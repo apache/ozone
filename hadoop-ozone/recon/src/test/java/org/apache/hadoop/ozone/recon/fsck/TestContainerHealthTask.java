@@ -25,9 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -492,6 +492,69 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
           "The inserted container state does not match for state " +
               state.name() + ".");
     }
+  }
+
+  @Test
+  public void testInsertFailureAndUpdateBehavior() {
+    UnhealthyContainersDao unHealthyContainersTableHandle =
+        getDao(UnhealthyContainersDao.class);
+
+    ContainerHealthSchemaManager containerHealthSchemaManager =
+        new ContainerHealthSchemaManager(
+            getSchemaDefinition(ContainerSchemaDefinition.class),
+            unHealthyContainersTableHandle);
+
+    ContainerSchemaDefinition.UnHealthyContainerStates state =
+        ContainerSchemaDefinition.UnHealthyContainerStates.MISSING;
+
+    long insertedTime = System.currentTimeMillis();
+    // Create a dummy UnhealthyContainer record with the current state
+    UnhealthyContainers unhealthyContainer = new UnhealthyContainers();
+    unhealthyContainer.setContainerId(state.ordinal() + 1L);
+    unhealthyContainer.setExpectedReplicaCount(3);
+    unhealthyContainer.setActualReplicaCount(0);
+    unhealthyContainer.setReplicaDelta(3);
+    unhealthyContainer.setContainerState(state.name());
+    unhealthyContainer.setInStateSince(insertedTime);
+
+    // Try inserting the record and catch any exception that occurs
+    Exception exception = null;
+    try {
+      containerHealthSchemaManager.insertUnhealthyContainerRecords(
+          Collections.singletonList(unhealthyContainer));
+    } catch (Exception e) {
+      exception = e;
+    }
+
+    // Assert no exception should be thrown for each state
+    assertNull(exception,
+        "Exception was thrown during insertion for state " + state.name() +
+            ": " + exception);
+
+    long updatedTime = System.currentTimeMillis();
+    unhealthyContainer.setExpectedReplicaCount(3);
+    unhealthyContainer.setActualReplicaCount(0);
+    unhealthyContainer.setReplicaDelta(3);
+    unhealthyContainer.setContainerState(state.name());
+    unhealthyContainer.setInStateSince(updatedTime);
+
+    try {
+      containerHealthSchemaManager.insertUnhealthyContainerRecords(
+          Collections.singletonList(unhealthyContainer));
+    } catch (Exception e) {
+      exception = e;
+    }
+
+    // Optionally, verify the record was updated correctly
+    List<UnhealthyContainers> updatedRecords =
+        unHealthyContainersTableHandle.fetchByContainerId(
+            state.ordinal() + 1L);
+    assertFalse(updatedRecords.isEmpty(),
+        "Record was not updated for state " + state.name() + ".");
+    assertEquals(updatedRecords.get(0).getContainerState(), state.name(),
+        "The inserted container state does not match for state " +
+            state.name() + ".");
+    assertEquals(updatedRecords.get(0).getInStateSince(), updatedTime);
   }
 
   @Test

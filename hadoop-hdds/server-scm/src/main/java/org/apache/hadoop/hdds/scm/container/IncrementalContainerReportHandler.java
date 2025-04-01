@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
@@ -58,11 +57,9 @@ public class IncrementalContainerReportHandler extends
                         final EventPublisher publisher) {
     final DatanodeDetails dnFromReport = report.getDatanodeDetails();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing incremental container report from data node {}",
-          dnFromReport.getUuid());
+      LOG.debug("Processing incremental container report from data node {}", dnFromReport);
     }
-    DatanodeDetails dd =
-        nodeManager.getNodeByUuid(dnFromReport.getUuid());
+    final DatanodeDetails dd = nodeManager.getNode(dnFromReport.getID());
     if (dd == null) {
       LOG.warn("Received container report from unknown datanode {}",
           dnFromReport);
@@ -112,8 +109,7 @@ public class IncrementalContainerReportHandler extends
             LOG.error("Exception while processing ICR for container {}",
                 replicaProto.getContainerID(), ex);
           }
-        } catch (IOException | InvalidStateTransitionException |
-                 TimeoutException e) {
+        } catch (IOException | InvalidStateTransitionException e) {
           LOG.error("Exception while processing ICR for container {}",
               replicaProto.getContainerID(), e);
         }

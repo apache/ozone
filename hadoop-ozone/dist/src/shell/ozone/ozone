@@ -36,7 +36,6 @@ function ozone_usage
   ozone_add_option "--jvmargs arguments" "append JVM options to any existing options defined in the OZONE_OPTS environment variable. Any defined in OZONE_CLIENT_OPTS will be append after these jvmargs"
   ozone_add_option "--validate (continue)" "validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present, command execution shall continue post validation failure if 'continue' is passed"
 
-  ozone_add_subcommand "auditparser" client "runs audit parser tool"
   ozone_add_subcommand "classpath" client "prints the class path needed for running ozone commands"
   ozone_add_subcommand "datanode" daemon "run a HDDS datanode"
   ozone_add_subcommand "envvars" client "display computed Hadoop environment variables"
@@ -60,7 +59,6 @@ function ozone_usage
   ozone_add_subcommand "admin" client "Ozone admin tool"
   ozone_add_subcommand "debug" client "Ozone debug tool"
   ozone_add_subcommand "repair" client "Ozone repair tool"
-  ozone_add_subcommand "checknative" client "checks if native libraries are loaded"
   ozone_add_subcommand "ratis" client "Ozone ratis tool"
 
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
@@ -83,10 +81,6 @@ function ozonecmd_case
   RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false ${RATIS_OPTS}"
 
   case ${subcmd} in
-    auditparser)
-      OZONE_CLASSNAME=org.apache.hadoop.ozone.audit.parser.AuditParser
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
-    ;;
     classpath)
       if [[ "$#" -gt 0 ]]; then
         OZONE_RUN_ARTIFACT_NAME="$1"
@@ -229,10 +223,6 @@ function ozonecmd_case
       OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
-    checknative)
-        OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.checknative.CheckNative
-        OZONE_RUN_ARTIFACT_NAME="ozone-tools"
-    ;;
     ratis)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneRatis
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
@@ -309,7 +299,13 @@ if [[ $# = 0 ]]; then
 fi
 
 OZONE_SUBCMD=$1
-shift
+
+if [[ "$OZONE_SUBCMD" == "auditparser" ]] || [[ "$OZONE_SUBCMD" == "checknative" ]]; then
+  echo "warning: 'ozone $OZONE_SUBCMD' is deprecated, use 'ozone debug $OZONE_SUBCMD' instead."
+  OZONE_SUBCMD="debug"
+else
+  shift
+fi
 
 
 if ozone_need_reexec ozone "${OZONE_SUBCMD}"; then

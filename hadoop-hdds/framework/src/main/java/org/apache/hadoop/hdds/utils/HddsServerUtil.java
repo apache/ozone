@@ -39,13 +39,14 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_T
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
+import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
+import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR;
 
 import com.google.common.base.Strings;
 import com.google.protobuf.BlockingService;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
@@ -60,10 +61,8 @@ import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.utils.IOUtils;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -403,6 +402,11 @@ public final class HddsServerUtil {
     return rawLocations;
   }
 
+  public static long requiredReplicationSpace(long defaultContainerSize) {
+    // During container import it requires double the container size to hold container in tmp and dest directory
+    return 2 * defaultContainerSize;
+  }
+
   public static Collection<String> getDatanodeStorageDirs(ConfigurationSource conf) {
     Collection<String> rawLocations = conf.getTrimmedStringCollection(HDDS_DATANODE_DIR_KEY);
     if (rawLocations.isEmpty()) {
@@ -597,12 +601,9 @@ public final class HddsServerUtil {
       List<String> toExcludeList,
       List<String> excludedList)
       throws IOException {
-    try (TarArchiveOutputStream archiveOutputStream =
-            new TarArchiveOutputStream(destination);
+    try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream = tar(destination);
         Stream<Path> files =
             Files.list(checkpoint.getCheckpointLocation())) {
-      archiveOutputStream.setBigNumberMode(
-          TarArchiveOutputStream.BIGNUMBER_POSIX);
       for (Path path : files.collect(Collectors.toList())) {
         if (path != null) {
           Path fileNamePath = path.getFileName();
@@ -620,27 +621,12 @@ public final class HddsServerUtil {
     }
   }
 
-  public static void includeFile(File file, String entryName,
-                                 ArchiveOutputStream archiveOutputStream)
-      throws IOException {
-    ArchiveEntry archiveEntry =
-        archiveOutputStream.createArchiveEntry(file, entryName);
-    archiveOutputStream.putArchiveEntry(archiveEntry);
-    try (InputStream fis = Files.newInputStream(file.toPath())) {
-      IOUtils.copy(fis, archiveOutputStream);
-      archiveOutputStream.flush();
-    } finally {
-      archiveOutputStream.closeArchiveEntry();
-    }
-  }
-
   // Mark tarball completed.
   public static void includeRatisSnapshotCompleteFlag(
-      ArchiveOutputStream archiveOutput) throws IOException {
+      ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
     File file = File.createTempFile(
         OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME, "");
-    String entryName = OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
-    includeFile(file, entryName, archiveOutput);
+    includeFile(file, OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME, archiveOutput);
   }
 
   static boolean ratisSnapshotComplete(Path dir) {

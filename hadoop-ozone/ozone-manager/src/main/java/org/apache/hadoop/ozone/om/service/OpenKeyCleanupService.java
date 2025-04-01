@@ -204,7 +204,8 @@ public class OpenKeyCleanupService extends BackgroundService {
           if (LOG.isDebugEnabled()) {
             StringBuilder sb = new StringBuilder();
             for (OpenKeyBucket.Builder openKey : openKeyBuckets) {
-              sb.append(openKey.getVolumeName() + OZONE_URI_DELIMITER +  openKey.getBucketName() + ": ")
+              sb.append(openKey.getVolumeName()).append(OZONE_URI_DELIMITER).append(openKey.getBucketName())
+                  .append(": ")
                   .append(openKey.getKeysList().stream().map(OzoneManagerProtocolProtos.OpenKey::getName)
                       .collect(Collectors.toList()))
                   .append("\n");
@@ -226,8 +227,8 @@ public class OpenKeyCleanupService extends BackgroundService {
             if (LOG.isDebugEnabled()) {
               StringBuilder sb = new StringBuilder();
               for (CommitKeyRequest.Builder openKey : hsyncKeys) {
-                sb.append(openKey.getKeyArgs().getVolumeName() + OZONE_URI_DELIMITER +
-                        openKey.getKeyArgs().getBucketName() + ": ")
+                sb.append(openKey.getKeyArgs().getVolumeName()).append(OZONE_URI_DELIMITER)
+                    .append(openKey.getKeyArgs().getBucketName()).append(": ")
                     .append(openKey.getKeyArgs().getKeyName())
                     .append(", ");
               }

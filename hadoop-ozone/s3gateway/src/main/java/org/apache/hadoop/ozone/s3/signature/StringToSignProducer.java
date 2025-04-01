@@ -43,10 +43,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedMap;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.kerby.util.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,15 +110,15 @@ public final class StringToSignProducer {
 
     // If the absolute path is empty, use a forward slash (/)
     String uri = signatureInfo.getUnfilteredURI();
-    uri = (!uri.trim().isEmpty()) ? uri : "/";
+    uri = StringUtils.isNotBlank(uri) ? uri : "/";
     // Encode URI and preserve forward slashes
-    strToSign.append(signatureInfo.getAlgorithm() + NEWLINE);
+    strToSign.append(signatureInfo.getAlgorithm()).append(NEWLINE);
     if (signatureInfo.getDateTime() == null) {
       LOG.error("DateTime Header not found.");
       throw S3_AUTHINFO_CREATION_ERROR;
     }
-    strToSign.append(signatureInfo.getDateTime() + NEWLINE);
-    strToSign.append(credentialScope + NEWLINE);
+    strToSign.append(signatureInfo.getDateTime()).append(NEWLINE);
+    strToSign.append(credentialScope).append(NEWLINE);
 
     String canonicalRequest = buildCanonicalRequest(
         scheme,
@@ -175,7 +175,7 @@ public final class StringToSignProducer {
 
     StringBuilder canonicalHeaders = new StringBuilder();
 
-    for (String header : StringUtils.getStringCollection(signedHeaders, ";")) {
+    for (String header : StringUtils.split(signedHeaders, ';')) {
       canonicalHeaders.append(header.toLowerCase());
       canonicalHeaders.append(":");
       if (headers.containsKey(header)) {

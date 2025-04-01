@@ -205,8 +205,7 @@ public class TestContainerStateManager {
         .setContainerState(ContainerReplicaProto.State.CLOSED)
         .setDatanodeDetails(node)
         .build();
-    containerStateManager
-        .updateContainerReplica(cont.containerID(), replica);
+    containerStateManager.updateContainerReplica(replica);
   }
 
   private ContainerInfo allocateContainer()
