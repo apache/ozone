@@ -17,12 +17,7 @@
 
 package org.apache.hadoop.ozone.shell;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
@@ -35,12 +30,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -50,8 +42,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -66,9 +56,10 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
@@ -76,41 +67,27 @@ import picocli.CommandLine;
 /**
  * Test Ozone Debug shell.
  */
+@ExtendWith(DebugShellOzoneClusterExtension.class)
 public class TestOzoneDebugShell {
+  @RegisterExtension
+  static DebugShellOzoneClusterExtension clusterExtension = new DebugShellOzoneClusterExtension();
+
+  private final StringWriter out = new StringWriter();
+  private final StringWriter err = new StringWriter();
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
   private static OzoneDebug ozoneDebugShell;
-
   private static OzoneConfiguration conf = null;
 
-  protected static void startCluster() throws Exception {
-    // Init HA cluster
-    final int numDNs = 5;
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numDNs)
-        .build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
-  }
-
-
-  @BeforeAll
-  public static void init() throws Exception {
-    ozoneDebugShell = new OzoneDebug();
-    conf = ozoneDebugShell.getOzoneConf();
-    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-        100, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
-    conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1, SECONDS);
-    conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 1, SECONDS);
-    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, SECONDS);
-    ReplicationManager.ReplicationManagerConfiguration replicationConf =
-        conf.getObject(
-            ReplicationManager.ReplicationManagerConfiguration.class);
-    replicationConf.setInterval(Duration.ofSeconds(1));
-    conf.setFromObject(replicationConf);
-    startCluster();
+  @BeforeEach
+  public void setup() {
+    conf = clusterExtension.getConfiguration();
+    cluster = clusterExtension.getCluster();
+    client = clusterExtension.getClient();
+    ozoneDebugShell = clusterExtension.getOzoneDebugShell();
+    ozoneDebugShell.getCmd().setOut(new PrintWriter(out));
+    ozoneDebugShell.getCmd().setErr(new PrintWriter(err));
   }
 
   @ParameterizedTest
@@ -192,7 +169,7 @@ public class TestOzoneDebugShell {
           BucketLayout.LEGACY);
       TestDataUtil.createKey(
           client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
-          keyName, repConfig, "test".getBytes(StandardCharsets.UTF_8));
+          keyName, repConfig, "test".getBytes(UTF_8));
     }
   }
 
@@ -262,16 +239,5 @@ public class TestOzoneDebugShell {
             ContainerID.valueOf(omKeyLocationInfo.getContainerID()));
     OzoneTestUtils.closeContainer(cluster.getStorageContainerManager(),
         container);
-  }
-
-  /**
-   * shutdown MiniOzoneCluster.
-   */
-  @AfterAll
-  public static void shutdown() {
-    IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 }
