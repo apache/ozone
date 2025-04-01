@@ -69,10 +69,15 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
    * Filter to return deleted keys/directories which are reclaimable based on their presence in previous snapshot in
    * the snapshot chain.
    *
-   * @param currentSnapshotInfo  : If null the deleted keys in AOS needs to be processed, hence the latest snapshot
-   *                             in the snapshot chain corresponding to bucket key needs to be processed.
-   * @param keyManager      : KeyManager corresponding to snapshot or AOS.
-   * @param lock                 : Lock for Active OM.
+   * @param ozoneManager : Ozone Manager instance
+   * @param omSnapshotManager : OmSnapshot Manager of OM instance.
+   * @param snapshotChainManager : snapshot chain manager of OM instance.
+   * @param currentSnapshotInfo : If null the deleted keys in Active Metadata manager needs to be processed, hence the
+   *                             latest snapshot in the snapshot chain corresponding to bucket key needs to be
+   *                             processed.
+   * @param keyManager : KeyManager corresponding to snapshot or Active Metadata Manager.
+   * @param lock : Lock for Active OM.
+   * @param numberOfPreviousSnapshotsFromChain : number of previous snapshots to be initialized.
    */
   public ReclaimableFilter(OzoneManager ozoneManager, OmSnapshotManager omSnapshotManager,
                            SnapshotChainManager snapshotChainManager,
