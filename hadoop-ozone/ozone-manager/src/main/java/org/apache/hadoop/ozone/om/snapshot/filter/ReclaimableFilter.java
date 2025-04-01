@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot.filter;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
@@ -94,8 +93,8 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
   private List<SnapshotInfo> getLastNSnapshotInChain(String volume, String bucket) throws IOException {
     if (currentSnapshotInfo != null &&
         (!currentSnapshotInfo.getVolumeName().equals(volume) || !currentSnapshotInfo.getBucketName().equals(bucket))) {
-      throw new IOException("Volume & Bucket name for snapshot : " + currentSnapshotInfo + " not matching for " +
-          "key in volume: " + volume + " bucket: " + bucket);
+      throw new IOException("Volume and Bucket name for snapshot : " + currentSnapshotInfo + " do not match " +
+          "against the volume: " + volume + " and bucket: " + bucket + " of the key.");
     }
     SnapshotInfo expectedPreviousSnapshotInfo = currentSnapshotInfo == null
         ? SnapshotUtils.getLatestSnapshotInfo(volume, bucket, ozoneManager, snapshotChainManager)
@@ -131,10 +130,6 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
 
   // Initialize the last N snapshots in the chain by acquiring locks. Throw IOException if it fails.
   private void initializePreviousSnapshotsFromChain(String volume, String bucket) throws IOException {
-    if (validateExistingLastNSnapshotsInChain(volume, bucket) && snapshotIdLocks.isLockAcquired()) {
-      return;
-    }
-    // If existing snapshotIds don't match then close all snapshots and reopen the previous N snapshots.
     close();
     try {
       // Acquire lock on last N snapshot & current snapshot(AOS if it is null).
@@ -157,14 +152,14 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
             previousSnapshotInfos.add(null);
           }
 
-          // TODO: Getting volumeId and bucket from active OM. This would be wrong on volume & bucket renames
+          // NOTE: Getting volumeId and bucket from active OM. This would be wrong on volume & bucket renames
           //  support.
           bucketInfo = ozoneManager.getBucketInfo(volume, bucket);
           volumeId = ozoneManager.getMetadataManager().getVolumeId(volume);
         }
       } else {
-        throw new IOException("Lock acquisition failed for last N snapshots : " +
-            expectedLastNSnapshotsInChain + " " + currentSnapshotInfo);
+        throw new IOException("Lock acquisition failed for last N snapshots: " +
+            expectedLastNSnapshotsInChain + ", " + currentSnapshotInfo);
       }
     } catch (IOException e) {
       this.close();
@@ -176,7 +171,10 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
   public synchronized Boolean apply(Table.KeyValue<String, V> keyValue) throws IOException {
     String volume = getVolumeName(keyValue);
     String bucket = getBucketName(keyValue);
-    initializePreviousSnapshotsFromChain(volume, bucket);
+    // If existing snapshotIds don't match then close all snapshots and reopen the previous N snapshots.
+    if (!validateExistingLastNSnapshotsInChain(volume, bucket) || !snapshotIdLocks.isLockAcquired()) {
+      initializePreviousSnapshotsFromChain(volume, bucket);
+    }
     boolean isReclaimable = isReclaimable(keyValue);
     // This is to ensure the reclamation ran on the same previous snapshot and no change occurred in the chain
     // while processing the entry.
@@ -192,9 +190,7 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
   @Override
   public void close() throws IOException {
     this.snapshotIdLocks.releaseLock();
-    for (ReferenceCounted<OmSnapshot> previousOmSnapshot : previousOmSnapshots) {
-      IOUtils.close(LOG, previousOmSnapshot);
-    }
+    IOUtils.close(LOG, previousOmSnapshots);
     previousOmSnapshots.clear();
     previousSnapshotInfos.clear();
   }
@@ -223,12 +219,10 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
     return ozoneManager;
   }
 
-  @VisibleForTesting
   List<SnapshotInfo> getPreviousSnapshotInfos() {
     return previousSnapshotInfos;
   }
 
-  @VisibleForTesting
   List<ReferenceCounted<OmSnapshot>> getPreviousOmSnapshots() {
     return previousOmSnapshots;
   }
