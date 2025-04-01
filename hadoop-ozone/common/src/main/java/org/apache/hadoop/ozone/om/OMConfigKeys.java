@@ -317,9 +317,6 @@ public final class OMConfigKeys {
       "ozone.manager.delegation.token.max-lifetime";
   public static final long    DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT =
       7 * 24 * 60 * 60 * 1000; // 7 days
-  
-  public static final long OZONE_DB_CHECKPOINT_TRANSFER_RATE_DEFAULT =
-      0;  //no throttling
 
   // Comma separated acls (users, groups) allowing clients accessing
   // OM client protocol
