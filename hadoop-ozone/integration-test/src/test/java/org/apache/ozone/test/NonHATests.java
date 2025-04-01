@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.TestOzoneManagerRestInterface;
 import org.apache.hadoop.ozone.reconfig.TestDatanodeReconfiguration;
 import org.apache.hadoop.ozone.reconfig.TestOmReconfiguration;
 import org.apache.hadoop.ozone.reconfig.TestScmReconfiguration;
+import org.apache.hadoop.ozone.shell.TestOzoneDebugReplicasVerify;
 import org.apache.hadoop.ozone.shell.TestOzoneDebugShell;
 import org.apache.hadoop.ozone.shell.TestReconfigShell;
 import org.apache.hadoop.ozone.shell.TestReplicationConfigPreference;
@@ -396,4 +397,11 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
     }
   }
 
+  @Nested
+  class OzoneDebugReplicasVerify extends TestOzoneDebugReplicasVerify {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
 }
