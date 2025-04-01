@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.CompositeKey;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
@@ -128,8 +129,13 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
   private Iterable<ReadWriteLock> bulkGetLock(Resource resource, Collection<String[]> keys) {
     Striped<ReadWriteLock> striped = stripedLockByResource.get(resource);
-    return striped.bulkGet(keys.stream().filter(Objects::nonNull)
-        .map(CompositeKey::combineKeys).collect(Collectors.toList()));
+    List<Object> lockKeys = new ArrayList<>(keys.size());
+    for (String[] key : keys) {
+      if (Objects.nonNull(key)) {
+        lockKeys.add(CompositeKey.combineKeys(key));
+      }
+    }
+    return striped.bulkGet(lockKeys);
   }
 
   private ReentrantReadWriteLock getLock(Resource resource, String... keys) {
@@ -448,8 +454,10 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   private OMLockDetails releaseLocks(Resource resource, boolean isReadLock,
                                     Collection<String[]> keys) {
     omLockDetails.get().clear();
-    Iterable<ReadWriteLock> locks = bulkGetLock(resource, keys);
-
+    List<ReadWriteLock> locks =
+        StreamSupport.stream(bulkGetLock(resource, keys).spliterator(), false).collect(Collectors.toList());
+    // Release locks in reverse order.
+    Collections.reverse(locks);
     for (ReadWriteLock lock : locks) {
       if (isReadLock) {
         lock.readLock().unlock();
