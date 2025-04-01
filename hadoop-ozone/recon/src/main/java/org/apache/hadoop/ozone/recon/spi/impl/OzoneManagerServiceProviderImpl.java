@@ -43,11 +43,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
@@ -58,13 +56,11 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
@@ -79,7 +75,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -130,7 +125,7 @@ public class OzoneManagerServiceProviderImpl
       LoggerFactory.getLogger(OzoneManagerServiceProviderImpl.class);
   private URLConnectionFactory connectionFactory;
 
-  private static int omDBTarProcessorThreadCount; // Number of parallel workers
+  private int omDBTarProcessorThreadCount; // Number of parallel workers
 
   private File omSnapshotDBParentDir = null;
   private File reconDbDir = null;
@@ -427,8 +422,7 @@ public class OzoneManagerServiceProviderImpl
     String snapshotFileName = RECON_OM_SNAPSHOT_DB + "_" + System.currentTimeMillis();
     Path untarredDbDir = Paths.get(omSnapshotDBParentDir.getAbsolutePath(), snapshotFileName);
 
-    int QUEUE_SIZE = omDBTarProcessorThreadCount * 10;
-    BlockingQueue<TarEntryData> queue = new LinkedBlockingQueue<>(QUEUE_SIZE);
+    BlockingQueue<TarEntryData> queue = new LinkedBlockingQueue<>(omDBTarProcessorThreadCount * 10);
 
     List<Future<Void>> futures = new ArrayList<>();
 
@@ -545,7 +539,8 @@ public class OzoneManagerServiceProviderImpl
   /**
    * Writes the extracted file to disk.
    */
-  private void writeFile(Path untarredDbDir, String entryName, InputStream inputStream, long fileSize) throws IOException {
+  private void writeFile(Path untarredDbDir, String entryName, InputStream inputStream, long fileSize)
+      throws IOException {
     File file = new File(untarredDbDir.toFile(), entryName);
 
     // Ensure parent directories exist
@@ -560,7 +555,9 @@ public class OzoneManagerServiceProviderImpl
       long transferred = 0;
       while (transferred < fileSize) {
         long bytes = outChannel.transferFrom(inChannel, transferred, Math.min(8192, fileSize - transferred));
-        if (bytes <= 0) break; // Avoid infinite loops
+        if (bytes <= 0) {
+          break; // Avoid infinite loops
+        }
         transferred += bytes;
       }
     }
@@ -571,9 +568,9 @@ public class OzoneManagerServiceProviderImpl
    */
   private static class TarEntryData {
     static final TarEntryData EOF = new TarEntryData(null, null, 0);
-    final String fileName;
-    final InputStream inputStream;
-    final long fileSize;
+    private final String fileName;
+    private final InputStream inputStream;
+    private final long fileSize;
 
     TarEntryData(String fileName, InputStream inputStream, long fileSize) {
       this.fileName = fileName;
