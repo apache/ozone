@@ -76,14 +76,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   // Minimum space should be left on volume.
   // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
-  // In this case when availableSpace is 990GB or below, volume is assumed as full
+  // In this case when availableSpace is 10GB or below, volume is assumed as full
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
       "hdds.datanode.volume.min.free.space";
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT =
       "5GB";
   // Minimum percent of space should be left on volume.
   // Ex: If volume has 1000GB and minFreeSpacePercent is configured as 2%,
-  // In this case when availableSpace is 980GB(1000 - 2% of 1000) or below, volume is assumed as full
+  // In this case when availableSpace is 20GB(2% of 1000) or below, volume is assumed as full
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
       "hdds.datanode.volume.min.free.space.percent";
   static final byte MIN_FREE_SPACE_UNSET = -1;
