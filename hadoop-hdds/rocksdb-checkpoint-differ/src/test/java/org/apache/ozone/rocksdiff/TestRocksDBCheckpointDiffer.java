@@ -47,9 +47,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1698,7 +1698,7 @@ public class TestRocksDBCheckpointDiffer {
 
   private void createFileWithContext(String fileName, String context)
       throws IOException {
-    try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
+    try (OutputStream fileOutputStream = Files.newOutputStream(Paths.get(fileName))) {
       fileOutputStream.write(context.getBytes(UTF_8));
     }
   }

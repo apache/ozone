@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -76,7 +75,7 @@ public class TestVolumeSet {
     String dataDirKey = volume1 + "," + volume2;
     volumes.add(volume1);
     volumes.add(volume2);
-    conf.set(HddsConfigKeys.HDDS_DATANODE_DATA_DIR_KEY, dataDirKey);
+    conf.set(HDDS_DATANODE_DIR_KEY, dataDirKey);
     conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         dataDirKey);
     initializeVolumeSet();
@@ -213,8 +212,7 @@ public class TestVolumeSet {
 
     // Verify that volume usage can be queried during shutdown.
     for (StorageVolume volume : volumesList) {
-      assertNotNull(volume.getVolumeInfo().get()
-              .getUsageForTesting());
+      assertThat(volume.getVolumeUsage()).isPresent();
       volume.getCurrentUsage();
     }
   }

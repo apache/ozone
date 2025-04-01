@@ -128,7 +128,7 @@ public class TestPipelinePlacementFactory {
         false, 10);
     nodeManager = spy(nodeManagerBase);
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+      when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
 

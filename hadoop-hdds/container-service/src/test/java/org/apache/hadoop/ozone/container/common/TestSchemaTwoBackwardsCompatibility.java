@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -131,7 +132,7 @@ public class TestSchemaTwoBackwardsCompatibility {
     blockManager = new BlockManagerImpl(conf);
     chunkManager = new FilePerBlockStrategy(true, blockManager);
 
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
     keyValueHandler = new KeyValueHandler(conf, datanodeUuid,
         containerSet, volumeSet, ContainerMetrics.create(conf), c -> { });
     ozoneContainer = mock(OzoneContainer.class);

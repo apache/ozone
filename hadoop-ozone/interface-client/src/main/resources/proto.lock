@@ -524,6 +524,42 @@
               {
                 "name": "GetSnapshotInfo",
                 "integer": 130
+              },
+              {
+                "name": "RenameSnapshot",
+                "integer": 131
+              },
+              {
+                "name": "ListOpenFiles",
+                "integer": 132
+              },
+              {
+                "name": "QuotaRepair",
+                "integer": 133
+              },
+              {
+                "name": "GetQuotaRepairStatus",
+                "integer": 135
+              },
+              {
+                "name": "StartQuotaRepair",
+                "integer": 136
+              },
+              {
+                "name": "SnapshotMoveTableKeys",
+                "integer": 137
+              },
+              {
+                "name": "PutObjectTagging",
+                "integer": 140
+              },
+              {
+                "name": "GetObjectTagging",
+                "integer": 141
+              },
+              {
+                "name": "DeleteObjectTagging",
+                "integer": 142
               }
             ]
           },
@@ -914,6 +950,18 @@
               {
                 "name": "TOO_MANY_BUCKETS",
                 "integer": 94
+              },
+              {
+                "name": "KEY_UNDER_LEASE_RECOVERY",
+                "integer": 95
+              },
+              {
+                "name": "KEY_ALREADY_CLOSED",
+                "integer": 96
+              },
+              {
+                "name": "KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD",
+                "integer": 97
               }
             ]
           },
@@ -1563,13 +1611,25 @@
                 "id": 91,
                 "name": "listTrashRequest",
                 "type": "ListTrashRequest",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 92,
                 "name": "RecoverTrashRequest",
                 "type": "RecoverTrashRequest",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 93,
@@ -1791,6 +1851,60 @@
                 "id": 128,
                 "name": "SnapshotInfoRequest",
                 "type": "SnapshotInfoRequest",
+                "optional": true
+              },
+              {
+                "id": 129,
+                "name": "RenameSnapshotRequest",
+                "type": "RenameSnapshotRequest",
+                "optional": true
+              },
+              {
+                "id": 130,
+                "name": "ListOpenFilesRequest",
+                "type": "ListOpenFilesRequest",
+                "optional": true
+              },
+              {
+                "id": 131,
+                "name": "QuotaRepairRequest",
+                "type": "QuotaRepairRequest",
+                "optional": true
+              },
+              {
+                "id": 133,
+                "name": "GetQuotaRepairStatusRequest",
+                "type": "GetQuotaRepairStatusRequest",
+                "optional": true
+              },
+              {
+                "id": 134,
+                "name": "StartQuotaRepairRequest",
+                "type": "StartQuotaRepairRequest",
+                "optional": true
+              },
+              {
+                "id": 135,
+                "name": "SnapshotMoveTableKeysRequest",
+                "type": "SnapshotMoveTableKeysRequest",
+                "optional": true
+              },
+              {
+                "id": 140,
+                "name": "getObjectTaggingRequest",
+                "type": "GetObjectTaggingRequest",
+                "optional": true
+              },
+              {
+                "id": 141,
+                "name": "putObjectTaggingRequest",
+                "type": "PutObjectTaggingRequest",
+                "optional": true
+              },
+              {
+                "id": 142,
+                "name": "deleteObjectTaggingRequest",
+                "type": "DeleteObjectTaggingRequest",
                 "optional": true
               }
             ]
@@ -2126,13 +2240,25 @@
                 "id": 91,
                 "name": "listTrashResponse",
                 "type": "ListTrashResponse",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 92,
                 "name": "RecoverTrashResponse",
                 "type": "RecoverTrashResponse",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 93,
@@ -2361,6 +2487,54 @@
                 "name": "omLockDetails",
                 "type": "OMLockDetailsProto",
                 "optional": true
+              },
+              {
+                "id": 132,
+                "name": "RenameSnapshotResponse",
+                "type": "RenameSnapshotResponse",
+                "optional": true
+              },
+              {
+                "id": 133,
+                "name": "ListOpenFilesResponse",
+                "type": "ListOpenFilesResponse",
+                "optional": true
+              },
+              {
+                "id": 134,
+                "name": "QuotaRepairResponse",
+                "type": "QuotaRepairResponse",
+                "optional": true
+              },
+              {
+                "id": 136,
+                "name": "GetQuotaRepairStatusResponse",
+                "type": "GetQuotaRepairStatusResponse",
+                "optional": true
+              },
+              {
+                "id": 137,
+                "name": "StartQuotaRepairResponse",
+                "type": "StartQuotaRepairResponse",
+                "optional": true
+              },
+              {
+                "id": 140,
+                "name": "getObjectTaggingResponse",
+                "type": "GetObjectTaggingResponse",
+                "optional": true
+              },
+              {
+                "id": 141,
+                "name": "putObjectTaggingResponse",
+                "type": "PutObjectTaggingResponse",
+                "optional": true
+              },
+              {
+                "id": 142,
+                "name": "deleteObjectTaggingResponse",
+                "type": "DeleteObjectTaggingResponse",
+                "optional": true
               }
             ]
           },
@@ -2371,31 +2545,61 @@
                 "id": 1,
                 "name": "volumeName",
                 "type": "string",
-                "required": true
+                "required": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 2,
                 "name": "bucketName",
                 "type": "string",
-                "required": true
+                "required": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 3,
                 "name": "startKeyName",
                 "type": "string",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 4,
                 "name": "keyPrefix",
                 "type": "string",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 5,
                 "name": "maxKeys",
                 "type": "int32",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               }
             ]
           },
@@ -2406,7 +2610,13 @@
                 "id": 1,
                 "name": "deletedKeys",
                 "type": "RepeatedKeyInfo",
-                "is_repeated": true
+                "is_repeated": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               }
             ]
           },
@@ -2417,25 +2627,49 @@
                 "id": 1,
                 "name": "volumeName",
                 "type": "string",
-                "required": true
+                "required": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 2,
                 "name": "bucketName",
                 "type": "string",
-                "required": true
+                "required": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 3,
                 "name": "keyName",
                 "type": "string",
-                "required": true
+                "required": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 4,
                 "name": "destinationBucket",
                 "type": "string",
-                "required": true
+                "required": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               }
             ]
           },
@@ -2446,7 +2680,13 @@
                 "id": 1,
                 "name": "response",
                 "type": "bool",
-                "required": true
+                "required": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               }
             ]
           },
@@ -3122,6 +3362,12 @@
                 "name": "defaultReplicationConfig",
                 "type": "hadoop.hdds.DefaultReplicationConfig",
                 "optional": true
+              },
+              {
+                "id": 12,
+                "name": "bekInfo",
+                "type": "BucketEncryptionInfoProto",
+                "optional": true
               }
             ]
           },
@@ -3275,6 +3521,12 @@
                 "id": 19,
                 "name": "deepCleanedDeletedDir",
                 "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 20,
+                "name": "lastTransactionInfo",
+                "type": "bytes",
                 "optional": true
               }
             ]
@@ -3808,6 +4060,24 @@
                 "name": "forceUpdateContainerCacheFromSCM",
                 "type": "bool",
                 "optional": true
+              },
+              {
+                "id": 21,
+                "name": "ownerName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 22,
+                "name": "tags",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 23,
+                "name": "expectedDataGeneration",
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -4096,6 +4366,24 @@
                 "name": "isFile",
                 "type": "bool",
                 "optional": true
+              },
+              {
+                "id": 20,
+                "name": "ownerName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 21,
+                "name": "tags",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 22,
+                "name": "expectedDataGeneration",
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -4147,6 +4435,12 @@
               {
                 "id": 8,
                 "name": "eTag",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "ownerName",
                 "type": "string",
                 "optional": true
               }
@@ -4202,6 +4496,12 @@
                 "name": "parentID",
                 "type": "uint64",
                 "required": true
+              },
+              {
+                "id": 9,
+                "name": "ownerName",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -4811,6 +5111,12 @@
                 "name": "keysToUpdate",
                 "type": "SnapshotMoveKeyInfos",
                 "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "expectedPreviousSnapshotID",
+                "type": "NullableUUID",
+                "optional": true
               }
             ]
           },
@@ -4856,6 +5162,23 @@
                 "id": 2,
                 "name": "snapshotTableKey",
                 "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "expectedPreviousSnapshotID",
+                "type": "NullableUUID",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "NullableUUID",
+            "fields": [
+              {
+                "id": 1,
+                "name": "uuid",
+                "type": "hadoop.hdds.UUID",
                 "optional": true
               }
             ]
@@ -5052,6 +5375,18 @@
                 "id": 15,
                 "name": "omServiceId",
                 "type": "string",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 16,
+                "name": "secretKeyId",
+                "type": "string",
                 "optional": true
               }
             ]
@@ -5172,6 +5507,12 @@
               {
                 "id": 3,
                 "name": "hsync",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "recovery",
                 "type": "bool",
                 "optional": true
               }
@@ -5456,6 +5797,64 @@
             "name": "CancelPrepareResponse"
           },
           {
+            "name": "ListOpenFilesRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "path",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "count",
+                "type": "uint32",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "token",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ListOpenFilesResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "totalOpenKeyCount",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "hasMore",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "continuationToken",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "clientID",
+                "type": "uint64",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "keyInfo",
+                "type": "KeyInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
             "name": "ServicePort",
             "fields": [
               {
@@ -5527,6 +5926,12 @@
                     "value": "0"
                   }
                 ]
+              },
+              {
+                "id": 6,
+                "name": "serverDefaults",
+                "type": "FsServerDefaultsProto",
+                "optional": true
               }
             ]
           },
@@ -5919,6 +6324,30 @@
                 "name": "prefix",
                 "type": "string",
                 "required": true
+              },
+              {
+                "id": 4,
+                "name": "keyMarker",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "uploadIdMarker",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "maxUploads",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "withPagination",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -5936,6 +6365,18 @@
                 "name": "uploadsList",
                 "type": "MultipartUploadInfo",
                 "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "nextKeyMarker",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "nextUploadIdMarker",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -6451,6 +6892,41 @@
             ]
           },
           {
+            "name": "RenameSnapshotRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "snapshotOldName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "snapshotNewName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "renameTime",
+                "type": "uint64",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "ListSnapshotRequest",
             "fields": [
               {
@@ -6696,6 +7172,35 @@
                 "id": 5,
                 "name": "deletedDirsToMove",
                 "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SnapshotMoveTableKeysRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "fromSnapshotID",
+                "type": "hadoop.hdds.UUID",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "deletedKeys",
+                "type": "SnapshotMoveKeyInfos",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "deletedDirs",
+                "type": "SnapshotMoveKeyInfos",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "renamedKeys",
+                "type": "hadoop.hdds.KeyValue",
                 "is_repeated": true
               }
             ]
@@ -6958,6 +7463,12 @@
                 "name": "snapshotInfo",
                 "type": "SnapshotInfo",
                 "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "lastSnapshot",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -7014,6 +7525,17 @@
           },
           {
             "name": "DeleteSnapshotResponse"
+          },
+          {
+            "name": "RenameSnapshotResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshotInfo",
+                "type": "SnapshotInfo",
+                "optional": true
+              }
+            ]
           },
           {
             "name": "SnapshotInfoResponse",
@@ -7224,6 +7746,12 @@
                 "name": "keyName",
                 "type": "string",
                 "optional": true
+              },
+              {
+                "id": 4,
+                "name": "force",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -7234,6 +7762,24 @@
                 "id": 1,
                 "name": "response",
                 "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "name": "keyInfo",
+                "type": "KeyInfo",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "openKeyInfo",
+                "type": "KeyInfo",
                 "optional": true
               }
             ]
@@ -7287,6 +7833,112 @@
             ]
           },
           {
+            "name": "QuotaRepairRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "bucketCount",
+                "type": "BucketQuotaCount",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "supportVolumeOldQuota",
+                "type": "bool",
+                "required": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "BucketQuotaCount",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "diffUsedBytes",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "diffUsedNamespace",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 5,
+                "name": "supportOldQuota",
+                "type": "bool",
+                "required": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "QuotaRepairResponse"
+          },
+          {
+            "name": "FsServerDefaultsProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyProviderUri",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetQuotaRepairStatusRequest"
+          },
+          {
+            "name": "GetQuotaRepairStatusResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "StartQuotaRepairRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "buckets",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "StartQuotaRepairResponse"
+          },
+          {
             "name": "OMLockDetailsProto",
             "fields": [
               {
@@ -7314,6 +7966,56 @@
                 "optional": true
               }
             ]
+          },
+          {
+            "name": "PutObjectTaggingRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "PutObjectTaggingResponse"
+          },
+          {
+            "name": "GetObjectTaggingRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetObjectTaggingResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "tags",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteObjectTaggingRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteObjectTaggingResponse"
           }
         ],
         "services": [

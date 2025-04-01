@@ -76,7 +76,7 @@ public class TestOmBucketInfo {
         .setCreationTime(Time.now())
         .setIsVersionEnabled(false)
         .setStorageType(StorageType.ARCHIVE)
-        .setAcls(Collections.singletonList(new OzoneAcl(
+        .setAcls(Collections.singletonList(OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             "defaultUser",
             OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
@@ -91,7 +91,7 @@ public class TestOmBucketInfo {
             + " to be equal");
 
     /* Reset acl & check not equal. */
-    omBucketInfo.setAcls(Collections.singletonList(new OzoneAcl(
+    omBucketInfo.setAcls(Collections.singletonList(OzoneAcl.of(
         IAccessAuthorizer.ACLIdentityType.USER,
         "newUser",
         OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
@@ -108,7 +108,7 @@ public class TestOmBucketInfo {
         cloneBucketInfo.getAcls().get(0));
 
     /* Remove acl & check. */
-    omBucketInfo.removeAcl(new OzoneAcl(
+    omBucketInfo.removeAcl(OzoneAcl.of(
         IAccessAuthorizer.ACLIdentityType.USER,
         "newUser",
         OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
@@ -124,7 +124,7 @@ public class TestOmBucketInfo {
         OmBucketInfo.newBuilder().setBucketName("bucket").setVolumeName("vol1")
             .setCreationTime(Time.now()).setIsVersionEnabled(false)
             .setStorageType(StorageType.ARCHIVE).setAcls(Collections
-                .singletonList(new OzoneAcl(
+                .singletonList(OzoneAcl.of(
                     IAccessAuthorizer.ACLIdentityType.USER,
                     "defaultUser", OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
                 ))).build();
@@ -143,7 +143,7 @@ public class TestOmBucketInfo {
         .setCreationTime(Time.now())
         .setIsVersionEnabled(false)
         .setStorageType(StorageType.ARCHIVE)
-        .setAcls(Collections.singletonList(new OzoneAcl(
+        .setAcls(Collections.singletonList(OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             "defaultUser", OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
         )))

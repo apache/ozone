@@ -1205,8 +1205,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin("admin")
         .setOwner("admin")
-        .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, aclRights))
-        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, userRights))
+        .addAcl(OzoneAcl.of(ACLIdentityType.WORLD, "", ACCESS, aclRights))
+        .addAcl(OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, userRights))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
     // Sanity check
@@ -1240,8 +1240,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // bucket acls have all access to admin and read+write+list access to world
     BucketArgs bucketArgs = new BucketArgs.Builder()
         .setOwner("admin")
-        .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE, LIST))
-        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, userRights))
+        .addAcl(OzoneAcl.of(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE, LIST))
+        .addAcl(OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, userRights))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
 
@@ -1300,7 +1300,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
     ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
-    OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
+    OzoneAcl aclWorldAccess = OzoneAcl.of(ACLIdentityType.WORLD, "",
         ACCESS, userRights);
     // Construct VolumeArgs
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
@@ -2295,7 +2295,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
     ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
-    OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
+    OzoneAcl aclWorldAccess = OzoneAcl.of(ACLIdentityType.WORLD, "",
         ACCESS, userRights);
     // Construct VolumeArgs, set ACL to world access
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()

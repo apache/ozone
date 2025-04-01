@@ -1340,13 +1340,13 @@ public class TestHSync {
 
       // hsync call for overwritten hsync key, should fail
       OMException omException = assertThrows(OMException.class, () -> outputStream1.hsync());
-      assertTrue(omException.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, omException.getResult());
       assertTrue(omException.getMessage().contains("already deleted/overwritten"));
 
       // allocate new block for overwritten hsync key, should fail
       IOException ioException = assertThrows(IOException.class, () -> outputStream1.write(newData));
       assertTrue(ioException.getCause() instanceof OMException);
-      assertTrue(((OMException)ioException.getCause()).getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ((OMException)ioException.getCause()).getResult());
       assertTrue(ioException.getMessage().contains("already deleted/overwritten"));
 
       // recover key will success since key is already committed by outputStream2
@@ -1508,7 +1508,7 @@ public class TestHSync {
 
       // close first hsync key should fail
       OMException omException = assertThrows(OMException.class, () -> outputStream1.close());
-      assertTrue(omException.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, omException.getResult());
       assertTrue(omException.getMessage().contains("already deleted/overwritten"));
 
       // hsync/close second hsync key should success

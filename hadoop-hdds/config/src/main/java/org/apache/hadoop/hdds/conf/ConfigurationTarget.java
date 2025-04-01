@@ -39,6 +39,10 @@ public interface ConfigurationTarget {
     set(name, Double.toString(value));
   }
 
+  default void setFloat(String name, float value) {
+    set(name, Float.toString(value));
+  }
+
   default void setBoolean(String name, boolean value) {
     set(name, Boolean.toString(value));
   }

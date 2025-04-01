@@ -66,39 +66,6 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   private final Set<StorageContainerManager> failedScmSet;
   private final Set<DatanodeDetails> failedDnSet;
 
-  // The service on which chaos will be unleashed.
-  enum FailureService {
-    DATANODE,
-    OZONE_MANAGER,
-    STORAGE_CONTAINER_MANAGER;
-
-    @Override
-    public String toString() {
-      switch (this) {
-      case DATANODE:
-        return "Datanode";
-      case OZONE_MANAGER:
-        return "OzoneManager";
-      case STORAGE_CONTAINER_MANAGER:
-        return "StorageContainerManager";
-      default:
-        return "";
-      }
-    }
-
-    public static FailureService of(String serviceName) {
-      if (serviceName.equalsIgnoreCase("Datanode")) {
-        return DATANODE;
-      } else if (serviceName.equalsIgnoreCase("OzoneManager")) {
-        return OZONE_MANAGER;
-      } else if (serviceName.equalsIgnoreCase("StorageContainerManager")) {
-        return STORAGE_CONTAINER_MANAGER;
-      }
-      throw new IllegalArgumentException("Unrecognized value for " +
-          "FailureService enum: " + serviceName);
-    }
-  }
-
   @SuppressWarnings("parameternumber")
   public MiniOzoneChaosCluster(OzoneConfiguration conf,
       OMHAService omService, SCMHAService scmService,
@@ -132,12 +99,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   public void shutdown() {
     try {
       failureManager.stop();
-      //this should be called after stopChaos to be sure that the
-      //datanode collection is not modified during the shutdown
-      super.shutdown();
     } catch (Exception e) {
-      LOG.error("failed to shutdown MiniOzoneChaosCluster", e);
+      LOG.error("failed to stop FailureManager", e);
     }
+    //this should be called after failureManager.stop to be sure that the
+    //datanode collection is not modified during the shutdown
+    super.shutdown();
   }
 
   /**
