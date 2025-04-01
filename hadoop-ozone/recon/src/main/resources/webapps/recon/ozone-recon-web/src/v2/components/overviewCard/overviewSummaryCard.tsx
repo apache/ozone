@@ -40,6 +40,7 @@ type OverviewTableCardProps = {
   linkToUrl?: string;
   showHeader?: boolean;
   state?: Record<string, any>;
+  taskIcon?: React.ReactElement;
 }
 
 // ------------- Styles -------------- //
@@ -63,14 +64,20 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
   loading = false,
   columns = [],
   tableData = [],
-  linkToUrl = '',
+  linkToUrl = undefined,
   showHeader = false,
-  state
+  state,
+  taskIcon = undefined
 }) => {
-  const titleElement = (linkToUrl)
-    ? (
-      <div className='card-title-div'>
+
+  const titleElement = (
+    <div className='card-title-div'>
+      <span>
+        {taskIcon}
         {title}
+      </span>
+      {
+        linkToUrl &&
         <Link
           to={{
             pathname: linkToUrl,
@@ -79,8 +86,8 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
           style={{
             fontWeight: 400
           }}>View Insights</Link>
-      </div>)
-    : title
+      }
+    </div>)
 
   return (
     <Card
@@ -107,7 +114,7 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
         columns={columns}
         onRow={(record: TableData) => ({
           'data-testid': `overview-${title}-${record.name}`
-        } as HTMLAttributes<HTMLElement>)}/>
+        } as HTMLAttributes<HTMLElement>)} />
     </Card>
   )
 }
