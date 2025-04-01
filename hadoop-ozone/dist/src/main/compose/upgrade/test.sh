@@ -41,4 +41,4 @@ run_test ha     non-rolling-upgrade 1.4.1 "$OZONE_CURRENT_VERSION"
 
 generate_report "upgrade" "$ALL_RESULT_DIR"
 
-exit "$?"
+exit "$RESULT"
