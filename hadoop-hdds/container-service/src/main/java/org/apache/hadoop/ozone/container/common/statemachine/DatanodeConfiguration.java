@@ -73,10 +73,17 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       "hdds.datanode.disk.check.min.gap";
   public static final String DISK_CHECK_TIMEOUT_KEY =
       "hdds.datanode.disk.check.timeout";
+
+  // Minimum space should be left on volume.
+  // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
+  // In this case when availableSpace is 990GB or below, volume is assumed as full
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
       "hdds.datanode.volume.min.free.space";
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT =
       "5GB";
+  // Minimum percent of space should be left on volume.
+  // Ex: If volume has 1000GB and minFreeSpacePercent is configured as 2%,
+  // In this case when availableSpace is 980GB(1000 - 2% of 1000) or below, volume is assumed as full
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
       "hdds.datanode.volume.min.free.space.percent";
   static final byte MIN_FREE_SPACE_UNSET = -1;
@@ -338,7 +345,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       description = "This determines the free space to be used for closing containers" +
           " When the difference between volume capacity and used reaches this number," +
           " containers that reside on this volume will be closed and no new containers" +
-          " would be allocated on this volume."
+          " would be allocated on this volume." +
+          " Either of min.free.space or min.free.space.percent should be configured, when both are set then" +
+          " min.free.space will be used."
   )
   private long minFreeSpace = MIN_FREE_SPACE_UNSET;
 
@@ -346,7 +355,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "-1",
       type = ConfigType.FLOAT,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
-      description = "" // not documented
+      description = "This determines the free space percent to be used for closing containers" +
+          " When the difference between volume capacity and used reaches (free.space.percent of volume capacity)," +
+          " containers that reside on this volume will be closed and no new containers" +
+          " would be allocated on this volume." +
+          " Either of min.free.space or min.free.space.percent should be configured, when both are set then" +
+          " min.free.space will be used."
   )
   private float minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
 
@@ -771,11 +785,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     final boolean minFreeSpaceRatioConfigured = minFreeSpaceRatio >= 0;
 
     if (minFreeSpaceConfigured && minFreeSpaceRatioConfigured) {
-      LOG.warn("Only one of {}={} and {}={} should be set. With both set, minFreeSpace value will be used.",
+      // Only one property should be configured.
+      // Since both properties are configured, HDDS_DATANODE_VOLUME_MIN_FREE_SPACE is used to determine minFreeSpace
+      LOG.warn("Only one of {}={} and {}={} should be set. With both set, {} value will be used.",
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
           minFreeSpace,
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
-          minFreeSpaceRatio);
+          minFreeSpaceRatio,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
       minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
     }
 
