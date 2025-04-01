@@ -232,6 +232,17 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return acquireLocks(resource, false, keys);
   }
 
+  private void acquireLock(Resource resource, boolean isReadLock, ReadWriteLock lock,
+                                    long startWaitingTimeNanos) {
+    if (isReadLock) {
+      lock.readLock().lock();
+      updateReadLockMetrics(resource, (ReentrantReadWriteLock) lock, startWaitingTimeNanos);
+    } else {
+      lock.writeLock().lock();
+      updateWriteLockMetrics(resource, (ReentrantReadWriteLock) lock, startWaitingTimeNanos);
+    }
+  }
+
   private OMLockDetails acquireLocks(Resource resource, boolean isReadLock,
                                     Collection<String[]> keys) {
     omLockDetails.get().clear();
@@ -244,13 +255,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     long startWaitingTimeNanos = Time.monotonicNowNanos();
 
     for (ReadWriteLock lock : bulkGetLock(resource, keys)) {
-      if (isReadLock) {
-        lock.readLock().lock();
-        updateReadLockMetrics(resource, (ReentrantReadWriteLock) lock, startWaitingTimeNanos);
-      } else {
-        lock.writeLock().lock();
-        updateWriteLockMetrics(resource, (ReentrantReadWriteLock) lock, startWaitingTimeNanos);
-      }
+      acquireLock(resource, isReadLock, lock, startWaitingTimeNanos);
     }
 
     lockSet.set(resource.setLock(lockSet.get()));
@@ -270,13 +275,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     long startWaitingTimeNanos = Time.monotonicNowNanos();
 
     ReentrantReadWriteLock lock = getLock(resource, keys);
-    if (isReadLock) {
-      lock.readLock().lock();
-      updateReadLockMetrics(resource, lock, startWaitingTimeNanos);
-    } else {
-      lock.writeLock().lock();
-      updateWriteLockMetrics(resource, lock, startWaitingTimeNanos);
-    }
+    acquireLock(resource, isReadLock, lock, startWaitingTimeNanos);
 
     lockSet.set(resource.setLock(lockSet.get()));
     omLockDetails.get().setLockAcquired(true);
