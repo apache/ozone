@@ -579,50 +579,6 @@ public class OzoneManagerServiceProviderImpl
     }
   }
 
-  /*DBCheckpoint getOzoneManagerDBSnapshot() {
-    String snapshotFileName = RECON_OM_SNAPSHOT_DB + "_" +
-        System.currentTimeMillis();
-    File targetFile = new File(omSnapshotDBParentDir, snapshotFileName +
-        ".tar");
-    try {
-      SecurityUtil.doAsLoginUser(() -> {
-        try (InputStream inputStream = reconUtils.makeHttpCall(
-            connectionFactory, getOzoneManagerSnapshotUrl(),
-            isOmSpnegoEnabled()).getInputStream()) {
-          FileUtils.copyInputStreamToFile(inputStream, targetFile);
-        }
-        return null;
-      });
-      // Untar the checkpoint file.
-      Path untarredDbDir = Paths.get(omSnapshotDBParentDir.getAbsolutePath(), snapshotFileName);
-      reconUtils.untarCheckpointFile(targetFile, untarredDbDir);
-
-      // Validate the presence of required SST files
-      File[] sstFiles = untarredDbDir.toFile().listFiles((dir, name) -> name.endsWith(".sst"));
-      if (sstFiles == null || sstFiles.length == 0) {
-        LOG.warn("No SST files found in the OM snapshot directory: {}", untarredDbDir);
-      }
-
-      List<String> sstFileNames = Arrays.stream(sstFiles)
-          .map(File::getName)
-          .collect(Collectors.toList());
-      LOG.debug("Valid SST files found: {}", sstFileNames);
-
-      // Currently, OM DB type is not configurable. Hence, defaulting to
-      // RocksDB.
-      reconContext.updateHealthStatus(new AtomicBoolean(true));
-      reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-      return new RocksDBCheckpoint(untarredDbDir);
-    } catch (IOException e) {
-      LOG.error("Unable to obtain Ozone Manager DB Snapshot. ", e);
-      reconContext.updateHealthStatus(new AtomicBoolean(false));
-      reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-    } finally {
-      FileUtils.deleteQuietly(targetFile);
-    }
-    return null;
-  }*/
-
   /**
    * Update Local OM DB with new OM DB snapshot.
    * @throws IOException
