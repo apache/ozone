@@ -24,7 +24,8 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedBloomFilter;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
-import org.rocksdb.*;
+import org.rocksdb.CompactionPriority;
+import org.rocksdb.CompactionStyle;
 
 /**
  * User visible configs based RocksDB tuning page. Documentation for Options.
