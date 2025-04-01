@@ -192,6 +192,7 @@ public class SCMBlockProtocolServer implements
       String owner, ExcludeList excludeList,
       String clientMachine
   ) throws IOException {
+    long startNanos = Time.monotonicNowNanos();
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
     auditMap.put("num", String.valueOf(num));
@@ -235,17 +236,21 @@ public class SCMBlockProtocolServer implements
         AUDIT.logWriteFailure(buildAuditMessageForFailure(
             SCMAction.ALLOCATE_BLOCK, auditMap, null)
         );
+        perfMetrics.updateAllocateBlockFailureLatencyNs(startNanos);
       } else {
         AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
             SCMAction.ALLOCATE_BLOCK, auditMap));
+        perfMetrics.updateAllocateBlockSuccessLatencyNs(startNanos);
       }
 
       return blocks;
     } catch (TimeoutException ex) {
+      perfMetrics.updateAllocateBlockFailureLatencyNs(startNanos);
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.ALLOCATE_BLOCK, auditMap, ex));
       throw new IOException(ex);
     } catch (Exception ex) {
+      perfMetrics.updateAllocateBlockFailureLatencyNs(startNanos);
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.ALLOCATE_BLOCK, auditMap, ex));
       throw ex;
