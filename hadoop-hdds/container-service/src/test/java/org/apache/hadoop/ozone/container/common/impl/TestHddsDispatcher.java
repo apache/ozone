@@ -289,8 +289,8 @@ public class TestHddsDispatcher {
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
       hddsDispatcher.setClusterId(scmId.toString());
-      containerData.getVolume().getVolumeInfo()
-          .ifPresent(volumeInfo -> volumeInfo.incrementUsedSpace(50));
+      containerData.getVolume().getVolumeUsage()
+          .ifPresent(usage -> usage.incrementUsedSpace(50));
       usedSpace.addAndGet(50);
       ContainerCommandResponseProto response = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);

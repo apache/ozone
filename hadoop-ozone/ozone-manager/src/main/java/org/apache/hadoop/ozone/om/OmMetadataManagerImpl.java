@@ -553,9 +553,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         ExitUtils.terminate(1, errorMsg, LOG);
       }
 
-      RocksDBConfiguration rocksDBConfiguration =
-          configuration.getObject(RocksDBConfiguration.class);
-
       // As When ratis is not enabled, when we perform put/commit to rocksdb we
       // should turn on sync flag. This needs to be done as when we return
       // response to client it is considered as complete, but if we have

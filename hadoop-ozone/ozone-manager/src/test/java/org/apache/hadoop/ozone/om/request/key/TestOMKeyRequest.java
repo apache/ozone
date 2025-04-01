@@ -118,7 +118,7 @@ public class TestOMKeyRequest {
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
   protected ScmBlockLocationProtocol scmBlockLocationProtocol;
   protected StorageContainerLocationProtocol scmContainerLocationProtocol;
-  protected OMPerformanceMetrics metrics;
+  protected OMPerformanceMetrics perfMetrics;
   protected DeletingServiceMetrics delMetrics;
 
   protected static final long CONTAINER_ID = 1000L;
@@ -139,7 +139,7 @@ public class TestOMKeyRequest {
   public void setup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
-    metrics = OMPerformanceMetrics.register();
+    perfMetrics = OMPerformanceMetrics.register();
     delMetrics = DeletingServiceMetrics.create();
     OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
@@ -151,7 +151,7 @@ public class TestOMKeyRequest {
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
-    when(ozoneManager.getPerfMetrics()).thenReturn(metrics);
+    when(ozoneManager.getPerfMetrics()).thenReturn(perfMetrics);
     when(ozoneManager.getDeletionMetrics()).thenReturn(delMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
@@ -173,9 +173,9 @@ public class TestOMKeyRequest {
     omBlockPrefetchClient = mock(OMBlockPrefetchClient.class);
     ozoneBlockTokenSecretManager = mock(OzoneBlockTokenSecretManager.class);
     scmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
-    metrics = mock(OMPerformanceMetrics.class);
+    perfMetrics = mock(OMPerformanceMetrics.class);
     keyManager = new KeyManagerImpl(ozoneManager, scmClient, ozoneConfiguration,
-        metrics);
+        perfMetrics);
     when(ozoneManager.getScmClient()).thenReturn(scmClient);
     when(ozoneManager.getBlockTokenSecretManager())
         .thenReturn(ozoneBlockTokenSecretManager);

@@ -1598,20 +1598,6 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Update set of containers available on a datanode.
-   *
-   * @param datanodeDetails - DatanodeID
-   * @param containerIds    - Set of containerIDs
-   * @throws NodeNotFoundException - if datanode is not known. For new datanode
-   *                               use addDatanodeInContainerMap call.
-   */
-  @Override
-  public void setContainers(DatanodeDetails datanodeDetails,
-      Set<ContainerID> containerIds) throws NodeNotFoundException {
-    nodeStateManager.setContainers(datanodeDetails.getID(), containerIds);
-  }
-
-  /**
    * Return set of containerIDs available on a datanode. This is a copy of the
    * set which resides inside NodeManager and hence can be modified without
    * synchronization or side effects.
@@ -1690,29 +1676,16 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  /**
-   * Given datanode uuid, returns the DatanodeDetails for the node.
-   *
-   * @param uuid node host address
-   * @return the given datanode, or null if not found
-   */
   @Override
-  public DatanodeDetails getNodeByUuid(String uuid) {
-    return uuid != null && !uuid.isEmpty()
-        ? getNodeByUuid(UUID.fromString(uuid))
-        : null;
-  }
-
-  @Override
-  public DatanodeDetails getNodeByUuid(UUID uuid) {
-    if (uuid == null) {
+  public DatanodeInfo getNode(DatanodeID id) {
+    if (id == null) {
       return null;
     }
 
     try {
-      return nodeStateManager.getNode(DatanodeID.of(uuid));
+      return nodeStateManager.getNode(id);
     } catch (NodeNotFoundException e) {
-      LOG.warn("Cannot find node for uuid {}", uuid);
+      LOG.warn("Cannot find node for uuid {}", id);
       return null;
     }
   }

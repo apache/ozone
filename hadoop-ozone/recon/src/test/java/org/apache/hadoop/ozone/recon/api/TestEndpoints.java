@@ -670,7 +670,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // Change Node OperationalState with NodeManager
     final NodeManager nodeManager = reconScm.getScmNodeManager();
     final DatanodeDetails dnDetailsInternal =
-        nodeManager.getNodeByUuid(datanodeDetails.getUuidString());
+        nodeManager.getNode(datanodeDetails.getID());
     // Backup existing state and sanity check
     final NodeStatus nStatus = nodeManager.getNodeStatus(dnDetailsInternal);
     final NodeOperationalState backupOpState =
@@ -1280,7 +1280,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // Change Node3 OperationalState with NodeManager to NodeOperationalState.DECOMMISSIONED
     final NodeManager nodeManager = reconScm.getScmNodeManager();
     final DatanodeDetails dnDetailsInternal =
-        nodeManager.getNodeByUuid(datanodeDetails3.getUuidString());
+        nodeManager.getNode(datanodeDetails3.getID());
     // Backup existing state and sanity check
     final NodeStatus nStatus = nodeManager.getNodeStatus(dnDetailsInternal);
     final NodeOperationalState backupOpState =

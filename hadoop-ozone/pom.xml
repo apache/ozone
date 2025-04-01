@@ -35,6 +35,7 @@
     <module>httpfsgateway</module>
     <module>insight</module>
     <module>integration-test</module>
+    <module>integration-test-s3</module>
     <module>interface-client</module>
     <module>interface-storage</module>
     <module>mini-cluster</module>
@@ -146,6 +147,12 @@
         <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-server-framework</artifactId>
         <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-server-framework</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
