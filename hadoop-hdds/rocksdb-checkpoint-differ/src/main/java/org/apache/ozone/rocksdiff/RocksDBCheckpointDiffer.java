@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -38,6 +39,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -65,10 +67,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -237,8 +243,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           this::pruneSstFiles,
           pruneCompactionDagDaemonRunIntervalInMs,
           pruneCompactionDagDaemonRunIntervalInMs,
-          TimeUnit.MILLISECONDS
-      );
+          TimeUnit.MILLISECONDS);
+
+      this.scheduler.scheduleWithFixedDelay(
+          this::pruneSstFileValues,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          TimeUnit.MILLISECONDS);
     } else {
       this.scheduler = null;
     }
@@ -1379,6 +1390,62 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       removeSstFiles(nonLeafSstFiles);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Defines the task that removes OMKeyInfo from SST files from backup directory to
+   * save disk space.
+   */
+  public void pruneSstFileValues() {
+    if (!shouldRun()) {
+      return;
+    }
+    Path sstBackupDirPath = Paths.get(sstBackupDir);
+    String kVSeparator = ",";
+
+    try (Stream<Path> files = Files.list(sstBackupDirPath)
+        .filter(file -> file.endsWith(ROCKSDB_SST_SUFFIX)) ) {
+
+      for (Path file : files.collect(Collectors.toList())) {
+        // Write the file.sst => file.sst.tmp
+        File sstFile = file.toFile();
+        File prunedSSTFile = Files.createFile(sstBackupDirPath
+            .resolve( sstFile.getName() + ".tmp")).toFile();
+
+        ManagedEnvOptions envOptions = new ManagedEnvOptions();
+        ManagedOptions managedOptions = new ManagedOptions();
+        ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions))
+        sstFileWriter.open(prunedSSTFile.getAbsolutePath());
+
+        ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader<>(
+            managedOptions, sstFile.getAbsolutePath(), 2 * 1024 * 1024);
+        ManagedRawSSTFileIterator<String> itr = sstFileReader.newIterator(
+            keyValue -> StringUtils.bytes2String(keyValue.getKey()) + kVSeparator
+                + StringUtils.bytes2String(keyValue.getValue()), null, null);
+
+        while(itr.hasNext()) {
+          String[] keyValue = itr.next().split(kVSeparator);
+          if (keyValue[1].isEmpty()) {
+            sstFileWriter.delete(keyValue[0].getBytes(UTF_8));
+          } else {
+            sstFileWriter.put(keyValue[0].getBytes(UTF_8), "\0".getBytes(UTF_8));
+          }
+        }
+        sstFileWriter.finish();
+
+        // Acquire a mutex
+        try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+          // Move file.sst.tmp file.sst and replace existing file atomically
+          Files.move(prunedSSTFile.toPath(), file, StandardCopyOption.ATOMIC_MOVE,
+              StandardCopyOption.REPLACE_EXISTING);
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+        LOG.debug("Prune OMKeyInfo from SST files: {}", sstFile.getPath());
+      }
+    } catch (IOException e) {
+      LOG.error("Could not prune OMKeyInfo from SST files.", e);
     }
   }
 
