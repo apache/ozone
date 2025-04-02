@@ -18,8 +18,10 @@
 package org.apache.ozone.rocksdiff;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.FileNotFoundException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -28,9 +30,13 @@ import java.util.Set;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.rocksdb.LiveFileMetaData;
+import org.rocksdb.RocksDBException;
+import org.rocksdb.TableProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,5 +141,30 @@ public final class RocksDiffUtils {
     String keyPrefix = columnFamilyToPrefixMap.get(node.getColumnFamily());
     return !isKeyWithPrefixPresent(keyPrefix, node.getStartKey(),
         node.getEndKey());
+  }
+
+  /**
+   * Get number of keys in an SST file.
+   * @param filename absolute path of SST file
+   * @return number of keys
+   */
+  public static long getSSTFileSummary(String filename)
+      throws RocksDBException, FileNotFoundException {
+
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
+      filename += SST_FILE_EXTENSION;
+    }
+
+    try (ManagedOptions option = new ManagedOptions();
+         ManagedSstFileReader reader = new ManagedSstFileReader(option)) {
+
+      reader.open(filename);
+
+      TableProperties properties = reader.getTableProperties();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{} has {} keys", filename, properties.getNumEntries());
+      }
+      return properties.getNumEntries();
+    }
   }
 }

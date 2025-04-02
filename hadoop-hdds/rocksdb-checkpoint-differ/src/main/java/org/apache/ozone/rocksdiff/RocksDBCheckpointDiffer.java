@@ -65,10 +65,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -81,7 +79,6 @@ import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.TableProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -576,31 +573,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
   }
 
-  /**
-   * Get number of keys in an SST file.
-   * @param filename SST filename
-   * @return number of keys
-   */
-  private long getSSTFileSummary(String filename)
-      throws RocksDBException, FileNotFoundException {
-
-    if (!filename.endsWith(SST_FILE_EXTENSION)) {
-      filename += SST_FILE_EXTENSION;
-    }
-
-    try (ManagedOptions option = new ManagedOptions();
-         ManagedSstFileReader reader = new ManagedSstFileReader(option)) {
-
-      reader.open(getAbsoluteSstFilePath(filename));
-
-      TableProperties properties = reader.getTableProperties();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("{} has {} keys", filename, properties.getNumEntries());
-      }
-      return properties.getNumEntries();
-    }
-  }
-
   private String getAbsoluteSstFilePath(String filename)
       throws FileNotFoundException {
     if (!filename.endsWith(SST_FILE_EXTENSION)) {
@@ -1065,7 +1037,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                                       String endKey, String columnFamily) {
     long numKeys = 0L;
     try {
-      numKeys = getSSTFileSummary(file);
+      numKeys = RocksDiffUtils.getSSTFileSummary(getAbsoluteSstFilePath(file));
     } catch (RocksDBException e) {
       LOG.warn("Can't get num of keys in SST '{}': {}", file, e.getMessage());
     } catch (FileNotFoundException e) {
