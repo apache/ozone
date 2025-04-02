@@ -233,7 +233,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private void acquireLock(Resource resource, boolean isReadLock, ReadWriteLock lock,
-                                    long startWaitingTimeNanos) {
+                           long startWaitingTimeNanos) {
     if (isReadLock) {
       lock.readLock().lock();
       updateReadLockMetrics(resource, (ReentrantReadWriteLock) lock, startWaitingTimeNanos);

@@ -49,8 +49,9 @@ public class MultiSnapshotLocks {
 
   public synchronized OMLockDetails acquireLock(Collection<UUID> ids) throws OMException {
     if (this.lockDetails.isLockAcquired()) {
-      throw new OMException("More locks cannot be acquired when locks have been already acquired. Locks acquired : ["
-          + objectLocks.stream().map(Arrays::toString).collect(Collectors.joining(",")) + "]",
+      throw new OMException(
+          objectLocks.stream().map(Arrays::toString).collect(Collectors.joining(",",
+              "More locks cannot be acquired when locks have been already acquired. Locks acquired : [", "]")),
           OMException.ResultCodes.INTERNAL_ERROR);
     }
     List<String[]> keys =
