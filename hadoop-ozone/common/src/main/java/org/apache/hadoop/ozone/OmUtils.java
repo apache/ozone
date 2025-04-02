@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.ozone.OzoneConsts.DOUBLE_SLASH_OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -760,7 +761,7 @@ public final class OmUtils {
     if (!StringUtils.isBlank(keyName)) {
       String normalizedKeyName;
       if (keyName.startsWith(OM_KEY_PREFIX)) {
-        normalizedKeyName = new Path(keyName).toUri().getPath();
+        normalizedKeyName = new Path(normalizeDoubleSlashPath(keyName)).toUri().getPath();
       } else {
         normalizedKeyName = new Path(OM_KEY_PREFIX + keyName)
             .toUri().getPath();
@@ -775,6 +776,23 @@ public final class OmUtils {
       return normalizedKeyName.substring(1);
     }
 
+    return keyName;
+  }
+
+  /**
+   * Normalizes paths that start with double slashes to avoid URI authority parsing issues.
+   * This prevents Path parsing issues where paths starting with "//" have the content
+   * after "//" interpreted as the URI authority rather than as part of the path.
+   * For example: Path("//dir1").toUri().getAuthority() returns "dir1" and getPath() returns ""
+   */
+  private static String normalizeDoubleSlashPath(String keyName) {
+    if (keyName.startsWith(DOUBLE_SLASH_OM_KEY_PREFIX)) {
+      int doubleSlashLen = DOUBLE_SLASH_OM_KEY_PREFIX.length();
+      if (keyName.length() > doubleSlashLen && keyName.charAt(doubleSlashLen) != OM_KEY_PREFIX.charAt(0)) {
+        keyName = OM_KEY_PREFIX + keyName.substring(2);
+      }
+      return new Path(keyName).toUri().getPath();
+    }
     return keyName;
   }
 

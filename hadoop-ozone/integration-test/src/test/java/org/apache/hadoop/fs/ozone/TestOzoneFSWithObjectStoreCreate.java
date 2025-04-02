@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -384,6 +385,47 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
         OmUtils.normalizeKey(key1, false));
 
     checkKeyList(ozoneKeyIterator, keys);
+  }
+
+  @Test
+  public void testDoubleSlashPrefixPathNormalization() throws Exception {
+    OzoneVolume ozoneVolume =
+        client.getObjectStore().getVolume(volumeName);
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    String doubleSlashKey = "//dir1/key1";
+    String normalizedDoubleSlashKey = "dir1/key1";
+    String tripleSlashKey = "///dir2/key2";
+    String normalizedTripleSlashKey = "dir2/key2";
+    byte[] data = new byte[10];
+    Arrays.fill(data, (byte)96);
+    ArrayList<String> expectedKeys = new ArrayList<>();
+    expectedKeys.add("dir1/");
+    expectedKeys.add(normalizedDoubleSlashKey);
+    expectedKeys.add("dir2/");
+    expectedKeys.add(normalizedTripleSlashKey);
+
+    OzoneOutputStream stream1 = ozoneBucket.createKey(doubleSlashKey, data.length);
+    stream1.write(data, 0, data.length);
+    stream1.close();
+    OzoneOutputStream stream2 = ozoneBucket.createKey(tripleSlashKey, data.length);
+    stream2.write(data, 0, data.length);
+    stream2.close();
+
+    try {
+      ozoneBucket.readKey(doubleSlashKey).close();
+      ozoneBucket.readKey(normalizedDoubleSlashKey).close();
+    } catch (Exception e) {
+      fail("Should be able to read key " + e.getMessage());
+    }
+    try {
+      ozoneBucket.readKey(tripleSlashKey).close();
+      ozoneBucket.readKey(normalizedTripleSlashKey).close();
+    } catch (Exception e) {
+      fail("Should be able to read key " + e.getMessage());
+    }
+
+    Iterator<? extends OzoneKey> it = ozoneBucket.listKeys("//dir");
+    checkKeyList(it, expectedKeys);
   }
 
   private void checkKeyList(Iterator<? extends OzoneKey > ozoneKeyIterator,
