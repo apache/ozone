@@ -48,6 +48,11 @@ public class ReconIncrementalContainerReportHandler
   }
 
   @Override
+  protected Logger getLogger() {
+    return LOG;
+  }
+
+  @Override
   public void onMessage(final IncrementalContainerReportFromDatanode report,
                         final EventPublisher publisher) {
     final DatanodeDetails dnFromReport = report.getDatanodeDetails();
