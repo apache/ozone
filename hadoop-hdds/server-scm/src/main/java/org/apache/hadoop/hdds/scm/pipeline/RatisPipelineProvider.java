@@ -148,7 +148,7 @@ public class RatisPipelineProvider
       throws IOException {
     if (exceedPipelineNumberLimit(replicationConfig)) {
       String limitInfo = (maxPipelinePerDatanode > 0)
-          ? String.format("per dataNode: %d", maxPipelinePerDatanode)
+          ? String.format("per datanode: %d", maxPipelinePerDatanode)
           : String.format(": %d", pipelineNumberLimit);
 
       throw new SCMException(
