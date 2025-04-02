@@ -38,6 +38,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * - ChunkLayOutVersion: data layout version
  */
 public class ContainerTestVersionInfo {
+
   private static List<ContainerTestVersionInfo> layoutList = new ArrayList<>();
 
   private static final String[] SCHEMA_VERSIONS = new String[] {

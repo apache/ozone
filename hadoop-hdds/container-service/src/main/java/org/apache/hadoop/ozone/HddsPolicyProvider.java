@@ -36,7 +36,8 @@ import org.apache.ratis.util.MemoizedSupplier;
 @Unstable
 public final class HddsPolicyProvider extends PolicyProvider {
 
-  private static final Supplier<HddsPolicyProvider> SUPPLIER = MemoizedSupplier.valueOf(HddsPolicyProvider::new);
+  private static final Supplier<HddsPolicyProvider> SUPPLIER =
+      MemoizedSupplier.valueOf(HddsPolicyProvider::new);
 
   private static final List<Service> DN_SERVICES =
       Collections.singletonList(

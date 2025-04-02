@@ -82,6 +82,7 @@ import org.mockito.Mockito;
  * Helper utility to test containers.
  */
 public final class ContainerTestUtils {
+
   public static final DispatcherContext WRITE_STAGE = DispatcherContext
       .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
       .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)

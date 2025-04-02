@@ -75,11 +75,12 @@ public interface Container<CONTAINERDATA extends ContainerData> {
 
     public Throwable getException() {
       return exception;
-    }/**
+    }
+
+    /**
      * Represents the reason a container scan failed and a container should
      * be marked unhealthy.
      */
-
     public enum FailureType {
       MISSING_CONTAINER_DIR,
       MISSING_METADATA_DIR,

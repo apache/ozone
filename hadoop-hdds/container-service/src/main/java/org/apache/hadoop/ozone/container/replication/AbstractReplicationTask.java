@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
  * of replication tasks.
  */
 public abstract class AbstractReplicationTask {
+
   private volatile Status status = Status.QUEUED;
 
   private final long containerId;
