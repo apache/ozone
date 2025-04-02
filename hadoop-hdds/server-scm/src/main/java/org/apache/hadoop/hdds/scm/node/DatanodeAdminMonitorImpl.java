@@ -72,7 +72,6 @@ import org.slf4j.LoggerFactory;
  */
 public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
-  private OzoneConfiguration conf;
   private EventPublisher eventQueue;
   private NodeManager nodeManager;
   private ReplicationManager replicationManager;
@@ -144,7 +143,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       EventPublisher eventQueue,
       NodeManager nodeManager,
       ReplicationManager replicationManager) {
-    this.conf = conf;
     this.eventQueue = eventQueue;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
@@ -235,7 +233,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         trackedDecomMaintenance = getTrackedNodeCount();
       }
       processTransitioningNodes();
-      if (trackedNodes.size() > 0 || pendingNodes.size() > 0) {
+      if (!trackedNodes.isEmpty() || !pendingNodes.isEmpty()) {
         LOG.info("There are {} nodes tracked for decommission and " +
             "maintenance.  {} pending nodes.",
             trackedNodes.size(), pendingNodes.size());
@@ -390,7 +388,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     Set<PipelineID> pipelines = nodeManager.getPipelines(dn
         .getDatanodeDetails());
     NodeStatus status = nodeManager.getNodeStatus(dn.getDatanodeDetails());
-    if (pipelines == null || pipelines.size() == 0
+    if (pipelines == null || pipelines.isEmpty()
         || status.operationalStateExpired()) {
       return true;
     } else {

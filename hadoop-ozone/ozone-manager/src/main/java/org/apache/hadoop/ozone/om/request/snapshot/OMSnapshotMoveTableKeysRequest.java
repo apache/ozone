@@ -45,16 +45,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveTableKeysRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Handles OMSnapshotMoveTableKeysRequest Request.
  * This is an OM internal request. Does not need @RequireSnapshotFeatureState.
  */
 public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
-
-  private static final Logger LOG = LoggerFactory.getLogger(OMSnapshotMoveTableKeysRequest.class);
 
   public OMSnapshotMoveTableKeysRequest(OMRequest omRequest) {
     super(omRequest);

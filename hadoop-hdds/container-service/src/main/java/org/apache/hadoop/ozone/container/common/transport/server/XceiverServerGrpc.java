@@ -70,7 +70,6 @@ import org.slf4j.LoggerFactory;
 public final class XceiverServerGrpc implements XceiverServerSpi {
   private static final Logger
       LOG = LoggerFactory.getLogger(XceiverServerGrpc.class);
-  private static final String COMPONENT = "dn";
   private int port;
   private UUID id;
   private Server server;

@@ -505,7 +505,7 @@ public class BucketEndpoint extends EndpointBase {
 
     Map<String, String> auditMap = getAuditParameters();
     auditMap.put("failedDeletes", deleteKeys.toString());
-    if (result.getErrors().size() != 0) {
+    if (!result.getErrors().isEmpty()) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(s3GAction,
           auditMap, new Exception("MultiDelete Exception")));
     } else {
@@ -633,7 +633,7 @@ public class BucketEndpoint extends EndpointBase {
       List<OzoneAcl> aclsToRemoveOnVolume = new ArrayList<>();
       List<OzoneAcl> currentAclsOnVolume = volume.getAcls();
       // Remove input user/group's permission from Volume first
-      if (currentAclsOnVolume.size() > 0) {
+      if (!currentAclsOnVolume.isEmpty()) {
         for (OzoneAcl acl : acls) {
           if (acl.getAclScope() == ACCESS) {
             aclsToRemoveOnVolume.addAll(OzoneAclUtil.filterAclList(
@@ -691,10 +691,10 @@ public class BucketEndpoint extends EndpointBase {
       }
       // Build ACL on Bucket
       EnumSet<IAccessAuthorizer.ACLType> aclsOnBucket = S3Acl.getOzoneAclOnBucketFromS3Permission(permission);
-      OzoneAcl defaultOzoneAcl = new OzoneAcl(
+      OzoneAcl defaultOzoneAcl = OzoneAcl.of(
           IAccessAuthorizer.ACLIdentityType.USER, part[1], OzoneAcl.AclScope.DEFAULT, aclsOnBucket
       );
-      OzoneAcl accessOzoneAcl = new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnBucket);
+      OzoneAcl accessOzoneAcl = OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnBucket);
       ozoneAclList.add(defaultOzoneAcl);
       ozoneAclList.add(accessOzoneAcl);
     }
@@ -723,7 +723,7 @@ public class BucketEndpoint extends EndpointBase {
       // Build ACL on Volume
       EnumSet<IAccessAuthorizer.ACLType> aclsOnVolume =
           S3Acl.getOzoneAclOnVolumeFromS3Permission(permission);
-      OzoneAcl accessOzoneAcl = new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnVolume);
+      OzoneAcl accessOzoneAcl = OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnVolume);
       ozoneAclList.add(accessOzoneAcl);
     }
     return ozoneAclList;

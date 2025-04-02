@@ -38,7 +38,9 @@ OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
 OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
+OZONE-SITE.XML_ozone.client.hbase.enhancements.allowed=true
 OZONE-SITE.XML_ozone.fs.hsync.enabled=true
+OZONE-SITE.XML_ozone.hbase.enhancements.allowed=true
 
 # If SCM sends container close commands as part of upgrade finalization while
 # datanodes are doing a leader election, all 3 replicas may end up in the

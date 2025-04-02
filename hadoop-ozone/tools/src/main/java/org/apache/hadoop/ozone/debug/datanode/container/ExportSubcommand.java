@@ -21,7 +21,8 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
@@ -72,7 +73,7 @@ public class ExportSubcommand implements Callable<Void> {
       replicationSource.prepare(containerId);
       final File destinationFile =
           new File(destination, "container-" + containerId + ".tar");
-      try (FileOutputStream fos = new FileOutputStream(destinationFile)) {
+      try (OutputStream fos = Files.newOutputStream(destinationFile.toPath())) {
         try {
           replicationSource.copyData(containerId, fos, NO_COMPRESSION);
         } catch (StorageContainerException e) {

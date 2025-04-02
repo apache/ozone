@@ -35,8 +35,8 @@ import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -215,7 +215,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
     long startTime = System.currentTimeMillis();
     reconTaskController.registerTask(reconOmTaskMock);
-    reconTaskController.reInitializeTasks(omMetadataManagerMock);
+    reconTaskController.reInitializeTasks(omMetadataManagerMock, null);
     long endTime = System.currentTimeMillis();
 
     verify(reconOmTaskMock, times(1))

@@ -82,10 +82,10 @@ public final class SCMDatanodeHeartbeatDispatcher {
    *
    * @return list of SCMCommand
    */
-  public List<SCMCommand> dispatch(SCMHeartbeatRequestProto heartbeat) {
+  public List<SCMCommand<?>> dispatch(SCMHeartbeatRequestProto heartbeat) {
     DatanodeDetails datanodeDetails =
         DatanodeDetails.getFromProtoBuf(heartbeat.getDatanodeDetails());
-    List<SCMCommand> commands;
+    List<SCMCommand<?>> commands;
 
     // If node is not registered, ask the node to re-register. Do not process
     // Heartbeat for unregistered nodes.
@@ -140,7 +140,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
       final List<IncrementalContainerReportProto> icrs =
           heartbeat.getIncrementalContainerReportList();
 
-      if (icrs.size() > 0) {
+      if (!icrs.isEmpty()) {
         LOG.debug("Dispatching ICRs.");
         for (IncrementalContainerReportProto icr : icrs) {
           eventPublisher.fireEvent(INCREMENTAL_CONTAINER_REPORT,
