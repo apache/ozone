@@ -51,9 +51,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     WARN, DELETE;
 
     static UnknownContainerAction parse(String s) {
-      return s.equals(WARN.name()) ? WARN
-          : s.equals(DELETE.name()) ? DELETE
-          : null;
+      return s.equals(DELETE.name()) ? DELETE : WARN;
     }
   }
 
