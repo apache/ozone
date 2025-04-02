@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.TestOzoneManagerRestInterface;
 import org.apache.hadoop.ozone.reconfig.TestDatanodeReconfiguration;
 import org.apache.hadoop.ozone.reconfig.TestOmReconfiguration;
 import org.apache.hadoop.ozone.reconfig.TestScmReconfiguration;
+import org.apache.hadoop.ozone.shell.TestOzoneDebugShell;
 import org.apache.hadoop.ozone.shell.TestReconfigShell;
 import org.apache.hadoop.ozone.shell.TestReplicationConfigPreference;
 import org.junit.jupiter.api.Nested;
@@ -365,6 +366,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class OmReconfiguration extends TestOmReconfiguration {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OzoneDebugShell extends TestOzoneDebugShell {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
