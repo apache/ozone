@@ -384,7 +384,7 @@ public class TestRatisPipelineProvider {
 
     // Validate exception message.
     String expectedError = String.format(
-        "Ratis pipeline number meets the limit per dataNode: %d replicationConfig: RATIS/THREE", limit);
+        "Ratis pipeline number meets the limit per datanode: %d replicationConfig: RATIS/THREE", limit);
     assertEquals(expectedError, exception.getMessage());
   }
 
