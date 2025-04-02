@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 
@@ -204,7 +203,7 @@ public class TestDiskBalancerSubCommand {
         Arguments.arguments(512L, 512L, 1L, 1L, 1L), // bytesMoved and bytesToMove < 1MB should be rounded up to 1MB
         Arguments.arguments(5242880L, 10485760L, 5L, 10L, 1L), // bytesMoved = 5MB, bytesToMove = 10MB, estTimeLeft = 1
         Arguments.arguments(13774139392L, 3229900800L, 13137L, 3081L, 6L),
-        Arguments.arguments(7482638336L, 939524096L, 7136L, 896L, 6L)
+        Arguments.arguments(7482638336L, 939524096L, 7136L, 896L, 2L)
     );
   }
 
@@ -237,11 +236,14 @@ public class TestDiskBalancerSubCommand {
     statusCmd1.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING).trim();
+    String[] lines = output.split("\\n");
 
-    // Check if expected values appear in output
-    assertTrue(output.contains(String.valueOf(bytesMovedMB)));
-    assertTrue(output.contains(String.valueOf(bytesToMoveMB)));
-    assertTrue(output.contains(estTimeLeft >= 0 ? String.valueOf(estTimeLeft) : "N/A"));
+    // Skip the header and find the data row
+    String[] columns = lines[2].split("\\s+");
+
+    assertEquals(String.valueOf(bytesMovedMB), columns[7]);
+    assertEquals(String.valueOf(bytesToMoveMB), columns[8]);
+    assertEquals(estTimeLeft >= 0 ? String.valueOf(estTimeLeft) : "N/A", columns[9]);
   }
 
   private List<DatanodeAdminError> generateError(int count) {
