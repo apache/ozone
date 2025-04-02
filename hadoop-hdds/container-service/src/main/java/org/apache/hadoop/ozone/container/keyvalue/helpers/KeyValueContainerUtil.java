@@ -281,6 +281,10 @@ public final class KeyValueContainerUtil {
   }
 
   private static void populateContainerDataChecksum(KeyValueContainerData kvContainerData) {
+    if (kvContainerData.isOpen()) {
+      return;
+    }
+
     Optional<ContainerChecksumInfo> optionalContainerChecksumInfo = ContainerChecksumTreeManager
         .readChecksumInfo(kvContainerData);
     if (optionalContainerChecksumInfo.isPresent()) {

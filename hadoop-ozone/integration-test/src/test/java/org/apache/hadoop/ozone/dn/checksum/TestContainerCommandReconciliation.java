@@ -87,6 +87,7 @@ public class TestContainerCommandReconciliation {
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     // Disable the container scanner so it does not create merkle tree files that interfere with this test.
     conf.getObject(ContainerScannerConfiguration.class).setEnabled(false);
+    conf.setBoolean("hdds.container.scrub.enabled", false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -270,9 +271,8 @@ public class TestContainerCommandReconciliation {
     }
 
     // Check non-zero checksum after datanode restart
-    cluster.shutdownHddsDatanodes();
-    cluster.startHddsDatanodes();
-    cluster.waitForClusterToBeReady();
+    // Restarting all the nodes take more time in mini ozone cluster, so restarting only one node
+    cluster.restartHddsDatanode(0, true);
     containerReplicas = cluster.getStorageContainerManager().getContainerManager()
         .getContainerReplicas(ContainerID.valueOf(containerID));
     for (ContainerReplica containerReplica: containerReplicas) {
