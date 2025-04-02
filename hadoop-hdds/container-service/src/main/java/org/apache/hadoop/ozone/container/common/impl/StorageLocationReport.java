@@ -18,20 +18,19 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import java.io.IOException;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.ozone.container.common.interfaces.StorageLocationReportMXBean;
-import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 
 /**
  * Storage location stats of datanodes that provide back store for containers.
  *
  */
-public final class StorageLocationReport implements
-    StorageLocationReportMXBean {
+@Immutable
+public final class StorageLocationReport implements StorageLocationReportMXBean {
 
   private final String id;
   private final boolean failed;
@@ -43,19 +42,16 @@ public final class StorageLocationReport implements
   private final StorageType storageType;
   private final String storageLocation;
 
-  @SuppressWarnings("checkstyle:parameternumber")
-  private StorageLocationReport(String id, boolean failed, long capacity,
-      long scmUsed, long remaining, long committed, long freeSpaceToSpare,
-      StorageType storageType, String storageLocation) {
-    this.id = id;
-    this.failed = failed;
-    this.capacity = capacity;
-    this.scmUsed = scmUsed;
-    this.remaining = remaining;
-    this.committed = committed;
-    this.freeSpaceToSpare = freeSpaceToSpare;
-    this.storageType = storageType;
-    this.storageLocation = storageLocation;
+  private StorageLocationReport(Builder builder) {
+    this.id = builder.id;
+    this.failed = builder.failed;
+    this.capacity = builder.capacity;
+    this.scmUsed = builder.scmUsed;
+    this.remaining = builder.remaining;
+    this.committed = builder.committed;
+    this.freeSpaceToSpare = builder.freeSpaceToSpare;
+    this.storageType = builder.storageType;
+    this.storageLocation = builder.storageLocation;
   }
 
   @Override
@@ -168,11 +164,6 @@ public final class StorageLocationReport implements
    * @throws IOException In case, the storage type specified is invalid.
    */
   public StorageReportProto getProtoBufMessage() throws IOException {
-    return getProtoBufMessage(null);
-  }
-
-  public StorageReportProto getProtoBufMessage(ConfigurationSource conf)
-      throws IOException {
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();
     return srb.setStorageUuid(getId())
         .setCapacity(getCapacity())
@@ -182,8 +173,7 @@ public final class StorageLocationReport implements
         .setStorageType(getStorageTypeProto())
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
-        .setFreeSpaceToSpare(conf != null ?
-            new VolumeUsage.MinFreeSpaceCalculator(conf).get(getCapacity()) : 0)
+        .setFreeSpaceToSpare(getFreeSpaceToSpare())
         .build();
   }
 
@@ -312,6 +302,10 @@ public final class StorageLocationReport implements
       return this;
     }
 
+    public boolean isFailed() {
+      return failed;
+    }
+
     /**
      * Sets the capacity of volume.
      *
@@ -322,6 +316,11 @@ public final class StorageLocationReport implements
       this.capacity = capacityValue;
       return this;
     }
+
+    public long getCapacity() {
+      return capacity;
+    }
+
     /**
      * Sets the scmUsed Value.
      *
@@ -395,8 +394,7 @@ public final class StorageLocationReport implements
      * @return StorageLocationReport
      */
     public StorageLocationReport build() {
-      return new StorageLocationReport(id, failed, capacity, scmUsed,
-          remaining, committed, freeSpaceToSpare, storageType, storageLocation);
+      return new StorageLocationReport(this);
     }
 
   }

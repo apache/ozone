@@ -21,11 +21,11 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Date;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -76,7 +76,7 @@ public final class UpgradeUtils {
 
   public static boolean createFile(File file) throws IOException {
     final Date date = new Date();
-    try (Writer writer = new OutputStreamWriter(new FileOutputStream(file),
+    try (Writer writer = new OutputStreamWriter(Files.newOutputStream(file.toPath()),
         StandardCharsets.UTF_8)) {
       writer.write(date.toString());
     }

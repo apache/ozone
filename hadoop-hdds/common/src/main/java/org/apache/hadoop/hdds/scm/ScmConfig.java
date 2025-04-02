@@ -75,7 +75,7 @@ public class ScmConfig extends ReconfigurableConfig {
       + " : chooses a pipeline in a round robin fashion. Intended for troubleshooting and testing purposes only.";
 
   // hdds.scm.pipeline.choose.policy.impl
-  @Config(key = "pipeline.choose.policy.impl",
+  @Config(key = "hdds.scm.pipeline.choose.policy.impl",
       type = ConfigType.STRING,
       defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy",
       tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
@@ -89,7 +89,7 @@ public class ScmConfig extends ReconfigurableConfig {
   private String pipelineChoosePolicyName;
 
   // hdds.scm.ec.pipeline.choose.policy.impl
-  @Config(key = "ec.pipeline.choose.policy.impl",
+  @Config(key = "hdds.scm.ec.pipeline.choose.policy.impl",
       type = ConfigType.STRING,
       defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy",
       tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
@@ -102,7 +102,7 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private String ecPipelineChoosePolicyName;
 
-  @Config(key = "block.deletion.per-interval.max",
+  @Config(key = "hdds.scm.block.deletion.per-interval.max",
       type = ConfigType.INT,
       defaultValue = "100000",
       reconfigurable = true,
@@ -116,7 +116,7 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private int blockDeletionLimit;
 
-  @Config(key = "block.deleting.service.interval",
+  @Config(key = "hdds.scm.block.deleting.service.interval",
       defaultValue = "60s",
       type = ConfigType.TIME,
       tags = { ConfigTag.SCM, ConfigTag.DELETION },

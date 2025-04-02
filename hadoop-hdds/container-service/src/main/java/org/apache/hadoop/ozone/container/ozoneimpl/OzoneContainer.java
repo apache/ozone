@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -188,7 +189,8 @@ public class OzoneContainer {
         OZONE_RECOVERING_CONTAINER_TIMEOUT,
         OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.witnessedContainerMetadataStore = WitnessedContainerMetadataStoreImpl.get(conf);
-    containerSet = new ContainerSet(witnessedContainerMetadataStore.getContainerIdsTable(), recoveringContainerTimeout);
+    containerSet = ContainerSet.newRwContainerSet(witnessedContainerMetadataStore.getContainerIdsTable(),
+        recoveringContainerTimeout);
     metadataScanner = null;
 
     metrics = ContainerMetrics.create(conf);
@@ -483,6 +485,11 @@ public class OzoneContainer {
       return;
     }
 
+    DatanodeLayoutStorage layoutStorage
+        = new DatanodeLayoutStorage(config);
+    layoutStorage.setClusterId(clusterId);
+    layoutStorage.persistCurrentState();
+
     buildContainerSet();
 
     // Start background volume checks, which will begin after the configured
@@ -599,7 +606,7 @@ public class OzoneContainer {
             NodeReportProto.newBuilder();
 
     for (StorageLocationReport report : reports) {
-      nrb.addStorageReport(report.getProtoBufMessage(config));
+      nrb.addStorageReport(report.getProtoBufMessage());
     }
 
     StorageLocationReport[] metaReports = metaVolumeSet.getStorageReport();

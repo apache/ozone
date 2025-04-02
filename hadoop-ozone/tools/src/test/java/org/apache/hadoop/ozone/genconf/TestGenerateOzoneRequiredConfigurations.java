@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.genconf;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -233,7 +234,7 @@ public class TestGenerateOzoneRequiredConfigurations {
    */
   @Test
   public void genconfFailureByInsufficientPermissions(@TempDir File tempPath) throws Exception {
-    tempPath.setReadOnly();
+    assertTrue(tempPath.setReadOnly());
     String[] args = new String[]{tempPath.getAbsolutePath()};
     executeWithException(args, "Insufficient permission.");
   }

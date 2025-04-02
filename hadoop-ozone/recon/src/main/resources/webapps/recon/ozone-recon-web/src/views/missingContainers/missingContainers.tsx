@@ -130,7 +130,7 @@ const CONTAINER_TAB_COLUMNS = [
     sorter: (a: IContainerResponse, b: IContainerResponse) => a.containerID - b.containerID
   },
   {
-    title: 'No. of Keys',
+    title: 'No. of Blocks',
     dataIndex: 'keys',
     key: 'keys',
     sorter: (a: IContainerResponse, b: IContainerResponse) => a.keys - b.keys

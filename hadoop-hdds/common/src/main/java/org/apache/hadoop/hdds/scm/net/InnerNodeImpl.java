@@ -564,7 +564,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     Preconditions.checkState(genToExclude >= 0);
     Preconditions.checkState(genToReturn >= 0);
 
-    if (nodes == null || nodes.size() == 0) {
+    if (nodes == null || nodes.isEmpty()) {
       return Collections.emptyMap();
     }
     // with the recursive call, genToReturn can be smaller than genToExclude
@@ -609,7 +609,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       if (excludedNodes != null && excludedNodes.contains(node)) {
         continue;
       }
-      if (excludedScopes != null && excludedScopes.size() > 0) {
+      if (excludedScopes != null && !excludedScopes.isEmpty()) {
         if (excludedScopes.stream().anyMatch(node::isDescendant)) {
           continue;
         }

@@ -122,7 +122,7 @@ public final class OmTestManagers {
         "scmTopologyClient", scmTopologyClient);
 
     om.start();
-    waitFor(() -> om.getOmRatisServer().checkLeaderStatus() == RaftServerStatus.LEADER_AND_READY,
+    waitFor(() -> om.getOmRatisServer().getLeaderStatus() == RaftServerStatus.LEADER_AND_READY,
         10, 10_000);
 
     rpcClient = OzoneClientFactory.getRpcClient(conf);

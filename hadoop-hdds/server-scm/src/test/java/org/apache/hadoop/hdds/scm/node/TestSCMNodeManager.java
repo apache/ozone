@@ -69,7 +69,6 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -645,7 +644,7 @@ public class TestSCMNodeManager {
       // If found mismatch, leader SCM fires a SetNodeOperationalStateCommand
       // to update the opState persisted in Datanode.
       scm.getScmContext().updateLeaderAndTerm(true, 1);
-      List<SCMCommand> commands = nodeManager.processHeartbeat(dn);
+      List<SCMCommand<?>> commands = nodeManager.processHeartbeat(dn);
 
       assertEquals(SetNodeOperationalStateCommand.class,
           commands.get(0).getClass());
@@ -1643,8 +1642,8 @@ public class TestSCMNodeManager {
         Thread.sleep(100);
       }
 
-      final long expectedScmUsed = usedPerHeartbeat * (heartbeatCount - 1);
-      final long expectedRemaining = capacity - expectedScmUsed;
+      long expectedScmUsed = usedPerHeartbeat * (heartbeatCount - 1);
+      long expectedRemaining = capacity - expectedScmUsed;
 
       GenericTestUtils.waitFor(
           () -> nodeManager.getStats().getScmUsed().get() == expectedScmUsed,
@@ -1764,7 +1763,7 @@ public class TestSCMNodeManager {
                   PipelineID.randomId())));
 
       eq.processAll(1000L);
-      List<SCMCommand> command =
+      List<SCMCommand<?>> command =
           nodemanager.processHeartbeat(datanodeDetails);
       // With dh registered, SCM will send create pipeline command to dn
       assertThat(command.size()).isGreaterThanOrEqualTo(1);
@@ -1828,7 +1827,7 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
-    conf.setBoolean(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+    conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
         useHostname);
 
     // create table mapping file
@@ -1942,7 +1941,7 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
-    conf.setBoolean(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+    conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
         useHostname);
 
     // create a set of hosts - note two hosts on "host1"

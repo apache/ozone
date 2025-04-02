@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -166,7 +167,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
 
     String dataString = RandomStringUtils.randomAlphabetic(100);
 
-    TestDataUtil.createKey(bucket, keyName, dataString);
+    TestDataUtil.createKey(bucket, keyName, dataString.getBytes(StandardCharsets.UTF_8));
     assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
     OmKeyInfo keyInfo = ozoneManager.lookupKey(omKeyArgs);
     assertEquals(0, keyInfo.getLatestVersionLocations().getVersion());
@@ -175,7 +176,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
 
     // When bucket versioning is disabled, overwriting a key doesn't increment
     // its version count. Rather it always resets the version to 0
-    TestDataUtil.createKey(bucket, keyName, dataString);
+    TestDataUtil.createKey(bucket, keyName, dataString.getBytes(StandardCharsets.UTF_8));
 
     keyInfo = ozoneManager.lookupKey(omKeyArgs);
     assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
@@ -184,7 +185,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
         keyInfo.getLatestVersionLocations().getLocationList().size());
 
     dataString = RandomStringUtils.randomAlphabetic(200);
-    TestDataUtil.createKey(bucket, keyName, dataString);
+    TestDataUtil.createKey(bucket, keyName, dataString.getBytes(StandardCharsets.UTF_8));
 
     keyInfo = ozoneManager.lookupKey(omKeyArgs);
     assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
