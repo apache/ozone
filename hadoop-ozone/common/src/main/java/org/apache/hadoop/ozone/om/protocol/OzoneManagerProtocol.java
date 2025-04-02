@@ -777,6 +777,7 @@ public interface OzoneManagerProtocol
    * @return message which tells the image name, parent dir and OM leader
    * node information.
    */
+  @Deprecated
   default String printCompactionLogDag(String fileNamePrefix, String graphType)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
