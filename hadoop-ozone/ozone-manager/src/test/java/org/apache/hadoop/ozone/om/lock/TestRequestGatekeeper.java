@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -30,21 +29,22 @@ import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 
 /**
- * Test for TestOmLockOperation.
+ * Test for OmRequestGatekeeper.
  */
-public class TestOmLockOperation {
+public class TestRequestGatekeeper {
 
   @Test
   public void testObsLockOprWithParallelLock() throws IOException, ExecutionException, InterruptedException {
-    OmLockOperation omLockOpr = new OmLockOperation();
-    OmLockInfo.KeyLockInfo lockInfo =
-        new OmLockInfo.KeyLockInfo("bucket", OmLockInfo.LockAction.READ, "testkey", OmLockInfo.LockAction.WRITE);
-    OmLockOperation.OmLockObject lockObject = omLockOpr.lock(lockInfo);
+    OmRequestGatekeeper omLockOpr = new OmRequestGatekeeper();
+    OmLockInfo lockInfo = new OmLockInfo.Builder()
+        .addBucketReadLock("vol", "bucket")
+        .addKeyWriteLock("vol", "bucket", "testkey").build();
+    OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo);
     assertEquals(2, lockObject.getLocks().size());
 
-    CompletableFuture<OmLockOperation.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
+    CompletableFuture<OmRequestGatekeeper.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
       try {
-        OmLockOperation.OmLockObject lockInfoAgain = omLockOpr.lock(lockInfo);
+        OmRequestGatekeeper.OmLockObject lockInfoAgain = omLockOpr.lock(lockInfo);
         omLockOpr.unlock(lockInfoAgain);
         return lockInfoAgain;
       } catch (IOException e) {
@@ -68,11 +68,12 @@ public class TestOmLockOperation {
 
   @Test
   public void testObsLockOprListKeyRepeated() throws IOException {
-    OmLockOperation omLockOpr = new OmLockOperation();
-    OmLockInfo.MultiKeyLockInfo lockInfo =
-        new OmLockInfo.MultiKeyLockInfo("bucket", OmLockInfo.LockAction.READ,
-            Arrays.asList("testkey", "testkey2"), OmLockInfo.LockAction.WRITE);
-    OmLockOperation.OmLockObject lockObject = omLockOpr.lock(lockInfo);
+    OmRequestGatekeeper omLockOpr = new OmRequestGatekeeper();
+    OmLockInfo lockInfo = new OmLockInfo.Builder()
+        .addBucketReadLock("vol", "bucket")
+        .addKeyWriteLock("vol", "bucket", "testkey")
+        .addKeyWriteLock("vol", "bucket", "testkey2").build();
+    OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo);
     assertEquals(3, lockObject.getLocks().size());
 
     omLockOpr.unlock(lockObject);
@@ -84,9 +85,9 @@ public class TestOmLockOperation {
 
   @Test
   public void testBucketReadLock() throws IOException {
-    OmLockOperation omLockOpr = new OmLockOperation();
-    OmLockInfo.BucketLockInfo lockInfo = new OmLockInfo.BucketLockInfo("bucket", OmLockInfo.LockAction.READ);
-    OmLockOperation.OmLockObject lockObject = omLockOpr.lock(lockInfo);
+    OmRequestGatekeeper omLockOpr = new OmRequestGatekeeper();
+    OmLockInfo lockInfo = new OmLockInfo.Builder().addBucketReadLock("vol", "bucket").build();
+    OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo);
     assertEquals(1, lockObject.getLocks().size());
 
     omLockOpr.unlock(lockObject);
@@ -94,16 +95,16 @@ public class TestOmLockOperation {
 
   @Test
   public void testBucketReadWithWriteParallelLock() throws IOException, ExecutionException, InterruptedException {
-    OmLockOperation omLockOpr = new OmLockOperation();
-    OmLockInfo.BucketLockInfo lockInfo = new OmLockInfo.BucketLockInfo("bucket", OmLockInfo.LockAction.READ);
-    OmLockOperation.OmLockObject lockObject = omLockOpr.lock(lockInfo);
+    OmRequestGatekeeper omLockOpr = new OmRequestGatekeeper();
+    OmLockInfo lockInfo = new OmLockInfo.Builder().addBucketReadLock("vol", "bucket").build();
+    OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo);
     assertEquals(1, lockObject.getLocks().size());
 
-    OmLockInfo.BucketLockInfo writeLockInfo = new OmLockInfo.BucketLockInfo("bucket", OmLockInfo.LockAction.WRITE);
+    OmLockInfo writeLockInfo = new OmLockInfo.Builder().addBucketWriteLock("vol", "bucket").build();
 
-    CompletableFuture<OmLockOperation.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
+    CompletableFuture<OmRequestGatekeeper.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
       try {
-        OmLockOperation.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo);
+        OmRequestGatekeeper.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo);
         omLockOpr.unlock(lockInfoAgain);
         return lockInfoAgain;
       } catch (IOException e) {
@@ -127,16 +128,16 @@ public class TestOmLockOperation {
 
   @Test
   public void testVolumeReadWithWriteParallelLock() throws IOException, ExecutionException, InterruptedException {
-    OmLockOperation omLockOpr = new OmLockOperation();
-    OmLockInfo.VolumeLockInfo lockInfo = new OmLockInfo.VolumeLockInfo("vol1", OmLockInfo.LockAction.READ);
-    OmLockOperation.OmLockObject lockObject = omLockOpr.lock(lockInfo);
+    OmRequestGatekeeper omLockOpr = new OmRequestGatekeeper();
+    OmLockInfo lockInfo = new OmLockInfo.Builder().addVolumeReadLock("vol").build();
+
+    OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo);
     assertEquals(1, lockObject.getLocks().size());
 
-    OmLockInfo.VolumeLockInfo writeLockInfo = new OmLockInfo.VolumeLockInfo("vol1", OmLockInfo.LockAction.WRITE);
-
-    CompletableFuture<OmLockOperation.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
+    OmLockInfo writeLockInfo = new OmLockInfo.Builder().addVolumeWriteLock("vol").build();
+    CompletableFuture<OmRequestGatekeeper.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
       try {
-        OmLockOperation.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo);
+        OmRequestGatekeeper.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo);
         omLockOpr.unlock(lockInfoAgain);
         return lockInfoAgain;
       } catch (IOException e) {
@@ -160,17 +161,18 @@ public class TestOmLockOperation {
 
   @Test
   public void testVolWriteWithVolBucketRWParallelLock() throws IOException, ExecutionException, InterruptedException {
-    OmLockOperation omLockOpr = new OmLockOperation();
-    OmLockInfo.VolumeLockInfo lockInfo = new OmLockInfo.VolumeLockInfo("vol1", OmLockInfo.LockAction.WRITE);
-    OmLockOperation.OmLockObject lockObject = omLockOpr.lock(lockInfo);
+    OmRequestGatekeeper omLockOpr = new OmRequestGatekeeper();
+    OmLockInfo lockInfo = new OmLockInfo.Builder().addVolumeWriteLock("vol").build();
+
+    OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo);
     assertEquals(1, lockObject.getLocks().size());
 
-    OmLockInfo.BucketLockInfo writeLockInfo = new OmLockInfo.BucketLockInfo("vol1",
-        OmLockInfo.LockAction.READ, "buck1", OmLockInfo.LockAction.WRITE);
+    OmLockInfo writeLockInfo = new OmLockInfo.Builder().addVolumeReadLock("vol")
+        .addBucketWriteLock("vol", "buck1").build();
 
-    CompletableFuture<OmLockOperation.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
+    CompletableFuture<OmRequestGatekeeper.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
       try {
-        OmLockOperation.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo);
+        OmRequestGatekeeper.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo);
         omLockOpr.unlock(lockInfoAgain);
         return lockInfoAgain;
       } catch (IOException e) {

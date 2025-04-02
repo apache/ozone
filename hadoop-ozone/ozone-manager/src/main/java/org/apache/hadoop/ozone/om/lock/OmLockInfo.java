@@ -17,165 +17,136 @@
 
 package org.apache.hadoop.ozone.om.lock;
 
-import java.util.List;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Lock information.
  */
 public final class OmLockInfo {
+  private final LockInfo volumeLock;
+  private final LockInfo bucketLock;
+  private final Set<LockInfo> keyLocks;
+
+  private OmLockInfo(Builder builder) {
+    volumeLock = builder.volumeLock;
+    bucketLock = builder.bucketLock;
+    keyLocks = builder.keyLocks;
+  }
+
+  public Optional<LockInfo> getVolumeLock() {
+    return Optional.ofNullable(volumeLock);
+  }
+
+  public Optional<LockInfo> getBucketLock() {
+    return Optional.ofNullable(bucketLock);
+  }
+
+  public Optional<Set<LockInfo>> getKeyLocks() {
+    return Optional.ofNullable(keyLocks);
+  }
+
   /**
-   * lock info provider.
+   * Builds an {@link OmLockInfo} object with optional volume, bucket or key locks.
    */
-  public interface LockInfoProvider {
-    default LockLevel getLevel() {
-      return LockLevel.NONE;
+  public static final class Builder {
+    private LockInfo volumeLock;
+    private LockInfo bucketLock;
+    private Set<LockInfo> keyLocks;
+
+    public Builder() {
+    }
+
+    public Builder addVolumeReadLock(String volume) {
+      volumeLock = LockInfo.writeLockInfo(volume);
+      return this;
+    }
+
+    public Builder addVolumeWriteLock(String volume) {
+      volumeLock = LockInfo.readLockInfo(volume);
+      return this;
+    }
+
+    public Builder addBucketReadLock(String volume, String bucket) {
+      bucketLock = LockInfo.readLockInfo(joinStrings(volume, bucket));
+      return this;
+    }
+
+    public Builder addBucketWriteLock(String volume, String bucket) {
+      bucketLock = LockInfo.writeLockInfo(joinStrings(volume, bucket));
+      return this;
+    }
+
+    // Currently there is no use case for key level read locks.
+    public Builder addKeyWriteLock(String volume, String bucket, String key) {
+      // Lazy init keys.
+      if (keyLocks == null) {
+        keyLocks = new HashSet<>();
+      }
+      keyLocks.add(LockInfo.writeLockInfo(joinStrings(volume, bucket, key)));
+      return this;
+    }
+
+    private String joinStrings(String... parts) {
+      return String.join(OzoneConsts.OZONE_URI_DELIMITER, parts);
+    }
+
+    public OmLockInfo build() {
+      return new OmLockInfo(this);
     }
   }
 
   /**
-   * volume lock info.
+   * This class provides specifications about a lock's requirements.
    */
-  public static class VolumeLockInfo implements LockInfoProvider {
-    private final String volumeName;
-    private final LockAction action;
+  public static final class LockInfo implements Comparable<LockInfo> {
+    private final String name;
+    private final boolean isWriteLock;
     
-    public VolumeLockInfo(String volumeName, LockAction volLockType) {
-      this.volumeName = volumeName;
-      this.action = volLockType;
+    private LockInfo(String name, boolean isWriteLock) {
+      this.name = name;
+      this.isWriteLock = isWriteLock;
     }
 
-    public String getVolumeName() {
-      return volumeName;
+    public static LockInfo writeLockInfo(String key) {
+      return new LockInfo(key, true);
     }
 
-    public LockAction getAction() {
-      return action;
+    public static LockInfo readLockInfo(String key) {
+      return new LockInfo(key, false);
     }
 
-    @Override
-    public LockLevel getLevel() {
-      return LockLevel.VOLUME;
-    }
-  }
-
-  /**
-   * bucket lock info.
-   */
-  public static class BucketLockInfo implements LockInfoProvider {
-    private final VolumeLockInfo volumeLockInfo;
-    private final String bucketName;
-    private final LockAction action;
-  
-    public BucketLockInfo(String bucketName, LockAction action) {
-      this.volumeLockInfo = null;
-      this.bucketName = bucketName;
-      this.action = action;
+    public String getName() {
+      return name;
     }
 
-    public BucketLockInfo(String volumeName, LockAction volLockType, String bucketName, LockAction action) {
-      this.volumeLockInfo = new VolumeLockInfo(volumeName, volLockType);
-      this.bucketName = bucketName;
-      this.action = action;
-    }
-
-    public VolumeLockInfo getVolumeLockInfo() {
-      return volumeLockInfo;
-    }
-
-    public String getBucketName() {
-      return bucketName;
-    }
-
-    public LockAction getAction() {
-      return action;
+    public boolean isWriteLock() {
+      return isWriteLock;
     }
 
     @Override
-    public LockLevel getLevel() {
-      return LockLevel.BUCKET;
-    }
-  }
-
-  /**
-   * key lock info.
-   */
-  public static class KeyLockInfo implements LockInfoProvider {
-    private final BucketLockInfo bucketLockInfo;
-    private final String key;
-    private final LockAction action;
-
-    public KeyLockInfo(String bucketName, LockAction bucketAction, String keyName, LockAction keyAction) {
-      this.bucketLockInfo = new BucketLockInfo(bucketName, bucketAction);
-      this.key = keyName;
-      this.action = keyAction;
-    }
-
-    public BucketLockInfo getBucketLockInfo() {
-      return bucketLockInfo;
-    }
-
-    public String getKey() {
-      return key;
-    }
-
-    public LockAction getAction() {
-      return action;
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof LockInfo)) {
+        return false;
+      }
+      LockInfo lockInfo = (LockInfo) o;
+      return isWriteLock == lockInfo.isWriteLock && Objects.equals(name, lockInfo.name);
     }
 
     @Override
-    public LockLevel getLevel() {
-      return LockLevel.KEY;
-    }
-  }
-
-  /**
-   * multiple keys lock info.
-   */
-  public static class MultiKeyLockInfo implements LockInfoProvider {
-    private final BucketLockInfo bucketLockInfo;
-    private final List<String> keyList;
-    private final LockAction action;
-
-    public MultiKeyLockInfo(
-        String bucketName, LockAction bucketAction, List<String> keyList, LockAction keyAction) {
-      this.bucketLockInfo = new BucketLockInfo(bucketName, bucketAction);
-      this.keyList = keyList;
-      this.action = keyAction;
-    }
-
-    public BucketLockInfo getBucketLockInfo() {
-      return bucketLockInfo;
-    }
-
-    public List<String> getKeyList() {
-      return keyList;
-    }
-
-    public LockAction getAction() {
-      return action;
+    public int hashCode() {
+      return Objects.hash(name, isWriteLock);
     }
 
     @Override
-    public LockLevel getLevel() {
-      return LockLevel.MULTI_KEY;
+    public int compareTo(LockInfo other) {
+      return Integer.compare(hashCode(), other.hashCode());
     }
-  }
-
-  /**
-   * way the lock should be taken.
-   */
-  public enum LockAction {
-    NONE, READ, WRITE
-  }
-
-  /**
-   * lock stage level, like volume, bucket, key.
-   */
-  public enum LockLevel {
-    NONE,
-    VOLUME,
-    BUCKET,
-    KEY,
-    MULTI_KEY
   }
 }
