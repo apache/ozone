@@ -319,24 +319,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private final MutableGraph<CompactionNode> backwardCompactionDAG =
       GraphBuilder.directed().build();
 
-  public static final Integer DEBUG_DAG_BUILD_UP = 2;
-  public static final Integer DEBUG_DAG_TRAVERSAL = 3;
-  public static final Integer DEBUG_DAG_LIVE_NODES = 4;
-  public static final Integer DEBUG_READ_ALL_DB_KEYS = 5;
-  private static final HashSet<Integer> DEBUG_LEVEL = new HashSet<>();
-
-  static {
-    addDebugLevel(DEBUG_DAG_BUILD_UP);
-    addDebugLevel(DEBUG_DAG_TRAVERSAL);
-    addDebugLevel(DEBUG_DAG_LIVE_NODES);
-  }
-
   static {
     RocksDB.loadLibrary();
-  }
-
-  public static void addDebugLevel(Integer level) {
-    DEBUG_LEVEL.add(level);
   }
 
   public void setRocksDBForCompactionTracking(ManagedDBOptions rocksOptions) {
@@ -1356,11 +1340,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   public boolean shouldRun() {
     return !suspended.get();
-  }
-
-  @VisibleForTesting
-  public boolean debugEnabled(Integer level) {
-    return DEBUG_LEVEL.contains(level);
   }
 
   @VisibleForTesting
