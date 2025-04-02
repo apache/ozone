@@ -111,7 +111,7 @@ public class RatisPipelineProvider
     if (maxPipelinePerDatanode > 0) {
       return (getPipelineStateManager().getPipelines(replicationConfig).size() -
           getPipelineStateManager().getPipelines(replicationConfig,
-              PipelineState.CLOSED).size()) > maxPipelinePerDatanode *
+              PipelineState.CLOSED).size()) >= maxPipelinePerDatanode *
           getNodeManager().getNodeCount(NodeStatus.inServiceHealthy()) /
           replicationConfig.getRequiredNodes();
     }
@@ -120,7 +120,7 @@ public class RatisPipelineProvider
     if (pipelineNumberLimit > 0) {
       return (getPipelineStateManager().getPipelines(replicationConfig).size() -
           getPipelineStateManager().getPipelines(
-              replicationConfig, PipelineState.CLOSED).size()) >
+              replicationConfig, PipelineState.CLOSED).size()) >=
           (pipelineNumberLimit - getPipelineStateManager()
               .getPipelines(RatisReplicationConfig
                   .getInstance(ReplicationFactor.ONE))
@@ -147,10 +147,15 @@ public class RatisPipelineProvider
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
     if (exceedPipelineNumberLimit(replicationConfig)) {
-      throw new SCMException("Ratis pipeline number meets the limit: " +
-          pipelineNumberLimit + " replicationConfig : " +
-          replicationConfig,
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+      String limitInfo = (maxPipelinePerDatanode > 0)
+          ? String.format("per dataNode: %d", maxPipelinePerDatanode)
+          : String.format(": %d", pipelineNumberLimit);
+
+      throw new SCMException(
+          String.format("Ratis pipeline number meets the limit %s replicationConfig: %s",
+              limitInfo, replicationConfig),
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE
+      );
     }
 
     List<DatanodeDetails> dns;
