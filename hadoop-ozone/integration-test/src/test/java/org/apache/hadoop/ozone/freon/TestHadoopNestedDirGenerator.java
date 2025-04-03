@@ -145,10 +145,7 @@ public abstract class TestHadoopNestedDirGenerator implements NonHATests.TestCas
 
   private int spanCheck(FileSystem fs, int span, Path p) throws IOException {
     int sp = 0;
-    int depth = 0;
-    if (span >= 0) {
-      depth = 0;
-    } else {
+    if (span <= 0) {
       LOG.info("Span value can never be negative");
     }
     FileStatus[] fileStatuses = fs.listStatus(p);
