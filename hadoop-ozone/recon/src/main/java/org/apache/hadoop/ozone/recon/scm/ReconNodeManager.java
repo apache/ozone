@@ -222,9 +222,9 @@ public class ReconNodeManager extends SCMNodeManager {
    * @return SCMheartbeat response.
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+  public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
       CommandQueueReportProto queueReport) {
-    List<SCMCommand> cmds = new ArrayList<>();
+    List<SCMCommand<?>> cmds = new ArrayList<>();
     long currentTime = Time.now();
     if (needUpdate(datanodeDetails, currentTime)) {
       cmds.add(new ReregisterCommand());
@@ -307,7 +307,7 @@ public class ReconNodeManager extends SCMNodeManager {
           nodeStatus.getOperationalState());
 
       setNodeOperationalState(dnDetails, nodeOperationalStateFromScm);
-      DatanodeDetails scmDnd = getNodeByUuid(dnDetails.getUuid());
+      DatanodeDetails scmDnd = getNode(dnDetails.getID());
       scmDnd.setPersistedOpState(nodeOperationalStateFromScm);
     }
   }

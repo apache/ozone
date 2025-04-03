@@ -215,7 +215,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     if (keyType.equals(String.class)) {
       return key.getBytes(UTF_8);
     } else if (keyType.equals(ContainerID.class)) {
-      return new ContainerID(Long.parseLong(key)).getBytes();
+      return ContainerID.getBytes(Long.parseLong(key));
     } else if (keyType.equals(Long.class)) {
       return LongCodec.get().toPersistedFormat(Long.parseLong(key));
     } else if (keyType.equals(PipelineID.class)) {

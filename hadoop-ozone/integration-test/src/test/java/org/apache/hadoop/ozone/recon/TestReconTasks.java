@@ -136,7 +136,7 @@ public class TestReconTasks {
 
     // Make sure Recon's pipeline state is initialized.
     LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() >= 1));
+        () -> (!reconPipelineManager.getPipelines().isEmpty()));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
@@ -216,7 +216,7 @@ public class TestReconTasks {
 
     // Make sure Recon's pipeline state is initialized.
     LambdaTestUtils.await(60000, 1000,
-        () -> (reconPipelineManager.getPipelines().size() >= 1));
+        () -> (!reconPipelineManager.getPipelines().isEmpty()));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
@@ -254,7 +254,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 1;
@@ -292,7 +292,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 0 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 0;
@@ -321,7 +321,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 1;

@@ -690,7 +690,7 @@ public class TestOmMetrics {
     // Test getAcl, addAcl, setAcl, removeAcl
     List<OzoneAcl> acls = ozoneManager.getAcl(volObj);
     writeClient.addAcl(volObj,
-        new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
+        OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
             ACCESS, IAccessAuthorizer.ACLType.ALL));
     writeClient.setAcl(volObj, acls);
     writeClient.removeAcl(volObj, acls.get(0));
@@ -745,7 +745,7 @@ public class TestOmMetrics {
     OMMetrics metrics = ozoneManager.getMetrics();
     long initialValue = metrics.getNumAddAcl();
     objectStore.addAcl(volObj,
-        new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
+        OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
             ACCESS, IAccessAuthorizer.ACLType.ALL));
 
     assertEquals(initialValue + 1, metrics.getNumAddAcl());

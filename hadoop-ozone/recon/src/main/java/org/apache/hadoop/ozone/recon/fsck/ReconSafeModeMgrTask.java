@@ -95,10 +95,10 @@ public class ReconSafeModeMgrTask {
   private void tryReconExitSafeMode()
       throws InterruptedException {
       // Recon starting first time
-    if (null == allNodes || allNodes.size() == 0) {
+    if (null == allNodes || allNodes.isEmpty()) {
       return;
     }
-    if (null == containers || containers.size() == 0) {
+    if (null == containers || containers.isEmpty()) {
       return;
     }
     final Set<ContainerID> currentContainersInAllDatanodes =

@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -259,16 +260,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       ContainerID containerId) throws NodeNotFoundException;
 
   /**
-   * Remaps datanode to containers mapping to the new set of containers.
-   * @param datanodeDetails - DatanodeDetails
-   * @param containerIds - Set of containerIDs
-   * @throws NodeNotFoundException - if datanode is not known. For new datanode
-   *                        use addDatanodeInContainerMap call.
-   */
-  void setContainers(DatanodeDetails datanodeDetails,
-      Set<ContainerID> containerIds) throws NodeNotFoundException;
-
-  /**
    * Return set of containerIDs available on a datanode.
    * @param datanodeDetails DatanodeDetails
    * @return set of containerIDs
@@ -282,7 +273,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param dnId datanode uuid
    * @param command
    */
-  void addDatanodeCommand(UUID dnId, SCMCommand command);
+  void addDatanodeCommand(UUID dnId, SCMCommand<?> command);
 
 
   /**
@@ -368,19 +359,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @return list of commands
    */
   // TODO: We can give better name to this method!
-  List<SCMCommand> getCommandQueue(UUID dnID);
+  List<SCMCommand<?>> getCommandQueue(UUID dnID);
 
-  /**
-   * Given datanode uuid, returns the DatanodeDetails for the node.
-   *
-   * @param uuid datanode uuid
-   * @return the given datanode, or null if not found
-   */
-  @Nullable DatanodeDetails getNodeByUuid(@Nullable String uuid);
-
-  default @Nullable DatanodeDetails getNodeByUuid(@Nullable UUID uuid) {
-    return uuid != null ? getNodeByUuid(uuid.toString()) : null;
-  };
+  /** @return the datanode of the given id if it exists; otherwise, return null. */
+  @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of

@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -97,7 +98,7 @@ public class TestHddsSecureDatanodeInit {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
     //conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
     String volumeDir = testDir + "/disk1";
-    conf.set(HddsConfigKeys.HDDS_DATANODE_DATA_DIR_KEY, volumeDir);
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeDir);
 
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     conf.setClass(OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY,

@@ -84,7 +84,7 @@ public class ContainerCommands extends AbstractSubcommand {
   public void loadContainersFromVolumes() throws IOException {
     OzoneConfiguration conf = getOzoneConf();
 
-    ContainerSet containerSet = new ContainerSet(null, 1000, true);
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 

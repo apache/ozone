@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -369,7 +369,8 @@ class TestObjectPut {
     MessageDigest messageDigest = mock(MessageDigest.class);
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // For example, EOFException during put-object due to client cancelling the operation before it completes
-      mocked.when(() -> IOUtils.copy(any(InputStream.class), any(OutputStream.class), anyInt()))
+      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
+              anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
 
@@ -554,7 +555,8 @@ class TestObjectPut {
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // Add the mocked methods only during the copy request
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
-      mocked.when(() -> IOUtils.copy(any(InputStream.class), any(OutputStream.class), anyInt()))
+      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
+              anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
 
       // Add copy header, and then call put

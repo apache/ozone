@@ -109,7 +109,7 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
   public void insertNewDatanode(UUID datanodeID,
       Set<StorageLocationReport> report) throws SCMException {
     Preconditions.checkNotNull(report);
-    Preconditions.checkState(report.size() != 0);
+    Preconditions.checkState(!report.isEmpty());
     Preconditions.checkNotNull(datanodeID);
     synchronized (scmNodeStorageReportMap) {
       if (isKnownDatanode(datanodeID)) {
@@ -132,7 +132,7 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
       Set<StorageLocationReport> report) throws SCMException {
     Preconditions.checkNotNull(datanodeID);
     Preconditions.checkNotNull(report);
-    Preconditions.checkState(report.size() != 0);
+    Preconditions.checkState(!report.isEmpty());
     synchronized (scmNodeStorageReportMap) {
       if (!scmNodeStorageReportMap.containsKey(datanodeID)) {
         throw new SCMException("No such datanode", NO_SUCH_DATANODE);

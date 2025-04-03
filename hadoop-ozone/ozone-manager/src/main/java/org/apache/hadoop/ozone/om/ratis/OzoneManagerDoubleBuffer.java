@@ -515,9 +515,8 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   private void terminate(Throwable t, int status, OMResponse omResponse) {
-    StringBuilder message = new StringBuilder(
-        "During flush to DB encountered error in " +
-        "OMDoubleBuffer flush thread " + Thread.currentThread().getName());
+    StringBuilder message = new StringBuilder("During flush to DB encountered error in OMDoubleBuffer flush thread ")
+        .append(Thread.currentThread().getName());
     if (omResponse != null) {
       message.append(" when handling OMRequest: ").append(omResponse);
     }
