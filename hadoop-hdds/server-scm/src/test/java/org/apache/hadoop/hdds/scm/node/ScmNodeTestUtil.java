@@ -15,5 +15,17 @@
  * limitations under the License.
  */
 
-/** Helper classes for ozone and container tests. */
-package org.apache.hadoop.ozone.container.testutils;
+package org.apache.hadoop.hdds.scm.node;
+
+import java.util.Set;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+
+/** Utilities for testing the {@link org.apache.hadoop.hdds.scm.node} package. */
+public interface ScmNodeTestUtil {
+  static void setContainers(SCMNodeManager scm, DatanodeDetails datanode,
+      Set<ContainerID> containers) throws NodeNotFoundException {
+    scm.getNodeStateManager().setContainersForTesting(datanode.getID(), containers);
+  }
+}

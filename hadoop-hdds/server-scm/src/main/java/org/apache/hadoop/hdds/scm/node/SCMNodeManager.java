@@ -56,7 +56,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -1098,16 +1098,14 @@ public class SCMNodeManager implements NodeManager {
       }
       List<StorageReportProto> storageReportProtos = node.getStorageReports();
       for (StorageReportProto reportProto : storageReportProtos) {
-        if (reportProto.getStorageType() ==
-            StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK) {
+        if (reportProto.getStorageType() == StorageTypeProto.DISK) {
           nodeInfo.compute(keyPrefix + UsageMetrics.DiskCapacity.name(),
               (k, v) -> v + reportProto.getCapacity());
           nodeInfo.compute(keyPrefix + UsageMetrics.DiskRemaining.name(),
               (k, v) -> v + reportProto.getRemaining());
           nodeInfo.compute(keyPrefix + UsageMetrics.DiskUsed.name(),
               (k, v) -> v + reportProto.getScmUsed());
-        } else if (reportProto.getStorageType() ==
-            StorageContainerDatanodeProtocolProtos.StorageTypeProto.SSD) {
+        } else if (reportProto.getStorageType() == StorageTypeProto.SSD) {
           nodeInfo.compute(keyPrefix + UsageMetrics.SSDCapacity.name(),
               (k, v) -> v + reportProto.getCapacity());
           nodeInfo.compute(keyPrefix + UsageMetrics.SSDRemaining.name(),
@@ -1598,20 +1596,6 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Update set of containers available on a datanode.
-   *
-   * @param datanodeDetails - DatanodeID
-   * @param containerIds    - Set of containerIDs
-   * @throws NodeNotFoundException - if datanode is not known. For new datanode
-   *                               use addDatanodeInContainerMap call.
-   */
-  @Override
-  public void setContainers(DatanodeDetails datanodeDetails,
-      Set<ContainerID> containerIds) throws NodeNotFoundException {
-    nodeStateManager.setContainers(datanodeDetails.getID(), containerIds);
-  }
-
-  /**
    * Return set of containerIDs available on a datanode. This is a copy of the
    * set which resides inside NodeManager and hence can be modified without
    * synchronization or side effects.
@@ -1690,29 +1674,16 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  /**
-   * Given datanode uuid, returns the DatanodeDetails for the node.
-   *
-   * @param uuid node host address
-   * @return the given datanode, or null if not found
-   */
   @Override
-  public DatanodeDetails getNodeByUuid(String uuid) {
-    return uuid != null && !uuid.isEmpty()
-        ? getNodeByUuid(UUID.fromString(uuid))
-        : null;
-  }
-
-  @Override
-  public DatanodeDetails getNodeByUuid(UUID uuid) {
-    if (uuid == null) {
+  public DatanodeInfo getNode(DatanodeID id) {
+    if (id == null) {
       return null;
     }
 
     try {
-      return nodeStateManager.getNode(DatanodeID.of(uuid));
+      return nodeStateManager.getNode(id);
     } catch (NodeNotFoundException e) {
-      LOG.warn("Cannot find node for uuid {}", uuid);
+      LOG.warn("Cannot find node for uuid {}", id);
       return null;
     }
   }

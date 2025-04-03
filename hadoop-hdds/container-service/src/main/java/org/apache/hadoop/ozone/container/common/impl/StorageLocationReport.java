@@ -20,9 +20,9 @@ package org.apache.hadoop.ozone.container.common.impl;
 import java.io.IOException;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.ozone.container.common.interfaces.StorageLocationReportMXBean;
 import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 

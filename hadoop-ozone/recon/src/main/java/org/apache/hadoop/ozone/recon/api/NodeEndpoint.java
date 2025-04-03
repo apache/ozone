@@ -46,6 +46,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.DecommissionUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
@@ -213,7 +214,7 @@ public class NodeEndpoint {
     Preconditions.checkArgument(!uuids.isEmpty(), "Datanode list argument should not be empty");
     try {
       for (String uuid : uuids) {
-        DatanodeDetails nodeByUuid = nodeManager.getNodeByUuid(uuid);
+        DatanodeDetails nodeByUuid = nodeManager.getNode(DatanodeID.fromUuidString(uuid));
         try {
           if (preChecksSuccess(nodeByUuid, failedNodeErrorResponseMap)) {
             removedDatanodes.add(DatanodeMetadata.newBuilder()

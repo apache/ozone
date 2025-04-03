@@ -48,6 +48,11 @@ public class ReconIncrementalContainerReportHandler
   }
 
   @Override
+  protected Logger getLogger() {
+    return LOG;
+  }
+
+  @Override
   public void onMessage(final IncrementalContainerReportFromDatanode report,
                         final EventPublisher publisher) {
     final DatanodeDetails dnFromReport = report.getDatanodeDetails();
@@ -56,8 +61,7 @@ public class ReconIncrementalContainerReportHandler
           dnFromReport);
     }
 
-    DatanodeDetails dd =
-        getNodeManager().getNodeByUuid(dnFromReport.getUuid());
+    final DatanodeDetails dd = getNodeManager().getNode(dnFromReport.getID());
     if (dd == null) {
       LOG.warn("Received container report from unknown datanode {}",
           dnFromReport);

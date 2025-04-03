@@ -78,6 +78,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -86,7 +87,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -670,7 +670,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // Change Node OperationalState with NodeManager
     final NodeManager nodeManager = reconScm.getScmNodeManager();
     final DatanodeDetails dnDetailsInternal =
-        nodeManager.getNodeByUuid(datanodeDetails.getUuidString());
+        nodeManager.getNode(datanodeDetails.getID());
     // Backup existing state and sanity check
     final NodeStatus nStatus = nodeManager.getNodeStatus(dnDetailsInternal);
     final NodeOperationalState backupOpState =
@@ -1280,7 +1280,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // Change Node3 OperationalState with NodeManager to NodeOperationalState.DECOMMISSIONED
     final NodeManager nodeManager = reconScm.getScmNodeManager();
     final DatanodeDetails dnDetailsInternal =
-        nodeManager.getNodeByUuid(datanodeDetails3.getUuidString());
+        nodeManager.getNode(datanodeDetails3.getID());
     // Backup existing state and sanity check
     final NodeStatus nStatus = nodeManager.getNodeStatus(dnDetailsInternal);
     final NodeOperationalState backupOpState =
