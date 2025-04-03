@@ -50,6 +50,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -407,6 +408,8 @@ public class OzoneManagerServiceProviderImpl
             connectionFactory, getOzoneManagerSnapshotUrl(), isOmSpnegoEnabled()).getInputStream()) {
           tarExtractor.extractTar(inputStream, untarredDbDir);
         } catch (IOException | InterruptedException e) {
+          reconContext.updateHealthStatus(new AtomicBoolean(false));
+          reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
           throw new RuntimeException("Error while extracting OM DB Snapshot TAR.", e);
         }
         return null;
@@ -418,10 +421,22 @@ public class OzoneManagerServiceProviderImpl
         LOG.warn("Number of SST files found in the OM snapshot directory: {} - {}", untarredDbDir, sstFiles.length);
       }
 
+      List<String> sstFileNames = Arrays.stream(sstFiles)
+          .map(File::getName)
+          .collect(Collectors.toList());
+      LOG.debug("Valid SST files found: {}", sstFileNames);
+
+      // Currently, OM DB type is not configurable. Hence, defaulting to
+      // RocksDB.
+      reconContext.updateHealthStatus(new AtomicBoolean(true));
+      reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+
       return new RocksDBCheckpoint(untarredDbDir);
 
     } catch (IOException e) {
       LOG.error("Unable to obtain Ozone Manager DB Snapshot.", e);
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
     } finally {
       tarExtractor.shutdown();
     }
