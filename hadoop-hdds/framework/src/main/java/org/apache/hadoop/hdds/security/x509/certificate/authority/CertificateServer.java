@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 /**
  * Interface for Certificate Authority. This can be extended to talk to
@@ -38,11 +37,9 @@ public interface CertificateServer {
    * Initialize the Certificate Authority.
    *
    * @param securityConfig - Security Configuration.
-   * @param type - The Type of CertificateServer we are creating, we make this
-   * explicit so that when we read code it is visible to the users.
    * @throws SCMSecurityException - Throws if the init fails.
    */
-  void init(SecurityConfig securityConfig, CAType type)
+  void init(SecurityConfig securityConfig)
       throws IOException;
 
   /**
@@ -92,7 +89,7 @@ public interface CertificateServer {
    * @throws SCMSecurityException - on Error.
    */
   Future<CertPath> requestCertificate(
-      PKCS10CertificationRequest csr,
+      String csr,
       CertificateApprover.ApprovalType type, NodeType role,
       String certSerialId) throws SCMSecurityException;
 
