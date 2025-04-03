@@ -32,7 +32,7 @@ public final class DBConsts {
   public static final String PROPS_FILE = "container-log-db-queries.properties";
   public static final int CACHE_SIZE = 1000000;
   public static final int BATCH_SIZE = 1000;
-  public static final String DATANODE_CONTAINER_LOG_TABLE_NAME="DatanodeContainerLogTable";
-  public static final String CONTAINER_LOG_TABLE_NAME="ContainerLogTable";
+  public static final String DATANODE_CONTAINER_LOG_TABLE_NAME = "DatanodeContainerLogTable";
+  public static final String CONTAINER_LOG_TABLE_NAME = "ContainerLogTable";
 
 }
