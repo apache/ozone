@@ -1528,12 +1528,6 @@
   </property>
 
   <property>
-    <name>hdds.rest.http-address</name>
-    <value>0.0.0.0:9880</value>
-    <description>The http address of Object Store REST server inside the
-      datanode.</description>
-  </property>
-  <property>
     <name>hdds.datanode.plugins</name>
     <value/>
     <description>
@@ -1853,10 +1847,11 @@
 
   <property>
     <name>ozone.s3g.https-address</name>
-    <value/>
+    <value>0.0.0.0:9879</value>
     <tag>OZONE, S3GATEWAY</tag>
-    <description>Ozone S3Gateway serverHTTPS server address and port
-      .</description>
+    <description>
+      Ozone S3Gateway serverHTTPS server address and port.
+    </description>
   </property>
 
   <property>
@@ -1878,7 +1873,7 @@
 
   <property>
     <name>ozone.s3g.webadmin.https-address</name>
-    <value/>
+    <value>0.0.0.0:19879</value>
     <tag>OZONE, S3GATEWAY</tag>
     <description>Ozone S3Gateway content server's HTTPS address and port.</description>
   </property>
@@ -3049,6 +3044,15 @@
       Property to determine the transport protocol for the client to Ozone Manager channel.
     </description>
   </property>
+
+  <property>
+    <name>ozone.recon.address</name>
+    <value>0.0.0.0:9891</value>
+    <tag>RECON, MANAGEMENT</tag>
+    <description>
+      RPC address of Recon Server.
+    </description>
+  </property>
   <property>
     <name>ozone.recon.http.enabled</name>
     <value>true</value>
@@ -3959,6 +3963,26 @@
       OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.s3.grpc.server_enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM, S3GATEWAY</tag>
+    <description>
+      Property to enable or disable Ozone Manager gRPC endpoint for clients.  Right now, it is used by S3 Gateway only.
+    </description>
+  </property>
+
+
+  <property>
+    <name>ozone.om.grpc.port</name>
+    <value></value>
+    <tag>OZONE, OM, S3GATEWAY</tag>
+    <description>
+      gRPC endpoint for clients to connect to Ozone Manager.
+    </description>
+  </property>
+
   <property>
     <name>ozone.om.grpc.maximum.response.length</name>
     <value>134217728</value>
