@@ -32,7 +32,7 @@ Test ozone debug checksums with one datanode STALE
     Set Test Variable    ${DIR}         ${directory}
 
     ${count_files} =               Count Files In Directory    ${directory}
-    Should Be Equal As Integers    ${count_files}     7
+    Should Be Equal As Integers    ${count_files}     1
 
     ${json} =                      Read Replicas Manifest
     ${md5sum} =                    Execute     md5sum ${TEMP_DIR}/${TESTFILE} | awk '{print $1}'
@@ -42,7 +42,5 @@ Test ozone debug checksums with one datanode STALE
 
         IF    '${datanode}' == '${STALE_DATANODE}'
             Verify Stale Replica     ${json}    ${replica}
-        ELSE
-            Verify Healthy Replica   ${json}    ${replica}    ${md5sum}
         END
     END

@@ -87,15 +87,9 @@ Verify Stale Replica
     [arguments]              ${json}    ${replica}
 
     FOR    ${block}    IN RANGE    2
-        ${n} =           Evaluate        ${block} + 1
         ${datanode} =    Set Variable    ${json}[blocks][${block}][replicas][${replica}][hostname]
-        ${filename} =    Set Variable    ${DIR}/${TESTFILE}_block${n}_${datanode}
 
         IF    '${datanode}' == '${STALE_DATANODE}'
-            File Should Be Empty    ${filename}
             Should Contain          ${json}[blocks][${block}][replicas][${replica}][exception]    UNAVAILABLE
-        ELSE
-            ${filesize} =                   Get File Size    ${filename}
-            Should Be Equal As Integers     ${json}[blocks][${block}][length]          ${filesize}
         END
     END

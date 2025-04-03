@@ -159,7 +159,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
      * for each volume in each datanode.
      * @param reservedSpace String that contains the numeric size value and ends with a
      *   {@link org.apache.hadoop.hdds.conf.StorageUnit} suffix. For example, "50GB".
-     * @see org.apache.hadoop.ozone.container.common.volume.VolumeInfo
+     * @see org.apache.hadoop.ozone.container.common.volume.VolumeUsage
      */
     public Builder setReservedSpace(String reservedSpace) {
       this.reservedSpace = reservedSpace;

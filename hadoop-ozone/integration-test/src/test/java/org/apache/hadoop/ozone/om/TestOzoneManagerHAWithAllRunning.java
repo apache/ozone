@@ -378,7 +378,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
       }
     }
     assertNotNull(followerOM);
-    assertSame(followerOM.getOmRatisServer().checkLeaderStatus(),
+    assertSame(followerOM.getOmRatisServer().getLeaderStatus(),
         OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER);
 
     OzoneManagerProtocolProtos.OMRequest writeRequest =
