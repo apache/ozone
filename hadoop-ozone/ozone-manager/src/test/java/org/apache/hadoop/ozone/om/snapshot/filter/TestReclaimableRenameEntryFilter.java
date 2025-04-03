@@ -51,7 +51,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.rocksdb.RocksDBException;
 
 /**
- * Test class for ReclaimableDirFilter.
+ * Test class for ReclaimableRenameEntryFilter.
  */
 public class TestReclaimableRenameEntryFilter extends TestAbstractReclaimableFilter {
   @Override
@@ -115,20 +115,16 @@ public class TestReclaimableRenameEntryFilter extends TestAbstractReclaimableFil
     return table;
   }
 
-  private KeyManager mockOmSnapshot(ReferenceCounted<OmSnapshot> snapshot,
-                                    OmBucketInfo bucketInfo, Table<String, OmKeyInfo> keyTable,
-                                    Table<String, OmDirectoryInfo> dirTable) {
+  private void mockOmSnapshot(ReferenceCounted<OmSnapshot> snapshot,
+                              OmBucketInfo bucketInfo, Table<String, OmKeyInfo> keyTable,
+                              Table<String, OmDirectoryInfo> dirTable) {
     if (snapshot != null) {
       OmSnapshot omSnapshot = snapshot.get();
-      KeyManager keyManager = mock(KeyManager.class);
       OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
       when(omSnapshot.getMetadataManager()).thenReturn(omMetadataManager);
-      when(keyManager.getMetadataManager()).thenReturn(omMetadataManager);
       when(omMetadataManager.getKeyTable(eq(bucketInfo.getBucketLayout()))).thenReturn(keyTable);
       when(omMetadataManager.getDirectoryTable()).thenReturn(dirTable);
-      return keyManager;
     }
-    return null;
   }
 
   @ParameterizedTest
