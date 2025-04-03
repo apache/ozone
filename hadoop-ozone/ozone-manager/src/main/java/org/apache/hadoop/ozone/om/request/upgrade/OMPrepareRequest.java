@@ -65,7 +65,7 @@ public class OMPrepareRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+    final long transactionLogIndex = context.getTermIndex().getIndex();
 
     LOG.info("OM {} Received prepare request with log {}", ozoneManager.getOMNodeId(), context.getTermIndex());
 
@@ -102,7 +102,7 @@ public class OMPrepareRequest extends OMClientRequest {
       // the snapshot index in the prepared state.
       OzoneManagerDoubleBuffer doubleBuffer =
           ozoneManager.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
-      doubleBuffer.add(response, context.getTermIndex());
+      doubleBuffer.add(response, context.getTermIndex(), context.getIndex());
 
       OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
       final RaftServer.Division division = omRatisServer.getServerDivision();

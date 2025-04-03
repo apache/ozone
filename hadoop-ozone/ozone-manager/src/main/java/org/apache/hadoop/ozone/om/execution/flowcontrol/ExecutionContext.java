@@ -27,10 +27,11 @@ public final class ExecutionContext {
   private final TermIndex termIndex;
 
   private ExecutionContext(long index, TermIndex termIndex) {
-    this.index = index;
     if (null == termIndex) {
+      // termIndex will be null for pre-ratis execution case which is before ratis transaction
       termIndex = TermIndex.valueOf(-1, index);
     }
+    this.index = index;
     this.termIndex = termIndex;
   }
 
