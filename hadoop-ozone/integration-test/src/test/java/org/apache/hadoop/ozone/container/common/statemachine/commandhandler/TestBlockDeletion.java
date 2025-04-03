@@ -673,7 +673,7 @@ public class TestBlockDeletion {
         .setEmpty(true)
         .build();
     // Update replica
-    containerStateManager.updateContainerReplica(containerId, replicaOne);
+    containerStateManager.updateContainerReplica(replicaOne);
 
     // Check replica updated with wrong keyCount
     scm.getContainerManager().getContainerReplicas(

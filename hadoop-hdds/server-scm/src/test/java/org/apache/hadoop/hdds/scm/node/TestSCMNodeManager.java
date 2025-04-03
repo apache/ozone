@@ -645,7 +645,7 @@ public class TestSCMNodeManager {
       // If found mismatch, leader SCM fires a SetNodeOperationalStateCommand
       // to update the opState persisted in Datanode.
       scm.getScmContext().updateLeaderAndTerm(true, 1);
-      List<SCMCommand> commands = nodeManager.processHeartbeat(dn);
+      List<SCMCommand<?>> commands = nodeManager.processHeartbeat(dn);
 
       assertEquals(SetNodeOperationalStateCommand.class,
           commands.get(0).getClass());
@@ -1764,7 +1764,7 @@ public class TestSCMNodeManager {
                   PipelineID.randomId())));
 
       eq.processAll(1000L);
-      List<SCMCommand> command =
+      List<SCMCommand<?>> command =
           nodemanager.processHeartbeat(datanodeDetails);
       // With dh registered, SCM will send create pipeline command to dn
       assertThat(command.size()).isGreaterThanOrEqualTo(1);

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container.metrics;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,13 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.UUID;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -41,8 +36,9 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneTestUtils;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
@@ -134,37 +130,21 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
 
   @Test
   public void testReportProcessingMetrics() throws Exception {
-    String volumeName = "vol-" + UUID.randomUUID();
-    String bucketName = "bucket1";
-    String key = "key1";
-
     MetricsRecordBuilder metrics =
         getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     assertThat(getLongCounter("NumContainerReportsProcessedSuccessful", metrics))
         .isPositive();
 
     final long previous = getLongCounter("NumICRReportsProcessedSuccessful", metrics);
+    OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
 
     // Create key should create container on DN.
-    client.getObjectStore().getClientProxy()
-        .createVolume(volumeName);
-    client.getObjectStore().getClientProxy()
-        .createBucket(volumeName, bucketName);
-    OzoneOutputStream ozoneOutputStream = client
-        .getObjectStore().getClientProxy().createKey(volumeName, bucketName,
-            key, 0, ReplicationType.RATIS, ReplicationFactor.ONE,
-            new HashMap<>());
-
-    String data = "file data";
-    ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
-    ozoneOutputStream.close();
-
+    TestDataUtil.createKeys(cluster(), 1);
 
     GenericTestUtils.waitFor(() -> {
       final MetricsRecordBuilder scmMetrics =
           getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-      return getLongCounter("NumICRReportsProcessedSuccessful",
-          scmMetrics) >= previous + 1;
+      return getLongCounter("NumICRReportsProcessedSuccessful", scmMetrics) > previous;
     }, 100, 30_000);
   }
 }

@@ -1,5 +1,5 @@
 Apache Ozone
-Copyright 2022 The Apache Software Foundation
+Copyright 2025 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
@@ -508,3 +508,10 @@ The Apache Software Foundation (http://www.apache.org/).
 ====================
 ratis-thirdparty-misc is a shaded dependency which includes additional 3rd party dependencies in shaded form.
 For the detailed list of the dependencies and the associated NOTICE file see licenses/NOTICE-ratis-thirdparty-misc.txt.
+
+====================
+Apache Hadoop Third-party Libs
+Copyright 2020 and onwards The Apache Software Foundation.
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).

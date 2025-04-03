@@ -108,7 +108,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       }
 
       // remove commands in command queue for the DN
-      final List<SCMCommand> cmdList = nodeManager.getCommandQueue(
+      final List<SCMCommand<?>> cmdList = nodeManager.getCommandQueue(
           datanodeDetails.getUuid());
       LOG.info("Clearing command queue of size {} for DN {}",
           cmdList.size(), datanodeDetails);
@@ -126,7 +126,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         //make sure after DN is removed from topology,
         //DatanodeDetails instance returned from nodeStateManager has no parent.
         Preconditions.checkState(
-            nodeManager.getNodeByUuid(datanodeDetails.getUuid())
+            nodeManager.getNode(datanodeDetails.getID())
                 .getParent() == null);
       }
     } catch (NodeNotFoundException ex) {

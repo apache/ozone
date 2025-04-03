@@ -120,7 +120,7 @@ public final class OMAuditLogger {
       if (null == builder.getAuditMap()) {
         builder.setAuditMap(new HashMap<>());
       }
-      builder.getAuditMap().put("Transaction", "" + termIndex.getIndex());
+      builder.getAuditMap().put("Transaction", String.valueOf(termIndex.getIndex()));
       builder.getMessageBuilder().withParams(builder.getAuditMap());
       builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
     }
@@ -150,7 +150,7 @@ public final class OMAuditLogger {
     }
     try {
       builder.getAuditMap().put("Command", request.getOmRequest().getCmdType().name());
-      builder.getAuditMap().put("Transaction", "" + termIndex.getIndex());
+      builder.getAuditMap().put("Transaction", String.valueOf(termIndex.getIndex()));
       request.buildAuditMessage(action, builder.getAuditMap(),
           th, request.getUserInfo());
       builder.setLog(true);

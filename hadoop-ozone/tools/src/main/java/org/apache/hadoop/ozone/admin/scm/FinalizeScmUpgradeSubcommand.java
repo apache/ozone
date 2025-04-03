@@ -17,15 +17,15 @@
 
 package org.apache.hadoop.ozone.admin.scm;
 
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitCancellationMsg;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitExitMsg;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitFinishedMsg;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitGeneralErrorMsg;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.handleInvalidRequestAfterInitiatingFinalization;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isFinalized;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isInprogress;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.emitCancellationMsg;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.emitExitMsg;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.emitFinishedMsg;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.emitGeneralErrorMsg;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.handleInvalidRequestAfterInitiatingFinalization;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isDone;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isFinalized;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isInprogress;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isStarting;
 
 import java.io.IOException;
 import java.util.UUID;

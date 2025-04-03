@@ -31,8 +31,14 @@
   <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
   <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
   <rule ref="category/java/bestpractices.xml/UseCollectionIsEmpty" />
+  <rule ref="category/java/bestpractices.xml/SimplifiableTestAssertion" />
 
+  <rule ref="category/java/performance.xml/AddEmptyString"/>
   <rule ref="category/java/performance.xml/AvoidFileStream"/>
+  <rule ref="category/java/performance.xml/InefficientEmptyStringCheck"/>
+  <rule ref="category/java/performance.xml/InefficientStringBuffering"/>
+  <rule ref="category/java/performance.xml/StringInstantiation"/>
+  <rule ref="category/java/performance.xml/UseStringBufferLength"/>
 
   <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
 </ruleset>

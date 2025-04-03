@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -93,7 +94,7 @@ class TestGrpcReplicationService {
 
     SecurityConfig secConf = new SecurityConfig(conf);
 
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
 
     DatanodeDetails.Builder dn =
         DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())

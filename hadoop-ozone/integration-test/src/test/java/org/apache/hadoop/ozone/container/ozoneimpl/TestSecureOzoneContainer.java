@@ -138,6 +138,7 @@ class TestSecureOzoneContainer {
       MutableVolumeSet volumeSet = container.getVolumeSet();
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempFolder.toFile()));
+      ContainerTestUtils.initializeDatanodeLayout(conf, dn);
       //Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 

@@ -117,11 +117,6 @@ public class BaseFreonGenerator implements FreonSubcommand {
       defaultValue = "")
   private String prefix = "";
 
-  @Option(names = {"--verbose"},
-          description = "More verbose output. "
-              + "Show all the command line Option info.")
-  private boolean verbose;
-
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
@@ -324,7 +319,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
             LOG.error("HTTP server can't be stopped.", ex);
           }
           printReport();
-          if (verbose) {
+          if (freonCommand.isVerbose()) {
             printOption();
           }
         }, 10);

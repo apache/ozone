@@ -23,11 +23,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
+import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerStateInSCM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -52,7 +51,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -95,6 +93,9 @@ public class TestContainerReportHandling {
         ContainerID containerID = ContainerID.valueOf(keyLocation.getContainerID());
         waitForContainerClose(cluster, containerID.getId());
 
+        // also wait till the container is closed in SCM
+        waitForContainerStateInSCM(cluster.getStorageContainerManager(), containerID, HddsProtos.LifeCycleState.CLOSED);
+
         // move the container to DELETING
         ContainerManager containerManager = cluster.getStorageContainerManager().getContainerManager();
         containerManager.updateContainerState(containerID, HddsProtos.LifeCycleEvent.DELETE);
@@ -109,14 +110,7 @@ public class TestContainerReportHandling {
         // restart a DN and wait for the container to get CLOSED.
         HddsDatanodeService dn = cluster.getHddsDatanode(keyLocation.getPipeline().getFirstNode());
         cluster.restartHddsDatanode(dn.getDatanodeDetails(), false);
-        GenericTestUtils.waitFor(() -> {
-          try {
-            return containerManager.getContainer(containerID).getState() == HddsProtos.LifeCycleState.CLOSED;
-          } catch (ContainerNotFoundException e) {
-            fail(e);
-          }
-          return false;
-        }, 2000, 20000);
+        waitForContainerStateInSCM(cluster.getStorageContainerManager(), containerID, HddsProtos.LifeCycleState.CLOSED);
 
         assertEquals(HddsProtos.LifeCycleState.CLOSED, containerManager.getContainer(containerID).getState());
       }

@@ -39,7 +39,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
@@ -49,7 +48,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Proto2Utils;
 import java.io.IOException;
 import java.time.Instant;
@@ -467,130 +465,12 @@ public class TestReplicationManager {
     storeContainerAndReplicas(container, replicas);
 
     replicationManager.processContainer(container, repQueue, repReport);
-    assertEquals(0, repReport.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, repReport.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(0, repQueue.underReplicatedQueueSize());
-    assertEquals(0, repQueue.overReplicatedQueueSize());
-  }
-
-  @Test
-  public void testQuasiClosedContainerWithVulnerableUnhealthyReplica()
-      throws IOException, NodeNotFoundException {
-    RatisReplicationConfig ratisRepConfig =
-        RatisReplicationConfig.getInstance(THREE);
-    long sequenceID = 10;
-    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
-        HddsProtos.LifeCycleState.QUASI_CLOSED, sequenceID);
-
-    // this method creates replicas with same origin id and zero sequence id
-    Set<ContainerReplica> replicas =
-        createReplicasWithSameOrigin(container.containerID(),
-            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
-    replicas.add(createContainerReplica(container.containerID(), 0,
-        IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY, sequenceID));
-    ContainerReplica decommissioning =
-        createContainerReplica(container.containerID(), 0, DECOMMISSIONING,
-            ContainerReplicaProto.State.UNHEALTHY, sequenceID);
-    replicas.add(decommissioning);
-    storeContainerAndReplicas(container, replicas);
-    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
-        .thenAnswer(invocation -> {
-          DatanodeDetails dn = invocation.getArgument(0);
-          if (dn.equals(decommissioning.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HddsProtos.NodeState.HEALTHY);
-          }
-
-          return NodeStatus.inServiceHealthy();
-        });
-
-    replicationManager.processContainer(container, repQueue, repReport);
     assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
-
-    when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
-        anyLong())).thenAnswer(invocation -> ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()));
-    when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
-        .thenAnswer(invocation -> {
-          Map<SCMCommandProto.Type, Integer> map = new HashMap<>();
-          map.put(SCMCommandProto.Type.replicateContainerCommand, 0);
-          map.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
-          return map;
-        });
-    RatisUnderReplicationHandler handler =
-        new RatisUnderReplicationHandler(ratisPlacementPolicy, configuration, replicationManager);
-
-    handler.processAndSendCommands(replicas, Collections.emptyList(), repQueue.dequeueUnderReplicatedContainer(), 2);
-    assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
-    assertEquals(SCMCommandProto.Type.replicateContainerCommand, command.getValue().getType());
-    assertEquals(decommissioning.getDatanodeDetails().getUuid(), command.getKey());
-  }
-
-
-  /**
-   * There is a QUASI_CLOSED container with some UNHEALTHY replicas on unique origin nodes. If the datanode hosting
-   * one such replica is being taken offline, then the UNHEALTHY replica needs to be replicated to another node.
-   */
-  @Test
-  public void testQuasiClosedContainerWithUnhealthyReplicaOnDecommissioningNodeWithUniqueOrigin()
-      throws IOException, NodeNotFoundException {
-    RatisReplicationConfig ratisRepConfig =
-        RatisReplicationConfig.getInstance(THREE);
-    // create a QUASI_CLOSED container with 3 QUASI_CLOSED replicas on same origin, and 1 UNHEALTHY on unique origin
-    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
-        HddsProtos.LifeCycleState.QUASI_CLOSED);
-    Set<ContainerReplica> replicas =
-        createReplicasWithSameOrigin(container.containerID(),
-            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
-    ContainerReplica unhealthy =
-        createContainerReplica(container.containerID(), 0, DECOMMISSIONING,
-            ContainerReplicaProto.State.UNHEALTHY);
-    replicas.add(unhealthy);
-    storeContainerAndReplicas(container, replicas);
-    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
-        .thenAnswer(invocation -> {
-          DatanodeDetails dn = invocation.getArgument(0);
-          if (dn.equals(unhealthy.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HddsProtos.NodeState.HEALTHY);
-          }
-
-          return NodeStatus.inServiceHealthy();
-        });
-
-    // the container should be under replicated and queued to under replication queue
-    replicationManager.processContainer(container, repQueue, repReport);
-    assertEquals(1, repReport.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, repReport.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(1, repQueue.underReplicatedQueueSize());
-    assertEquals(0, repQueue.overReplicatedQueueSize());
-
-    // next, this test sets up some mocks to test if RatisUnderReplicationHandler will handle this container correctly
-    when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
-        anyLong())).thenAnswer(invocation -> ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()));
-    when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
-        .thenAnswer(invocation -> {
-          Map<SCMCommandProto.Type, Integer> map = new HashMap<>();
-          map.put(SCMCommandProto.Type.replicateContainerCommand, 0);
-          map.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
-          return map;
-        });
-    RatisUnderReplicationHandler handler =
-        new RatisUnderReplicationHandler(ratisPlacementPolicy, configuration, replicationManager);
-
-    handler.processAndSendCommands(replicas, Collections.emptyList(), repQueue.dequeueUnderReplicatedContainer(), 2);
-    assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
-    // a replicate command should have been sent for the UNHEALTHY replica
-    assertEquals(SCMCommandProto.Type.replicateContainerCommand, command.getValue().getType());
-    assertEquals(unhealthy.getDatanodeDetails().getUuid(), command.getKey());
   }
 
   /**
@@ -1435,7 +1315,7 @@ public class TestReplicationManager {
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
         0, src, target, scmDeadline);
 
-    ArgumentCaptor<SCMCommand> command =
+    ArgumentCaptor<SCMCommand<?>> command =
         ArgumentCaptor.forClass(SCMCommand.class);
     ArgumentCaptor<UUID> targetUUID =
         ArgumentCaptor.forClass(UUID.class);
@@ -1759,12 +1639,12 @@ public class TestReplicationManager {
     ContainerReplicaOp delOp = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE, dn2, 1, command, commandDeadline);
 
-    replicationManager.opCompleted(addOp, new ContainerID(1L), false);
-    replicationManager.opCompleted(delOp, new ContainerID(1L), false);
+    replicationManager.opCompleted(addOp, ContainerID.valueOf(1L), false);
+    replicationManager.opCompleted(delOp, ContainerID.valueOf(1L), false);
     // No commands should be sent for either of the above ops.
     assertEquals(0, commandsSent.size());
 
-    replicationManager.opCompleted(delOp, new ContainerID(1L), true);
+    replicationManager.opCompleted(delOp, ContainerID.valueOf(1L), true);
     assertEquals(1, commandsSent.size());
     Pair<UUID, SCMCommand<?>> sentCommand = commandsSent.iterator().next();
     // The target should be DN2 and the deadline should have been updated from the value set in commandDeadline above
