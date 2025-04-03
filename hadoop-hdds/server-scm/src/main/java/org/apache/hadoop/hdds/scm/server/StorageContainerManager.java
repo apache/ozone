@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
@@ -1093,7 +1092,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       int readThreads)
       throws IOException {
 
-    RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
+    RPC.Server rpcServer = new RPC.Builder(conf)
         .setProtocol(protocol)
         .setInstance(instance)
         .setBindAddress(addr.getHostString())
@@ -1102,7 +1101,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         .setNumReaders(readThreads)
         .setVerbose(false)
         .setSecretManager(null)
-        .build());
+        .build();
 
     HddsServerUtil.addPBProtocol(conf, protocol, instance, rpcServer);
     return rpcServer;

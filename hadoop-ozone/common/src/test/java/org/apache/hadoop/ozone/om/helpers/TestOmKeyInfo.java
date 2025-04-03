@@ -181,7 +181,7 @@ public class TestOmKeyInfo {
       }
     }
 
-    key.setAcls(Arrays.asList(new OzoneAcl(
+    key.setAcls(Arrays.asList(OzoneAcl.of(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
         ACCESS, IAccessAuthorizer.ACLType.WRITE)));
 

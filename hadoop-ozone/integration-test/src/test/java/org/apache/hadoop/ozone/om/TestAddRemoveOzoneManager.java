@@ -351,10 +351,17 @@ public class TestAddRemoveOzoneManager {
   @Test
   public void testDecommission() throws Exception {
     setupCluster(3);
-    user = UserGroupInformation.getCurrentUser();
 
-    // Stop the 3rd OM and decommission it
+    user = UserGroupInformation.createUserForTesting("user", new String[]{});
+    // Stop the 3rd OM and decommission it using non-privileged user
     String omNodeId3 = cluster.getOzoneManager(2).getOMNodeId();
+    cluster.stopOzoneManager(omNodeId3);
+    // decommission should fail
+    assertThrows(IOException.class, () -> decommissionOM(omNodeId3));
+
+    // Switch to admin user
+    user = UserGroupInformation.getCurrentUser();
+    // Stop the 3rd OM and decommission it
     cluster.stopOzoneManager(omNodeId3);
     decommissionOM(omNodeId3);
 

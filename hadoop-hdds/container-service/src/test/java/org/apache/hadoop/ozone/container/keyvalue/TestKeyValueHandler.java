@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSIN
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -274,7 +275,7 @@ public class TestKeyValueHandler {
         volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
     try {
-      ContainerSet cset = new ContainerSet(1000);
+      ContainerSet cset = newContainerSet();
       int[] interval = new int[1];
       interval[0] = 2;
       ContainerMetrics metrics = new ContainerMetrics(interval);
@@ -367,7 +368,7 @@ public class TestKeyValueHandler {
       final String clusterId = UUID.randomUUID().toString();
       final String datanodeId = UUID.randomUUID().toString();
       final ConfigurationSource conf = new OzoneConfiguration();
-      final ContainerSet containerSet = new ContainerSet(1000);
+      final ContainerSet containerSet = newContainerSet();
       final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
 
       HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)
@@ -461,7 +462,7 @@ public class TestKeyValueHandler {
     final String clusterId = UUID.randomUUID().toString();
     final String datanodeId = UUID.randomUUID().toString();
     final ConfigurationSource conf = new OzoneConfiguration();
-    final ContainerSet containerSet = new ContainerSet(1000);
+    final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     final Clock clock = mock(Clock.class);
     long startTime = System.currentTimeMillis();

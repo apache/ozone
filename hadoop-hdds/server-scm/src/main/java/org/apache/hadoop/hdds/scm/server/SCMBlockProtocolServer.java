@@ -42,12 +42,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -224,6 +226,10 @@ public class SCMBlockProtocolServer implements
       }
 
       auditMap.put("allocated", String.valueOf(blocks.size()));
+      String blockIDs = blocks.stream().limit(10)
+          .map(block -> block.getBlockID().toString())
+          .collect(Collectors.joining(", ", "[", "]"));
+      auditMap.put("sampleBlocks", blockIDs);
 
       if (blocks.size() < num) {
         AUDIT.logWriteFailure(buildAuditMessageForFailure(
@@ -373,7 +379,7 @@ public class SCMBlockProtocolServer implements
       final Node client = getClientNode(clientMachine);
       List<DatanodeDetails> nodeList = new ArrayList<>();
       nodes.forEach(uuid -> {
-        DatanodeDetails node = nodeManager.getNodeByUuid(uuid);
+        DatanodeDetails node = nodeManager.getNode(DatanodeID.fromUuidString(uuid));
         if (node != null) {
           nodeList.add(node);
         }

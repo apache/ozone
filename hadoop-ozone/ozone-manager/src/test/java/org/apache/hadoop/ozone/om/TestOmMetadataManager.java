@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -613,7 +614,7 @@ public class TestOmMetadataManager {
         bucketLayout, 100, dbPrefix, false, dbPrefix);
 
     assertEquals(numOpenKeys, res.getTotalOpenKeyCount());
-    assertEquals(false, res.hasMore());
+    assertFalse(res.hasMore());
     List<OpenKeySession> keySessionList = res.getOpenKeys();
     assertEquals(numOpenKeys, keySessionList.size());
     // Verify that every single open key shows up in the result, and in order
@@ -632,7 +633,7 @@ public class TestOmMetadataManager {
     // total open key count should still be 3
     assertEquals(numOpenKeys, res.getTotalOpenKeyCount());
     // hasMore should have been set
-    assertEquals(true, res.hasMore());
+    assertTrue(res.hasMore());
     keySessionList = res.getOpenKeys();
     assertEquals(numExpectedKeys, keySessionList.size());
     for (int i = 0; i < numExpectedKeys; i++) {
@@ -648,7 +649,7 @@ public class TestOmMetadataManager {
     numExpectedKeys = numOpenKeys - pageSize;
     // total open key count should still be 3
     assertEquals(numOpenKeys, res.getTotalOpenKeyCount());
-    assertEquals(false, res.hasMore());
+    assertFalse(res.hasMore());
     keySessionList = res.getOpenKeys();
     assertEquals(numExpectedKeys, keySessionList.size());
     for (int i = 0; i < numExpectedKeys; i++) {

@@ -171,8 +171,7 @@
     <name>hdds.datanode.dir</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
-    <description>Determines where on the local filesystem HDDS data will be
-      stored. Defaults to hdds.datanode.data.dir if not specified.
+    <description>Determines where on the local filesystem HDDS data will be stored.
       The directories should be tagged with corresponding storage types
       ([SSD]/[DISK]/[ARCHIVE]/[RAM_DISK]) for storage policies. The default
       storage type will be DISK if the directory does not have a storage type
@@ -211,24 +210,12 @@
   </property>
   <property>
     <name>hdds.datanode.volume.choosing.policy</name>
-    <value/>
+    <value>org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy</value>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
     <description>
-      The class name of the policy for choosing volumes in the list of
-      directories.  Defaults to
-      org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy.
-      This volume choosing policy selects volumes in a round-robin order.
-    </description>
-  </property>
-  <property>
-    <name>hdds.datanode.volume.min.free.space</name>
-    <value>5GB</value>
-    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
-    <description>
-      This determines the free space to be used for closing containers
-      When the difference between volume capacity and used reaches this number,
-      containers that reside on this volume will be closed and no new containers
-      would be allocated on this volume.
+      The class name of the policy for choosing volumes in the list of directories.
+      Defaults to org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy.
+      This volume choosing policy randomly chooses two volumes with remaining space and then picks the one with lower utilization.
     </description>
   </property>
   <property>
@@ -649,18 +636,6 @@
       needs to set policies accordingly to allow all volume listing
       e.g. for Ranger, a new policy with special volume "/" can be added to
       allow group public LIST access.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.user.max.volume</name>
-    <value>1024</value>
-    <tag>OM, MANAGEMENT</tag>
-    <description>
-      The maximum number of volumes a user can have on a cluster.Increasing or
-      decreasing this number has no real impact on ozone cluster. This is
-      defined only for operational purposes. Only an administrator can create a
-      volume, once a volume is created there are no restrictions on the number
-      of buckets or keys inside each bucket a user can create.
     </description>
   </property>
   <property>
@@ -1518,6 +1493,16 @@
       to the OM.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.snapshot.rocksdb.metrics.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Skip collecting RocksDBStore metrics for Snapshotted DB.
+    </description>
+  </property>
+
   <property>
     <name>hdds.rest.http-address</name>
     <value>0.0.0.0:9880</value>
@@ -2740,16 +2725,6 @@
   </property>
 
   <property>
-    <name>ozone.manager.db.checkpoint.transfer.bandwidthPerSec</name>
-    <value>0</value>
-    <tag>OZONE</tag>
-    <description>
-      Maximum bandwidth used for Ozone Manager DB checkpoint download through
-      the servlet.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.freon.http-address</name>
     <value>0.0.0.0:9884</value>
     <tag>OZONE, MANAGEMENT</tag>
@@ -3537,6 +3512,14 @@
     <value>2m</value>
     <description>
       Timeout for the request submitted directly to Ratis in datanode.
+    </description>
+  </property>
+  <property>
+    <name>hdds.container.ratis.statemachine.write.wait.interval</name>
+    <tag>OZONE, DATANODE</tag>
+    <value>10m</value>
+    <description>
+      Timeout for the write path for container blocks.
     </description>
   </property>
   <property>
@@ -4541,6 +4524,154 @@
       This setting specifies the interval (in seconds) for monitoring percentile performance metrics.
       It helps in tracking the read and write performance of DataNodes in real-time,
       allowing for better identification and analysis of performance issues.
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.datanode.dns.interface</name>
+    <value>default</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      The name of the Network Interface from which a Datanode should
+      report its IP address. e.g. eth2. This setting may be required for some
+      multi-homed nodes where the Datanodes are assigned multiple hostnames
+      and it is desirable for the Datanodes to use a non-default hostname.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.dns.nameserver</name>
+    <value>default</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      The host name or IP address of the name server (DNS) which a Datanode
+      should use to determine its own host name.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.hostname</name>
+    <value/>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Optional. The hostname for the Datanode containing this
+      configuration file.  Will be different for each machine.
+      Defaults to current hostname.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.use.datanode.hostname</name>
+    <value>false</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Whether Datanodes should use Datanode hostnames when
+      connecting to other Datanodes for data transfer.
+    </description>
+  </property>
+  <property>
+    <name>hdds.xframe.enabled</name>
+    <value>true</value>
+    <tag>OZONE, HDDS</tag>
+    <description>
+      If true, then enables protection against clickjacking by returning
+      X_FRAME_OPTIONS header value set to SAMEORIGIN.
+      Clickjacking protection prevents an attacker from using transparent or
+      opaque layers to trick a user into clicking on a button
+      or link on another page.
+    </description>
+  </property>
+  <property>
+    <name>hdds.xframe.value</name>
+    <value>SAMEORIGIN</value>
+    <tag>OZONE, HDDS</tag>
+    <description>
+      This configration value allows user to specify the value for the
+      X-FRAME-OPTIONS. The possible values for this field are
+      DENY, SAMEORIGIN and ALLOW-FROM. Any other value will throw an
+      exception when Datanodes are starting up.
+    </description>
+  </property>
+  <property>
+    <name>hdds.metrics.session-id</name>
+    <value/>
+    <tag>OZONE, HDDS</tag>
+    <description>
+      Get the user-specified session identifier. The default is the empty string.
+      The session identifier is used to tag metric data that is reported to some
+      performance metrics system via the org.apache.hadoop.metrics API.  The
+      session identifier is intended, in particular, for use by Hadoop-On-Demand
+      (HOD) which allocates a virtual Hadoop cluster dynamically and transiently.
+      HOD will set the session identifier by modifying the mapred-site.xml file
+      before starting the cluster.
+      When not running under HOD, this identifer is expected to remain set to
+      the empty string.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.kerberos.principal</name>
+    <value/>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      The Datanode service principal. This is typically set to
+      dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its
+      own fully qualified hostname at startup. The _HOST placeholder
+      allows using the same configuration setting on all Datanodes.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.kerberos.keytab.file</name>
+    <value/>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      The keytab file used by each Datanode daemon to login as its
+      service principal. The principal name is configured with
+      hdds.datanode.kerberos.principal.
+    </description>
+  </property>
+  <property>
+    <name>hdds.metrics.percentiles.intervals</name>
+    <value></value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Comma-delimited set of integers denoting the desired rollover intervals
+      (in seconds) for percentile latency metrics on the Datanode.
+      By default, percentile latency metrics are disabled.
+    </description>
+  </property>
+
+  <property>
+    <name>net.topology.node.switch.mapping.impl</name>
+    <value>org.apache.hadoop.net.ScriptBasedMapping</value>
+    <tag>OZONE, SCM</tag>
+    <description>
+      The default implementation of the DNSToSwitchMapping. It
+      invokes a script specified in net.topology.script.file.name to resolve
+      node names. If the value for net.topology.script.file.name is not set, the
+      default value of DEFAULT_RACK is returned for all node names.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.edekcacheloader.interval.ms</name>
+    <value>1000</value>
+    <description>When KeyProvider is configured, the interval time of warming
+      up edek cache on OM starts up. All edeks will be loaded
+      from KMS into provider cache. The edek cache loader will try to warm up the
+      cache until succeed or OM leaves active state.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.edekcacheloader.initial.delay.ms</name>
+    <value>3000</value>
+    <description>When KeyProvider is configured, the time delayed until the first
+      attempt to warm up edek cache on OM start up.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.edekcacheloader.max-retries</name>
+    <value>10</value>
+    <description>When KeyProvider is configured, the max retries allowed to attempt
+      warm up edek cache if none of key successful on OM start up.
     </description>
   </property>
 </configuration>

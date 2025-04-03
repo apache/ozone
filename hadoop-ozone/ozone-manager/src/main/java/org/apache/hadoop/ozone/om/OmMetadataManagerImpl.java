@@ -27,6 +27,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_L
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
@@ -392,7 +394,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     omEpoch = 0;
     int maxOpenFiles = conf.getInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
-    setStore(loadDB(conf, dir, name, true, Optional.of(Boolean.TRUE), maxOpenFiles, false, false));
+    setStore(loadDB(conf, dir, name, true, Optional.of(Boolean.TRUE),
+        maxOpenFiles, false, false, true));
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
   }
@@ -425,7 +428,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         checkSnapshotDirExist(checkpoint);
       }
       setStore(loadDB(conf, metaDir, dbName, false,
-          java.util.Optional.of(Boolean.TRUE), maxOpenFiles, false, false));
+          java.util.Optional.of(Boolean.TRUE), maxOpenFiles, false, false,
+          conf.getBoolean(OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED,
+              OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT)));
       initializeOmTables(CacheType.PARTIAL_CACHE, false);
     } catch (IOException e) {
       stop();
@@ -548,9 +553,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         ExitUtils.terminate(1, errorMsg, LOG);
       }
 
-      RocksDBConfiguration rocksDBConfiguration =
-          configuration.getObject(RocksDBConfiguration.class);
-
       // As When ratis is not enabled, when we perform put/commit to rocksdb we
       // should turn on sync flag. This needs to be done as when we return
       // response to client it is considered as complete, but if we have
@@ -571,16 +573,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles) throws IOException {
-    return loadDB(configuration, metaDir, OM_DB_NAME, false, java.util.Optional.empty(), maxOpenFiles, true, true);
+    return loadDB(configuration, metaDir, OM_DB_NAME, false,
+        java.util.Optional.empty(), maxOpenFiles, true, true, true);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-                               String dbName, boolean readOnly,
-                               java.util.Optional<Boolean> disableAutoCompaction,
-                               int maxOpenFiles,
-                               boolean enableCompactionDag,
-                               boolean createCheckpointDirs)
+      String dbName, boolean readOnly,
+      java.util.Optional<Boolean> disableAutoCompaction,
+      int maxOpenFiles,
+      boolean enableCompactionDag,
+      boolean createCheckpointDirs,
+      boolean enableRocksDBMetrics)
       throws IOException {
     final int maxFSSnapshots = configuration.getInt(
         OZONE_OM_FS_SNAPSHOT_MAX_LIMIT, OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
@@ -593,7 +597,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setMaxFSSnapshots(maxFSSnapshots)
         .setEnableCompactionDag(enableCompactionDag)
         .setCreateCheckpointDirs(createCheckpointDirs)
-        .setMaxNumberOfOpenFiles(maxOpenFiles);
+        .setMaxNumberOfOpenFiles(maxOpenFiles)
+        .setEnableRocksDbMetrics(enableRocksDBMetrics);
     disableAutoCompaction.ifPresent(
             dbStoreBuilder::disableDefaultCFAutoCompaction);
     return addOMTablesAndCodecs(dbStoreBuilder).build();
