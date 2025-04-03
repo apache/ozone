@@ -79,6 +79,10 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       // This handler is only for Ratis containers.
       return false;
     }
+    if (QuasiClosedStuckReplicationCheck
+        .shouldHandleAsQuasiClosedStuck(request.getContainerInfo(), request.getContainerReplicas())) {
+      return false;
+    }
     ReplicationManagerReport report = request.getReport();
     ContainerInfo container = request.getContainerInfo();
     ContainerHealthResult health = checkHealth(request);

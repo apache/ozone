@@ -33,6 +33,9 @@ source "${_testlib_dir}/../smoketest/testlib.sh"
 : ${OZONE_COMPOSE_RUNNING:=false}
 : ${SCM:=scm}
 
+# version is used in bucket name, which does not allow uppercase
+export OZONE_CURRENT_VERSION="$(echo "${ozone.version}" | sed -e 's/-SNAPSHOT//' | tr '[:upper:]' '[:lower:]')"
+
 # create temp directory for test data; only once, even if testlib.sh is sourced again
 if [[ -z "${TEST_DATA_DIR:-}" ]] && [[ "${KEEP_RUNNING:-false}" == "false" ]]; then
   export TEST_DATA_DIR="$(mktemp -d "${TMPDIR:-/tmp}"/robot-data-XXXXXX)"

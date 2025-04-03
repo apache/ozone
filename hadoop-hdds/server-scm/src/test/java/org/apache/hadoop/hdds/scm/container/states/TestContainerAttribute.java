@@ -23,8 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.NavigableSet;
+import java.util.NavigableMap;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.junit.jupiter.api.Test;
 
@@ -43,24 +44,21 @@ public class TestContainerAttribute {
   }
 
   static <T extends Enum<T>> boolean hasContainerID(ContainerAttribute<T> attribute, T key, ContainerID id) {
-    final NavigableSet<ContainerID> set = attribute.get(key);
-    return set != null && set.contains(id);
+    final NavigableMap<ContainerID, ContainerInfo> map = attribute.get(key);
+    return map != null && map.containsKey(id);
   }
 
   @Test
-  public void testInsert() {
+  public void testAddNonExisting() {
     ContainerAttribute<Key> containerAttribute = new ContainerAttribute<>(Key.class);
-    ContainerID id = ContainerID.valueOf(42);
-    containerAttribute.insert(key1, id);
+    ContainerInfo info = new ContainerInfo.Builder().setContainerID(42).build();
+    ContainerID id = info.containerID();
+    containerAttribute.addNonExisting(key1, info);
     assertEquals(1, containerAttribute.getCollection(key1).size());
-    assertThat(containerAttribute.getCollection(key1)).contains(id);
+    assertThat(containerAttribute.get(key1)).containsKey(id);
 
-    // Insert again and verify that the new ContainerId is inserted.
-    ContainerID newId =
-        ContainerID.valueOf(42);
-    containerAttribute.insert(key1, newId);
-    assertEquals(1, containerAttribute.getCollection(key1).size());
-    assertThat(containerAttribute.getCollection(key1)).contains(newId);
+    // Adding it again should fail.
+    assertThrows(IllegalStateException.class, () -> containerAttribute.addNonExisting(key1, info));
   }
 
   @Test
@@ -68,7 +66,8 @@ public class TestContainerAttribute {
     ContainerAttribute<Key> containerAttribute = new ContainerAttribute<>(Key.class);
     for (Key k : Key.values()) {
       for (int x = 1; x < 101; x++) {
-        containerAttribute.insert(k, ContainerID.valueOf(x));
+        ContainerInfo info = new ContainerInfo.Builder().setContainerID(x).build();
+        containerAttribute.addNonExisting(k, info);
       }
     }
     for (Key k : Key.values()) {
@@ -85,7 +84,8 @@ public class TestContainerAttribute {
 
     for (Key k : Key.values()) {
       for (int x = 1; x < 101; x++) {
-        containerAttribute.insert(k, ContainerID.valueOf(x));
+        ContainerInfo info = new ContainerInfo.Builder().setContainerID(x).build();
+        containerAttribute.addNonExisting(k, info);
       }
     }
     for (int x = 1; x < 101; x += 2) {
@@ -106,9 +106,10 @@ public class TestContainerAttribute {
   @Test
   public void tesUpdate() throws SCMException {
     ContainerAttribute<Key> containerAttribute = new ContainerAttribute<>(Key.class);
-    ContainerID id = ContainerID.valueOf(42);
+    ContainerInfo info = new ContainerInfo.Builder().setContainerID(42).build();
+    ContainerID id = info.containerID();
 
-    containerAttribute.insert(key1, id);
+    containerAttribute.addNonExisting(key1, info);
     assertTrue(hasContainerID(containerAttribute, key1, id));
     assertFalse(hasContainerID(containerAttribute, key2, id));
 

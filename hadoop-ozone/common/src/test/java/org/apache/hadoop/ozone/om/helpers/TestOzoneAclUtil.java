@@ -46,10 +46,10 @@ public class TestOzoneAclUtil {
   private static final List<OzoneAcl> DEFAULT_ACLS =
       getDefaultAcls();
 
-  private static final OzoneAcl USER1 = new OzoneAcl(USER, "user1",
+  private static final OzoneAcl USER1 = OzoneAcl.of(USER, "user1",
       ACCESS, ACLType.READ_ACL);
 
-  private static final OzoneAcl GROUP1 = new OzoneAcl(GROUP, "group1",
+  private static final OzoneAcl GROUP1 = OzoneAcl.of(GROUP, "group1",
       ACCESS, ACLType.ALL);
 
   @Test
@@ -59,7 +59,7 @@ public class TestOzoneAclUtil {
 
     // Add new permission to existing acl entry.
     OzoneAcl oldAcl = currentAcls.get(0);
-    OzoneAcl newAcl = new OzoneAcl(oldAcl.getType(), oldAcl.getName(),
+    OzoneAcl newAcl = OzoneAcl.of(oldAcl.getType(), oldAcl.getName(),
         ACCESS, ACLType.READ_ACL);
 
     addAndVerifyAcl(currentAcls, newAcl, true, DEFAULT_ACLS.size());
@@ -91,7 +91,7 @@ public class TestOzoneAclUtil {
 
     // Add new permission to existing acl entru.
     OzoneAcl oldAcl = currentAcls.get(0);
-    OzoneAcl newAcl = new OzoneAcl(oldAcl.getType(), oldAcl.getName(),
+    OzoneAcl newAcl = OzoneAcl.of(oldAcl.getType(), oldAcl.getName(),
         ACCESS, ACLType.READ_ACL);
 
     // Remove non existing acl entry
@@ -185,12 +185,12 @@ public class TestOzoneAclUtil {
     IAccessAuthorizer.ACLType[] userRights = aclConfig.getUserDefaultRights();
     IAccessAuthorizer.ACLType[] groupRights = aclConfig.getGroupDefaultRights();
 
-    OzoneAclUtil.addAcl(ozoneAcls, new OzoneAcl(USER,
+    OzoneAclUtil.addAcl(ozoneAcls, OzoneAcl.of(USER,
         ugi.getUserName(), ACCESS, userRights));
     //Group ACLs of the User
     List<String> userGroups = Arrays.asList(ugi.getGroupNames());
     userGroups.stream().forEach((group) -> OzoneAclUtil.addAcl(ozoneAcls,
-        new OzoneAcl(GROUP, group, ACCESS, groupRights)));
+        OzoneAcl.of(GROUP, group, ACCESS, groupRights)));
     return ozoneAcls;
   }
 

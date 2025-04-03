@@ -112,9 +112,6 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
       "ozone.om.volume.listall.allowed";
   public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
-  public static final String OZONE_OM_USER_MAX_VOLUME =
-      "ozone.om.user.max.volume";
-  public static final int OZONE_OM_USER_MAX_VOLUME_DEFAULT = 1024;
 
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
@@ -622,4 +619,17 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MAX_BUCKET =
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY =
+      "ozone.om.edekcacheloader.initial.delay.ms";
+
+  public static final int OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT = 3000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_KEY = "ozone.om.edekcacheloader.interval.ms";
+
+  public static final int OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT = 1000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_KEY =
+      "ozone.om.edekcacheloader.max-retries";
+  public static final int OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT = 10;
 }

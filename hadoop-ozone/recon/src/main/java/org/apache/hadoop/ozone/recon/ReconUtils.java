@@ -31,17 +31,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
 import jakarta.annotation.Nonnull;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -60,23 +54,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
+import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -103,8 +94,6 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 public class ReconUtils {
-
-  private static final int WRITE_BUFFER = 1048576; //1MB
 
   public ReconUtils() {
   }
@@ -164,59 +153,12 @@ public class ReconUtils {
    *
    * @param sourcePath the path to the directory to be archived.
    * @return tar file
-   * @throws IOException
    */
   public static File createTarFile(Path sourcePath) throws IOException {
-    TarArchiveOutputStream tarOs = null;
-    OutputStream fileOutputStream = null;
-    try {
-      String sourceDir = sourcePath.toString();
-      String fileName = sourceDir.concat(".tar");
-      fileOutputStream = Files.newOutputStream(Paths.get(fileName));
-      tarOs = new TarArchiveOutputStream(fileOutputStream);
-      tarOs.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
-      File folder = new File(sourceDir);
-      File[] filesInDir = folder.listFiles();
-      if (filesInDir != null) {
-        for (File file : filesInDir) {
-          addFilesToArchive(file.getName(), file, tarOs);
-        }
-      }
-      return new File(fileName);
-    } finally {
-      try {
-        org.apache.hadoop.io.IOUtils.closeStream(tarOs);
-        org.apache.hadoop.io.IOUtils.closeStream(fileOutputStream);
-      } catch (Exception e) {
-        log.error("Exception encountered when closing " +
-            "TAR file output stream: " + e);
-      }
-    }
-  }
-
-  private static void addFilesToArchive(String source, File file,
-                                        TarArchiveOutputStream
-                                            tarFileOutputStream)
-      throws IOException {
-    tarFileOutputStream.putArchiveEntry(new TarArchiveEntry(file, source));
-    if (file.isFile()) {
-      try (InputStream fileInputStream = Files.newInputStream(file.toPath())) {
-        BufferedInputStream bufferedInputStream =
-            new BufferedInputStream(fileInputStream);
-        org.apache.commons.compress.utils.IOUtils.copy(bufferedInputStream,
-            tarFileOutputStream);
-        tarFileOutputStream.closeArchiveEntry();
-      }
-    } else if (file.isDirectory()) {
-      tarFileOutputStream.closeArchiveEntry();
-      File[] filesInDir = file.listFiles();
-      if (filesInDir != null) {
-        for (File cFile : filesInDir) {
-          addFilesToArchive(cFile.getAbsolutePath(), cFile,
-              tarFileOutputStream);
-        }
-      }
-    }
+    String source = StringUtils.removeEnd(sourcePath.toString(), "/");
+    File tarFile = new File(source.concat(".tar"));
+    Archiver.create(tarFile, sourcePath);
+    return tarFile;
   }
 
   /**
@@ -228,52 +170,7 @@ public class ReconUtils {
    */
   public void untarCheckpointFile(File tarFile, Path destPath)
       throws IOException {
-
-    InputStream fileInputStream = null;
-    try {
-      fileInputStream = Files.newInputStream(tarFile.toPath());
-
-      //Create Destination directory if it does not exist.
-      if (!destPath.toFile().exists()) {
-        boolean success = destPath.toFile().mkdirs();
-        if (!success) {
-          throw new IOException("Unable to create Destination directory.");
-        }
-      }
-
-      try (TarArchiveInputStream tarInStream =
-               new TarArchiveInputStream(fileInputStream)) {
-        TarArchiveEntry entry;
-
-        while ((entry = (TarArchiveEntry) tarInStream.getNextEntry()) != null) {
-          Path path = Paths.get(destPath.toString(), entry.getName());
-          HddsUtils.validatePath(path, destPath);
-          File f = path.toFile();
-          //If directory, create a directory.
-          if (entry.isDirectory()) {
-            boolean success = f.mkdirs();
-            if (!success) {
-              log.error("Unable to create directory found in tar.");
-            }
-          } else {
-            //Write contents of file in archive to a new file.
-            int count;
-            byte[] data = new byte[WRITE_BUFFER];
-
-            OutputStream fos = Files.newOutputStream(f.toPath());
-            try (BufferedOutputStream dest =
-                     new BufferedOutputStream(fos, WRITE_BUFFER)) {
-              while ((count =
-                  tarInStream.read(data, 0, WRITE_BUFFER)) != -1) {
-                dest.write(data, 0, count);
-              }
-            }
-          }
-        }
-      }
-    } finally {
-      IOUtils.closeStream(fileInputStream);
-    }
+    Archiver.extract(tarFile, destPath);
   }
 
 
@@ -555,6 +452,7 @@ public class ReconUtils {
             }
           } catch (NumberFormatException nfEx) {
             log.warn("Unknown file found in Recon DB dir : {}", fileName);
+            FileUtils.deleteQuietly(snapshotFile);
           }
         }
       }

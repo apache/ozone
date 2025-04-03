@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
@@ -85,6 +86,7 @@ class TestContainerBalancerSubCommand {
   private ContainerBalancerStatusSubcommand statusCmd;
   private GenericTestUtils.PrintStreamCapturer out;
   private GenericTestUtils.PrintStreamCapturer err;
+  private AtomicBoolean verbose;
 
   private static ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfoResponseProto(
       ContainerBalancerConfiguration config) {
@@ -230,9 +232,15 @@ class TestContainerBalancerSubCommand {
 
   @BeforeEach
   void setup() {
+    verbose = new AtomicBoolean();
     stopCmd = new ContainerBalancerStopSubcommand();
     startCmd = new ContainerBalancerStartSubcommand();
-    statusCmd = new ContainerBalancerStatusSubcommand();
+    statusCmd = new ContainerBalancerStatusSubcommand() {
+      @Override
+      protected boolean isVerbose() {
+        return verbose.get();
+      }
+    };
     out = GenericTestUtils.captureOut();
     err = GenericTestUtils.captureErr();
   }
@@ -294,7 +302,8 @@ class TestContainerBalancerSubCommand {
     //test status is running
     when(scmClient.getContainerBalancerStatusInfo()).thenReturn(statusInfoResponseProto);
     CommandLine c = new CommandLine(statusCmd);
-    c.parseArgs("--verbose", "--history");
+    verbose.set(true);
+    c.parseArgs("--history");
     statusCmd.execute(scmClient);
 
     String firstHistoryIterationOutput =
@@ -355,8 +364,7 @@ class TestContainerBalancerSubCommand {
         statusInfoResponseProto = getContainerBalancerStatusInfoResponseProto(config);
     //test status is running
     when(scmClient.getContainerBalancerStatusInfo()).thenReturn(statusInfoResponseProto);
-    CommandLine c = new CommandLine(statusCmd);
-    c.parseArgs("--verbose");
+    verbose.set(true);
     statusCmd.execute(scmClient);
 
     String currentIterationOutput =
