@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +14,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.ozone.test;
 
+import java.util.UUID;
+import org.apache.hadoop.fs.ozone.TestOzoneFsHAURLs;
+import org.apache.hadoop.hdds.scm.TestStorageContainerManagerHAWithAllRunning;
+import org.apache.hadoop.hdds.scm.container.TestScmApplyTransactionFailure;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.TestGetClusterTreeInformation;
+import org.apache.hadoop.ozone.container.metrics.TestDatanodeQueueMetrics;
+import org.apache.hadoop.ozone.shell.TestScmAdminHA;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
-
-import java.util.UUID;
 
 /**
  * Group tests to be run with a single HA cluster.
@@ -34,8 +39,8 @@ import java.util.UUID;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
 
-  /** Hook method for subclasses. */
-  MiniOzoneHAClusterImpl.Builder newClusterBuilder() {
+  @Override
+  protected MiniOzoneHAClusterImpl.Builder newClusterBuilder() {
     return MiniOzoneCluster.newHABuilder(createOzoneConfig())
         .setOMServiceId("om-" + UUID.randomUUID())
         .setNumOfOzoneManagers(3)
@@ -49,7 +54,7 @@ public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
   }
 
   @Nested
-  class OzoneFsHAURLs extends org.apache.hadoop.fs.ozone.TestOzoneFsHAURLs {
+  class OzoneFsHAURLs extends TestOzoneFsHAURLs {
     @Override
     public MiniOzoneHAClusterImpl cluster() {
       return getCluster();
@@ -57,7 +62,7 @@ public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
   }
 
   @Nested
-  class ScmApplyTransactionFailure extends org.apache.hadoop.hdds.scm.container.TestScmApplyTransactionFailure {
+  class StorageContainerManagerHAWithAllRunning extends TestStorageContainerManagerHAWithAllRunning {
     @Override
     public MiniOzoneHAClusterImpl cluster() {
       return getCluster();
@@ -65,7 +70,7 @@ public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
   }
 
   @Nested
-  class GetClusterTreeInformation extends org.apache.hadoop.ozone.TestGetClusterTreeInformation {
+  class ScmApplyTransactionFailure extends TestScmApplyTransactionFailure {
     @Override
     public MiniOzoneHAClusterImpl cluster() {
       return getCluster();
@@ -73,7 +78,7 @@ public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
   }
 
   @Nested
-  class DatanodeQueueMetrics extends org.apache.hadoop.ozone.container.metrics.TestDatanodeQueueMetrics {
+  class GetClusterTreeInformation extends TestGetClusterTreeInformation {
     @Override
     public MiniOzoneHAClusterImpl cluster() {
       return getCluster();
@@ -81,7 +86,15 @@ public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
   }
 
   @Nested
-  class ScmAdminHA extends org.apache.hadoop.ozone.shell.TestScmAdminHA {
+  class DatanodeQueueMetrics extends TestDatanodeQueueMetrics {
+    @Override
+    public MiniOzoneHAClusterImpl cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ScmAdminHA extends TestScmAdminHA {
     @Override
     public MiniOzoneHAClusterImpl cluster() {
       return getCluster();

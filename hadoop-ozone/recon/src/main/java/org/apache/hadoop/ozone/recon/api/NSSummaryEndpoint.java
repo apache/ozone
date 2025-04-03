@@ -71,7 +71,7 @@ public class NSSummaryEndpoint {
   public Response getBasicInfo(
       @QueryParam("path") String path) throws IOException {
 
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
@@ -112,7 +112,7 @@ public class NSSummaryEndpoint {
                                @DefaultValue("false") @QueryParam("replica") boolean withReplica,
                                @DefaultValue("true") @QueryParam("sortSubPaths") boolean sortSubpaths)
       throws IOException {
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
@@ -143,7 +143,7 @@ public class NSSummaryEndpoint {
   public Response getQuotaUsage(@QueryParam("path") String path)
       throws IOException {
 
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
@@ -173,7 +173,7 @@ public class NSSummaryEndpoint {
   public Response getFileSizeDistribution(@QueryParam("path") String path)
       throws IOException {
 
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 

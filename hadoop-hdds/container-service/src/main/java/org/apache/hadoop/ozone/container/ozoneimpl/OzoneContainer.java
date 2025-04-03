@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -188,7 +189,8 @@ public class OzoneContainer {
         OZONE_RECOVERING_CONTAINER_TIMEOUT,
         OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.witnessedContainerMetadataStore = WitnessedContainerMetadataStoreImpl.get(conf);
-    containerSet = new ContainerSet(witnessedContainerMetadataStore.getContainerIdsTable(), recoveringContainerTimeout);
+    containerSet = ContainerSet.newRwContainerSet(witnessedContainerMetadataStore.getContainerIdsTable(),
+        recoveringContainerTimeout);
     metadataScanner = null;
 
     metrics = ContainerMetrics.create(conf);
@@ -334,8 +336,8 @@ public class OzoneContainer {
     }
 
     try {
-      for (int i = 0; i < volumeThreads.size(); i++) {
-        volumeThreads.get(i).join();
+      for (Thread volumeThread : volumeThreads) {
+        volumeThread.join();
       }
       try (TableIterator<Long, ? extends Table.KeyValue<Long, String>> itr =
                containerSet.getContainerIdsTable().iterator()) {
@@ -483,6 +485,11 @@ public class OzoneContainer {
       return;
     }
 
+    DatanodeLayoutStorage layoutStorage
+        = new DatanodeLayoutStorage(config);
+    layoutStorage.setClusterId(clusterId);
+    layoutStorage.persistCurrentState();
+
     buildContainerSet();
 
     // Start background volume checks, which will begin after the configured
@@ -597,20 +604,22 @@ public class OzoneContainer {
     StorageContainerDatanodeProtocolProtos.NodeReportProto.Builder nrb
             = StorageContainerDatanodeProtocolProtos.
             NodeReportProto.newBuilder();
-    for (int i = 0; i < reports.length; i++) {
-      nrb.addStorageReport(reports[i].getProtoBufMessage(config));
+
+    for (StorageLocationReport report : reports) {
+      nrb.addStorageReport(report.getProtoBufMessage());
     }
 
     StorageLocationReport[] metaReports = metaVolumeSet.getStorageReport();
-    for (int i = 0; i < metaReports.length; i++) {
-      nrb.addMetadataStorageReport(
-          metaReports[i].getMetadataProtoBufMessage());
+
+    for (StorageLocationReport metaReport : metaReports) {
+      nrb.addMetadataStorageReport(metaReport.getMetadataProtoBufMessage());
     }
 
     if (dbVolumeSet != null) {
       StorageLocationReport[] dbReports = dbVolumeSet.getStorageReport();
-      for (int i = 0; i < dbReports.length; i++) {
-        nrb.addDbStorageReport(dbReports[i].getProtoBufMessage());
+
+      for (StorageLocationReport dbReport : dbReports) {
+        nrb.addDbStorageReport(dbReport.getProtoBufMessage());
       }
     }
 

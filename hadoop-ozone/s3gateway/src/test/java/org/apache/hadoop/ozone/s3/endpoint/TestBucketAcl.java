@@ -82,7 +82,7 @@ public class TestBucketAcl {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
     Response response =
         bucketEndpoint.get(BUCKET_NAME, null, null, null, 0, null,
-            null, null, null, ACL_MARKER, headers);
+            null, null, null, ACL_MARKER, null, null, 0, headers);
     assertEquals(HTTP_OK, response.getStatus());
     System.out.println(response.getEntity());
   }

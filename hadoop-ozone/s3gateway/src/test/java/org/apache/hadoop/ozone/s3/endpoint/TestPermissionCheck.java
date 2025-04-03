@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.anyString;
@@ -142,12 +143,12 @@ public class TestPermissionCheck {
   @Test
   public void testListMultiUpload() throws IOException {
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).listMultipartUploads(anyString());
+    doThrow(exception).when(bucket).listMultipartUploads(anyString(), anyString(), anyString(), anyInt());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.listMultipartUploads("bucketName", "prefix"));
+        bucketEndpoint.listMultipartUploads("bucketName", "prefix", "", "", 10));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -162,7 +163,7 @@ public class TestPermissionCheck {
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
         "bucketName", null, null, null, 1000,
-        null, null, null, null, null, null));
+        null, null, null, null, null, null, null, 0, null));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -206,8 +207,8 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
-        "bucketName", null, null, null, 1000, null, null, null, null, "acl",
-        null), "Expected OS3Exception with FORBIDDEN http code.");
+            "bucketName", null, null, null, 1000, null, null, null, null, "acl",
+            null, null, 0, null), "Expected OS3Exception with FORBIDDEN http code.");
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 

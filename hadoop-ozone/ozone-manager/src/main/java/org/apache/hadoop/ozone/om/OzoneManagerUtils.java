@@ -31,8 +31,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Ozone Manager utility class.
@@ -41,9 +39,6 @@ public final class OzoneManagerUtils {
 
   private OzoneManagerUtils() {
   }
-
-  private static final Logger LOG = LoggerFactory
-      .getLogger(OzoneManagerUtils.class);
 
   /**
    * All the client requests are executed through

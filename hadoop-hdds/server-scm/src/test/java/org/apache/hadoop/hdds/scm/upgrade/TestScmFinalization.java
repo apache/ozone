@@ -51,8 +51,8 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -336,9 +336,9 @@ public class TestScmFinalization {
   private StatusAndMessages getStatusFromCheckpoint(
       FinalizationCheckpoint initialCheckpoint) {
     if (initialCheckpoint == FinalizationCheckpoint.FINALIZATION_COMPLETE) {
-      return UpgradeFinalizer.FINALIZED_MSG;
+      return UpgradeFinalization.FINALIZED_MSG;
     } else {
-      return UpgradeFinalizer.STARTING_MSG;
+      return UpgradeFinalization.STARTING_MSG;
     }
   }
 

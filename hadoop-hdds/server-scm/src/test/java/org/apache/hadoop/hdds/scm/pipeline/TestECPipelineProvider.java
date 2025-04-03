@@ -137,10 +137,10 @@ public class TestECPipelineProvider {
         .thenReturn(NodeStatus.inServiceDead());
     DatanodeDetails dead2 = iterator.next().getDatanodeDetails();
     when(nodeManager.getNodeStatus(dead2))
-        .thenReturn(new NodeStatus(IN_MAINTENANCE, DEAD));
+        .thenReturn(NodeStatus.valueOf(IN_MAINTENANCE, DEAD));
     DatanodeDetails dead3 = iterator.next().getDatanodeDetails();
     when(nodeManager.getNodeStatus(dead3))
-        .thenReturn(new NodeStatus(DECOMMISSIONED, DEAD));
+        .thenReturn(NodeStatus.valueOf(DECOMMISSIONED, DEAD));
     Set<DatanodeDetails> deadNodes = ImmutableSet.of(dead, dead2, dead3);
 
     Pipeline pipeline = provider.createForRead(ecConf, replicas);
@@ -166,7 +166,7 @@ public class TestECPipelineProvider {
       DatanodeDetails decomNode = MockDatanodeDetails.randomDatanodeDetails();
       replicas.add(replica.toBuilder().setDatanodeDetails(decomNode).build());
       when(nodeManager.getNodeStatus(decomNode))
-          .thenReturn(new NodeStatus(DECOMMISSIONING, HEALTHY));
+          .thenReturn(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
       decomNodes.add(decomNode);
 
       DatanodeDetails staleNode = MockDatanodeDetails.randomDatanodeDetails();

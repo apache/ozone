@@ -30,10 +30,10 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -112,9 +112,9 @@ public class TestSCMContainerPlacementCapacity {
         .thenReturn(new SCMNodeMetric(100L, 80L, 20L, 0, 19));
     when(mockNodeManager.getNodeStat(datanodes.get(4)))
         .thenReturn(new SCMNodeMetric(100L, 70L, 30L, 0, 20));
-    when(mockNodeManager.getNodeByUuid(any(UUID.class))).thenAnswer(
+    when(mockNodeManager.getNode(any(DatanodeID.class))).thenAnswer(
             invocation -> datanodes.stream()
-                .filter(dn -> dn.getUuid().equals(invocation.getArgument(0)))
+                .filter(dn -> dn.getID().equals(invocation.getArgument(0)))
                 .findFirst()
                 .orElse(null));
 

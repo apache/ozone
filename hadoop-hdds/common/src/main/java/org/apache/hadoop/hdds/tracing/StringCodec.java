@@ -50,7 +50,7 @@ public class StringCodec implements Codec<StringBuilder> {
         throw new MalformedTracerStateStringException(value);
       } else {
         String traceId = parts[0];
-        if (traceId.length() <= 32 && traceId.length() >= 1) {
+        if (traceId.length() <= 32 && !traceId.isEmpty()) {
           return new JaegerSpanContext(high(traceId),
               (new BigInteger(traceId, 16)).longValue(),
               (new BigInteger(parts[1], 16)).longValue(),

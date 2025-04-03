@@ -116,7 +116,7 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, ozoneConfiguration);
+            reconOMMetadataManager, 10);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
   }
 

@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOz
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -36,8 +37,8 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -53,18 +54,20 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for NSSummaryTaskWithLegacy.
  */
-public final class TestNSSummaryTaskWithLegacy {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class TestNSSummaryTaskWithLegacy {
 
-  private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private static OMMetadataManager omMetadataManager;
-  private static ReconOMMetadataManager reconOMMetadataManager;
-  private static NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
-  private static OzoneConfiguration omConfiguration;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private OMMetadataManager omMetadataManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
+  private NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
+  private OzoneConfiguration omConfiguration;
 
   // Object names
   private static final String VOL = "vol";
@@ -112,15 +115,12 @@ public final class TestNSSummaryTaskWithLegacy {
   private static final long KEY_FOUR_SIZE = 2050L;
   private static final long KEY_FIVE_SIZE = 100L;
 
-  private static Set<Long> bucketOneAns = new HashSet<>();
-  private static Set<Long> bucketTwoAns = new HashSet<>();
-  private static Set<Long> dirOneAns = new HashSet<>();
-
-  private TestNSSummaryTaskWithLegacy() {
-  }
+  private final Set<Long> bucketOneAns = new HashSet<>();
+  private final Set<Long> bucketTwoAns = new HashSet<>();
+  private final Set<Long> dirOneAns = new HashSet<>();
 
   @BeforeAll
-  public static void setUp(@TempDir File tmpDir) throws Exception {
+  void setUp(@TempDir File tmpDir) throws Exception {
     initializeNewOmMetadataManager(new File(tmpDir, "om"));
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         getMockOzoneManagerServiceProvider();
@@ -143,9 +143,11 @@ public final class TestNSSummaryTaskWithLegacy {
 
     populateOMDB();
 
+    long nsSummaryFlushToDBMaxThreshold = omConfiguration.getLong(
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 10);
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, omConfiguration);
+        reconOMMetadataManager, omConfiguration, nsSummaryFlushToDBMaxThreshold);
   }
 
   /**
@@ -293,7 +295,7 @@ public final class TestNSSummaryTaskWithLegacy {
     @BeforeEach
     public void setUp() throws IOException {
       nSSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
-      nSSummaryTaskWithLegacy.processWithLegacy(processEventBatch());
+      nSSummaryTaskWithLegacy.processWithLegacy(processEventBatch(), 0);
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
@@ -599,7 +601,7 @@ public final class TestNSSummaryTaskWithLegacy {
    *
    * @throws IOException
    */
-  private static void populateOMDB() throws IOException {
+  private void populateOMDB() throws IOException {
     writeKeyToOm(reconOMMetadataManager,
         KEY_ONE,
         BUCKET_ONE,
@@ -684,14 +686,14 @@ public final class TestNSSummaryTaskWithLegacy {
    * buckets.
    * @throws IOException ioEx
    */
-  private static void initializeNewOmMetadataManager(
+  private void initializeNewOmMetadataManager(
       File omDbDir)
       throws IOException {
     omConfiguration = new OzoneConfiguration();
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
-    omConfiguration.set(OMConfigKeys
-        .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
+    omConfiguration.set(OmConfig.Keys.ENABLE_FILESYSTEM_PATHS, "true");
+    omConfiguration.set(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, "10");
     omMetadataManager = new OmMetadataManagerImpl(
         omConfiguration, null);
 

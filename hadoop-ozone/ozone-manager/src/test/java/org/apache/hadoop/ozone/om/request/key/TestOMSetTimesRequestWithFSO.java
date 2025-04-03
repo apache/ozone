@@ -75,6 +75,7 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
    * Verify that setTimes() on key works as expected.
    * @throws Exception
    */
+  @Override
   @Test
   public void testKeySetTimesRequest() throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -105,6 +106,7 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     assertEquals(mtime, keyMtime);
   }
 
+  @Override
   protected String addKeyToTable() throws Exception {
     String key = PARENT_DIR + "/" + FILE_NAME;
     keyName = key; // updated key name
@@ -132,6 +134,7 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
         volumeId, bucketId, omKeyInfo.getParentObjectID(), FILE_NAME);
   }
 
+  @Override
   protected OMKeySetTimesRequest getOmKeySetTimesRequest(
       OMRequest setTimesRequest) {
     return new OMKeySetTimesRequestWithFSO(setTimesRequest, getBucketLayout());

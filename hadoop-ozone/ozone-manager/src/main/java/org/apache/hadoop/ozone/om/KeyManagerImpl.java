@@ -79,7 +79,6 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -104,11 +103,12 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.Node;
@@ -354,7 +354,7 @@ public class KeyManagerImpl implements KeyManager {
 
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
         configuration.getClass(
-            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
             TableMapping.class, DNSToSwitchMapping.class);
     DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
         dnsToSwitchMappingClass, configuration);
@@ -802,6 +802,7 @@ public class KeyManagerImpl implements KeyManager {
     return snapshotDeletingService;
   }
 
+  @Override
   public SnapshotDirectoryCleaningService getSnapshotDirectoryService() {
     return snapshotDirectoryCleaningService;
   }
@@ -816,42 +817,34 @@ public class KeyManagerImpl implements KeyManager {
   
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix) throws OMException {
+      String bucketName,
+      String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
+      throws OMException {
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
+      List<OmMultipartUpload> multipartUploadKeys = metadataManager
+          .getMultipartUploadKeys(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads,
+              !withPagination);
+      OmMultipartUploadList.Builder resultBuilder = OmMultipartUploadList.newBuilder();
 
-      Set<String> multipartUploadKeys =
-          metadataManager
-              .getMultipartUploadKeys(volumeName, bucketName, prefix);
+      if (withPagination && multipartUploadKeys.size() == maxUploads + 1) {
+        int lastIndex = multipartUploadKeys.size() - 1;
+        OmMultipartUpload lastUpload = multipartUploadKeys.get(lastIndex);
+        resultBuilder.setNextKeyMarker(lastUpload.getKeyName())
+            .setNextUploadIdMarker(lastUpload.getUploadId())
+            .setIsTruncated(true);
 
-      List<OmMultipartUpload> collect = multipartUploadKeys.stream()
-          .map(OmMultipartUpload::from)
-          .peek(upload -> {
-            try {
-              Table<String, OmMultipartKeyInfo> keyInfoTable =
-                  metadataManager.getMultipartInfoTable();
+        // remove next upload from the list
+        multipartUploadKeys.remove(lastIndex);
+      }
 
-              OmMultipartKeyInfo multipartKeyInfo =
-                  keyInfoTable.get(upload.getDbKey());
-
-              upload.setCreationTime(
-                  Instant.ofEpochMilli(multipartKeyInfo.getCreationTime()));
-              upload.setReplicationConfig(
-                      multipartKeyInfo.getReplicationConfig());
-            } catch (IOException e) {
-              LOG.warn(
-                  "Open key entry for multipart upload record can be read  {}",
-                  metadataManager.getOzoneKey(upload.getVolumeName(),
-                          upload.getBucketName(), upload.getKeyName()));
-            }
-          })
-          .collect(Collectors.toList());
-
-      return new OmMultipartUploadList(collect);
+      return resultBuilder
+          .setUploads(multipartUploadKeys)
+          .build();
 
     } catch (IOException ex) {
       LOG.error("List Multipart Uploads Failed: volume: " + volumeName +
@@ -1279,7 +1272,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     try {
       // Check if this is the root of the filesystem.
-      if (keyName.length() == 0) {
+      if (keyName.isEmpty()) {
         OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
         return new OzoneFileStatus();
       }
@@ -1424,7 +1417,7 @@ public class KeyManagerImpl implements KeyManager {
             bucketName);
     try {
       // Check if this is the root of the filesystem.
-      if (keyName.length() == 0) {
+      if (keyName.isEmpty()) {
         OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
         return new OzoneFileStatus();
       }
@@ -1637,6 +1630,7 @@ public class KeyManagerImpl implements KeyManager {
     return listStatus(args, recursive, startKey, numEntries, null);
   }
 
+  @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
                                           String startKey, long numEntries,
                                           String clientAddress)
@@ -1968,8 +1962,8 @@ public class KeyManagerImpl implements KeyManager {
                              List<DatanodeDetails> nodes) {
     List<DatanodeDetails> matchingNodes = new ArrayList<>();
     boolean useHostname = ozoneManager.getConfiguration().getBoolean(
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     for (DatanodeDetails node : nodes) {
       if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(
           clientMachine)) {

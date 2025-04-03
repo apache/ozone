@@ -23,8 +23,8 @@ import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature;
-import org.hadoop.ozone.recon.schema.ReconSchemaDefinition;
-import org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition;
+import org.apache.ozone.recon.schema.ReconSchemaDefinition;
+import org.apache.ozone.recon.schema.SchemaVersionTableDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

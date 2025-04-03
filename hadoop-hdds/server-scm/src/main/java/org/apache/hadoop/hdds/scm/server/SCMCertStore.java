@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -31,7 +30,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
-import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -84,6 +82,7 @@ public final class SCMCertStore implements CertificateStore {
    * @param certificate - Certificate to persist.
    * @throws IOException - on Failure.
    */
+  @Override
   public void storeValidScmCertificate(BigInteger serialID,
       X509Certificate certificate) throws IOException {
     lock.lock();
@@ -101,6 +100,7 @@ public final class SCMCertStore implements CertificateStore {
     }
   }
 
+  @Override
   public void checkValidCertID(BigInteger serialID) throws IOException {
     lock.lock();
     try {
@@ -225,17 +225,9 @@ public final class SCMCertStore implements CertificateStore {
     }
 
     public CertificateStore build() {
-      final SCMCertStore scmCertStore = new SCMCertStore(metadataStore
-      );
-
-      final SCMHAInvocationHandler scmhaInvocationHandler =
-          new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.CERT_STORE,
-              scmCertStore, scmRatisServer);
-
-      return (CertificateStore) Proxy.newProxyInstance(
-          SCMHAInvocationHandler.class.getClassLoader(),
-          new Class<?>[]{CertificateStore.class}, scmhaInvocationHandler);
-
+      final SCMCertStore scmCertStore = new SCMCertStore(metadataStore);
+      return scmRatisServer.getProxyHandler(SCMRatisProtocol.RequestType.CERT_STORE,
+         CertificateStore.class, scmCertStore);
     }
   }
 }

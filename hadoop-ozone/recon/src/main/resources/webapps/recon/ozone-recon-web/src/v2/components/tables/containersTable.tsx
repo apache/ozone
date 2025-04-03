@@ -225,7 +225,7 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
         dataSource={dataSource}
         columns={KEY_TABLE_COLUMNS}
         pagination={paginationConfig}
-        rowKey={(record: KeyResponse) => `${record.Volume}/${record.Bucket}/${record.Key}`}
+        rowKey={(record: KeyResponse) => record.CompletePath}
         locale={{ filterTitle: '' }} />
     )
   };

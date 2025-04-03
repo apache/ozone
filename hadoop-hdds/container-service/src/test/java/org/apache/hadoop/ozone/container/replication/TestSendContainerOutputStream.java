@@ -64,6 +64,7 @@ class TestSendContainerOutputStream
     verify(getObserver()).onCompleted();
   }
 
+  @Override
   protected ByteString verifyPart(SendContainerRequest response,
       int expectedOffset, int size) {
     assertEquals(getContainerId(), response.getContainerID());

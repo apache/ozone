@@ -345,7 +345,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       if (keyArgs.getIsMultipartKey()) {
         throw new IOException("Hsync is unsupported for multipart keys.");
       } else {
-        if (keyArgs.getLocationInfoList().size() == 0) {
+        if (keyArgs.getLocationInfoList().isEmpty()) {
           MetricUtil.captureLatencyNs(clientMetrics::addOMHsyncLatency,
               () -> omClient.hsyncKey(keyArgs, openID));
         } else {

@@ -27,7 +27,7 @@ import picocli.CommandLine;
 public class SnapshotUri implements CommandLine.ITypeConverter<OzoneAddress> {
 
   private static final String OZONE_SNAPSHOT_URI_DESCRIPTION =
-      "URI of the volume/bucket/snapshot.\n" + Shell.OZONE_URI_DESCRIPTION;
+      "URI of the snapshot (format: volume/bucket/snapshot).\n" + Shell.OZONE_URI_DESCRIPTION;
 
   @CommandLine.Parameters(index = "0", arity = "1..1",
       description = OZONE_SNAPSHOT_URI_DESCRIPTION,

@@ -912,6 +912,8 @@ message SnapshotDiffJobProto {
   optional uint64 totalDiffEntries = 9;
   optional string message = 10;
   optional bool disableNativeDiff = 11;
+  optional SnapshotDiffResponse.SubStatus subStatus = 12;
+  optional double keysProcessedPct = 13;
 }
 
 message OzoneObj {
@@ -1759,11 +1761,17 @@ message ListMultipartUploadsRequest {
     required string volume = 1;
     required string bucket = 2;
     required string prefix = 3;
+    optional string keyMarker = 4;
+    optional string uploadIdMarker = 5;
+    optional int32 maxUploads = 6;
+    optional bool withPagination = 7; // for backward compatibility
 }
 
 message ListMultipartUploadsResponse {
     optional bool isTruncated = 1;
     repeated MultipartUploadInfo uploadsList = 2;
+    optional string nextKeyMarker = 3;
+    optional string nextUploadIdMarker = 4;
 }
 
 message MultipartUploadInfo {
@@ -2095,10 +2103,19 @@ message SnapshotDiffResponse {
     CANCELLED = 6;
   }
 
+  enum SubStatus {
+      SST_FILE_DELTA_DAG_WALK = 1;
+      SST_FILE_DELTA_FULL_DIFF = 2;
+      OBJECT_ID_MAP_GEN_OBS = 3;
+      OBJECT_ID_MAP_GEN_FSO = 4;
+      DIFF_REPORT_GEN = 5;
+  }
+
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
   optional JobStatusProto jobStatus = 2;
   optional int64 waitTimeInMs = 3;
   optional string reason = 4;
+  optional SubStatus subStatus = 5;
 }
 
 message CancelSnapshotDiffResponse {
