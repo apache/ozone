@@ -120,8 +120,6 @@ public class HddsVolume extends StorageVolume {
   private HddsVolume(Builder b) throws IOException {
     super(b);
 
-    LOG.info("Creating HddsVolume: {}", getReport());
-
     if (!b.getFailedVolume()) {
       this.setState(VolumeState.NOT_INITIALIZED);
       ConfigurationSource conf = getConf();
@@ -139,6 +137,8 @@ public class HddsVolume extends StorageVolume {
       volumeIOStats = null;
       volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
     }
+
+    LOG.info("HddsVolume: {}", getReport());
   }
 
   @Override

@@ -236,12 +236,9 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
   public String toString() {
     StringBuilder sb = new StringBuilder(128)
         .append("{")
+        .append(" id=").append(id)
         .append(" dir=").append(storageLocation)
         .append(" type=").append(storageType);
-
-    if (id != null) {
-      sb.append(" id=").append(id);
-    }
 
     if (failed) {
       sb.append(" failed");
