@@ -130,8 +130,17 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
-  private static List<String> extractSubList(List<String>input, int index) {
-    return input.subList(0, Math.min(index, input.size()));
+  private static void logSstFileList(List<String>sstList, int sampleSize) {
+    String msg = "Received list of {} SST files to be excluded{}: {}";
+    int count = sstList.size();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(msg, count, "", sstList);
+    } else if (count > sampleSize) {
+      List<String> sample = sstList.subList(0, sampleSize);
+      LOG.info(msg, count, ", sample", sample);
+    } else {
+      LOG.info(msg, count, "", sstList);
+    }
   }
 
   /**
@@ -199,8 +208,7 @@ public class DBCheckpointServlet extends HttpServlet
               .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
               .distinct()
               .collect(Collectors.toList()));
-      LOG.info("Received list of {} SST files to be excluded, sample: {}",
-          receivedSstList.size(), extractSubList(receivedSstList, 5));
+      logSstFileList(receivedSstList, 5);
     }
 
     Path tmpdir = null;
@@ -234,8 +242,7 @@ public class DBCheckpointServlet extends HttpServlet
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
-      LOG.info("Excluded SST {} from the latest checkpoint. The total excluded sst files count is {}",
-          extractSubList(excludedSstList, 5), excludedSstList.size());
+      logSstFileList(excludedSstList, 5);
       if (!excludedSstList.isEmpty()) {
         dbMetrics.incNumIncrementalCheckpoint();
       }
