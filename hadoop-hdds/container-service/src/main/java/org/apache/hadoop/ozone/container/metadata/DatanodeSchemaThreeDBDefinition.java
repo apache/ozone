@@ -193,6 +193,8 @@ public class DatanodeSchemaThreeDBDefinition
 
   private ManagedColumnFamilyOptions getCFOptions(
       ConfigurationSource config, DatanodeDBProfile dbProfile, Path pathToDb, String cfName) {
+    // Use prefix seek to mitigating seek overhead.
+    // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
     return (ManagedColumnFamilyOptions) dbProfile
         .getColumnFamilyOptions(config, pathToDb, cfName)
         .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());

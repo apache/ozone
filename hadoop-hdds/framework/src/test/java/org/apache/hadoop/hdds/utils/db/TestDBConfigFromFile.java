@@ -18,9 +18,12 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.hadoop.hdds.utils.db.DBConfigFromFile.getOptionsFileNameFromDB;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -69,10 +72,19 @@ public class TestDBConfigFromFile {
   }
 
   @Test
-  public void readFromFileInvalidConfig() throws IOException {
-    final DBOptions options = DBConfigFromFile.readDBOptionsFromFile(Paths.get("badfile.db.ini"));
+  public void readFromNonExistentFile() throws IOException {
+    final DBOptions options = DBConfigFromFile.readDBOptionsFromFile(Paths.get("nonExistent.db.ini"));
     // This has to return a Null, since we have config defined for badfile.db
     assertNull(options);
+  }
+
+  @Test
+  public void readFromEmptyFile() throws IOException {
+    File emptyFile = new File(Paths.get(System.getProperty(DBConfigFromFile.CONFIG_DIR)).toString(), "empty.ini");
+    assertTrue(emptyFile.createNewFile());
+    IOException thrownException =
+        assertThrows(IOException.class, () -> DBConfigFromFile.readDBOptionsFromFile(emptyFile.toPath()));
+    assertThat(thrownException.getMessage()).contains("A RocksDB Option file must have a single DBOptions section");
   }
 
   @Test

@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
-import java.util.Objects;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedBloomFilter;
@@ -82,8 +81,8 @@ public enum DBProfile {
     @Override
     public ManagedColumnFamilyOptions getColumnFamilyOptions(Path dbPath, String cfName) {
       ManagedColumnFamilyOptions option = null;
-      if (Objects.isNull(dbPath)) {
-        LOG.debug("RocksDB path does not exists: {}", dbPath);
+      if (dbPath == null) {
+        LOG.debug("RocksDB path is null");
         return null;
       }
       try {
