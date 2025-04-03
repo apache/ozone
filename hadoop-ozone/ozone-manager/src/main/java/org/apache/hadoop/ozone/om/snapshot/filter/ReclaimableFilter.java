@@ -17,14 +17,13 @@
 
 package org.apache.hadoop.ozone.om.snapshot.filter;
 
-import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -56,7 +55,8 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
   private final SnapshotInfo currentSnapshotInfo;
   private final OmSnapshotManager omSnapshotManager;
   private final SnapshotChainManager snapshotChainManager;
-
+  private final List<SnapshotInfo> tmpValidationSnapshotInfos;
+  private final List<UUID> lockedSnapshotIds;
   private final List<SnapshotInfo> previousSnapshotInfos;
   private final List<ReferenceCounted<OmSnapshot>> previousOmSnapshots;
   private final MultiSnapshotLocks snapshotIdLocks;
@@ -93,6 +93,9 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
     this.numberOfPreviousSnapshotsFromChain = numberOfPreviousSnapshotsFromChain;
     this.previousOmSnapshots = new ArrayList<>(numberOfPreviousSnapshotsFromChain);
     this.previousSnapshotInfos = new ArrayList<>(numberOfPreviousSnapshotsFromChain);
+    // Used for tmp list to avoid lots of garbage collection of list.
+    this.tmpValidationSnapshotInfos = new ArrayList<>(numberOfPreviousSnapshotsFromChain);
+    this.lockedSnapshotIds = new ArrayList<>(numberOfPreviousSnapshotsFromChain + 1);
   }
 
   private List<SnapshotInfo> getLastNSnapshotInChain(String volume, String bucket) throws IOException {
@@ -101,36 +104,42 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
       throw new IOException("Volume and Bucket name for snapshot : " + currentSnapshotInfo + " do not match " +
           "against the volume: " + volume + " and bucket: " + bucket + " of the key.");
     }
+    tmpValidationSnapshotInfos.clear();
     SnapshotInfo expectedPreviousSnapshotInfo = currentSnapshotInfo == null
         ? SnapshotUtils.getLatestSnapshotInfo(volume, bucket, ozoneManager, snapshotChainManager)
         : SnapshotUtils.getPreviousSnapshot(ozoneManager, snapshotChainManager, currentSnapshotInfo);
-    List<SnapshotInfo> snapshotInfos = Lists.newArrayList();
     SnapshotInfo snapshotInfo = expectedPreviousSnapshotInfo;
-    while (snapshotInfos.size() < numberOfPreviousSnapshotsFromChain) {
+    while (tmpValidationSnapshotInfos.size() < numberOfPreviousSnapshotsFromChain) {
       // If changes made to the snapshot have not been flushed to disk, throw exception immediately, next run of
       // garbage collection would process the snapshot.
       if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(ozoneManager.getMetadataManager(), snapshotInfo)) {
         throw new IOException("Changes made to the snapshot " + snapshotInfo + " have not been flushed to the disk ");
       }
-      snapshotInfos.add(snapshotInfo);
+      tmpValidationSnapshotInfos.add(snapshotInfo);
       snapshotInfo = snapshotInfo == null ? null
           : SnapshotUtils.getPreviousSnapshot(ozoneManager, snapshotChainManager, snapshotInfo);
     }
 
     // Reversing list to get the correct order in chain. To ensure locking order is as per the chain ordering.
-    Collections.reverse(snapshotInfos);
-    return snapshotInfos;
+    Collections.reverse(tmpValidationSnapshotInfos);
+    return tmpValidationSnapshotInfos;
   }
 
   private boolean validateExistingLastNSnapshotsInChain(String volume, String bucket) throws IOException {
     List<SnapshotInfo> expectedLastNSnapshotsInChain = getLastNSnapshotInChain(volume, bucket);
-    List<UUID> expectedSnapshotIds = expectedLastNSnapshotsInChain.stream()
-        .map(snapshotInfo -> snapshotInfo == null ? null : snapshotInfo.getSnapshotId())
-        .collect(Collectors.toList());
-    List<UUID> existingSnapshotIds = previousOmSnapshots.stream()
-        .map(omSnapshotReferenceCounted -> omSnapshotReferenceCounted == null ? null :
-            omSnapshotReferenceCounted.get().getSnapshotID()).collect(Collectors.toList());
-    return expectedSnapshotIds.equals(existingSnapshotIds);
+    if (expectedLastNSnapshotsInChain.size() != previousOmSnapshots.size()) {
+      return false;
+    }
+    for (int i = 0; i < expectedLastNSnapshotsInChain.size(); i++) {
+      SnapshotInfo snapshotInfo = expectedLastNSnapshotsInChain.get(i);
+      ReferenceCounted<OmSnapshot> omSnapshot = previousOmSnapshots.get(i);
+      UUID snapshotId = snapshotInfo == null ? null : snapshotInfo.getSnapshotId();
+      UUID existingOmSnapshotId = omSnapshot == null ? null : omSnapshot.get().getSnapshotID();
+      if (!Objects.equals(snapshotId, existingOmSnapshotId)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // Initialize the last N snapshots in the chain by acquiring locks. Throw IOException if it fails.
@@ -139,35 +148,34 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
     try {
       // Acquire lock on last N snapshot & current snapshot(AOS if it is null).
       List<SnapshotInfo> expectedLastNSnapshotsInChain = getLastNSnapshotInChain(volume, bucket);
-      List<UUID> lockIds = expectedLastNSnapshotsInChain.stream()
-          .map(snapshotInfo -> snapshotInfo == null ? null : snapshotInfo.getSnapshotId())
-          .collect(Collectors.toList());
+      for (SnapshotInfo snapshotInfo : expectedLastNSnapshotsInChain) {
+        lockedSnapshotIds.add(snapshotInfo == null ? null : snapshotInfo.getSnapshotId());
+      }
       //currentSnapshotInfo for AOS will be null.
-      lockIds.add(currentSnapshotInfo == null ? null : currentSnapshotInfo.getSnapshotId());
+      lockedSnapshotIds.add(currentSnapshotInfo == null ? null : currentSnapshotInfo.getSnapshotId());
 
-      if (snapshotIdLocks.acquireLock(lockIds).isLockAcquired()) {
-        for (SnapshotInfo snapshotInfo : expectedLastNSnapshotsInChain) {
-          if (snapshotInfo != null) {
-            // Fail operation if any of the previous snapshots are not active.
-            previousOmSnapshots.add(omSnapshotManager.getActiveSnapshot(snapshotInfo.getVolumeName(),
-                snapshotInfo.getBucketName(), snapshotInfo.getName()));
-            previousSnapshotInfos.add(snapshotInfo);
-          } else {
-            previousOmSnapshots.add(null);
-            previousSnapshotInfos.add(null);
-          }
-
-          // NOTE: Getting volumeId and bucket from active OM. This would be wrong on volume & bucket renames
-          //  support.
-          bucketInfo = ozoneManager.getBucketInfo(volume, bucket);
-          volumeId = ozoneManager.getMetadataManager().getVolumeId(volume);
-        }
-      } else {
+      if (!snapshotIdLocks.acquireLock(lockedSnapshotIds).isLockAcquired()) {
         throw new IOException("Lock acquisition failed for last N snapshots: " +
             expectedLastNSnapshotsInChain + ", " + currentSnapshotInfo);
       }
+      for (SnapshotInfo snapshotInfo : expectedLastNSnapshotsInChain) {
+        if (snapshotInfo != null) {
+          // Fail operation if any of the previous snapshots are not active.
+          previousOmSnapshots.add(omSnapshotManager.getActiveSnapshot(snapshotInfo.getVolumeName(),
+              snapshotInfo.getBucketName(), snapshotInfo.getName()));
+          previousSnapshotInfos.add(snapshotInfo);
+        } else {
+          previousOmSnapshots.add(null);
+          previousSnapshotInfos.add(null);
+        }
+
+        // NOTE: Getting volumeId and bucket from active OM. This would be wrong on volume & bucket renames
+        //  support.
+        bucketInfo = ozoneManager.getBucketInfo(volume, bucket);
+        volumeId = ozoneManager.getMetadataManager().getVolumeId(volume);
+      }
     } catch (IOException e) {
-      this.close();
+      this.cleanup();
       throw e;
     }
   }
@@ -194,10 +202,15 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
 
   @Override
   public void close() throws IOException {
+    this.cleanup();
+  }
+
+  private void cleanup() {
     this.snapshotIdLocks.releaseLock();
     IOUtils.close(LOG, previousOmSnapshots);
     previousOmSnapshots.clear();
     previousSnapshotInfos.clear();
+    lockedSnapshotIds.clear();
   }
 
   protected ReferenceCounted<OmSnapshot> getPreviousOmSnapshot(int index) {
