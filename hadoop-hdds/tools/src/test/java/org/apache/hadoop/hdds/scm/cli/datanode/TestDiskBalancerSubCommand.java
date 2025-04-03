@@ -27,15 +27,20 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 /**
@@ -192,6 +197,54 @@ public class TestDiskBalancerSubCommand {
     stopCmd.setAllHosts(false);
   }
 
+  public static Stream<Arguments> values() {
+    return Stream.of(
+        Arguments.arguments(0L, 0L, 0L, 0L, 0L),  // bytesMovedMB = 0, bytesToMoveMB = 0, estimatedTimeLeft = 0
+        Arguments.arguments(512L, 512L, 1L, 1L, 1L), // bytesMoved and bytesToMove < 1MB should be rounded up to 1MB
+        Arguments.arguments(5242880L, 10485760L, 5L, 10L, 1L), // bytesMoved = 5MB, bytesToMove = 10MB, estTimeLeft = 1
+        Arguments.arguments(13774139392L, 3229900800L, 13137L, 3081L, 6L),
+        Arguments.arguments(7482638336L, 939524096L, 7136L, 896L, 2L)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("values")
+  public void testDiskBalancerStatusCalculations(long bytesMoved, long bytesToMove, long bytesMovedMB,
+      long bytesToMoveMB, long estTimeLeft) throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+
+    HddsProtos.DatanodeDiskBalancerInfoProto proto =
+        HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
+            .setNode(generateDatanodeDetails())
+            .setCurrentVolumeDensitySum(random.nextDouble())
+            .setRunningStatus(HddsProtos.DiskBalancerRunningStatus.
+                valueOf(random.nextInt(2) + 1))
+            .setBytesMoved(bytesMoved)
+            .setBytesToMove(bytesToMove)
+            .setDiskBalancerConf(
+                HddsProtos.DiskBalancerConfigurationProto.newBuilder()
+                    .setDiskBandwidthInMB(10)
+                    .setThreshold(10.0)
+                    .setParallelThread(5)
+                    .build())
+            .build();
+
+    List<HddsProtos.DatanodeDiskBalancerInfoProto> resultList = Collections.singletonList(proto);
+    Mockito.when(scmClient.getDiskBalancerStatus(Mockito.any(), Mockito.any())).thenReturn(resultList);
+
+    DiskBalancerStatusSubcommand statusCmd1 = new DiskBalancerStatusSubcommand();
+    statusCmd1.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING).trim();
+    String[] lines = output.split("\\n");
+
+    // Skip the header and find the data row
+    String[] columns = lines[2].split("\\s+");
+
+    assertEquals(String.valueOf(bytesMovedMB), columns[7]);
+    assertEquals(String.valueOf(bytesToMoveMB), columns[8]);
+    assertEquals(estTimeLeft >= 0 ? String.valueOf(estTimeLeft) : "N/A", columns[9]);
+  }
 
   private List<DatanodeAdminError> generateError(int count) {
     List<DatanodeAdminError> result = new ArrayList<>();

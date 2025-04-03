@@ -35,6 +35,7 @@ public class DiskBalancerInfo {
   private long successCount;
   private long failureCount;
   private long bytesToMove;
+  private long balancedBytes;
 
   public DiskBalancerInfo(boolean shouldRun, double threshold,
       long bandwidthInMB, int parallelThread) {
@@ -54,7 +55,7 @@ public class DiskBalancerInfo {
   @SuppressWarnings("checkstyle:ParameterNumber")
   public DiskBalancerInfo(boolean shouldRun, double threshold,
       long bandwidthInMB, int parallelThread, DiskBalancerVersion version,
-      long successCount, long failureCount, long bytesToMove) {
+      long successCount, long failureCount, long bytesToMove, long balancedBytes) {
     this.shouldRun = shouldRun;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
@@ -63,6 +64,7 @@ public class DiskBalancerInfo {
     this.successCount = successCount;
     this.failureCount = failureCount;
     this.bytesToMove = bytesToMove;
+    this.balancedBytes = balancedBytes;
   }
 
   public DiskBalancerInfo(boolean shouldRun,
@@ -98,6 +100,7 @@ public class DiskBalancerInfo {
     builder.setSuccessMoveCount(successCount);
     builder.setFailureMoveCount(failureCount);
     builder.setBytesToMove(bytesToMove);
+    builder.setBalancedBytes(balancedBytes);
     return builder.build();
   }
 
