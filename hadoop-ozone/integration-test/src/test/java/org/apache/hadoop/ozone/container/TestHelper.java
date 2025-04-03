@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.security.MessageDigest;
@@ -454,5 +455,21 @@ public final class TestHelper {
     } else {
       conf.set(key, value);
     }
+  }
+
+  public static void waitForContainerStateInSCM(StorageContainerManager scm,
+      ContainerID containerID, HddsProtos.LifeCycleState expectedState)
+      throws TimeoutException, InterruptedException {
+    ContainerManager containerManager = scm.getContainerManager();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return containerManager.getContainer(containerID).getState() == expectedState;
+      } catch (ContainerNotFoundException e) {
+        LOG.error("Container {} not found while waiting for state {}", 
+            containerID, expectedState, e);
+        fail("Container " + containerID + " not found while waiting for state " + expectedState + ": " + e);
+        return false;
+      }
+    }, 2000, 20000);
   }
 }

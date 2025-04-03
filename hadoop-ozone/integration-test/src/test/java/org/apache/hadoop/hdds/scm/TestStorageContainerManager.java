@@ -454,10 +454,10 @@ public class TestStorageContainerManager {
       GenericTestUtils.waitFor(() -> {
         NodeManager nodeManager = cluster.getStorageContainerManager()
             .getScmNodeManager();
-        List<SCMCommand> commands = nodeManager.processHeartbeat(
+        List<SCMCommand<?>> commands = nodeManager.processHeartbeat(
             nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0));
         if (commands != null) {
-          for (SCMCommand cmd : commands) {
+          for (SCMCommand<?> cmd : commands) {
             if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
               List<DeletedBlocksTransaction> deletedTXs =
                   ((DeleteBlocksCommand) cmd).blocksTobeDeleted();
@@ -639,7 +639,7 @@ public class TestStorageContainerManager {
     assertEquals(cluster.getHddsDatanodes().size(), allNodes.size());
 
     for (DatanodeDetails node : allNodes) {
-      DatanodeInfo datanodeInfo = assertInstanceOf(DatanodeInfo.class, nodeManager.getNodeByUuid(node.getUuid()));
+      DatanodeInfo datanodeInfo = assertInstanceOf(DatanodeInfo.class, nodeManager.getNode(node.getID()));
       assertNotNull(datanodeInfo);
       assertThat(datanodeInfo.getLastHeartbeatTime()).isPositive();
       assertEquals(datanodeInfo.getUuidString(), datanodeInfo.getNetworkName());

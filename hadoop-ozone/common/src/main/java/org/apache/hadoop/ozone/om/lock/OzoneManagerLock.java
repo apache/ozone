@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.CompositeKey;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
@@ -128,8 +129,13 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
   private Iterable<ReadWriteLock> bulkGetLock(Resource resource, Collection<String[]> keys) {
     Striped<ReadWriteLock> striped = stripedLockByResource.get(resource);
-    return striped.bulkGet(keys.stream().filter(Objects::nonNull)
-        .map(CompositeKey::combineKeys).collect(Collectors.toList()));
+    List<Object> lockKeys = new ArrayList<>(keys.size());
+    for (String[] key : keys) {
+      if (Objects.nonNull(key)) {
+        lockKeys.add(CompositeKey.combineKeys(key));
+      }
+    }
+    return striped.bulkGet(lockKeys);
   }
 
   private ReentrantReadWriteLock getLock(Resource resource, String... keys) {
@@ -226,6 +232,17 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return acquireLocks(resource, false, keys);
   }
 
+  private void acquireLock(Resource resource, boolean isReadLock, ReadWriteLock lock,
+                           long startWaitingTimeNanos) {
+    if (isReadLock) {
+      lock.readLock().lock();
+      updateReadLockMetrics(resource, (ReentrantReadWriteLock) lock, startWaitingTimeNanos);
+    } else {
+      lock.writeLock().lock();
+      updateWriteLockMetrics(resource, (ReentrantReadWriteLock) lock, startWaitingTimeNanos);
+    }
+  }
+
   private OMLockDetails acquireLocks(Resource resource, boolean isReadLock,
                                     Collection<String[]> keys) {
     omLockDetails.get().clear();
@@ -238,13 +255,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     long startWaitingTimeNanos = Time.monotonicNowNanos();
 
     for (ReadWriteLock lock : bulkGetLock(resource, keys)) {
-      if (isReadLock) {
-        lock.readLock().lock();
-        updateReadLockMetrics(resource, (ReentrantReadWriteLock) lock, startWaitingTimeNanos);
-      } else {
-        lock.writeLock().lock();
-        updateWriteLockMetrics(resource, (ReentrantReadWriteLock) lock, startWaitingTimeNanos);
-      }
+      acquireLock(resource, isReadLock, lock, startWaitingTimeNanos);
     }
 
     lockSet.set(resource.setLock(lockSet.get()));
@@ -264,13 +275,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     long startWaitingTimeNanos = Time.monotonicNowNanos();
 
     ReentrantReadWriteLock lock = getLock(resource, keys);
-    if (isReadLock) {
-      lock.readLock().lock();
-      updateReadLockMetrics(resource, lock, startWaitingTimeNanos);
-    } else {
-      lock.writeLock().lock();
-      updateWriteLockMetrics(resource, lock, startWaitingTimeNanos);
-    }
+    acquireLock(resource, isReadLock, lock, startWaitingTimeNanos);
 
     lockSet.set(resource.setLock(lockSet.get()));
     omLockDetails.get().setLockAcquired(true);
@@ -397,6 +402,14 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return releaseLock(resource, false, keys);
   }
 
+  /**
+   * Release write lock on multiple resources.
+   * @param resource - Type of the resource.
+   * @param keys - List of resource names on which user want to acquire lock.
+   * For Resource type BUCKET_LOCK, first param should be volume, second param
+   * should be bucket name. For remaining all resource only one param should
+   * be passed.
+   */
   @Override
   public OMLockDetails releaseWriteLocks(Resource resource, Collection<String[]> keys) {
     return releaseLocks(resource, false, keys);
@@ -448,8 +461,10 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   private OMLockDetails releaseLocks(Resource resource, boolean isReadLock,
                                     Collection<String[]> keys) {
     omLockDetails.get().clear();
-    Iterable<ReadWriteLock> locks = bulkGetLock(resource, keys);
-
+    List<ReadWriteLock> locks =
+        StreamSupport.stream(bulkGetLock(resource, keys).spliterator(), false).collect(Collectors.toList());
+    // Release locks in reverse order.
+    Collections.reverse(locks);
     for (ReadWriteLock lock : locks) {
       if (isReadLock) {
         lock.readLock().unlock();

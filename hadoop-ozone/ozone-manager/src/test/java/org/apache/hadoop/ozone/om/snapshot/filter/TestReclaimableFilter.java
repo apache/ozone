@@ -143,9 +143,9 @@ public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
       IOException ex = assertThrows(IOException.class, () ->
           testSnapshotInitAndLocking(volume.get(), bucket.get(), numberOfPreviousSnapshotsFromChain, index,
               currentSnapshotInfo, true, true));
-      assertEquals("Volume & Bucket name for snapshot : "
-          + currentSnapshotInfo + " not matching for key in volume: " + volume
-          + " bucket: " + bucket, ex.getMessage());
+      assertEquals("Volume and Bucket name for snapshot : "
+          + currentSnapshotInfo + " do not match against the volume: " + volume
+          + " and bucket: " + bucket + " of the key.", ex.getMessage());
     }
     volume.set(getVolumes().get(3));
     bucket.set(getBuckets().get(2));
@@ -158,9 +158,9 @@ public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
       IOException ex = assertThrows(IOException.class, () ->
           testSnapshotInitAndLocking(volume.get(), bucket.get(), numberOfPreviousSnapshotsFromChain, index,
               currentSnapshotInfo, true, true));
-      assertEquals("Volume & Bucket name for snapshot : "
-          + currentSnapshotInfo + " not matching for key in volume: " + volume
-          + " bucket: " + bucket, ex.getMessage());
+      assertEquals("Volume and Bucket name for snapshot : "
+          + currentSnapshotInfo + " do not match against the volume: " + volume
+          + " and bucket: " + bucket + " of the key.", ex.getMessage());
     }
   }
 

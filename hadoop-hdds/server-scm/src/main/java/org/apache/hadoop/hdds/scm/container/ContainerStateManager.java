@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
@@ -103,22 +104,33 @@ public interface ContainerStateManager {
   boolean contains(ContainerID containerID);
 
   /**
-   * Returns the ID of all the managed containers.
+   * Get {@link ContainerInfo}s.
    *
-   * @return Set of {@link ContainerID}
+   * @param start the start {@link ContainerID} (inclusive)
+   * @param count the size limit
+   * @return a list of {@link ContainerInfo};
    */
-  Set<ContainerID> getContainerIDs();
+  List<ContainerInfo> getContainerInfos(ContainerID start, int count);
 
   /**
+   * Get {@link ContainerInfo}s for the given state.
    *
+   * @param start the start {@link ContainerID} (inclusive)
+   * @param count the size limit
+   * @return a list of {@link ContainerInfo};
    */
-  Set<ContainerID> getContainerIDs(LifeCycleState state);
+  List<ContainerInfo> getContainerInfos(LifeCycleState state, ContainerID start, int count);
 
+  /** @return all {@link ContainerInfo}s for the given state. */
+  List<ContainerInfo> getContainerInfos(LifeCycleState state);
 
   /**
-   * Returns the IDs of the Containers whose ReplicationType matches the given type.
+   * @return number of containers for the given state.
    */
-  Set<ContainerID> getContainerIDs(ReplicationType type);
+  int getContainerCount(LifeCycleState state);
+
+  /** @return all {@link ContainerInfo}s for the given type. */
+  List<ContainerInfo> getContainerInfos(ReplicationType type);
 
   /**
    *
@@ -133,14 +145,12 @@ public interface ContainerStateManager {
   /**
    *
    */
-  void updateContainerReplica(ContainerID id,
-                              ContainerReplica replica);
+  void updateContainerReplica(ContainerReplica replica);
 
   /**
    *
    */
-  void removeContainerReplica(ContainerID id,
-                              ContainerReplica replica);
+  void removeContainerReplica(ContainerReplica replica);
 
   /**
    *

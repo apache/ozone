@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -49,6 +48,11 @@ public class ReconIncrementalContainerReportHandler
   }
 
   @Override
+  protected Logger getLogger() {
+    return LOG;
+  }
+
+  @Override
   public void onMessage(final IncrementalContainerReportFromDatanode report,
                         final EventPublisher publisher) {
     final DatanodeDetails dnFromReport = report.getDatanodeDetails();
@@ -57,8 +61,7 @@ public class ReconIncrementalContainerReportHandler
           dnFromReport);
     }
 
-    DatanodeDetails dd =
-        getNodeManager().getNodeByUuid(dnFromReport.getUuid());
+    final DatanodeDetails dd = getNodeManager().getNode(dnFromReport.getID());
     if (dd == null) {
       LOG.warn("Received container report from unknown datanode {}",
           dnFromReport);
@@ -98,8 +101,7 @@ public class ReconIncrementalContainerReportHandler
         success = false;
         LOG.error("Received ICR from unknown datanode {}.",
             report.getDatanodeDetails(), ex);
-      } catch (IOException | InvalidStateTransitionException |
-               TimeoutException e) {
+      } catch (IOException | InvalidStateTransitionException e) {
         success = false;
         LOG.error("Exception while processing ICR for container {}",
             replicaProto.getContainerID());

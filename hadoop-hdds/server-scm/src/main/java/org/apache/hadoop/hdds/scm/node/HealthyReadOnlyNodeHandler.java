@@ -103,7 +103,7 @@ public class HealthyReadOnlyNodeHandler
       // make sure after DN is added back into topology, DatanodeDetails
       // instance returned from nodeStateManager has parent correctly set.
       Preconditions.checkNotNull(
-          nodeManager.getNodeByUuid(datanodeDetails.getUuid())
+          nodeManager.getNode(datanodeDetails.getID())
               .getParent());
     }
   }

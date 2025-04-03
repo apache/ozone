@@ -121,6 +121,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @param volume - Volume name
    * @param bucket - Bucket name
+   * @return /volume/bucket/
    */
   String getBucketKeyPrefix(String volume, String bucket);
 
@@ -129,6 +130,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @param volume - Volume name
    * @param bucket - Bucket name
+   * @return /volumeId/bucketId/
+   *    e.g. /-9223372036854772480/-9223372036854771968/
    */
   String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException;
 
