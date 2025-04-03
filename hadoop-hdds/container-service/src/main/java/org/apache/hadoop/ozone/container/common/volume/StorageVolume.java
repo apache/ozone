@@ -123,6 +123,7 @@ public abstract class StorageVolume
   private final StorageType storageType;
   private final String volumeRoot;
   private final File storageDir;
+  /** This is the raw storage dir location, saved for logging, to avoid repeated filesystem lookup. */
   private final String storageDirStr;
   private String workingDirName;
   private File tmpDir;
