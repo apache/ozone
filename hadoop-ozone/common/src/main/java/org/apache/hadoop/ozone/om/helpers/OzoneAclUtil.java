@@ -68,10 +68,10 @@ public final class OzoneAclUtil {
     }
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     // User ACL.
-    listOfAcls.add(new OzoneAcl(USER, ugi.getShortUserName(), ACCESS, userRights));
+    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, userRights));
     try {
       String groupName = ugi.getPrimaryGroupName();
-      listOfAcls.add(new OzoneAcl(GROUP, groupName, ACCESS, groupRights));
+      listOfAcls.add(OzoneAcl.of(GROUP, groupName, ACCESS, groupRights));
     } catch (IOException e) {
       // do nothing, since user has the permission, user can add ACL for selected groups later.
       LOG.warn("Failed to get primary group from user {}", ugi);
@@ -82,10 +82,10 @@ public final class OzoneAclUtil {
   public static List<OzoneAcl> getAclList(UserGroupInformation ugi, ACLType userPrivilege, ACLType groupPrivilege) {
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     // User ACL.
-    listOfAcls.add(new OzoneAcl(USER, ugi.getShortUserName(), ACCESS, userPrivilege));
+    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, userPrivilege));
     try {
       String groupName = ugi.getPrimaryGroupName();
-      listOfAcls.add(new OzoneAcl(GROUP, groupName, ACCESS, groupPrivilege));
+      listOfAcls.add(OzoneAcl.of(GROUP, groupName, ACCESS, groupPrivilege));
     } catch (IOException e) {
       // do nothing, since user has the permission, user can add ACL for selected groups later.
       LOG.warn("Failed to get primary group from user {}", ugi);

@@ -19,8 +19,7 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 basename=$(basename ${COMPOSE_DIR})
 
-# version is used in bucket name, which does not allow uppercase
-current_version="$(echo "${ozone.version}" | sed -e 's/-SNAPSHOT//' | tr '[:upper:]' '[:lower:]')"
+current_version="${OZONE_CURRENT_VERSION}"
 # TODO: debug acceptance test failures for client versions 1.0.0 on secure clusters
 old_versions="1.1.0 1.2.1 1.3.0 1.4.0 1.4.1" # container is needed for each version in clients.yaml
 
