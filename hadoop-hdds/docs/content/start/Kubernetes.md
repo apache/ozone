@@ -53,7 +53,7 @@ kubectl port-forward scm-0 9876:9876
 
 ## Apache Ozone Helm Chart
 
-For a streamlined and production-ready deployment of Apache Ozone on Kubernetes, consider using the [Apache Ozone Helm Chart](https://apache.github.io/ozone-helm-charts/). This Helm Chart simplifies the installation and management of an Ozone cluster by packaging best practices into a set of configurable Kubernetes resources.
+For a streamlined deployment of Apache Ozone on Kubernetes, consider using the [Apache Ozone Helm Chart](https://apache.github.io/ozone-helm-charts/). This Helm Chart simplifies the installation and management of an Ozone cluster by packaging best practices into a set of configurable Kubernetes resources.
 
 1. **Add the Ozone Helm Repository**
 
