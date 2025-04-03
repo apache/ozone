@@ -42,30 +42,18 @@ import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -73,8 +61,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -99,6 +85,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.TarExtractor;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
@@ -148,8 +135,7 @@ public class OzoneManagerServiceProviderImpl
   private ThreadFactory threadFactory;
   private ReconContext reconContext;
   private ReconTaskStatusUpdaterManager taskStatusUpdaterManager;
-  private ForkJoinPool.ForkJoinWorkerThreadFactory fetchOMDBThreadFactory;
-  private ForkJoinPool omDbTarExecutor;
+  private TarExtractor tarExtractor;
 
   /**
    * OM Snapshot related task names.
@@ -236,17 +222,12 @@ public class OzoneManagerServiceProviderImpl
     this.threadFactory =
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "SyncOM-%d")
             .build();
-    this.omDBTarProcessorThreadCount = Runtime.getRuntime().availableProcessors();
-    // Create a custom ForkJoinWorkerThreadFactory to name threads
-    this.fetchOMDBThreadFactory = pool -> {
-      ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
-      worker.setName("FetchOMDBTar-" + threadNamePrefix + "-" + worker.getPoolIndex());
-      return worker;
-    };
+    this.omDBTarProcessorThreadCount = Math.max(64, Runtime.getRuntime().availableProcessors());
     this.reconContext = reconContext;
     this.taskStatusUpdaterManager = taskStatusUpdaterManager;
     this.omDBLagThreshold = configuration.getLong(RECON_OM_DELTA_UPDATE_LAG_THRESHOLD,
         RECON_OM_DELTA_UPDATE_LAG_THRESHOLD_DEFAULT);
+    this.tarExtractor = new TarExtractor(omDBTarProcessorThreadCount, threadNamePrefix);
   }
 
   @Override
@@ -258,7 +239,6 @@ public class OzoneManagerServiceProviderImpl
   public void start() {
     LOG.info("Starting Ozone Manager Service Provider.");
     scheduler = Executors.newScheduledThreadPool(1, threadFactory);
-    omDbTarExecutor = new ForkJoinPool(omDBTarProcessorThreadCount, fetchOMDBThreadFactory, null, false);
     try {
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
@@ -381,7 +361,6 @@ public class OzoneManagerServiceProviderImpl
     scheduler.shutdownNow();
     metrics.unRegister();
     connectionFactory.destroy();
-    omDbTarExecutor.shutdownNow();
   }
 
   /**
@@ -422,64 +401,16 @@ public class OzoneManagerServiceProviderImpl
     String snapshotFileName = RECON_OM_SNAPSHOT_DB + "_" + System.currentTimeMillis();
     Path untarredDbDir = Paths.get(omSnapshotDBParentDir.getAbsolutePath(), snapshotFileName);
 
-    BlockingQueue<TarEntryData> queue = new LinkedBlockingQueue<>(omDBTarProcessorThreadCount * 10);
-
-    List<Future<Void>> futures = new ArrayList<>();
-
     try {
       SecurityUtil.doAsLoginUser(() -> {
         try (InputStream inputStream = reconUtils.makeHttpCall(
-            connectionFactory, getOzoneManagerSnapshotUrl(), isOmSpnegoEnabled()).getInputStream();
-             TarArchiveInputStream tarInput = new TarArchiveInputStream(inputStream)) {
-
-          // Start worker threads (Consumers)
-          for (int i = 0; i < omDBTarProcessorThreadCount; i++) {
-            futures.add(omDbTarExecutor.submit(() -> {
-              processQueue(queue, untarredDbDir);
-              return null;
-            }));
-          }
-
-          // Producer: Read TAR entries & enqueue them
-          TarArchiveEntry entry;
-          while ((entry = tarInput.getNextTarEntry()) != null) {
-            if (entry.isDirectory()) {
-              File dir = new File(untarredDbDir.toFile(), entry.getName());
-              if (!dir.exists() && !dir.mkdirs()) {
-                throw new IOException("Failed to create directory: " + dir);
-              }
-            } else {
-              long expectedSize = entry.getSize();
-              byte[] fileData = new byte[(int) expectedSize];
-              int bytesReadTotal = 0;
-
-              while (bytesReadTotal < expectedSize) {
-                int bytesRead = tarInput.read(fileData, bytesReadTotal, (int) (expectedSize - bytesReadTotal));
-                if (bytesRead == -1) {
-                  throw new IOException("Unexpected end of stream for entry: " + entry.getName());
-                }
-                bytesReadTotal += bytesRead;
-              }
-
-              queue.put(new TarEntryData(entry.getName(), new ByteArrayInputStream(fileData), expectedSize));
-            }
-          }
-
-          // Signal consumers that no more data will come
-          for (int i = 0; i < omDBTarProcessorThreadCount; i++) {
-            queue.put(TarEntryData.EOF);
-          }
-
+            connectionFactory, getOzoneManagerSnapshotUrl(), isOmSpnegoEnabled()).getInputStream()) {
+          tarExtractor.extractTar(inputStream, untarredDbDir);
         } catch (IOException | InterruptedException e) {
           throw new RuntimeException("Error while extracting OM DB Snapshot TAR.", e);
         }
         return null;
       });
-
-      // Wait for all worker threads to finish
-      for (Future<Void> future : futures) {
-        future.get();
-      }
 
       // Validate extracted files
       File[] sstFiles = untarredDbDir.toFile().listFiles((dir, name) -> name.endsWith(".sst"));
@@ -489,103 +420,13 @@ public class OzoneManagerServiceProviderImpl
 
       return new RocksDBCheckpoint(untarredDbDir);
 
-    } catch (IOException | InterruptedException | ExecutionException e) {
+    } catch (IOException e) {
       LOG.error("Unable to obtain Ozone Manager DB Snapshot.", e);
     } finally {
-      omDbTarExecutor.shutdown();
-      try {
-        if (!omDbTarExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
-          LOG.warn("Forcing shutdown of OM DB Tar Executor...");
-          omDbTarExecutor.shutdownNow();
-        }
-      } catch (InterruptedException e) {
-        LOG.warn("Interrupted during shutdown. Forcing shutdown...");
-        omDbTarExecutor.shutdownNow();
-        Thread.currentThread().interrupt();
-      }
+      tarExtractor.shutdown();
     }
 
     return null;
-  }
-
-  /**
-   * Worker method that processes the queue and writes files in parallel.
-   */
-  private void processQueue(BlockingQueue<TarEntryData> queue, Path untarredDbDir) {
-    try {
-      while (true) {
-        TarEntryData entryData = queue.take(); // Blocking take
-        if (entryData == TarEntryData.EOF) {
-          break; // Exit thread when EOF is received
-        }
-
-        File outputFile = new File(untarredDbDir.toFile(), entryData.fileName);
-        Path parentDir = outputFile.toPath().getParent();
-
-        // Fix: Check if parentDir is null before calling createDirectories
-        if (parentDir != null && !Files.exists(parentDir)) {
-          Files.createDirectories(parentDir);
-        }
-
-        // Use new writeFile method that takes InputStream
-        if (entryData.inputStream != null) {
-          try (InputStream inputStream = entryData.inputStream) {
-            writeFile(untarredDbDir, entryData.fileName, inputStream, entryData.fileSize);
-          }
-        } else {
-          LOG.warn("Skipping file {} as inputStream is null", entryData.fileName);
-        }
-      }
-    } catch (IOException e) {
-      LOG.error("Error writing extracted file.", e);
-      throw new RuntimeException(e);
-    } catch (InterruptedException e) {
-      LOG.warn("Worker thread interrupted. Exiting...");
-      Thread.currentThread().interrupt();
-    }
-  }
-
-  /**
-   * Writes the extracted file to disk.
-   */
-  private void writeFile(Path untarredDbDir, String entryName, InputStream inputStream, long fileSize)
-      throws IOException {
-    File file = new File(untarredDbDir.toFile(), entryName);
-
-    // Ensure parent directories exist
-    File parentDir = file.getParentFile();
-    if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
-      throw new IOException("Failed to create parent directories for: " + file);
-    }
-
-    // Write using FileChannel with Buffered Input
-    try (FileChannel outChannel = FileChannel.open(file.toPath(), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-         ReadableByteChannel inChannel = Channels.newChannel(inputStream)) {
-      long transferred = 0;
-      while (transferred < fileSize) {
-        long bytes = outChannel.transferFrom(inChannel, transferred, Math.min(8192, fileSize - transferred));
-        if (bytes <= 0) {
-          break; // Avoid infinite loops
-        }
-        transferred += bytes;
-      }
-    }
-  }
-
-  /**
-   * Wrapper class for TAR entry data.
-   */
-  private static class TarEntryData {
-    static final TarEntryData EOF = new TarEntryData(null, null, 0);
-    private final String fileName;
-    private final InputStream inputStream;
-    private final long fileSize;
-
-    TarEntryData(String fileName, InputStream inputStream, long fileSize) {
-      this.fileName = fileName;
-      this.inputStream = inputStream;
-      this.fileSize = fileSize;
-    }
   }
 
   /**
