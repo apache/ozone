@@ -17,11 +17,10 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 
 /**
  * Metrics for the usage of ContainerDB.
@@ -53,7 +52,7 @@ public final class ContainerCacheMetrics {
   }
 
   public static ContainerCacheMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     String name = "ContainerCacheMetrics";
 
     return ms.register(name, "null", new ContainerCacheMetrics());
