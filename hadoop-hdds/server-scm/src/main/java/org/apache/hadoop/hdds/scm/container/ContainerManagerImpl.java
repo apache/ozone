@@ -17,16 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static java.util.Comparator.reverseOrder;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
-import static org.apache.hadoop.hdds.utils.CollectionUtils.findTopN;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -144,21 +139,20 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public List<ContainerInfo> getContainers(ReplicationType type) {
-    return toContainers(containerStateManager.getContainerIDs(type));
+    return containerStateManager.getContainerInfos(type);
   }
 
   @Override
   public List<ContainerInfo> getContainers(final ContainerID startID,
                                            final int count) {
     scmContainerManagerMetrics.incNumListContainersOps();
-    return toContainers(filterSortAndLimit(startID, count,
-        containerStateManager.getContainerIDs()));
+    return containerStateManager.getContainerInfos(startID, count);
   }
 
   @Override
   public List<ContainerInfo> getContainers(final LifeCycleState state) {
     scmContainerManagerMetrics.incNumListContainersOps();
-    return toContainers(containerStateManager.getContainerIDs(state));
+    return containerStateManager.getContainerInfos(state);
   }
 
   @Override
@@ -166,13 +160,12 @@ public class ContainerManagerImpl implements ContainerManager {
                                            final int count,
                                            final LifeCycleState state) {
     scmContainerManagerMetrics.incNumListContainersOps();
-    return toContainers(filterSortAndLimit(startID, count,
-        containerStateManager.getContainerIDs(state)));
+    return containerStateManager.getContainerInfos(state, startID, count);
   }
 
   @Override
   public int getContainerStateCount(final LifeCycleState state) {
-    return containerStateManager.getContainerIDs(state).size();
+    return containerStateManager.getContainerCount(state);
   }
 
   @Override
@@ -318,7 +311,7 @@ public class ContainerManagerImpl implements ContainerManager {
                                      final ContainerReplica replica)
       throws ContainerNotFoundException {
     if (containerExist(cid)) {
-      containerStateManager.updateContainerReplica(cid, replica);
+      containerStateManager.updateContainerReplica(replica);
     } else {
       throwContainerNotFoundException(cid);
     }
@@ -329,7 +322,7 @@ public class ContainerManagerImpl implements ContainerManager {
                                      final ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
     if (containerExist(cid)) {
-      containerStateManager.removeContainerReplica(cid, replica);
+      containerStateManager.removeContainerReplica(replica);
     } else {
       throwContainerNotFoundException(cid);
     }
@@ -468,34 +461,5 @@ public class ContainerManagerImpl implements ContainerManager {
   @VisibleForTesting
   public SCMHAManager getSCMHAManager() {
     return haManager;
-  }
-
-  private static List<ContainerID> filterSortAndLimit(
-      ContainerID startID, int count, Set<ContainerID> set) {
-
-    if (ContainerID.MIN.equals(startID) && count >= set.size()) {
-      List<ContainerID> list = new ArrayList<>(set);
-      Collections.sort(list);
-      return list;
-    }
-
-    return findTopN(set, count, reverseOrder(),
-        id -> id.compareTo(startID) >= 0);
-  }
-
-  /**
-   * Returns a list of all containers identified by {@code ids}.
-   */
-  private List<ContainerInfo> toContainers(Collection<ContainerID> ids) {
-    List<ContainerInfo> containers = new ArrayList<>(ids.size());
-
-    for (ContainerID id : ids) {
-      ContainerInfo container = containerStateManager.getContainer(id);
-      if (container != null) {
-        containers.add(container);
-      }
-    }
-
-    return containers;
   }
 }

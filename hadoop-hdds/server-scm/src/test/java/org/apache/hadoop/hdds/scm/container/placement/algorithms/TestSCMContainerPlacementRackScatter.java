@@ -243,7 +243,7 @@ public class TestSCMContainerPlacementRackScatter {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuid()))
+      when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
     when(nodeManager.getClusterNetworkTopologyMap())
@@ -511,7 +511,7 @@ public class TestSCMContainerPlacementRackScatter {
     assertEquals(dataList.size(), StringUtils.countMatches(
         clusterMap.toString(), NetConstants.DEFAULT_RACK));
     for (DatanodeInfo dn: dnInfoList) {
-      when(nodeManager.getNodeByUuid(dn.getUuid()))
+      when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
 
@@ -826,7 +826,7 @@ public class TestSCMContainerPlacementRackScatter {
     setup(datanodeCount);
 
     // DN 5 is out of service
-    dnInfos.get(5).setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
+    dnInfos.get(5).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
 
     // SCM should have detected that DN 5 is dead
     cluster.remove(datanodes.get(5));

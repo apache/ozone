@@ -80,10 +80,10 @@ public class TestOzoneRpcClientForAclAuditLog {
       LoggerFactory.getLogger(TestOzoneRpcClientForAclAuditLog.class);
   private static UserGroupInformation ugi;
   private static final OzoneAcl USER_ACL =
-      new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
+      OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER,
           "johndoe", ACCESS, IAccessAuthorizer.ACLType.ALL);
   private static final OzoneAcl USER_ACL_2 =
-      new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
+      OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER,
           "jane", ACCESS, IAccessAuthorizer.ACLType.ALL);
   private static List<OzoneAcl> aclListToAdd = new ArrayList<>();
   private static MiniOzoneCluster cluster = null;

@@ -107,7 +107,6 @@ public final class DBStoreBuilder {
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
   private Integer maxNumberOfOpenFiles = null;
-  private String threadNamePrefix = "";
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -233,7 +232,7 @@ public final class DBStoreBuilder {
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
           registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
           enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
-          configuration, threadNamePrefix, enableRocksDbMetrics);
+          configuration, enableRocksDbMetrics);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
@@ -320,11 +319,6 @@ public final class DBStoreBuilder {
 
   public DBStoreBuilder setMaxNumberOfOpenFiles(Integer maxNumberOfOpenFiles) {
     this.maxNumberOfOpenFiles = maxNumberOfOpenFiles;
-    return this;
-  }
-
-  public DBStoreBuilder setThreadNamePrefix(String prefix) {
-    this.threadNamePrefix = prefix;
     return this;
   }
 
