@@ -135,7 +135,7 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     GenericTestUtils
         .waitFor(() -> new File(snapshotCurrent).exists(), 1000, 120000);
     String[] args =
-        new String[] {"--db=" + dbPath, "scan", "--cf", "keyTable"};
+        new String[] {"--db=" + dbPath, "scan", "--cf", "fileTable"};
     int exitCode = cmd.execute(args);
     assertEquals(0, exitCode);
     String cmdOut = stdout.toString();
@@ -157,9 +157,8 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
       repConfig = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
           ReplicationFactor.THREE);
     }
-    // see HDDS-10091 for making this work with FILE_SYSTEM_OPTIMIZED layout
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
-        BucketLayout.LEGACY);
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
     TestDataUtil.createKey(
         client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
         keyName, repConfig, "test".getBytes(StandardCharsets.UTF_8));
