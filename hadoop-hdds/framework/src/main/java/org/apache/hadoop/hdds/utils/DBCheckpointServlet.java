@@ -150,7 +150,6 @@ public class DBCheckpointServlet extends HttpServlet
    */
   private void generateSnapshotCheckpoint(HttpServletRequest request,
       HttpServletResponse response, boolean isFormData) {
-    String msg = "Received list of {} SST files to be excluded{}: {}";
     if (dbStore == null) {
       LOG.error(
           "Unable to process metadata snapshot request. DB Store is null");
@@ -208,7 +207,8 @@ public class DBCheckpointServlet extends HttpServlet
               .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
               .distinct()
               .collect(Collectors.toList()));
-      logSstFileList(receivedSstList, msg, 5);
+      logSstFileList(receivedSstList,
+          "Received list of {} SST files to be excluded{}: {}", 5);
     }
 
     Path tmpdir = null;
@@ -242,7 +242,8 @@ public class DBCheckpointServlet extends HttpServlet
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
-      logSstFileList(excludedSstList, msg, 5);
+      logSstFileList(excludedSstList,
+          "Excluded {} SST files from the latest checkpoint{}: {}", 5);
       if (!excludedSstList.isEmpty()) {
         dbMetrics.incNumIncrementalCheckpoint();
       }
