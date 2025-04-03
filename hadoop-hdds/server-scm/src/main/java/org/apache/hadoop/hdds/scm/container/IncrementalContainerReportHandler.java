@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container;
 import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -42,27 +43,26 @@ public class IncrementalContainerReportHandler extends
   private static final Logger LOG = LoggerFactory.getLogger(
       IncrementalContainerReportHandler.class);
 
-  private final NodeManager nodeManager;
-
   public IncrementalContainerReportHandler(
       final NodeManager nodeManager,
       final ContainerManager containerManager,
       final SCMContext scmContext) {
-    super(containerManager, scmContext, LOG);
-    this.nodeManager = nodeManager;
+    super(nodeManager, containerManager, scmContext);
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return LOG;
   }
 
   @Override
   public void onMessage(final IncrementalContainerReportFromDatanode report,
                         final EventPublisher publisher) {
     final DatanodeDetails dnFromReport = report.getDatanodeDetails();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing incremental container report from data node {}", dnFromReport);
-    }
-    final DatanodeDetails dd = nodeManager.getNode(dnFromReport.getID());
+    getLogger().debug("Processing incremental container report from datanode {}", dnFromReport);
+    final DatanodeDetails dd = getNodeManager().getNode(dnFromReport.getID());
     if (dd == null) {
-      LOG.warn("Received container report from unknown datanode {}",
-          dnFromReport);
+      getLogger().warn("Datanode not found: {}", dnFromReport);
       return;
     }
 
@@ -82,11 +82,10 @@ public class IncrementalContainerReportHandler extends
             // Ensure we reuse the same ContainerID instance in containerInfo
             id = container.containerID();
           } finally {
-            if (replicaProto.getState().equals(
-                ContainerReplicaProto.State.DELETED)) {
-              nodeManager.removeContainer(dd, id);
+            if (replicaProto.getState() == State.DELETED) {
+              getNodeManager().removeContainer(dd, id);
             } else {
-              nodeManager.addContainer(dd, id);
+              getNodeManager().addContainer(dd, id);
             }
           }
           if (ContainerReportValidator.validate(container, dd, replicaProto)) {
@@ -94,32 +93,27 @@ public class IncrementalContainerReportHandler extends
           }
           success = true;
         } catch (ContainerNotFoundException e) {
-          LOG.warn("Container {} not found!", replicaProto.getContainerID());
+          getLogger().warn("Container {} not found!", replicaProto.getContainerID());
         } catch (NodeNotFoundException ex) {
-          LOG.error("Received ICR from unknown datanode {}",
-              report.getDatanodeDetails(), ex);
+          getLogger().error("Datanode not found {}", report.getDatanodeDetails(), ex);
         } catch (ContainerReplicaNotFoundException e) {
-          LOG.warn("Container {} replica not found!",
+          getLogger().warn("Container {} replica not found!",
               replicaProto.getContainerID());
         } catch (SCMException ex) {
           if (ex.getResult() == SCMException.ResultCodes.SCM_NOT_LEADER) {
-            LOG.info("Failed to process {} container {}: {}",
+            getLogger().info("Failed to process {} container {}: {}",
                 replicaProto.getState(), id, ex.getMessage());
           } else {
-            LOG.error("Exception while processing ICR for container {}",
+            getLogger().error("Exception while processing ICR for container {}",
                 replicaProto.getContainerID(), ex);
           }
         } catch (IOException | InvalidStateTransitionException e) {
-          LOG.error("Exception while processing ICR for container {}",
+          getLogger().error("Exception while processing ICR for container {}",
               replicaProto.getContainerID(), e);
         }
       }
     }
 
     getContainerManager().notifyContainerReportProcessing(false, success);
-  }
-
-  protected NodeManager getNodeManager() {
-    return this.nodeManager;
   }
 }
