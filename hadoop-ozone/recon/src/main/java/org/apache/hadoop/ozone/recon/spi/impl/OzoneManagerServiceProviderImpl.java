@@ -419,9 +419,11 @@ public class OzoneManagerServiceProviderImpl
     // may be left due to any previous partial extraction of tar entries and during copy sst files process by
     // tarExtractor.extractTar
     File[] leftOverStagingDirs = omSnapshotDBParentDir.listFiles(f -> f.getName().startsWith(STAGING));
-    for (File stagingDir : leftOverStagingDirs) {
-      LOG.warn("Cleaning up leftover staging folder from failed extraction: {}", stagingDir.getAbsolutePath());
-      FileUtils.deleteQuietly(stagingDir);
+    if (leftOverStagingDirs != null) {
+      for (File stagingDir : leftOverStagingDirs) {
+        LOG.warn("Cleaning up leftover staging folder from failed extraction: {}", stagingDir.getAbsolutePath());
+        FileUtils.deleteQuietly(stagingDir);
+      }
     }
 
     try {

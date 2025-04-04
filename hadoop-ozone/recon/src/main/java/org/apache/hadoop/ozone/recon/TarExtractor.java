@@ -80,6 +80,9 @@ public class TarExtractor {
       throws IOException, InterruptedException, ExecutionException {
     String stagingDirName = STAGING + UUID.randomUUID();
     Path parentDir = outputDir.getParent();
+    if (parentDir == null) {
+      parentDir = outputDir; // Handle null parent case
+    }
     Path stagingDir = parentDir.resolve(stagingDirName);
 
     Files.createDirectories(stagingDir); // Ensure staging directory exists
@@ -116,7 +119,11 @@ public class TarExtractor {
     if (Files.exists(outputDir)) {
       FileUtils.deleteDirectory(outputDir.toFile()); // Clean old data
     }
-    Files.move(stagingDir, outputDir, StandardCopyOption.ATOMIC_MOVE);
+    try {
+      Files.move(stagingDir, outputDir, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    } catch (IOException e) {
+      LOG.warn("Atomic move of staging dir : {} to {} failed.", stagingDir, outputDir, e);
+    }
 
     LOG.info("Tar extraction completed and moved from staging to: {}", outputDir);
   }
