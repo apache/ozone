@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
-import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.createBlockMetaData;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -102,6 +102,7 @@ public class TestReconcileContainerCommandHandler {
           PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
       data.setMetadataPath(tempDir.toString());
       data.setDbFile(dbFile.toFile());
+      createBlockMetaData(data, 5, 3);
       containerSet.addContainer(new KeyValueContainer(data, conf));
     }
 
@@ -131,11 +132,6 @@ public class TestReconcileContainerCommandHandler {
     init(layout, icrSender);
 
     for (int id = 1; id <= NUM_CONTAINERS; id++) {
-      KeyValueContainerData data = new KeyValueContainerData(id, layout, GB,
-          PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
-      data.setMetadataPath(tempDir.toString());
-      data.setDbFile(dbFile.toFile());
-      createBlockMetaData(data, 5, 3);
       ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptySet());
       subject.handle(cmd, ozoneContainer, context, null);
     }

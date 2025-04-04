@@ -373,7 +373,7 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    // TODO: Use On-demand container scanner to build the new container merkle tree.
+    // TODO: Use On-demand container scanner to build the new container merkle tree. (HDDS-10374)
     Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
     kvHandler.createContainerMerkleTree(container);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
@@ -476,6 +476,7 @@ public class TestContainerCommandReconciliation {
 
     // 3. Set Unhealthy for first chunk of all blocks. This should be done by the scanner, Until then this is a
     // manual step.
+    // // TODO: Use On-demand container scanner to build the new container merkle tree (HDDS-10374)
     Random random = new Random();
     ContainerProtos.ContainerChecksumInfo.Builder builder = containerChecksumAfterChunkCorruption.toBuilder();
     List<ContainerProtos.BlockMerkleTree> blockMerkleTreeList = builder.getContainerMerkleTree()

@@ -162,11 +162,12 @@ public class ContainerChecksumTreeManager {
     ContainerDiffReport report = new ContainerDiffReport();
     try {
       captureLatencyNs(metrics.getMerkleTreeDiffLatencyNS(), () -> {
-        Preconditions.assertNotNull(thisChecksumInfo, "Our checksum info is null");
-        Preconditions.assertNotNull(peerChecksumInfo, "Peer checksum info is null");
+        Preconditions.assertNotNull(thisChecksumInfo, "Datanode's checksum info is null.");
+        Preconditions.assertNotNull(peerChecksumInfo, "Peer checksum info is null.");
         if (thisChecksumInfo.getContainerID() != peerChecksumInfo.getContainerID()) {
-          throw new StorageContainerException("Container Id does not match for container "
-              + thisChecksumInfo.getContainerID(), ContainerProtos.Result.CONTAINER_ID_MISMATCH);
+          throw new StorageContainerException("Container ID does not match. Local container ID "
+              + thisChecksumInfo.getContainerID() + " , Peer container ID " + peerChecksumInfo.getContainerID(),
+              ContainerProtos.Result.CONTAINER_ID_MISMATCH);
         }
 
         compareContainerMerkleTree(thisChecksumInfo, peerChecksumInfo, report);

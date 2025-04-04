@@ -28,10 +28,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.getContainerChecksumFile;
-import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.createBlockMetaData;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.writeContainerDataTreeProto;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.getBlock;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -912,7 +912,7 @@ public class TestKeyValueHandler {
       ContainerProtos.ChunkInfo chunkInfo = chunks.remove(chunkIndex);
       corruptFileAtOffset(blockFile, (int) chunkInfo.getOffset(), (int) chunkInfo.getLen());
 
-      // TODO: On-demand scanner should detect this corruption and generate container merkle tree.
+      // TODO: On-demand scanner (HDDS-10374) should detect this corruption and generate container merkle tree.
       ContainerProtos.ContainerChecksumInfo.Builder builder = kvHandler.getChecksumManager()
           .read(containerData).get().toBuilder();
       List<ContainerProtos.BlockMerkleTree> blockMerkleTreeList = builder.getContainerMerkleTree()

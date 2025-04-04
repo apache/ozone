@@ -727,7 +727,7 @@ public class ChunkInputStream extends InputStream
     return chunkInfo.getChunkName();
   }
 
-  public long getLength() {
+  protected long getLength() {
     return length;
   }
 
