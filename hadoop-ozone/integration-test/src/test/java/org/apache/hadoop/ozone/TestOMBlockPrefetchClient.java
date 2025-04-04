@@ -56,7 +56,6 @@ import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -64,12 +63,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCHED_BLOCKS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDatanodeDetails;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -123,34 +120,11 @@ public class TestOMBlockPrefetchClient {
     conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME, true);
     conf.setClass(ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
-
     datanodes = createFixedDatanodes(NUM_DATANODES);
-
     StaticMapping.resetMap();
     StaticMapping.addNodeToRack(null, CLIENT_RACK);
     datanodes.forEach(dn -> StaticMapping.addNodeToRack(dn.getHostName(), dn.getNetworkLocation()));
-
-//    try {
-//      Field defaultAdditionalBlocksField = OMBlockPrefetchClient.class.getDeclaredField("ADDITIONAL_BLOCKS_MAX");
-//      defaultAdditionalBlocksField.setAccessible(true);
-//      actualAdditionalBlocksMax = defaultAdditionalBlocksField.getInt(null);
-//    } catch (NoSuchFieldException | IllegalAccessException e) {
-//      LOG.error("Could not read default ADDITIONAL_BLOCKS_MAX via reflection, using fallback.", e);
-//      actualAdditionalBlocksMax = 20;
-//    }
-    LOG.info("Using actual ADDITIONAL_BLOCKS_MAX value from client: {}", actualAdditionalBlocksMax);
-    try {
-      Field parallelCounterField = OMBlockPrefetchClient.class.getDeclaredField("PARALLEL_ADDITIONAL_BLOCKS");
-      parallelCounterField.setAccessible(true);
-      ((AtomicInteger) parallelCounterField.get(null)).set(0);
-    } catch (NoSuchFieldException | IllegalAccessException e) {
-      LOG.error("Could not reset PARALLEL_ADDITIONAL_BLOCKS via reflection.", e);
-    }
-
-
     omBlockPrefetchClient.start(conf);
-
-
     Field queueMapField = OMBlockPrefetchClient.class.getDeclaredField("blockQueueMap");
     queueMapField.setAccessible(true);
     blockQueueMap = (Map<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>>)
