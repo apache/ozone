@@ -24,12 +24,17 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.cache.CacheLoader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.ozone.test.GenericTestUtils;
@@ -67,6 +72,23 @@ class TestSnapshotCache {
           when(omSnapshot.getSnapshotTableKey()).thenReturn(snapshotID.toString());
           when(omSnapshot.getSnapshotID()).thenReturn(snapshotID);
 
+          OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+          org.apache.hadoop.hdds.utils.db.DBStore store = mock(org.apache.hadoop.hdds.utils.db.DBStore.class);
+          when(omSnapshot.getMetadataManager()).thenReturn(metadataManager);
+          when(metadataManager.getStore()).thenReturn(store);
+
+          Table<?, ?> table1 = mock(Table.class);
+          Table<?, ?> table2 = mock(Table.class);
+          Table<?, ?> keyTable = mock(Table.class);
+          when(table1.getName()).thenReturn("table1");
+          when(table2.getName()).thenReturn("table2");
+          when(keyTable.getName()).thenReturn("keyTable"); // This is in COLUMN_FAMILIES_TO_TRACK_IN_DAG
+          ArrayList tables = new ArrayList();
+          tables.add(table1);
+          tables.add(table2);
+          tables.add(keyTable);
+          when(store.listTables()).thenReturn(tables);
+          
           return omSnapshot;
         }
     );
@@ -209,7 +231,7 @@ class TestSnapshotCache {
   void testEviction1() throws IOException, InterruptedException, TimeoutException {
 
     final UUID dbKey1 = UUID.randomUUID();
-    snapshotCache.get(dbKey1);
+    ReferenceCounted<OmSnapshot> snapshot1 = snapshotCache.get(dbKey1);
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
     snapshotCache.release(dbKey1);
@@ -240,6 +262,14 @@ class TestSnapshotCache {
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
     assertEntryExistence(dbKey1, false);
+    
+    // Verify compaction was called on the tables
+    OMMetadataManager metadataManager1 = snapshot1.get().getMetadataManager();
+    org.apache.hadoop.hdds.utils.db.DBStore store1 = metadataManager1.getStore();
+    verify(store1, times(1)).compactTable("table1");
+    verify(store1, times(1)).compactTable("table2");
+    // Verify compaction was NOT called on the reserved table
+    verify(store1, times(0)).compactTable("keyTable");
   }
 
   @Test
