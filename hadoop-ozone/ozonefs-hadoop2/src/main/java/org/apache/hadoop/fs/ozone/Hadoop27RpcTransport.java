@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
@@ -170,10 +171,7 @@ public class Hadoop27RpcTransport implements OmTransport {
   @Override
   public void close() throws IOException {
     omFailoverProxyProvider.close();
-    for (HadoopRpcSingleOMFailoverProxyProvider<OzoneManagerProtocolPB> failoverProxyProvider
-        : omFailoverProxyProviders.values()) {
-      failoverProxyProvider.close();
-    }
+    IOUtils.closeQuietly(omFailoverProxyProviders.values());
   }
 
 }
