@@ -369,7 +369,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   @Test
-  public void testPutDoubleSlashPrefixObject() {
+  public void testPutDoubleSlashPrefixObject() throws IOException {
     final String bucketName = getBucketName();
     final String keyName = "//dir1";
     final String content = "bar";
@@ -384,8 +384,6 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
           .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
       OzoneManagerProtocol ozoneManagerProtocol = store.getClientProxy().getOzoneManagerClient();
       ozoneManagerProtocol.createBucket(bucketInfo.build());
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
 
     InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));

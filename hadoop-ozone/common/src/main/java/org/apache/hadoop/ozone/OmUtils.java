@@ -761,7 +761,7 @@ public final class OmUtils {
     if (!StringUtils.isBlank(keyName)) {
       String normalizedKeyName;
       if (keyName.startsWith(OM_KEY_PREFIX)) {
-        normalizedKeyName = new Path(normalizeDoubleSlashPath(keyName)).toUri().getPath();
+        normalizedKeyName = new Path(normalizeLeadingSlashes(keyName)).toUri().getPath();
       } else {
         normalizedKeyName = new Path(OM_KEY_PREFIX + keyName)
             .toUri().getPath();
@@ -780,18 +780,15 @@ public final class OmUtils {
   }
 
   /**
-   * Normalizes paths that start with double slashes to avoid URI authority parsing issues.
-   * This prevents Path parsing issues where paths starting with "//" have the content
-   * after "//" interpreted as the URI authority rather than as part of the path.
-   * For example: Path("//dir1").toUri().getAuthority() returns "dir1" and getPath() returns ""
+   * Normalizes paths by replacing multiple leading slashes with a single slash.
    */
-  private static String normalizeDoubleSlashPath(String keyName) {
+  private static String normalizeLeadingSlashes(String keyName) {
     if (keyName.startsWith(DOUBLE_SLASH_OM_KEY_PREFIX)) {
-      int doubleSlashLen = DOUBLE_SLASH_OM_KEY_PREFIX.length();
-      if (keyName.length() > doubleSlashLen && keyName.charAt(doubleSlashLen) != OM_KEY_PREFIX.charAt(0)) {
-        keyName = OM_KEY_PREFIX + keyName.substring(2);
+      int index = 0;
+      while (index < keyName.length() && keyName.charAt(index) == OM_KEY_PREFIX.charAt(0)) {
+        index++;
       }
-      return new Path(keyName).toUri().getPath();
+      return OM_KEY_PREFIX + keyName.substring(index);
     }
     return keyName;
   }

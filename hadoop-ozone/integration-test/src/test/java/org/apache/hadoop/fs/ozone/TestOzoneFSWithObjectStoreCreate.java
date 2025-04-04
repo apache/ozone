@@ -68,6 +68,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Class tests create with object store and getFileStatus.
@@ -387,44 +389,35 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     checkKeyList(ozoneKeyIterator, keys);
   }
 
-  @Test
-  public void testDoubleSlashPrefixPathNormalization() throws Exception {
-    OzoneVolume ozoneVolume =
-        client.getObjectStore().getVolume(volumeName);
+  @ParameterizedTest
+  @ValueSource(ints = {2, 3, 4})
+  public void testDoubleSlashPrefixPathNormalization(int slashCount) throws Exception {
+    OzoneVolume ozoneVolume = client.getObjectStore().getVolume(volumeName);
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    String doubleSlashKey = "//dir1/key1";
-    String normalizedDoubleSlashKey = "dir1/key1";
-    String tripleSlashKey = "///dir2/key2";
-    String normalizedTripleSlashKey = "dir2/key2";
+    // Generate a path with the specified number of leading slashes
+    StringBuilder keyPrefix = new StringBuilder();
+    for (int i = 0; i < slashCount; i++) {
+      keyPrefix.append('/');
+    }
+    String dirPath = "dir" + slashCount + "/";
+    String keyName = "key" + slashCount;
+    String slashyKey = keyPrefix + dirPath + keyName;
+    String normalizedKey = dirPath + keyName;
     byte[] data = new byte[10];
     Arrays.fill(data, (byte)96);
     ArrayList<String> expectedKeys = new ArrayList<>();
-    expectedKeys.add("dir1/");
-    expectedKeys.add(normalizedDoubleSlashKey);
-    expectedKeys.add("dir2/");
-    expectedKeys.add(normalizedTripleSlashKey);
-
-    OzoneOutputStream stream1 = ozoneBucket.createKey(doubleSlashKey, data.length);
-    stream1.write(data, 0, data.length);
-    stream1.close();
-    OzoneOutputStream stream2 = ozoneBucket.createKey(tripleSlashKey, data.length);
-    stream2.write(data, 0, data.length);
-    stream2.close();
+    expectedKeys.add(dirPath);
+    expectedKeys.add(normalizedKey);
+    TestDataUtil.createKey(ozoneBucket, slashyKey, data);
 
     try {
-      ozoneBucket.readKey(doubleSlashKey).close();
-      ozoneBucket.readKey(normalizedDoubleSlashKey).close();
-    } catch (Exception e) {
-      fail("Should be able to read key " + e.getMessage());
-    }
-    try {
-      ozoneBucket.readKey(tripleSlashKey).close();
-      ozoneBucket.readKey(normalizedTripleSlashKey).close();
+      ozoneBucket.readKey(slashyKey).close();
+      ozoneBucket.readKey(normalizedKey).close();
     } catch (Exception e) {
       fail("Should be able to read key " + e.getMessage());
     }
 
-    Iterator<? extends OzoneKey> it = ozoneBucket.listKeys("//dir");
+    Iterator<? extends OzoneKey> it = ozoneBucket.listKeys(dirPath);
     checkKeyList(it, expectedKeys);
   }
 
