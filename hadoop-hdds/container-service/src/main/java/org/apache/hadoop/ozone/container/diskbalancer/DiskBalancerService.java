@@ -82,6 +82,7 @@ public class DiskBalancerService extends BackgroundService {
   private double threshold;
   private long bandwidthInMB;
   private int parallelThread;
+  private boolean stopAfterDiskEven;
 
   private DiskBalancerVersion version;
 
@@ -206,6 +207,7 @@ public class DiskBalancerService extends BackgroundService {
     setThreshold(diskBalancerInfo.getThreshold());
     setBandwidthInMB(diskBalancerInfo.getBandwidthInMB());
     setParallelThread(diskBalancerInfo.getParallelThread());
+    setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
 
     // Default executorService is ScheduledThreadPoolExecutor, so we can
@@ -295,6 +297,10 @@ public class DiskBalancerService extends BackgroundService {
     this.parallelThread = parallelThread;
   }
 
+  public void setStopAfterDiskEven(boolean stopAfterDiskEven) {
+    this.stopAfterDiskEven = stopAfterDiskEven;
+  }
+
   public void setVersion(DiskBalancerVersion version) {
     this.version = version;
   }
@@ -309,6 +315,7 @@ public class DiskBalancerService extends BackgroundService {
                 .setThreshold(threshold)
                 .setDiskBandwidthInMB(bandwidthInMB)
                 .setParallelThread(parallelThread)
+                .setStopAfterDiskEven(stopAfterDiskEven)
                 .build())
         .build();
   }
@@ -354,6 +361,10 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     if (queue.isEmpty()) {
+      bytesToMove = 0;
+      if (stopAfterDiskEven) {
+        setShouldRun(false);
+      }
       metrics.incrIdleLoopNoAvailableVolumePairCount();
     } else {
       bytesToMove = calculateBytesToMove(volumeSet);
@@ -465,7 +476,8 @@ public class DiskBalancerService extends BackgroundService {
         moveSucceeded = false;
         if (diskBalancerTmpDir != null) {
           try {
-            Files.deleteIfExists(diskBalancerTmpDir);
+            File dir = new File(String.valueOf(diskBalancerTmpDir));
+            org.apache.commons.io.FileUtils.deleteDirectory(dir);
           } catch (IOException ex) {
             LOG.warn("Failed to delete tmp directory {}", diskBalancerTmpDir,
                 ex);
@@ -473,10 +485,11 @@ public class DiskBalancerService extends BackgroundService {
         }
         if (diskBalancerDestDir != null) {
           try {
-            Files.deleteIfExists(diskBalancerDestDir);
+            File dir = new File(String.valueOf(diskBalancerDestDir));
+            org.apache.commons.io.FileUtils.deleteDirectory(dir);
           } catch (IOException ex) {
             LOG.warn("Failed to delete dest directory {}: {}.",
-                diskBalancerDestDir, ex.getMessage());
+                diskBalancerDestDir, ex.getMessage(), ex);
           }
         }
         // Only need to check for destVolume, sourceVolume's usedSpace is
@@ -514,7 +527,7 @@ public class DiskBalancerService extends BackgroundService {
 
   public DiskBalancerInfo getDiskBalancerInfo() {
     return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
-        parallelThread, version, metrics.getSuccessCount(),
+        parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
         metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes());
   }
 

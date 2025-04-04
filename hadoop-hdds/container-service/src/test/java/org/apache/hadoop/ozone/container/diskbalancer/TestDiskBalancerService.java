@@ -120,6 +120,7 @@ public class TestDiskBalancerService {
     svc.setThreshold(10.0d);
     svc.setBandwidthInMB(1L);
     svc.setParallelThread(5);
+    svc.setStopAfterDiskEven(true);
     svc.setVersion(DiskBalancerVersion.DEFAULT_VERSION);
 
     svc.start();
@@ -128,14 +129,16 @@ public class TestDiskBalancerService {
     assertEquals(10, svc.getDiskBalancerInfo().getThreshold(), 0.0);
     assertEquals(1, svc.getDiskBalancerInfo().getBandwidthInMB());
     assertEquals(5, svc.getDiskBalancerInfo().getParallelThread());
+    assertTrue(svc.getDiskBalancerInfo().isStopAfterDiskEven());
 
-    DiskBalancerInfo newInfo = new DiskBalancerInfo(false, 20.0d, 5L, 10);
+    DiskBalancerInfo newInfo = new DiskBalancerInfo(false, 20.0d, 5L, 10, false);
     svc.refresh(newInfo);
 
     assertFalse(svc.getDiskBalancerInfo().isShouldRun());
     assertEquals(20, svc.getDiskBalancerInfo().getThreshold(), 0.0);
     assertEquals(5, svc.getDiskBalancerInfo().getBandwidthInMB());
     assertEquals(10, svc.getDiskBalancerInfo().getParallelThread());
+    assertFalse(svc.getDiskBalancerInfo().isStopAfterDiskEven());
 
     svc.shutdown();
   }

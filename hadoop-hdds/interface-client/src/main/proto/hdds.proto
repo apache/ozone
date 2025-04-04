@@ -552,6 +552,7 @@ message DiskBalancerConfigurationProto {
     optional double threshold = 1;
     optional uint64 diskBandwidthInMB = 2;
     optional int32 parallelThread = 3;
+    optional bool stopAfterDiskEven = 4;
 }
 
 enum DiskBalancerRunningStatus {

@@ -34,6 +34,7 @@ import picocli.CommandLine.Command;
  *      [ -t/--threshold {@literal <threshold>}]
  *      [ -b/--bandwidthInMB {@literal <bandwidthInMB>}]
  *      [ -p/--parallelThread {@literal <parallelThread>}]
+ *      [ -s/--stop-after-disk-even {@literal <stopAfterDiskEven>}]
  *      [ -a/--all {@literal <alldatanodes>}]
  *      [ -d/--datanodes {@literal <datanodes>}]
  *      [ {@literal <hosts>}]
@@ -43,13 +44,16 @@ import picocli.CommandLine.Command;
  *        datanodes
  *      ozone admin datanode diskbalancer start -a
  *        start balancer with default values in the configuration on all
- *        datanodes in the cluster
+ *        datanodes in the cluster and stops automatically after balancing
  *      ozone admin datanode diskbalancer start -t 5 -d {@literal <hosts>}
  *        start balancer with a threshold of 5%
  *      ozone admin datanode diskbalancer start -b 20 -d {@literal <hosts>}
  *        start balancer with maximum 20MB/s diskbandwidth
  *      ozone admin datanode diskbalancer start -p 5 -d {@literal <hosts>}
  *        start balancer with 5 parallel thread on each datanode
+ *      ozone admin datanode diskbalancer start -s=false -a}
+ *        start balancer and will keep running until stopped by the
+ *        stop command
  * To stop:
  *      ozone admin datanode diskbalancer stop -a
  *        stop diskblancer on all datanodes
