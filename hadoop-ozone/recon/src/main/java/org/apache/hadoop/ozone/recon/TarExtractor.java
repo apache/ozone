@@ -59,15 +59,16 @@ public class TarExtractor {
   private static final Logger LOG =
       LoggerFactory.getLogger(TarExtractor.class);
 
-  private final ExecutorService executor;
+  private int threadPoolSize;
+  private ExecutorService executor;
   private ThreadFactory threadFactory;
 
   public TarExtractor(int threadPoolSize, String threadNamePrefix) {
+    this.threadPoolSize = threadPoolSize;
     this.threadFactory =
         new ThreadFactoryBuilder().setNameFormat("FetchOMDBTar-%d" + threadNamePrefix)
             .build();
-    this.executor =
-        new ThreadPoolExecutor(0, threadPoolSize, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), threadFactory);
+    start();
   }
 
   public void extractTar(InputStream tarStream, Path outputDir)
@@ -133,7 +134,12 @@ public class TarExtractor {
     }
   }
 
-  public void shutdown() {
+  public void start() {
+    this.executor =
+        new ThreadPoolExecutor(0, threadPoolSize, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), threadFactory);
+  }
+
+  public void stop() {
     executor.shutdown();
     try {
       if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {

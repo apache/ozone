@@ -240,6 +240,7 @@ public class OzoneManagerServiceProviderImpl
   public void start() {
     LOG.info("Starting Ozone Manager Service Provider.");
     scheduler = Executors.newScheduledThreadPool(1, threadFactory);
+    tarExtractor.start();
     try {
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
@@ -335,6 +336,7 @@ public class OzoneManagerServiceProviderImpl
 
   private void stopSyncDataFromOMThread() {
     scheduler.shutdownNow();
+    tarExtractor.stop();
     LOG.debug("Shutdown the OM DB sync scheduler.");
   }
 
@@ -346,6 +348,7 @@ public class OzoneManagerServiceProviderImpl
       // immediately.
       stopSyncDataFromOMThread();
       scheduler = Executors.newScheduledThreadPool(1, threadFactory);
+      tarExtractor.start();
       startSyncDataFromOM(0L);
       return true;
     } else {
@@ -362,6 +365,7 @@ public class OzoneManagerServiceProviderImpl
     scheduler.shutdownNow();
     metrics.unRegister();
     connectionFactory.destroy();
+    tarExtractor.stop();
   }
 
   /**
@@ -418,7 +422,7 @@ public class OzoneManagerServiceProviderImpl
       // Validate extracted files
       File[] sstFiles = untarredDbDir.toFile().listFiles((dir, name) -> name.endsWith(".sst"));
       if (sstFiles != null && sstFiles.length > 0) {
-        LOG.warn("Number of SST files found in the OM snapshot directory: {} - {}", untarredDbDir, sstFiles.length);
+        LOG.info("Number of SST files found in the OM snapshot directory: {} - {}", untarredDbDir, sstFiles.length);
       }
 
       List<String> sstFileNames = Arrays.stream(sstFiles)
@@ -437,8 +441,6 @@ public class OzoneManagerServiceProviderImpl
       LOG.error("Unable to obtain Ozone Manager DB Snapshot.", e);
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-    } finally {
-      tarExtractor.shutdown();
     }
 
     return null;
