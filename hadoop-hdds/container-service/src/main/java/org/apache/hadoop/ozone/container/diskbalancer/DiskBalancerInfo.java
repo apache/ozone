@@ -172,12 +172,13 @@ public class DiskBalancerInfo {
         Double.compare(that.threshold, threshold) == 0 &&
         bandwidthInMB == that.bandwidthInMB &&
         parallelThread == that.parallelThread &&
+        stopAfterDiskEven == that.stopAfterDiskEven &&
         version == that.version;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(shouldRun, threshold, bandwidthInMB, parallelThread,
+    return Objects.hash(shouldRun, threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
         version);
   }
 }

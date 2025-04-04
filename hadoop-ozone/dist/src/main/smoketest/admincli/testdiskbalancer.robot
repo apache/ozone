@@ -39,3 +39,13 @@ Check success with non-admin user for status and report diskbalancer
                         Should Contain                  ${result}                Status result:
     ${result} =         Execute                         ozone admin datanode diskbalancer report
                         Should Contain                  ${result}                Report result:
+
+Check if balancer stops automatically
+    Run Keyword         Kinit test user                 testuser                testuser.keytab
+    Execute             ozone admin datanode diskbalancer start -a
+    Sleep               12s
+    ${result} =         Execute                         ozone admin datanode diskbalancer status
+                        Should Contain                  ${result}               RUNNING
+    Sleep               1min
+    ${result} =         Execute                         ozone admin datanode diskbalancer status
+                        Should Contain                  ${result}               STOPPED
