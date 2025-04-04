@@ -80,6 +80,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private int ratisByteLimit;
   private final AtomicBoolean suspended;
   private AtomicBoolean isRunningOnAOS;
+  private String dirDeletingServiceInterval;
+  private int threadNumberDirDeletion;
 
   private final DeletedDirSupplier deletedDirSupplier;
 
@@ -99,6 +101,12 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.suspended = new AtomicBoolean(false);
     this.isRunningOnAOS = new AtomicBoolean(false);
     this.dirDeletingCorePoolSize = dirDeletingServiceCorePoolSize;
+    this.dirDeletingServiceInterval = configuration.get(
+        OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL,
+        OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT);
+    this.threadNumberDirDeletion = configuration.getInt(
+        OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION,
+        OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT);
     deletedDirSupplier = new DeletedDirSupplier();
     taskCount.set(0);
   }
@@ -344,6 +352,22 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   public KeyValue<String, OmKeyInfo> getPendingDeletedDirInfo()
       throws IOException {
     return deletedDirSupplier.get();
+  }
+
+  public String getDirDeletingServiceInterval() {
+    return dirDeletingServiceInterval;
+  }
+
+  public void setDirDeletingServiceInterval(String dirDeletingServiceInterval) {
+    this.dirDeletingServiceInterval = dirDeletingServiceInterval;
+  }
+
+  public int getThreadNumberDirDeletion() {
+    return threadNumberDirDeletion;
+  }
+
+  public void setThreadNumberDirDeletion(int threadNumberDirDeletion) {
+    this.threadNumberDirDeletion = threadNumberDirDeletion;
   }
 
 }
