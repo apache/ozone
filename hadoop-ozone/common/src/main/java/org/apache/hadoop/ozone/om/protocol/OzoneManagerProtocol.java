@@ -780,8 +780,7 @@ public interface OzoneManagerProtocol
   @Deprecated
   default String printCompactionLogDag(String fileNamePrefix, String graphType)
       throws IOException {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented");
+    throw new UnsupportedOperationException("This API has been deprecated.");
   }
 
   /**

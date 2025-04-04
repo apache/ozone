@@ -34,9 +34,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
+import org.apache.hadoop.ozone.graph.PrintableGraph;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
-import org.apache.ozone.graph.PrintableGraph;
 import org.apache.ozone.rocksdiff.CompactionNode;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -69,19 +69,12 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
   private String dbPath;
 
   // TODO: Change graphType to enum.
-  @CommandLine.Option(names = {"-t", "--graph-type"},
-      description = "Type of node name to use in the graph image. (optional)\n Accepted values are: \n" +
-          "  FILE_NAME (default) : to use file name as node name in DAG,\n" +
-          "  KEY_SIZE: to show the no. of keys in the file along with file name in the DAG node name,\n" +
-          "  CUMULATIVE_SIZE: to show the cumulative size along with file name in the DAG node name.",
-      defaultValue = "FILE_NAME")
-  private String graphType;
 
   @Override
   public Void call() throws Exception {
     try {
       CreateCompactionDag createCompactionDag = new CreateCompactionDag(dbPath);
-      createCompactionDag.pngPrintMutableGraph(imageLocation, PrintableGraph.GraphType.valueOf(graphType));
+      createCompactionDag.pngPrintMutableGraph(imageLocation);
       out().println("Graph was generated at '" + imageLocation + "'.");
     } catch (RocksDBException ex) {
       err().println("Failed to open RocksDB: " + ex);
@@ -107,15 +100,14 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
       compactionLogTableCFHandle = RocksDBUtils.getColumnFamilyHandle(COMPACTION_LOG_TABLE, cfHandleList);
     }
 
-    public void pngPrintMutableGraph(String filePath, PrintableGraph.GraphType gType)
+    public void pngPrintMutableGraph(String filePath)
         throws IOException, RocksDBException {
       Objects.requireNonNull(filePath, "Image file path is required.");
-      Objects.requireNonNull(gType, "Graph type is required.");
 
       loadAllCompactionLogs();
 
       PrintableGraph graph;
-      graph = new PrintableGraph(backwardCompactionDAG, gType);
+      graph = new PrintableGraph(backwardCompactionDAG, PrintableGraph.GraphType.FILE_NAME);
       graph.generateImage(filePath);
     }
 
@@ -174,7 +166,7 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
                                         String endKey, String columnFamily) {
       long numKeys = 0L;
       try {
-        numKeys = RocksDiffUtils.getSSTFileSummary(dbPath + "/" + file);
+        numKeys = RocksDiffUtils.getSSTFileNumKeys(dbPath + "/" + file);
       } catch (RocksDBException e) {
         err().println("Warning: Can't get num of keys in SST '" + file + "'. Reason: " + e.getMessage());
       } catch (FileNotFoundException e) {

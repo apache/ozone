@@ -18,4 +18,4 @@
 /**
  * Generic ozone specific classes.
  */
-package org.apache.ozone.graph;
+package org.apache.hadoop.ozone.graph;

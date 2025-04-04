@@ -148,7 +148,7 @@ public final class RocksDiffUtils {
    * @param filename absolute path of SST file
    * @return number of keys
    */
-  public static long getSSTFileSummary(String filename)
+  public static long getSSTFileNumKeys(String filename)
       throws RocksDBException, FileNotFoundException {
 
     if (!filename.endsWith(SST_FILE_EXTENSION)) {

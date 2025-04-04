@@ -47,7 +47,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -70,8 +69,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
-import org.apache.ozone.graph.PrintableGraph;
-import org.apache.ozone.graph.PrintableGraph.GraphType;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyHandle;
@@ -206,7 +203,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     this.sstBackupDir = Paths.get(metadataDirName, sstBackupDirName) + "/";
     createSstBackUpDir();
 
-    // Active DB location is used in getSSTFileSummary
+    // Active DB location is used in getSSTFileNumKeys
     this.activeDBLocationStr = activeDBLocationName + "/";
     this.maxAllowedTimeInDag = configuration.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
@@ -1021,7 +1018,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                                       String endKey, String columnFamily) {
     long numKeys = 0L;
     try {
-      numKeys = RocksDiffUtils.getSSTFileSummary(getAbsoluteSstFilePath(file));
+      numKeys = RocksDiffUtils.getSSTFileNumKeys(getAbsoluteSstFilePath(file));
     } catch (RocksDBException e) {
       LOG.warn("Can't get num of keys in SST '{}': {}", file, e.getMessage());
     } catch (FileNotFoundException e) {
@@ -1400,19 +1397,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
-  }
-
-  public void pngPrintMutableGraph(String filePath, GraphType graphType)
-      throws IOException {
-    Objects.requireNonNull(filePath, "Image file path is required.");
-    Objects.requireNonNull(graphType, "Graph type is required.");
-
-    PrintableGraph graph;
-    synchronized (this) {
-      graph = new PrintableGraph(backwardCompactionDAG, graphType);
-    }
-
-    graph.generateImage(filePath);
   }
 
   private Map<String, CompactionFileInfo> toFileInfoList(List<String> sstFiles, RocksDB db) {
