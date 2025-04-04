@@ -64,6 +64,11 @@ public class ReplicasVerify extends Handler {
         defaultValue = "false")
     private boolean doExecuteChecksums;
 
+    @CommandLine.Option(names = "--block-existence",
+        description = "Check for block existence on datanodes.",
+        defaultValue = "false")
+    private boolean doExecuteBlockExistence;
+
   }
   private List<ReplicaVerifier> replicaVerifiers;
 
@@ -73,6 +78,10 @@ public class ReplicasVerify extends Handler {
 
     if (verification.doExecuteChecksums) {
       replicaVerifiers.add(new Checksums(client, outputDir));
+    }
+
+    if (verification.doExecuteBlockExistence) {
+      replicaVerifiers.add(new BlockExistenceVerifier(client, LOG, out(), getConf()));
     }
 
     findCandidateKeys(client, address);
