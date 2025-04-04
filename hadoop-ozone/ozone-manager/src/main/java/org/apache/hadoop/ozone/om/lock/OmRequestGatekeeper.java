@@ -21,9 +21,9 @@ import com.google.common.util.concurrent.Striped;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
@@ -53,16 +53,16 @@ public class OmRequestGatekeeper {
 
   public OmLockObject lock(OmLockInfo lockInfo) throws IOException {
     OmLockObject omLockObject = new OmLockObject(lockInfo);
-    List<Lock> locks = omLockObject.getLocks();
     long startTime = Time.monotonicNowNanos();
     Optional<OmLockInfo.LockInfo> optionalVolumeLock = lockInfo.getVolumeLock();
     Optional<OmLockInfo.LockInfo> optionalBucketLock = lockInfo.getBucketLock();
     Optional<Set<OmLockInfo.LockInfo>> optionalKeyLocks = lockInfo.getKeyLocks();
+    List<Lock> locks = new ArrayList<>();
 
     if (optionalVolumeLock.isPresent()) {
       OmLockInfo.LockInfo volumeLockInfo = optionalVolumeLock.get();
       if (volumeLockInfo.isWriteLock()) {
-        omLockObject.setLockStatType(OmLockStats.Type.WRITE);
+        omLockObject.setReadStatsType(false);
         locks.add(volumeLocks.get(volumeLockInfo.getName()).writeLock());
       } else {
         locks.add(volumeLocks.get(volumeLockInfo.getName()).readLock());
@@ -72,7 +72,7 @@ public class OmRequestGatekeeper {
     if (optionalBucketLock.isPresent()) {
       OmLockInfo.LockInfo bucketLockInfo = optionalBucketLock.get();
       if (bucketLockInfo.isWriteLock()) {
-        omLockObject.setLockStatType(OmLockStats.Type.WRITE);
+        omLockObject.setReadStatsType(false);
         locks.add(bucketLocks.get(bucketLockInfo.getName()).writeLock());
       } else {
         locks.add(bucketLocks.get(bucketLockInfo.getName()).readLock());
@@ -81,35 +81,24 @@ public class OmRequestGatekeeper {
 
     if (optionalKeyLocks.isPresent()) {
       for (ReadWriteLock keyLock: keyLocks.bulkGet(optionalKeyLocks.get())) {
-        omLockObject.setLockStatType(OmLockStats.Type.WRITE);
+        omLockObject.setReadStatsType(false);
         locks.add(keyLock.writeLock());
       }
     }
 
     try {
-      acquireLocks(locks);
+      acquireLocks(locks, omLockObject.getLocks());
       lockStatsBegin(omLockObject.getLockStats(), Time.monotonicNowNanos(), startTime);
     } catch (InterruptedException e) {
-      locks.clear();
       Thread.currentThread().interrupt();
-      throw new OMException("waiting for locks is interrupted", OMException.ResultCodes.INTERNAL_ERROR);
+      throw new OMException("Waiting for locks is interrupted, " + lockInfo, OMException.ResultCodes.INTERNAL_ERROR);
     } catch (TimeoutException e) {
-      locks.clear();
-      throw new OMException("Unable to get locks, timeout occurred", OMException.ResultCodes.TIMEOUT);
+      throw new OMException("Timeout occurred for locks " + lockInfo, OMException.ResultCodes.TIMEOUT);
     }
     return omLockObject;
   }
 
-  /*
-  Optional: If we want more diagnostic info on the type of lock that failed to be acquired (volume, bucket, or key),
-  We can make the parameter a list of objects that wrap the Lock with information about its type.
-  Note that logging the specific volume, bucket or keys this lock was trying to acquire is not helpful and
-  misleading because collisions within the stripe lock might mean we are blocked on a request for a completely
-  different part of the namespace.
-  Obtaining the thread ID that we were waiting on would be more useful, but there is no easy way to do that.
-   */
-  private void acquireLocks(List<Lock> locks) throws TimeoutException, InterruptedException {
-    List<Lock> acquiredLocks = new ArrayList<>(locks.size());
+  private void acquireLocks(List<Lock> locks, Stack<Lock> acquiredLocks) throws TimeoutException, InterruptedException {
     for (Lock lock: locks) {
       if (lock.tryLock(LOCK_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS)) {
         try {
@@ -127,45 +116,41 @@ public class OmRequestGatekeeper {
     }
   }
 
-  public void unlock(OmLockObject lockObject) {
-    releaseLocks(lockObject.getLocks());
-    lockStatsEnd(lockObject.getLockStats(), lockObject.getLockStatType());
-    lockObject.getLocks().clear();
-  }
-
-  private void releaseLocks(List<Lock> locks) {
-    ListIterator<Lock> reverseIterator = locks.listIterator(locks.size());
-    while (reverseIterator.hasPrevious()) {
-      Lock lock = reverseIterator.previous();
-      lock.unlock();
+  private void releaseLocks(Stack<Lock> locks) {
+    while (!locks.empty()) {
+      locks.pop().unlock();
     }
   }
 
   private static void lockStatsBegin(OmLockStats lockStats, long endTime, long startTime) {
-    lockStats.add(endTime - startTime, OmLockStats.Type.WAIT);
+    lockStats.addWaitLockNanos(endTime - startTime);
     lockStats.setLockStartTime(endTime);
   }
 
-  private static void lockStatsEnd(OmLockStats lockStats, OmLockStats.Type type) {
+  private static void lockStatsEnd(OmLockStats lockStats, boolean readStatsType) {
     if (lockStats.getLockStartTime() > 0) {
-      lockStats.add(Time.monotonicNowNanos() - lockStats.getLockStartTime(), type);
+      if (readStatsType) {
+        lockStats.addReadLockNanos(Time.monotonicNowNanos() - lockStats.getLockStartTime());
+      } else {
+        lockStats.addWriteLockNanos(Time.monotonicNowNanos() - lockStats.getLockStartTime());
+      }
     }
   }
 
   /**
-   * Lock information after taking locks.
+   * Lock information after taking locks, and to be used to release locks.
    */
-  public static class OmLockObject {
+  public static class OmLockObject implements AutoCloseable {
     private final OmLockInfo omLockInfo;
-    private final List<Lock> locks = new ArrayList<>();
+    private final Stack<Lock> locks = new Stack<>();
     private final OmLockStats lockStats = new OmLockStats();
-    private OmLockStats.Type lockStatType = OmLockStats.Type.READ;
+    private boolean readStatsType = true;
 
     public OmLockObject(OmLockInfo lockInfoProvider) {
       this.omLockInfo = lockInfoProvider;
     }
 
-    public List<Lock> getLocks() {
+    public Stack<Lock> getLocks() {
       return locks;
     }
 
@@ -173,16 +158,24 @@ public class OmRequestGatekeeper {
       return lockStats;
     }
 
-    public OmLockStats.Type getLockStatType() {
-      return lockStatType;
+    public void setReadStatsType(boolean readStatsType) {
+      this.readStatsType = readStatsType;
     }
 
-    public void setLockStatType(OmLockStats.Type lockStatType) {
-      this.lockStatType = lockStatType;
+    public boolean getReadStatsType() {
+      return readStatsType;
     }
 
     public OmLockInfo getOmLockInfo() {
       return omLockInfo;
+    }
+
+    @Override
+    public void close() throws IOException {
+      while (!locks.empty()) {
+        locks.pop().unlock();
+      }
+      lockStatsEnd(lockStats, readStatsType);
     }
   }
 
@@ -215,28 +208,16 @@ public class OmRequestGatekeeper {
       return writeLockNanos;
     }
 
-    void add(long timeNanos, Type type) {
-      switch (type) {
-      case WAIT:
-        waitLockNanos += timeNanos;
-        break;
-      case READ:
-        readLockNanos += timeNanos;
-        break;
-      case WRITE:
-        writeLockNanos += timeNanos;
-        break;
-      default:
-      }
+    void addWaitLockNanos(long timeNanos) {
+      waitLockNanos += timeNanos;
     }
 
-    /**
-     * lock time stat type.
-     */
-    public enum Type {
-      WAIT,
-      READ,
-      WRITE
+    void addReadLockNanos(long timeNanos) {
+      readLockNanos += timeNanos;
+    }
+
+    void addWriteLockNanos(long timeNanos) {
+      writeLockNanos += timeNanos;
     }
   }
 }

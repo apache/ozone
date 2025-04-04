@@ -42,15 +42,13 @@ public class TestRequestGatekeeper {
     OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo);
     assertEquals(2, lockObject.getLocks().size());
 
-    CompletableFuture<OmRequestGatekeeper.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
-      try {
-        OmRequestGatekeeper.OmLockObject lockInfoAgain = omLockOpr.lock(lockInfo);
-        omLockOpr.unlock(lockInfoAgain);
-        return lockInfoAgain;
+    CompletableFuture<Boolean> rst = CompletableFuture.supplyAsync(() -> {
+      try (OmRequestGatekeeper.OmLockObject ignored = omLockOpr.lock(lockInfo)) {
+        return true;
       } catch (IOException e) {
         fail("should not throw exception");
       }
-      return null;
+      return false;
     });
 
     // parallel lock wait should fail as previous lock not released
@@ -62,7 +60,7 @@ public class TestRequestGatekeeper {
     }
 
     // after unlock, the thread should be able to get lock
-    omLockOpr.unlock(lockObject);
+    lockObject.close();
     rst.get();
   }
 
@@ -73,24 +71,22 @@ public class TestRequestGatekeeper {
         .addBucketReadLock("vol", "bucket")
         .addKeyWriteLock("vol", "bucket", "testkey")
         .addKeyWriteLock("vol", "bucket", "testkey2").build();
-    OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo);
-    assertEquals(3, lockObject.getLocks().size());
+    try (OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo)) {
+      assertEquals(3, lockObject.getLocks().size());
+    }
 
-    omLockOpr.unlock(lockObject);
-
-    lockObject = omLockOpr.lock(lockInfo);
-    assertEquals(3, lockObject.getLocks().size());
-    omLockOpr.unlock(lockObject);
+    try (OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo)) {
+      assertEquals(3, lockObject.getLocks().size());
+    }
   }
 
   @Test
   public void testBucketReadLock() throws IOException {
     OmRequestGatekeeper omLockOpr = new OmRequestGatekeeper();
     OmLockInfo lockInfo = new OmLockInfo.Builder().addBucketReadLock("vol", "bucket").build();
-    OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo);
-    assertEquals(1, lockObject.getLocks().size());
-
-    omLockOpr.unlock(lockObject);
+    try (OmRequestGatekeeper.OmLockObject lockObject = omLockOpr.lock(lockInfo)) {
+      assertEquals(1, lockObject.getLocks().size());
+    }
   }
 
   @Test
@@ -102,15 +98,13 @@ public class TestRequestGatekeeper {
 
     OmLockInfo writeLockInfo = new OmLockInfo.Builder().addBucketWriteLock("vol", "bucket").build();
 
-    CompletableFuture<OmRequestGatekeeper.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
-      try {
-        OmRequestGatekeeper.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo);
-        omLockOpr.unlock(lockInfoAgain);
-        return lockInfoAgain;
+    CompletableFuture<Boolean> rst = CompletableFuture.supplyAsync(() -> {
+      try (OmRequestGatekeeper.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo)) {
+        return true;
       } catch (IOException e) {
         fail("should not throw exception");
       }
-      return null;
+      return false;
     });
 
     // parallel lock wait should fail as previous lock not released
@@ -122,7 +116,7 @@ public class TestRequestGatekeeper {
     }
 
     // after unlock, the thread should be able to get lock
-    omLockOpr.unlock(lockObject);
+    lockObject.close();
     rst.get();
   }
 
@@ -135,15 +129,13 @@ public class TestRequestGatekeeper {
     assertEquals(1, lockObject.getLocks().size());
 
     OmLockInfo writeLockInfo = new OmLockInfo.Builder().addVolumeWriteLock("vol").build();
-    CompletableFuture<OmRequestGatekeeper.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
-      try {
-        OmRequestGatekeeper.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo);
-        omLockOpr.unlock(lockInfoAgain);
-        return lockInfoAgain;
+    CompletableFuture<Boolean> rst = CompletableFuture.supplyAsync(() -> {
+      try (OmRequestGatekeeper.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo)) {
+        return true;
       } catch (IOException e) {
         fail("should not throw exception");
       }
-      return null;
+      return false;
     });
 
     // parallel lock wait should fail as previous lock not released
@@ -155,7 +147,7 @@ public class TestRequestGatekeeper {
     }
 
     // after unlock, the thread should be able to get lock
-    omLockOpr.unlock(lockObject);
+    lockObject.close();
     rst.get();
   }
 
@@ -170,15 +162,13 @@ public class TestRequestGatekeeper {
     OmLockInfo writeLockInfo = new OmLockInfo.Builder().addVolumeReadLock("vol")
         .addBucketWriteLock("vol", "buck1").build();
 
-    CompletableFuture<OmRequestGatekeeper.OmLockObject> rst = CompletableFuture.supplyAsync(() -> {
-      try {
-        OmRequestGatekeeper.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo);
-        omLockOpr.unlock(lockInfoAgain);
-        return lockInfoAgain;
+    CompletableFuture<Boolean> rst = CompletableFuture.supplyAsync(() -> {
+      try (OmRequestGatekeeper.OmLockObject lockInfoAgain = omLockOpr.lock(writeLockInfo)) {
+        return true;
       } catch (IOException e) {
         fail("should not throw exception");
       }
-      return null;
+      return false;
     });
 
     // parallel lock wait should fail as previous lock not released
@@ -190,7 +180,7 @@ public class TestRequestGatekeeper {
     }
 
     // after unlock, the thread should be able to get lock
-    omLockOpr.unlock(lockObject);
+    lockObject.close();
     rst.get();
   }
 }

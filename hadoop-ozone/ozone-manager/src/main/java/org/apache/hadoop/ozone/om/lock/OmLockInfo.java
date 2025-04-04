@@ -49,6 +49,21 @@ public final class OmLockInfo {
     return Optional.ofNullable(keyLocks);
   }
 
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    if (volumeLock != null) {
+      sb.append("Volume:").append(volumeLock);
+    }
+    if (bucketLock != null) {
+      sb.append("Bucket:").append(bucketLock);
+    }
+    if (keyLocks != null) {
+      sb.append("Keys:").append(keyLocks);
+    }
+    return sb.toString();
+  }
+
   /**
    * Builds an {@link OmLockInfo} object with optional volume, bucket or key locks.
    */
@@ -147,6 +162,11 @@ public final class OmLockInfo {
     @Override
     public int compareTo(LockInfo other) {
       return Integer.compare(hashCode(), other.hashCode());
+    }
+
+    @Override
+    public String toString() {
+      return "LockInfo{" + "name=" + name + ", isWriteLock=" + isWriteLock + '}';
     }
   }
 }
