@@ -58,9 +58,9 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
 
@@ -85,13 +85,15 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testChunkInfoCmdBeforeAfterCloseContainer(boolean isEcKey) throws Exception {
+  @CsvSource(value = {"true,FILE_SYSTEM_OPTIMIZED", "false,FILE_SYSTEM_OPTIMIZED",
+      "true,LEGACY", "false,LEGACY",
+      "true,OBJECT_STORE", "false,OBJECT_STORE"})
+  public void testChunkInfoCmdBeforeAfterCloseContainer(boolean isEcKey, BucketLayout layout) throws Exception {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
 
-    writeKey(volumeName, bucketName, keyName, isEcKey);
+    writeKey(volumeName, bucketName, keyName, isEcKey, layout);
 
     int exitCode = runChunkInfoCommand(volumeName, bucketName, keyName);
     assertEquals(0, exitCode);
@@ -102,18 +104,20 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     assertEquals(0, exitCode);
   }
 
-  @Test
-  public void testChunkInfoVerifyPathsAreDifferent() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "LEGACY", "OBJECT_STORE"})
+  public void testChunkInfoVerifyPathsAreDifferent(BucketLayout layout) throws Exception {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
-    writeKey(volumeName, bucketName, keyName, false);
+    writeKey(volumeName, bucketName, keyName, false, layout);
     int exitCode = runChunkInfoAndVerifyPaths(volumeName, bucketName, keyName);
     assertEquals(0, exitCode);
   }
 
-  @Test
-  public void testLdbCliForOzoneSnapshot() throws Exception {
+  @ParameterizedTest
+  @CsvSource(value = {"FILE_SYSTEM_OPTIMIZED,fileTable", "LEGACY,keyTable", "OBJECT_STORE,keyTable"})
+  public void testLdbCliForOzoneSnapshot(BucketLayout layout, String columnFamily) throws Exception {
     StringWriter stdout = new StringWriter();
     PrintWriter pstdout = new PrintWriter(stdout);
     CommandLine cmd = new CommandLine(new RDBParser())
@@ -122,7 +126,7 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
 
-    writeKey(volumeName, bucketName, keyName, false);
+    writeKey(volumeName, bucketName, keyName, false, layout);
 
     String snapshotName =
         client.getObjectStore().createSnapshot(volumeName, bucketName, "snap1");
@@ -135,7 +139,7 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     GenericTestUtils
         .waitFor(() -> new File(snapshotCurrent).exists(), 1000, 120000);
     String[] args =
-        new String[] {"--db=" + dbPath, "scan", "--cf", "fileTable"};
+        new String[] {"--db=" + dbPath, "scan", "--cf", columnFamily};
     int exitCode = cmd.execute(args);
     assertEquals(0, exitCode);
     String cmdOut = stdout.toString();
@@ -149,7 +153,7 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
   }
 
   private void writeKey(String volumeName, String bucketName,
-      String keyName, boolean isEcKey) throws IOException {
+      String keyName, boolean isEcKey, BucketLayout layout) throws IOException {
     ReplicationConfig repConfig;
     if (isEcKey) {
       repConfig = new ECReplicationConfig(3, 2);
@@ -158,7 +162,7 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
           ReplicationFactor.THREE);
     }
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+        layout);
     TestDataUtil.createKey(
         client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
         keyName, repConfig, "test".getBytes(StandardCharsets.UTF_8));
