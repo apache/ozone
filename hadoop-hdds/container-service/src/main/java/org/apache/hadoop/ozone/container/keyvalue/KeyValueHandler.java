@@ -1508,7 +1508,6 @@ public class KeyValueHandler extends Handler {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
     Optional<ContainerProtos.ContainerChecksumInfo> optionalChecksumInfo = checksumManager.read(containerData);
-    long oldDataChecksum = 0;
     ContainerProtos.ContainerChecksumInfo checksumInfo;
 
     if (optionalChecksumInfo.isPresent()) {
@@ -1517,7 +1516,7 @@ public class KeyValueHandler extends Handler {
       // Try creating the checksum info from RocksDB metadata if it is not present.
       checksumInfo = updateAndGetContainerChecksum(containerData);
     }
-    oldDataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
+    long oldDataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
 
     for (DatanodeDetails peer : peers) {
       long start = Instant.now().toEpochMilli();
@@ -1763,6 +1762,9 @@ public class KeyValueHandler extends Handler {
           chunkByteBuffer.flip();
           ChunkBuffer chunkBuffer = ChunkBuffer.wrap(chunkByteBuffer);
           writeChunkForClosedContainer(chunkInfo, blockID, chunkBuffer, container);
+          // In reconciling missing chunks which happens at the end of the block, we are expected to have holes in
+          // the blockData's chunk list because we continue to reconcile even if there are failures while reconciling
+          // chunks which is fine as we don't update the bcsId.
           localChunksMap.put(chunkInfo.getOffset(), chunkInfoProto);
         } catch (IOException ex) {
           overwriteBcsId = false;
