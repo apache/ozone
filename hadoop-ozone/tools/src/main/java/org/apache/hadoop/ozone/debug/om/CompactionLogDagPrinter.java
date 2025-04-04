@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import com.google.protobuf.InvalidProtocolBufferException;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +37,6 @@ import org.apache.hadoop.ozone.graph.PrintableGraph;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.CompactionNode;
-import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -164,16 +162,7 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
 
     private CompactionNode addNodeToDAG(String file, long seqNum, String startKey,
                                         String endKey, String columnFamily) {
-      long numKeys = 0L;
-      try {
-        numKeys = RocksDiffUtils.getSSTFileNumKeys(dbPath + "/" + file);
-      } catch (RocksDBException e) {
-        err().println("Warning: Can't get num of keys in SST '" + file + "'. Reason: " + e.getMessage());
-      } catch (FileNotFoundException e) {
-        out().println("Warning: Can't find SST : " + file);
-      }
-
-      CompactionNode fileNode = new CompactionNode(file, numKeys,
+      CompactionNode fileNode = new CompactionNode(file, 0L,
           seqNum, startKey, endKey, columnFamily);
       backwardCompactionDAG.addNode(fileNode);
       return fileNode;
