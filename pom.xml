@@ -91,7 +91,7 @@
     <enforced.maven.version>[3.3.0,)</enforced.maven.version>
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
-    <excluded-test-groups>native | unhealthy</excluded-test-groups>
+    <excluded-test-groups>unhealthy</excluded-test-groups>
     <exec-maven-plugin.version>3.5.0</exec-maven-plugin.version>
     <failIfNoTests>false</failIfNoTests>
     <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
@@ -228,8 +228,8 @@
     <test.build.dir>${project.build.directory}/test-dir</test.build.dir>
     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
     <testsThreadCount>4</testsThreadCount>
-    <!-- test groups excluded in CI (except in dedicated profiles for flaky and native) -->
-    <unstable-test-groups>flaky | native | slow | unhealthy</unstable-test-groups>
+    <!-- test groups excluded in CI (except in dedicated profiles for flaky) -->
+    <unstable-test-groups>flaky | slow | unhealthy</unstable-test-groups>
     <vault.driver.version>5.1.0</vault.driver.version>
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
@@ -2292,18 +2292,6 @@
         <skip.npx>true</skip.npx>
       </properties>
     </profile>
-    <profile>
-      <!-- @Native tests are excluded by default.  This profile removes the exclusion if native build is enabled. -->
-      <id>rocks-native-tests</id>
-      <activation>
-        <property>
-          <name>rocks_tools_native</name>
-        </property>
-      </activation>
-      <properties>
-        <excluded-test-groups>unhealthy</excluded-test-groups>
-      </properties>
-    </profile>
     <!-- The following profiles define test splits for CI -->
     <profile>
       <id>test-client</id>
@@ -2501,22 +2489,6 @@
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <groups>flaky</groups>
-              <excludedGroups>native | slow | unhealthy</excludedGroups>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <!-- Test split dedicated for running @Native tests -->
-      <id>native-tests</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <groups>native</groups>
               <excludedGroups>slow | unhealthy</excludedGroups>
             </configuration>
           </plugin>

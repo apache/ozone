@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
+import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -37,9 +37,9 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TestUtils;
-import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -48,7 +48,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Test for ManagedRawSSTFileReaderIterator.
  */
-@Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
+@EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
 class TestManagedRawSSTFileIterator {
 
   @TempDir
@@ -74,7 +74,7 @@ class TestManagedRawSSTFileIterator {
     return file;
   }
 
-  private static Stream<? extends Arguments> keyValueFormatArgs() {
+  private static Stream<Arguments> keyValueFormatArgs() {
     return Stream.of(Arguments.of(Named.of("Key starting with a single quote", "'key%1$d=>"),
             Named.of("Value starting with a number ending with a single quote", "%1$dvalue'")),
         Arguments.of(Named.of("Key ending with a number", "key%1$d"),
