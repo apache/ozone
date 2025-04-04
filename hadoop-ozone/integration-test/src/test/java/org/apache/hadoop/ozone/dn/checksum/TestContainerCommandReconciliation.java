@@ -255,8 +255,10 @@ public class TestContainerCommandReconciliation {
   public void testDataChecksumReportedAtSCM() throws Exception {
     long containerID = writeDataAndGetContainer(true);
     // Check non-zero checksum after container close
+    // TODO: Introduce corruption in the container and after reconciliation all checksums should match (HDDS-11763)
     Set<ContainerReplica> containerReplicas = cluster.getStorageContainerManager().getContainerManager()
         .getContainerReplicas(ContainerID.valueOf(containerID));
+    assertEquals(3, containerReplicas.size());
     for (ContainerReplica containerReplica: containerReplicas) {
       assertNotEquals(0, containerReplica.getDataChecksum());
     }
@@ -266,6 +268,7 @@ public class TestContainerCommandReconciliation {
     // Check non-zero checksum after container reconciliation
     containerReplicas = cluster.getStorageContainerManager().getContainerManager()
         .getContainerReplicas(ContainerID.valueOf(containerID));
+    assertEquals(3, containerReplicas.size());
     for (ContainerReplica containerReplica: containerReplicas) {
       assertNotEquals(0, containerReplica.getDataChecksum());
     }
@@ -273,8 +276,10 @@ public class TestContainerCommandReconciliation {
     // Check non-zero checksum after datanode restart
     // Restarting all the nodes take more time in mini ozone cluster, so restarting only one node
     cluster.restartHddsDatanode(0, true);
+    cluster.restartStorageContainerManager(true);
     containerReplicas = cluster.getStorageContainerManager().getContainerManager()
         .getContainerReplicas(ContainerID.valueOf(containerID));
+    assertEquals(3, containerReplicas.size());
     for (ContainerReplica containerReplica: containerReplicas) {
       assertNotEquals(0, containerReplica.getDataChecksum());
     }
