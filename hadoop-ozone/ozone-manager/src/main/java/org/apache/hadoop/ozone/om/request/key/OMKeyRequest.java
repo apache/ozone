@@ -1117,6 +1117,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
                     keyArgs.getTagsList()))
             .setUpdateID(transactionLogIndex)
             .setOwnerName(keyArgs.getOwnerName())
+            .setGroupName(keyArgs.getGroupName())
             .setFile(true);
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format

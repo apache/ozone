@@ -42,6 +42,7 @@ public final class BasicOmKeyInfo {
   private final boolean isFile;
   private final String eTag;
   private String ownerName;
+  private String groupName;
 
   private BasicOmKeyInfo(Builder b) {
     this.volumeName = b.volumeName;
@@ -54,6 +55,7 @@ public final class BasicOmKeyInfo {
     this.isFile = b.isFile;
     this.eTag = StringUtils.isNotEmpty(b.eTag) ? b.eTag : null;
     this.ownerName = b.ownerName;
+    this.groupName = b.groupName;
   }
 
   private BasicOmKeyInfo(OmKeyInfo b) {
@@ -67,6 +69,7 @@ public final class BasicOmKeyInfo {
     this.isFile = b.isFile();
     this.eTag = b.getMetadata().get(ETAG);
     this.ownerName = b.getOwnerName();
+    this.groupName = b.getGroupName();
   }
 
   public String getVolumeName() {
@@ -109,6 +112,10 @@ public final class BasicOmKeyInfo {
     return ownerName;
   }
 
+  public String getGroupName() {
+    return groupName;
+  }
+
   public long getReplicatedSize() {
     return QuotaUtil.getReplicatedSize(getDataSize(), replicationConfig);
   }
@@ -127,6 +134,7 @@ public final class BasicOmKeyInfo {
     private boolean isFile;
     private String eTag;
     private String ownerName;
+    private String groupName;
 
     public Builder setVolumeName(String volumeName) {
       this.volumeName = volumeName;
@@ -178,6 +186,11 @@ public final class BasicOmKeyInfo {
       return this;
     }
 
+    public Builder setGroupName(String groupName) {
+      this.groupName = groupName;
+      return this;
+    }
+
     public BasicOmKeyInfo build() {
       return new BasicOmKeyInfo(this);
     }
@@ -192,6 +205,9 @@ public final class BasicOmKeyInfo {
         .setType(replicationConfig.getReplicationType());
     if (ownerName != null) {
       builder.setOwnerName(ownerName);
+    }
+    if (groupName != null) {
+      builder.setGroupName(groupName);
     }
     if (replicationConfig instanceof ECReplicationConfig) {
       builder.setEcReplicationConfig(
@@ -228,7 +244,8 @@ public final class BasicOmKeyInfo {
             basicKeyInfo.getEcReplicationConfig()))
         .setETag(basicKeyInfo.getETag())
         .setIsFile(!keyName.endsWith("/"))
-        .setOwnerName(basicKeyInfo.getOwnerName());
+        .setOwnerName(basicKeyInfo.getOwnerName())
+        .setGroupName(basicKeyInfo.getGroupName());
 
     return builder.build();
   }
@@ -254,7 +271,8 @@ public final class BasicOmKeyInfo {
             basicKeyInfo.getEcReplicationConfig()))
         .setETag(basicKeyInfo.getETag())
         .setIsFile(!keyName.endsWith("/"))
-        .setOwnerName(basicKeyInfo.getOwnerName());
+        .setOwnerName(basicKeyInfo.getOwnerName())
+        .setGroupName(basicKeyInfo.getGroupName());
 
     return builder.build();
   }
@@ -277,7 +295,8 @@ public final class BasicOmKeyInfo {
         replicationConfig.equals(basicOmKeyInfo.replicationConfig) &&
         Objects.equals(eTag, basicOmKeyInfo.eTag) &&
         isFile == basicOmKeyInfo.isFile &&
-        ownerName.equals(basicOmKeyInfo.ownerName);
+        ownerName.equals(basicOmKeyInfo.ownerName) &&
+        groupName.equals(basicOmKeyInfo.groupName);
   }
 
   @Override

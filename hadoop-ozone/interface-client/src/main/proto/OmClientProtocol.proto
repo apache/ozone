@@ -1081,6 +1081,7 @@ message KeyArgs {
     // This allows a key to be created an committed atomically if the original has not
     // been modified.
     optional uint64 expectedDataGeneration = 23;
+    optional string groupName = 24;
 }
 
 message KeyLocation {
@@ -1172,6 +1173,7 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+    optional string groupName = 23;
 }
 
 message BasicKeyInfo {
@@ -1184,6 +1186,7 @@ message BasicKeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
     optional string eTag = 8;
     optional string ownerName = 9;
+    optional string groupName = 10;
 }
 
 message DirectoryInfo {
@@ -1196,6 +1199,7 @@ message DirectoryInfo {
     required uint64 updateID = 7;
     required uint64 parentID = 8;
     optional string ownerName = 9;
+    optional string groupName = 10;
 }
 
 message RepeatedKeyInfo {

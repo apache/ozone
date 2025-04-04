@@ -379,7 +379,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     store.deleteVolume(volumeName);
   }
 
-  @Test void testKeyOwner() throws IOException {
+  @Test void testKeyOwnerAndGroup() throws IOException {
     // Save the old user, and switch to the old user after test
     UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
     try {
@@ -418,8 +418,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       assertNotNull(bucket.getKey(key2));
       assertEquals(user1.getShortUserName(),
           bucket.getKey(key1).getOwner());
+      assertEquals(user1.getPrimaryGroupName(),
+          bucket.getKey(key1).getGroup());
       assertEquals(user2.getShortUserName(),
           bucket.getKey(key2).getOwner());
+      assertEquals(user2.getPrimaryGroupName(),
+          bucket.getKey(key2).getGroup());
     } finally {
       UserGroupInformation.setLoginUser(oldUser);
       setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
@@ -3239,7 +3243,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // User without permission should fail to upload the object
     String userName = "test-user";
     UserGroupInformation remoteUser =
-        UserGroupInformation.createRemoteUser(userName);
+        UserGroupInformation.createUserForTesting(userName, new String[] {userName});
     try (OzoneClient client =
         remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)
             () -> OzoneClientFactory.getRpcClient(cluster.getConf()))) {

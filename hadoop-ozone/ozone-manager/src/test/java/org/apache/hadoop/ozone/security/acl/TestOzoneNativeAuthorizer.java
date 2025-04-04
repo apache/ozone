@@ -171,6 +171,7 @@ public class TestOzoneNativeAuthorizer {
         .setDataSize(0)
         .setAcls(OzoneAclUtil.getAclList(testUgi, ALL, ALL))
         .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+        .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
         .build();
 
     if (keyName.split(OZONE_URI_DELIMITER).length > 1) {

@@ -211,6 +211,7 @@ class TestMultipartUploadCleanupService {
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setLocationInfoList(new ArrayList<>())
             .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+            .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
             .build();
 
     OmMultipartInfo omMultipartInfo = writeClient.
@@ -230,6 +231,7 @@ class TestMultipartUploadCleanupService {
               .setReplicationConfig(
                   StandaloneReplicationConfig.getInstance(ONE))
               .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+              .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
               .build();
 
       OpenKeySession openKey = writeClient.openKey(partKeyArgs);

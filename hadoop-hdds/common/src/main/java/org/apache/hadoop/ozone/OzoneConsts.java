@@ -262,6 +262,7 @@ public final class OzoneConsts {
   public static final String UPDATE_ID = "updateID";
   public static final String CLIENT_ID = "clientID";
   public static final String OWNER = "owner";
+  public static final String GROUP = "group";
   public static final String ADMIN = "admin";
   public static final String USERNAME = "username";
   public static final String PREV_KEY = "prevKey";

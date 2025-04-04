@@ -376,6 +376,7 @@ public class TestSstFilteringService {
             .setLocationInfoList(new ArrayList<>())
             .setOwnerName(
                 UserGroupInformation.getCurrentUser().getShortUserName())
+            .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
             .build();
     //Open and Commit the Key in the Key Manager.
     OpenKeySession session = managerProtocol.openKey(keyArg);

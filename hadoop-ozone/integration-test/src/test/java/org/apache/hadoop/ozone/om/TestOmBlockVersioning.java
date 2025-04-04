@@ -86,6 +86,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
         .setAcls(new ArrayList<>())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setOwnerName("user" + RandomStringUtils.randomNumeric(5))
+        .setGroupName("group" + RandomStringUtils.randomNumeric(5))
         .build();
 
     // 1st update, version 0

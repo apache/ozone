@@ -490,6 +490,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .addMetadata(OzoneConsts.ETAG,
               multipartUploadedKeyHash(partKeyInfoMap))
           .setOwnerName(keyArgs.getOwnerName())
+          .setGroupName(keyArgs.getGroupName())
           .addAllTags(dbOpenKeyInfo.getTags());
       // Check if db entry has ObjectID. This check is required because
       // it is possible that between multipart key uploads and complete,

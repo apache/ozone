@@ -516,6 +516,7 @@ class TestOpenKeyCleanupService {
             .setLocationInfoList(new ArrayList<>())
             .setOwnerName(UserGroupInformation.getCurrentUser()
                 .getShortUserName())
+            .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
             .build();
 
     // Open and write the key without commit it.
@@ -573,6 +574,7 @@ class TestOpenKeyCleanupService {
                 HddsProtos.ReplicationFactor.ONE))
             .setLocationInfoList(new ArrayList<>())
             .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+            .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
             .build();
 
     OmMultipartInfo omMultipartInfo = writeClient.
@@ -592,6 +594,7 @@ class TestOpenKeyCleanupService {
               .setReplicationConfig(RatisReplicationConfig.getInstance(
                   HddsProtos.ReplicationFactor.ONE))
               .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+              .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
               .build();
 
       OpenKeySession openKey = writeClient.openKey(partKeyArgs);

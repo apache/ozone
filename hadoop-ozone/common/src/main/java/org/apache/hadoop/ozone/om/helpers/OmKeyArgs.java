@@ -40,6 +40,7 @@ public final class OmKeyArgs implements Auditable {
   private final String bucketName;
   private final String keyName;
   private final String ownerName;
+  private final String groupName;
   private long dataSize;
   private final ReplicationConfig replicationConfig;
   private List<OmKeyLocationInfo> locationInfoList;
@@ -80,6 +81,7 @@ public final class OmKeyArgs implements Auditable {
     this.headOp = b.headOp;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
     this.ownerName = b.ownerName;
+    this.groupName = b.groupName;
     this.tags = b.tags;
     this.expectedDataGeneration = b.expectedDataGeneration;
   }
@@ -118,6 +120,10 @@ public final class OmKeyArgs implements Auditable {
 
   public String getOwner() {
     return ownerName;
+  }
+
+  public String getGroup() {
+    return groupName;
   }
 
   public long getDataSize() {
@@ -175,6 +181,7 @@ public final class OmKeyArgs implements Auditable {
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.KEY, this.keyName);
     auditMap.put(OzoneConsts.OWNER, this.ownerName);
+    auditMap.put(OzoneConsts.GROUP, this.groupName);
     auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(this.dataSize));
     auditMap.put(OzoneConsts.REPLICATION_CONFIG,
         (this.replicationConfig != null) ?
@@ -196,6 +203,7 @@ public final class OmKeyArgs implements Auditable {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setOwnerName(ownerName)
+        .setGroupName(groupName)
         .setDataSize(dataSize)
         .setReplicationConfig(replicationConfig)
         .setLocationInfoList(locationInfoList)
@@ -247,6 +255,7 @@ public final class OmKeyArgs implements Auditable {
     private String bucketName;
     private String keyName;
     private String ownerName;
+    private String groupName;
     private long dataSize;
     private ReplicationConfig replicationConfig;
     private List<OmKeyLocationInfo> locationInfoList;
@@ -280,6 +289,11 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder setOwnerName(String owner) {
       this.ownerName = owner;
+      return this;
+    }
+
+    public Builder setGroupName(String group) {
+      this.groupName = group;
       return this;
     }
 

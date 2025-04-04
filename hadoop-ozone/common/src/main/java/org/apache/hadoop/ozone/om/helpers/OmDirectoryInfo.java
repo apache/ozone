@@ -48,6 +48,7 @@ public class OmDirectoryInfo extends WithParentObjectId
 
   private final String name; // directory name
   private String owner;
+  private String group;
 
   private final long creationTime;
   private final long modificationTime;
@@ -58,6 +59,7 @@ public class OmDirectoryInfo extends WithParentObjectId
     super(builder);
     this.name = builder.name;
     this.owner = builder.owner;
+    this.group = builder.group;
     this.acls = builder.acls;
     this.creationTime = builder.creationTime;
     this.modificationTime = builder.modificationTime;
@@ -78,6 +80,7 @@ public class OmDirectoryInfo extends WithParentObjectId
   public static class Builder extends WithParentObjectId.Builder {
     private String name;
     private String owner;
+    private String group;
 
     private long creationTime;
     private long modificationTime;
@@ -114,6 +117,11 @@ public class OmDirectoryInfo extends WithParentObjectId
 
     public Builder setOwner(String ownerName) {
       this.owner = ownerName;
+      return this;
+    }
+
+    public Builder setGroup(String groupName) {
+      this.group = groupName;
       return this;
     }
 
@@ -175,6 +183,10 @@ public class OmDirectoryInfo extends WithParentObjectId
     return owner;
   }
 
+  public String getGroup() {
+    return group;
+  }
+
   public long getCreationTime() {
     return creationTime;
   }
@@ -201,6 +213,9 @@ public class OmDirectoryInfo extends WithParentObjectId
                     .setParentID(getParentObjectID());
     if (owner != null) {
       pib.setOwnerName(owner);
+    }
+    if (group != null) {
+      pib.setGroupName(group);
     }
     if (acls != null) {
       pib.addAllAcls(OzoneAclUtil.toProtobuf(acls));
@@ -235,6 +250,9 @@ public class OmDirectoryInfo extends WithParentObjectId
     if (dirInfo.hasOwnerName()) {
       opib.setOwner(dirInfo.getOwnerName());
     }
+    if (dirInfo.hasGroupName()) {
+      opib.setGroup(dirInfo.getGroupName());
+    }
     return opib.build();
   }
 
@@ -251,6 +269,7 @@ public class OmDirectoryInfo extends WithParentObjectId
             modificationTime == omDirInfo.modificationTime &&
             name.equals(omDirInfo.name) &&
             Objects.equals(owner, omDirInfo.owner) &&
+            Objects.equals(group, omDirInfo.group) &&
             Objects.equals(getMetadata(), omDirInfo.getMetadata()) &&
             Objects.equals(acls, omDirInfo.acls) &&
             getObjectID() == omDirInfo.getObjectID() &&
@@ -271,6 +290,7 @@ public class OmDirectoryInfo extends WithParentObjectId
     OmDirectoryInfo.Builder builder = new Builder()
             .setName(name)
             .setOwner(owner)
+            .setGroup(group)
             .setCreationTime(creationTime)
             .setModificationTime(modificationTime)
             .setAcls(acls)

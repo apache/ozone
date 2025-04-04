@@ -897,6 +897,7 @@ public class TestOmMetrics {
         .setAcls(Lists.emptyList())
         .setReplicationConfig(repConfig)
         .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+        .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
         .build();
   }
 
