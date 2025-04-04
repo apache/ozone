@@ -46,14 +46,14 @@ import org.slf4j.Logger;
 /**
  * Checks block existence using GetBlock calls to the Datanodes.
  */
-public class MetadataCheck implements ReplicaVerifier {
+public class BlockExistenceVerifier implements ReplicaVerifier {
 
   private OzoneClient client;
   private Logger log;
   private PrintWriter printWriter;
   private OzoneConfiguration conf;
 
-  public MetadataCheck(OzoneClient client, Logger log, PrintWriter printWriter, OzoneConfiguration conf) {
+  public BlockExistenceVerifier(OzoneClient client, Logger log, PrintWriter printWriter, OzoneConfiguration conf) {
     this.client = client;
     this.log = log;
     this.printWriter = printWriter;

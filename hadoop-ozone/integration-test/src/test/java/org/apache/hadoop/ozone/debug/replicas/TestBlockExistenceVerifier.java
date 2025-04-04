@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -61,13 +63,13 @@ import org.slf4j.LoggerFactory;
  * This class checks block existence using GetBlock calls to the Datanodes.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class TestMetadataCheck {
+public class TestBlockExistenceVerifier {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TestMetadataCheck.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestBlockExistenceVerifier.class);
   private static MiniOzoneCluster cluster;
   private static OzoneClient client;
   private static OzoneConfiguration conf;
-  private static MetadataCheck metadataCheck;
+  private static BlockExistenceVerifier blockExistenceVerifier;
   private static final String VOLUME_NAME = UUID.randomUUID().toString();
   private static final String BUCKET_NAME = UUID.randomUUID().toString();
   private static final String KEY_NAME = UUID.randomUUID().toString();
@@ -86,12 +88,12 @@ public class TestMetadataCheck {
     writeKey(KEY_NAME);
 
     printWriter = new PrintWriter(OUT);
-    metadataCheck = new MetadataCheck(client, LOG, printWriter, conf);
+    blockExistenceVerifier = new BlockExistenceVerifier(client, LOG, printWriter, conf);
   }
 
   @AfterEach
   public void cleanUp() {
-    OUT.flush();
+    OUT.getBuffer().setLength(0);
   }
 
   @AfterAll
@@ -104,11 +106,14 @@ public class TestMetadataCheck {
   void testBlockExists() throws IOException {
     OzoneKeyDetails keyDetails = client.getProxy().getKeyDetails(VOLUME_NAME, BUCKET_NAME, KEY_NAME);
 
-    metadataCheck.verifyKey(keyDetails);
+    blockExistenceVerifier.verifyKey(keyDetails);
     String cliOutput = OUT.toString();
 
-    assertThat(cliOutput).contains("\"status\":\"BLOCK_EXISTS\"");
-    assertThat(cliOutput).contains("\"pass\":true");
+    ObjectMapper objectMapper = new ObjectMapper();
+    JsonNode jsonNode = objectMapper.readTree(cliOutput);
+
+    assertThat(jsonNode.get("status").asText()).isEqualTo("BLOCK_EXISTS");
+    assertThat(jsonNode.get("pass").asBoolean()).isTrue();
   }
 
   @Order(2)
@@ -145,11 +150,14 @@ public class TestMetadataCheck {
       }
     }
 
-    metadataCheck.verifyKey(keyDetails);
+    blockExistenceVerifier.verifyKey(keyDetails);
     String cliOutput = OUT.toString();
 
-    assertThat(cliOutput).contains("\"status\":\"MISSING_REPLICAS\"");
-    assertThat(cliOutput).contains("\"pass\":false");
+    ObjectMapper objectMapper = new ObjectMapper();
+    JsonNode jsonNode = objectMapper.readTree(cliOutput);
+
+    assertThat(jsonNode.get("status").asText()).isEqualTo("MISSING_REPLICAS");
+    assertThat(jsonNode.get("pass").asBoolean()).isFalse();
   }
 
   private static List<OmKeyLocationInfo> lookupKey(MiniOzoneCluster ozoneCluster)
