@@ -15,29 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.cli.container;
-
-import org.apache.hadoop.hdds.cli.AdminSubcommand;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.kohsuke.MetaInfServices;
-import picocli.CommandLine.Command;
-
 /**
- * Subcommand to group container related operations.
+ * Contains all of the container related scm commands.
  */
-@Command(
-    name = "container",
-    description = "Container specific operations",
-    mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class,
-    subcommands = {
-        ListSubcommand.class,
-        InfoSubcommand.class,
-        CreateSubcommand.class,
-        CloseSubcommand.class,
-        ReportSubcommand.class,
-    })
-@MetaInfServices(AdminSubcommand.class)
-public class ContainerCommands implements AdminSubcommand {
-
-}
+package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
