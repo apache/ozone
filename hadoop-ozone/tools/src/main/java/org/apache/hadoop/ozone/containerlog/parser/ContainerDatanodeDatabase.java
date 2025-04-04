@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
-import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sqlite.SQLiteConfig;
@@ -117,7 +116,7 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  public void insertContainerDatanodeData(String key, List<JSONObject> transitionList) throws SQLException {
+  public void insertContainerDatanodeData(String key, List<DatanodeContainerInfo> transitionList) throws SQLException {
     String[] parts = key.split("#");
     if (parts.length != 2) {
       System.err.println("Invalid key format: " + key);
@@ -134,15 +133,15 @@ public class ContainerDatanodeDatabase {
 
       int count = 0;
 
-      for (JSONObject jsonObject : transitionList) {
+      for (DatanodeContainerInfo info : transitionList) {
         preparedStatement.setLong(1, datanodeId);
         preparedStatement.setLong(2, containerId);
-        preparedStatement.setString(3, (String) jsonObject.get("timestamp"));
-        preparedStatement.setString(4, (String) jsonObject.get("state"));
-        preparedStatement.setLong(5, (Long) jsonObject.get("bcsid"));
-        preparedStatement.setString(6, (String) jsonObject.get("errorMessage"));
-        preparedStatement.setString(7, (String) jsonObject.get("logLevel"));
-        preparedStatement.setInt(8, (Integer) jsonObject.get("index"));
+        preparedStatement.setString(3, info.getTimestamp());
+        preparedStatement.setString(4, info.getState());
+        preparedStatement.setLong(5, info.getBcsid());
+        preparedStatement.setString(6, info.getErrorMessage());
+        preparedStatement.setString(7, info.getLogLevel());
+        preparedStatement.setInt(8, info.getIndexValue());
         preparedStatement.addBatch();
 
         count++;
