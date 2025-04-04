@@ -129,11 +129,6 @@ public class HddsVolume extends StorageVolume {
       this.volumeInfoMetrics =
           new VolumeInfoMetrics(b.getVolumeRootStr(), this);
 
-      LOG.info("Creating HddsVolume: {} of storage type: {}, {}",
-          getStorageDir(),
-          b.getStorageType(),
-          getCurrentUsage());
-
       initialize();
     } else {
       // Builder is called with failedVolume set, so create a failed volume
@@ -142,6 +137,8 @@ public class HddsVolume extends StorageVolume {
       volumeIOStats = null;
       volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
     }
+
+    LOG.info("HddsVolume: {}", getReport());
   }
 
   @Override
