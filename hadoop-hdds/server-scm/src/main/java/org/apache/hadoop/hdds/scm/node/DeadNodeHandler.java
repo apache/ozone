@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerException;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -91,12 +92,21 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       closeContainers(datanodeDetails, publisher);
       destroyPipelines(datanodeDetails);
 
+      boolean isNodeInMaintenance = nodeManager.getNodeStatus(datanodeDetails).isInMaintenance();
+
       // Remove the container replicas associated with the dead node unless it
       // is IN_MAINTENANCE
-      if (!nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
+      if (!isNodeInMaintenance) {
         removeContainerReplicas(datanodeDetails);
       }
-      
+
+      // Notify ReplicationManager
+      if (!isNodeInMaintenance) {
+        LOG.debug("Notifying ReplicationManager about dead node: {}",
+            datanodeDetails);
+        publisher.fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanodeDetails);
+      }
+
       // remove commands in command queue for the DN
       final List<SCMCommand<?>> cmdList = nodeManager.getCommandQueue(
           datanodeDetails.getUuid());
@@ -105,8 +115,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
 
       // remove DeleteBlocksCommand associated with the dead node unless it
       // is IN_MAINTENANCE
-      if (deletedBlockLog != null &&
-          !nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
+      if (deletedBlockLog != null && !isNodeInMaintenance) {
         deletedBlockLog.onDatanodeDead(datanodeDetails.getUuid());
       }
 

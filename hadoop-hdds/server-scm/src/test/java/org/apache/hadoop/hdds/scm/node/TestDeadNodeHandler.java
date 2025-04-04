@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLU
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -107,6 +108,7 @@ public class TestDeadNodeHandler {
     pipelineManager =
         (PipelineManagerImpl)scm.getPipelineManager();
     pipelineManager.setScmContext(scmContext);
+    scm.getReplicationManager().setScmContext(scmContext);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -230,6 +232,10 @@ public class TestDeadNodeHandler {
     assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
+    verify(publisher, times(0)).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
+
+    clearInvocations(publisher);
+
     verify(deletedBlockLog, times(0))
         .onDatanodeDead(datanode1.getUuid());
 
@@ -259,8 +265,8 @@ public class TestDeadNodeHandler {
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
 
-    verify(deletedBlockLog, times(1))
-        .onDatanodeDead(datanode1.getUuid());
+    verify(publisher).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
+    verify(deletedBlockLog).onDatanodeDead(datanode1.getUuid());
 
     container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));
