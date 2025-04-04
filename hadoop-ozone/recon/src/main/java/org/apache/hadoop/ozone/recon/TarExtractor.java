@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.STAGING;
+
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -26,8 +28,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -37,6 +41,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +78,12 @@ public class TarExtractor {
 
   public void extractTar(InputStream tarStream, Path outputDir)
       throws IOException, InterruptedException, ExecutionException {
+    String stagingDirName = STAGING + UUID.randomUUID();
+    Path parentDir = outputDir.getParent();
+    Path stagingDir = parentDir.resolve(stagingDirName);
+
+    Files.createDirectories(stagingDir); // Ensure staging directory exists
+
     List<Future<Void>> futures = new ArrayList<>();
 
     try (TarArchiveInputStream tarInput = new TarArchiveInputStream(tarStream)) {
@@ -84,11 +95,11 @@ public class TarExtractor {
           // Submit extraction as a task
           TarArchiveEntry finalEntry = entry;
           futures.add(executor.submit(() -> {
-            writeFile(outputDir, finalEntry.getName(), fileData);
+            writeFile(stagingDir, finalEntry.getName(), fileData);
             return null;
           }));
         } else {
-          File dir = new File(outputDir.toFile(), entry.getName());
+          File dir = new File(stagingDir.toFile(), entry.getName());
           if (!dir.exists() && !dir.mkdirs()) {
             throw new IOException("Failed to create directory: " + dir);
           }
@@ -100,6 +111,14 @@ public class TarExtractor {
     for (Future<Void> future : futures) {
       future.get();
     }
+
+    // Move staging to outputDir atomically
+    if (Files.exists(outputDir)) {
+      FileUtils.deleteDirectory(outputDir.toFile()); // Clean old data
+    }
+    Files.move(stagingDir, outputDir, StandardCopyOption.ATOMIC_MOVE);
+
+    LOG.info("Tar extraction completed and moved from staging to: {}", outputDir);
   }
 
   private byte[] readEntryData(TarArchiveInputStream tarInput, long size) throws IOException {

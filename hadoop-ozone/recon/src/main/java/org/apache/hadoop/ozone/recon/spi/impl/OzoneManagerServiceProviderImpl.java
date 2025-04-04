@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPO
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
+import static org.apache.hadoop.ozone.recon.ReconConstants.STAGING;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT;
@@ -62,6 +63,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -240,7 +242,6 @@ public class OzoneManagerServiceProviderImpl
   public void start() {
     LOG.info("Starting Ozone Manager Service Provider.");
     scheduler = Executors.newScheduledThreadPool(1, threadFactory);
-    tarExtractor.start();
     try {
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
@@ -317,6 +318,7 @@ public class OzoneManagerServiceProviderImpl
             OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT),
         TimeUnit.MILLISECONDS);
     LOG.debug("Started the OM DB sync scheduler.");
+    tarExtractor.start();
     scheduler.scheduleWithFixedDelay(() -> {
       try {
         LOG.info("Last known sequence number before sync: {}", getCurrentOMDBSequenceNumber());
@@ -348,7 +350,6 @@ public class OzoneManagerServiceProviderImpl
       // immediately.
       stopSyncDataFromOMThread();
       scheduler = Executors.newScheduledThreadPool(1, threadFactory);
-      tarExtractor.start();
       startSyncDataFromOM(0L);
       return true;
     } else {
@@ -363,9 +364,9 @@ public class OzoneManagerServiceProviderImpl
     reconTaskController.stop();
     omMetadataManager.stop();
     scheduler.shutdownNow();
+    tarExtractor.stop();
     metrics.unRegister();
     connectionFactory.destroy();
-    tarExtractor.stop();
   }
 
   /**
@@ -405,6 +406,23 @@ public class OzoneManagerServiceProviderImpl
   public DBCheckpoint getOzoneManagerDBSnapshot() {
     String snapshotFileName = RECON_OM_SNAPSHOT_DB + "_" + System.currentTimeMillis();
     Path untarredDbDir = Paths.get(omSnapshotDBParentDir.getAbsolutePath(), snapshotFileName);
+
+    // Before fetching full snapshot again and create a new OM DB snapshot directory, check and delete
+    // any existing OM DB snapshot directories under recon om db dir location and delete all such
+    // om db snapshot dirs including the last known om db snapshot dir returned by reconUtils.getLastKnownDB
+    File lastKnownDB = reconUtils.getLastKnownDB(omSnapshotDBParentDir, RECON_OM_SNAPSHOT_DB);
+    if (lastKnownDB != null) {
+      FileUtils.deleteQuietly(lastKnownDB);
+    }
+
+    // Now below cleanup operation will even remove any left over staging dirs in recon om db dir location which
+    // may be left due to any previous partial extraction of tar entries and during copy sst files process by
+    // tarExtractor.extractTar
+    File[] leftOverStagingDirs = omSnapshotDBParentDir.listFiles(f -> f.getName().startsWith(STAGING));
+    for (File stagingDir : leftOverStagingDirs) {
+      LOG.warn("Cleaning up leftover staging folder from failed extraction: {}", stagingDir.getAbsolutePath());
+      FileUtils.deleteQuietly(stagingDir);
+    }
 
     try {
       SecurityUtil.doAsLoginUser(() -> {
