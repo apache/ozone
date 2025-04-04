@@ -83,6 +83,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -393,12 +394,12 @@ public class ReconUtils {
     });
 
     executor.submit(() -> {
-      long startTime = System.currentTimeMillis();
+      long startTime = Time.monotonicNow();
       log.info("Rebuilding NSSummary tree...");
       try {
         reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
       } finally {
-        long endTime = System.currentTimeMillis();
+        long endTime = Time.monotonicNow();
         log.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
       }
     });

@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -465,7 +466,7 @@ public class TestKeyValueHandler {
     final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     final Clock clock = mock(Clock.class);
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
 
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     when(clock.millis())

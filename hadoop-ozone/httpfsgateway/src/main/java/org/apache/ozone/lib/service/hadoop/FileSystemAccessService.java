@@ -38,6 +38,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.ozone.lib.server.BaseService;
 import org.apache.ozone.lib.server.ServiceException;
@@ -112,7 +113,7 @@ public class FileSystemAccessService extends BaseService
           fs = null;
           lastUse = -1;
         } else {
-          lastUse = System.currentTimeMillis();
+          lastUse = Time.monotonicNow();
         }
       }
     }
@@ -125,7 +126,7 @@ public class FileSystemAccessService extends BaseService
     synchronized boolean purgeIfIdle() throws IOException {
       boolean ret = false;
       if (count == 0 && lastUse != -1 &&
-          (System.currentTimeMillis() - lastUse) > timeout) {
+          (Time.monotonicNow() - lastUse) > timeout) {
         fs.close();
         fs = null;
         lastUse = -1;

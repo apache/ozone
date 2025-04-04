@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
+import org.apache.hadoop.util.Time;
 import picocli.CommandLine;
 
 /**
@@ -112,10 +113,10 @@ public class PrepareSubCommand implements Callable<Void> {
     System.out.println();
     System.out.println("Checking individual OM instances for prepare request " +
         "completion...");
-    long endTime = System.currentTimeMillis() + pTimeout.toMillis();
+    long endTime = Time.monotonicNow() + pTimeout.toMillis();
     int expectedNumPreparedOms = omPreparedStatusMap.size();
     int currentNumPreparedOms = 0;
-    while (System.currentTimeMillis() < endTime &&
+    while (Time.monotonicNow() < endTime &&
         currentNumPreparedOms < expectedNumPreparedOms) {
       for (Map.Entry<String, Boolean> e : omPreparedStatusMap.entrySet()) {
         if (!e.getValue()) {
