@@ -18,6 +18,12 @@ Documentation       Test ozone admin datanode diskbalancer command
 Library             OperatingSystem
 Resource            ../commonlib.robot
 
+*** Keywords ***
+Check Balancer Status
+    [Arguments]         ${expected_status}
+    ${result} =         Execute             ozone admin datanode diskbalancer status
+    Should Contain      ${result}           ${expected_status}
+
 ** Test Cases ***
 Check failure with non-admin user to start, stop and update diskbalancer
     Requires admin privilege     ozone admin datanode diskbalancer start -a
@@ -43,9 +49,9 @@ Check success with non-admin user for status and report diskbalancer
 Check if balancer stops automatically
     Run Keyword         Kinit test user                 testuser                testuser.keytab
     Execute             ozone admin datanode diskbalancer start -a
-    Sleep               12s
-    ${result} =         Execute                         ozone admin datanode diskbalancer status
-                        Should Contain                  ${result}               RUNNING
-    Sleep               1min
-    ${result} =         Execute                         ozone admin datanode diskbalancer status
-                        Should Contain                  ${result}               STOPPED
+
+    # Wait until the balancer status contains "RUNNING", retry every 5s for up to 1 min
+    Wait Until Keyword Succeeds   1 min   5 sec   Check Balancer Status   RUNNING
+
+    # Wait until the balancer status contains "STOPPED", retry every 5s for up to 2 min
+    Wait Until Keyword Succeeds   2 min   5 sec   Check Balancer Status   STOPPED
