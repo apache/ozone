@@ -83,9 +83,6 @@ import org.mockito.Mockito;
  */
 public final class ContainerTestUtils {
 
-  private ContainerTestUtils() {
-  }
-
   public static final DispatcherContext WRITE_STAGE = DispatcherContext
       .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
       .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
@@ -99,6 +96,14 @@ public final class ContainerTestUtils {
 
   public static final DispatcherContext COMBINED_STAGE
       = DispatcherContext.getHandleWriteChunk();
+
+  private static final ContainerDispatcher NOOP_CONTAINER_DISPATCHER = new NoopContainerDispatcher();
+
+  private static final ContainerController EMPTY_CONTAINER_CONTROLLER
+      = new ContainerController(ContainerImplTestUtils.newContainerSet(), Collections.emptyMap());
+
+  private ContainerTestUtils() {
+  }
 
   /**
    * Creates an Endpoint class for testing purpose.
@@ -329,15 +334,9 @@ public final class ContainerTestUtils {
     }
   }
 
-  private static final ContainerDispatcher NOOP_CONTAINER_DISPATCHER
-      = new NoopContainerDispatcher();
-
   public static ContainerDispatcher getNoopContainerDispatcher() {
     return NOOP_CONTAINER_DISPATCHER;
   }
-
-  private static final ContainerController EMPTY_CONTAINER_CONTROLLER
-      = new ContainerController(ContainerImplTestUtils.newContainerSet(), Collections.emptyMap());
 
   public static ContainerController getEmptyContainerController() {
     return EMPTY_CONTAINER_CONTROLLER;

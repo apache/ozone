@@ -57,6 +57,15 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   private String clusterId;
   private String scmId;
 
+  // Map of datanode to containers
+  private Map<DatanodeDetails,
+      Map<String, ContainerReplicaProto>> nodeContainers =
+      new HashMap<>();
+  private Map<DatanodeDetails, NodeReportProto> nodeReports = new HashMap<>();
+  private AtomicInteger commandStatusReport = new AtomicInteger(0);
+  private List<CommandStatus> cmdStatusList = new ArrayList<>();
+  private List<SCMCommandProto> scmCommandRequests = new ArrayList<>();
+
   public ScmTestMock() {
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
@@ -66,15 +75,6 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
     this.clusterId = clusterId;
     this.scmId = UUID.randomUUID().toString();
   }
-
-  // Map of datanode to containers
-  private Map<DatanodeDetails,
-      Map<String, ContainerReplicaProto>> nodeContainers =
-      new HashMap<>();
-  private Map<DatanodeDetails, NodeReportProto> nodeReports = new HashMap<>();
-  private AtomicInteger commandStatusReport = new AtomicInteger(0);
-  private List<CommandStatus> cmdStatusList = new ArrayList<>();
-  private List<SCMCommandProto> scmCommandRequests = new ArrayList<>();
   /**
    * Returns the number of heartbeats made to this class.
    *

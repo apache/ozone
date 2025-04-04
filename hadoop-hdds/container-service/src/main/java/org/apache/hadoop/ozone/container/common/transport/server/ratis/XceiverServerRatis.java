@@ -122,37 +122,12 @@ import org.slf4j.LoggerFactory;
  * Ozone containers.
  */
 public final class XceiverServerRatis implements XceiverServerSpi {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(XceiverServerRatis.class);
-
-  private static class ActivePipelineContext {
-    /** The current datanode is the current leader of the pipeline. */
-    private final boolean isPipelineLeader;
-    /** The heartbeat containing pipeline close action has been triggered. */
-    private final boolean isPendingClose;
-
-    ActivePipelineContext(boolean isPipelineLeader, boolean isPendingClose) {
-      this.isPipelineLeader = isPipelineLeader;
-      this.isPendingClose = isPendingClose;
-    }
-
-    public boolean isPipelineLeader() {
-      return isPipelineLeader;
-    }
-
-    public boolean isPendingClose() {
-      return isPendingClose;
-    }
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(XceiverServerRatis.class);
 
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
-  private static final List<Integer> DEFAULT_PRIORITY_LIST =
-      new ArrayList<>(
-          Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
 
-  private static long nextCallId() {
-    return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
-  }
+  private static final List<Integer> DEFAULT_PRIORITY_LIST =
+      new ArrayList<>(Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
 
   private int serverPort;
   private int adminPort;
@@ -177,6 +152,30 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final boolean streamEnable;
   private final DatanodeRatisServerConfig ratisServerConfig;
   private final HddsDatanodeService datanodeService;
+
+  private static class ActivePipelineContext {
+    /** The current datanode is the current leader of the pipeline. */
+    private final boolean isPipelineLeader;
+    /** The heartbeat containing pipeline close action has been triggered. */
+    private final boolean isPendingClose;
+
+    ActivePipelineContext(boolean isPipelineLeader, boolean isPendingClose) {
+      this.isPipelineLeader = isPipelineLeader;
+      this.isPendingClose = isPendingClose;
+    }
+
+    public boolean isPipelineLeader() {
+      return isPipelineLeader;
+    }
+
+    public boolean isPendingClose() {
+      return isPendingClose;
+    }
+  }
+
+  private static long nextCallId() {
+    return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
+  }
 
   private XceiverServerRatis(HddsDatanodeService hddsDatanodeService, DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
