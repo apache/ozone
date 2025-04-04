@@ -58,8 +58,7 @@ import org.apache.ratis.server.RaftServerConfigKeys;
  * Configuration for ozone.
  */
 @InterfaceAudience.Private
-public class OzoneConfiguration extends Configuration
-    implements MutableConfigurationSource {
+public class OzoneConfiguration extends Configuration implements MutableConfigurationSource {
 
   public static final SortedSet<String> TAGS = unmodifiableSortedSet(
       Arrays.stream(ConfigTag.values())
@@ -71,6 +70,8 @@ public class OzoneConfiguration extends Configuration
 
     activate();
   }
+
+  private Properties delegatingProps;
 
   public static OzoneConfiguration of(ConfigurationSource source) {
     if (source instanceof LegacyHadoopConfigurationSource) {
@@ -433,8 +434,6 @@ public class OzoneConfiguration extends Configuration
     }
     return Integer.parseInt(value);
   }
-
-  private Properties delegatingProps;
 
   @Override
   public synchronized void reloadConfiguration() {

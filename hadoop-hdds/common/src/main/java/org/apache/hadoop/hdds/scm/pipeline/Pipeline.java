@@ -68,10 +68,6 @@ public final class Pipeline {
       Pipeline.class,
       DelegatedCodec.CopyType.UNSUPPORTED);
 
-  public static Codec<Pipeline> getCodec() {
-    return CODEC;
-  }
-
   private static final Logger LOG = LoggerFactory.getLogger(Pipeline.class);
   private final PipelineID id;
   private final ReplicationConfig replicationConfig;
@@ -115,6 +111,10 @@ public final class Pipeline {
     replicaIndexes = b.replicaIndexes;
     creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
     stateEnterTime = Instant.now();
+  }
+
+  public static Codec<Pipeline> getCodec() {
+    return CODEC;
   }
 
   /**
