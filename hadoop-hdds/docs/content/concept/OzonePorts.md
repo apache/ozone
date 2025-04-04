@@ -31,7 +31,7 @@ This document provides a comprehensive overview of the network ports utilized by
 
 | Default Port Number | Configuration Key | Endpoint Protocol | Purpose |
 | :---- | :---- | :---- | :---- |
-| 9862 | ozone.om.address | Hadooop RPC | Primary RPC endpoint for Ozone clients. |
+| 9862 | ozone.om.address | Hadoop RPC | Primary RPC endpoint for Ozone clients. |
 | 9874 | ozone.om.http-address | HTTP | Web UI for monitoring OM status and metadata. |
 | 9875 | ozone.om.https-address | HTTPS | Secure Web UI for monitoring OM status and metadata. |
 | 9872 | ozone.om.ratis.port  | HTTP/2 | RPC endpoint for OM HA instances to form a RAFT consensus ring |
