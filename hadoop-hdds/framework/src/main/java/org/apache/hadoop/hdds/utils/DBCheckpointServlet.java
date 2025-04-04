@@ -130,6 +130,18 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
+  private static void logSstFileList(List<String>sstList, String msg, int sampleSize) {
+    int count = sstList.size();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(msg, count, "", sstList);
+    } else if (count > sampleSize) {
+      List<String> sample = sstList.subList(0, sampleSize);
+      LOG.info(msg, count, ", sample", sample);
+    } else {
+      LOG.info(msg, count, "", sstList);
+    }
+  }
+
   /**
    * Generates Snapshot checkpoint as tar ball.
    * @param request the HTTP servlet request
@@ -195,7 +207,8 @@ public class DBCheckpointServlet extends HttpServlet
               .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
               .distinct()
               .collect(Collectors.toList()));
-      LOG.info("Received excluding SST {}", receivedSstList);
+      logSstFileList(receivedSstList,
+          "Received list of {} SST files to be excluded{}: {}", 5);
     }
 
     Path tmpdir = null;
@@ -229,9 +242,8 @@ public class DBCheckpointServlet extends HttpServlet
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
-
-      LOG.info("Excluded SST {} from the latest checkpoint.",
-          excludedSstList);
+      logSstFileList(excludedSstList,
+          "Excluded {} SST files from the latest checkpoint{}: {}", 5);
       if (!excludedSstList.isEmpty()) {
         dbMetrics.incNumIncrementalCheckpoint();
       }

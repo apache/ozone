@@ -2725,16 +2725,6 @@
   </property>
 
   <property>
-    <name>ozone.manager.db.checkpoint.transfer.bandwidthPerSec</name>
-    <value>0</value>
-    <tag>OZONE</tag>
-    <description>
-      Maximum bandwidth used for Ozone Manager DB checkpoint download through
-      the servlet.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.freon.http-address</name>
     <value>0.0.0.0:9884</value>
     <tag>OZONE, MANAGEMENT</tag>
