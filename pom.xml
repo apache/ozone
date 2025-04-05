@@ -112,7 +112,7 @@
     <jackson-jaxr.version>1.9.13</jackson-jaxr.version>
     <jackson1.version>1.9.13</jackson1.version>
     <jackson2-bom.version>2.16.2</jackson2-bom.version>
-    <jacoco.version>0.8.12</jacoco.version>
+    <jacoco.version>0.8.13</jacoco.version>
     <jaeger.version>1.8.1</jaeger.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
