@@ -67,7 +67,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     FLUSH, HSYNC, CLOSE, FULL
   }
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(KeyDataStreamOutput.class);
 
   private boolean closed;

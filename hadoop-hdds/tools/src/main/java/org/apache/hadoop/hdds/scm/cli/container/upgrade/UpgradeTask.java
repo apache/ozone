@@ -63,7 +63,7 @@ import org.slf4j.LoggerFactory;
  */
 public class UpgradeTask {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(UpgradeTask.class);
 
   private final ConfigurationSource config;

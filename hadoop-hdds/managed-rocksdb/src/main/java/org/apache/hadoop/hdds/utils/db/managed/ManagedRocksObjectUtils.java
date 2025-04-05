@@ -37,7 +37,7 @@ public final class ManagedRocksObjectUtils {
   private ManagedRocksObjectUtils() {
   }
 
-  public static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(ManagedRocksObjectUtils.class);
 
   private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);

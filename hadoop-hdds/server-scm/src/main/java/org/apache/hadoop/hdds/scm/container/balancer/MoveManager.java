@@ -102,7 +102,7 @@ public final class MoveManager implements
     FAIL_UNEXPECTED_ERROR
   }
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(MoveManager.class);
 
   // TODO - Should pending ops notify under lock to allow MM to schedule a

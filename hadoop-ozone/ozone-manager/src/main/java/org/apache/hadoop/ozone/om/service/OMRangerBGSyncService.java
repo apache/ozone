@@ -84,7 +84,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OMRangerBGSyncService extends BackgroundService {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMRangerBGSyncService.class);
   private static final ClientId CLIENT_ID = ClientId.randomId();
 

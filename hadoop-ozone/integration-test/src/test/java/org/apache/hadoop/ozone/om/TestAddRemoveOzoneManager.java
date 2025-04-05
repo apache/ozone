@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.apache.ratis.protocol.RaftPeer;
@@ -229,10 +230,8 @@ public class TestAddRemoveOzoneManager {
     OzoneManager existingOM = cluster.getOzoneManager(0);
     String existingOMNodeId = existingOM.getOMNodeId();
 
-    GenericTestUtils.LogCapturer omLog =
-        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
-    GenericTestUtils.LogCapturer miniOzoneClusterLog =
-        GenericTestUtils.LogCapturer.captureLogs(MiniOzoneHAClusterImpl.LOG);
+    LogCapturer omLog = LogCapturer.captureLogs(OzoneManager.class);
+    LogCapturer miniOzoneClusterLog = LogCapturer.captureLogs(MiniOzoneHAClusterImpl.class);
 
     /***************************************************************************
      * 1. Bootstrap without updating config on any existing OM -> fail
@@ -301,10 +300,8 @@ public class TestAddRemoveOzoneManager {
     config.setInt(
         OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_KEY, 100);
 
-    GenericTestUtils.LogCapturer omLog =
-        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
-    GenericTestUtils.LogCapturer miniOzoneClusterLog =
-        GenericTestUtils.LogCapturer.captureLogs(MiniOzoneHAClusterImpl.LOG);
+    LogCapturer omLog = LogCapturer.captureLogs(OzoneManager.class);
+    LogCapturer miniOzoneClusterLog = LogCapturer.captureLogs(MiniOzoneHAClusterImpl.class);
 
     /***************************************************************************
      * 1. Force bootstrap (with 1 node down and updated configs on rest) -> pass

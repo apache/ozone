@@ -66,7 +66,7 @@ import org.slf4j.LoggerFactory;
  * Grpc transport for grpc between s3g and om.
  */
 public class GrpcOmTransport implements OmTransport {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(GrpcOmTransport.class);
 
   private static final String CLIENT_NAME = "GrpcOmTransport";

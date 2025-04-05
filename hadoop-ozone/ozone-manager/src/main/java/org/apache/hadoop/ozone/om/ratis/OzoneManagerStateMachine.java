@@ -83,7 +83,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OzoneManagerStateMachine extends BaseStateMachine {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerStateMachine.class);
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();

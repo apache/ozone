@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
  * This class is used to get the DataChannel for streaming.
  */
 public class KeyValueStreamDataChannel extends StreamDataChannelBase {
-  public static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(KeyValueStreamDataChannel.class);
 
   interface WriteMethod {

@@ -66,11 +66,6 @@ public final class OzoneClientFactory {
             HddsUtils.formatStackTrace(stackTrace, 4), LOG));
   }
 
-  public static Logger getLogger() {
-    return LOG;
-  }
-
-
   /**
    * Constructs and return an OzoneClient with default configuration.
    *

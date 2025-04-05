@@ -103,7 +103,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ReplicationManager implements SCMService, ContainerReplicaPendingOpsSubscriber {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
 
   /**

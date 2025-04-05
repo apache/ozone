@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * under and over replication etc.
  */
 public class QuasiClosedContainerHandler extends AbstractCheck {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(QuasiClosedContainerHandler.class);
 
   private final ReplicationManager replicationManager;

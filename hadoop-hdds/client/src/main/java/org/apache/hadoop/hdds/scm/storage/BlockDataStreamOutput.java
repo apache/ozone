@@ -79,7 +79,7 @@ import org.slf4j.LoggerFactory;
  * through to the container.
  */
 public class BlockDataStreamOutput implements ByteBufferStreamOutput {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutput.class);
 
   public static final int PUT_BLOCK_REQUEST_LENGTH_MAX = 1 << 20;  // 1MB

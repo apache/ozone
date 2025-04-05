@@ -65,6 +65,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -268,15 +269,11 @@ public class TestReconWithOzoneManager {
   // And Recon should fall back on full snapshot and recover itself.
   @Test
   public void testOmDBSyncWithSeqNumberMismatch() throws Exception {
-    GenericTestUtils.LogCapturer
-        logs = GenericTestUtils.LogCapturer.captureLogs(RDBStore.getLogger());
-    GenericTestUtils.setLogLevel(RDBStore.getLogger(), INFO);
+    LogCapturer logs = LogCapturer.captureLogs(RDBStore.class);
+    GenericTestUtils.setLogLevel(RDBStore.class, INFO);
 
-    GenericTestUtils.LogCapturer
-        omServiceProviderImplLogs = GenericTestUtils.LogCapturer.captureLogs(
-        OzoneManagerServiceProviderImpl.getLogger());
-    GenericTestUtils.setLogLevel(OzoneManagerServiceProviderImpl.getLogger(),
-        INFO);
+    LogCapturer omServiceProviderImplLogs = LogCapturer.captureLogs(OzoneManagerServiceProviderImpl.class);
+    GenericTestUtils.setLogLevel(OzoneManagerServiceProviderImpl.class, INFO);
 
     // add a vol, bucket and key
     addKeys(10, 15);

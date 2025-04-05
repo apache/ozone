@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BackgroundContainerMetadataScanner extends
     AbstractBackgroundContainerScanner {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BackgroundContainerMetadataScanner.class);
 
   private final ContainerMetadataScannerMetrics metrics;

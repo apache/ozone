@@ -57,7 +57,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
 
   private Table<String, Long> finalizeBlocksTableWithIterator;
 
-  public static final Logger LOG =
+  protected static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
 
   /**

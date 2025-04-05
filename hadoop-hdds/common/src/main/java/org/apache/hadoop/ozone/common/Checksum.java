@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * This class is not thread safe.
  */
 public class Checksum {
-  public static final Logger LOG = LoggerFactory.getLogger(Checksum.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Checksum.class);
 
   private static Function<ByteBuffer, ByteString> newMessageDigestFunction(
       String algorithm) {

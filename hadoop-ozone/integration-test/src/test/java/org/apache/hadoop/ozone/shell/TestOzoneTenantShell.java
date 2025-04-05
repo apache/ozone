@@ -172,14 +172,14 @@ public class TestOzoneTenantShell {
     ozoneSh.getCmd().setOut(new PrintWriter(out));
     ozoneSh.getCmd().setErr(new PrintWriter(err));
     // Suppress OMNotLeaderException in the log
-    GenericTestUtils.setLogLevel(RetryInvocationHandler.LOG, Level.WARN);
+    GenericTestUtils.setLogLevel(RetryInvocationHandler.class, Level.WARN);
     // Enable debug logging for interested classes
-    GenericTestUtils.setLogLevel(OMTenantCreateRequest.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMTenantCreateRequest.class, Level.DEBUG);
     GenericTestUtils.setLogLevel(
-        OMTenantAssignUserAccessIdRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(AuthorizerLockImpl.LOG, Level.DEBUG);
+        OMTenantAssignUserAccessIdRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(AuthorizerLockImpl.class, Level.DEBUG);
 
-    GenericTestUtils.setLogLevel(OMRangerBGSyncService.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMRangerBGSyncService.class, Level.DEBUG);
   }
 
   /**

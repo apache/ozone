@@ -73,11 +73,11 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests DeleteContainerCommand Handler.
@@ -235,9 +235,7 @@ public class TestDeleteContainerHandler {
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     // Check the log for the error message when deleting non-empty containers
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(KeyValueHandler.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(KeyValueHandler.class);
     GenericTestUtils.waitFor(() ->
             logCapturer.getOutput().
                 contains("Files still part of the container on delete"),
@@ -432,9 +430,7 @@ public class TestDeleteContainerHandler {
 
 
     // Check the log for the error message when deleting non-empty containers
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(KeyValueHandler.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(KeyValueHandler.class);
     GenericTestUtils.waitFor(() ->
             logCapturer.getOutput().
                 contains("the container is not empty with blockCount"),
@@ -641,9 +637,7 @@ public class TestDeleteContainerHandler {
     // Deleting a non-empty container should fail on DN when the force flag
     // is false.
     // Check the log for the error message when deleting non-empty containers
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(DeleteContainerCommandHandler.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(DeleteContainerCommandHandler.class);
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains("Non" +
             "-force deletion of non-empty container is not allowed"), 500,
         5 * 1000);

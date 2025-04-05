@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
  */
 @Timeout(600)
 public class TestKeyValueContainerMarkUnhealthy {
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestKeyValueContainerMarkUnhealthy.class);
 
   @TempDir

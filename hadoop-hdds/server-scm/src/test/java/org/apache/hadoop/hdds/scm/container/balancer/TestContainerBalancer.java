@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -90,7 +91,7 @@ public class TestContainerBalancer {
     // time to verify, and interrupt when stop.
     balancerConfiguration.setTriggerDuEnable(true);
     conf.setFromObject(balancerConfiguration);
-    GenericTestUtils.setLogLevel(ContainerBalancer.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ContainerBalancer.class, Level.DEBUG);
 
     when(scm.getScmNodeManager()).thenReturn(mock(NodeManager.class));
     when(scm.getScmContext()).thenReturn(SCMContext.emptyContext());
@@ -236,8 +237,7 @@ public class TestContainerBalancer {
     containerBalancer.notifyStatusChanged();
     assertFalse(containerBalancer.isBalancerRunning());
 
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(ContainerBalancerTask.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(ContainerBalancerTask.class);
     String expectedLog = "ContainerBalancer will sleep for " + delayDuration +
         " seconds before starting balancing.";
     /*

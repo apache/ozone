@@ -77,7 +77,7 @@ import picocli.CommandLine;
         "OM should be stopped while this tool is run."
 )
 public class FSORepairTool extends RepairTool {
-  public static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
+  private static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
   private static final String REACHABLE_TABLE = "reachable";
 
   @CommandLine.Option(names = {"--db"},

@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
 public class ContainerSafeModeRule extends
     SafeModeExitRule<NodeRegistrationContainerReport> {
 
-  public static final Logger LOG = LoggerFactory.getLogger(ContainerSafeModeRule.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ContainerSafeModeRule.class);
   
   private static final String NAME = "ContainerSafeModeRule";
 

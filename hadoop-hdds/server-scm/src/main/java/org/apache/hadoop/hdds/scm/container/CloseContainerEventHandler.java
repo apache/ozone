@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
  */
 public class CloseContainerEventHandler implements EventHandler<ContainerID> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(CloseContainerEventHandler.class);
 
   private final PipelineManager pipelineManager;

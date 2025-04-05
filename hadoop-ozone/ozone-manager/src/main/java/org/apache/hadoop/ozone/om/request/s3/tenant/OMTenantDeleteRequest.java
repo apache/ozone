@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
  * Handles OMTenantDelete request.
  */
 public class OMTenantDeleteRequest extends OMVolumeRequest {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMTenantDeleteRequest.class);
 
   public OMTenantDeleteRequest(OMRequest omRequest) {

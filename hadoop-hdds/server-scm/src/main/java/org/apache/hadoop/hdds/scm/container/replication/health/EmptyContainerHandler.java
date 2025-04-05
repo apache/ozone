@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  * and all its replicas are empty.
  */
 public class EmptyContainerHandler extends AbstractCheck {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(EmptyContainerHandler.class);
 
   private final ReplicationManager replicationManager;

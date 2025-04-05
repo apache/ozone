@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.LifeCycle;
@@ -180,9 +181,8 @@ public class TestSCMInstallSnapshotWithHA {
     followerSM.notifyTermIndexUpdated(lastTermIndex.getTerm(),
         lastTermIndex.getIndex() + 100);
 
-    GenericTestUtils.setLogLevel(SCMHAManagerImpl.getLogger(), Level.INFO);
-    GenericTestUtils.LogCapturer logCapture =
-        GenericTestUtils.LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
+    GenericTestUtils.setLogLevel(SCMHAManagerImpl.class, Level.INFO);
+    LogCapturer logCapture = LogCapturer.captureLogs(SCMHAManagerImpl.class);
 
     // Install the old checkpoint on the follower . This should fail as the
     // follower is already ahead of that transactionLogIndex and the
@@ -254,9 +254,8 @@ public class TestSCMInstallSnapshotWithHA {
 
     SCMHAManagerImpl scmhaManager =
         (SCMHAManagerImpl) (followerSCM.getScmHAManager());
-    GenericTestUtils.setLogLevel(SCMHAManagerImpl.getLogger(), Level.ERROR);
-    GenericTestUtils.LogCapturer logCapture =
-        GenericTestUtils.LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
+    GenericTestUtils.setLogLevel(SCMHAManagerImpl.class, Level.ERROR);
+    LogCapturer logCapture = LogCapturer.captureLogs(SCMHAManagerImpl.class);
     scmhaManager.setExitManagerForTesting(new DummyExitManager());
 
     followerSM.pause();

@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 @Timeout(150)
 public class TestPeriodicVolumeChecker {
 
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestPeriodicVolumeChecker.class);
 
   @TempDir

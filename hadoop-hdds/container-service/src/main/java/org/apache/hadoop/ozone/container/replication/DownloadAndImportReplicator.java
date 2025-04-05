@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  */
 public class DownloadAndImportReplicator implements ContainerReplicator {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DownloadAndImportReplicator.class);
 
   private final ConfigurationSource conf;

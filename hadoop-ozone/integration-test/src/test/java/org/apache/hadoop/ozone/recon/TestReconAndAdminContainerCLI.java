@@ -134,7 +134,7 @@ class TestReconAndAdminContainerCLI {
                   .includeRecon(true)
                   .build();
     cluster.waitForClusterToBeReady();
-    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ReconNodeManager.class, Level.DEBUG);
 
     scmClient = new ContainerOperationClient(CONF);
     StorageContainerManager scm = cluster.getStorageContainerManager();

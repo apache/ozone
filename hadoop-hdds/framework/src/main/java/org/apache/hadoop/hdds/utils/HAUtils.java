@@ -79,7 +79,7 @@ import org.slf4j.LoggerFactory;
  * utility class used by SCM and OM for HA.
  */
 public final class HAUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(HAUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HAUtils.class);
 
   private HAUtils() {
   }

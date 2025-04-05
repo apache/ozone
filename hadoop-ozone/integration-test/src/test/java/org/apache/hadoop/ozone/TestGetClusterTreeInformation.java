@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
 @Timeout(300)
 public abstract class TestGetClusterTreeInformation implements HATests.TestCase {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(TestGetClusterTreeInformation.class);
   private OzoneConfiguration conf;
   private StorageContainerManager scm;

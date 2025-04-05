@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
 public class OzoneDelegationTokenSecretManager
     extends OzoneSecretManager<OzoneTokenIdentifier> {
 
-  public static final Logger LOG = LoggerFactory
+  private static final Logger LOG = LoggerFactory
       .getLogger(OzoneDelegationTokenSecretManager.class);
   private final Map<OzoneTokenIdentifier, TokenInfo> currentTokens;
   private final OzoneSecretStore store;

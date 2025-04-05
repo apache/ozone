@@ -45,7 +45,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +64,7 @@ public class TestOmAcls {
   private static boolean prefixAclAllow = true;
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
-  private static GenericTestUtils.LogCapturer logCapturer;
+  private static LogCapturer logCapturer;
 
   static {
     AuditLogTestUtils.enableAuditLog();
@@ -86,8 +86,7 @@ public class TestOmAcls {
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
-    logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.getLogger());
+    logCapturer = LogCapturer.captureLogs(OzoneManager.class);
   }
 
   @AfterAll

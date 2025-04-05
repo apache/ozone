@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -113,9 +114,8 @@ public class TestFailoverWithSCMHA {
         new ScmBlockLocationProtocolClientSideTranslatorPB(
             failoverProxyProvider);
     GenericTestUtils
-        .setLogLevel(SCMBlockLocationFailoverProxyProvider.LOG, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
-        .captureLogs(SCMBlockLocationFailoverProxyProvider.LOG);
+        .setLogLevel(SCMBlockLocationFailoverProxyProvider.class, Level.DEBUG);
+    LogCapturer logCapture = LogCapturer.captureLogs(SCMBlockLocationFailoverProxyProvider.class);
     ScmBlockLocationProtocol scmBlockLocationProtocol = TracingUtil
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
@@ -125,10 +125,9 @@ public class TestFailoverWithSCMHA {
     scm = getLeader(cluster);
     SCMContainerLocationFailoverProxyProvider proxyProvider =
         new SCMContainerLocationFailoverProxyProvider(conf, null);
-    GenericTestUtils.setLogLevel(SCMContainerLocationFailoverProxyProvider.LOG,
+    GenericTestUtils.setLogLevel(SCMContainerLocationFailoverProxyProvider.class,
         Level.DEBUG);
-    logCapture = GenericTestUtils.LogCapturer
-        .captureLogs(SCMContainerLocationFailoverProxyProvider.LOG);
+    logCapture = LogCapturer.captureLogs(SCMContainerLocationFailoverProxyProvider.class);
     proxyProvider.changeCurrentProxy(scm.getSCMNodeId());
     StorageContainerLocationProtocol scmContainerClient =
         TracingUtil.createProxy(

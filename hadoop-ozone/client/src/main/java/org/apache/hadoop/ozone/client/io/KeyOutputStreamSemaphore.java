@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
  */
 public class KeyOutputStreamSemaphore {
 
-  public static final Logger LOG = LoggerFactory.getLogger(KeyOutputStreamSemaphore.class);
+  private static final Logger LOG = LoggerFactory.getLogger(KeyOutputStreamSemaphore.class);
   private final Semaphore requestSemaphore;
 
   KeyOutputStreamSemaphore(int maxConcurrentWritePerKey) {

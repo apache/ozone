@@ -39,8 +39,7 @@ import org.slf4j.LoggerFactory;
  */
 public class VersionEndpointTask implements
     Callable<EndpointStateMachine.EndPointStates> {
-  public static final Logger LOG = LoggerFactory.getLogger(VersionEndpointTask
-      .class);
+  private static final Logger LOG = LoggerFactory.getLogger(VersionEndpointTask.class);
   private final EndpointStateMachine rpcEndPoint;
   private final ConfigurationSource configuration;
   private final OzoneContainer ozoneContainer;

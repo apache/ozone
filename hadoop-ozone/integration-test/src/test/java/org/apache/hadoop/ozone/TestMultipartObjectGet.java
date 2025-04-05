@@ -60,7 +60,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TestMultipartObjectGet {
 
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestMultipartObjectGet.class);
   private static OzoneConfiguration conf;
   private static String omServiceId;

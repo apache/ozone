@@ -43,7 +43,7 @@ public class TestTableCache {
 
   @BeforeAll
   public static void setLogLevel() {
-    GenericTestUtils.setLogLevel(FullTableCache.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(FullTableCache.class, Level.DEBUG);
   }
 
   private void createTableCache(TableCache.CacheType cacheType) {

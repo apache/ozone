@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class ThrottledAsyncChecker<K, V> implements AsyncChecker<K, V> {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ThrottledAsyncChecker.class);
 
   private final Timer timer;

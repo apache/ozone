@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 @CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE})
 public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateResponseWithFSO.class);
 
   private OmDirectoryInfo dirInfo;

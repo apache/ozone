@@ -84,7 +84,7 @@ public class KeyOutputStream extends OutputStream
     FLUSH, HSYNC, CLOSE, FULL
   }
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
 
   private boolean closed;

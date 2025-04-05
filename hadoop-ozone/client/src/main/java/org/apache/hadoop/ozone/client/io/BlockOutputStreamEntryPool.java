@@ -56,7 +56,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStreamEntryPool.class);
 
   /**

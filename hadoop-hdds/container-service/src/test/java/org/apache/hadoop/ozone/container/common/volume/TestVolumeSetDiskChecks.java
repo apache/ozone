@@ -78,7 +78,7 @@ public class TestVolumeSetDiskChecks {
   @TempDir
   private Path tempDir;
 
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestVolumeSetDiskChecks.class);
   @TempDir
   private File dir;

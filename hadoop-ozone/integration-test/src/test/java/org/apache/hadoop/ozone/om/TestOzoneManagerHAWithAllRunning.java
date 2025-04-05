@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -471,8 +472,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     String volumeName = randomUUID().toString();
 
 
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(OMVolumeCreateRequest.getLogger());
+    LogCapturer logCapturer = LogCapturer.captureLogs(OMVolumeCreateRequest.class);
 
     OzoneManagerProtocolProtos.UserInfo userInfo =
         OzoneManagerProtocolProtos.UserInfo.newBuilder()

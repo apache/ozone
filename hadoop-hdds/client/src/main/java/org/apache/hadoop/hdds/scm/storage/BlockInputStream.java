@@ -62,7 +62,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockInputStream extends BlockExtendedInputStream {
 
-  public static final Logger LOG = LoggerFactory.getLogger(BlockInputStream.class);
+  private static final Logger LOG = LoggerFactory.getLogger(BlockInputStream.class);
 
   private static final List<Validator> VALIDATORS =
       ContainerProtocolCalls.toValidatorList((request, response) -> validate(response));

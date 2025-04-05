@@ -180,6 +180,10 @@ public abstract class GenericTestUtils {
     setLogLevel(toLog4j(logger), Level.toLevel(level.toString()));
   }
 
+  public static void setLogLevel(Class<?> clazz, org.slf4j.event.Level level) {
+    setLogLevel(LoggerFactory.getLogger(clazz), level);
+  }
+
   public static void withLogDisabled(Class<?> clazz, Runnable task) {
     org.slf4j.Logger logger = LoggerFactory.getLogger(clazz);
     final Logger log4j = toLog4j(logger);
@@ -248,6 +252,10 @@ public abstract class GenericTestUtils {
 
     public static LogCapturer captureLogs(Logger logger, Layout layout) {
       return new Log4j1Capturer(logger, layout);
+    }
+
+    public static LogCapturer captureLogs(Class<?> clazz) {
+      return captureLogs(LoggerFactory.getLogger(clazz));
     }
 
     public static LogCapturer captureLogs(org.slf4j.Logger logger) {

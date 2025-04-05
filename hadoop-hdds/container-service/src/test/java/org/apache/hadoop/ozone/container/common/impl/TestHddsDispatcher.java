@@ -92,7 +92,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -391,8 +391,7 @@ public class TestHddsDispatcher {
       assertEquals(
           ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
 
-      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-          .captureLogs(HddsDispatcher.LOG);
+      LogCapturer logCapturer = LogCapturer.captureLogs(HddsDispatcher.class);
       // send write chunk request without sending create container
       response = hddsDispatcher.dispatch(writeChunkRequest, COMMIT_STAGE);
       // container should not be found
@@ -429,8 +428,7 @@ public class TestHddsDispatcher {
       doReturn(builder.build()).when(mockDispatcher)
           .createContainer(writeChunkRequest);
 
-      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-          .captureLogs(HddsDispatcher.LOG);
+      LogCapturer logCapturer = LogCapturer.captureLogs(HddsDispatcher.class);
       // send write chunk request without sending create container
       mockDispatcher.dispatch(writeChunkRequest, null);
       // verify the error log

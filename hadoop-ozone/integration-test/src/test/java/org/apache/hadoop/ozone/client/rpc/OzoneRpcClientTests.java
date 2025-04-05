@@ -27,7 +27,6 @@ import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.corruptData;
 import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByID;
-import static org.apache.hadoop.ozone.OmUtils.LOG;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -192,6 +191,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ozone.test.tag.Unhealthy;
@@ -205,6 +205,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This is an abstract class to test all the public facing APIs of Ozone
@@ -212,6 +214,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
 abstract class OzoneRpcClientTests extends OzoneTestBase {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OzoneRpcClientTests.class);
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
@@ -2460,7 +2464,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     }, 1000, 10000);
 
     // Try reading keyName2
-    GenericTestUtils.setLogLevel(XceiverClientGrpc.getLogger(), DEBUG);
+    GenericTestUtils.setLogLevel(XceiverClientGrpc.class, DEBUG);
     try (OzoneInputStream is = bucket.readKey(keyName2)) {
       byte[] content = new byte[100];
       is.read(content);
@@ -3335,9 +3339,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
-    GenericTestUtils.LogCapturer ozoneClientFactoryLogCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            OzoneClientFactory.getLogger());
+    LogCapturer ozoneClientFactoryLogCapturer =
+        LogCapturer.captureLogs(
+            OzoneClientFactory.class);
 
     client.getObjectStore().createVolume(volumeName);
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
@@ -5060,8 +5064,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     volume.createBucket(bucketName);
     String keyName = UUID.randomUUID().toString();
 
-    GenericTestUtils.LogCapturer omSMLog = GenericTestUtils.LogCapturer
-        .captureLogs(OzoneManagerStateMachine.LOG);
+    LogCapturer omSMLog = LogCapturer.captureLogs(OzoneManagerStateMachine.class);
     OzoneManagerStateMachine omSM = getCluster().getOzoneManager()
         .getOmRatisServer().getOmStateMachine();
 

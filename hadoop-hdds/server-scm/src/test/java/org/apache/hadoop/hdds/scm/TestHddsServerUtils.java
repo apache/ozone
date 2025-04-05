@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  */
 @Timeout(300)
 public class TestHddsServerUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestHddsServerUtils.class);
 
   /**

@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       RoundRobinVolumeChoosingPolicy.class);
 
   // Stores the index of the next volume to be returned.

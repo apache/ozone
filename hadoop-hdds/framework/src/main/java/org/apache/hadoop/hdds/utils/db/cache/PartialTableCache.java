@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
 @Evolving
 public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(PartialTableCache.class);
 
   private final Map<CacheKey<KEY>, CacheValue<VALUE>> cache;

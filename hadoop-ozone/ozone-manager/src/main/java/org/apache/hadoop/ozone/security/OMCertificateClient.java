@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OMCertificateClient extends DefaultCertificateClient {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMCertificateClient.class);
 
   public static final String COMPONENT_NAME = "om";

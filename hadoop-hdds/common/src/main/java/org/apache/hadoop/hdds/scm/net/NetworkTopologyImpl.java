@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * manages traffic in/out of data centers or racks.
  */
 public class NetworkTopologyImpl implements NetworkTopology {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(NetworkTopologyImpl.class);
 
   /** The Inner node crate factory. */

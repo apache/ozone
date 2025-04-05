@@ -78,7 +78,7 @@ import org.slf4j.LoggerFactory;
  */
 public class DeleteBlocksCommandHandler implements CommandHandler {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeleteBlocksCommandHandler.class);
 
   private final ContainerSet containerSet;

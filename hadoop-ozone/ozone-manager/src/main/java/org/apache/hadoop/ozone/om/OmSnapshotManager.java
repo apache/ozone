@@ -108,7 +108,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class OmSnapshotManager implements AutoCloseable {
   public static final String OM_HARDLINK_FILE = "hardLinkFile";
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshotManager.class);
 
   // Threshold for the table iterator loop in nanoseconds.

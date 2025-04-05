@@ -155,9 +155,9 @@ public class TestRocksDBCheckpointDiffer {
   @BeforeEach
   public void init() throws RocksDBException {
     // Checkpoint differ log level. Set to DEBUG for verbose output
-    GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.getLog(), Level.INFO);
+    GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.class, Level.INFO);
     // Test class log level. Set to DEBUG for verbose output
-    GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.LOG, Level.INFO);
+    GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.class, Level.INFO);
 
     activeDbDir = new File(ACTIVE_DB_DIR_NAME);
     createDir(activeDbDir, ACTIVE_DB_DIR_NAME);

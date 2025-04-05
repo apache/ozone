@@ -254,9 +254,9 @@ public class TestOMKeyRequest {
         .thenReturn(omSnapshotManager);
 
     // Enable DEBUG level logging for relevant classes
-    GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyCommitRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.class, Level.DEBUG);
   }
 
   @Nonnull

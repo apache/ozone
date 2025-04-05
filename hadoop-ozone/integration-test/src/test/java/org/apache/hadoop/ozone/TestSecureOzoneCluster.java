@@ -545,8 +545,8 @@ final class TestSecureOzoneCluster {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
     scm = HddsTestUtils.getScmSimple(conf);
-    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
-    GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
+    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.class);
+    GenericTestUtils.setLogLevel(OzoneManager.class, INFO);
 
     try {
       scm.start();
@@ -566,8 +566,8 @@ final class TestSecureOzoneCluster {
   @Test
   void testAccessControlExceptionOnClient() throws Exception {
     initSCM();
-    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
-    GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
+    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.class);
+    GenericTestUtils.setLogLevel(OzoneManager.class, INFO);
     try {
       // Create a secure SCM instance as om client will connect to it
       scm = HddsTestUtils.getScmSimple(conf);
@@ -605,7 +605,7 @@ final class TestSecureOzoneCluster {
             ClientId.randomId().toString());
     String exMessage = "org.apache.hadoop.security.AccessControlException: " +
         "Client cannot authenticate via:[TOKEN, KERBEROS]";
-    logs = LogCapturer.captureLogs(Client.LOG);
+    logs = LogCapturer.captureLogs(Client.class);
     IOException ioException = assertThrows(IOException.class,
         () -> unsecureClient.listAllVolumes(null, null, 0));
     assertThat(ioException).hasMessageContaining(exMessage);
@@ -626,9 +626,8 @@ final class TestSecureOzoneCluster {
    */
   @Test
   void testDelegationTokenRenewal() throws Exception {
-    GenericTestUtils
-        .setLogLevel(LoggerFactory.getLogger(Server.class.getName()), INFO);
-    LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.getLogger());
+    GenericTestUtils.setLogLevel(Server.class, INFO);
+    LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.class);
 
     // Setup SCM
     initSCM();
@@ -822,8 +821,7 @@ final class TestSecureOzoneCluster {
    */
   @Test
   void testSecureOmReInit() throws Exception {
-    LogCapturer omLogs =
-        LogCapturer.captureLogs(OMCertificateClient.LOG);
+    LogCapturer omLogs = LogCapturer.captureLogs(OMCertificateClient.class);
     omLogs.clearOutput();
 
     initSCM();
@@ -879,7 +877,7 @@ final class TestSecureOzoneCluster {
   @Test
   void testSecureOmInitSuccess() throws Exception {
     LogCapturer omLogs =
-        LogCapturer.captureLogs(OMCertificateClient.LOG);
+        LogCapturer.captureLogs(OMCertificateClient.class);
     omLogs.clearOutput();
     initSCM();
     try {
@@ -1004,7 +1002,7 @@ final class TestSecureOzoneCluster {
    */
   @Test
   void testCertificateRotationRecoverableFailure() throws Exception {
-    LogCapturer omLogs = LogCapturer.captureLogs(OMCertificateClient.LOG);
+    LogCapturer omLogs = LogCapturer.captureLogs(OMCertificateClient.class);
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
     omStorage.setOmId(omId);
@@ -1094,8 +1092,8 @@ final class TestSecureOzoneCluster {
   void testCertificateRotationUnRecoverableFailure() throws Exception {
     ExitUtils.disableSystemExit();
     ExitUtil.disableSystemExit();
-    LogCapturer certClientLogs = LogCapturer.captureLogs(OMCertificateClient.LOG);
-    LogCapturer exitUtilLog = LogCapturer.captureLogs(LoggerFactory.getLogger(ExitUtil.class));
+    LogCapturer certClientLogs = LogCapturer.captureLogs(OMCertificateClient.class);
+    LogCapturer exitUtilLog = LogCapturer.captureLogs(ExitUtil.class);
 
 
     OMStorage omStorage = new OMStorage(conf);

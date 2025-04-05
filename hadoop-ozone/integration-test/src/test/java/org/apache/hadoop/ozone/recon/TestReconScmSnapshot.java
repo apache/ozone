@@ -35,12 +35,12 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test Recon SCM Snapshot Download implementation.
@@ -71,9 +71,7 @@ public class TestReconScmSnapshot {
   }
 
   public static void testSnapshot(MiniOzoneCluster cluster) throws Exception {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(LoggerFactory.getLogger(
-        ReconStorageContainerManagerFacade.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(ReconStorageContainerManagerFacade.class);
 
     List<ContainerInfo> reconContainers = cluster.getReconServer()
         .getReconStorageContainerManager().getContainerManager()

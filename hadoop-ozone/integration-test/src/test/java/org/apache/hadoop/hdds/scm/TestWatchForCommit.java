@@ -62,7 +62,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
@@ -251,8 +251,7 @@ public class TestWatchForCommit {
   @ParameterizedTest
   @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
   public void testWatchForCommitForRetryfailure(RaftProtos.ReplicationLevel watchType) throws Exception {
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(XceiverClientRatis.class);
     RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
     ratisClientConfig.setWatchType(watchType.toString());
     conf.setFromObject(ratisClientConfig);
@@ -303,8 +302,7 @@ public class TestWatchForCommit {
   @ParameterizedTest
   @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
   public void test2WayCommitForTimeoutException(RaftProtos.ReplicationLevel watchType) throws Exception {
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(XceiverClientRatis.class);
     RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
     ratisClientConfig.setWatchType(watchType.toString());
     conf.setFromObject(ratisClientConfig);
