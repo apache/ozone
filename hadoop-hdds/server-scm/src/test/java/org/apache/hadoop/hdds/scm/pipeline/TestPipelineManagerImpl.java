@@ -89,6 +89,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -356,10 +357,9 @@ public class TestPipelineManagerImpl {
   @Test
   public void testPipelineReport() throws Exception {
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
-      SCMSafeModeManager scmSafeModeManager =
-          new SCMSafeModeManager(conf,
-              mock(ContainerManager.class), pipelineManager,
-              new EventQueue(), serviceManager, scmContext);
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(conf,
+          mock(ContainerManager.class), pipelineManager, mock(NodeManager.class),
+          new EventQueue(), serviceManager, scmContext);
       Pipeline pipeline = pipelineManager
           .createPipeline(RatisReplicationConfig
               .getInstance(ReplicationFactor.THREE));
@@ -467,10 +467,9 @@ public class TestPipelineManagerImpl {
     assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
-    SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(new OzoneConfiguration(),
-            mock(ContainerManager.class), pipelineManager, new EventQueue(),
-            serviceManager, scmContext);
+    SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(new OzoneConfiguration(),
+        mock(ContainerManager.class), pipelineManager, mock(NodeManager.class),
+        new EventQueue(), serviceManager, scmContext);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,
             SCMContext.emptyContext(), conf);
