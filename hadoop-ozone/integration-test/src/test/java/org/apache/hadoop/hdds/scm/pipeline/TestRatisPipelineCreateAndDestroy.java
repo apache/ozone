@@ -145,7 +145,7 @@ public class TestRatisPipelineCreateAndDestroy {
         pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE)),
         "pipeline creation should fail after shutting down pipeline");
-    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES, ioe.getResult());
+    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE, ioe.getResult());
 
     // make sure pipelines is destroyed
     waitForPipelines(0);
