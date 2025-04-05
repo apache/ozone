@@ -90,7 +90,7 @@ devDependencies:
     version: 5.62.0(eslint@7.32.0)(typescript@4.9.5)
   '@vitejs/plugin-react-swc':
     specifier: ^3.5.0
-    version: 3.7.0(vite@4.5.11)
+    version: 3.7.0(vite@4.5.12)
   eslint:
     specifier: ^7.28.0
     version: 7.32.0
@@ -116,11 +116,11 @@ devDependencies:
     specifier: ^2.8.4
     version: 2.8.8
   vite:
-    specifier: 4.5.11
-    version: 4.5.11(less@3.13.1)
+    specifier: 4.5.12
+    version: 4.5.12(less@3.13.1)
   vite-tsconfig-paths:
     specifier: ^3.6.0
-    version: 3.6.0(vite@4.5.11)
+    version: 3.6.0(vite@4.5.12)
   vitest:
     specifier: ^1.6.1
     version: 1.6.1(jsdom@24.1.3)(less@3.13.1)
@@ -1543,13 +1543,13 @@ packages:
       eslint-visitor-keys: 3.4.3
     dev: true
 
-  /@vitejs/plugin-react-swc@3.7.0(vite@4.5.11):
+  /@vitejs/plugin-react-swc@3.7.0(vite@4.5.12):
     resolution: {integrity: sha512-yrknSb3Dci6svCd/qhHqhFPDSw0QtjumcqdKMoNNzmOl5lMXTTiqzjWtG4Qask2HdvvzaNgSunbQGet8/GrKdA==}
     peerDependencies:
       vite: ^4 || ^5
     dependencies:
       '@swc/core': 1.7.21
-      vite: 4.5.11(less@3.13.1)
+      vite: 4.5.12(less@3.13.1)
     transitivePeerDependencies:
       - '@swc/helpers'
     dev: true
@@ -6957,7 +6957,7 @@ packages:
       - terser
     dev: true
 
-  /vite-tsconfig-paths@3.6.0(vite@4.5.11):
+  /vite-tsconfig-paths@3.6.0(vite@4.5.12):
     resolution: {integrity: sha512-UfsPYonxLqPD633X8cWcPFVuYzx/CMNHAjZTasYwX69sXpa4gNmQkR0XCjj82h7zhLGdTWagMjC1qfb9S+zv0A==}
     peerDependencies:
       vite: '>2.0.0-0'
@@ -6966,13 +6966,13 @@ packages:
       globrex: 0.1.2
       recrawl-sync: 2.2.3
       tsconfig-paths: 4.2.0
-      vite: 4.5.11(less@3.13.1)
+      vite: 4.5.12(less@3.13.1)
     transitivePeerDependencies:
       - supports-color
     dev: true
 
-  /vite@4.5.11(less@3.13.1):
-    resolution: {integrity: sha512-4mVdhLkZ0vpqZLGJhNm+X1n7juqXApEMGlUXcOQawA45UmpxivOYaMBkI/Js3FlBsNA8hCgEnX5X04moFitSGw==}
+  /vite@4.5.12(less@3.13.1):
+    resolution: {integrity: sha512-qrMwavANtSz91nDy3zEiUHMtL09x0mniQsSMvDkNxuCBM1W5vriJ22hEmwTth6DhLSWsZnHBT0yHFAQXt6efGA==}
     engines: {node: ^14.18.0 || >=16.0.0}
     hasBin: true
     peerDependencies:
