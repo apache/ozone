@@ -42,6 +42,7 @@ import java.util.concurrent.Future;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -391,11 +392,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     String keyString = UUID.randomUUID().toString();
     byte[] data = ContainerTestHelper.getFixedLengthString(
         keyString, 100).getBytes(UTF_8);
-    OzoneOutputStream keyStream = TestHelper.createKey(
-        keyName, ReplicationType.RATIS, ReplicationFactor.ONE,
-        100, store, volumeName, bucketName);
-    keyStream.write(data);
-    keyStream.close();
+    TestDataUtil.createKey(store.getVolume(volumeName).
+        getBucket(bucketName), keyName, data);
   }
 
   private void assertKeysWritten(String volumeName,
