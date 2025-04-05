@@ -214,16 +214,6 @@ public abstract class ContainerData {
         (state != oldState)) {
       releaseCommitSpace();
     }
-
-    /**
-     * commit space when container transitions (back) to Open.
-     * when? perhaps closing a container threw an exception
-     */
-    if ((state == ContainerDataProto.State.OPEN) &&
-        (state != oldState)) {
-      Preconditions.checkState(getMaxSize() > 0);
-      commitSpace();
-    }
   }
 
   /**
@@ -370,8 +360,9 @@ public abstract class ContainerData {
     ContainerDataProto.State myState = getState();
     HddsVolume cVol;
 
-    //we don't expect duplicate calls
-    Preconditions.checkState(!committedSpace);
+    if (committedSpace) {
+      return;
+    }
 
     // Only Open Containers have Committed Space
     if (myState != ContainerDataProto.State.OPEN) {
@@ -469,6 +460,10 @@ public abstract class ContainerData {
    */
   public void setBytesUsed(long used) {
     this.bytesUsed.set(used);
+  }
+
+  public void setCommittedSpace(boolean committed) {
+    this.committedSpace = committed;
   }
 
   /**

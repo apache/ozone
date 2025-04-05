@@ -204,10 +204,18 @@ public class TestContainerPersistence {
     data.addMetadata("VOLUME", "shire");
     data.addMetadata("owner)", "bilbo");
     KeyValueContainer container = new KeyValueContainer(data, conf);
+
+    // build a map of volume and committed bytes before create
+    Map<String, Long> volumeMap = new HashMap<>();
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(
+        volumeSet.getVolumesList())) {
+      volumeMap.put(getVolumeKey(volume), volume.getCommittedBytes());
+    }
+
     container.create(volumeSet, volumeChoosingPolicy, SCM_ID);
-    commitBytesBefore = container.getContainerData()
-        .getVolume().getCommittedBytes();
     cSet.addContainer(container);
+
+    commitBytesBefore = volumeMap.get(getVolumeKey(container.getContainerData().getVolume()));
     commitBytesAfter = container.getContainerData()
         .getVolume().getCommittedBytes();
     commitIncrement = commitBytesAfter - commitBytesBefore;
@@ -1004,5 +1012,9 @@ public class TestContainerPersistence {
         () -> blockManager.listBlock(container, 0, -1));
     assertThat(exception.getMessage())
         .contains("Count must be a positive number.");
+  }
+
+  private String getVolumeKey(HddsVolume volume) {
+    return volume.getHddsRootDir().getPath();
   }
 }

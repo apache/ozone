@@ -46,9 +46,8 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
   // Stores the index of the next volume to be returned.
   private final Random random = new Random();
-
   @Override
-  public HddsVolume chooseVolume(List<HddsVolume> volumes,
+  public synchronized HddsVolume chooseVolume(List<HddsVolume> volumes,
       long maxContainerSize) throws IOException {
 
     // No volumes available to choose from
@@ -93,7 +92,10 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
           - firstVolume.getCommittedBytes();
       long secondAvailable = secondVolume.getCurrentUsage().getAvailable()
           - secondVolume.getCommittedBytes();
-      return firstAvailable < secondAvailable ? secondVolume : firstVolume;
+      HddsVolume selectedVolume = firstAvailable < secondAvailable ? secondVolume : firstVolume;
+
+      selectedVolume.incCommittedBytes(maxContainerSize);
+      return selectedVolume;
     }
   }
 }
