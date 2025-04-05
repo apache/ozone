@@ -28,8 +28,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_CO
 import static org.apache.hadoop.util.Time.now;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -151,6 +149,18 @@ public class TestRocksDBCheckpointDiffer {
   private ColumnFamilyHandle directoryTableCFHandle;
   private ColumnFamilyHandle fileTableCFHandle;
   private ColumnFamilyHandle compactionLogTableCFHandle;
+
+  public static final Integer DEBUG_DAG_BUILD_UP = 2;
+  public static final Integer DEBUG_DAG_TRAVERSAL = 3;
+  public static final Integer DEBUG_DAG_LIVE_NODES = 4;
+  public static final Integer DEBUG_READ_ALL_DB_KEYS = 5;
+  private static final HashSet<Integer> DEBUG_LEVEL = new HashSet<>();
+
+  static {
+    DEBUG_LEVEL.add(DEBUG_DAG_BUILD_UP);
+    DEBUG_LEVEL.add(DEBUG_DAG_TRAVERSAL);
+    DEBUG_LEVEL.add(DEBUG_DAG_LIVE_NODES);
+  }
 
   @BeforeEach
   public void init() throws RocksDBException {
@@ -877,7 +887,7 @@ public class TestRocksDBCheckpointDiffer {
         LOG.debug("\tLevel: {}", m.level());
         LOG.debug("\tTable: {}", bytes2String(m.columnFamilyName()));
         LOG.debug("\tKey Range: {}", bytes2String(m.smallestKey()) + " <-> " + bytes2String(m.largestKey()));
-        if (differ.debugEnabled(DEBUG_DAG_LIVE_NODES)) {
+        if (debugEnabled(DEBUG_DAG_LIVE_NODES)) {
           printMutableGraphFromAGivenNode(
               differ.getCompactionNodeMap(),
               m.fileName(), m.level(),
@@ -885,7 +895,7 @@ public class TestRocksDBCheckpointDiffer {
         }
       }
 
-      if (differ.debugEnabled(DEBUG_READ_ALL_DB_KEYS)) {
+      if (debugEnabled(DEBUG_READ_ALL_DB_KEYS)) {
         try (ManagedRocksIterator iter = new ManagedRocksIterator(rocksDB.get().newIterator())) {
           for (iter.get().seekToFirst(); iter.get().isValid(); iter.get().next()) {
             LOG.debug(
@@ -905,6 +915,10 @@ public class TestRocksDBCheckpointDiffer {
         rocksDB.close();
       }
     }
+  }
+
+  public boolean debugEnabled(Integer level) {
+    return DEBUG_LEVEL.contains(level);
   }
 
   /**

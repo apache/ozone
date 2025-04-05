@@ -47,7 +47,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -65,15 +64,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
-import org.apache.ozone.graph.PrintableGraph;
-import org.apache.ozone.graph.PrintableGraph.GraphType;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyHandle;
@@ -81,7 +76,6 @@ import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.TableProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -209,7 +203,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     this.sstBackupDir = Paths.get(metadataDirName, sstBackupDirName) + "/";
     createSstBackUpDir();
 
-    // Active DB location is used in getSSTFileSummary
+    // Active DB location is used in getSSTFileNumKeys
     this.activeDBLocationStr = activeDBLocationName + "/";
     this.maxAllowedTimeInDag = configuration.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
@@ -322,24 +316,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private final MutableGraph<CompactionNode> backwardCompactionDAG =
       GraphBuilder.directed().build();
 
-  public static final Integer DEBUG_DAG_BUILD_UP = 2;
-  public static final Integer DEBUG_DAG_TRAVERSAL = 3;
-  public static final Integer DEBUG_DAG_LIVE_NODES = 4;
-  public static final Integer DEBUG_READ_ALL_DB_KEYS = 5;
-  private static final HashSet<Integer> DEBUG_LEVEL = new HashSet<>();
-
-  static {
-    addDebugLevel(DEBUG_DAG_BUILD_UP);
-    addDebugLevel(DEBUG_DAG_TRAVERSAL);
-    addDebugLevel(DEBUG_DAG_LIVE_NODES);
-  }
-
   static {
     RocksDB.loadLibrary();
-  }
-
-  public static void addDebugLevel(Integer level) {
-    DEBUG_LEVEL.add(level);
   }
 
   public void setRocksDBForCompactionTracking(ManagedDBOptions rocksOptions) {
@@ -573,31 +551,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } catch (IOException e) {
       LOG.error("Exception in creating hard link for {}", source);
       throw new RuntimeException("Failed to create hard link", e);
-    }
-  }
-
-  /**
-   * Get number of keys in an SST file.
-   * @param filename SST filename
-   * @return number of keys
-   */
-  private long getSSTFileSummary(String filename)
-      throws RocksDBException, FileNotFoundException {
-
-    if (!filename.endsWith(SST_FILE_EXTENSION)) {
-      filename += SST_FILE_EXTENSION;
-    }
-
-    try (ManagedOptions option = new ManagedOptions();
-         ManagedSstFileReader reader = new ManagedSstFileReader(option)) {
-
-      reader.open(getAbsoluteSstFilePath(filename));
-
-      TableProperties properties = reader.getTableProperties();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("{} has {} keys", filename, properties.getNumEntries());
-      }
-      return properties.getNumEntries();
     }
   }
 
@@ -1065,7 +1018,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                                       String endKey, String columnFamily) {
     long numKeys = 0L;
     try {
-      numKeys = getSSTFileSummary(file);
+      numKeys = RocksDiffUtils.getSSTFileNumKeys(getAbsoluteSstFilePath(file));
     } catch (RocksDBException e) {
       LOG.warn("Can't get num of keys in SST '{}': {}", file, e.getMessage());
     } catch (FileNotFoundException e) {
@@ -1387,11 +1340,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
-  public boolean debugEnabled(Integer level) {
-    return DEBUG_LEVEL.contains(level);
-  }
-
-  @VisibleForTesting
   public static Logger getLog() {
     return LOG;
   }
@@ -1449,19 +1397,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
-  }
-
-  public void pngPrintMutableGraph(String filePath, GraphType graphType)
-      throws IOException {
-    Objects.requireNonNull(filePath, "Image file path is required.");
-    Objects.requireNonNull(graphType, "Graph type is required.");
-
-    PrintableGraph graph;
-    synchronized (this) {
-      graph = new PrintableGraph(backwardCompactionDAG, graphType);
-    }
-
-    graph.generateImage(filePath);
   }
 
   private Map<String, CompactionFileInfo> toFileInfoList(List<String> sstFiles, RocksDB db) {
