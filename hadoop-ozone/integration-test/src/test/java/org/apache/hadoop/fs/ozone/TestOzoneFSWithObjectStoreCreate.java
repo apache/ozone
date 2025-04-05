@@ -46,6 +46,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -423,6 +425,38 @@ public class TestOzoneFSWithObjectStoreCreate {
         OmUtils.normalizeKey(key1, false));
 
     checkKeyList(ozoneKeyIterator, keys);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {2, 3, 4})
+  public void testDoubleSlashPrefixPathNormalization(int slashCount) throws Exception {
+    OzoneVolume ozoneVolume = client.getObjectStore().getVolume(volumeName);
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    // Generate a path with the specified number of leading slashes
+    StringBuilder keyPrefix = new StringBuilder();
+    for (int i = 0; i < slashCount; i++) {
+      keyPrefix.append('/');
+    }
+    String dirPath = "dir" + slashCount + "/";
+    String keyName = "key" + slashCount;
+    String slashyKey = keyPrefix + dirPath + keyName;
+    String normalizedKey = dirPath + keyName;
+    byte[] data = new byte[10];
+    Arrays.fill(data, (byte)96);
+    ArrayList<String> expectedKeys = new ArrayList<>();
+    expectedKeys.add(dirPath);
+    expectedKeys.add(normalizedKey);
+    TestDataUtil.createKey(ozoneBucket, slashyKey, new String(data, UTF_8));
+
+    try {
+      ozoneBucket.readKey(slashyKey).close();
+      ozoneBucket.readKey(normalizedKey).close();
+    } catch (Exception e) {
+      fail("Should be able to read key " + e.getMessage());
+    }
+
+    Iterator<? extends OzoneKey> it = ozoneBucket.listKeys(dirPath);
+    checkKeyList(it, expectedKeys);
   }
 
   private void checkKeyList(Iterator<? extends OzoneKey > ozoneKeyIterator,
