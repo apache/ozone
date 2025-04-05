@@ -77,8 +77,6 @@ public class TestOneReplicaPipelineSafeModeRule {
   private void setup(int nodes, int pipelineFactorThreeCount,
       int pipelineFactorOneCount) throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.setBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
     ozoneConfiguration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempDir.toString());
     ozoneConfiguration.setBoolean(
