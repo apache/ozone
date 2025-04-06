@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.dn.scanner;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,8 +47,6 @@ import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -57,7 +56,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -223,9 +221,8 @@ public abstract class TestContainerScannerIntegrationAbstract {
   }
 
   private OzoneOutputStream createKey(String keyName) throws Exception {
-    return TestDataUtil.createKey(store.getVolume(volumeName).getBucket(bucketName),
-        keyName, ReplicationConfig.
-            fromTypeAndFactor(ReplicationType.RATIS, ONE), 0);
+    return TestHelper.createKey(
+        keyName, RATIS, ONE, 0, store, volumeName, bucketName);
   }
 
   /**

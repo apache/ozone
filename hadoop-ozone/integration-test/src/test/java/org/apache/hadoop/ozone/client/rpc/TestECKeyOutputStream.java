@@ -61,7 +61,6 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -74,6 +73,7 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
@@ -181,10 +181,10 @@ public class TestECKeyOutputStream {
 
   @Test
   public void testCreateKeyWithECReplicationConfig() throws Exception {
-    try (OzoneOutputStream key = TestDataUtil
-        .createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
-            keyString, new ECReplicationConfig(3, 2,
-                ECReplicationConfig.EcCodec.RS, chunkSize), inputSize)) {
+    try (OzoneOutputStream key = TestHelper
+        .createKey(keyString, new ECReplicationConfig(3, 2,
+                ECReplicationConfig.EcCodec.RS, chunkSize), inputSize,
+            objectStore, volumeName, bucketName)) {
       assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
     }
   }
@@ -212,9 +212,8 @@ public class TestECKeyOutputStream {
       ObjectStore store = client1.getObjectStore();
       store.createVolume(volumeName);
       store.getVolume(volumeName).createBucket(bucketName);
-      OzoneOutputStream key = TestDataUtil.createKey(store.getVolume(volumeName).getBucket(bucketName),
-          keyString, new ECReplicationConfig(3, 2,
-          ECReplicationConfig.EcCodec.RS, 1024), inputSize);
+      OzoneOutputStream key = TestHelper.createKey(keyString, new ECReplicationConfig(3, 2,
+          ECReplicationConfig.EcCodec.RS, 1024), inputSize, store, volumeName, bucketName);
       byte[] b = new byte[6 * 1024];
       ECKeyOutputStream groupOutputStream = (ECKeyOutputStream) key.getOutputStream();
       List<OmKeyLocationInfo> locationInfoList = groupOutputStream.getLocationInfoList();
@@ -574,9 +573,9 @@ public class TestECKeyOutputStream {
   @Test
   public void testBlockedHflushAndHsync() throws Exception {
     // Expect ECKeyOutputStream hflush and hsync calls to throw exception
-    try (OzoneOutputStream oOut = TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
+    try (OzoneOutputStream oOut = TestHelper.createKey(
         keyString, new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, chunkSize),
-        inputSize)) {
+        inputSize, objectStore, volumeName, bucketName)) {
       assertInstanceOf(ECKeyOutputStream.class, oOut.getOutputStream());
       KeyOutputStream kOut = (KeyOutputStream) oOut.getOutputStream();
 

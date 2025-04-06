@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.client.rpc;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.TestDataUtil.createKey;
+import static org.apache.hadoop.ozone.container.TestHelper.createKey;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -30,8 +30,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -91,9 +89,7 @@ public abstract class TestDiscardPreallocatedBlocks implements NonHATests.TestCa
   public void testDiscardPreallocatedBlocks() throws Exception {
     String keyName = "key";
     OzoneOutputStream key =
-        createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
-            keyName, ReplicationConfig.
-                fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE), 2L * blockSize);
+        createKey(keyName, ReplicationType.RATIS, 2L * blockSize, objectStore, volumeName, bucketName);
     KeyOutputStream keyOutputStream =
         assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     // With the initial size provided, it should have pre allocated 2 blocks

@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -133,11 +132,6 @@ public final class TestDataUtil {
         repConfig, content)) {
       stream.write(content);
     }
-  }
-
-  public static OzoneOutputStream createKey(OzoneBucket bucket, String keyName,
-                                            ReplicationConfig replicationConfig, long size) throws Exception {
-    return bucket.createKey(keyName, size, replicationConfig, new HashMap<>());
   }
 
   public static String getKey(OzoneBucket bucket, String keyName)

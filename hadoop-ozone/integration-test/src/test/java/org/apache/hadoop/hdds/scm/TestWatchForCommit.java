@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -36,8 +35,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -183,10 +180,7 @@ public class TestWatchForCommit {
   @Test
   public void testWatchForCommitWithKeyWrite() throws Exception {
     String keyName = getKeyName();
-
-    OzoneOutputStream key = createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
-        keyName, ReplicationConfig.
-            fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE), 0);
+    OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
     int dataLength = maxFlushSize + 50;
     // write data more than 1 chunk
     byte[] data1 =
@@ -396,6 +390,12 @@ public class TestWatchForCommit {
         clientManager.releaseClient(xceiverClient, false);
       }
     }
+  }
+
+  private OzoneOutputStream createKey(String keyName, ReplicationType type,
+      long size) throws Exception {
+    return TestHelper
+        .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
