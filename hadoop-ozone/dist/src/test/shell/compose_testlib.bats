@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 load ../../main/compose/testlib.sh
 @test "Find test recursive, only on one level" {
   cd $BATS_TEST_DIRNAME
