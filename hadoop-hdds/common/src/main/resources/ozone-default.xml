@@ -1167,7 +1167,7 @@
     <value>2s</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
-      Heartbeat interval used during Datanode initialization for Datanode.
+      Heartbeat interval used during Datanode initialization for SCM.
     </description>
   </property>
   <property>

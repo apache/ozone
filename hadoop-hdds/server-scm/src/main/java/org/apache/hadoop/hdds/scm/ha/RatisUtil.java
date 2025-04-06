@@ -138,14 +138,8 @@ public final class RatisUtil {
                             OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT_DEFAULT,
                     TimeUnit.MILLISECONDS),
             TimeUnit.MILLISECONDS));
-    long firstElectionTimeout = ozoneConf.getTimeDuration(
-        ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT, -1, TimeUnit.MILLISECONDS);
-    if (firstElectionTimeout > 0) {
-      Rpc.setFirstElectionTimeoutMin(
-          properties,  TimeDuration.valueOf(firstElectionTimeout, TimeUnit.MILLISECONDS));
-      Rpc.setFirstElectionTimeoutMax(
-          properties,  TimeDuration.valueOf(firstElectionTimeout + 200, TimeUnit.MILLISECONDS));
-    }
+    RatisHelper.setFirstElectionTimeoutDuration(
+        ozoneConf, properties, ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT);
   }
 
   /**
