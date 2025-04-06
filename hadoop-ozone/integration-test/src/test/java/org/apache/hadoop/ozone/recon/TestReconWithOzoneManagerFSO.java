@@ -24,19 +24,17 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.util.UUID;
 import javax.ws.rs.core.Response;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
@@ -67,7 +65,7 @@ public class TestReconWithOzoneManagerFSO {
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     cluster =
             MiniOzoneCluster.newBuilder(conf)
-                    .setNumDatanodes(1)
+                    .setNumDatanodes(3)
                     .includeRecon(true)
                     .build();
     cluster.waitForClusterToBeReady();
@@ -85,26 +83,16 @@ public class TestReconWithOzoneManagerFSO {
     }
   }
 
-  private void writeTestData(String volumeName,
-                             String bucketName,
-                             String keyName) throws Exception {
-
-    String keyString = UUID.randomUUID().toString();
-    byte[] data = ContainerTestHelper.getFixedLengthString(
-            keyString, 100).getBytes(UTF_8);
-    OzoneOutputStream keyStream = TestHelper.createKey(
-            keyName, ReplicationType.RATIS, ReplicationFactor.ONE,
-            100, store, volumeName, bucketName);
-    keyStream.write(data);
-    keyStream.close();
-  }
-
   private void writeKeys(String vol, String bucket, String key)
           throws Exception {
     store.createVolume(vol);
     OzoneVolume volume = store.getVolume(vol);
     volume.createBucket(bucket);
-    writeTestData(vol, bucket, key);
+    OzoneBucket ozoneBucket = volume.getBucket(bucket);
+    String keyString = UUID.randomUUID().toString();
+    byte[] data = ContainerTestHelper.getFixedLengthString(
+        keyString, 100).getBytes(UTF_8);
+    TestDataUtil.createKey(ozoneBucket, key, data);
   }
 
   @Test
