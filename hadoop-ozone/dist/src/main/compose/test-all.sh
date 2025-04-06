@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -u -o pipefail
 
 #
 # Test executor to test all the compose/*/test.sh test scripts.
