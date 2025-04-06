@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.UUID;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -43,6 +44,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -183,9 +185,10 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
                                       long size) throws Exception {
-    return TestHelper
-        .createKey(keyName, type, ReplicationFactor.ONE,
-            size, objectStore, volumeName, bucketName);
+    return TestDataUtil
+        .createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
+            keyName, ReplicationConfig.
+                fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE), size);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {

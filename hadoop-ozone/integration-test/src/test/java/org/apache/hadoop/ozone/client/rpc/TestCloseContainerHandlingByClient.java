@@ -31,10 +31,13 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -321,8 +324,10 @@ public abstract class TestCloseContainerHandlingByClient implements NonHATests.T
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
                                       long size) throws Exception {
-    return TestHelper
-        .createKey(keyName, type, size, objectStore, volumeName, bucketName);
+    return TestDataUtil
+        .createKey(objectStore.
+            getVolume(volumeName).getBucket(bucketName), keyName,
+            ReplicationConfig.fromTypeAndFactor(type, ReplicationFactor.THREE), size);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {

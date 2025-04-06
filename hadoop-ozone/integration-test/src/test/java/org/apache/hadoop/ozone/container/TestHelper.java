@@ -132,22 +132,6 @@ public final class TestHelper {
     return count;
   }
 
-  public static OzoneOutputStream createKey(String keyName,
-      ReplicationType type, long size, ObjectStore objectStore,
-      String volumeName, String bucketName) throws Exception {
-    if (type == ReplicationType.STAND_ALONE) {
-      throw new IllegalArgumentException(ReplicationType.STAND_ALONE +
-          " replication type should not be used in tests to write keys anymore."
-      );
-    }
-    org.apache.hadoop.hdds.client.ReplicationFactor factor =
-            org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
-    ReplicationConfig config =
-            ReplicationConfig.fromTypeAndFactor(type, factor);
-    return objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey(keyName, size, config, new HashMap<>());
-  }
-
   public static OzoneDataStreamOutput createStreamKey(String keyName,
       ReplicationType type, long size, ObjectStore objectStore,
       String volumeName, String bucketName) throws Exception {
@@ -159,24 +143,6 @@ public final class TestHelper {
         ReplicationConfig.fromTypeAndFactor(type, factor);
     return objectStore.getVolume(volumeName).getBucket(bucketName)
         .createStreamKey(keyName, size, config, new HashMap<>());
-  }
-
-  public static OzoneOutputStream createKey(String keyName,
-      ReplicationType type,
-      org.apache.hadoop.hdds.client.ReplicationFactor factor, long size,
-      ObjectStore objectStore, String volumeName, String bucketName)
-      throws Exception {
-    ReplicationConfig config =
-            ReplicationConfig.fromTypeAndFactor(type, factor);
-    return objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey(keyName, size, config, new HashMap<>());
-  }
-
-  public static OzoneOutputStream createKey(String keyName,
-      ReplicationConfig replicationConfig, long size, ObjectStore objectStore,
-      String volumeName, String bucketName) throws Exception {
-    return objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey(keyName, size, replicationConfig, new HashMap<>());
   }
 
   public static void validateData(String keyName, byte[] data,

@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -779,8 +781,9 @@ class TestBlockOutputStream {
 
   static OzoneOutputStream createKey(OzoneClient client, String keyName,
       long size, ReplicationFactor factor) throws Exception {
-    return TestHelper.createKey(keyName, ReplicationType.RATIS, factor, size,
-        client.getObjectStore(), VOLUME, BUCKET);
+    ReplicationConfig config = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, factor);
+    return TestDataUtil.createKey(client.getObjectStore().getVolume(VOLUME).getBucket(BUCKET),
+        keyName, config, size);
   }
 
   static String getKeyName() {
