@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_A
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -387,6 +388,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         leaderElectionMinTimeout.toLong(TimeUnit.MILLISECONDS) + 200;
     RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
         TimeDuration.valueOf(leaderElectionMaxTimeout, TimeUnit.MILLISECONDS));
+
+    long firstElectionDuration = conf.getTimeDuration(HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+        -1, TimeUnit.MILLISECONDS);
+    if (firstElectionDuration > 0) {
+      RaftServerConfigKeys.Rpc.setFirstElectionTimeoutMin(properties, TimeDuration.valueOf(
+          firstElectionDuration, TimeUnit.MILLISECONDS));
+      RaftServerConfigKeys.Rpc.setFirstElectionTimeoutMax(properties, TimeDuration.valueOf(
+          firstElectionDuration + 200, TimeUnit.MILLISECONDS));
+    }
   }
 
   private void setTimeoutForRetryCache(RaftProperties properties) {

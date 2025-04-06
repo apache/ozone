@@ -348,6 +348,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.ratis.leader.first.election.minimum.timeout.duration</name>
+    <value/>
+    <tag>OZONE, RATIS, MANAGEMENT</tag>
+    <description>ratis Minimum timeout for the first election of a leader.
+      If not configured, fallback to hdds.ratis.leader.election.minimum.timeout.duration.
+    </description>
+  </property>
+  <property>
     <name>hdds.node.report.interval</name>
     <value>60000ms</value>
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
@@ -1155,11 +1163,27 @@
     </description>
   </property>
   <property>
+    <name>hdds.initial.heartbeat.interval</name>
+    <value>2s</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Heartbeat interval used during Datanode initialization for Datanode.
+    </description>
+  </property>
+  <property>
     <name>hdds.recon.heartbeat.interval</name>
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
       The heartbeat interval from a Datanode to Recon.
+    </description>
+  </property>
+  <property>
+    <name>hdds.recon.initial.heartbeat.interval</name>
+    <value>60s</value>
+    <tag>OZONE, MANAGEMENT, RECON</tag>
+    <description>
+      Heartbeat interval used during Datanode initialization for Recon.
     </description>
   </property>
   <property>
@@ -3834,6 +3858,13 @@
       election. Default is 1s.</description>
   </property>
   <property>
+    <name>ozone.scm.ha.raft.server.rpc.first-election.timeout</name>
+    <value/>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>ratis timeout for the first election of a leader.
+      If not configured, fallback to ozone.scm.ha.ratis.leader.election.timeout.
+    </description>
+  </property><property>
     <name>ozone.scm.ha.ratis.server.leaderelection.pre-vote</name>
     <value>true</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
