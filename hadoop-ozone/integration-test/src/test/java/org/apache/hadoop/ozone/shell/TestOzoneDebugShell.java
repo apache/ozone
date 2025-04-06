@@ -20,11 +20,8 @@ package org.apache.hadoop.ozone.shell;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,7 +39,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -56,8 +52,6 @@ import org.apache.hadoop.ozone.debug.ldb.RDBParser;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -66,7 +60,6 @@ import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -81,25 +74,12 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
   private OzoneClient client;
   private OzoneDebug ozoneDebugShell;
   private OMMetadataManager omMetadataManager;
-  private OzoneConfiguration conf;
-  private OzoneManager ozoneManager;
-  @TempDir
-  private java.nio.file.Path folder;
 
   @BeforeEach
   void init() throws Exception {
     ozoneDebugShell = new OzoneDebug();
     client = cluster().newClient();
-
-    conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_DB_DIRS, folder.toAbsolutePath().toString());
-    ozoneManager = mock(OzoneManager.class);
-    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-
-    OzoneConfiguration ozoneConfiguration = mock(OzoneConfiguration.class);
-    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
-
-    omMetadataManager = new OmMetadataManagerImpl(conf, ozoneManager);
+    omMetadataManager = cluster().getOzoneManager().getMetadataManager();
   }
 
   @AfterEach
