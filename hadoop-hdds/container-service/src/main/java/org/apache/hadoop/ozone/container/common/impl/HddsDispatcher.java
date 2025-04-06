@@ -178,8 +178,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void buildMissingContainerSetAndValidate(
       Map<Long, Long> container2BCSIDMap) {
-    containerSet
-        .buildMissingContainerSetAndValidate(container2BCSIDMap);
+    containerSet.buildMissingContainerSetAndValidate(container2BCSIDMap, n -> n);
   }
 
   @Override
