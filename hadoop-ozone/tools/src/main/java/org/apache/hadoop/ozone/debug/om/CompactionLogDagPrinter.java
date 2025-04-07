@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.debug.om;
 import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
 
 import com.google.common.graph.GraphBuilder;
-import com.google.common.graph.MutableGraph;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,8 +30,7 @@ import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.graph.PrintableGraph;
-import org.apache.ozone.rocksdiff.CompactionNode;
-import org.apache.ozone.rocksdiff.RocksDiffUtils;
+import org.apache.ozone.rocksdiff.CompactionDagHelper;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -67,8 +65,18 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
   @Override
   public Void call() throws Exception {
     try {
-      CreateCompactionDag createCompactionDag = new CreateCompactionDag(dbPath);
-      createCompactionDag.pngPrintMutableGraph(imageLocation);
+      final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
+      List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
+      ManagedRocksDB activeRocksDB = ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList);
+      ColumnFamilyHandle compactionLogTableCFHandle = RocksDBUtils
+          .getColumnFamilyHandle(COMPACTION_LOG_TABLE, cfHandleList);
+
+      CompactionDagHelper helper = new CompactionDagHelper(activeRocksDB, compactionLogTableCFHandle,
+          new ConcurrentHashMap<>(), null, GraphBuilder.directed().build(),
+          null, null, false);
+      helper.createCompactionDags();
+
+      pngPrintMutableGraph(helper, imageLocation);
       out().println("Graph was generated at '" + imageLocation + "'.");
     } catch (RocksDBException ex) {
       err().println("Failed to open RocksDB: " + ex);
@@ -77,33 +85,11 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
     return null;
   }
 
-  static class CreateCompactionDag {
-    // Hash table to track CompactionNode for a given SST File.
-    private final ConcurrentHashMap<String, CompactionNode> compactionNodeMap =
-        new ConcurrentHashMap<>();
-    private final MutableGraph<CompactionNode> backwardCompactionDAG =
-        GraphBuilder.directed().build();
-
-    private ColumnFamilyHandle compactionLogTableCFHandle;
-    private ManagedRocksDB activeRocksDB;
-
-    CreateCompactionDag(String dbPath) throws RocksDBException {
-      final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-      List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
-      activeRocksDB = ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList);
-      compactionLogTableCFHandle = RocksDBUtils.getColumnFamilyHandle(COMPACTION_LOG_TABLE, cfHandleList);
-    }
-
-    public void pngPrintMutableGraph(String filePath)
-        throws IOException, RocksDBException {
-      Objects.requireNonNull(filePath, "Image file path is required.");
-
-      RocksDiffUtils.createCompactionDags(activeRocksDB, compactionLogTableCFHandle, compactionNodeMap,
-          null, backwardCompactionDAG);
-
-      PrintableGraph graph;
-      graph = new PrintableGraph(backwardCompactionDAG, PrintableGraph.GraphType.FILE_NAME);
-      graph.generateImage(filePath);
-    }
+  public void pngPrintMutableGraph(CompactionDagHelper helper, String filePath)
+      throws IOException {
+    Objects.requireNonNull(filePath, "Image file path is required.");
+    PrintableGraph graph;
+    graph = new PrintableGraph(helper.getBackwardCompactionDAG(), PrintableGraph.GraphType.FILE_NAME);
+    graph.generateImage(filePath);
   }
 }

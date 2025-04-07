@@ -31,7 +31,6 @@ import com.google.common.graph.MutableGraph;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.file.FileAlreadyExistsException;
@@ -497,10 +496,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           addToCompactionLogTable(compactionLogEntry);
 
           // Populate the DAG
-          RocksDiffUtils.populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
+          CompactionDagHelper helper = new CompactionDagHelper(activeRocksDB, compactionLogTableCFHandle,
+              compactionNodeMap, forwardCompactionDAG, backwardCompactionDAG, sstBackupDir, activeDBLocationStr, true);
+          helper.populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
               compactionLogEntry.getOutputFileInfoList(),
-              compactionLogEntry.getDbSequenceNumber(),
-              compactionNodeMap, forwardCompactionDAG, backwardCompactionDAG);
+              compactionLogEntry.getDbSequenceNumber());
           for (String inputFile : inputFileCompactions.keySet()) {
             inflightCompactions.remove(inputFile);
           }
@@ -552,22 +552,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } catch (IOException e) {
       LOG.error("Exception in creating hard link for {}", source);
       throw new RuntimeException("Failed to create hard link", e);
-    }
-  }
-
-  private String getAbsoluteSstFilePath(String filename)
-      throws FileNotFoundException {
-    if (!filename.endsWith(SST_FILE_EXTENSION)) {
-      filename += SST_FILE_EXTENSION;
-    }
-    File sstFile = new File(sstBackupDir + filename);
-    File sstFileInActiveDB = new File(activeDBLocationStr + filename);
-    if (sstFile.exists()) {
-      return sstBackupDir + filename;
-    } else if (sstFileInActiveDB.exists()) {
-      return activeDBLocationStr + filename;
-    } else {
-      throw new FileNotFoundException("Can't find SST file: " + filename);
     }
   }
 
@@ -712,8 +696,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     synchronized (this) {
       preconditionChecksForLoadAllCompactionLogs();
       addEntriesFromLogFilesToDagAndCompactionLogTable();
-      RocksDiffUtils.createCompactionDags(activeRocksDB, compactionLogTableCFHandle, compactionNodeMap,
-          forwardCompactionDAG, backwardCompactionDAG);
+      CompactionDagHelper helper = new CompactionDagHelper(activeRocksDB, compactionLogTableCFHandle,
+          compactionNodeMap, forwardCompactionDAG, backwardCompactionDAG, sstBackupDir, activeDBLocationStr, true);
+      helper.createCompactionDags();
     }
   }
 
