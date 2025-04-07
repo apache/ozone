@@ -18,6 +18,10 @@
 package org.apache.ozone.rocksdiff;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
@@ -29,6 +33,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
+import com.google.common.util.concurrent.Striped;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -56,6 +61,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.collections.CollectionUtils;
@@ -66,6 +74,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.Scheduler;
+import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
@@ -169,6 +178,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private final long maxAllowedTimeInDag;
   private final BootstrapStateHandler.Lock lock
       = new BootstrapStateHandler.Lock();
+  private final Striped<ReadWriteLock> stripedSSTLock;
+  private static final String SST_FILE_LOCK = "SST_FILE_LOCK";
 
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
   private static final String DAG_PRUNING_SERVICE_NAME = "CompactionDagPruningService";
@@ -222,6 +233,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.suspended = new AtomicBoolean(false);
+
+    this.stripedSSTLock = SimpleStriped.readWriteLock(
+        configuration.getInt(OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX +
+                SST_FILE_LOCK.toLowerCase(),
+            OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT),
+        configuration.getBoolean(OZONE_MANAGER_FAIR_LOCK,
+            OZONE_MANAGER_FAIR_LOCK_DEFAULT));
 
     long pruneCompactionDagDaemonRunIntervalInMs =
         configuration.getTimeDuration(
@@ -854,9 +872,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
               String sstFullPath = getSSTFullPath(sst, src.getDbPath(), dest.getDbPath());
               Path link = Paths.get(sstFilesDirForSnapDiffJob,
                   sst + SST_FILE_EXTENSION);
-              Path srcFile = Paths.get(sstFullPath);
-              createLink(link, srcFile);
-              return link.toString();
+              // Take a read lock on the SST FILE
+              getSSTFileLock(link.toFile().getAbsolutePath()).readLock().lock();
+              try {
+                Path srcFile = Paths.get(sstFullPath);
+                createLink(link, srcFile);
+                return link.toString();
+              } finally {
+                getSSTFileLock(link.toFile().getAbsolutePath()).readLock().unlock();
+              }
             })
         .collect(Collectors.toList()));
   }
@@ -1402,49 +1426,49 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       return;
     }
     Path sstBackupDirPath = Paths.get(sstBackupDir);
-    String kVSeparator = ",";
 
     try (Stream<Path> files = Files.list(sstBackupDirPath)
-        .filter(file -> file.endsWith(ROCKSDB_SST_SUFFIX)) ) {
-
+        .filter(file -> file.endsWith(ROCKSDB_SST_SUFFIX))) {
+      ManagedEnvOptions envOptions = new ManagedEnvOptions();
+      ManagedOptions managedOptions = new ManagedOptions();
       for (Path file : files.collect(Collectors.toList())) {
         // Write the file.sst => file.sst.tmp
         File sstFile = file.toFile();
         File prunedSSTFile = Files.createFile(sstBackupDirPath
             .resolve( sstFile.getName() + ".tmp")).toFile();
 
-        ManagedEnvOptions envOptions = new ManagedEnvOptions();
-        ManagedOptions managedOptions = new ManagedOptions();
-        ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions))
+        ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions);
         sstFileWriter.open(prunedSSTFile.getAbsolutePath());
 
         ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader<>(
             managedOptions, sstFile.getAbsolutePath(), 2 * 1024 * 1024);
-        ManagedRawSSTFileIterator<String> itr = sstFileReader.newIterator(
-            keyValue -> StringUtils.bytes2String(keyValue.getKey()) + kVSeparator
-                + StringUtils.bytes2String(keyValue.getValue()), null, null);
+        Function<ManagedRawSSTFileIterator.KeyValue, Pair<byte[], Integer>> keyValueFuntion =
+            keyValue ->  Pair.of(keyValue.getKey(), keyValue.getType());
+        ManagedRawSSTFileIterator<Pair<byte[], Integer>> itr = sstFileReader.newIterator(keyValueFuntion, null, null);
 
         while(itr.hasNext()) {
-          String[] keyValue = itr.next().split(kVSeparator);
-          if (keyValue[1].isEmpty()) {
-            sstFileWriter.delete(keyValue[0].getBytes(UTF_8));
+          Pair<byte[], Integer> keyValue = itr.next();
+          if (keyValue.getValue() == 0) {
+            sstFileWriter.delete(keyValue.getKey());
           } else {
-            sstFileWriter.put(keyValue[0].getBytes(UTF_8), "\0".getBytes(UTF_8));
+            sstFileWriter.put(keyValue.getKey(), new byte[0]);
           }
         }
         sstFileWriter.finish();
 
-        // Acquire a mutex
-        try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+        // Take a write lock on the SST File
+        getSSTFileLock(sstFile.getAbsolutePath()).writeLock().lock();
+        try {
           // Move file.sst.tmp file.sst and replace existing file atomically
-          Files.move(prunedSSTFile.toPath(), file, StandardCopyOption.ATOMIC_MOVE,
-              StandardCopyOption.REPLACE_EXISTING);
-        } catch (InterruptedException e) {
+          Files.move(prunedSSTFile.toPath(), file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception e) {
           throw new RuntimeException(e);
+        } finally {
+          getSSTFileLock(sstFile.getAbsolutePath()).writeLock().unlock();
         }
         LOG.debug("Prune OMKeyInfo from SST files: {}", sstFile.getPath());
       }
-    } catch (IOException e) {
+    } catch (Exception e) {
       LOG.error("Could not prune OMKeyInfo from SST files.", e);
     }
   }
@@ -1511,6 +1535,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
+  }
+
+  public ReentrantReadWriteLock getSSTFileLock(String key) {
+    return (ReentrantReadWriteLock) stripedSSTLock.get(key);
   }
 
   public void pngPrintMutableGraph(String filePath, GraphType graphType)
