@@ -57,7 +57,7 @@ public abstract class OmOperationLock {
     }
   }
 
-  private TimeInfo timeInfo;
+  private TimeInfo timeInfo = new TimeInfo();
 
   TimeInfo getTimeInfo() {
     return timeInfo;

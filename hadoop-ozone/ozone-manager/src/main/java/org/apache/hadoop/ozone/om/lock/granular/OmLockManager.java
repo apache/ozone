@@ -21,6 +21,9 @@ import com.google.common.util.concurrent.StripedReadWriteLocks;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.hadoop.ozone.om.lock.granular.OmComponentLock.Component;
 import org.apache.hadoop.ozone.om.lock.granular.OmComponentLock.Type;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -90,5 +93,56 @@ public class OmLockManager {
   public UncheckedAutoCloseable acquireBucketReadKeyWriteLock(String bucket, List<String> keys) {
     return newBucketReadKeyWriteLock(bucket, keys)
         .acquire();
+  }
+
+  static List<String> generate(int start, int count) {
+    return IntStream.range(start, start + count).boxed()
+        .map(i -> "key" + i)
+        .collect(Collectors.toList());
+  }
+
+  static long memoryUsage(String name) {
+    final long usage = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+    System.out.printf("memory: %9.3f MB (%s)%n", usage *1.0/(1<<20), name);
+    return usage;
+  }
+
+  public static void main(String[] args) throws Exception {
+    final int bucketKeyCount = 1_000_000;
+    final int bucketKeyListCount = 1_000;
+    benchmark(bucketKeyCount, bucketKeyListCount);
+  }
+
+  static final int KEY_MAX = 100_000;
+  static void benchmark(int bucketKeyCount, int bucketKeyListCount) throws Exception {
+    System.out.println("bucketKeyCount     = " + bucketKeyCount);
+    System.out.println("bucketKeyListCount = " + bucketKeyListCount);
+
+    final Random random = new Random(1);
+    final List<String> keys = generate(0, bucketKeyCount);
+    final List<List<String>> keyLists = IntStream.range(0, bucketKeyListCount).boxed()
+        .map(i -> generate(random.nextInt(KEY_MAX - 10), 10))
+        .collect(Collectors.toList());
+    final long before = memoryUsage("before");
+
+    final OmLockManager lockManager = new OmLockManager();
+    System.out.println(lockManager.getClass().getSimpleName());
+
+    final long startTime = System.nanoTime();
+    for(int i = 0; i < bucketKeyCount; i++) {
+      try(UncheckedAutoCloseable ignored = lockManager.acquireBucketReadKeyWriteLock("buck0", keys.get(i))) {
+      }
+    }
+
+    for(int i = 0; i < bucketKeyListCount; i++) {
+      try(UncheckedAutoCloseable ignored = lockManager.acquireBucketReadKeyWriteLock("buck0", keyLists.get(i))) {
+      }
+    }
+    final long duration = System.nanoTime() - startTime;
+    System.out.printf("time  : %9.3f s%n", duration/1_000_000_000.0);
+
+    final long after = memoryUsage("after");
+    final long diff = after - before;
+    System.out.printf("memory: %9.3f MB (%s)%n", diff*1.0/(1<<20), "diff");
   }
 }
