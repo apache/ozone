@@ -139,7 +139,7 @@ public final class RatisUtil {
                     TimeUnit.MILLISECONDS),
             TimeUnit.MILLISECONDS));
     RatisHelper.setFirstElectionTimeoutDuration(
-        ozoneConf, properties, ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT);
+        ozoneConf, properties, ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_FIRST_ELECTION_TIMEOUT);
   }
 
   /**

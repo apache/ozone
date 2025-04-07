@@ -636,8 +636,8 @@ public final class ScmConfigKeys {
       = "hdds.container.ratis.statemachine.write.wait.interval";
   public static final long HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_NS_DEFAULT = 10 * 60 * 1000_000_000L;
 
-  public static final String OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT
-      = "ozone.scm.ha.raft.server.rpc.first-election.timeout";
+  public static final String OZONE_SCM_HA_RATIS_LEADER_FIRST_ELECTION_TIMEOUT
+      = "ozone.scm.ha.ratis.leader.first-election.timeout";
 
   /**
    * Never constructed.
