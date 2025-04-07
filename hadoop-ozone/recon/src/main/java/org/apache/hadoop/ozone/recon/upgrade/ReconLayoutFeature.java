@@ -30,7 +30,8 @@ import org.reflections.Reflections;
 public enum ReconLayoutFeature {
   // Represents the starting point for Recon's layout versioning system.
   INITIAL_VERSION(0, "Recon Layout Versioning Introduction"),
-  TASK_STATUS_STATISTICS(1, "Recon Task Status Statistics Tracking Introduced");
+  TASK_STATUS_STATISTICS(1, "Recon Task Status Statistics Tracking Introduced"),
+  UNHEALTHY_CONTAINER_REPLICA_MISMATCH(2, "Adding replica mismatch state to the unhealthy container table");
 
   private final int version;
   private final String description;
