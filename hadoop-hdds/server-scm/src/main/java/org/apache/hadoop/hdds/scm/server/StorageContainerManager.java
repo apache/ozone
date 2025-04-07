@@ -461,7 +461,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(scmNodeManager);
     PipelineReportHandler pipelineReportHandler =
-        new PipelineReportHandler(pipelineManager, scmContext, configuration);
+        new PipelineReportHandler(
+            scmSafeModeManager, pipelineManager, scmContext, configuration);
     CommandStatusReportHandler cmdStatusReportHandler =
         new CommandStatusReportHandler();
 

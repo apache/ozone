@@ -356,6 +356,10 @@ public class TestPipelineManagerImpl {
   @Test
   public void testPipelineReport() throws Exception {
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      SCMSafeModeManager scmSafeModeManager =
+          new SCMSafeModeManager(conf,
+              mock(ContainerManager.class), pipelineManager,
+              new EventQueue(), serviceManager, scmContext);
       Pipeline pipeline = pipelineManager
           .createPipeline(RatisReplicationConfig
               .getInstance(ReplicationFactor.THREE));
@@ -366,7 +370,8 @@ public class TestPipelineManagerImpl {
           pipelineManager.getPipeline(pipeline.getId()).isHealthy());
       // get pipeline report from each dn in the pipeline
       PipelineReportHandler pipelineReportHandler =
-          new PipelineReportHandler(pipelineManager, SCMContext.emptyContext(), conf);
+          new PipelineReportHandler(scmSafeModeManager, pipelineManager,
+              SCMContext.emptyContext(), conf);
       nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
           pipelineReportHandler, false));
       sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
@@ -462,8 +467,13 @@ public class TestPipelineManagerImpl {
     assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
+    SCMSafeModeManager scmSafeModeManager =
+        new SCMSafeModeManager(new OzoneConfiguration(),
+            mock(ContainerManager.class), pipelineManager, new EventQueue(),
+            serviceManager, scmContext);
     PipelineReportHandler pipelineReportHandler =
-        new PipelineReportHandler(pipelineManager, SCMContext.emptyContext(), conf);
+        new PipelineReportHandler(scmSafeModeManager, pipelineManager,
+            SCMContext.emptyContext(), conf);
 
     // Report pipelines with leaders
     List<DatanodeDetails> nodes = pipeline.getNodes();

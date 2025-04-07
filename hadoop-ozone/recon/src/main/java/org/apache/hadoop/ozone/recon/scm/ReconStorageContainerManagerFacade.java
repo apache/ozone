@@ -259,7 +259,8 @@ public class ReconStorageContainerManagerFacade
 
     this.safeModeManager = safeModeManager;
     ReconPipelineReportHandler pipelineReportHandler =
-        new ReconPipelineReportHandler(pipelineManager, scmContext, conf, scmServiceProvider);
+        new ReconPipelineReportHandler(safeModeManager,
+            pipelineManager, scmContext, conf, scmServiceProvider);
 
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, scmContext);

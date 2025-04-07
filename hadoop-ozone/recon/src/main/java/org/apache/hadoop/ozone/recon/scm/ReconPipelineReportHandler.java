@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -44,11 +45,12 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
 
   private StorageContainerServiceProvider scmServiceProvider;
 
-  public ReconPipelineReportHandler(PipelineManager pipelineManager,
+  public ReconPipelineReportHandler(SafeModeManager scmSafeModeManager,
+      PipelineManager pipelineManager,
       SCMContext scmContext,
       ConfigurationSource conf,
       StorageContainerServiceProvider scmServiceProvider) {
-    super(pipelineManager, scmContext, conf);
+    super(scmSafeModeManager, pipelineManager, scmContext, conf);
     this.scmServiceProvider = scmServiceProvider;
   }
 
