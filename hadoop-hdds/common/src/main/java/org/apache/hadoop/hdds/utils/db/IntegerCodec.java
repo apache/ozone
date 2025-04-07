@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
 import java.nio.ByteBuffer;
+import java.util.Comparator;
+import java.util.Objects;
 
 /**
  * Codec to serialize/deserialize {@link Integer}.
@@ -26,6 +28,7 @@ import java.nio.ByteBuffer;
 public final class IntegerCodec implements Codec<Integer> {
 
   private static final IntegerCodec INSTANCE = new IntegerCodec();
+  private static final Comparator<Integer> COMPARATOR = (o1, o2) -> Objects.compare(o1, o2, Integer::compare);
 
   public static IntegerCodec get() {
     return INSTANCE;
@@ -69,5 +72,10 @@ public final class IntegerCodec implements Codec<Integer> {
   @Override
   public Integer copyObject(Integer object) {
     return object;
+  }
+
+  @Override
+  public Comparator<Integer> comparator() {
+    return COMPARATOR;
   }
 }

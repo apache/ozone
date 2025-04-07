@@ -74,6 +74,7 @@ public class RDBStore implements DBStore {
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
+  private final ThrottledThreadpoolExecutor parallelTableIteratorPool;
 
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
@@ -83,8 +84,8 @@ public class RDBStore implements DBStore {
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
                   ConfigurationSource configuration,
-                  boolean enableRocksDBMetrics)
-
+                  boolean enableRocksDBMetrics,
+                  int parallelTableIteratorMaxPoolSize)
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
@@ -94,7 +95,7 @@ public class RDBStore implements DBStore {
     dbLocation = dbFile;
     this.dbOptions = dbOptions;
     this.statistics = statistics;
-
+    this.parallelTableIteratorPool = new ThrottledThreadpoolExecutor(parallelTableIteratorMaxPoolSize);
     try {
       if (enableCompactionDag) {
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
@@ -226,7 +227,6 @@ public class RDBStore implements DBStore {
       metrics.unregister();
       metrics = null;
     }
-
     RDBMetrics.unRegister();
     IOUtils.close(LOG, checkPointManager);
     if (rocksDBCheckpointDiffer != null) {
@@ -237,6 +237,10 @@ public class RDBStore implements DBStore {
       IOUtils.close(LOG, statistics);
     }
     IOUtils.close(LOG, db);
+
+    if (parallelTableIteratorPool != null) {
+      IOUtils.close(LOG, parallelTableIteratorPool);
+    }
   }
 
   @Override
@@ -290,34 +294,34 @@ public class RDBStore implements DBStore {
     if (handle == null) {
       throw new IOException("No such table in this DB. TableName : " + name);
     }
-    return new RDBTable(this.db, handle, rdbMetrics);
+    return new RDBTable(db, handle, rdbMetrics, parallelTableIteratorPool);
   }
 
   @Override
   public <K, V> TypedTable<K, V> getTable(String name,
       Class<K> keyType, Class<V> valueType) throws IOException {
     return new TypedTable<>(getTable(name), codecRegistry, keyType,
-        valueType);
+        valueType, parallelTableIteratorPool);
   }
 
   @Override
   public <K, V> TypedTable<K, V> getTable(
       String name, Codec<K> keyCodec, Codec<V> valueCodec, TableCache.CacheType cacheType) throws IOException {
-    return new TypedTable<>(getTable(name), keyCodec, valueCodec, cacheType);
+    return new TypedTable<>(getTable(name), keyCodec, valueCodec, cacheType, parallelTableIteratorPool);
   }
 
   @Override
   public <K, V> Table<K, V> getTable(String name,
       Class<K> keyType, Class<V> valueType,
       TableCache.CacheType cacheType) throws IOException {
-    return new TypedTable<>(getTable(name), codecRegistry, keyType, valueType, cacheType);
+    return new TypedTable<>(getTable(name), codecRegistry, keyType, valueType, cacheType, parallelTableIteratorPool);
   }
 
   @Override
   public ArrayList<Table> listTables() {
     ArrayList<Table> returnList = new ArrayList<>();
     for (ColumnFamily family : getColumnFamilies()) {
-      returnList.add(new RDBTable(db, family, rdbMetrics));
+      returnList.add(new RDBTable(db, family, rdbMetrics, parallelTableIteratorPool));
     }
     return returnList;
   }
@@ -463,6 +467,11 @@ public class RDBStore implements DBStore {
           dbUpdatesWrapper.isDBUpdateSuccess());
     }
     return dbUpdatesWrapper;
+  }
+
+  @Override
+  public ThrottledThreadpoolExecutor getParallelTableIteratorPool() {
+    return this.parallelTableIteratorPool;
   }
 
   @Override

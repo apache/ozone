@@ -406,9 +406,8 @@ public class TestRDBTableStore {
     final StringCodec codec = StringCodec.get();
     final String tableName = families.get(0);
     try (RDBTable testTable = rdbStore.getTable(tableName)) {
-      final TypedTable<String, String> typedTable = new TypedTable<>(
-          testTable, CodecRegistry.newBuilder().build(),
-          String.class, String.class);
+      final TypedTable<String, String> typedTable = new TypedTable<>(testTable, CodecRegistry.newBuilder().build(),
+          String.class, String.class, null);
 
       for (int i = 0; i < 20; i++) {
         final int valueSize = TypedTable.BUFFER_SIZE_DEFAULT * i / 4;

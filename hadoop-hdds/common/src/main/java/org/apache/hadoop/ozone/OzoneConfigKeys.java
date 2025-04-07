@@ -197,6 +197,10 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT =
       "ozone.client.ec.grpc.write.timeout";
   public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "30s";
+  public static final String OZONE_PARALLEL_DB_ITERATORS_CORE_POOL_SIZE = "ozone.db.parallel.iterators.core.pool.size";
+  public static final int OZONE_PARALLEL_DB_ITERATORS_CORE_POOL_SIZE_DEFAULT = 0;
+  public static final String OZONE_PARALLEL_DB_ITERATORS_MAX_POOL_SIZE = "ozone.db.parallel.iterators.max.pool.size";
+  public static final int OZONE_PARALLEL_DB_ITERATORS_MAX_POOL_SIZE_DEFAULT = 10;
 
 
   /**

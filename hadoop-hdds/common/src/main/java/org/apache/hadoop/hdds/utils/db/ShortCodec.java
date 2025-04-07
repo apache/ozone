@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
 import java.nio.ByteBuffer;
+import java.util.Comparator;
+import java.util.Objects;
 
 /**
  * Codec to serialize/deserialize {@link Short}.
@@ -26,6 +28,7 @@ import java.nio.ByteBuffer;
 public final class ShortCodec implements Codec<Short> {
 
   private static final ShortCodec INSTANCE = new ShortCodec();
+  private static final Comparator<Short> COMPARATOR = (o1, o2) -> Objects.compare(o1, o2, Short::compare);
 
   public static ShortCodec get() {
     return INSTANCE;
@@ -70,5 +73,10 @@ public final class ShortCodec implements Codec<Short> {
   @Override
   public Short copyObject(Short object) {
     return object;
+  }
+
+  @Override
+  public Comparator<Short> comparator() {
+    return COMPARATOR;
   }
 }

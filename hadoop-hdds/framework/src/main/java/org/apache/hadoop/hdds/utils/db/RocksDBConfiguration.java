@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OM;
+import static org.apache.hadoop.hdds.conf.ConfigTag.RECON;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
 import org.apache.hadoop.hdds.conf.Config;
@@ -84,6 +85,13 @@ public class RocksDBConfiguration {
           + "Default 0 means no limit.")
   private long walSizeLimit = 0;
 
+  @Config(key = "rocksdb.parallel.iterator.max.pool.size",
+      type = ConfigType.INT,
+      defaultValue = "10",
+      tags = {OM, SCM, DATANODE, RECON},
+      description = "Max pool size for parallely iterating a rocksdb table in ozone")
+  private int parallelIteratorMaxPoolSize = 10;
+
   public void setRocksdbLoggingEnabled(boolean enabled) {
     this.rocksdbLogEnabled = enabled;
   }
@@ -138,5 +146,9 @@ public class RocksDBConfiguration {
 
   public int getKeepLogFileNum() {
     return rocksdbKeepLogFileNum;
+  }
+
+  public int getParallelIteratorMaxPoolSize() {
+    return parallelIteratorMaxPoolSize;
   }
 }

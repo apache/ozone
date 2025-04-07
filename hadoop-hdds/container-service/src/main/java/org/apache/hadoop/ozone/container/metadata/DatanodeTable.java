@@ -20,10 +20,13 @@ package org.apache.hadoop.ozone.container.metadata;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.ratis.util.function.CheckedFunction;
+import org.slf4j.Logger;
 
 /**
  * Wrapper class to represent a table in a datanode RocksDB instance.
@@ -87,6 +90,14 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
     throw new UnsupportedOperationException("Iterating tables directly is not" +
         " supported for datanode containers due to differing schema " +
         "version.");
+  }
+
+  @Override
+  public void parallelTableOperation(
+      KEY startKey, KEY endKey, CheckedFunction<KeyValue<KEY, VALUE>, Void, IOException> operation,
+      Logger logger, int logPercentageThreshold)
+      throws IOException, ExecutionException, InterruptedException {
+    table.parallelTableOperation(startKey, endKey, operation, logger, logPercentageThreshold);
   }
 
   @Override

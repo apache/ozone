@@ -171,6 +171,9 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT = "5m";
   public static final String OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED =
       "ozone.om.snapshot.rocksdb.metrics.enabled";
+  public static final String OZONE_OM_SNAPSHOT_DB_PARALLEL_ITERATOR_MAX_POOL_SIZE =
+      "ozone.om.snapshot.db.parallel.iterator.pool.size";
+  public static final int OZONE_OM_SNAPSHOT_DB_PARALLEL_ITERATOR_MAX_POOL_SIZE_DEFAULT = 1;
   public static final boolean
       OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT = false;
 

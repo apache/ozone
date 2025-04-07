@@ -3963,6 +3963,14 @@
       OM grpc server netty boss event group size.
     </description>
   </property>
+  <property>
+    <name>ozone.om.snapshot.db.parallel.iterator.pool.size</name>
+    <value>1</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Max iterator pool size for parallely iterating through DB.
+    </description>
+  </property>
 
   <property>
     <name>ozone.om.grpc.workergroup.size</name>

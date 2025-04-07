@@ -15,29 +15,15 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.container.common.impl;
+package org.apache.hadoop.hdds.utils.db;
 
-import java.time.Clock;
-import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
-import org.apache.hadoop.hdds.utils.db.LongCodec;
+import java.io.IOException;
+import java.util.List;
+import org.rocksdb.LiveFileMetaData;
 
 /**
- * Helper utility to test container impl.
+ * Base table interface for Rocksdb.
  */
-public final class ContainerImplTestUtils {
-
-  private ContainerImplTestUtils() {
-  }
-
-  public static ContainerSet newContainerSet() {
-    return newContainerSet(1000);
-  }
-
-  public static ContainerSet newContainerSet(long recoveringTimeout) {
-    return ContainerSet.newRwContainerSet(new InMemoryTestTable<>(LongCodec.get()), recoveringTimeout);
-  }
-
-  public static ContainerSet newContainerSet(long recoveringTimeout, Clock clock) {
-    return new ContainerSet(new InMemoryTestTable<>(LongCodec.get()), recoveringTimeout, clock);
-  }
+public interface BaseRDBTable<KEY, VALUE> extends Table<KEY, VALUE> {
+  List<LiveFileMetaData> getTableSstFiles() throws IOException;
 }

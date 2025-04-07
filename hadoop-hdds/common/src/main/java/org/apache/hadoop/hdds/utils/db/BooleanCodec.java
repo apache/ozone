@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
+import java.util.Comparator;
+import java.util.Objects;
 
 /**
  * Codec to serialize/deserialize {@link Boolean}.
@@ -27,6 +29,7 @@ public final class BooleanCodec implements Codec<Boolean> {
   private static final byte TRUE = 1;
   private static final byte FALSE = 0;
   private static final BooleanCodec INSTANCE = new BooleanCodec();
+  private static final Comparator<Boolean> COMPARATOR = (o1, o2) -> Objects.compare(o1, o2, Boolean::compare);
 
   public static BooleanCodec get() {
     return INSTANCE;
@@ -74,5 +77,10 @@ public final class BooleanCodec implements Codec<Boolean> {
   @Override
   public Boolean copyObject(Boolean object) {
     return object;
+  }
+
+  @Override
+  public Comparator<Boolean> comparator() {
+    return COMPARATOR;
   }
 }

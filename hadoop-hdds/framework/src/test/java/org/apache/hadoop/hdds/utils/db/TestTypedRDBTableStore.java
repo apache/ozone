@@ -123,10 +123,8 @@ public class TestTypedRDBTableStore {
 
   private Table<String, String> createTypedTable(String name)
       throws IOException {
-    return new TypedTable<String, String>(
-        rdbStore.getTable(name),
-        codecRegistry,
-        String.class, String.class);
+    return new TypedTable<String, String>(rdbStore.getTable(name),
+        codecRegistry, String.class, String.class, rdbStore.getParallelTableIteratorPool());
   }
 
   @Test
@@ -253,7 +251,7 @@ public class TestTypedRDBTableStore {
     when(rdbTable.iterator((CodecBuffer) null))
         .thenThrow(new IOException());
     try (Table<String, String> testTable = new TypedTable<>(rdbTable,
-        codecRegistry, String.class, String.class)) {
+        codecRegistry, String.class, String.class, rdbStore.getParallelTableIteratorPool())) {
       assertThrows(IOException.class, testTable::iterator);
     }
   }
@@ -412,7 +410,7 @@ public class TestTypedRDBTableStore {
     try (Table<byte[], byte[]> testTable = new TypedTable<>(
             rdbStore.getTable("Ten"),
             codecRegistry,
-            byte[].class, byte[].class)) {
+            byte[].class, byte[].class, null)) {
       byte[] key = new byte[] {1, 2, 3};
       byte[] value = new byte[] {4, 5, 6};
       testTable.put(key, value);
