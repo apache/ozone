@@ -88,7 +88,7 @@ public class OMRatisLogRepair extends RepairTool {
       if (!isDryRun()) {
         Files.copy(segmentFile.toPath(), backupPath.toPath());
       }
-      System.out.println("File renamed successfully!");
+      System.out.println("File backed-up successfully!");
     } catch (IOException ex) {
       throw new RuntimeException("Error: Failed to take backup of the file. " +
           "It might be due to file locks or permission issues.");
@@ -96,6 +96,8 @@ public class OMRatisLogRepair extends RepairTool {
 
     LogSegmentPath pi = LogSegmentPath.matchLogSegment(this.segmentFile.toPath());
     if (pi == null) {
+      error("Deleting backup file as provided segmentFile is invalid.");
+      backupPath.delete();
       throw new RuntimeException("Invalid Segment File");
     }
     String tempOutput = segmentFile.getAbsolutePath() + ".skr.output";
@@ -161,7 +163,7 @@ public class OMRatisLogRepair extends RepairTool {
               .setStateMachineLogEntry(newEntry)
               .build();
 
-          info("Replacing {" + next.getStateMachineLogEntry().getLogData() + "} with EchoRPC command at index "
+          info("Replacing {" + oldRequest + "} with EchoRPC command at index "
               + next.getIndex());
 
           if (!isDryRun()) {
