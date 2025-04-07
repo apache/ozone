@@ -20,12 +20,12 @@ package org.apache.hadoop.ozone.om.request.util;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import java.io.IOException;
-import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.util.UUIDv7;
 
 /**
  * Utility class related to OM Multipart Upload.
@@ -41,7 +41,7 @@ public final class OMMultipartUploadUtils {
    * @return multipart upload ID
    */
   public static String getMultipartUploadId() {
-    return UUID.randomUUID() + "-" + UniqueId.next();
+    return UUIDv7.randomUUID() + "-" + UniqueId.next();
   }
 
   /**

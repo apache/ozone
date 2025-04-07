@@ -39,7 +39,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -56,6 +55,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
@@ -113,7 +113,7 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -617,7 +617,7 @@ public class SCMClientProtocolServer implements
       throws IOException {
     HddsProtos.Node result = null;
     try {
-      DatanodeDetails node = scm.getScmNodeManager().getNodeByUuid(uuid);
+      DatanodeDetails node = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
       if (node != null) {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
         result = HddsProtos.Node.newBuilder()
@@ -802,6 +802,7 @@ public class SCMClientProtocolServer implements
     } catch (Exception ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.CLOSE_PIPELINE, auditMap, ex));
+      throw ex;
     }
   }
 
@@ -812,20 +813,8 @@ public class SCMClientProtocolServer implements
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
-              .setScmId(scm.getScmStorageConfig().getScmId());
-      if (scm.getScmHAManager().getRatisServer() != null) {
-        builder.setRatisPeerRoles(
-            scm.getScmHAManager().getRatisServer().getRatisRoles());
-        builder.setScmRatisEnabled(true);
-      } else {
-        // In case, there is no ratis, there is no ratis role.
-        // This will just print the hostname with ratis port as the default
-        // behaviour.
-        String address = scm.getSCMHANodeDetails().getLocalNodeDetails()
-            .getRatisHostPortStr();
-        builder.setRatisPeerRoles(Arrays.asList(address));
-        builder.setScmRatisEnabled(false);
-      }
+              .setScmId(scm.getScmStorageConfig().getScmId())
+              .setPeerRoles(scm.getScmHAManager().getRatisServer().getRatisRoles());
       return builder.build();
     } catch (Exception ex) {
       auditSuccess = false;
@@ -1234,7 +1223,7 @@ public class SCMClientProtocolServer implements
     // get datanodes by ip or uuid
     List<DatanodeDetails> nodes = new ArrayList<>();
     if (!Strings.isNullOrEmpty(uuid)) {
-      nodes.add(scm.getScmNodeManager().getNodeByUuid(uuid));
+      nodes.add(scm.getScmNodeManager().getNode(DatanodeID.fromUuidString(uuid)));
     } else if (!Strings.isNullOrEmpty(address)) {
       nodes = scm.getScmNodeManager().getNodesByAddress(address);
     } else {
@@ -1444,7 +1433,7 @@ public class SCMClientProtocolServer implements
     Set<DatanodeDetails> returnSet = new TreeSet<>();
     List<DatanodeDetails> tmp = scm.getScmNodeManager()
         .getNodes(opState, nodeState);
-    if ((tmp != null) && (tmp.size() > 0)) {
+    if ((tmp != null) && (!tmp.isEmpty())) {
       returnSet.addAll(tmp);
     }
     return returnSet;

@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -28,7 +30,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -53,8 +54,6 @@ public class DiskBalancerManager {
   public static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerManager.class);
 
-
-  private OzoneConfiguration conf;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
   private final NodeManager nodeManager;
@@ -69,13 +68,10 @@ public class DiskBalancerManager {
                         EventPublisher eventPublisher,
                         SCMContext scmContext,
                         NodeManager nodeManager) {
-    this.conf = conf;
     this.scmNodeEventPublisher = eventPublisher;
     this.scmContext = scmContext;
     this.nodeManager = nodeManager;
-    this.useHostnames = conf.getBoolean(
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+    this.useHostnames = conf.getBoolean(HDDS_DATANODE_USE_DN_HOSTNAME, HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     this.statusMap = new ConcurrentHashMap<>();
   }
 
@@ -323,7 +319,7 @@ public class DiskBalancerManager {
     DiskBalancerConfiguration diskBalancerConfiguration =
         reportProto.hasDiskBalancerConf() ?
             DiskBalancerConfiguration.fromProtobuf(
-                reportProto.getDiskBalancerConf(), conf) :
+                reportProto.getDiskBalancerConf()) :
             new DiskBalancerConfiguration();
     long successMoveCount = reportProto.getSuccessMoveCount();
     long failureMoveCount = reportProto.getFailureMoveCount();

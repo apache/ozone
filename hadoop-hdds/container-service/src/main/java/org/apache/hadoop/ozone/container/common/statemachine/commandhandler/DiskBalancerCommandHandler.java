@@ -137,17 +137,4 @@ public class DiskBalancerCommandHandler implements CommandHandler {
   public int getQueuedCount() {
     return 0;
   }
-
-  private void startDiskBalancer(DiskBalancerConfiguration configuration) {
-    // Todo: add implementation to start DiskBalancer
-  }
-
-  private void stopDiskBalancer() {
-    // Todo: add implementation to stop DiskBalancer
-  }
-
-  private void updateDiskBalancer(DiskBalancerConfiguration
-      configuration) {
-    // Todo: add implementation to update diskBalancer configuration
-  }
 }

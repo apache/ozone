@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -252,10 +251,8 @@ public final class DiskBalancerConfiguration {
   }
 
   public static DiskBalancerConfiguration fromProtobuf(
-      @Nonnull HddsProtos.DiskBalancerConfigurationProto proto,
-      @Nonnull ConfigurationSource configurationSource) {
-    DiskBalancerConfiguration config =
-        configurationSource.getObject(DiskBalancerConfiguration.class);
+      @Nonnull HddsProtos.DiskBalancerConfigurationProto proto) {
+    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
     if (proto.hasThreshold()) {
       config.setThreshold(proto.getThreshold());
     }

@@ -23,10 +23,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
@@ -45,6 +45,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -56,9 +57,8 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.SortedSet;
+import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -89,7 +89,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
-import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -312,7 +311,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table snapshotRenamedTable;
   private Table compactionLogTable;
 
-  private boolean ignorePipelineinKey;
   private Table deletedDirTable;
 
   private OzoneManager ozoneManager;
@@ -350,9 +348,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
     this.lock = new OzoneManagerLock(conf);
     this.omEpoch = OmUtils.getOMEpoch();
-    // For test purpose only
-    ignorePipelineinKey = conf.getBoolean(
-        "ozone.om.ignore.pipeline", Boolean.TRUE);
     start(conf);
   }
 
@@ -397,7 +392,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     omEpoch = 0;
     int maxOpenFiles = conf.getInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
-    setStore(loadDB(conf, dir, name, true, Optional.of(Boolean.TRUE), maxOpenFiles, false, false));
+    setStore(loadDB(conf, dir, name, true, Optional.of(Boolean.TRUE),
+        maxOpenFiles, false, false, true));
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
   }
@@ -430,7 +426,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         checkSnapshotDirExist(checkpoint);
       }
       setStore(loadDB(conf, metaDir, dbName, false,
-          java.util.Optional.of(Boolean.TRUE), maxOpenFiles, false, false));
+          java.util.Optional.of(Boolean.TRUE), maxOpenFiles, false, false,
+          conf.getBoolean(OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED,
+              OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT)));
       initializeOmTables(CacheType.PARTIAL_CACHE, false);
     } catch (IOException e) {
       stop();
@@ -553,9 +551,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         ExitUtils.terminate(1, errorMsg, LOG);
       }
 
-      RocksDBConfiguration rocksDBConfiguration =
-          configuration.getObject(RocksDBConfiguration.class);
-
       // As When ratis is not enabled, when we perform put/commit to rocksdb we
       // should turn on sync flag. This needs to be done as when we return
       // response to client it is considered as complete, but if we have
@@ -576,29 +571,29 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles) throws IOException {
-    return loadDB(configuration, metaDir, OM_DB_NAME, false, java.util.Optional.empty(), maxOpenFiles, true, true);
+    return loadDB(configuration, metaDir, OM_DB_NAME, false,
+        java.util.Optional.empty(), maxOpenFiles, true, true, true);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-                               String dbName, boolean readOnly,
-                               java.util.Optional<Boolean> disableAutoCompaction,
-                               int maxOpenFiles,
-                               boolean enableCompactionDag,
-                               boolean createCheckpointDirs)
+      String dbName, boolean readOnly,
+      java.util.Optional<Boolean> disableAutoCompaction,
+      int maxOpenFiles,
+      boolean enableCompactionDag,
+      boolean createCheckpointDirs,
+      boolean enableRocksDBMetrics)
       throws IOException {
-    final int maxFSSnapshots = configuration.getInt(
-        OZONE_OM_FS_SNAPSHOT_MAX_LIMIT, OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
     RocksDBConfiguration rocksDBConfiguration =
         configuration.getObject(RocksDBConfiguration.class);
     DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
         rocksDBConfiguration).setName(dbName)
         .setOpenReadOnly(readOnly)
         .setPath(Paths.get(metaDir.getPath()))
-        .setMaxFSSnapshots(maxFSSnapshots)
         .setEnableCompactionDag(enableCompactionDag)
         .setCreateCheckpointDirs(createCheckpointDirs)
-        .setMaxNumberOfOpenFiles(maxOpenFiles);
+        .setMaxNumberOfOpenFiles(maxOpenFiles)
+        .setEnableRocksDbMetrics(enableRocksDBMetrics);
     disableAutoCompaction.ifPresent(
             dbStoreBuilder::disableDefaultCFAutoCompaction);
     return addOMTablesAndCodecs(dbStoreBuilder).build();
@@ -1710,7 +1705,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             if (Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),
                 Optional.ofNullable(previousSnapshotInfo).map(SnapshotInfo::getSnapshotId))) {
               // If all the versions are not reclaimable, then do nothing.
-              if (notReclaimableKeyInfoList.size() > 0 &&
+              if (!notReclaimableKeyInfoList.isEmpty() &&
                   notReclaimableKeyInfoList.size() !=
                       infoList.getOmKeyInfoList().size()) {
                 keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
@@ -1936,12 +1931,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public MultipartUploadKeys getMultipartUploadKeys(
+  public List<OmMultipartUpload> getMultipartUploadKeys(
       String volumeName, String bucketName, String prefix, String keyMarker,
       String uploadIdMarker, int maxUploads, boolean noPagination) throws IOException {
 
-    MultipartUploadKeys.Builder resultBuilder = MultipartUploadKeys.newBuilder();
-    SortedSet<String> responseKeys = new TreeSet<>();
+    SortedMap<String, OmMultipartKeyInfo> responseKeys = new TreeMap<>();
     Set<String> aborted = new HashSet<>();
 
     String prefixKey =
@@ -1964,9 +1958,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       String cacheKey = cacheEntry.getKey().getCacheKey();
       if (cacheKey.startsWith(prefixKey)) {
         // Check if it is marked for delete, due to abort mpu
-        if (cacheEntry.getValue().getCacheValue() != null &&
+        OmMultipartKeyInfo multipartKeyInfo = cacheEntry.getValue().getCacheValue();
+        if (multipartKeyInfo != null &&
             cacheKey.compareTo(seekKey) >= 0) {
-          responseKeys.add(cacheKey);
+          responseKeys.put(cacheKey, multipartKeyInfo);
         } else {
           aborted.add(cacheKey);
         }
@@ -1984,35 +1979,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
         // If it is marked for abort, skip it.
         if (!aborted.contains(entry.getKey())) {
-          responseKeys.add(entry.getKey());
+          responseKeys.put(entry.getKey(), entry.getValue());
           dbKeysCount++;
         }
       }
     }
 
-    if (noPagination) {
-      resultBuilder.setKeys(responseKeys);
-      return resultBuilder.build();
+    List<OmMultipartUpload> result = new ArrayList<>(responseKeys.size());
+
+    for (Map.Entry<String, OmMultipartKeyInfo> entry : responseKeys.entrySet()) {
+      OmMultipartUpload multipartUpload = OmMultipartUpload.from(entry.getKey());
+
+      multipartUpload.setCreationTime(
+          Instant.ofEpochMilli(entry.getValue().getCreationTime()));
+      multipartUpload.setReplicationConfig(
+          entry.getValue().getReplicationConfig());
+
+      result.add(multipartUpload);
     }
 
-    String lastKey = responseKeys.stream()
-        .skip(maxUploads)
-        .findFirst()
-        .orElse(null);
-    if (lastKey != null) {
-      // implies the keyset size is greater than maxUploads
-      OmMultipartUpload lastKeyMultipartUpload = OmMultipartUpload.from(lastKey);
-      resultBuilder.setNextKeyMarker(lastKeyMultipartUpload.getKeyName())
-          .setNextUploadIdMarker(lastKeyMultipartUpload.getUploadId())
-          .setIsTruncated(true);
-      
-      // keep the [0, maxUploads] keys
-      responseKeys = responseKeys.subSet(responseKeys.first(), lastKey);
-    }
-
-    return resultBuilder
-      .setKeys(responseKeys)
-      .build();
+    return noPagination || result.size() <= maxUploads ? result : result.subList(0, maxUploads + 1);
   }
 
   @Override

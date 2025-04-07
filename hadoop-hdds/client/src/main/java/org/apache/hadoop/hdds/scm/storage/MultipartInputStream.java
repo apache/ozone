@@ -83,7 +83,7 @@ public class MultipartInputStream extends ExtendedInputStream {
 
     int totalReadLen = 0;
     while (strategy.getTargetLength() > 0) {
-      if (partStreams.size() == 0 ||
+      if (partStreams.isEmpty() ||
           partStreams.size() - 1 <= partIndex &&
               partStreams.get(partIndex).getRemaining() == 0) {
         return totalReadLen == 0 ? EOF : totalReadLen;

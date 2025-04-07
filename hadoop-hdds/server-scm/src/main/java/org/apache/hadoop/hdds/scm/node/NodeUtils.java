@@ -24,15 +24,11 @@ import java.net.UnknownHostException;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Util class for Node operations.
  */
 public final class NodeUtils {
-
-  private static final Logger LOG = LoggerFactory.getLogger(NodeUtils.class);
 
   private NodeUtils() {
   }
@@ -57,7 +53,7 @@ public final class NodeUtils {
         dnsName = addr.getHostAddress();
       }
       List<DatanodeDetails> found = nodeManager.getNodesByAddress(dnsName);
-      if (found.size() == 0) {
+      if (found.isEmpty()) {
         throw new InvalidHostStringException("Host " + host.getRawHostname()
             + " (" + dnsName + ") is not running any datanodes registered"
             + " with SCM."

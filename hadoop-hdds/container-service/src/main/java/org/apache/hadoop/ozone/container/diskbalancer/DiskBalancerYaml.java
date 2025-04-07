@@ -18,12 +18,10 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
+import java.io.InputStream;
 import java.io.Writer;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import org.apache.hadoop.hdds.server.YamlUtils;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -52,8 +50,7 @@ public final class DiskBalancerYaml {
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.FLOW);
     Yaml yaml = new Yaml(options);
 
-    try (Writer writer = new OutputStreamWriter(
-        new FileOutputStream(path), StandardCharsets.UTF_8)) {
+    try (Writer writer = Files.newBufferedWriter(path.toPath())) {
       yaml.dump(getDiskBalancerInfoYaml(diskBalancerInfo), writer);
     }
   }
@@ -65,7 +62,7 @@ public final class DiskBalancerYaml {
       throws IOException {
     DiskBalancerInfo diskBalancerInfo;
 
-    try (FileInputStream inputFileStream = new FileInputStream(path)) {
+    try (InputStream inputFileStream = Files.newInputStream(path.toPath())) {
       DiskBalancerInfoYaml diskBalancerInfoYaml;
       try {
         diskBalancerInfoYaml =

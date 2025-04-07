@@ -63,6 +63,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -310,6 +311,13 @@ public class TestEndPoint {
 
       assertEquals("different_cluster_id", layout1.getClusterID());
       assertNotEquals(scmServerImpl.getClusterId(), layout1.getClusterID());
+
+      // another call() with OzoneContainer already started should not write the file
+      FileUtils.forceDelete(layout1.getVersionFile());
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+      versionTask.call();
+      assertEquals(StorageState.NOT_INITIALIZED, new DatanodeLayoutStorage(ozoneConf, "any").getState());
+
       FileUtils.forceDelete(storageDir);
     }
   }
@@ -424,7 +432,7 @@ public class TestEndPoint {
     when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     RegisterEndpointTask endpointTask =
-        new RegisterEndpointTask(rpcEndPoint, conf, ozoneContainer,
+        new RegisterEndpointTask(rpcEndPoint, ozoneContainer,
             mock(StateContext.class), versionManager);
     if (!clearDatanodeDetails) {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
@@ -515,10 +523,10 @@ public class TestEndPoint {
   }
 
   @Test
-  public void testHeartbeatWithCommandStatusReport() throws Exception {
+  public void testHeartbeatWithCommandStatusReport(@TempDir File endPointTempDir) throws Exception {
     DatanodeDetails dataNode = randomDatanodeDetails();
     try (EndpointStateMachine rpcEndPoint =
-        createEndpoint(SCMTestUtils.getConf(tempDir),
+        createEndpoint(SCMTestUtils.getConf(endPointTempDir),
             serverAddress, 1000)) {
       // Add some scmCommands for heartbeat response
       addScmCommands();

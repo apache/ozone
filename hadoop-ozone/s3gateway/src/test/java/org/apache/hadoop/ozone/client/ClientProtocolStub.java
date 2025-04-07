@@ -709,6 +709,7 @@ public class ClientProtocolStub implements ClientProtocol {
     return null;
   }
   
+  @Override
   public void deleteSnapshot(String volumeName,
       String bucketName, String snapshotName)
       throws IOException {
@@ -721,6 +722,7 @@ public class ClientProtocolStub implements ClientProtocol {
     return null;
   }
 
+  @Override
   public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType) throws IOException {
     return null;

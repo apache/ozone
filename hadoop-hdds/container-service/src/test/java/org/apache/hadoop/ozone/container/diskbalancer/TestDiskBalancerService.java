@@ -106,7 +106,7 @@ public class TestDiskBalancerService {
       volume.incrementUsedSpace(volume.getCurrentUsage().getCapacity() / 2);
     }
 
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
@@ -143,7 +143,7 @@ public class TestDiskBalancerService {
   @ContainerTestVersionInfo.ContainerTest
   public void testPolicyClassInitialization(ContainerTestVersionInfo versionInfo) throws IOException {
     setLayoutAndSchemaForTest(versionInfo);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
@@ -165,7 +165,7 @@ public class TestDiskBalancerService {
 
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < volumeCount; i++) {
-      sb.append(base + "/vol" + i);
+      sb.append(base).append("/vol").append(i);
       sb.append(",");
     }
     return sb.substring(0, sb.length() - 1);
@@ -225,7 +225,7 @@ public class TestDiskBalancerService {
       }
     }
 
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
@@ -239,7 +239,7 @@ public class TestDiskBalancerService {
         (totalCapacity * expectedBytesToMovePercent) / 100.0 * totalOverUtilisedVolumes);
 
     // data precision loss due to double data involved in calculation
-    assertEquals(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(volumeSet)) <= 1, true);
+    assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(volumeSet)) <= 1);
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,

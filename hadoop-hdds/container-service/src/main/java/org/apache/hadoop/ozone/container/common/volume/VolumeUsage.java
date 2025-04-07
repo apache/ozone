@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT;
@@ -31,17 +28,71 @@ import java.util.Collection;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageSize;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.CachingSpaceUsageSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Class that wraps the space df of the Datanode Volumes used by SCM
- * containers.
+ * Stores information about a disk/volume.
+ *
+ * Since we have a reserved space for each volume for other usage,
+ * let's clarify the space values a bit here:
+ * - used: hdds actual usage.
+ * - avail: remaining space for hdds usage.
+ * - reserved: total space for other usage.
+ * - capacity: total space for hdds usage.
+ * - other: space used by other service consuming the same volume.
+ * - fsAvail: reported remaining space from local fs.
+ * - fsUsed: reported total used space from local fs.
+ * - fsCapacity: reported total capacity from local fs.
+ * - minVolumeFreeSpace (mvfs) : determines the free space for closing
+     containers.This is like adding a few reserved bytes to reserved space.
+     Dn's will send close container action to SCM at this limit, and it is
+     configurable.
+
+ *
+ * <pre>
+ * {@code
+ * |----used----|   (avail)   |++mvfs++|++++reserved+++++++|
+ * |<-     capacity                  ->|
+ *              |     fsAvail      |-------other-----------|
+ * |<-                   fsCapacity                      ->|
+ * }</pre>
+ * <pre>
+ * What we could directly get from local fs:
+ *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsAvail)
+ * We could get from config:
+ *     reserved
+ * Get from cmd line:
+ *     used: from cmd 'du' (by default)
+ * Get from calculation:
+ *     capacity = fsCapacity - reserved
+ *     other = fsUsed - used
+ *
+ * The avail is the result we want from calculation.
+ * So, it could be:
+ * A) avail = capacity - used
+ * B) avail = fsAvail - Max(reserved - other, 0);
+ *
+ * To be Conservative, we could get min
+ *     avail = Max(Min(A, B), 0);
+ *
+ * If we have a dedicated disk for hdds and are not using the reserved space,
+ * then we should use DedicatedDiskSpaceUsage for
+ * `hdds.datanode.du.factory.classname`,
+ * Then it is much simpler, since we don't care about other usage:
+ * {@code
+ *  |----used----|             (avail)/fsAvail              |
+ *  |<-              capacity/fsCapacity                  ->|
+ * }
+ *
+ *  We have avail == fsAvail.
+ *  </pre>
  */
 public class VolumeUsage {
 
@@ -124,68 +175,21 @@ public class VolumeUsage {
     source.refreshNow();
   }
 
-  public long getReservedBytes() {
+  public long getReservedInBytes() {
     return reservedInBytes;
   }
 
-  /**
-   * Convenience class to calculate minimum free space.
-   */
-  public static class MinFreeSpaceCalculator {
-    private final boolean minFreeSpaceConfigured;
-    private final boolean minFreeSpacePercentConfigured;
-    private final long freeSpace;
-    private float freeSpacePercent;
-    private final long defaultFreeSpace;
-    public MinFreeSpaceCalculator(ConfigurationSource conf) {
-      // cache these values to avoid repeated lookups
-      minFreeSpaceConfigured = conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
-      minFreeSpacePercentConfigured = conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT);
-      freeSpace = (long)conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT, StorageUnit.BYTES);
-      if (minFreeSpacePercentConfigured) {
-        freeSpacePercent = Float.parseFloat(
-            conf.get(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT));
-      }
-      StorageSize measure = StorageSize.parse(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
-      double byteValue = measure.getUnit().toBytes(measure.getValue());
-      defaultFreeSpace = (long)StorageUnit.BYTES.fromBytes(byteValue);
-    }
-
-    /**
-     * If 'hdds.datanode.volume.min.free.space' is defined,
-     * it will be honored first. If it is not defined and
-     * 'hdds.datanode.volume.min.free.space' is defined, it will honor this
-     * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
-     */
-    public long get(long capacity) {
-      if (minFreeSpaceConfigured && minFreeSpacePercentConfigured) {
-        LOG.error(
-            "Both {} and {} are set. Set either one, not both. If both are set,"
-                + "it will use default value which is {} as min free space",
-            HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
-            HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
-            HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
-        return defaultFreeSpace;
-      }
-
-      if (minFreeSpaceConfigured) {
-        return freeSpace;
-      } else if (minFreeSpacePercentConfigured) {
-        return (long) (capacity * freeSpacePercent);
-      }
-      // either properties are not configured,then return
-      // HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT
-      return defaultFreeSpace;
-    }
+  private static long getUsableSpace(
+      long available, long committed, long minFreeSpace) {
+    return available - committed - minFreeSpace;
   }
 
-  public static boolean hasVolumeEnoughSpace(long volumeAvailableSpace,
-                                             long volumeCommittedBytesCount,
-                                             long requiredSpace,
-                                             long volumeFreeSpaceToSpare) {
-    return (volumeAvailableSpace - volumeCommittedBytesCount) >
-        Math.max(requiredSpace, volumeFreeSpaceToSpare);
+  public static long getUsableSpace(StorageReportProto report) {
+    return getUsableSpace(report.getRemaining(), report.getCommitted(), report.getFreeSpaceToSpare());
+  }
+
+  public static long getUsableSpace(StorageLocationReport report) {
+    return getUsableSpace(report.getRemaining(), report.getCommitted(), report.getFreeSpaceToSpare());
   }
 
   private static long getReserved(ConfigurationSource conf, String rootDir,

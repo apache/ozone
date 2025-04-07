@@ -28,7 +28,7 @@ import picocli.CommandLine;
 public class BucketUri implements CommandLine.ITypeConverter<OzoneAddress> {
 
   private static final String OZONE_BUCKET_URI_DESCRIPTION =
-      "URI of the volume/bucket.\n" + Shell.OZONE_URI_DESCRIPTION;
+      "URI of the bucket (format: volume/bucket).\n" + Shell.OZONE_URI_DESCRIPTION;
 
   @CommandLine.Parameters(index = "0", arity = "1..1",
       description = OZONE_BUCKET_URI_DESCRIPTION,

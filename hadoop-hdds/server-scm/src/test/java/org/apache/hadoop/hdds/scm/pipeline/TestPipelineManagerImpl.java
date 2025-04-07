@@ -582,8 +582,7 @@ public class TestPipelineManagerImpl {
         pipeline.getPipelineState());
 
     // Now, "unregister" one of the nodes in the pipeline
-    DatanodeDetails firstDN = nodeManager.getNodeByUuid(
-        pipeline.getNodes().get(0).getUuidString());
+    DatanodeDetails firstDN = nodeManager.getNode(pipeline.getNodes().get(0).getID());
     nodeManager.getClusterNetworkTopologyMap().remove(firstDN);
 
     pipelineManager.scrubPipelines();
@@ -636,7 +635,7 @@ public class TestPipelineManagerImpl {
     // Simulate safemode check exiting.
     scmContext.updateSafeModeStatus(
         new SCMSafeModeManager.SafeModeStatus(true, true));
-    GenericTestUtils.waitFor(() -> pipelineManager.getPipelines().size() != 0,
+    GenericTestUtils.waitFor(() -> !pipelineManager.getPipelines().isEmpty(),
         100, 10000);
     pipelineManager.close();
   }
@@ -868,7 +867,7 @@ public class TestPipelineManagerImpl {
     doThrow(SCMException.class).when(pipelineManagerSpy)
         .createPipeline(any(), any(), anyList());
     provider = new WritableRatisContainerProvider(
-        conf, pipelineManagerSpy, containerManager, pipelineChoosingPolicy);
+        pipelineManagerSpy, containerManager, pipelineChoosingPolicy);
 
     // Add a single pipeline to manager, (in the allocated state)
     allocatedPipeline = pipelineManager.createPipeline(repConfig);

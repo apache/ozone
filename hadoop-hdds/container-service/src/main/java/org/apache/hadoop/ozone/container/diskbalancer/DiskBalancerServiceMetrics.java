@@ -140,15 +140,14 @@ public final class DiskBalancerServiceMetrics {
   @Override
   public String toString() {
     StringBuffer buffer = new StringBuffer();
-    buffer.append("successCount = " + successCount.value()).append("\t")
-        .append("successBytes = " + successBytes.value()).append("\t")
-        .append("failureCount = " + failureCount.value()).append("\t")
-        .append("moveSuccessTime = " + moveSuccessTime.lastStat().mean()).append("\t")
-        .append("moveFailureTime = " + moveFailureTime.lastStat().mean()).append("\t")
-        .append("idleLoopNoAvailableVolumePairCount = " +
-            idleLoopNoAvailableVolumePairCount.value()).append("\t")
-        .append("idleLoopExceedsBandwidthCount = " +
-            idleLoopExceedsBandwidthCount.value());
+    buffer.append("successCount = ").append(successCount.value()).append("\t")
+        .append("successBytes = ").append(successBytes.value()).append("\t")
+        .append("failureCount = ").append(failureCount.value()).append("\t")
+        .append("moveSuccessTime = ").append(moveSuccessTime.lastStat().mean()).append("\t")
+        .append("moveFailureTime = ").append(moveFailureTime.lastStat().mean()).append("\t")
+        .append("idleLoopNoAvailableVolumePairCount = ")
+        .append(idleLoopNoAvailableVolumePairCount.value()).append("\t")
+        .append("idleLoopExceedsBandwidthCount = ").append(idleLoopExceedsBandwidthCount.value());
     return buffer.toString();
   }
 }

@@ -110,7 +110,7 @@ public class StateContext {
 
   static final Logger LOG =
       LoggerFactory.getLogger(StateContext.class);
-  private final Queue<SCMCommand> commandQueue;
+  private final Queue<SCMCommand<?>> commandQueue;
   private final Map<Long, CommandStatus> cmdStatusMap;
   private final Lock lock;
   private final DatanodeStateMachine parentDatanodeStateMachine;
@@ -606,7 +606,7 @@ public class StateContext {
     }
 
     ThreadPoolExecutor ex = (ThreadPoolExecutor) executor;
-    if (ex.getQueue().size() == 0) {
+    if (ex.getQueue().isEmpty()) {
       return true;
     }
 
@@ -754,7 +754,7 @@ public class StateContext {
    *
    * @return SCMCommand or Null.
    */
-  public SCMCommand getNextCommand() {
+  public SCMCommand<?> getNextCommand() {
     lock.lock();
     try {
       initTermOfLeaderSCM();
@@ -788,7 +788,7 @@ public class StateContext {
    *
    * @param command - SCMCommand.
    */
-  public void addCommand(SCMCommand command) {
+  public void addCommand(SCMCommand<?> command) {
     lock.lock();
     try {
       if (commandQueue.size() >= maxCommandQueueLimit) {
@@ -808,7 +808,7 @@ public class StateContext {
     Map<SCMCommandProto.Type, Integer> summary = new HashMap<>();
     lock.lock();
     try {
-      for (SCMCommand cmd : commandQueue) {
+      for (SCMCommand<?> cmd : commandQueue) {
         summary.put(cmd.getType(), summary.getOrDefault(cmd.getType(), 0) + 1);
       }
     } finally {
@@ -848,7 +848,7 @@ public class StateContext {
    *
    * @param cmd - {@link SCMCommand}.
    */
-  public void addCmdStatus(SCMCommand cmd) {
+  public void addCmdStatus(SCMCommand<?> cmd) {
     if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
       addCmdStatus(cmd.getId(),
           DeleteBlockCommandStatusBuilder.newBuilder()

@@ -42,13 +42,13 @@ public class DiskBalancerCommonOptions {
    * @return if the check passed
    */
   public boolean check() {
-    if (datanodes.size() == 0 && !allHosts) {
+    if (datanodes.isEmpty() && !allHosts) {
       System.out.println("Datanode not specified. Please specify at least " +
           "one datanode or use \"-a(--all)\" to start diskBalancer " +
           "on all datanodes");
       return false;
     }
-    if (datanodes.size() != 0 && allHosts) {
+    if (!datanodes.isEmpty() && allHosts) {
       System.out.println("Invalid option selection. " +
           "Use either \"-a(--all)\" or \"-d(--datanodes)\".");
       return false;
@@ -61,7 +61,7 @@ public class DiskBalancerCommonOptions {
   }
 
   public Optional<List<String>> getSpecifiedDatanodes() {
-    return getDatanodes().size() == 0 ?
+    return getDatanodes().isEmpty() ?
         Optional.empty() : Optional.of(getDatanodes());
   }
 

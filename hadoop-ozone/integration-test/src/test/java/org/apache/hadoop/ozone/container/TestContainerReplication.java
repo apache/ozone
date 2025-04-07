@@ -26,12 +26,14 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACE
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.TestHelper.isContainerClosed;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.any;
 
@@ -279,6 +281,43 @@ class TestContainerReplication {
       container.getDispatcher().getHandler(KeyValueContainer).deleteContainer(containerData, true);
     }
     cluster.getHddsDatanode(dn).getDatanodeStateMachine().triggerHeartbeat();
+  }
+
+  @Flaky("HDDS-12760")
+  @Test
+  public void testImportedContainerIsClosed() throws Exception {
+    OzoneConfiguration conf = createConfiguration(false);
+    // create a 4 node cluster
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(4).build()) {
+      cluster.waitForClusterToBeReady();
+
+      try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+        List<DatanodeDetails> allNodes =
+            cluster.getHddsDatanodes().stream()
+                .map(HddsDatanodeService::getDatanodeDetails)
+                .collect(Collectors.toList());
+        // shutdown 4th node (node 3 is down now)
+        cluster.shutdownHddsDatanode(allNodes.get(allNodes.size() - 1));
+
+        createTestData(client);
+        final OmKeyLocationInfo keyLocation = lookupKeyFirstLocation(cluster);
+        long containerID = keyLocation.getContainerID();
+        waitForContainerClose(cluster, containerID);
+
+        // shutdown nodes 0 and 1. only node 2 is up now
+        for (int i = 0; i < 2; i++) {
+          cluster.shutdownHddsDatanode(allNodes.get(i));
+        }
+        waitForReplicaCount(containerID, 1, cluster);
+
+        // bring back up the 4th node
+        cluster.restartHddsDatanode(allNodes.get(allNodes.size() - 1), false);
+
+        // the container should have been imported on the 4th node
+        waitForReplicaCount(containerID, 2, cluster);
+        assertTrue(isContainerClosed(cluster, containerID, allNodes.get(allNodes.size() - 1)));
+      }
+    }
   }
 
 

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
@@ -57,7 +56,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -472,18 +470,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new CommandStatusReportHandler();
 
     NewNodeHandler newNodeHandler = new NewNodeHandler(pipelineManager,
-        scmDecommissionManager, configuration, serviceManager);
+        scmDecommissionManager, serviceManager);
     NodeAddressUpdateHandler nodeAddressUpdateHandler =
             new NodeAddressUpdateHandler(pipelineManager,
                     scmDecommissionManager, serviceManager);
     StaleNodeHandler staleNodeHandler =
-        new StaleNodeHandler(scmNodeManager, pipelineManager, configuration);
+        new StaleNodeHandler(scmNodeManager, pipelineManager);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
         pipelineManager, containerManager);
     StartDatanodeAdminHandler datanodeStartAdminHandler =
         new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
     ReadOnlyHealthyToHealthyNodeHandler readOnlyHealthyToHealthyNodeHandler =
-        new ReadOnlyHealthyToHealthyNodeHandler(configuration, serviceManager);
+        new ReadOnlyHealthyToHealthyNodeHandler(serviceManager);
     HealthyReadOnlyNodeHandler
         healthyReadOnlyNodeHandler =
         new HealthyReadOnlyNodeHandler(scmNodeManager,
@@ -498,7 +496,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new IncrementalContainerReportHandler(
             scmNodeManager, containerManager, scmContext);
     PipelineActionHandler pipelineActionHandler =
-        new PipelineActionHandler(pipelineManager, scmContext, configuration);
+        new PipelineActionHandler(pipelineManager, scmContext);
     DiskBalancerReportHandler diskBalancerReportHandler =
         new DiskBalancerReportHandler(diskBalancerManager);
 
@@ -716,7 +714,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
         conf.getClass(
-            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
             TableMapping.class, DNSToSwitchMapping.class);
     DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
         dnsToSwitchMappingClass, conf);
@@ -1103,7 +1101,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       int readThreads)
       throws IOException {
 
-    RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
+    RPC.Server rpcServer = new RPC.Builder(conf)
         .setProtocol(protocol)
         .setInstance(instance)
         .setBindAddress(addr.getHostString())
@@ -1112,7 +1110,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         .setNumReaders(readThreads)
         .setVerbose(false)
         .setSecretManager(null)
-        .build());
+        .build();
 
     HddsServerUtil.addPBProtocol(conf, protocol, instance, rpcServer);
     return rpcServer;
@@ -1343,7 +1341,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Preconditions.checkNotNull(scmNodeInfoList, "scmNodeInfoList is null");
 
     InetSocketAddress scmAddress = null;
-    if (SCMHAUtils.getScmServiceId(conf) != null) {
+    if (HddsUtils.getScmServiceId(conf) != null) {
       for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
         if (haDetails.getLocalNodeDetails().getNodeId() != null
             && haDetails.getLocalNodeDetails().getNodeId().equals(
@@ -2150,7 +2148,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public String getPrimordialNode() {
     String primordialNode = SCMHAUtils.getPrimordialSCM(configuration);
     // primordialNode can be nodeId too . If it is then return hostname.
-    if (SCMHAUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
+    if (HddsUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
       List<SCMNodeDetails> localAndPeerNodes =
           new ArrayList<>(scmHANodeDetails.getPeerNodeDetails());
       localAndPeerNodes.add(getSCMHANodeDetails().getLocalNodeDetails());

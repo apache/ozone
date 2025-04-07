@@ -91,7 +91,6 @@ public class SCMSafeModeManager implements SafeModeManager {
   private Set<String> preCheckRules = new HashSet<>(1);
   private ConfigurationSource config;
   private static final String CONT_EXIT_RULE = "ContainerSafeModeRule";
-  private static final String DN_EXIT_RULE = "DataNodeSafeModeRule";
   private static final String HEALTHY_PIPELINE_EXIT_RULE =
       "HealthyPipelineSafeModeRule";
   private static final String ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE =

@@ -44,6 +44,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
+import com.google.protobuf.TextFormat;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -286,7 +287,7 @@ public class SCMDatanodeProtocolServer implements
         auditMap.append(" encodedToken: \"").append(cmd.getEncodedToken()).append("\"");
         auditMap.append(" deadlineMsSinceEpoch: ").append(cmd.getDeadlineMsSinceEpoch());
       } else {
-        auditMap.append(cmd);
+        auditMap.append(TextFormat.shortDebugString(cmd));
       }
       auditMap.append(", ");
     }
@@ -302,14 +303,14 @@ public class SCMDatanodeProtocolServer implements
   public SCMHeartbeatResponseProto sendHeartbeat(
       SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
-    for (SCMCommand cmd : heartbeatDispatcher.dispatch(heartbeat)) {
+    for (SCMCommand<?> cmd : heartbeatDispatcher.dispatch(heartbeat)) {
       cmdResponses.add(getCommandResponse(cmd, scm));
     }
     final OptionalLong term = getTermIfLeader();
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeUUID", heartbeat.getDatanodeDetails().getUuid());
-    auditMap.put("command", flatten(constructCommandAuditMap(cmdResponses)));
+    auditMap.put("command", constructCommandAuditMap(cmdResponses));
     term.ifPresent(t -> auditMap.put("term", String.valueOf(t)));
     try {
       SCMHeartbeatResponseProto.Builder builder =
@@ -352,7 +353,7 @@ public class SCMDatanodeProtocolServer implements
    * @throws IOException
    */
   @VisibleForTesting
-  public static SCMCommandProto getCommandResponse(SCMCommand cmd,
+  public static SCMCommandProto getCommandResponse(SCMCommand<?> cmd,
       OzoneStorageContainerManager scm) throws IOException, TimeoutException {
     SCMCommandProto.Builder builder = SCMCommandProto.newBuilder()
         .setEncodedToken(cmd.getEncodedToken());
@@ -483,13 +484,6 @@ public class SCMDatanodeProtocolServer implements
         .withResult(AuditEventStatus.FAILURE)
         .withException(throwable)
         .build();
-  }
-
-  private static String flatten(String input) {
-    return input
-        .replaceAll(System.lineSeparator(), " ")
-        .trim()
-        .replaceAll(" +", " ");
   }
 
   /**

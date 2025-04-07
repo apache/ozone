@@ -70,7 +70,7 @@ public class TestContainerDataYaml {
    */
   private File createContainerFile(long containerID, int replicaIndex)
       throws IOException {
-    new File(testRoot).mkdirs();
+    assertTrue(new File(testRoot).mkdirs());
 
     String containerPath = containerID + ".container";
 
@@ -89,8 +89,7 @@ public class TestContainerDataYaml {
     File containerFile = new File(testRoot, containerPath);
 
     // Create .container file with ContainerData
-    ContainerDataYaml.createContainerFile(ContainerProtos.ContainerType
-        .KeyValueContainer, keyValueContainerData, containerFile);
+    ContainerDataYaml.createContainerFile(keyValueContainerData, containerFile);
 
     //Check .container file exists or not.
     assertTrue(containerFile.exists());
@@ -140,8 +139,7 @@ public class TestContainerDataYaml {
     kvData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
 
 
-    ContainerDataYaml.createContainerFile(ContainerProtos.ContainerType
-            .KeyValueContainer, kvData, containerFile);
+    ContainerDataYaml.createContainerFile(kvData, containerFile);
 
     // Reading newly updated data from .container file
     kvData =  (KeyValueContainerData) ContainerDataYaml.readContainerFile(
@@ -167,6 +165,8 @@ public class TestContainerDataYaml {
         kvData.lastDataScanTime().get().toEpochMilli());
     assertEquals(SCAN_TIME.toEpochMilli(),
         kvData.getDataScanTimestamp().longValue());
+
+    cleanup();
   }
 
   @ContainerLayoutTestInfo.ContainerTest

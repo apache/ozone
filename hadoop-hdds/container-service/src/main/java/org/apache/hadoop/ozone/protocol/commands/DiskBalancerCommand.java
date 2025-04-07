@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.protocol.commands;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerCommandProto;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
@@ -61,12 +60,10 @@ public class DiskBalancerCommand extends SCMCommand<DiskBalancerCommandProto> {
     return builder.build();
   }
 
-  public static DiskBalancerCommand getFromProtobuf(DiskBalancerCommandProto
-      diskbalancerCommandProto, ConfigurationSource configuration) {
+  public static DiskBalancerCommand getFromProtobuf(DiskBalancerCommandProto diskbalancerCommandProto) {
     Preconditions.checkNotNull(diskbalancerCommandProto);
     return new DiskBalancerCommand(diskbalancerCommandProto.getOpType(),
-        DiskBalancerConfiguration.fromProtobuf(
-            diskbalancerCommandProto.getDiskBalancerConf(), configuration));
+        DiskBalancerConfiguration.fromProtobuf(diskbalancerCommandProto.getDiskBalancerConf()));
   }
 
   public HddsProtos.DiskBalancerOpType getOpType() {

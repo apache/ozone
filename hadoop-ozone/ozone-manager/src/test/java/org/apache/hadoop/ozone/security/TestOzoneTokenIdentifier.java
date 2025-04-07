@@ -22,10 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
@@ -65,16 +65,6 @@ public class TestOzoneTokenIdentifier {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(TestOzoneTokenIdentifier.class);
-  private static String sslConfsDir;
-  private static final String EXCLUDE_CIPHERS =
-      "TLS_ECDHE_RSA_WITH_RC4_128_SHA,"
-          + "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA,  \n"
-          + "SSL_RSA_WITH_DES_CBC_SHA,"
-          + "SSL_DHE_RSA_WITH_DES_CBC_SHA,  "
-          + "SSL_RSA_EXPORT_WITH_RC4_40_MD5,\t \n"
-          + "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA,"
-          + "SSL_RSA_WITH_RC4_128_MD5";
-
 
   @Test
   public void testSignToken(@TempDir Path baseDir) throws GeneralSecurityException, IOException {
@@ -208,7 +198,6 @@ public class TestOzoneTokenIdentifier {
   public void testSymmetricTokenPerfHelper(String hmacAlgorithm, int keyLen) {
     final int testTokenCount = 1000;
     List<OzoneTokenIdentifier> tokenIds = new ArrayList<>();
-    List<byte[]> tokenPasswordSym = new ArrayList<>();
     for (int i = 0; i < testTokenCount; i++) {
       tokenIds.add(generateTestToken());
     }
@@ -234,8 +223,7 @@ public class TestOzoneTokenIdentifier {
 
     long startTime = Time.monotonicNowNanos();
     for (int i = 0; i < testTokenCount; i++) {
-      tokenPasswordSym.add(
-          signTokenSymmetric(tokenIds.get(i), mac, secretKey));
+      signTokenSymmetric(tokenIds.get(i), mac, secretKey);
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with {}({} symmetric key) is {} ns",
@@ -248,19 +236,20 @@ public class TestOzoneTokenIdentifier {
   @Test
   public void testReadWriteInProtobuf(@TempDir Path baseDir) throws IOException {
     OzoneTokenIdentifier id = getIdentifierInst();
-    File idFile = baseDir.resolve("tokenFile").toFile();
+    Path idFile = baseDir.resolve("tokenFile");
 
-    FileOutputStream fop = new FileOutputStream(idFile);
-    DataOutputStream dataOutputStream = new DataOutputStream(fop);
-    id.write(dataOutputStream);
-    fop.close();
+    try (OutputStream fop = Files.newOutputStream(idFile)) {
+      DataOutputStream dataOutputStream = new DataOutputStream(fop);
+      id.write(dataOutputStream);
+    }
 
-    FileInputStream fis = new FileInputStream(idFile);
-    DataInputStream dis = new DataInputStream(fis);
-    OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
+    try (InputStream fis = Files.newInputStream(idFile)) {
+      DataInputStream dis = new DataInputStream(fis);
+      OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
 
-    id2.readFields(dis);
-    assertEquals(id, id2);
+      id2.readFields(dis);
+      assertEquals(id, id2);
+    }
   }
 
 

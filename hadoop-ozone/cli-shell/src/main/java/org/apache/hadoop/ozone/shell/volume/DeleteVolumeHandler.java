@@ -144,7 +144,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
           }
         }
         // delete if any remaining keys left
-        if (keys.size() > 0) {
+        if (!keys.isEmpty()) {
           bucket.deleteKeys(keys);
         }
       }

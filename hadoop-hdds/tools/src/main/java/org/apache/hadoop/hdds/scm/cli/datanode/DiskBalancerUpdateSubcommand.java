@@ -69,7 +69,7 @@ public class DiskBalancerUpdateSubcommand extends ScmSubcommand {
     System.out.println("Update DiskBalancer Configuration on datanode(s):\n" +
         commonOptions.getHostString());
 
-    if (errors.size() > 0) {
+    if (!errors.isEmpty()) {
       for (DatanodeAdminError error : errors) {
         System.err.println("Error: " + error.getHostname() + ": "
             + error.getError());

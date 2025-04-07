@@ -69,7 +69,7 @@ public class TestNodeDecommissionManager {
 
   private NodeDecommissionManager decom;
   private StorageContainerManager scm;
-  private NodeManager nodeManager;
+  private SCMNodeManager nodeManager;
   private ContainerManager containerManager;
   private OzoneConfiguration conf;
   private static int id = 1;
@@ -79,13 +79,17 @@ public class TestNodeDecommissionManager {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     scm = HddsTestUtils.getScm(conf);
-    nodeManager = scm.getScmNodeManager();
+    nodeManager = (SCMNodeManager)scm.getScmNodeManager();
     containerManager = mock(ContainerManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
     when(containerManager.allocateContainer(any(ReplicationConfig.class), anyString()))
         .thenAnswer(invocation -> createMockContainer((ReplicationConfig)invocation.getArguments()[0],
             (String) invocation.getArguments()[1]));
+  }
+
+  void setContainers(DatanodeDetails datanode, Set<ContainerID> containers) throws NodeNotFoundException {
+    ScmNodeTestUtil.setContainers(nodeManager, datanode, containers);
   }
 
   private ContainerInfo createMockContainer(ReplicationConfig rep, String owner) {
@@ -425,7 +429,7 @@ public class TestNodeDecommissionManager {
     }
 
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
@@ -479,7 +483,7 @@ public class TestNodeDecommissionManager {
     }
 
     for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
-      nodeManager.setContainers(dn, idsEC);
+      setContainers(dn, idsEC);
     }
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
@@ -528,10 +532,10 @@ public class TestNodeDecommissionManager {
         });
 
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
-      nodeManager.setContainers(dn, idsEC);
+      setContainers(dn, idsEC);
     }
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
@@ -572,7 +576,7 @@ public class TestNodeDecommissionManager {
     }
 
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
 
     // decommission one node successfully
@@ -607,7 +611,7 @@ public class TestNodeDecommissionManager {
       idsRatis.add(container.containerID());
     }
 
-    nodeManager = mock(NodeManager.class);
+    nodeManager = mock(SCMNodeManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
     when(containerManager.getContainer(any(ContainerID.class)))
@@ -668,7 +672,7 @@ public class TestNodeDecommissionManager {
       idsRatis.add(container.containerID());
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
 
     decom.setMaintenanceConfigs(2, 1); // default config
@@ -768,7 +772,7 @@ public class TestNodeDecommissionManager {
       idsEC.add(container.containerID());
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
-      nodeManager.setContainers(dn, idsEC);
+      setContainers(dn, idsEC);
     }
 
     decom.setMaintenanceConfigs(2, 1); // default config
@@ -851,10 +855,10 @@ public class TestNodeDecommissionManager {
               (ContainerID)invocation.getArguments()[0]);
         });
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
-      nodeManager.setContainers(dn, idsEC);
+      setContainers(dn, idsEC);
     }
 
     decom.setMaintenanceConfigs(2, 1); // default config
@@ -925,7 +929,7 @@ public class TestNodeDecommissionManager {
       idsRatis.add(container.containerID());
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
 
     // put 2 nodes into maintenance successfully
@@ -965,7 +969,7 @@ public class TestNodeDecommissionManager {
       idsRatis.add(container.containerID());
     }
 
-    nodeManager = mock(NodeManager.class);
+    nodeManager = mock(SCMNodeManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
     when(containerManager.getContainer(any(ContainerID.class)))
@@ -1039,11 +1043,11 @@ public class TestNodeDecommissionManager {
 
   private NodeStatus getNodeOpState(DatanodeDetails dn, List<DatanodeDetails> dns) throws NodeNotFoundException {
     if (dn.equals(dns.get(0))) {
-      throw new NodeNotFoundException();
+      throw new NodeNotFoundException(dn.getID());
     }
     for (DatanodeDetails datanode : dns) {
       if (datanode.equals(dn)) {
-        return new NodeStatus(datanode.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
+        return NodeStatus.valueOf(datanode.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
       }
     }
     return null;

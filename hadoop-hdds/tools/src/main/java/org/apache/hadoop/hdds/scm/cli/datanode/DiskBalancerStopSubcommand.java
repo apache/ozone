@@ -51,7 +51,7 @@ public class DiskBalancerStopSubcommand extends ScmSubcommand {
 
     System.out.println("Stopping DiskBalancer on datanode(s):\n" +
         commonOptions.getHostString());
-    if (errors.size() > 0) {
+    if (!errors.isEmpty()) {
       for (DatanodeAdminError error : errors) {
         System.err.println("Error: " + error.getHostname() + ": "
             + error.getError());
