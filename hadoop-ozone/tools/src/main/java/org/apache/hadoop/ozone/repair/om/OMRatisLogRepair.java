@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -43,9 +45,14 @@ import picocli.CommandLine;
  * Tool to omit a raft log in a ratis segment file.
  */
 @CommandLine.Command(
-    name = "ratislogrepair",
-    description = "CLI to omit a raft log in a ratis segment file. " +
-        "Requires admin privileges.",
+    name = "skip-ratis-transaction",
+    aliases = "srt",
+    description = "CLI to omit a raft log in a ratis segment file. The raft log at the index specified " +
+        "is replaced with an EchoOM command (which is a dummy command). It is an offline command " +
+        "i.e., doesn't require OM to be running. " +
+        "The command should be run for the same transaction on all 3 OMs only when they all OMs are crashing " +
+        "while applying the same transaction. If there is only one OM that is crashing, " +
+        "then the DB should manually copied from one of the good OMs to the crashing OM instead.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
@@ -55,33 +62,55 @@ public class OMRatisLogRepair extends RepairTool {
       required = true,
       description = "Path of the input segment file")
   private File segmentFile;
-  @CommandLine.Option(names = {"-o", "--output-path", "--outputPath"},
+  @CommandLine.Option(names = {"-b", "--backup"},
       required = true,
-      description = "Path of the repaired segment file")
-  private String outputPath;
+      description = "Path to put the backup of the original repaired segment file")
+  private File backupPath;
 
   @CommandLine.Option(names = {"--index"},
       required = true,
-      description = "Path of the segment file")
+      description = "Index of the failing transaction that should be removed")
   private long index;
 
   @Override
   public void execute() throws Exception {
 
+    info("Taking back up of Raft Log file: " + this.segmentFile.getAbsolutePath() + " to location: " + backupPath);
+    if (!segmentFile.exists()) {
+      error("Error: Source segment file \"" + segmentFile + "\" does not exist.");
+      return;
+    }
+    if (backupPath.exists()) {
+      error("Error: Backup file for segment file  \"" + backupPath + "\" already exists.");
+      return;
+    }
+    try {
+      if (!isDryRun()) {
+        Files.copy(segmentFile.toPath(), backupPath.toPath());
+      }
+      System.out.println("File renamed successfully!");
+    } catch (IOException ex) {
+      throw new RuntimeException("Error: Failed to take backup of the file. " +
+          "It might be due to file locks or permission issues.");
+    }
+
     LogSegmentPath pi = LogSegmentPath.matchLogSegment(this.segmentFile.toPath());
     if (pi == null) {
-      error("Invalid segment file");
       throw new RuntimeException("Invalid Segment File");
     }
+    String tempOutput = segmentFile.getAbsolutePath() + ".skr.output";
+    File outputFile = createOutputFile(tempOutput);
+
     info("Processing Raft Log file: " + this.segmentFile.getAbsolutePath() + " size:" + this.segmentFile.length());
     SegmentedRaftLogOutputStream outputStream = null;
     SegmentedRaftLogInputStream logInputStream = null;
 
     try {
       logInputStream = getInputStream(pi);
-      File outputFile = createOutputFile(outputPath);
-      outputStream = new SegmentedRaftLogOutputStream(outputFile, false,
-          1024, 1024, ByteBuffer.allocateDirect(10 * 1024));
+      if (!isDryRun()) {
+        outputStream = new SegmentedRaftLogOutputStream(outputFile, false,
+            1024, 1024, ByteBuffer.allocateDirect(10 * 1024));
+      }
 
       RaftProtos.LogEntryProto next;
       for (RaftProtos.LogEntryProto prev = null; (next = logInputStream.nextEntry()) != null; prev = next) {
@@ -90,7 +119,7 @@ public class OMRatisLogRepair extends RepairTool {
               "gap between entry %s and entry %s", prev, next);
         }
 
-        if (next.getIndex() != index) {
+        if (next.getIndex() != index && !isDryRun()) {
           // all other logs will be written as it is
           outputStream.write(next);
         } else {
@@ -131,9 +160,22 @@ public class OMRatisLogRepair extends RepairTool {
               .setIndex(next.getIndex())
               .setStateMachineLogEntry(newEntry)
               .build();
-          outputStream.write(newLogEntry);
+
+          info("Replacing {" + next.getStateMachineLogEntry().getLogData() + "} with EchoRPC command at index "
+              + next.getIndex());
+
+          if (!isDryRun()) {
+            outputStream.write(newLogEntry);
+          }
         }
       }
+
+      if (!isDryRun()) {
+        outputStream.flush();
+        outputStream.close();
+        Files.move(outputFile.toPath(), segmentFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      }
+
     } catch (Exception ex) {
       error("Exception: " + ex);
     } finally {
@@ -143,6 +185,9 @@ public class OMRatisLogRepair extends RepairTool {
       if (outputStream != null) {
         outputStream.flush();
         outputStream.close();
+      }
+      if (isDryRun()) {
+        outputFile.delete();
       }
     }
   }
