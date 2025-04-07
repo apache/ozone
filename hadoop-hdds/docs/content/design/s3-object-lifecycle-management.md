@@ -22,8 +22,8 @@ author: Mohanad Elsafty, Xi Chen, Ivan Andika, Sammi Chen, Ashish Kumar
 
 # Abstract
 
-S3 Lifecycle Configurations - Object Expiration.
+Support AWS S3 compatible object lifecycle management with expiration action.
 
 # Link
 
-* https://docs.google.com/document/d/1LDE7jnhPJ_fc--zEob48RmqDxcqrDgOv3E3NBInoC08/edit
+* https://issues.apache.org/jira/secure/attachment/13075761/S3%20Object%20LifeCycle%20Management-Object%20Expiration-V1.pdf
