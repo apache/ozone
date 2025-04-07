@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
 
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,14 +28,11 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.graph.PrintableGraph;
-import org.apache.ozone.compaction.log.CompactionFileInfo;
-import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.CompactionNode;
+import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -81,7 +77,7 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
     return null;
   }
 
-  class CreateCompactionDag {
+  static class CreateCompactionDag {
     // Hash table to track CompactionNode for a given SST File.
     private final ConcurrentHashMap<String, CompactionNode> compactionNodeMap =
         new ConcurrentHashMap<>();
@@ -102,71 +98,12 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
         throws IOException, RocksDBException {
       Objects.requireNonNull(filePath, "Image file path is required.");
 
-      loadAllCompactionLogs();
+      RocksDiffUtils.createCompactionDags(activeRocksDB, compactionLogTableCFHandle, compactionNodeMap,
+          null, backwardCompactionDAG);
 
       PrintableGraph graph;
       graph = new PrintableGraph(backwardCompactionDAG, PrintableGraph.GraphType.FILE_NAME);
       graph.generateImage(filePath);
     }
-
-    public void loadAllCompactionLogs() {
-      try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
-          activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
-        managedRocksIterator.get().seekToFirst();
-        while (managedRocksIterator.get().isValid()) {
-          byte[] value = managedRocksIterator.get().value();
-          CompactionLogEntry compactionLogEntry =
-              CompactionLogEntry.getFromProtobuf(
-                  HddsProtos.CompactionLogEntryProto.parseFrom(value));
-          populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
-              compactionLogEntry.getOutputFileInfoList(),
-              compactionLogEntry.getDbSequenceNumber());
-          managedRocksIterator.get().next();
-        }
-      } catch (InvalidProtocolBufferException e) {
-        throw new RuntimeException(e);
-      }
-    }
-
-    /**
-     * Populate the compaction DAG with input and output SST files lists.
-     * @param inputFiles List of compaction input files.
-     * @param outputFiles List of compaction output files.
-     * @param seqNum DB transaction sequence number.
-     */
-    private void populateCompactionDAG(List<CompactionFileInfo> inputFiles,
-                                       List<CompactionFileInfo> outputFiles,
-                                       long seqNum) {
-
-      for (CompactionFileInfo outfile : outputFiles) {
-
-        final CompactionNode outfileNode = compactionNodeMap.computeIfAbsent(
-            outfile.getFileName(),
-            file -> addNodeToDAG(file, seqNum, outfile.getStartKey(),
-                outfile.getEndKey(), outfile.getColumnFamily()));
-
-
-        for (CompactionFileInfo infile : inputFiles) {
-          final CompactionNode infileNode = compactionNodeMap.computeIfAbsent(
-              infile.getFileName(),
-              file -> addNodeToDAG(file, seqNum, infile.getStartKey(),
-                  infile.getEndKey(), infile.getColumnFamily()));
-
-          // Draw the edges
-          if (!outfileNode.getFileName().equals(infileNode.getFileName())) {
-            backwardCompactionDAG.putEdge(infileNode, outfileNode);
-          }
-        }
-      }
-    }
-
-    private CompactionNode addNodeToDAG(String file, long seqNum, String startKey,
-                                        String endKey, String columnFamily) {
-      CompactionNode fileNode = new CompactionNode(file, 0L,
-          seqNum, startKey, endKey, columnFamily);
-      backwardCompactionDAG.addNode(fileNode);
-      return fileNode;
-    }
   }
-
 }

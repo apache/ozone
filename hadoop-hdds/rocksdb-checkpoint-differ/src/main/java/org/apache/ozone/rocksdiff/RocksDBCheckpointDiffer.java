@@ -497,9 +497,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           addToCompactionLogTable(compactionLogEntry);
 
           // Populate the DAG
-          populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
+          RocksDiffUtils.populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
               compactionLogEntry.getOutputFileInfoList(),
-              compactionLogEntry.getDbSequenceNumber());
+              compactionLogEntry.getDbSequenceNumber(),
+              compactionNodeMap, forwardCompactionDAG, backwardCompactionDAG);
           for (String inputFile : inputFileCompactions.keySet()) {
             inflightCompactions.remove(inputFile);
           }
@@ -711,22 +712,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     synchronized (this) {
       preconditionChecksForLoadAllCompactionLogs();
       addEntriesFromLogFilesToDagAndCompactionLogTable();
-      try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
-          activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
-        managedRocksIterator.get().seekToFirst();
-        while (managedRocksIterator.get().isValid()) {
-          byte[] value = managedRocksIterator.get().value();
-          CompactionLogEntry compactionLogEntry =
-              CompactionLogEntry.getFromProtobuf(
-                  CompactionLogEntryProto.parseFrom(value));
-          populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
-              compactionLogEntry.getOutputFileInfoList(),
-              compactionLogEntry.getDbSequenceNumber());
-          managedRocksIterator.get().next();
-        }
-      } catch (InvalidProtocolBufferException e) {
-        throw new RuntimeException(e);
-      }
+      RocksDiffUtils.createCompactionDags(activeRocksDB, compactionLogTableCFHandle, compactionNodeMap,
+          forwardCompactionDAG, backwardCompactionDAG);
     }
   }
 
@@ -1008,68 +995,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @VisibleForTesting
   public MutableGraph<CompactionNode> getBackwardCompactionDAG() {
     return backwardCompactionDAG;
-  }
-
-  /**
-   * Helper method to add a new file node to the DAG.
-   * @return CompactionNode
-   */
-  private CompactionNode addNodeToDAG(String file, long seqNum, String startKey,
-                                      String endKey, String columnFamily) {
-    long numKeys = 0L;
-    try {
-      numKeys = RocksDiffUtils.getSSTFileNumKeys(getAbsoluteSstFilePath(file));
-    } catch (RocksDBException e) {
-      LOG.warn("Can't get num of keys in SST '{}': {}", file, e.getMessage());
-    } catch (FileNotFoundException e) {
-      LOG.info("Can't find SST '{}'", file);
-    }
-
-    CompactionNode fileNode = new CompactionNode(file, numKeys,
-        seqNum, startKey, endKey, columnFamily);
-
-    forwardCompactionDAG.addNode(fileNode);
-    backwardCompactionDAG.addNode(fileNode);
-
-    return fileNode;
-  }
-
-  /**
-   * Populate the compaction DAG with input and output SST files lists.
-   * @param inputFiles List of compaction input files.
-   * @param outputFiles List of compaction output files.
-   * @param seqNum DB transaction sequence number.
-   */
-  private void populateCompactionDAG(List<CompactionFileInfo> inputFiles,
-                                     List<CompactionFileInfo> outputFiles,
-                                     long seqNum) {
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Input files: {} -> Output files: {}", inputFiles, outputFiles);
-    }
-
-    for (CompactionFileInfo outfile : outputFiles) {
-      final CompactionNode outfileNode = compactionNodeMap.computeIfAbsent(
-          outfile.getFileName(),
-
-          file -> addNodeToDAG(file, seqNum, outfile.getStartKey(),
-              outfile.getEndKey(), outfile.getColumnFamily()));
-
-
-      for (CompactionFileInfo infile : inputFiles) {
-        final CompactionNode infileNode = compactionNodeMap.computeIfAbsent(
-            infile.getFileName(),
-
-            file -> addNodeToDAG(file, seqNum, infile.getStartKey(),
-                infile.getEndKey(), infile.getColumnFamily()));
-
-        // Draw the edges
-        if (!outfileNode.getFileName().equals(infileNode.getFileName())) {
-          forwardCompactionDAG.putEdge(outfileNode, infileNode);
-          backwardCompactionDAG.putEdge(infileNode, outfileNode);
-        }
-      }
-    }
   }
 
   private void addFileInfoToCompactionLogTable(
