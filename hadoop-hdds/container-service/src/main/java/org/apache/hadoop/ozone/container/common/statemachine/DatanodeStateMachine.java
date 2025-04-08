@@ -555,6 +555,7 @@ public class DatanodeStateMachine implements Closeable {
           ExitUtils.terminate(1, message, ex, LOG);
         })
         .build().newThread(startStateMachineTask);
+    stateMachineThread.setPriority(Thread.MAX_PRIORITY);
     stateMachineThread.start();
   }
 
@@ -678,6 +679,7 @@ public class DatanodeStateMachine implements Closeable {
 
     // We will have only one thread for command processing in a datanode.
     cmdProcessThread = getCommandHandlerThread(processCommandQueue);
+    cmdProcessThread.setPriority(Thread.NORM_PRIORITY);
     cmdProcessThread.start();
   }
 
@@ -745,4 +747,15 @@ public class DatanodeStateMachine implements Closeable {
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
   }
+
+  @VisibleForTesting
+  public Thread getStateMachineThread() {
+    return stateMachineThread;
+  }
+
+  @VisibleForTesting
+  public Thread getCmdProcessThread() {
+    return cmdProcessThread;
+  }
+
 }
