@@ -856,7 +856,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     checkSnapshotActive(toSnapInfo, false);
   }
 
-  public void validateSnapshotLimit() throws IOException {
+  public void snapshotLimitCheck() throws IOException {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager =
