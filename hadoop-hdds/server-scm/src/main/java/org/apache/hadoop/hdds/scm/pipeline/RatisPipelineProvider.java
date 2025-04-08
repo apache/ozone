@@ -101,32 +101,41 @@ public class RatisPipelineProvider
     }
   }
 
-  private boolean exceedPipelineNumberLimit(
-      RatisReplicationConfig replicationConfig) {
+  private boolean exceedPipelineNumberLimit(RatisReplicationConfig replicationConfig) {
+    // Apply limits only for replication factor THREE
     if (replicationConfig.getReplicationFactor() != ReplicationFactor.THREE) {
-      // Only put limits for Factor THREE pipelines.
       return false;
     }
-    // Per datanode limit
+
+    PipelineStateManager pipelineStateManager = getPipelineStateManager();
+
+    int totalActivePipelines = pipelineStateManager.getPipelines(replicationConfig).size();
+
+    int closedPipelines = pipelineStateManager.getPipelines(replicationConfig, PipelineState.CLOSED).size();
+
+    int openPipelines = totalActivePipelines - closedPipelines;
+
+    // Check per-datanode pipeline limit
     if (maxPipelinePerDatanode > 0) {
-      return (getPipelineStateManager().getPipelines(replicationConfig).size() -
-          getPipelineStateManager().getPipelines(replicationConfig,
-              PipelineState.CLOSED).size()) >= maxPipelinePerDatanode *
-          getNodeManager().getNodeCount(NodeStatus.inServiceHealthy()) /
-          replicationConfig.getRequiredNodes();
+      int healthyNodeCount = getNodeManager()
+          .getNodeCount(NodeStatus.inServiceHealthy());
+
+      int allowedOpenPipelines = (maxPipelinePerDatanode * healthyNodeCount)
+          / replicationConfig.getRequiredNodes();
+
+      return openPipelines >= allowedOpenPipelines;
     }
 
-    // Global limit
+    // Check global pipeline limit
     if (pipelineNumberLimit > 0) {
-      return (getPipelineStateManager().getPipelines(replicationConfig).size() -
-          getPipelineStateManager().getPipelines(
-              replicationConfig, PipelineState.CLOSED).size()) >=
-          (pipelineNumberLimit - getPipelineStateManager()
-              .getPipelines(RatisReplicationConfig
-                  .getInstance(ReplicationFactor.ONE))
-              .size());
-    }
+      int factorOnePipelineCount = pipelineStateManager
+          .getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.ONE)).size();
 
+      int allowedOpenPipelines = pipelineNumberLimit - factorOnePipelineCount;
+
+      return openPipelines >= allowedOpenPipelines;
+    }
+    // No limits are set
     return false;
   }
 
