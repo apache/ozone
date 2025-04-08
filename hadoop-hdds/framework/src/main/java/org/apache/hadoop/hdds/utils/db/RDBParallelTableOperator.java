@@ -36,6 +36,7 @@ public class RDBParallelTableOperator<K, V> extends ParallelTableOperator<BaseRD
     super(throttledThreadpoolExecutor, table, keyCodec);
   }
 
+  @Override
   protected List<K> getBounds(K startKey, K endKey) throws IOException {
     Set<K> keys = new HashSet<>();
     for (LiveFileMetaData sstFile : this.getTable().getTableSstFiles()) {

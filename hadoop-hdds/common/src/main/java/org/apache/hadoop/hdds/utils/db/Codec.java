@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Comparator;
 import java.util.Objects;
 
@@ -134,7 +135,7 @@ public interface Codec<T> {
   /**
    * Comparator to compare 2 byte arrays based on their relative lexicographical ordering.
    */
-  class ByteArrayComparator implements Comparator<byte[]> {
+  class ByteArrayComparator implements Comparator<byte[]>, Serializable {
     @Override
     public int compare(byte[] o1, byte[] o2) {
       int len = Math.min(o1.length, o2.length);

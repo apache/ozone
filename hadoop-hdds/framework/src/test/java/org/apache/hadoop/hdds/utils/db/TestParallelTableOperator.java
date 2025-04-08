@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
@@ -55,7 +54,7 @@ public class TestParallelTableOperator {
 
   private static ThrottledThreadpoolExecutor executor;
   private static final Logger LOG = LoggerFactory.getLogger(TestParallelTableOperator.class);
-  Map<Integer, Integer> visited;
+  private Map<Integer, Integer> visited;
 
   @BeforeAll
   public static void init() {
@@ -94,7 +93,7 @@ public class TestParallelTableOperator {
     );
   }
 
-
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private void testParallelTableOperator(Table<Integer, Integer> intTable,
       ParallelTableOperator<Table<Integer, Integer>, Integer, Integer> parallelTableOperator,
       int maxKeyIdx, int keyJumps, Integer start, Integer end, List<Integer> bounds,
