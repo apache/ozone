@@ -151,6 +151,17 @@ message KeyValue {
 }
 
 /**
+ * Types of storage media.
+ */
+enum StorageTypeProto {
+  DISK = 1;
+  SSD = 2;
+  ARCHIVE = 3;
+  RAM_DISK = 4;
+  PROVIDED = 5;
+}
+
+/**
  * Type of the node.
  */
 enum NodeType {

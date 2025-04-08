@@ -31,7 +31,6 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.getDefaultFreeSpace;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.concurrent.TimeUnit;
@@ -191,18 +190,19 @@ public class TestDatanodeConfiguration {
   }
 
   @Test
-  void usesDefaultFreeSpaceIfBothMinFreeSpacePropertiesSet() {
+  void useMinFreeSpaceIfBothMinFreeSpacePropertiesSet() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setLong(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, 10000);
+    int minFreeSpace = 10000;
+    conf.setLong(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, minFreeSpace);
     conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, .5f);
 
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
 
-    assertEquals(DatanodeConfiguration.getDefaultFreeSpace(), subject.getMinFreeSpace());
+    assertEquals(minFreeSpace, subject.getMinFreeSpace());
     assertEquals(DatanodeConfiguration.MIN_FREE_SPACE_UNSET, subject.getMinFreeSpaceRatio());
 
     for (long capacity : CAPACITIES) {
-      assertEquals(getDefaultFreeSpace(), subject.getMinFreeSpace(capacity));
+      assertEquals(minFreeSpace, subject.getMinFreeSpace(capacity));
     }
   }
 

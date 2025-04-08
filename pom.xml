@@ -32,11 +32,11 @@
     <annotation-api.version>1.3.2</annotation-api.version>
     <aopalliance.version>1.0</aopalliance.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
-    <aspectj-plugin.version>1.14</aspectj-plugin.version>
+    <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.3</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.31.6</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.31.16</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.80</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
@@ -99,7 +99,7 @@
     <gson.version>2.10.1</gson.version>
     <guava.version>32.1.3-jre</guava.version>
     <guice.version>6.0.0</guice.version>
-    <hadoop-thirdparty.version>1.3.0</hadoop-thirdparty.version>
+    <hadoop-thirdparty.version>1.4.0</hadoop-thirdparty.version>
     <hadoop.version>3.4.1</hadoop.version>
     <hadoop2.version>2.10.2</hadoop2.version>
     <hamcrest.version>2.2</hamcrest.version>
@@ -112,7 +112,7 @@
     <jackson-jaxr.version>1.9.13</jackson-jaxr.version>
     <jackson1.version>1.9.13</jackson1.version>
     <jackson2-bom.version>2.16.2</jackson2-bom.version>
-    <jacoco.version>0.8.12</jacoco.version>
+    <jacoco.version>0.8.13</jacoco.version>
     <jaeger.version>1.8.1</jaeger.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
@@ -174,7 +174,6 @@
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
-    <native-maven-plugin.version>1.0-M1</native-maven-plugin.version>
     <native.lib.tmp.dir />
     <!-- Use netty version known to work with grpc-netty. See table: -->
     <!-- https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty -->
@@ -209,7 +208,7 @@
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
     <reload4j.version>1.2.26</reload4j.version>
-    <restrict-imports.enforcer.version>2.6.0</restrict-imports.enforcer.version>
+    <restrict-imports.enforcer.version>2.6.1</restrict-imports.enforcer.version>
     <rocksdb.version>7.7.3</rocksdb.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
@@ -1458,11 +1457,6 @@
             <xmlOutput>true</xmlOutput>
             <includeTests>true</includeTests>
           </configuration>
-        </plugin>
-        <plugin>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>native-maven-plugin</artifactId>
-          <version>${native-maven-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>

@@ -156,8 +156,7 @@ public abstract class SCMCommonPlacementPolicy implements
     }
     for (int i = 0; i < dns.size(); i++) {
       DatanodeDetails node = dns.get(i);
-      DatanodeDetails datanodeDetails =
-          nodeManager.getNodeByUuid(node.getUuid());
+      final DatanodeDetails datanodeDetails = nodeManager.getNode(node.getID());
       if (datanodeDetails != null) {
         dns.set(i, datanodeDetails);
       }
@@ -496,7 +495,7 @@ public abstract class SCMCommonPlacementPolicy implements
   public boolean isValidNode(DatanodeDetails datanodeDetails,
       long metadataSizeRequired, long dataSizeRequired) {
     DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
-        .getNodeByUuid(datanodeDetails.getUuid());
+        .getNode(datanodeDetails.getID());
     if (datanodeInfo == null) {
       LOG.error("Failed to find the DatanodeInfo for datanode {}",
           datanodeDetails);
