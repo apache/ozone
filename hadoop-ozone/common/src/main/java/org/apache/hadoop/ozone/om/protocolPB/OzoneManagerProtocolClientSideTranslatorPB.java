@@ -1474,13 +1474,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public ListSnapshotDiffJobResponse listSnapshotDiffJobs(String volumeName,
-                                                          String bucketName,
-                                                          String jobStatus,
-                                                          boolean listAll,
-                                                          String prevSnapshotDiffJob,
-                                                          int maxListResult)
-      throws IOException {
+  public ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAll,
+      String prevSnapshotDiffJob,
+      int maxListResult) throws IOException {
     final OzoneManagerProtocolProtos
         .ListSnapshotDiffJobRequest.Builder requestBuilder =
         OzoneManagerProtocolProtos

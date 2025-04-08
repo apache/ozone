@@ -732,21 +732,21 @@ public class ObjectStore {
 
   /**
    * Get a list of the SnapshotDiff jobs for a bucket based on the JobStatus.
-   *
-   * @param volumeName          Name of the volume to which the snapshotted bucket belong
-   * @param bucketName          Name of the bucket to which the snapshots belong
-   * @param jobStatus           JobStatus to be used to filter the snapshot diff jobs
-   * @param listAll             Option to specify whether to list all jobs or not
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
+   * @param listAll Option to specify whether to list all jobs or not
    * @param prevSnapshotDiffJob list snapshot diff jobs after this snapshot diff job.
    * @return an iterator of SnapshotDiffJob objects
    * @throws IOException in case there is a failure while getting a response.
    */
-  public Iterator<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
-                                                          String bucketName,
-                                                          String jobStatus,
-                                                          boolean listAll,
-                                                          String prevSnapshotDiffJob)
-      throws IOException {
+  public Iterator<OzoneSnapshotDiff> listSnapshotDiffJobs(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAll,
+      String prevSnapshotDiffJob
+  ) throws IOException {
     return new SnapshotDiffJobIterator(volumeName, bucketName, jobStatus, listAll, prevSnapshotDiffJob);
   }
 
@@ -761,11 +761,12 @@ public class ObjectStore {
     private String lastSnapshotDiffJob;
     private Iterator<OzoneSnapshotDiff> currentIterator;
 
-    private SnapshotDiffJobIterator(String volumeName,
-                                    String bucketName,
-                                    String jobStatus,
-                                    boolean listAll,
-                                    String prevSnapshotDiffJob) throws IOException {
+    private SnapshotDiffJobIterator(
+        String volumeName,
+        String bucketName,
+        String jobStatus,
+        boolean listAll,
+        String prevSnapshotDiffJob) throws IOException {
       this.volumeName = volumeName;
       this.bucketName = bucketName;
       this.jobStatus = jobStatus;

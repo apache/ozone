@@ -423,12 +423,13 @@ public class SnapshotDiffManager implements AutoCloseable {
     return new CancelSnapshotDiffResponse(reason);
   }
 
-  public ListSnapshotDiffJobResponse getSnapshotDiffJobList(String volumeName,
-                                                            String bucketName,
-                                                            String jobStatus,
-                                                            boolean listAll,
-                                                            String prevDiffJob,
-                                                            int maxEntries) throws IOException {
+  public ListSnapshotDiffJobResponse getSnapshotDiffJobList(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAll,
+      String prevDiffJob,
+      int maxEntries) throws IOException {
     List<SnapshotDiffJob> jobs = new ArrayList<>();
     String lastSnapshotDiffJob = null;
 

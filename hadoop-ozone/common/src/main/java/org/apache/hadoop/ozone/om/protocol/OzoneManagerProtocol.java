@@ -855,13 +855,13 @@ public interface OzoneManagerProtocol
    * @return a list of SnapshotDiffJob objects
    * @throws IOException in case there is a failure while getting a response.
    */
-  default ListSnapshotDiffJobResponse listSnapshotDiffJobs(String volumeName,
-                                                           String bucketName,
-                                                           String jobStatus,
-                                                           boolean listAll,
-                                                           String prevSnapshotDiffJob,
-                                                           int maxListResult)
-      throws IOException {
+  default ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAll,
+      String prevSnapshotDiffJob,
+      int maxListResult) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");
   }

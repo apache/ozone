@@ -1271,13 +1271,13 @@ public interface ClientProtocol {
    * @return a list of SnapshotDiffJob objects
    * @throws IOException in case there is a failure while getting a response.
    */
-  ListSnapshotDiffJobResponse listSnapshotDiffJobs(String volumeName,
-                                                   String bucketName,
-                                                   String jobStatus,
-                                                   boolean listAll,
-                                                   String prevSnapshotDiffJob,
-                                                   int maxListResult)
-      throws IOException;
+  ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAll,
+      String prevSnapshotDiffJob,
+      int maxListResult) throws IOException;
 
   /**
    * Time to be set for given Ozone object. This operations updates modification

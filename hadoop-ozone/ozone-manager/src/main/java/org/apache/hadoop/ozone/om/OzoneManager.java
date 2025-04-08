@@ -4913,13 +4913,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public ListSnapshotDiffJobResponse listSnapshotDiffJobs(String volume,
-                                                          String bucket,
-                                                          String jobStatus,
-                                                          boolean listAll,
-                                                          String prevSnapshotDiffJob,
-                                                          int maxListResult)
-      throws IOException {
+  public ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      String volume,
+      String bucket,
+      String jobStatus,
+      boolean listAll,
+      String prevSnapshotDiffJob,
+      int maxListResult) throws IOException {
     ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
     if (isAclEnabled) {
       omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, volume, bucket, null);

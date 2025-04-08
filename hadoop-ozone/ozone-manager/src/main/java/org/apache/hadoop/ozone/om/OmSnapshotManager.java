@@ -803,13 +803,13 @@ public final class OmSnapshotManager implements AutoCloseable {
     return snapshotDiffReport;
   }
 
-  public ListSnapshotDiffJobResponse getSnapshotDiffList(final String volumeName,
-                                                         final String bucketName,
-                                                         final String jobStatus,
-                                                         final boolean listAll,
-                                                         final String prevSnapshotDiffJob,
-                                                         int maxListResult)
-      throws IOException {
+  public ListSnapshotDiffJobResponse getSnapshotDiffList(
+      final String volumeName,
+      final String bucketName,
+      final String jobStatus,
+      final boolean listAll,
+      final String prevSnapshotDiffJob,
+      int maxListResult) throws IOException {
     String volumeKey = ozoneManager.getMetadataManager()
         .getVolumeKey(volumeName);
     String bucketKey = ozoneManager.getMetadataManager()
