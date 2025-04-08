@@ -230,7 +230,7 @@ public class ReplicasVerify extends Handler {
       throw new RuntimeException("Error retrieving replicas for key: " + keyName);
     }
 
-    if (!keyPass | allKeys) {
+    if (!keyPass || allKeys) {
       keyNode.set("blocks", blocksArray);
       keyNode.put("pass", keyPass);
       keysArray.add(keyNode);

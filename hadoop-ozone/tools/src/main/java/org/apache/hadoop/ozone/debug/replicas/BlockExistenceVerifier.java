@@ -41,7 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 public class BlockExistenceVerifier implements ReplicaVerifier {
 
   private OzoneConfiguration conf;
-  private final String checkType = "blockExistence";
+  private static final String CHECKTYPE = "blockExistence";
 
   public BlockExistenceVerifier(OzoneConfiguration conf) {
     this.conf = conf;
@@ -72,14 +72,14 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
         ContainerProtos.GetBlockResponseProto response = responses.get(datanode);
         boolean hasBlock = response != null && response.hasBlockData();
 
-        return new BlockVerificationResult(checkType, hasBlock, hasBlock ? Collections.emptyList() :
+        return new BlockVerificationResult(CHECKTYPE, hasBlock, hasBlock ? Collections.emptyList() :
             Collections.singletonList(new BlockVerificationResult.FailureDetail(
             true, "Block does not exist on this replica")));
       }
 
     } catch (IOException | InterruptedException e) {
       BlockVerificationResult.FailureDetail failure = new BlockVerificationResult.FailureDetail(true, e.getMessage());
-      return new BlockVerificationResult(checkType, false, Collections.singletonList(failure));
+      return new BlockVerificationResult(CHECKTYPE, false, Collections.singletonList(failure));
     }
   }
 

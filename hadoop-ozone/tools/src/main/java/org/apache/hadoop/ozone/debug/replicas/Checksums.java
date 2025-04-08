@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
  * downloaded replicas.
  */
 public class Checksums implements ReplicaVerifier {
-  private final String checkType = "checksum";
+  private static final String CHECKTYPE = "checksum";
 
   public Checksums() {
   }
@@ -43,11 +43,11 @@ public class Checksums implements ReplicaVerifier {
     try (InputStream is = stream) {
       IOUtils.copyLarge(is, NullOutputStream.INSTANCE);
 
-      return new BlockVerificationResult(checkType, true, Collections.emptyList());
+      return new BlockVerificationResult(CHECKTYPE, true, Collections.emptyList());
     } catch (IOException e) {
       BlockVerificationResult.FailureDetail failure = new BlockVerificationResult
           .FailureDetail(true, e.getMessage());
-      return new BlockVerificationResult(checkType, false, Collections.singletonList(failure));
+      return new BlockVerificationResult(CHECKTYPE, false, Collections.singletonList(failure));
     }
   }
 
