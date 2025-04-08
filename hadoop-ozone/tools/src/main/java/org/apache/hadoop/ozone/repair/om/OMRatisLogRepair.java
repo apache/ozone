@@ -26,6 +26,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -51,17 +53,22 @@ import picocli.CommandLine;
         "is replaced with an EchoOM command (which is a dummy command). It is an offline command " +
         "i.e., doesn't require OM to be running. " +
         "The command should be run for the same transaction on all 3 OMs only when they all OMs are crashing " +
-        "while applying the same transaction. If there is only one OM that is crashing, " +
-        "then the DB should manually copied from one of the good OMs to the crashing OM instead.",
+        "while applying the same transaction. If there is only one OM that is crashing and " +
+        "other OMs have executed the log successfully, then the DB should manually copied from one of the good OMs " +
+        "to the crashing OM instead.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
 public class OMRatisLogRepair extends RepairTool {
 
   @CommandLine.Option(names = {"-s", "--segment-path", "--segmentPath"},
-      required = true,
       description = "Path of the input segment file")
   private File segmentFile;
+
+  @CommandLine.Option(names = {"-d", "--ratis-log-dir", "--ratisLogDir"},
+      description = "Path of the ratis log directory")
+  private File logDir;
+
   @CommandLine.Option(names = {"-b", "--backup"},
       required = true,
       description = "Path to put the backup of the original repaired segment file")
@@ -75,31 +82,34 @@ public class OMRatisLogRepair extends RepairTool {
   @Override
   public void execute() throws Exception {
 
-    info("Taking back up of Raft Log file: " + this.segmentFile.getAbsolutePath() + " to location: " + backupPath);
-    if (!segmentFile.exists()) {
-      error("Error: Source segment file \"" + segmentFile + "\" does not exist.");
-      return;
+    if (segmentFile == null && logDir == null) {
+      throw new IllegalArgumentException("Path to either a segment-file or ratis-log-dir must be provided.");
     }
-    if (backupPath.exists()) {
-      error("Error: Backup file for segment file  \"" + backupPath + "\" already exists.");
-      return;
-    }
-    try {
-      if (!isDryRun()) {
-        Files.copy(segmentFile.toPath(), backupPath.toPath());
-      }
-      System.out.println("File backed-up successfully!");
-    } catch (IOException ex) {
-      throw new RuntimeException("Error: Failed to take backup of the file. " +
-          "It might be due to file locks or permission issues.");
+    if (segmentFile == null) {
+      segmentFile = findSegmentFileContainingIndex();
     }
 
     LogSegmentPath pi = LogSegmentPath.matchLogSegment(this.segmentFile.toPath());
     if (pi == null) {
-      error("Deleting backup file as provided segmentFile is invalid.");
-      backupPath.delete();
-      throw new RuntimeException("Invalid Segment File");
+      throw new IOException("Invalid Segment File");
     }
+
+    if (!segmentFile.exists()) {
+      throw new IOException("Error: Source segment file \"" + segmentFile + "\" does not exist.");
+    }
+    if (backupPath.exists()) {
+      throw new IOException("Error: Backup file for segment file  \"" + backupPath + "\" already exists.");
+    }
+    try {
+      info("Taking back up of Raft Log file: " + this.segmentFile.getAbsolutePath() + " to location: " + backupPath);
+      if (!isDryRun()) {
+        Files.copy(segmentFile.toPath(), backupPath.toPath());
+      }
+      info("File backed-up successfully!");
+    } catch (IOException ex) {
+      throw new IOException("Error: Failed to take backup of the file. Exception: " + ex, ex);
+    }
+
     String tempOutput = segmentFile.getAbsolutePath() + ".skr.output";
     File outputFile = createOutputFile(tempOutput);
 
@@ -111,7 +121,7 @@ public class OMRatisLogRepair extends RepairTool {
       logInputStream = getInputStream(pi);
       if (!isDryRun()) {
         outputStream = new SegmentedRaftLogOutputStream(outputFile, false,
-            1024, 1024, ByteBuffer.allocateDirect(10 * 1024));
+            1024, 1024, ByteBuffer.allocateDirect(SizeInBytes.valueOf("8MB").getSizeInt()));
       }
 
       RaftProtos.LogEntryProto next;
@@ -124,6 +134,8 @@ public class OMRatisLogRepair extends RepairTool {
         if (next.getIndex() != index && !isDryRun()) {
           // all other logs will be written as it is
           outputStream.write(next);
+          outputStream.flush();
+          info("Copied raft log for index (" + next.getIndex() + ").");
         } else {
           // replace the transaction with a dummy OmEcho operation
           OzoneManagerProtocolProtos.OMRequest oldRequest = OMRatisHelper
@@ -163,12 +175,12 @@ public class OMRatisLogRepair extends RepairTool {
               .setStateMachineLogEntry(newEntry)
               .build();
 
-          info("Replacing {" + oldRequest + "} with EchoRPC command at index "
-              + next.getIndex());
-
           if (!isDryRun()) {
             outputStream.write(newLogEntry);
+            outputStream.flush();
           }
+          info("Replaced {" + oldRequest + "} with EchoRPC command at index "
+              + next.getIndex());
         }
       }
 
@@ -176,6 +188,7 @@ public class OMRatisLogRepair extends RepairTool {
         outputStream.flush();
         outputStream.close();
         Files.move(outputFile.toPath(), segmentFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        info("Moved temporary output file to correct raft log location : " + segmentFile.toPath());
       }
 
     } catch (Exception ex) {
@@ -198,17 +211,17 @@ public class OMRatisLogRepair extends RepairTool {
     File temp = new File(name);
     try {
       if (temp.exists()) {
-        throw new IOException("Error: File already exists - " + temp.getAbsolutePath());
-      } else {
-        if (temp.createNewFile()) {
-          System.out.println("File created successfully: " + temp.getAbsolutePath());
-        } else {
-          throw new IOException("Error: Failed to create file - " + temp.getAbsolutePath());
+        error("Warning: Temporary output file already exists - " + temp.getAbsolutePath() +
+            ". Trying to delete it and create a new one.");
+        boolean success = temp.delete();
+        if (!success) {
+          throw new IOException("Unable to delete old temporary file.");
         }
       }
+      temp.createNewFile();
+      info("Temporary output file created successfully: " + temp.getAbsolutePath());
     } catch (IOException e) {
-      error("Exception while trying to open output file: " + e.getMessage());
-      throw e;
+      throw new IOException("Error: Failed to create temporary output file - " + temp.getAbsolutePath(), e);
     }
     return temp;
   }
@@ -233,5 +246,44 @@ public class OMRatisLogRepair extends RepairTool {
       error("Exception while trying to get input stream for segment file : " + ex);
       throw new RuntimeException(ex);
     }
+  }
+
+  private File findSegmentFileContainingIndex() {
+    if (!logDir.exists() || !logDir.isDirectory()) {
+      throw new IllegalArgumentException("Invalid log directory: " + logDir);
+    }
+
+    // Pattern to match Ratis log files: log_<start>-<end> or log_inprogress_<start>
+    Pattern pattern = Pattern.compile("log(?:_inprogress)?_(\\d+)(?:-(\\d+))?");
+
+    File[] segmentFiles = logDir.listFiles();
+    if (segmentFiles == null) {
+      throw new IllegalArgumentException("Invalid log directory: " + logDir + ". No segment files present.");
+    }
+
+    for (File file : segmentFiles) {
+      Matcher matcher = pattern.matcher(file.getName());
+      if (matcher.matches()) {
+        long start = Long.parseLong(matcher.group(1));
+        String endStr = matcher.group(2);
+
+        // If it's an in-progress file, assume it contains all entries from start onwards
+        if (endStr == null) {
+          if (index >= start) {
+            info("Segment file \"" + file + "\" contains the index (" + index + ").");
+            return file;
+          }
+        } else {
+          long end = Long.parseLong(endStr);
+          if (index >= start && index <= end) {
+            info("Segment file \"" + file + "\" contains the index (" + index + ").");
+            return file;
+          }
+        }
+      }
+    }
+
+    throw new IllegalArgumentException("Invalid index (" + index
+        + ") for log directory: \"" + logDir + "\". None of the segment files have the index.");
   }
 }
