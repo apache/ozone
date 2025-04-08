@@ -19,16 +19,38 @@ package org.apache.hadoop.ozone.utils;
 
 import java.util.Objects;
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.ratis.util.ReflectionUtils;
 import org.reflections.Reflections;
 import picocli.AutoComplete;
 import picocli.CommandLine;
+import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-/**
- * Tool to generate bash/zsh auto-complete scripts for Ozone CLI.
- */
-public final class AutoCompletion {
+/** Tool to generate auto-completion scripts for Ozone CLI. */
+@Command(name = "ozone completion",
+    header = "Generate autocompletion script for the specified shell.",
+    synopsisHeading = "%nUsage: ",
+    description = AutoCompletion.DESCRIPTION,
+    versionProvider = HddsVersionProvider.class,
+    mixinStandardHelpOptions = true)
+public final class AutoCompletion extends GenericCli {
+
+  public static final String DESCRIPTION = "%nThe generated shell code must " +
+      "be evaluated to provide interactive completion of ozone commands. " +
+      "See each sub-command's help for details on how to use the generated script.%n";
+
+  private static final String BASH_DESCRIPTION = "%nTo load completions in your current shell session: %n" +
+      "%n\t source <(ozone completion bash) %n" +
+      "%nTo load completions for every new session automatically, %n" +
+      "add this to your `~/.bash_profile`: %n" +
+      "%n\t eval \"$(ozone completion bash)\" %n";
+
+  private static final String ZSH_DESCRIPTION = "%nTo load completions in your current shell session: %n" +
+      "%n\t source <(ozone completion zsh)%n" +
+      "%nTo load completions for every new session automatically, %n" +
+      "generate a `_ozone` completion script and put it in your `$fpath`: %n" +
+      "%n\t ozone completion zsh > \"$${fpath[1]}/_ozone\" %n";
 
   private static final String OZONE_COMMAND = "ozone ";
   private static final int PREFIX_LENGTH = OZONE_COMMAND.length();
@@ -38,9 +60,29 @@ public final class AutoCompletion {
       "org.apache.ozone",
   };
 
-  private AutoCompletion() { }
+  /** Generates bash auto-completion script for Ozone CLI. */
+  @Command(name = "bash",
+      header = "Generate the shell completion code for bash.",
+      synopsisHeading = "%nUsage: ",
+      description = AutoCompletion.BASH_DESCRIPTION,
+      versionProvider = HddsVersionProvider.class,
+      mixinStandardHelpOptions = true)
+  public void bashCompletion() {
+    out().println(getBashCompletion());
+  }
 
-  public static void main(String[] args) {
+  /** Generates zsh auto-completion script for Ozone CLI. */
+  @Command(name = "zsh",
+      header = "Generate the shell completion code for zsh.",
+      synopsisHeading = "%nUsage: ",
+      description = AutoCompletion.ZSH_DESCRIPTION,
+      versionProvider = HddsVersionProvider.class,
+      mixinStandardHelpOptions = true)
+  public void zshCompletion() {
+    bashCompletion();
+  }
+
+  private String getBashCompletion() {
     final CommandLine ozone = new CommandLine(new Ozone());
     for (String pkg : PACKAGES_TO_SCAN) {
       new Reflections(pkg).getSubTypesOf(GenericCli.class).stream()
@@ -49,7 +91,7 @@ public final class AutoCompletion {
           .filter(AutoCompletion::isPublicCommand)
           .forEach(command -> ozone.addSubcommand(getCommandName(command), command));
     }
-    System.out.println(AutoComplete.bash("ozone", ozone));
+    return AutoComplete.bash("ozone", ozone);
   }
 
   private static CommandLine getCommand(Class<? extends GenericCli> clazz) {
@@ -75,12 +117,14 @@ public final class AutoCompletion {
       qualifiedName.substring(PREFIX_LENGTH) : qualifiedName;
   }
 
-  /**
-   * Ozone top level command, used only to generate auto-complete.
-   */
-  @CommandLine.Command(name = "ozone",
+  public static void main(String[] args) {
+    new AutoCompletion().run(args);
+  }
+
+  /** Ozone top level command, used only to generate auto-complete. */
+  @Command(name = "ozone",
       description = "Ozone top level command")
-  private static class Ozone {
+  private static final class Ozone {
 
     @Option(names = {"--buildpaths"},
         description = "attempt to add class files from build tree")
