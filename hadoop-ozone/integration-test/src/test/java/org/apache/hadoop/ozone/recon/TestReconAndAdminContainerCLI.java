@@ -149,7 +149,7 @@ class TestReconAndAdminContainerCLI {
     reconContainerManager = reconScm.getContainerManager();
 
     LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() >= 4));
+        () -> (reconPipelineManager.getPipelines().size() >= scmPipelineManager.getPipelines().size()));
 
     // Verify that Recon has all the pipelines from SCM.
     scmPipelineManager.getPipelines().forEach(p -> {
