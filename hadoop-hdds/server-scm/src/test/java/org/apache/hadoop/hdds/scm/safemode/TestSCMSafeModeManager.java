@@ -208,9 +208,6 @@ public class TestSCMSafeModeManager {
   private OzoneConfiguration createConf(double healthyPercent,
       double oneReplicaPercent) {
     OzoneConfiguration conf = new OzoneConfiguration(config);
-    conf.setBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-        true);
     conf.setDouble(HddsConfigKeys.
         HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT, healthyPercent);
     conf.setDouble(HddsConfigKeys.
@@ -667,67 +664,56 @@ public class TestSCMSafeModeManager {
   public void testSafeModePipelineExitRule() throws Exception {
     containers = new ArrayList<>();
     containers.addAll(HddsTestUtils.getContainerInfo(25 * 4));
-    try {
-      MockNodeManager nodeManager = new MockNodeManager(true, 3);
-      // enable pipeline check
-      config.setBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
+    MockNodeManager nodeManager = new MockNodeManager(true, 3);
+    PipelineManagerImpl pipelineManager =
+        PipelineManagerImpl.newPipelineManager(
+            config,
+            SCMHAManagerStub.getInstance(true),
+            nodeManager,
+            scmMetadataStore.getPipelineTable(),
+            queue,
+            scmContext,
+            serviceManager,
+            Clock.system(ZoneOffset.UTC));
 
-      PipelineManagerImpl pipelineManager =
-          PipelineManagerImpl.newPipelineManager(
-              config,
-              SCMHAManagerStub.getInstance(true),
-              nodeManager,
-              scmMetadataStore.getPipelineTable(),
-              queue,
-              scmContext,
-              serviceManager,
-              Clock.system(ZoneOffset.UTC));
+    PipelineProvider<RatisReplicationConfig> mockRatisProvider =
+        new MockRatisPipelineProvider(nodeManager,
+            pipelineManager.getStateManager(), config);
+    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+        mockRatisProvider);
 
-      PipelineProvider<RatisReplicationConfig> mockRatisProvider =
-          new MockRatisPipelineProvider(nodeManager,
-              pipelineManager.getStateManager(), config);
-      pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
-          mockRatisProvider);
+    Pipeline pipeline = pipelineManager.createPipeline(
+        RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE));
 
-      Pipeline pipeline = pipelineManager.createPipeline(
-          RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+    pipeline = pipelineManager.getPipeline(pipeline.getId());
+    MockRatisPipelineProvider.markPipelineHealthy(pipeline);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
 
-      pipeline = pipelineManager.getPipeline(pipeline.getId());
-      MockRatisPipelineProvider.markPipelineHealthy(pipeline);
-      ContainerManager containerManager = mock(ContainerManager.class);
-      when(containerManager.getContainers()).thenReturn(containers);
-
-      scmSafeModeManager = new SCMSafeModeManager(
+    scmSafeModeManager = new SCMSafeModeManager(
           config, containerManager, pipelineManager, nodeManager, queue,
           serviceManager, scmContext);
 
-      SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
-          HddsTestUtils.createNodeRegistrationContainerReport(containers);
-      queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeRegistrationContainerReport);
-      queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, nodeRegistrationContainerReport);
+    SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
+        HddsTestUtils.createNodeRegistrationContainerReport(containers);
+    queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeRegistrationContainerReport);
+    queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, nodeRegistrationContainerReport);
+      
 
-      assertTrue(scmSafeModeManager.getInSafeMode());
+    assertTrue(scmSafeModeManager.getInSafeMode());
 
-      firePipelineEvent(pipelineManager, pipeline);
+    firePipelineEvent(pipelineManager, pipeline);
 
-      GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
-          100, 1000 * 10);
-      pipelineManager.close();
-    } finally {
-      config.setBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-          false);
-    }
+    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
+        100, 1000 * 10);
+    pipelineManager.close();
   }
 
   @Test
   public void testPipelinesNotCreatedUntilPreCheckPasses() throws Exception {
     int numOfDns = 5;
     // enable pipeline check
-    config.setBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
     config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, numOfDns);
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         true);
