@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -92,6 +93,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   private ConfigurationSource config;
   private static final String RATIS_CONTAINER_EXIT_RULE = "RatisContainerSafeModeRule";
   private static final String EC_CONTAINER_EXIT_RULE = "ECContainerSafeModeRule";
+  private static final String DN_EXIT_RULE = "DataNodeSafeModeRule";
   private static final String HEALTHY_PIPELINE_EXIT_RULE =
       "HealthyPipelineSafeModeRule";
   private static final String ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE =
@@ -106,12 +108,10 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   private final SafeModeMetrics safeModeMetrics;
 
-
-  // TODO: Remove allContainers argument. (HDDS-11795)
   public SCMSafeModeManager(ConfigurationSource conf,
              ContainerManager containerManager, PipelineManager pipelineManager,
-             EventQueue eventQueue, SCMServiceManager serviceManager,
-             SCMContext scmContext) {
+             NodeManager nodeManager, EventQueue eventQueue,
+             SCMServiceManager serviceManager, SCMContext scmContext) {
     this.config = conf;
     this.eventPublisher = eventQueue;
     this.serviceManager = serviceManager;
@@ -125,7 +125,7 @@ public class SCMSafeModeManager implements SafeModeManager {
 
       // TODO: Remove the cyclic ("this") dependency (HDDS-11797)
       SafeModeRuleFactory.initialize(config, scmContext, eventQueue,
-          this, pipelineManager, containerManager);
+          this, pipelineManager, containerManager, nodeManager);
       SafeModeRuleFactory factory = SafeModeRuleFactory.getInstance();
 
       exitRules = factory.getSafeModeRules().stream().collect(
@@ -350,6 +350,10 @@ public class SCMSafeModeManager implements SafeModeManager {
   public OneReplicaPipelineSafeModeRule getOneReplicaPipelineSafeModeRule() {
     return (OneReplicaPipelineSafeModeRule)
         exitRules.get(ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE);
+  }
+
+  public DataNodeSafeModeRule getDataNodeSafeModeRule() {
+    return (DataNodeSafeModeRule) exitRules.get(DN_EXIT_RULE);
   }
 
 

@@ -19,8 +19,12 @@ package org.apache.hadoop.hdds.utils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_INITIAL_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -266,6 +270,19 @@ public final class HddsServerUtil {
         HDDS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
 
+
+  /**
+   * Heartbeat Interval - Defines the initial heartbeat frequency from a datanode to
+   * SCM.
+   *
+   * @param conf - Ozone Config
+   * @return - HB interval in milli seconds.
+   */
+  public static long getScmInitialHeartbeatInterval(ConfigurationSource conf) {
+    return conf.getTimeDuration(HDDS_INITIAL_HEARTBEAT_INTERVAL,
+        HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+  }
+
   /**
    * Heartbeat Interval - Defines the heartbeat frequency from a datanode to
    * Recon.
@@ -276,6 +293,18 @@ public final class HddsServerUtil {
   public static long getReconHeartbeatInterval(ConfigurationSource conf) {
     return conf.getTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
         HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * Heartbeat Interval - Defines the initial heartbeat frequency from a datanode to
+   * Recon.
+   *
+   * @param conf - Ozone Config
+   * @return - HB interval in milli seconds.
+   */
+  public static long getInitialReconHeartbeatInterval(ConfigurationSource conf) {
+    return conf.getTimeDuration(HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL,
+        HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
 
   /**

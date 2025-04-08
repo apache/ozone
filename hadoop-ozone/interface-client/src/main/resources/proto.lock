@@ -983,27 +983,6 @@
             ]
           },
           {
-            "name": "StorageTypeProto",
-            "enum_fields": [
-              {
-                "name": "DISK",
-                "integer": 1
-              },
-              {
-                "name": "SSD",
-                "integer": 2
-              },
-              {
-                "name": "ARCHIVE",
-                "integer": 3
-              },
-              {
-                "name": "RAM_DISK",
-                "integer": 4
-              }
-            ]
-          },
-          {
             "name": "BucketLayoutProto",
             "enum_fields": [
               {
@@ -3071,7 +3050,7 @@
               {
                 "id": 5,
                 "name": "storageType",
-                "type": "StorageTypeProto",
+                "type": "hadoop.hdds.StorageTypeProto",
                 "required": true,
                 "options": [
                   {
@@ -3330,7 +3309,7 @@
               {
                 "id": 6,
                 "name": "storageType",
-                "type": "StorageTypeProto",
+                "type": "hadoop.hdds.StorageTypeProto",
                 "optional": true
               },
               {
