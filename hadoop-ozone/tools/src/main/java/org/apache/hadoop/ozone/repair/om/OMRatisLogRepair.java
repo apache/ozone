@@ -89,6 +89,10 @@ public class OMRatisLogRepair extends RepairTool {
       segmentFile = findSegmentFileContainingIndex();
     }
 
+    if (segmentFile.toPath().equals(backupPath)) {
+      throw new IOException("Backup path cannot be same as segment file path.");
+    }
+
     LogSegmentPath pi = LogSegmentPath.matchLogSegment(this.segmentFile.toPath());
     if (pi == null) {
       throw new IOException("Invalid Segment File");
