@@ -41,6 +41,7 @@ import org.sqlite.SQLiteConfig;
 public class ContainerDatanodeDatabase {
 
   private static Map<String, String> queries;
+  public static final String CONTAINER_KEY_DELIMITER = "#";
 
   static {
     loadProperties();
@@ -117,7 +118,7 @@ public class ContainerDatanodeDatabase {
   }
 
   public void insertContainerDatanodeData(String key, List<DatanodeContainerInfo> transitionList) throws SQLException {
-    String[] parts = key.split("#");
+    String[] parts = key.split(CONTAINER_KEY_DELIMITER);
     if (parts.length != 2) {
       System.err.println("Invalid key format: " + key);
       return;
@@ -156,7 +157,7 @@ public class ContainerDatanodeDatabase {
         preparedStatement.executeBatch();
       }
     } catch (SQLException e) {
-      LOG.error("Error while inserting data: {}", e.getMessage());
+      LOG.error("Failed to insert container log for container {} on datanode {}", containerId, datanodeId, e);
       throw e;
     } catch (Exception e) {
       LOG.error(e.getMessage());
@@ -186,18 +187,22 @@ public class ContainerDatanodeDatabase {
         long containerId = resultSet.getLong("container_id");
         String containerState = resultSet.getString("container_state");
         long bcsid = resultSet.getLong("bcsid");
+        try {
+          insertStmt.setLong(1, datanodeId);
+          insertStmt.setLong(2, containerId);
+          insertStmt.setString(3, containerState);
+          insertStmt.setLong(4, bcsid);
+          insertStmt.addBatch();
 
-        insertStmt.setLong(1, datanodeId);
-        insertStmt.setLong(2, containerId);
-        insertStmt.setString(3, containerState);
-        insertStmt.setLong(4, bcsid);
-        insertStmt.addBatch();
+          count++;
 
-        count++;
-
-        if (count % DBConsts.BATCH_SIZE == 0) {
-          insertStmt.executeBatch();
-          count = 0;
+          if (count % DBConsts.BATCH_SIZE == 0) {
+            insertStmt.executeBatch();
+            count = 0;
+          }
+        } catch (SQLException e) {
+          LOG.error("Failed to insert container log entry for container {} on datanode {} ", containerId, datanodeId, e);
+          throw e;
         }
       }
 
@@ -205,7 +210,7 @@ public class ContainerDatanodeDatabase {
         insertStmt.executeBatch();
       }
     } catch (SQLException e) {
-      LOG.error("Error while inserting data: {}", e.getMessage());
+      LOG.error("Failed to insert container log entry: {}", e.getMessage());
       throw e;
     } catch (Exception e) {
       LOG.error(e.getMessage());
@@ -218,14 +223,5 @@ public class ContainerDatanodeDatabase {
     stmt.executeUpdate(dropTableSQL);
   }
 
-  public void closeConnection(Connection connection) {
-    if (connection != null) {
-      try {
-        connection.close();
-      } catch (SQLException e) {
-        System.err.println("Error while closing the connection: " + e.getMessage());
-      }
-    }
-  }
 }
 
