@@ -89,7 +89,7 @@ public class OMRatisLogRepair extends RepairTool {
       segmentFile = findSegmentFileContainingIndex();
     }
 
-    if (segmentFile.toPath().equals(backupPath)) {
+    if (segmentFile.toPath().equals(backupPath.toPath())) {
       throw new IOException("Backup path cannot be same as segment file path.");
     }
 
@@ -206,7 +206,10 @@ public class OMRatisLogRepair extends RepairTool {
         outputStream.close();
       }
       if (isDryRun()) {
-        outputFile.delete();
+        boolean success = outputFile.delete();
+        if (!success) {
+          error("Error: Could not delete temporary output file \"" + outputFile + "\".");
+        }
       }
     }
   }
@@ -222,9 +225,13 @@ public class OMRatisLogRepair extends RepairTool {
           throw new IOException("Unable to delete old temporary file.");
         }
       }
-      temp.createNewFile();
-      info("Temporary output file created successfully: " + temp.getAbsolutePath());
-    } catch (IOException e) {
+      boolean success = temp.createNewFile();
+      if (success) {
+        info("Temporary output file created successfully: " + temp.getAbsolutePath());
+      } else {
+        throw new IOException("createNewFile() failed.");
+      }
+    } catch (Exception e) {
       throw new IOException("Error: Failed to create temporary output file - " + temp.getAbsolutePath(), e);
     }
     return temp;
