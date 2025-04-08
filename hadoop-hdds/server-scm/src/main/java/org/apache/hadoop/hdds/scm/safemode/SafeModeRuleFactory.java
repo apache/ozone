@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 
@@ -39,6 +40,7 @@ public final class SafeModeRuleFactory {
   private final SCMSafeModeManager safeModeManager;
   private final PipelineManager pipelineManager;
   private final ContainerManager containerManager;
+  private final NodeManager nodeManager;
 
   private final List<SafeModeExitRule<?>> safeModeRules;
   private final List<SafeModeExitRule<?>> preCheckRules;
@@ -50,13 +52,15 @@ public final class SafeModeRuleFactory {
                               final EventQueue eventQueue,
                               final SCMSafeModeManager safeModeManager,
                               final PipelineManager pipelineManager,
-                              final ContainerManager containerManager) {
+                              final ContainerManager containerManager,
+                              final NodeManager nodeManager) {
     this.config = config;
     this.scmContext = scmContext;
     this.eventQueue = eventQueue;
     this.safeModeManager = safeModeManager;
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
+    this.nodeManager = nodeManager;
     this.safeModeRules = new ArrayList<>();
     this.preCheckRules = new ArrayList<>();
     loadRules();
@@ -67,7 +71,7 @@ public final class SafeModeRuleFactory {
     SafeModeExitRule<?> containerRule = new ContainerSafeModeRule(eventQueue, 
         config, containerManager, safeModeManager);
     SafeModeExitRule<?> datanodeRule = new DataNodeSafeModeRule(eventQueue, 
-        config, safeModeManager);
+        config, nodeManager, safeModeManager);
 
     safeModeRules.add(containerRule);
     safeModeRules.add(datanodeRule);
@@ -98,9 +102,10 @@ public final class SafeModeRuleFactory {
       final EventQueue eventQueue,
       final SCMSafeModeManager safeModeManager,
       final PipelineManager pipelineManager,
-      final ContainerManager containerManager) {
+      final ContainerManager containerManager,
+      final NodeManager nodeManager) {
     instance = new SafeModeRuleFactory(config, scmContext, eventQueue,
-          safeModeManager, pipelineManager, containerManager);
+          safeModeManager, pipelineManager, containerManager, nodeManager);
   }
 
   public List<SafeModeExitRule<?>> getSafeModeRules() {
