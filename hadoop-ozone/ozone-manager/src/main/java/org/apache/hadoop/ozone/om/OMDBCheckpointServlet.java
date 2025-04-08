@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -93,6 +94,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final long serialVersionUID = 1L;
   private transient BootstrapStateHandler.Lock lock;
   private long maxTotalSstSize = 0;
+  private OMMetadataManager omMetadataManager;
 
   @Override
   public void init() throws ServletException {
@@ -126,6 +128,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         om.isSpnegoEnabled());
 
     lock = new Lock(om);
+    omMetadataManager = om.getMetadataManager();
   }
 
   @Override
@@ -290,42 +293,68 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     AtomicLong copySize = new AtomicLong(0L);
+
+    if (includeSnapshotData) {
+      // Get the snapshot files.
+      Set<Path> snapshotPaths = waitForSnapshotDirs(checkpoint);
+      Path snapshotDir = getSnapshotDir();
+      boolean processedSnapshotData = processDir(snapshotDir, copyFiles, hardLinkFiles,
+          sstFilesToExclude, snapshotPaths, excluded, copySize, null);
+      if (LOG.isDebugEnabled()) {
+        if (processedSnapshotData) {
+          LOG.debug("Finished processing OM snapshot data");
+        }
+      }
+      if (!processedSnapshotData) {
+        return false;
+      }
+
+      // Process the tmp sst compaction dir.
+      boolean processedTmpSstCompactionDir = processDir(sstBackupDir.getTmpDir().toPath(),
+          copyFiles, hardLinkFiles, sstFilesToExclude, new HashSet<>(),
+              excluded, copySize, sstBackupDir.getOriginalDir().toPath());
+      if (LOG.isDebugEnabled()) {
+        if (processedTmpSstCompactionDir) {
+          LOG.debug("Finished processing tmp SST Compaction Dir");
+        }
+      }
+      if (!processedTmpSstCompactionDir) {
+        return false;
+      }
+
+      // Process the tmp compaction log dir.
+      boolean processedTmpCompactionLogDir = processDir(compactionLogDir.getTmpDir().toPath(),
+          copyFiles, hardLinkFiles, sstFilesToExclude, new HashSet<>(),
+              excluded, copySize, compactionLogDir.getOriginalDir().toPath());
+      if (LOG.isDebugEnabled()) {
+        if (processedTmpCompactionLogDir) {
+          LOG.debug("Finished processing tmp compaction Log dir");
+        }
+      }
+      if (!processedTmpCompactionLogDir) {
+        return false;
+      }
+    }
+
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
-    if (!processDir(dir, copyFiles, hardLinkFiles, sstFilesToExclude,
-        new HashSet<>(), excluded, copySize, null)) {
-      return false;
+    boolean processedActiveFsData = processDir(dir, copyFiles, hardLinkFiles,
+        sstFilesToExclude, new HashSet<>(), excluded, copySize, null);
+    if (LOG.isDebugEnabled()) {
+      if (processedActiveFsData) {
+        LOG.debug("Finished processing active FS data");
+      }
     }
-
-    if (!includeSnapshotData) {
-      return true;
-    }
-
-    // Get the snapshot files.
-    Set<Path> snapshotPaths = waitForSnapshotDirs(checkpoint);
-    Path snapshotDir = getSnapshotDir();
-    if (!processDir(snapshotDir, copyFiles, hardLinkFiles, sstFilesToExclude,
-        snapshotPaths, excluded, copySize, null)) {
-      return false;
-    }
-    // Process the tmp sst compaction dir.
-    if (!processDir(sstBackupDir.getTmpDir().toPath(), copyFiles, hardLinkFiles,
-        sstFilesToExclude, new HashSet<>(), excluded, copySize,
-        sstBackupDir.getOriginalDir().toPath())) {
-      return false;
-    }
-
-    // Process the tmp compaction log dir.
-    return processDir(compactionLogDir.getTmpDir().toPath(), copyFiles,
-        hardLinkFiles, sstFilesToExclude,
-        new HashSet<>(), excluded, copySize,
-        compactionLogDir.getOriginalDir().toPath());
+    return processedActiveFsData;
 
   }
 
   /**
    * The snapshotInfo table may contain a snapshot that
-   * doesn't yet exist on the fs, so wait a few seconds for it.
+   * doesn't yet exist on the fs. This happens when the transaction is added to
+   * table Cache + Raft log but not yet flushed to DB. During the flush to DB
+   * the table cache is cleaned up. So we only wait for the path existence
+   * for such entries.
    * @param checkpoint Checkpoint containing snapshot entries expected.
    * @return Set of expected snapshot dirs.
    */
@@ -344,15 +373,23 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         iterator = checkpointMetadataManager
         .getSnapshotInfoTable().iterator()) {
 
-      // For each entry, wait for corresponding directory.
+      // For each entry, wait for corresponding directory if the key is
+      // present in snapshot table cache.
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
         Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
-        waitForDirToExist(path);
+        boolean presentInTableCache = null != omMetadataManager.getSnapshotInfoTable()
+            .getCacheValue(new CacheKey<>(entry.getKey()));
+        if (presentInTableCache) {
+          waitForDirToExist(path);
+        }
         snapshotPaths.add(path);
       }
     } finally {
       checkpointMetadataManager.stop();
+    }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Total snapshots to process : {}", snapshotPaths.size());
     }
     return snapshotPaths;
   }
@@ -419,6 +456,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           long fileSize = processFile(file, copyFiles, hardLinkFiles,
               sstFilesToExclude, excluded, destDir);
           if (copySize.get() + fileSize > maxTotalSstSize) {
+            LOG.info("Excluding file : {} as it exceeds max sst size of {}." +
+                "Will be picked up in the next batch", file, maxTotalSstSize);
             return false;
           } else {
             copySize.addAndGet(fileSize);

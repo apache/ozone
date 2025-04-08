@@ -199,7 +199,13 @@ public class DBCheckpointServlet extends HttpServlet
     }
 
     Path tmpdir = null;
+    Instant start = Instant.now();
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+      if (LOG.isDebugEnabled()) {
+        Instant end = Instant.now();
+        long duration = Duration.between(start, end).toMillis();
+        LOG.debug("Time taken to acquire the BootstrapStateLock " + ": {} milliseconds", duration);
+      }
       tmpdir = Files.createTempDirectory(bootstrapTempData.toPath(),
           "bootstrap-data-");
       checkpoint = getCheckpoint(tmpdir, flush);
@@ -221,7 +227,7 @@ public class DBCheckpointServlet extends HttpServlet
           "attachment; filename=\"" +
                file + ".tar\"");
 
-      Instant start = Instant.now();
+      start = Instant.now();
       writeDbDataToStream(checkpoint, request,
           response.getOutputStream(), receivedSstList, excludedSstList, tmpdir);
       Instant end = Instant.now();
@@ -289,7 +295,7 @@ public class DBCheckpointServlet extends HttpServlet
         sstParam.add(Streams.asString(item.openStream()));
       }
     } catch (Exception e) {
-      LOG.warn("Exception occured during form data parsing {}", e.getMessage());
+      LOG.error("Exception occurred during form data parsing", e);
     }
 
     return sstParam.isEmpty() ? null : sstParam.toArray(new String[0]);

@@ -112,9 +112,14 @@ public abstract class RDBSnapshotProvider implements Closeable {
     while (true) {
       String snapshotFileName = getSnapshotFileName(leaderNodeID);
       File targetFile = new File(snapshotDir, snapshotFileName);
-      downloadSnapshot(leaderNodeID, targetFile);
+      try {
+        downloadSnapshot(leaderNodeID, targetFile);
+      } catch (IOException ioe){
+        LOG.error("Failed to download DB Snapshot", ioe);
+        throw ioe;
+      }
       LOG.info(
-          "Successfully download the latest snapshot {} from leader OM: {}",
+          "Successfully downloaded the latest snapshot {} from leader OM: {}",
           targetFile, leaderNodeID);
 
       numDownloaded.incrementAndGet();
@@ -122,7 +127,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
 
       RocksDBCheckpoint checkpoint = getCheckpointFromSnapshotFile(targetFile,
           candidateDir, true);
-      LOG.info("Successfully untar the downloaded snapshot {} at {}.",
+      LOG.info("Successfully un-tarred the downloaded snapshot {} at {}.",
           targetFile, checkpoint.getCheckpointLocation());
       if (ratisSnapshotComplete(checkpoint.getCheckpointLocation())) {
         LOG.info("Ratis snapshot transfer is complete.");

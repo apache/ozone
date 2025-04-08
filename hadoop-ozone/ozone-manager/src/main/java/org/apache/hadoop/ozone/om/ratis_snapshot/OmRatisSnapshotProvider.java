@@ -157,14 +157,17 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       connection.connect();
       int errorCode = connection.getResponseCode();
       if ((errorCode != HTTP_OK) && (errorCode != HTTP_CREATED)) {
-        throw new IOException("Unexpected exception when trying to reach " +
+        String message = "Unexpected exception when trying to reach " +
             "OM to download latest checkpoint. Checkpoint URL: " +
-            omCheckpointUrl + ". ErrorCode: " + errorCode);
+                omCheckpointUrl + ". ErrorCode: " + errorCode;
+        LOG.error(message);
+        throw new IOException(message);
       }
 
       try (InputStream inputStream = connection.getInputStream()) {
         downloadFileWithProgress(inputStream, targetFile);
       } catch (IOException ex) {
+        LOG.error("Failed to download the snapshot from leader", ex);
         boolean deleted = FileUtils.deleteQuietly(targetFile);
         if (!deleted) {
           LOG.error("OM snapshot which failed to download {} cannot be deleted",
