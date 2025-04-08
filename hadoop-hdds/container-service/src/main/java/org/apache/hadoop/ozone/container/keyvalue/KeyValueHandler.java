@@ -1689,6 +1689,7 @@ public class KeyValueHandler extends Handler {
       BlockData putBlockData = BlockData.getFromProtoBuf(peerBlockData);
       putBlockData.setChunks(successfulChunksList);
       putBlockForClosedContainer(container, putBlockData, maxBcsId, overwriteBcsId);
+      chunkManager.finishWriteChunks(container, putBlockData);
     }
   }
 
@@ -1776,6 +1777,7 @@ public class KeyValueHandler extends Handler {
       List<ContainerProtos.ChunkInfo> localChunkList = new ArrayList<>(localChunksMap.values());
       localBlockData.setChunks(localChunkList);
       putBlockForClosedContainer(container, localBlockData, maxBcsId, overwriteBcsId);
+      chunkManager.finishWriteChunks(container, localBlockData);
     }
   }
 

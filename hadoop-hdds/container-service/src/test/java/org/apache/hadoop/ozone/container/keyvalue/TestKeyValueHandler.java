@@ -29,7 +29,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOU
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.getContainerChecksumFile;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.writeContainerDataTreeProto;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
@@ -41,12 +40,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
@@ -54,7 +52,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -70,6 +67,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -82,7 +80,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -90,17 +87,14 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
-import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -109,7 +103,6 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.helpers.TokenHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -128,6 +121,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.util.Sets;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -150,13 +144,10 @@ public class TestKeyValueHandler {
   private Path tempDir;
   @TempDir
   private Path dbFile;
-  @TempDir
-  private Path testRoot;
 
   private static final long DUMMY_CONTAINER_ID = 9999;
   private static final String DUMMY_PATH = "dummy/dir/doesnt/exist";
-  private static final int UNIT_LEN = 1024;
-  private static final int CHUNK_LEN = 3 * UNIT_LEN;
+  private static final int CHUNK_LEN = 3 * (int) OzoneConsts.KB;
   private static final int CHUNKS_PER_BLOCK = 4;
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
@@ -165,6 +156,9 @@ public class TestKeyValueHandler {
   private KeyValueHandler handler;
   private OzoneConfiguration conf;
 
+  /**
+   * Number of corrupt blocks and chunks.
+   */
   public static Stream<Arguments> corruptionValues() {
     return Stream.of(
         Arguments.of(5, 0),
@@ -186,8 +180,8 @@ public class TestKeyValueHandler {
   public void setup() throws IOException {
     // Create mock HddsDispatcher and KeyValueHandler.
     conf = new OzoneConfiguration();
-    conf.set(HDDS_DATANODE_DIR_KEY, testRoot.toString());
-    conf.set(OZONE_METADATA_DIRS, testRoot.toString());
+    conf.set(HDDS_DATANODE_DIR_KEY, tempDir.toString());
+    conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     handler = mock(KeyValueHandler.class);
 
     HashMap<ContainerType, Handler> handlers = new HashMap<>();
@@ -546,7 +540,7 @@ public class TestKeyValueHandler {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
-  public void testReconcileContainer(ContainerLayoutVersion layoutVersion) throws Exception {
+  public void testContainerChecksumInvocation(ContainerLayoutVersion layoutVersion) throws Exception {
     conf = new OzoneConfiguration();
 
     KeyValueContainerData data = new KeyValueContainerData(123L, layoutVersion, GB,
@@ -585,22 +579,20 @@ public class TestKeyValueHandler {
     when(mockDnClient.getContainerChecksumInfo(anyLong(), any())).thenReturn(null);
     keyValueHandler.reconcileContainer(mockDnClient, container, Sets.newHashSet(peer1, peer2, peer3));
     // Make sure all the replicas are used for reconciliation.
-    Mockito.verify(mockDnClient, times(3)).getContainerChecksumInfo(anyLong(), any());
+    Mockito.verify(mockDnClient, atMostOnce()).getContainerChecksumInfo(anyLong(), eq(peer1));
+    Mockito.verify(mockDnClient, atMostOnce()).getContainerChecksumInfo(anyLong(), eq(peer2));
+    Mockito.verify(mockDnClient, atMostOnce()).getContainerChecksumInfo(anyLong(), eq(peer3));
     Assertions.assertEquals(1, icrCount.get());
   }
 
   @ParameterizedTest
   @MethodSource("corruptionValues")
   public void testFullContainerReconciliation(int numBlocks, int numChunks) throws Exception {
-    KeyValueHandler kvHandler = createKeyValueHandler(testRoot);
+    KeyValueHandler kvHandler = createKeyValueHandler(tempDir);
     ContainerChecksumTreeManager checksumManager = kvHandler.getChecksumManager();
-    DNContainerOperationClient dnClient = mock(DNContainerOperationClient.class);
-    XceiverClientManager xceiverClientManager = mock(XceiverClientManager.class);
-    TokenHelper tokenHelper = new TokenHelper(new SecurityConfig(conf), null);
-    when(dnClient.getTokenHelper()).thenReturn(tokenHelper);
-    when(dnClient.getXceiverClientManager()).thenReturn(xceiverClientManager);
+    DNContainerOperationClient dnClient = new DNContainerOperationClient(conf, null, null);
     final long containerID = 100L;
-    // Create 3 containers with 10 blocks each and 3 replicas.
+    // Create 3 containers with 15 blocks each and 3 replicas.
     List<KeyValueContainer> containers = createContainerWithBlocks(kvHandler, containerID, 15, 3);
     assertEquals(3, containers.size());
 
@@ -620,44 +612,50 @@ public class TestKeyValueHandler {
     // There should be more than 1 checksum because of the corruption.
     assertTrue(checksumsBeforeReconciliation.size() > 1);
 
-    List<DatanodeDetails> datanodes = Lists.newArrayList(randomDatanodeDetails(), randomDatanodeDetails(),
+    List<DatanodeDetails> datanodes = ImmutableList.of(randomDatanodeDetails(), randomDatanodeDetails(),
         randomDatanodeDetails());
+    Map<String, KeyValueContainer> dnToContainerMap = new HashMap<>();
+    dnToContainerMap.put(datanodes.get(0).getUuidString(), containers.get(0));
+    dnToContainerMap.put(datanodes.get(1).getUuidString(), containers.get(1));
+    dnToContainerMap.put(datanodes.get(2).getUuidString(), containers.get(2));
 
     // Setup mock for each datanode network calls needed for reconciliation.
-    try (MockedStatic<ContainerProtocolCalls> containerProtocolMock = Mockito.mockStatic(ContainerProtocolCalls.class);
-         MockedStatic<DNContainerOperationClient> dnClientMock = Mockito.mockStatic(DNContainerOperationClient.class)) {
+    try (MockedStatic<ContainerProtocolCalls> containerProtocolMock =
+             Mockito.mockStatic(ContainerProtocolCalls.class)) {
+      // Mock getContainerChecksumInfo
+      containerProtocolMock.when(() -> ContainerProtocolCalls.getContainerChecksumInfo(any(), anyLong(), any()))
+          .thenAnswer(inv -> {
+            XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
+            DatanodeDetails dn = xceiverClientSpi.getPipeline().getClosestNode();
+            KeyValueContainer container = dnToContainerMap.get(dn.getUuidString());
+            ByteString checksumInfo = checksumManager.getContainerChecksumInfo(container.getContainerData());
+            return ContainerProtos.GetContainerChecksumInfoResponseProto.newBuilder()
+                .setContainerID(containerID)
+                .setContainerChecksumInfo(checksumInfo)
+                .build();
+          });
 
-      for (int i = 0; i < datanodes.size(); i++) {
-        DatanodeDetails datanode = datanodes.get(i);
-        KeyValueContainer container = containers.get(i);
+      // Mock getBlock
+      containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(any(), any(), any(), any(), anyMap()))
+          .thenAnswer(inv -> {
+            XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
+            DatanodeDetails dn = xceiverClientSpi.getPipeline().getClosestNode();
+            KeyValueContainer container = dnToContainerMap.get(dn.getUuidString());
+            ContainerProtos.BlockData blockData = kvHandler.getBlockManager().getBlock(container, inv.getArgument(2))
+                  .getProtoBufMessage();
+            return ContainerProtos.GetBlockResponseProto.newBuilder()
+                .setBlockData(blockData)
+                .build();
+          });
 
-        Pipeline pipeline = Pipeline.newBuilder()
-            .setNodes(ImmutableList.of(datanode))
-            .setId(PipelineID.valueOf(datanode.getUuid()))
-            .setState(Pipeline.PipelineState.CLOSED)
-            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
-                HddsProtos.ReplicationFactor.ONE)).build();
-        XceiverClientSpi client = mock(XceiverClientSpi.class);
-
-        dnClientMock.when(() -> DNContainerOperationClient.createSingleNodePipeline(datanode)).thenReturn(pipeline);
-        when(xceiverClientManager.acquireClientForReadData(pipeline)).thenReturn(client);
-        doNothing().when(xceiverClientManager).releaseClientForReadData(eq(client), anyBoolean());
-        when(client.getPipeline()).thenReturn(pipeline);
-
-        // Mock checksum info
-        when(dnClient.getContainerChecksumInfo(containerID, datanode))
-            .thenReturn(checksumManager.read(container.getContainerData()).get());
-
-        // Mock getBlock
-        containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(eq(client), any(), any(), any(), anyMap()))
-            .thenAnswer(inv -> ContainerProtos.GetBlockResponseProto.newBuilder()
-                .setBlockData(kvHandler.getBlockManager().getBlock(container, inv.getArgument(2)).getProtoBufMessage())
-                .build());
-
-        // Mock readChunk
-        containerProtocolMock.when(() -> ContainerProtocolCalls.readChunk(eq(client), any(), any(), any(), any()))
-            .thenAnswer(inv -> createReadChunkResponse(inv, container, kvHandler));
-      }
+      // Mock readChunk
+      containerProtocolMock.when(() -> ContainerProtocolCalls.readChunk(any(), any(), any(), any(), any()))
+          .thenAnswer(inv -> {
+            XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
+            DatanodeDetails dn = xceiverClientSpi.getPipeline().getClosestNode();
+            KeyValueContainer container = dnToContainerMap.get(dn.getUuidString());
+            return createReadChunkResponse(inv, container, kvHandler);
+          });
 
       kvHandler.reconcileContainer(dnClient, containers.get(0), Sets.newHashSet(datanodes));
       kvHandler.reconcileContainer(dnClient, containers.get(1), Sets.newHashSet(datanodes));
@@ -810,6 +808,10 @@ public class TestKeyValueHandler {
     final KeyValueHandler kvHandler = ContainerTestUtils.getKeyValueHandler(conf,
         DATANODE_UUID, containerSet, volumeSet);
     kvHandler.setClusterID(CLUSTER_ID);
+    // Clean up metrics for next tests.
+    hddsVolume.getVolumeInfoStats().unregister();
+    hddsVolume.getVolumeIOStats().unregister();
+    ContainerMetrics.remove();
     return kvHandler;
   }
 
@@ -827,7 +829,7 @@ public class TestKeyValueHandler {
     MutableVolumeSet volumeSet = new MutableVolumeSet(DATANODE_UUID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     createDbInstancesForTestIfNeeded(volumeSet, CLUSTER_ID, CLUSTER_ID, conf);
-    int bytesPerChecksum = 2 * UNIT_LEN;
+    int bytesPerChecksum = 2 * (int) OzoneConsts.KB;
     Checksum checksum = new Checksum(ContainerProtos.ChecksumType.SHA256,
         bytesPerChecksum);
     byte[] chunkData = RandomStringUtils.randomAscii(CHUNK_LEN).getBytes(UTF_8);
@@ -837,7 +839,7 @@ public class TestKeyValueHandler {
       KeyValueContainerData containerData = new KeyValueContainerData(containerId,
           ContainerLayoutVersion.FILE_PER_BLOCK, (long) CHUNKS_PER_BLOCK * CHUNK_LEN * blocks,
           UUID.randomUUID().toString(), UUID.randomUUID().toString());
-      Path kvContainerPath = Files.createDirectory(testRoot.resolve(containerId + "-" + j));
+      Path kvContainerPath = Files.createDirectory(tempDir.resolve(containerId + "-" + j));
       containerData.setMetadataPath(kvContainerPath.toString());
       containerData.setDbFile(kvContainerPath.toFile());
 
@@ -863,9 +865,8 @@ public class TestKeyValueHandler {
           chunkList.add(info.getProtoBufMessage());
           kvHandler.getChunkManager().writeChunk(container, blockID, info,
               ByteBuffer.wrap(chunkData), WRITE_STAGE);
-          kvHandler.getChunkManager().writeChunk(container, blockID, info,
-              ByteBuffer.wrap(chunkData), COMMIT_STAGE);
         }
+        kvHandler.getChunkManager().finishWriteChunks(container, blockData);
         blockData.setChunks(chunkList);
         blockData.setBlockCommitSequenceId(i);
         kvHandler.getBlockManager().putBlock(container, blockData);
@@ -880,6 +881,12 @@ public class TestKeyValueHandler {
     return containers;
   }
 
+  /**
+   * Introduce corruption in the container.
+   * 1. Delete blocks from the container.
+   * 2. Corrupt chunks at an offset.
+   * If revers is true, the blocks and chunks are deleted in reverse order.
+   */
   private void introduceCorruption(KeyValueHandler kvHandler, KeyValueContainer keyValueContainer, int numBlocks,
                                    int numChunks, boolean reverse) throws IOException {
     Random random = new Random();
