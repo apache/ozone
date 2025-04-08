@@ -201,7 +201,8 @@ public class ContainerDatanodeDatabase {
             count = 0;
           }
         } catch (SQLException e) {
-          LOG.error("Failed to insert container log entry for container {} on datanode {} ", containerId, datanodeId, e);
+          LOG.error("Failed to insert container log entry for container {} on datanode {} ",
+              containerId, datanodeId, e);
           throw e;
         }
       }
