@@ -63,6 +63,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -80,7 +81,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -227,8 +228,7 @@ public class TestEndPoint {
     ozoneConf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
         serverAddress, 1000)) {
-      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-          .captureLogs(VersionEndpointTask.LOG);
+      LogCapturer logCapturer = LogCapturer.captureLogs(VersionEndpointTask.class);
       OzoneContainer ozoneContainer = new OzoneContainer(dnDetails, ozoneConf,
           ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
@@ -310,6 +310,13 @@ public class TestEndPoint {
 
       assertEquals("different_cluster_id", layout1.getClusterID());
       assertNotEquals(scmServerImpl.getClusterId(), layout1.getClusterID());
+
+      // another call() with OzoneContainer already started should not write the file
+      FileUtils.forceDelete(layout1.getVersionFile());
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+      versionTask.call();
+      assertEquals(StorageState.NOT_INITIALIZED, new DatanodeLayoutStorage(ozoneConf, "any").getState());
+
       FileUtils.forceDelete(storageDir);
     }
   }

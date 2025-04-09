@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -143,9 +144,8 @@ class TestOmSnapshotManager {
   public void testCloseOnEviction() throws IOException,
       InterruptedException, TimeoutException {
 
-    GenericTestUtils.setLogLevel(RDBStore.getLogger(), Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapture =
-        GenericTestUtils.LogCapturer.captureLogs(RDBStore.getLogger());
+    GenericTestUtils.setLogLevel(RDBStore.class, Level.DEBUG);
+    LogCapturer logCapture = LogCapturer.captureLogs(RDBStore.class);
     // set up db tables
     Table<String, OmVolumeArgs> volumeTable = mock(Table.class);
     Table<String, OmBucketInfo> bucketTable = mock(Table.class);
@@ -654,8 +654,7 @@ class TestOmSnapshotManager {
   @Test
   public void testCreateSnapshotIdempotent() throws Exception {
     // set up db tables
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(OmSnapshotManager.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(OmSnapshotManager.class);
     Table<String, OmVolumeArgs> volumeTable = mock(Table.class);
     Table<String, OmBucketInfo> bucketTable = mock(Table.class);
     Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);

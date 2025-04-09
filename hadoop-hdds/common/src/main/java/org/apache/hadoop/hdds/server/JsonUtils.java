@@ -47,7 +47,7 @@ public final class JsonUtils {
   private static final ObjectMapper MAPPER;
   private static final ObjectWriter WRITER;
   private static final ObjectMapper INDENT_OUTPUT_MAPPER; // New mapper instance
-  public static final Logger LOG = LoggerFactory.getLogger(JsonUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JsonUtils.class);
 
   static {
     MAPPER = new ObjectMapper()

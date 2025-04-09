@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 public final class StatefulServiceStateManagerImpl
     implements StatefulServiceStateManager {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(StatefulServiceStateManagerImpl.class);
 
   // this table maps the service name to the configuration (ByteString)

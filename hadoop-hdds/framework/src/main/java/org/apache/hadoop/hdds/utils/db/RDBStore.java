@@ -78,7 +78,7 @@ public class RDBStore implements DBStore {
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
-                  CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
+                  CodecRegistry registry, boolean readOnly,
                   String dbJmxBeanName, boolean enableCompactionDag,
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
@@ -301,6 +301,12 @@ public class RDBStore implements DBStore {
   }
 
   @Override
+  public <K, V> TypedTable<K, V> getTable(
+      String name, Codec<K> keyCodec, Codec<V> valueCodec, TableCache.CacheType cacheType) throws IOException {
+    return new TypedTable<>(getTable(name), keyCodec, valueCodec, cacheType);
+  }
+
+  @Override
   public <K, V> Table<K, V> getTable(String name,
       Class<K> keyType, Class<V> valueType,
       TableCache.CacheType cacheType) throws IOException {
@@ -479,9 +485,5 @@ public class RDBStore implements DBStore {
 
   public RDBMetrics getMetrics() {
     return rdbMetrics;
-  }
-
-  public static Logger getLogger() {
-    return LOG;
   }
 }

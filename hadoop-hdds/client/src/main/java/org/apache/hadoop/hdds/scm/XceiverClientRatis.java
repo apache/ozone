@@ -71,7 +71,7 @@ import org.slf4j.LoggerFactory;
  * The underlying RPC mechanism can be chosen via the constructor.
  */
 public final class XceiverClientRatis extends XceiverClientSpi {
-  public static final Logger LOG = LoggerFactory.getLogger(XceiverClientRatis.class);
+  private static final Logger LOG = LoggerFactory.getLogger(XceiverClientRatis.class);
 
   private final Pipeline pipeline;
   private final RpcType rpcType;

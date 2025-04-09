@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -71,7 +70,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
@@ -112,7 +110,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
   private long slowOpThresholdNs;
-  private VolumeUsage.MinFreeSpaceCalculator freeSpaceCalculator;
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -146,7 +143,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             LOG,
             HddsUtils::processForDebug,
             HddsUtils::processForDebug);
-    this.freeSpaceCalculator = new VolumeUsage.MinFreeSpaceCalculator(conf);
   }
 
   @Override
@@ -618,14 +614,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .orElse(Boolean.FALSE);
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
-      SpaceUsageSource usage = volume.getCurrentUsage();
-      long volumeCapacity = usage.getCapacity();
-      long volumeFreeSpaceToSpare =
-          freeSpaceCalculator.get(volumeCapacity);
-      long volumeFree = usage.getAvailable();
-      long volumeCommitted = volume.getCommittedBytes();
-      long volumeAvailable = volumeFree - volumeCommitted;
-      return (volumeAvailable <= volumeFreeSpaceToSpare);
+      StorageLocationReport volumeReport = volume.getReport();
+      boolean full = volumeReport.getUsableSpace() <= 0;
+      if (full) {
+        LOG.info("Container {} volume is full: {}", container.getContainerData().getContainerID(), volumeReport);
+      }
+      return full;
     }
     return false;
   }

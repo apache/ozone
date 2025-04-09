@@ -50,7 +50,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
@@ -93,7 +92,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -245,16 +244,16 @@ public class TestHddsDispatcher {
       ContainerLayoutVersion layoutVersion) throws Exception {
     String testDirPath = testDir.getPath();
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setStorageSize(HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+    conf.setStorageSize(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
         100.0, StorageUnit.BYTES);
     DatanodeDetails dd = randomDatanodeDetails();
 
     HddsVolume.Builder volumeBuilder =
         new HddsVolume.Builder(testDirPath).datanodeUuid(dd.getUuidString())
             .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
-    // state of cluster : available (140) > 100  ,datanode volume
+    // state of cluster : available (160) > 100  ,datanode volume
     // utilisation threshold not yet reached. container creates are successful.
-    AtomicLong usedSpace = new AtomicLong(360);
+    AtomicLong usedSpace = new AtomicLong(340);
     SpaceUsageSource spaceUsage = MockSpaceUsageSource.of(500, usedSpace);
 
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
@@ -268,6 +267,7 @@ public class TestHddsDispatcher {
       ContainerSet containerSet = newContainerSet();
       StateContext context = ContainerTestUtils.getMockContext(dd, conf);
       // create a 50 byte container
+      // available (160) > 100 (min free space) + 50 (container size)
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
           layoutVersion,
           50, UUID.randomUUID().toString(),
@@ -289,8 +289,8 @@ public class TestHddsDispatcher {
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
       hddsDispatcher.setClusterId(scmId.toString());
-      containerData.getVolume().getVolumeInfo()
-          .ifPresent(volumeInfo -> volumeInfo.incrementUsedSpace(50));
+      containerData.getVolume().getVolumeUsage()
+          .ifPresent(usage -> usage.incrementUsedSpace(50));
       usedSpace.addAndGet(50);
       ContainerCommandResponseProto response = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
@@ -391,8 +391,7 @@ public class TestHddsDispatcher {
       assertEquals(
           ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
 
-      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-          .captureLogs(HddsDispatcher.LOG);
+      LogCapturer logCapturer = LogCapturer.captureLogs(HddsDispatcher.class);
       // send write chunk request without sending create container
       response = hddsDispatcher.dispatch(writeChunkRequest, COMMIT_STAGE);
       // container should not be found
@@ -429,8 +428,7 @@ public class TestHddsDispatcher {
       doReturn(builder.build()).when(mockDispatcher)
           .createContainer(writeChunkRequest);
 
-      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-          .captureLogs(HddsDispatcher.LOG);
+      LogCapturer logCapturer = LogCapturer.captureLogs(HddsDispatcher.class);
       // send write chunk request without sending create container
       mockDispatcher.dispatch(writeChunkRequest, null);
       // verify the error log

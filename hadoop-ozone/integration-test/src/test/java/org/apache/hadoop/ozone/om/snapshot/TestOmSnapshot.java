@@ -1073,7 +1073,7 @@ public abstract class TestOmSnapshot {
     key1 = createFileKeyWithPrefix(bucket, key1);
     createSnapshot(testVolumeName, testBucketName, snap1);
     OzoneObj keyObj = buildKeyObj(bucket, key1);
-    OzoneAcl userAcl = new OzoneAcl(USER, "user",
+    OzoneAcl userAcl = OzoneAcl.of(USER, "user",
         DEFAULT, WRITE);
     store.addAcl(keyObj, userAcl);
 

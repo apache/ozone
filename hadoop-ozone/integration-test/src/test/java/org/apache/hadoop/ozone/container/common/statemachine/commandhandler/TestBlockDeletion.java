@@ -111,7 +111,7 @@ import org.slf4j.event.Level;
  */
 public class TestBlockDeletion {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(TestBlockDeletion.class);
 
   private OzoneConfiguration conf = null;
@@ -128,9 +128,9 @@ public class TestBlockDeletion {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    GenericTestUtils.setLogLevel(DeletedBlockLogImpl.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(ReplicationManager.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(DeletedBlockLogImpl.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(SCMBlockDeletingService.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ReplicationManager.class, Level.DEBUG);
 
     conf.set("ozone.replication.allowed-configs",
         "^(RATIS/THREE)|(EC/2-1-256k)$");
@@ -210,8 +210,7 @@ public class TestBlockDeletion {
   public void testBlockDeletion(ReplicationConfig repConfig) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(DeleteBlocksCommandHandler.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(DeleteBlocksCommandHandler.class);
 
     String value = RandomStringUtils.random(1024 * 1024);
     store.createVolume(volumeName);
@@ -404,7 +403,7 @@ public class TestBlockDeletion {
       });
     });
 
-    LogCapturer logCapturer = LogCapturer.captureLogs(ReplicationManager.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(ReplicationManager.class);
     logCapturer.clearOutput();
     cluster.shutdownHddsDatanode(0);
     replicationManager.processAll();

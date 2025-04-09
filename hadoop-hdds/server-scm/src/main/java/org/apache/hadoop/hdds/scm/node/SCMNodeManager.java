@@ -53,9 +53,10 @@ import javax.management.ObjectName;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -113,7 +114,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SCMNodeManager implements NodeManager {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMNodeManager.class);
 
   private final NodeStateManager nodeStateManager;
@@ -126,7 +127,7 @@ public class SCMNodeManager implements NodeManager {
   private final NetworkTopology clusterMap;
   private final Function<String, String> nodeResolver;
   private final boolean useHostname;
-  private final Map<String, Set<UUID>> dnsToUuidMap = new ConcurrentHashMap<>();
+  private final Map<String, Set<DatanodeID>> dnsToDnIdMap = new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
@@ -151,6 +152,7 @@ public class SCMNodeManager implements NodeManager {
    * Constructs SCM machine Manager.
    */
   public SCMNodeManager(
+
       OzoneConfiguration conf,
       SCMStorageConfig scmStorageConfig,
       EventPublisher eventPublisher,
@@ -409,7 +411,7 @@ public class SCMNodeManager implements NodeManager {
       datanodeDetails.setNetworkLocation(networkLocation);
     }
 
-    final UUID uuid = datanodeDetails.getUuid();
+    final DatanodeID dnId = datanodeDetails.getID();
     if (!isNodeRegistered(datanodeDetails)) {
       try {
         clusterMap.add(datanodeDetails);
@@ -417,7 +419,7 @@ public class SCMNodeManager implements NodeManager {
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
-        addToDnsToUuidMap(uuid, ipAddress, hostName);
+        addToDnsToDnIdMap(dnId, ipAddress, hostName);
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
         LOG.info("Registered datanode: {}", datanodeDetails.toDebugString());
@@ -435,8 +437,8 @@ public class SCMNodeManager implements NodeManager {
       // Update datanode if it is registered but the ip or hostname changes
       try {
         final DatanodeInfo oldNode = nodeStateManager.getNode(datanodeDetails);
-        if (updateDnsToUuidMap(oldNode.getHostName(), oldNode.getIpAddress(),
-            hostName, ipAddress, uuid)) {
+        if (updateDnsToDnIdMap(oldNode.getHostName(), oldNode.getIpAddress(),
+            hostName, ipAddress, dnId)) {
           LOG.info("Updating datanode {} from {} to {}",
                   datanodeDetails.getUuidString(),
                   oldNode,
@@ -472,42 +474,42 @@ public class SCMNodeManager implements NodeManager {
    * and each host can have multiple addresses,
    * this is a many to many mapping.
    *
-   * @param uuid the UUID of the registered node.
+   * @param datanodeID the DataNodeID of the registered node.
    * @param addresses hostname and/or IP of the node
    */
-  private synchronized void addToDnsToUuidMap(UUID uuid, String... addresses) {
+  private synchronized void addToDnsToDnIdMap(DatanodeID datanodeID, String... addresses) {
     for (String addr : addresses) {
       if (!Strings.isNullOrEmpty(addr)) {
-        dnsToUuidMap.computeIfAbsent(addr, k -> ConcurrentHashMap.newKeySet())
-            .add(uuid);
+        dnsToDnIdMap.computeIfAbsent(addr, k -> ConcurrentHashMap.newKeySet())
+            .add(datanodeID);
       }
     }
   }
 
-  private synchronized void removeFromDnsToUuidMap(UUID uuid, String address) {
+  private synchronized void removeFromDnsToDnIdMap(DatanodeID datanodeID, String address) {
     if (address != null) {
-      Set<UUID> dnSet = dnsToUuidMap.get(address);
-      if (dnSet != null && dnSet.remove(uuid) && dnSet.isEmpty()) {
-        dnsToUuidMap.remove(address);
+      Set<DatanodeID> dnSet = dnsToDnIdMap.get(address);
+      if (dnSet != null && dnSet.remove(datanodeID) && dnSet.isEmpty()) {
+        dnsToDnIdMap.remove(address);
       }
     }
   }
 
-  private boolean updateDnsToUuidMap(
+  private boolean updateDnsToDnIdMap(
       String oldHostName, String oldIpAddress,
       String newHostName, String newIpAddress,
-      UUID uuid) {
+      DatanodeID datanodeID) {
     final boolean ipChanged = !Objects.equals(oldIpAddress, newIpAddress);
     final boolean hostNameChanged = !Objects.equals(oldHostName, newHostName);
     if (ipChanged || hostNameChanged) {
       synchronized (this) {
         if (ipChanged) {
-          removeFromDnsToUuidMap(uuid, oldIpAddress);
-          addToDnsToUuidMap(uuid, newIpAddress);
+          removeFromDnsToDnIdMap(datanodeID, oldIpAddress);
+          addToDnsToDnIdMap(datanodeID, newIpAddress);
         }
         if (hostNameChanged) {
-          removeFromDnsToUuidMap(uuid, oldHostName);
-          addToDnsToUuidMap(uuid, newHostName);
+          removeFromDnsToDnIdMap(datanodeID, oldHostName);
+          addToDnsToDnIdMap(datanodeID, newHostName);
         }
       }
     }
@@ -634,9 +636,34 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     DatanodeDetails scmDnd = nodeStateManager.getNode(reportedDn);
+    NodeOperationalState oldPersistedOpState = scmDnd.getPersistedOpState();
+    NodeOperationalState newPersistedOpState = reportedDn.getPersistedOpState();
+
     scmDnd.setPersistedOpStateExpiryEpochSec(
         reportedDn.getPersistedOpStateExpiryEpochSec());
-    scmDnd.setPersistedOpState(reportedDn.getPersistedOpState());
+    scmDnd.setPersistedOpState(newPersistedOpState);
+
+    maybeNotifyReplicationManager(reportedDn, oldPersistedOpState, newPersistedOpState);
+  }
+
+  private void maybeNotifyReplicationManager(
+      DatanodeDetails datanode,
+      NodeOperationalState oldState,
+      NodeOperationalState newState) {
+    if (!scmContext.isLeader()) {
+      return;
+    }
+
+    if (oldState != newState) {
+      // Notify when a node is entering maintenance, decommissioning or back to service
+      if (newState == NodeOperationalState.ENTERING_MAINTENANCE
+          || newState == NodeOperationalState.DECOMMISSIONING
+          || newState == NodeOperationalState.IN_SERVICE) {
+        LOG.info("Notifying ReplicationManager of node state change for {}: {} -> {}",
+            datanode, oldState, newState);
+        scmNodeEventPublisher.fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode);
+      }
+    }
   }
 
   @Override
@@ -1096,16 +1123,14 @@ public class SCMNodeManager implements NodeManager {
       }
       List<StorageReportProto> storageReportProtos = node.getStorageReports();
       for (StorageReportProto reportProto : storageReportProtos) {
-        if (reportProto.getStorageType() ==
-            StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK) {
+        if (reportProto.getStorageType() == StorageTypeProto.DISK) {
           nodeInfo.compute(keyPrefix + UsageMetrics.DiskCapacity.name(),
               (k, v) -> v + reportProto.getCapacity());
           nodeInfo.compute(keyPrefix + UsageMetrics.DiskRemaining.name(),
               (k, v) -> v + reportProto.getRemaining());
           nodeInfo.compute(keyPrefix + UsageMetrics.DiskUsed.name(),
               (k, v) -> v + reportProto.getScmUsed());
-        } else if (reportProto.getStorageType() ==
-            StorageContainerDatanodeProtocolProtos.StorageTypeProto.SSD) {
+        } else if (reportProto.getStorageType() == StorageTypeProto.SSD) {
           nodeInfo.compute(keyPrefix + UsageMetrics.SSDCapacity.name(),
               (k, v) -> v + reportProto.getCapacity());
           nodeInfo.compute(keyPrefix + UsageMetrics.SSDRemaining.name(),
@@ -1585,29 +1610,14 @@ public class SCMNodeManager implements NodeManager {
   public void addContainer(final DatanodeDetails datanodeDetails,
       final ContainerID containerId)
       throws NodeNotFoundException {
-    nodeStateManager.addContainer(datanodeDetails.getUuid(), containerId);
+    nodeStateManager.addContainer(datanodeDetails.getID(), containerId);
   }
 
   @Override
   public void removeContainer(final DatanodeDetails datanodeDetails,
                            final ContainerID containerId)
       throws NodeNotFoundException {
-    nodeStateManager.removeContainer(datanodeDetails.getUuid(), containerId);
-  }
-
-  /**
-   * Update set of containers available on a datanode.
-   *
-   * @param datanodeDetails - DatanodeID
-   * @param containerIds    - Set of containerIDs
-   * @throws NodeNotFoundException - if datanode is not known. For new datanode
-   *                               use addDatanodeInContainerMap call.
-   */
-  @Override
-  public void setContainers(DatanodeDetails datanodeDetails,
-      Set<ContainerID> containerIds) throws NodeNotFoundException {
-    nodeStateManager.setContainers(datanodeDetails.getUuid(),
-        containerIds);
+    nodeStateManager.removeContainer(datanodeDetails.getID(), containerId);
   }
 
   /**
@@ -1621,12 +1631,12 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public Set<ContainerID> getContainers(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    return nodeStateManager.getContainers(datanodeDetails.getUuid());
+    return nodeStateManager.getContainers(datanodeDetails.getID());
   }
 
   public int getContainerCount(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    return nodeStateManager.getContainerCount(datanodeDetails.getUuid());
+    return nodeStateManager.getContainerCount(datanodeDetails.getID());
   }
 
   public int getPipeLineCount(DatanodeDetails datanodeDetails)
@@ -1689,29 +1699,16 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  /**
-   * Given datanode uuid, returns the DatanodeDetails for the node.
-   *
-   * @param uuid node host address
-   * @return the given datanode, or null if not found
-   */
   @Override
-  public DatanodeDetails getNodeByUuid(String uuid) {
-    return uuid != null && !uuid.isEmpty()
-        ? getNodeByUuid(UUID.fromString(uuid))
-        : null;
-  }
-
-  @Override
-  public DatanodeDetails getNodeByUuid(UUID uuid) {
-    if (uuid == null) {
+  public DatanodeInfo getNode(DatanodeID id) {
+    if (id == null) {
       return null;
     }
 
     try {
-      return nodeStateManager.getNode(uuid);
+      return nodeStateManager.getNode(id);
     } catch (NodeNotFoundException e) {
-      LOG.warn("Cannot find node for uuid {}", uuid);
+      LOG.warn("Cannot find node for uuid {}", id);
       return null;
     }
   }
@@ -1725,24 +1722,28 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public List<DatanodeDetails> getNodesByAddress(String address) {
+    List<DatanodeDetails> allNodes = getAllNodes();
     List<DatanodeDetails> results = new LinkedList<>();
     if (Strings.isNullOrEmpty(address)) {
       LOG.warn("address is null");
       return results;
     }
-    Set<UUID> uuids = dnsToUuidMap.get(address);
-    if (uuids == null) {
+    Set<DatanodeID> datanodeIDS = dnsToDnIdMap.get(address);
+    if (datanodeIDS == null) {
       LOG.debug("Cannot find node for address {}", address);
       return results;
     }
 
-    for (UUID uuid : uuids) {
+    datanodeIDS.forEach(datanodeID -> {
       try {
-        results.add(nodeStateManager.getNode(uuid));
-      } catch (NodeNotFoundException e) {
-        LOG.warn("Cannot find node for uuid {}", uuid);
+        List<DatanodeDetails> datanodeDetails = allNodes.stream().
+            filter(node -> node.getID().equals(datanodeID)).
+            collect(Collectors.toList());
+        results.addAll(datanodeDetails);
+      } catch (Exception e) {
+        LOG.warn("Error find node for DataNode ID {}", datanodeID);
       }
-    }
+    });
     return results;
   }
 
@@ -1844,8 +1845,8 @@ public class SCMNodeManager implements NodeManager {
         if (clusterMap.contains(datanodeDetails)) {
           clusterMap.remove(datanodeDetails);
         }
-        nodeStateManager.removeNode(datanodeDetails);
-        removeFromDnsToUuidMap(datanodeDetails.getUuid(), datanodeDetails.getIpAddress());
+        nodeStateManager.removeNode(datanodeDetails.getID());
+        removeFromDnsToDnIdMap(datanodeDetails.getID(), datanodeDetails.getIpAddress());
         final List<SCMCommand<?>> cmdList = getCommandQueue(datanodeDetails.getUuid());
         LOG.info("Clearing command queue of size {} for DN {}", cmdList.size(), datanodeDetails);
       } else {

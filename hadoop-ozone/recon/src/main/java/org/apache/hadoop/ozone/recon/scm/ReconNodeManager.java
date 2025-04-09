@@ -68,7 +68,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ReconNodeManager extends SCMNodeManager {
 
-  public static final Logger LOG = LoggerFactory
+  private static final Logger LOG = LoggerFactory
       .getLogger(ReconNodeManager.class);
 
   private Table<UUID, DatanodeDetails> nodeDB;
@@ -307,7 +307,7 @@ public class ReconNodeManager extends SCMNodeManager {
           nodeStatus.getOperationalState());
 
       setNodeOperationalState(dnDetails, nodeOperationalStateFromScm);
-      DatanodeDetails scmDnd = getNodeByUuid(dnDetails.getUuid());
+      DatanodeDetails scmDnd = getNode(dnDetails.getID());
       scmDnd.setPersistedOpState(nodeOperationalStateFromScm);
     }
   }

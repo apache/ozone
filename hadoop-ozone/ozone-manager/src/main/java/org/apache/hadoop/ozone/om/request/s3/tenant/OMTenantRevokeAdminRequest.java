@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
  *     - Update tenantAccessIdTable
  */
 public class OMTenantRevokeAdminRequest extends OMClientRequest {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMTenantRevokeAdminRequest.class);
 
   public OMTenantRevokeAdminRequest(OMRequest omRequest) {
