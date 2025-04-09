@@ -79,7 +79,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -629,7 +628,7 @@ public class TestDecommissionAndMaintenance {
     cluster.shutdownHddsDatanode(dn);
     waitForDnToReachHealthState(nm, dn, DEAD);
 
-    newEndTime = Time.monotonicNow() / 1000 + 5;
+    newEndTime = System.currentTimeMillis() / 1000 + 5;
     nm.setNodeOperationalState(dn, IN_MAINTENANCE, newEndTime);
     waitForDnToReachOpState(nm, dn, IN_SERVICE);
     // Ensure there are 3 replicas not including the dead node, indicating a new
