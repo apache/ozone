@@ -75,8 +75,6 @@ public class TestHealthyPipelineSafeModeRule {
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
     config.setBoolean(
-            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
-    config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
 
@@ -97,7 +95,7 @@ public class TestHealthyPipelineSafeModeRule {
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
           mockRatisProvider);
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, eventQueue,
+          config, containerManager, pipelineManager, nodeManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
@@ -128,8 +126,6 @@ public class TestHealthyPipelineSafeModeRule {
     when(containerManager.getContainers()).thenReturn(containers);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
-    config.setBoolean(
-            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
     config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
@@ -177,7 +173,7 @@ public class TestHealthyPipelineSafeModeRule {
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, eventQueue,
+          config, containerManager, pipelineManager, nodeManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
@@ -225,8 +221,6 @@ public class TestHealthyPipelineSafeModeRule {
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
     config.setBoolean(
-            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
-    config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
@@ -273,7 +267,7 @@ public class TestHealthyPipelineSafeModeRule {
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, eventQueue,
+          config, containerManager, pipelineManager, nodeManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =

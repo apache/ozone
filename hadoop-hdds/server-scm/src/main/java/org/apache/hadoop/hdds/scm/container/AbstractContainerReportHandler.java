@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -46,30 +47,18 @@ import org.slf4j.Logger;
 /**
  * Base class for all the container report handlers.
  */
-public class AbstractContainerReportHandler {
-
+abstract class AbstractContainerReportHandler {
+  private final NodeManager nodeManager;
   private final ContainerManager containerManager;
   private final SCMContext scmContext;
-  private final Logger logger;
 
-  /**
-   * Constructs AbstractContainerReportHandler instance with the
-   * given ContainerManager instance.
-   *
-   * @param containerManager ContainerManager
-   * @param logger Logger to be used for logging
-   */
-  AbstractContainerReportHandler(final ContainerManager containerManager,
-                                 final SCMContext scmContext,
-                                 final Logger logger) {
+  AbstractContainerReportHandler(NodeManager nodeManager, ContainerManager containerManager, SCMContext scmContext) {
+    this.nodeManager = Objects.requireNonNull(nodeManager, "nodeManager == null");
     this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
     this.scmContext = Objects.requireNonNull(scmContext, "scmContext == null");
-    this.logger = Objects.requireNonNull(logger, "logger == null");
   }
 
-  protected Logger getLogger() {
-    return logger;
-  }
+  protected abstract Logger getLogger();
 
   /** @return the container in SCM and the replica from a datanode details for logging. */
   static Object getDetailsForLogging(ContainerInfo container, ContainerReplicaProto replica, DatanodeDetails datanode) {
@@ -414,10 +403,10 @@ public class AbstractContainerReportHandler {
         && replicaState != State.DELETED;
   }
 
-  /**
-   * Return ContainerManager.
-   * @return {@link ContainerManager}
-   */
+  protected NodeManager getNodeManager() {
+    return nodeManager;
+  }
+
   protected ContainerManager getContainerManager() {
     return containerManager;
   }

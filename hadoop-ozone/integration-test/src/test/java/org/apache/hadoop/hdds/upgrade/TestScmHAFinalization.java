@@ -88,6 +88,7 @@ public class TestScmHAFinalization {
     configurator.setUpgradeFinalizationExecutor(executor);
 
     conf.setInt(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT, "5s");
 
     MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf);
     clusterBuilder.setNumOfStorageContainerManagers(NUM_SCMS)

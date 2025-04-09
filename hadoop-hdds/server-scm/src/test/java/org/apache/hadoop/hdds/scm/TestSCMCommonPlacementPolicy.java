@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto.DISK;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

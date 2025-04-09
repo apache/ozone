@@ -27,10 +27,18 @@ public final class HddsConfigKeys {
       "hdds.heartbeat.interval";
   public static final String HDDS_HEARTBEAT_INTERVAL_DEFAULT =
       "30s";
+  public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL =
+      "hdds.initial.heartbeat.interval";
+  public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
+      "2s";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL =
       "hdds.recon.heartbeat.interval";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT =
       "60s";
+  public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL =
+      "hdds.recon.initial.heartbeat.interval";
+  public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
+      "2s";
   public static final String HDDS_NODE_REPORT_INTERVAL =
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =
@@ -80,11 +88,6 @@ public final class HddsConfigKeys {
 
   public static final String
       HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT = "5m";
-
-  public static final String HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK =
-      "hdds.scm.safemode.pipeline-availability.check";
-  public static final boolean
-      HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT = true;
 
   public static final String HDDS_SCM_SAFEMODE_PIPELINE_CREATION =
       "hdds.scm.safemode.pipeline.creation";
