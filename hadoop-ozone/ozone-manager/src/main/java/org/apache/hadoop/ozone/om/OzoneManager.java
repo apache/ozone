@@ -4917,7 +4917,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String volume,
       String bucket,
       String jobStatus,
-      boolean listAll,
+      boolean listAllStatus,
       String prevSnapshotDiffJob,
       int maxListResult) throws IOException {
     ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
@@ -4926,7 +4926,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     return omSnapshotManager.getSnapshotDiffList(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
-        jobStatus, listAll, prevSnapshotDiffJob, maxListResult);
+        jobStatus, listAllStatus, prevSnapshotDiffJob, maxListResult);
   }
 
   @Override

@@ -1122,7 +1122,7 @@ public class TestSnapshotDiffManager {
   @ParameterizedTest
   @MethodSource("listSnapshotDiffJobsScenarios")
   public void testListSnapshotDiffJobs(String jobStatus,
-                                       boolean listAll,
+                                       boolean listAllStatus,
                                        boolean containsJob)
       throws IOException {
     String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
@@ -1144,7 +1144,7 @@ public class TestSnapshotDiffManager {
     assertNull(diffJob);
 
     ListSnapshotDiffJobResponse snapshotDiffJobList = snapshotDiffManager
-        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll, null, 1000);
+        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAllStatus, null, 1000);
     // There are no jobs in the table, therefore
     // the response list should be empty.
     List<SnapshotDiffJob> jobList = snapshotDiffJobList.getSnapshotDiffJobs();
@@ -1170,11 +1170,11 @@ public class TestSnapshotDiffManager {
         diffJob.getStatus());
 
     snapshotDiffJobList = snapshotDiffManager
-        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll, null, 1000);
+        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAllStatus, null, 1000);
     jobList = snapshotDiffJobList.getSnapshotDiffJobs();
 
-    // When listAll is true, jobStatus is ignored.
-    // If the job is IN_PROGRESS or listAll is used,
+    // When listAllStatus is true, jobStatus is ignored.
+    // If the job is IN_PROGRESS or listAllStatus is used,
     // there should be a response.
     // Otherwise, response list should be empty.
     if (containsJob) {
@@ -1208,7 +1208,7 @@ public class TestSnapshotDiffManager {
     spy.getSnapshotDiffReport(volumeName, bucketName, fromSnapshotName,
             toSnapshotName, 0, 0, false, false);
 
-    // Invalid status, without listAll true, results in an exception.
+    // Invalid status, without listAllStatus true, results in an exception.
     assertThrows(IOException.class, () -> snapshotDiffManager
         .getSnapshotDiffJobList(volumeName, bucketName, "invalid", false, null, 1000));
   }

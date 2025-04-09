@@ -756,7 +756,7 @@ public class ClientProtocolStub implements ClientProtocol {
       String volumeName,
       String bucketName,
       String jobStatus,
-      boolean listAll,
+      boolean listAllStatus,
       String prevSnapshotDiffJob,
       int maxListResult) {
     return null;

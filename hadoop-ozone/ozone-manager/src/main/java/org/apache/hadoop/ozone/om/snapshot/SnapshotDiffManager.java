@@ -427,7 +427,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       String volumeName,
       String bucketName,
       String jobStatus,
-      boolean listAll,
+      boolean listAllStatus,
       String prevDiffJob,
       int maxEntries) throws IOException {
     List<SnapshotDiffJob> jobs = new ArrayList<>();
@@ -445,7 +445,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
         if (Objects.equals(snapshotDiffJob.getVolume(), volumeName) &&
             Objects.equals(snapshotDiffJob.getBucket(), bucketName)) {
-          if (listAll) {
+          if (listAllStatus) {
             jobs.add(snapshotDiffJob);
           } else if (Objects.equals(snapshotDiffJob.getStatus(), getJobStatus(jobStatus))) {
             jobs.add(snapshotDiffJob);

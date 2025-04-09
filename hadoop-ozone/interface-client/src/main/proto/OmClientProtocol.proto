@@ -1979,7 +1979,7 @@ message ListSnapshotDiffJobRequest {
   required string volumeName = 1;
   required string bucketName = 2;
   optional string jobStatus = 3;
-  optional bool listAll = 4;
+  optional bool listAll = 4; // Option to specify whether to list all jobs regardless of status
   optional string prevSnapshotDiffJob = 5;
   optional uint32 maxListResult = 6;
 }

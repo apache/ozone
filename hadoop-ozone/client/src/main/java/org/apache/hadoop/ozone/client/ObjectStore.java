@@ -735,7 +735,7 @@ public class ObjectStore {
    * @param volumeName Name of the volume to which the snapshotted bucket belong
    * @param bucketName Name of the bucket to which the snapshots belong
    * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
-   * @param listAll Option to specify whether to list all jobs or not
+   * @param listAllStatus Option to specify whether to list all jobs regardless of status
    * @param prevSnapshotDiffJob list snapshot diff jobs after this snapshot diff job.
    * @return an iterator of SnapshotDiffJob objects
    * @throws IOException in case there is a failure while getting a response.
@@ -744,10 +744,10 @@ public class ObjectStore {
       String volumeName,
       String bucketName,
       String jobStatus,
-      boolean listAll,
+      boolean listAllStatus,
       String prevSnapshotDiffJob
   ) throws IOException {
-    return new SnapshotDiffJobIterator(volumeName, bucketName, jobStatus, listAll, prevSnapshotDiffJob);
+    return new SnapshotDiffJobIterator(volumeName, bucketName, jobStatus, listAllStatus, prevSnapshotDiffJob);
   }
 
   /**
@@ -757,7 +757,7 @@ public class ObjectStore {
     private final String volumeName;
     private final String bucketName;
     private final String jobStatus;
-    private final boolean listAll;
+    private final boolean listAllJobs;
     private String lastSnapshotDiffJob;
     private Iterator<OzoneSnapshotDiff> currentIterator;
 
@@ -765,12 +765,12 @@ public class ObjectStore {
         String volumeName,
         String bucketName,
         String jobStatus,
-        boolean listAll,
+        boolean listAllStatus,
         String prevSnapshotDiffJob) throws IOException {
       this.volumeName = volumeName;
       this.bucketName = bucketName;
       this.jobStatus = jobStatus;
-      this.listAll = listAll;
+      this.listAllJobs = listAllStatus;
       // Initialized the currentIterator and lastSnapshotDiffJob.
       getNextListOfSnapshotDiffJobs(prevSnapshotDiffJob);
     }
@@ -797,8 +797,8 @@ public class ObjectStore {
     }
 
     private void getNextListOfSnapshotDiffJobs(String prevSnapshotDiffJob) throws IOException {
-      ListSnapshotDiffJobResponse response =
-          proxy.listSnapshotDiffJobs(volumeName, bucketName, jobStatus, listAll, prevSnapshotDiffJob, listCacheSize);
+      ListSnapshotDiffJobResponse response = proxy.listSnapshotDiffJobs(volumeName, bucketName, jobStatus, listAllJobs,
+          prevSnapshotDiffJob, listCacheSize);
       this.currentIterator =
           response.getSnapshotDiffJobs().stream().map(OzoneSnapshotDiff::fromSnapshotDiffJob).iterator();
       this.lastSnapshotDiffJob = response.getLastSnapshotDiffJob();

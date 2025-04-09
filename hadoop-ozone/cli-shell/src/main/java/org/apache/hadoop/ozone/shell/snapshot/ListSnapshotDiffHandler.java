@@ -44,6 +44,11 @@ public class ListSnapshotDiffHandler extends Handler {
       defaultValue = "in_progress")
   private String jobStatus;
 
+  @CommandLine.Option(names = {"--all-status"},
+      description = "List all jobs regardless of status.",
+      defaultValue = "false")
+  private boolean listAllStatus;
+
   @CommandLine.Mixin
   private ListOptions listOptions;
 
@@ -58,7 +63,7 @@ public class ListSnapshotDiffHandler extends Handler {
     String bucketName = snapshotPath.getValue().getBucketName();
 
     Iterator<OzoneSnapshotDiff> iterator = client.getObjectStore()
-        .listSnapshotDiffJobs(volumeName, bucketName, jobStatus, listOptions.isAll(), listOptions.getStartItem());
+        .listSnapshotDiffJobs(volumeName, bucketName, jobStatus, listAllStatus, listOptions.getStartItem());
 
     int counter = printAsJsonArray(iterator, listOptions.getLimit());
 

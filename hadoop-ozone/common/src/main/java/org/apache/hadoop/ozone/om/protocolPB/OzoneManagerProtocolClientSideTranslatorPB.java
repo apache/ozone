@@ -1478,7 +1478,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       String volumeName,
       String bucketName,
       String jobStatus,
-      boolean listAll,
+      boolean listAllStatus,
       String prevSnapshotDiffJob,
       int maxListResult) throws IOException {
     final OzoneManagerProtocolProtos
@@ -1488,7 +1488,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setJobStatus(jobStatus)
-            .setListAll(listAll)
+            .setListAll(listAllStatus)
             .setMaxListResult(maxListResult);
 
     if (prevSnapshotDiffJob != null) {

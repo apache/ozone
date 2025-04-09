@@ -807,7 +807,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       final String volumeName,
       final String bucketName,
       final String jobStatus,
-      final boolean listAll,
+      final boolean listAllStatus,
       final String prevSnapshotDiffJob,
       int maxListResult) throws IOException {
     String volumeKey = ozoneManager.getMetadataManager()
@@ -833,12 +833,12 @@ public final class OmSnapshotManager implements AutoCloseable {
       return new ListSnapshotDiffJobResponse(Collections.emptyList(), null);
     }
 
-    if (maxListResult < 0 || maxListResult > maxPageSize) {
+    if (maxListResult <= 0 || maxListResult > maxPageSize) {
       maxListResult = maxPageSize;
     }
 
-    return snapshotDiffManager.getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll, prevSnapshotDiffJob,
-        maxListResult);
+    return snapshotDiffManager.getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAllStatus,
+        prevSnapshotDiffJob, maxListResult);
   }
 
   private void validateSnapshotsExistAndActive(final String volumeName,

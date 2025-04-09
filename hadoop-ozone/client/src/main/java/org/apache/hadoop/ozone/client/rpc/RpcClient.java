@@ -1075,15 +1075,15 @@ public class RpcClient implements ClientProtocol {
       String volumeName,
       String bucketName,
       String jobStatus,
-      boolean listAll,
+      boolean listAllStatus,
       String prevSnapshotDiffJob,
       int maxListResult) throws IOException {
     Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
         "volume can't be null or empty.");
     Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
         "bucket can't be null or empty.");
-    return ozoneManagerClient.listSnapshotDiffJobs(volumeName, bucketName, jobStatus, listAll, prevSnapshotDiffJob,
-        maxListResult);
+    return ozoneManagerClient.listSnapshotDiffJobs(volumeName, bucketName, jobStatus, listAllStatus,
+        prevSnapshotDiffJob, maxListResult);
   }
 
   /**
