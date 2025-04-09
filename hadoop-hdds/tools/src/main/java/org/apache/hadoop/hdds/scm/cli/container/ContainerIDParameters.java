@@ -15,25 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.cli.datanode;
+package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.util.List;
 import org.apache.hadoop.hdds.cli.ItemsFromStdin;
 import picocli.CommandLine;
 
-/** Parameter for specifying list of hostnames. */
+/** Parameter for specifying list of container IDs. */
 @CommandLine.Command
-public class HostNameParameters extends ItemsFromStdin {
+public class ContainerIDParameters extends ItemsFromStdin {
 
-  @CommandLine.Parameters(description = "Host names" + FORMAT_DESCRIPTION,
+  @CommandLine.Parameters(description = "Container IDs" + FORMAT_DESCRIPTION,
       arity = "1..*",
-      paramLabel = "<host name>")
-  public void setHostNames(List<String> arguments) {
+      paramLabel = "<container ID>")
+  public void setContainerIDs(List<String> arguments) {
     setItems(arguments);
   }
-
-  public List<String> getHostNames() {
-    return getItems();
-  }
-
 }
