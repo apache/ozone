@@ -614,7 +614,7 @@ public class TestDecommissionAndMaintenance {
     scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(dn)), 0, true);
     waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
 
-    long newEndTime = Time.monotonicNow() / 1000 + 5;
+    long newEndTime = System.currentTimeMillis() / 1000 + 5;
     // Update the maintenance end time via NM manually. As the current
     // decommission interface only allows us to specify hours from now as the
     // end time, that is not really suitable for a test like this.

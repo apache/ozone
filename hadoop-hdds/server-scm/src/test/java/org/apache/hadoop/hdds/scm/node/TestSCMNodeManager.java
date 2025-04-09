@@ -637,7 +637,7 @@ public class TestSCMNodeManager {
       DatanodeDetails dn = HddsTestUtils.createRandomDatanodeAndRegister(
           nodeManager);
 
-      long expiry = Time.monotonicNow() / 1000 + 1000;
+      long expiry = System.currentTimeMillis() / 1000 + 1000;
       nodeManager.setNodeOperationalState(dn,
           HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, expiry);
 
