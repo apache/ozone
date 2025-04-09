@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.junit.jupiter.api.Test;
@@ -78,7 +79,8 @@ class TestSafeModeRuleFactory {
     when(safeModeManager.getSafeModeMetrics()).thenReturn(mock(SafeModeMetrics.class));
     SafeModeRuleFactory.initialize(new OzoneConfiguration(),
         SCMContext.emptyContext(), new EventQueue(), safeModeManager, mock(
-            PipelineManager.class), mock(ContainerManager.class));
+            PipelineManager.class),
+        mock(ContainerManager.class), mock(NodeManager.class));
   }
 
 }

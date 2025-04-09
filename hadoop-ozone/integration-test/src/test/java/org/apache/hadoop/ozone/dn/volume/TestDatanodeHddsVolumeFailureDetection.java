@@ -266,7 +266,7 @@ class TestDatanodeHddsVolumeFailureDetection {
     DatanodeConfiguration dnConf =
         ozoneConfig.getObject(DatanodeConfiguration.class);
     dnConf.setFailedDataVolumesTolerated(1);
-    dnConf.setDiskCheckMinGap(Duration.ofSeconds(5));
+    dnConf.setDiskCheckMinGap(Duration.ofSeconds(2));
     ozoneConfig.setFromObject(dnConf);
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(ozoneConfig)
         .setNumDatanodes(1)

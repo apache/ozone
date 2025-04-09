@@ -415,6 +415,8 @@ public final class OzoneConfigKeys {
       ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY;
   public static final long HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
       ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT;
+  public static final String HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
+      "hdds.ratis.leader.first.election.minimum.timeout.duration";
 
   public static final String HDDS_DATANODE_PLUGINS_KEY =
       "hdds.datanode.plugins";

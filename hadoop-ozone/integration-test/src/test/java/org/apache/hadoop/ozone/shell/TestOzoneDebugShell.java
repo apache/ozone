@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.debug.ldb.RDBParser;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -58,9 +59,9 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
 
@@ -72,11 +73,13 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
 
   private OzoneClient client;
   private OzoneDebug ozoneDebugShell;
+  private OMMetadataManager omMetadataManager;
 
   @BeforeEach
   void init() throws Exception {
     ozoneDebugShell = new OzoneDebug();
     client = cluster().newClient();
+    omMetadataManager = cluster().getOzoneManager().getMetadataManager();
   }
 
   @AfterEach
@@ -91,7 +94,7 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
 
-    writeKey(volumeName, bucketName, keyName, isEcKey);
+    writeKey(volumeName, bucketName, keyName, isEcKey, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     int exitCode = runChunkInfoCommand(volumeName, bucketName, keyName);
     assertEquals(0, exitCode);
@@ -102,18 +105,21 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     assertEquals(0, exitCode);
   }
 
-  @Test
-  public void testChunkInfoVerifyPathsAreDifferent() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  public void testChunkInfoVerifyPathsAreDifferent(BucketLayout layout) throws Exception {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
-    writeKey(volumeName, bucketName, keyName, false);
+    writeKey(volumeName, bucketName, keyName, false, layout);
     int exitCode = runChunkInfoAndVerifyPaths(volumeName, bucketName, keyName);
     assertEquals(0, exitCode);
   }
 
-  @Test
-  public void testLdbCliForOzoneSnapshot() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  public void testLdbCliForOzoneSnapshot(BucketLayout layout) throws Exception {
+    String columnFamily = omMetadataManager.getKeyTable(layout).getName();
     StringWriter stdout = new StringWriter();
     PrintWriter pstdout = new PrintWriter(stdout);
     CommandLine cmd = new CommandLine(new RDBParser())
@@ -122,7 +128,7 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
 
-    writeKey(volumeName, bucketName, keyName, false);
+    writeKey(volumeName, bucketName, keyName, false, layout);
 
     String snapshotName =
         client.getObjectStore().createSnapshot(volumeName, bucketName, "snap1");
@@ -135,7 +141,7 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     GenericTestUtils
         .waitFor(() -> new File(snapshotCurrent).exists(), 1000, 120000);
     String[] args =
-        new String[] {"--db=" + dbPath, "scan", "--cf", "keyTable"};
+        new String[] {"--db=" + dbPath, "scan", "--cf", columnFamily};
     int exitCode = cmd.execute(args);
     assertEquals(0, exitCode);
     String cmdOut = stdout.toString();
@@ -149,7 +155,7 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
   }
 
   private void writeKey(String volumeName, String bucketName,
-      String keyName, boolean isEcKey) throws IOException {
+      String keyName, boolean isEcKey, BucketLayout layout) throws IOException {
     ReplicationConfig repConfig;
     if (isEcKey) {
       repConfig = new ECReplicationConfig(3, 2);
@@ -157,9 +163,8 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
       repConfig = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
           ReplicationFactor.THREE);
     }
-    // see HDDS-10091 for making this work with FILE_SYSTEM_OPTIMIZED layout
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
-        BucketLayout.LEGACY);
+        layout);
     TestDataUtil.createKey(
         client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
         keyName, repConfig, "test".getBytes(StandardCharsets.UTF_8));
