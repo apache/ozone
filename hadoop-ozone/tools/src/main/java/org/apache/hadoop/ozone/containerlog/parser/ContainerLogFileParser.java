@@ -18,9 +18,7 @@
 package org.apache.hadoop.ozone.containerlog.parser;
 
 import java.io.BufferedReader;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -68,7 +66,8 @@ public class ContainerLogFileParser {
       CountDownLatch latch = new CountDownLatch(files.size());
       //int count = 1;
       for (Path file : files) {
-        String fileName = file.getFileName().toString();
+        Path fileNamePath = file.getFileName();
+        String fileName = (fileNamePath != null) ? fileNamePath.toString() : "";
         String[] parts = fileName.split(FILENAME_PARTS_REGEX);
 
         if (parts.length < 3) {
@@ -153,14 +152,13 @@ public class ContainerLogFileParser {
       globalLock.unlock();
       isGlobalLockHeld.set(false);
       synchronized (globalLockNotifier) {
-        notifyAll();
+        globalLockNotifier.notifyAll();
       }
     }
   }
 
   public void processFile(String logFilePath, ContainerDatanodeDatabase dbstore, long datanodeId) throws SQLException {
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(logFilePath),
-        StandardCharsets.UTF_8))) {
+    try (BufferedReader reader = Files.newBufferedReader(Paths.get(logFilePath), StandardCharsets.UTF_8)) {
       String line;
       while ((line = reader.readLine()) != null) {
         String[] parts = line.split(LOG_LINE_SPLIT_REGEX);
