@@ -3047,10 +3047,10 @@
 
   <property>
     <name>ozone.recon.address</name>
-    <value>0.0.0.0:9891</value>
+    <value/>
     <tag>RECON, MANAGEMENT</tag>
     <description>
-      RPC address of Recon Server.
+      RPC address of Recon Server. If not set, datanodes will not configure Recon Server.
     </description>
   </property>
   <property>
