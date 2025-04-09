@@ -64,7 +64,7 @@ public class ContainerLogFileParser {
       executorService = Executors.newFixedThreadPool(threadCount);
 
       CountDownLatch latch = new CountDownLatch(files.size());
-      //int count = 1;
+
       for (Path file : files) {
         Path fileNamePath = file.getFileName();
         String fileName = (fileNamePath != null) ? fileNamePath.toString() : "";
@@ -83,7 +83,6 @@ public class ContainerLogFileParser {
 
         try {
           datanodeId = Long.parseLong(datanodeIdStr);
-          System.out.println("Parsed datanodeId: " + datanodeId);
 
         } catch (NumberFormatException e) {
           System.out.println("Invalid datanode ID in filename: " + fileName);
@@ -91,8 +90,7 @@ public class ContainerLogFileParser {
         }
 
         long finalDatanodeId = datanodeId;
-        //count++;
-        //int finalCount = count;
+
         executorService.submit(() -> {
 
           String threadName = Thread.currentThread().getName();
