@@ -215,10 +215,14 @@ public class SCMClientProtocolServer implements
     try {
       LOG.info("Stopping the RPC server for Client Protocol");
       getClientRpcServer().stop();
+
     } catch (Exception ex) {
-      LOG.error("Client Protocol RPC stop failed.", ex);
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.STOP_SERVER, null, ex));
     }
     IOUtils.cleanupWithLogger(LOG, scm.getScmNodeManager());
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.STOP_SERVER, null));
   }
 
   public void join() throws InterruptedException {
@@ -230,43 +234,55 @@ public class SCMClientProtocolServer implements
   public ContainerWithPipeline allocateContainer(HddsProtos.ReplicationType
       replicationType, HddsProtos.ReplicationFactor factor,
       String owner) throws IOException {
-    if (scm.getScmContext().isInSafeMode()) {
-      throw new SCMException("SafeModePrecheck failed for allocateContainer",
-          ResultCodes.SAFE_MODE_EXCEPTION);
+
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("replicationType", String.valueOf(replicationType));
+    auditMap.put("factor", String.valueOf(factor));
+    auditMap.put("owner", String.valueOf(owner));
+
+    try {
+      if (scm.getScmContext().isInSafeMode()) {
+        throw new SCMException("SafeModePrecheck failed for allocateContainer",
+            ResultCodes.SAFE_MODE_EXCEPTION);
+      }
+      getScm().checkAdminAccess(getRemoteUser(), false);
+      final ContainerInfo container = scm.getContainerManager()
+          .allocateContainer(
+              ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor),
+              owner);
+      final Pipeline pipeline = scm.getPipelineManager()
+          .getPipeline(container.getPipelineID());
+      ContainerWithPipeline cp = new ContainerWithPipeline(container, pipeline);
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.ALLOCATE_CONTAINER, auditMap)
+      );
+      return cp;
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.ALLOCATE_CONTAINER, auditMap, ex)
+      );
+      throw ex;
     }
-    getScm().checkAdminAccess(getRemoteUser(), false);
-    final ContainerInfo container = scm.getContainerManager()
-        .allocateContainer(
-            ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor),
-            owner);
-    final Pipeline pipeline = scm.getPipelineManager()
-        .getPipeline(container.getPipelineID());
-    return new ContainerWithPipeline(container, pipeline);
   }
 
   @Override
   public ContainerInfo getContainer(long containerID) throws IOException {
-    boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("containerID", String.valueOf(containerID));
-    getScm().checkAdminAccess(getRemoteUser(), true);
     try {
-      return scm.getContainerManager()
+      getScm().checkAdminAccess(getRemoteUser(), true);
+      ContainerInfo info = scm.getContainerManager()
           .getContainer(ContainerID.valueOf(containerID));
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_CONTAINER, auditMap)
+      );
+      return info;
     } catch (IOException ex) {
-      auditSuccess = false;
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(SCMAction.GET_CONTAINER, auditMap, ex)
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_CONTAINER, auditMap, ex)
       );
       throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(SCMAction.GET_CONTAINER, auditMap)
-        );
-      }
     }
-
   }
 
   private ContainerWithPipeline getContainerWithPipelineCommon(
@@ -326,22 +342,35 @@ public class SCMClientProtocolServer implements
   public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
       long containerId, int clientVersion) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> results = new ArrayList<>();
+    Map<String, String> auditMap = new HashMap<>();
+    auditMap.put("containerId", String.valueOf(containerId));
+    auditMap.put("clientVersion", String.valueOf(clientVersion));
 
-    Set<ContainerReplica> replicas = getScm().getContainerManager()
-        .getContainerReplicas(ContainerID.valueOf(containerId));
-    for (ContainerReplica r : replicas) {
-      results.add(
-          HddsProtos.SCMContainerReplicaProto.newBuilder()
-              .setContainerID(containerId)
-              .setState(r.getState().toString())
-              .setDatanodeDetails(r.getDatanodeDetails().toProto(clientVersion))
-              .setBytesUsed(r.getBytesUsed())
-              .setPlaceOfBirth(r.getOriginDatanodeId().toString())
-              .setKeyCount(r.getKeyCount())
-              .setSequenceID(r.getSequenceId())
-              .setReplicaIndex(r.getReplicaIndex()).build()
-      );
+    try {
+      Set<ContainerReplica> replicas = getScm().getContainerManager()
+          .getContainerReplicas(ContainerID.valueOf(containerId));
+      for (ContainerReplica r : replicas) {
+        results.add(
+            HddsProtos.SCMContainerReplicaProto.newBuilder()
+                .setContainerID(containerId)
+                .setState(r.getState().toString())
+                .setDatanodeDetails(r.getDatanodeDetails().toProto(clientVersion))
+                .setBytesUsed(r.getBytesUsed())
+                .setPlaceOfBirth(r.getOriginDatanodeId().toString())
+                .setKeyCount(r.getKeyCount())
+                .setSequenceID(r.getSequenceId())
+                .setReplicaIndex(r.getReplicaIndex()).build()
+        );
+      }
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_CONTAINER_REPLICAS,
+          auditMap, ex));
+      throw ex;
     }
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
+        auditMap));
     return results;
   }
 
@@ -382,10 +411,15 @@ public class SCMClientProtocolServer implements
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
       } catch (IOException ex) {
-        //not found , just go ahead
-        LOG.error("Container with common pipeline not found: {}", ex);
+        AUDIT.logReadFailure(buildAuditMessageForFailure(
+            SCMAction.GET_EXIST_CONTAINER_WITH_PIPELINE_BATCH,
+            Collections.singletonMap("containerID",
+            ContainerID.valueOf(containerID).toString()), ex));
       }
     }
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_EXIST_CONTAINER_WITH_PIPELINE_BATCH,
+        Collections.singletonMap("containerIDs", containerIDs.toString())));
     return cpList;
   }
 
@@ -579,10 +613,15 @@ public class SCMClientProtocolServer implements
 
   @Override
   public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("datanodeDetails", dn.toString());
     try {
-      return scm.getScmDecommissionManager().getContainersPendingReplication(dn);
-    } catch (NodeNotFoundException e) {
-      throw new IOException("Failed to get containers list. Unable to find required node", e);
+      Map<String, List<ContainerID>> result =  scm.getScmDecommissionManager().getContainersPendingReplication(dn);
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.GET_CONTAINERS_ON_DECOM_NODE, auditMap));
+      return result;
+    } catch (NodeNotFoundException ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.GET_CONTAINERS_ON_DECOM_NODE, auditMap, ex));
+      throw new IOException("Failed to get containers list. Unable to find required node", ex);
     }
   }
 
@@ -591,8 +630,18 @@ public class SCMClientProtocolServer implements
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
       HddsProtos.QueryScope queryScope, String poolName, int clientVersion)
       throws IOException {
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("opState", opState.toString());
+    auditMap.put("state", state.toString());
+    auditMap.put("queryScope", queryScope.toString());
+    auditMap.put("poolName", poolName);
+    auditMap.put("clientVersion", String.valueOf(clientVersion));
+
     if (queryScope == HddsProtos.QueryScope.POOL) {
-      throw new IllegalArgumentException("Not Supported yet");
+      IllegalArgumentException ex =  new IllegalArgumentException("Not Supported yet");
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.QUERY_NODE, auditMap, ex));
+      throw ex;
     }
 
     List<HddsProtos.Node> result = new ArrayList<>();
@@ -605,10 +654,14 @@ public class SCMClientProtocolServer implements
             .addNodeOperationalStates(ns.getOperationalState())
             .build());
       } catch (NodeNotFoundException e) {
-        throw new IOException(
-            "An unexpected error occurred querying the NodeStatus", e);
+        IOException ex = new  IOException("An unexpected error occurred querying the NodeStatus", e);
+        AUDIT.logReadFailure(buildAuditMessageForFailure(
+            SCMAction.QUERY_NODE, auditMap, ex));
+        throw ex;
       }
     }
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        SCMAction.QUERY_NODE, auditMap));
     return result;
   }
 
@@ -627,20 +680,33 @@ public class SCMClientProtocolServer implements
             .build();
       }
     } catch (NodeNotFoundException e) {
-      throw new IOException(
+      IOException ex = new IOException(
           "An unexpected error occurred querying the NodeStatus", e);
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.QUERY_NODE_BY_UUID,
+          Collections.singletonMap("uuid", uuid.toString()), ex));
+      throw ex;
     }
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_NODE_BY_UUID,
+        Collections.singletonMap("uuid", uuid.toString())));
     return result;
   }
 
   @Override
   public List<DatanodeAdminError> decommissionNodes(List<String> nodes, boolean force)
       throws IOException {
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("nodes", nodes.toString());
+    auditMap.put("force", String.valueOf(force));
+
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
-      return scm.getScmDecommissionManager().decommissionNodes(nodes, force);
+      List<DatanodeAdminError> result =  scm.getScmDecommissionManager().decommissionNodes(nodes, force);
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.DECOMMISSION_NODES, auditMap));
+      return result;
     } catch (Exception ex) {
-      LOG.error("Failed to decommission nodes", ex);
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.DECOMMISSION_NODES, auditMap, ex));
       throw ex;
     }
   }
@@ -648,11 +714,17 @@ public class SCMClientProtocolServer implements
   @Override
   public List<DatanodeAdminError> recommissionNodes(List<String> nodes)
       throws IOException {
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("nodes", nodes.toString());
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
-      return scm.getScmDecommissionManager().recommissionNodes(nodes);
+      List<DatanodeAdminError> result = scm.getScmDecommissionManager().recommissionNodes(nodes);
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.DECOMMISSION_NODES, auditMap));
+      return result;
     } catch (Exception ex) {
-      LOG.error("Failed to recommission nodes", ex);
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.DECOMMISSION_NODES, auditMap, ex));
       throw ex;
     }
   }
@@ -660,12 +732,20 @@ public class SCMClientProtocolServer implements
   @Override
   public List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
       int endInHours, boolean force) throws IOException {
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("nodes", nodes.toString());
+    auditMap.put("endInHours", String.valueOf(endInHours));
+    auditMap.put("force", String.valueOf(force));
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
-      return scm.getScmDecommissionManager()
+      List<DatanodeAdminError> result =  scm.getScmDecommissionManager()
           .startMaintenanceNodes(nodes, endInHours, force);
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.START_MAINTENANCE_NODES, auditMap));
+      return result;
     } catch (Exception ex) {
-      LOG.error("Failed to place nodes into maintenance mode", ex);
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.START_MAINTENANCE_NODES, auditMap, ex));
       throw ex;
     }
   }
@@ -708,7 +788,7 @@ public class SCMClientProtocolServer implements
   public Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), false);
+
     Map<String, String> auditMap = Maps.newHashMap();
     if (type != null) {
       auditMap.put("replicationType", type.toString());
@@ -724,6 +804,7 @@ public class SCMClientProtocolServer implements
       auditMap.put("nodePool", String.join(", ", nodeIpAddresses));
     }
     try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
       Pipeline result = scm.getPipelineManager().createPipeline(
           ReplicationConfig.fromProtoTypeAndFactor(type, factor));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
@@ -737,17 +818,32 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<Pipeline> listPipelines() {
-    AUDIT.logReadSuccess(
-        buildAuditMessageForSuccess(SCMAction.LIST_PIPELINE, null));
-    return scm.getPipelineManager().getPipelines();
+  public List<Pipeline> listPipelines() throws IOException {
+    try {
+      List<Pipeline> pipelines = scm.getPipelineManager().getPipelines();
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.LIST_PIPELINE, null));
+      return pipelines;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.LIST_PIPELINE, null, ex));
+      throw ex;
+    }
   }
 
   @Override
   public Pipeline getPipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    return scm.getPipelineManager().getPipeline(
-        PipelineID.getFromProtobuf(pipelineID));
+    try {
+      Pipeline pipeline = scm.getPipelineManager().getPipeline(PipelineID.getFromProtobuf(pipelineID));
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+              SCMAction.LIST_PIPELINE, Collections.singletonMap("pipelineID", pipelineID.toString())));
+      return pipeline;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.LIST_PIPELINE, Collections.singletonMap("pipelineID", pipelineID.toString()), ex));
+      throw ex;
+    }
   }
 
   @Override
@@ -815,33 +911,29 @@ public class SCMClientProtocolServer implements
               .setClusterId(scm.getScmStorageConfig().getClusterID())
               .setScmId(scm.getScmStorageConfig().getScmId())
               .setPeerRoles(scm.getScmHAManager().getRatisServer().getRatisRoles());
-      return builder.build();
+      ScmInfo info =  builder.build();
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+            SCMAction.GET_SCM_INFO, null));
+      return info;
     } catch (Exception ex) {
-      auditSuccess = false;
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(SCMAction.GET_SCM_INFO, null, ex)
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_SCM_INFO, null, ex)
       );
       throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(SCMAction.GET_SCM_INFO, null)
-        );
-      }
     }
   }
 
   @Override
   public void transferLeadership(String newLeaderId)
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), false);
-    checkIfCertSignRequestAllowed(scm.getRootCARotationManager(),
-        false, config, "transferLeadership");
 
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("newLeaderId", newLeaderId);
     try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+      checkIfCertSignRequestAllowed(scm.getRootCARotationManager(),
+          false, config, "transferLeadership");
       SCMRatisServer scmRatisServer = scm.getScmHAManager().getRatisServer();
       RaftGroup group = scmRatisServer.getDivision().getGroup();
       RaftPeerId targetPeerId;
@@ -863,17 +955,14 @@ public class SCMClientProtocolServer implements
 
       RatisHelper.transferRatisLeadership(scm.getConfiguration(), group,
           targetPeerId, tlsConfig);
+        
     } catch (Exception ex) {
-      auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(
           SCMAction.TRANSFER_LEADERSHIP, auditMap, ex));
       throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-            SCMAction.TRANSFER_LEADERSHIP, auditMap));
-      }
     }
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+            SCMAction.TRANSFER_LEADERSHIP, auditMap));
   }
 
   @Override
@@ -883,6 +972,7 @@ public class SCMClientProtocolServer implements
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("count", String.valueOf(count));
     auditMap.put("startTxId", String.valueOf(startTxId));
+
     try {
       result = scm.getScmBlockManager().getDeletedBlockLog()
           .getFailedTransactions(count, startTxId).stream()
@@ -903,8 +993,8 @@ public class SCMClientProtocolServer implements
   @Override
   public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
-    getScm().checkAdminAccess(getRemoteUser(), false);
     try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
       int count = scm.getScmBlockManager().getDeletedBlockLog().
           resetCount(txIDs);
       auditMap.put("txIDs", txIDs.toString());
@@ -935,7 +1025,16 @@ public class SCMClientProtocolServer implements
   @Override
   public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
       throws IOException {
-    return scm.getRuleStatus();
+    try {
+      Map<String, Pair<Boolean, String>> result = scm.getRuleStatus();
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_SAFE_MODE_RULE_STATUSES, null));
+      return result;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_SAFE_MODE_RULE_STATUSES, null, ex));
+      throw ex;
+    }
   }
 
   /**
@@ -946,27 +1045,49 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public boolean forceExitSafeMode() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), false);
-    AUDIT.logWriteSuccess(
-        buildAuditMessageForSuccess(SCMAction.FORCE_EXIT_SAFE_MODE, null)
-    );
-    return scm.exitSafeMode();
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+      boolean result = scm.exitSafeMode();
+      AUDIT.logWriteSuccess(
+          buildAuditMessageForSuccess(SCMAction.FORCE_EXIT_SAFE_MODE, null)
+      );
+      return result;
+
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(
+          buildAuditMessageForFailure(SCMAction.FORCE_EXIT_SAFE_MODE, null, ex)
+      );
+      throw ex;
+    }
   }
 
   @Override
   public void startReplicationManager() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), false);
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-        SCMAction.START_REPLICATION_MANAGER, null));
-    scm.getReplicationManager().start();
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+      scm.getReplicationManager().start();
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.START_REPLICATION_MANAGER, null));
+
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.START_REPLICATION_MANAGER, null, ex));
+      throw ex;
+    }
   }
 
   @Override
   public void stopReplicationManager() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), false);
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-        SCMAction.STOP_REPLICATION_MANAGER, null));
-    scm.getReplicationManager().stop();
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.STOP_REPLICATION_MANAGER, null));
+      scm.getReplicationManager().stop();
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.STOP_REPLICATION_MANAGER, null, ex));
+      throw ex;
+    }
   }
 
   @Override
@@ -986,35 +1107,47 @@ public class SCMClientProtocolServer implements
   @Override
   public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
       IOException {
-    // check admin authorization
     try {
+      // check admin authorization
       getScm().checkAdminAccess(getRemoteUser(), false);
-    } catch (IOException e) {
-      LOG.error("Authorization failed for finalize scm upgrade", e);
-      throw e;
+      // TODO HDDS-6762: Return to the client once the FINALIZATION_STARTED
+      //  checkpoint has been crossed and continue finalizing asynchronously.
+      StatusAndMessages result = scm.getFinalizationManager().finalizeUpgrade(upgradeClientID);
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.FINALIZE_SCM_UPGRADE, Collections.singletonMap("upgradeClientID", upgradeClientID)));
+      return result;
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.FINALIZE_SCM_UPGRADE, Collections.singletonMap("upgradeClientID", upgradeClientID), ex));
+      throw ex;
     }
-    // TODO HDDS-6762: Return to the client once the FINALIZATION_STARTED
-    //  checkpoint has been crossed and continue finalizing asynchronously.
-    return scm.getFinalizationManager().finalizeUpgrade(upgradeClientID);
+
   }
 
   @Override
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException {
-    if (!readonly) {
-      // check admin authorization
-      try {
-        getScm().checkAdminAccess(getRemoteUser(), true);
-      } catch (IOException e) {
-        LOG.error("Authorization failed for query scm upgrade finalization " +
-            "progress", e);
-        throw e;
-      }
-    }
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("upgradeClientID", upgradeClientID);
+    auditMap.put("force", String.valueOf(force));
+    auditMap.put("readonly", String.valueOf(readonly));
 
-    return scm.getFinalizationManager()
-        .queryUpgradeFinalizationProgress(upgradeClientID, force, readonly);
+    try {
+      // check admin authorization
+      if (!readonly) {
+        getScm().checkAdminAccess(getRemoteUser(), true);
+      }
+      StatusAndMessages result = scm.getFinalizationManager()
+          .queryUpgradeFinalizationProgress(upgradeClientID, force, readonly);
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.QUERY_UPGRADE_FINALIZATION_PROGRESS, auditMap));
+      return result;
+    } catch (IOException ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.QUERY_UPGRADE_FINALIZATION_PROGRESS, auditMap, ex));
+      throw ex;
+    }
   }
 
   @Override
@@ -1030,11 +1163,11 @@ public class SCMClientProtocolServer implements
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes) throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), false);
-    ContainerBalancerConfiguration cbc =
-        scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
     Map<String, String> auditMap = Maps.newHashMap();
     try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+      ContainerBalancerConfiguration cbc =
+          scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
       if (threshold.isPresent()) {
         double tsd = threshold.get();
         auditMap.put("threshold", String.valueOf(tsd));
@@ -1160,8 +1293,8 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void stopContainerBalancer() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), false);
     try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
       scm.getContainerBalancer().stopBalancer();
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.STOP_CONTAINER_BALANCER, null));
@@ -1212,33 +1345,40 @@ public class SCMClientProtocolServer implements
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String address, String uuid, int clientVersion) throws IOException {
 
-    // check admin authorisation
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("address", address);
+    auditMap.put("uuid", uuid);
+    auditMap.put("clientVersion", String.valueOf(clientVersion));
+
     try {
+      // check admin authorisation
       getScm().checkAdminAccess(getRemoteUser(), true);
-    } catch (IOException e) {
-      LOG.error("Authorization failed", e);
-      throw e;
-    }
+      // get datanodes by ip or uuid
+      List<DatanodeDetails> nodes = new ArrayList<>();
+      if (!Strings.isNullOrEmpty(uuid)) {
+        nodes.add(scm.getScmNodeManager().getNode(DatanodeID.fromUuidString(uuid)));
+      } else if (!Strings.isNullOrEmpty(address)) {
+        nodes = scm.getScmNodeManager().getNodesByAddress(address);
+      } else {
+        throw new IOException(
+            "Could not get datanode with the specified parameters."
+        );
+      }
 
-    // get datanodes by ip or uuid
-    List<DatanodeDetails> nodes = new ArrayList<>();
-    if (!Strings.isNullOrEmpty(uuid)) {
-      nodes.add(scm.getScmNodeManager().getNode(DatanodeID.fromUuidString(uuid)));
-    } else if (!Strings.isNullOrEmpty(address)) {
-      nodes = scm.getScmNodeManager().getNodesByAddress(address);
-    } else {
-      throw new IOException(
-          "Could not get datanode with the specified parameters."
-      );
-    }
+      // get datanode usage info
+      List<HddsProtos.DatanodeUsageInfoProto> infoList = new ArrayList<>();
+      for (DatanodeDetails node : nodes) {
+        infoList.add(getUsageInfoFromDatanodeDetails(node, clientVersion));
+      }
 
-    // get datanode usage info
-    List<HddsProtos.DatanodeUsageInfoProto> infoList = new ArrayList<>();
-    for (DatanodeDetails node : nodes) {
-      infoList.add(getUsageInfoFromDatanodeDetails(node, clientVersion));
-    }
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_DATANODE_USAGE_INFO, auditMap));
 
-    return infoList;
+      return infoList;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.GET_DATANODE_USAGE_INFO, auditMap, ex));
+      throw ex;
+    }
   }
 
   /**
@@ -1270,53 +1410,74 @@ public class SCMClientProtocolServer implements
       boolean mostUsed, int count, int clientVersion)
       throws IOException, IllegalArgumentException {
 
-    // check admin authorisation
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("mostUsed", String.valueOf(mostUsed));
+    auditMap.put("count", String.valueOf(count));
+    auditMap.put("clientVersion", String.valueOf(clientVersion));
+
     try {
+      // check admin authorisation
       getScm().checkAdminAccess(getRemoteUser(), true);
-    } catch (IOException e) {
-      LOG.error("Authorization failed", e);
-      throw e;
+      if (count < 1) {
+        throw new IllegalArgumentException("The specified parameter count must " +
+            "be an integer greater than zero.");
+      }
+      List<DatanodeUsageInfo> datanodeUsageInfoList =
+          scm.getScmNodeManager().getMostOrLeastUsedDatanodes(mostUsed);
+
+      // if count is greater than the size of list containing healthy,
+      // in-service nodes, just set count to that size
+      if (count > datanodeUsageInfoList.size()) {
+        count = datanodeUsageInfoList.size();
+      }
+
+      // return count number of DatanodeUsageInfoProto
+      List<HddsProtos.DatanodeUsageInfoProto> result =  datanodeUsageInfoList.stream()
+          .map(each -> each.toProto(clientVersion))
+          .limit(count)
+          .collect(Collectors.toList());
+
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_DATANODE_USAGE_INFO, auditMap));
+      return result;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_DATANODE_USAGE_INFO, auditMap, ex));
+      throw ex;
     }
-
-    if (count < 1) {
-      throw new IllegalArgumentException("The specified parameter count must " +
-          "be an integer greater than zero.");
-    }
-
-    List<DatanodeUsageInfo> datanodeUsageInfoList =
-        scm.getScmNodeManager().getMostOrLeastUsedDatanodes(mostUsed);
-
-    // if count is greater than the size of list containing healthy,
-    // in-service nodes, just set count to that size
-    if (count > datanodeUsageInfoList.size()) {
-      count = datanodeUsageInfoList.size();
-    }
-
-    // return count number of DatanodeUsageInfoProto
-    return datanodeUsageInfoList.stream()
-        .map(each -> each.toProto(clientVersion))
-        .limit(count)
-        .collect(Collectors.toList());
   }
 
   @Override
   public Token<?> getContainerToken(ContainerID containerID)
       throws IOException {
-    UserGroupInformation remoteUser = getRemoteUser();
-    getScm().checkAdminAccess(remoteUser, true);
+    try {
+      UserGroupInformation remoteUser = getRemoteUser();
+      getScm().checkAdminAccess(getRemoteUser(), true);
 
-    return scm.getContainerTokenGenerator()
-        .generateToken(remoteUser.getUserName(), containerID);
+      Token<?> token =  scm.getContainerTokenGenerator()
+          .generateToken(remoteUser.getUserName(), containerID);
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_CONTAINER_TOKEN, Collections.singletonMap("containerID", containerID.toString())));
+      return token;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_CONTAINER_TOKEN, Collections.singletonMap("containerID", containerID.toString()), ex));
+      throw ex;
+    }
   }
 
   @Override
   public long getContainerCount() throws IOException {
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_CONTAINER_COUNT, null));
     return scm.getContainerManager().getContainers().size();
   }
 
   @Override
   public long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException {
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_CONTAINER_COUNT, Collections.singletonMap("state", state.toString())));
     return scm.getContainerManager().getContainers(state).size();
   }
 
@@ -1324,6 +1485,14 @@ public class SCMClientProtocolServer implements
   public List<ContainerInfo> getListOfContainers(
       long startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
+
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("startContainerID", String.valueOf(startContainerID));
+    auditMap.put("count", String.valueOf(count));
+    auditMap.put("state", state.toString());
+
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        SCMAction.LIST_CONTAINER, auditMap));
     return scm.getContainerManager().getContainers(
         ContainerID.valueOf(startContainerID), count, state);
   }
@@ -1414,6 +1583,7 @@ public class SCMClientProtocolServer implements
   @Override
   public DecommissionScmResponseProto decommissionScm(
       String scmId) {
+
     Builder decommissionScmResponseBuilder =
         DecommissionScmResponseProto.newBuilder();
 
@@ -1425,13 +1595,26 @@ public class SCMClientProtocolServer implements
       decommissionScmResponseBuilder
           .setSuccess(false)
           .setErrorMsg(ex.getMessage());
+      AUDIT.logWriteSuccess(buildAuditMessageForFailure(
+          SCMAction.DECOMMISSION_SCM, Collections.singletonMap("scmId", scmId), ex));
     }
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.DECOMMISSION_SCM, Collections.singletonMap("scmId", scmId)));
     return decommissionScmResponseBuilder.build();
   }
 
   @Override
   public String getMetrics(String query) throws IOException {
-    FetchMetrics fetchMetrics = new FetchMetrics();
-    return fetchMetrics.getMetrics(query);
+    try {
+      FetchMetrics fetchMetrics = new FetchMetrics();
+      String metrics = fetchMetrics.getMetrics(query);
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_METRICS, Collections.singletonMap("query", query)));
+      return metrics;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_METRICS, Collections.singletonMap("query", query), ex));
+      throw ex;
+    }
   }
 }
