@@ -413,8 +413,7 @@ public class SCMClientProtocolServer implements
       } catch (IOException ex) {
         AUDIT.logReadFailure(buildAuditMessageForFailure(
             SCMAction.GET_EXIST_CONTAINER_WITH_PIPELINE_BATCH,
-            Collections.singletonMap("containerID",
-            ContainerID.valueOf(containerID).toString()), ex));
+            Collections.singletonMap("containerID", String.valueOf(containerID)), ex));
       }
     }
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
@@ -614,7 +613,7 @@ public class SCMClientProtocolServer implements
   @Override
   public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("datanodeDetails", dn.toString());
+    auditMap.put("datanodeDetails", String.valueOf(dn));
     try {
       Map<String, List<ContainerID>> result =  scm.getScmDecommissionManager().getContainersPendingReplication(dn);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.GET_CONTAINERS_ON_DECOM_NODE, auditMap));
@@ -631,9 +630,9 @@ public class SCMClientProtocolServer implements
       HddsProtos.QueryScope queryScope, String poolName, int clientVersion)
       throws IOException {
     final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("opState", opState.toString());
-    auditMap.put("state", state.toString());
-    auditMap.put("queryScope", queryScope.toString());
+    auditMap.put("opState", String.valueOf(opState));
+    auditMap.put("state", String.valueOf(state));
+    auditMap.put("queryScope", String.valueOf(queryScope));
     auditMap.put("poolName", poolName);
     auditMap.put("clientVersion", String.valueOf(clientVersion));
 
@@ -683,11 +682,11 @@ public class SCMClientProtocolServer implements
       IOException ex = new IOException(
           "An unexpected error occurred querying the NodeStatus", e);
       AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.QUERY_NODE_BY_UUID,
-          Collections.singletonMap("uuid", uuid.toString()), ex));
+          Collections.singletonMap("uuid", String.valueOf(uuid)), ex));
       throw ex;
     }
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_NODE_BY_UUID,
-        Collections.singletonMap("uuid", uuid.toString())));
+        Collections.singletonMap("uuid", String.valueOf(uuid))));
     return result;
   }
 
@@ -695,7 +694,7 @@ public class SCMClientProtocolServer implements
   public List<DatanodeAdminError> decommissionNodes(List<String> nodes, boolean force)
       throws IOException {
     final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("nodes", nodes.toString());
+    auditMap.put("nodes", String.valueOf(nodes));
     auditMap.put("force", String.valueOf(force));
 
     try {
@@ -715,7 +714,7 @@ public class SCMClientProtocolServer implements
   public List<DatanodeAdminError> recommissionNodes(List<String> nodes)
       throws IOException {
     final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("nodes", nodes.toString());
+    auditMap.put("nodes", String.valueOf(nodes));
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
       List<DatanodeAdminError> result = scm.getScmDecommissionManager().recommissionNodes(nodes);
@@ -733,7 +732,7 @@ public class SCMClientProtocolServer implements
   public List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
       int endInHours, boolean force) throws IOException {
     final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("nodes", nodes.toString());
+    auditMap.put("nodes", String.valueOf(nodes));
     auditMap.put("endInHours", String.valueOf(endInHours));
     auditMap.put("force", String.valueOf(force));
     try {
@@ -837,11 +836,11 @@ public class SCMClientProtocolServer implements
     try {
       Pipeline pipeline = scm.getPipelineManager().getPipeline(PipelineID.getFromProtobuf(pipelineID));
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-              SCMAction.LIST_PIPELINE, Collections.singletonMap("pipelineID", pipelineID.toString())));
+              SCMAction.LIST_PIPELINE, Collections.singletonMap("pipelineID", String.valueOf(pipelineID))));
       return pipeline;
     } catch (Exception ex) {
       AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.LIST_PIPELINE, Collections.singletonMap("pipelineID", pipelineID.toString()), ex));
+          SCMAction.LIST_PIPELINE, Collections.singletonMap("pipelineID", String.valueOf(pipelineID)), ex));
       throw ex;
     }
   }
@@ -1457,11 +1456,11 @@ public class SCMClientProtocolServer implements
       Token<?> token =  scm.getContainerTokenGenerator()
           .generateToken(remoteUser.getUserName(), containerID);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-          SCMAction.GET_CONTAINER_TOKEN, Collections.singletonMap("containerID", containerID.toString())));
+          SCMAction.GET_CONTAINER_TOKEN, Collections.singletonMap("containerID", String.valueOf(containerID))));
       return token;
     } catch (Exception ex) {
       AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.GET_CONTAINER_TOKEN, Collections.singletonMap("containerID", containerID.toString()), ex));
+          SCMAction.GET_CONTAINER_TOKEN, Collections.singletonMap("containerID", String.valueOf(containerID)), ex));
       throw ex;
     }
   }
@@ -1477,7 +1476,7 @@ public class SCMClientProtocolServer implements
   public long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException {
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-        SCMAction.GET_CONTAINER_COUNT, Collections.singletonMap("state", state.toString())));
+        SCMAction.GET_CONTAINER_COUNT, Collections.singletonMap("state", String.valueOf(state))));
     return scm.getContainerManager().getContainers(state).size();
   }
 
@@ -1489,7 +1488,7 @@ public class SCMClientProtocolServer implements
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
     auditMap.put("count", String.valueOf(count));
-    auditMap.put("state", state.toString());
+    auditMap.put("state", String.valueOf(state));
 
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.LIST_CONTAINER, auditMap));
