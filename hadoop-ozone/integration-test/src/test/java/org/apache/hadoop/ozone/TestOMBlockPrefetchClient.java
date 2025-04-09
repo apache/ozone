@@ -14,8 +14,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDatanodeDetails;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -42,35 +74,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDatanodeDetails;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
 /**
  * This class is to test the boundary cases for prefetching and caching of blocks from SCM.
@@ -130,7 +133,8 @@ public class TestOMBlockPrefetchClient {
     blockQueueMap = (Map<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>>)
         queueMapField.get(omBlockPrefetchClient);
 
-    Class<?> expiringBlockClass = Class.forName("org.apache.hadoop.hdds.scm.client.OMBlockPrefetchClient$ExpiringAllocatedBlock");
+    Class<?> expiringBlockClass =
+        Class.forName("org.apache.hadoop.hdds.scm.client.OMBlockPrefetchClient$ExpiringAllocatedBlock");
     expiringBlockConstructor = expiringBlockClass.getDeclaredConstructor(AllocatedBlock.class, long.class);
     expiringBlockConstructor.setAccessible(true);
   }
@@ -173,11 +177,6 @@ public class TestOMBlockPrefetchClient {
         .build();
   }
 
-  private AllocatedBlock createMockAllocatedBlock(long containerId, long localId) {
-    assertTrue(datanodes.size() >= 3, "Not enough predefined datanodes for default pipeline");
-    return createMockAllocatedBlock(containerId, localId, datanodes.subList(0, 3));
-  }
-
   private Queue<ExpiringAllocatedBlock> getInternalQueue(ReplicationConfig config) {
     return blockQueueMap.computeIfAbsent(config, k -> new ConcurrentLinkedDeque<>());
   }
@@ -205,12 +204,15 @@ public class TestOMBlockPrefetchClient {
 
     List<DatanodeDetails> expectedOrder = new ArrayList<>(originalNodes);
     expectedOrder.sort(Comparator.<DatanodeDetails, Integer>comparing(dn -> {
-      if (dn.getNetworkLocation() == null) return 2;
+      if (dn.getNetworkLocation() == null) {
+        return 2;
+      }
       return CLIENT_RACK.equals(dn.getNetworkLocation()) ? 0 : 1;
     }).thenComparing(DatanodeDetails::getHostName));
 
     List<String> actualHostnames = sortedNodes.stream().map(DatanodeDetails::getHostName).collect(Collectors.toList());
-    List<String> expectedHostnames = expectedOrder.stream().map(DatanodeDetails::getHostName).collect(Collectors.toList());
+    List<String> expectedHostnames =
+        expectedOrder.stream().map(DatanodeDetails::getHostName).collect(Collectors.toList());
 
     assertEquals(expectedHostnames, actualHostnames, "Nodes are not sorted as expected by mock topology");
   }
@@ -235,7 +237,8 @@ public class TestOMBlockPrefetchClient {
         BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID,
         new ExcludeList(), null, networkTopology);
 
-    verify(scmBlockLocationProtocol, times(1)).allocateBlock(anyLong(), eq(expectedBlocksFromScm), any(), anyString(), any(), any());
+    verify(scmBlockLocationProtocol, times(1)).allocateBlock(anyLong(), eq(expectedBlocksFromScm), any(), anyString(),
+        any(), any());
     assertEquals(numBlocksToRequest, resultBlocks.size());
 
     Queue<ExpiringAllocatedBlock> queue = getInternalQueue(REP_CONFIG);
@@ -253,7 +256,7 @@ public class TestOMBlockPrefetchClient {
 
     assertTrue(Collections.disjoint(resultBlocks.stream().map(AllocatedBlock::getBlockID).collect(Collectors.toSet()),
             actualCachedBlocks.stream().map(AllocatedBlock::getBlockID).collect(Collectors.toSet())),
-        "Overlap detected between returned and cached blocks");;
+        "Overlap detected between returned and cached blocks");
   }
 
 
@@ -273,7 +276,8 @@ public class TestOMBlockPrefetchClient {
         BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID,
         new ExcludeList(), null, networkTopology);
 
-    verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(), anyString());
+    verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(),
+        anyString());
     assertEquals(numBlocksToRequest, resultBlocks.size());
     AllocatedBlock returnedBlock = resultBlocks.get(0);
     assertEquals(cachedBlock.getBlockID(), returnedBlock.getBlockID());
@@ -387,7 +391,8 @@ public class TestOMBlockPrefetchClient {
         BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, new ExcludeList(), null, networkTopology);
 
     assertTrue(resultBlocks.isEmpty());
-    verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(), anyString());
+    verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(),
+        anyString());
   }
 
   @Test
@@ -409,13 +414,15 @@ public class TestOMBlockPrefetchClient {
     List<AllocatedBlock> resultBlocks = omBlockPrefetchClient.getBlocks(
         BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, new ExcludeList(), null, networkTopology);
 
-    verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(), anyString());
+    verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(),
+        anyString());
     assertEquals(numBlocksToRequest, resultBlocks.size());
     assertEquals(initialCachedBlocks.get(0).getBlockID(), resultBlocks.get(0).getBlockID());
     assertNodesSorted(resultBlocks.get(0).getPipeline().getNodesInOrder(), defaultNodes);
     assertEquals(initialCacheSize - numBlocksToRequest, queue.size());
     List<AllocatedBlock> actualRemaining = getBlocksFromQueue(queue);
-    assertEquals(initialCachedBlocks.subList(1, initialCacheSize).stream().map(AllocatedBlock::getBlockID).collect(Collectors.toList()),
+    assertEquals(initialCachedBlocks.subList(1, initialCacheSize).stream().map(AllocatedBlock::getBlockID)
+            .collect(Collectors.toList()),
         actualRemaining.stream().map(AllocatedBlock::getBlockID).collect(Collectors.toList()));
     actualRemaining.forEach(b -> assertEquals(defaultNodes, b.getPipeline().getNodesInOrder()));
   }
@@ -437,7 +444,8 @@ public class TestOMBlockPrefetchClient {
     List<AllocatedBlock> resultBlocks = omBlockPrefetchClient.getBlocks(
         BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, new ExcludeList(), null, networkTopology);
 
-    verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(), anyString());
+    verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(),
+        anyString());
     assertEquals(numBlocksToRequest, resultBlocks.size());
     assertEquals(validBlock.getBlockID(), resultBlocks.get(0).getBlockID());
     assertNodesSorted(resultBlocks.get(0).getPipeline().getNodesInOrder(), defaultNodes);

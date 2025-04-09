@@ -118,6 +118,9 @@ public class OMBlockPrefetchClient {
     blockQueueMap.put(XOR_10_4_4096, new ConcurrentLinkedDeque<>());
   }
 
+  /**
+   * Tracks an allocated block to be cached with its cache expiry.
+   */
   public static final class ExpiringAllocatedBlock {
     private final AllocatedBlock block;
     private final long expiryTime;
