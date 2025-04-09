@@ -66,7 +66,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneHAClusterImpl.class);
 
   private final OMHAService omhaService;

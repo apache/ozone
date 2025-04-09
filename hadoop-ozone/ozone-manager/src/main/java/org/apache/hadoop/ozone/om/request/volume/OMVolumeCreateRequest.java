@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -209,11 +208,6 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       omMetrics.incNumVolumeCreateFails();
     }
     return omClientResponse;
-  }
-
-  @VisibleForTesting
-  public static Logger getLogger() {
-    return LOG;
   }
 }
 

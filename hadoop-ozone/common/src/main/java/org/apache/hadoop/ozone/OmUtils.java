@@ -85,7 +85,7 @@ import org.slf4j.LoggerFactory;
  * communication.
  */
 public final class OmUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(OmUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OmUtils.class);
   private static final SecureRandom SRAND = new SecureRandom();
   private static byte[] randomBytes = new byte[32];
 

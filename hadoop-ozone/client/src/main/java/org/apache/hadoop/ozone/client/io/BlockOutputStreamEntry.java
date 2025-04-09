@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
  * but there can be other implementations that are using a different way.
  */
 public class BlockOutputStreamEntry extends OutputStream {
-  public static final Logger LOG = LoggerFactory.getLogger(BlockOutputStreamEntry.class);
+  private static final Logger LOG = LoggerFactory.getLogger(BlockOutputStreamEntry.class);
   private final OzoneClientConfig config;
   private BlockOutputStream outputStream;
   private BlockID blockID;

@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  */
 public class StringCodec implements Codec<StringBuilder> {
 
-  public static final Logger LOG  = LoggerFactory.getLogger(StringCodec.class);
+  private static final Logger LOG  = LoggerFactory.getLogger(StringCodec.class);
   public static final StringFormat FORMAT = new StringFormat();
 
   @Override

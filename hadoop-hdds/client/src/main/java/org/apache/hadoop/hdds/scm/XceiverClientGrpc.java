@@ -659,11 +659,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return config;
   }
 
-  @VisibleForTesting
-  public static Logger getLogger() {
-    return LOG;
-  }
-
   public void setTimeout(long timeout) {
     this.timeout = timeout;
   }
