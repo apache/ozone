@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,40 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -66,50 +99,16 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
+import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Test for container endpoint.
@@ -299,10 +298,13 @@ public class TestContainerEndpoint {
   }
 
   private void reprocessContainerKeyMapper() {
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
-            omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
+        new ContainerKeyMapperTaskOBS(reconContainerMetadataManager, omConfiguration);
+    containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager);
+
+    ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
+        new ContainerKeyMapperTaskFSO(reconContainerMetadataManager, omConfiguration);
+    containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager);
   }
 
   private void setUpFSOData() throws IOException {
@@ -479,7 +481,7 @@ public class TestContainerEndpoint {
     setUpFSOData();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, new OzoneConfiguration());
+            reconOMMetadataManager, 10);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
@@ -567,7 +569,7 @@ public class TestContainerEndpoint {
     reprocessContainerKeyMapper();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, new OzoneConfiguration());
+            reconOMMetadataManager, 10);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     response = containerEndpoint.getKeysForContainer(20L, -1, "/0/1/2/file7");
 
@@ -1146,6 +1148,11 @@ public class TestContainerEndpoint {
     return new ContainerWithPipeline(containerInfo, localPipeline);
   }
 
+  void assertContainerCount(HddsProtos.LifeCycleState state, int expected) {
+    final int computed = containerStateManager.getContainerCount(state);
+    assertEquals(expected, computed);
+  }
+
   @Test
   public void testGetSCMDeletedContainers() throws Exception {
     reconContainerManager.addNewContainer(
@@ -1163,9 +1170,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(102L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(103L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1174,14 +1179,10 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(103L),
             HddsProtos.LifeCycleEvent.DELETE);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(103L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(2, 0);
@@ -1214,9 +1215,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(104L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(105L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1228,9 +1227,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(105L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(1, 0);
@@ -1260,9 +1257,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(106L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(107L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1274,9 +1269,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(107L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(2, 106L);
@@ -1556,16 +1549,12 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(1),
             HddsProtos.LifeCycleEvent.DELETE);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETING, 1);
 
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(1),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
@@ -1595,6 +1584,42 @@ public class TestContainerEndpoint {
   }
 
   @Test
+  public void testGetOmContainersDeletedInSCMPagination() throws Exception {
+    Map<Long, ContainerMetadata> omContainers = reconContainerMetadataManager.getContainers(-1, 0);
+    putContainerInfos(2);
+    List<ContainerInfo> scmContainers = reconContainerManager.getContainers();
+    assertEquals(omContainers.size(), scmContainers.size());
+    // Update container state of Container Id 2 to CLOSING to CLOSED
+    // and then to DELETED
+    updateContainerStateToDeleted(2);
+
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
+
+    List<ContainerInfo> deletedSCMContainers = reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
+    assertEquals(1, deletedSCMContainers.size());
+
+    Response omContainersDeletedInSCMResponse =
+        containerEndpoint.getOmContainersDeletedInSCM(1, 0);
+    assertNotNull(omContainersDeletedInSCMResponse);
+
+    Map<String, Object> responseMap = (Map<String, Object>) omContainersDeletedInSCMResponse.getEntity();
+
+    // Fetch the ContainerDiscrepancyInfo list from the response
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        (List<ContainerDiscrepancyInfo>) responseMap.get("containerDiscrepancyInfo");
+    assertEquals(1, containerDiscrepancyInfoList.size());
+    // Check the prevKey is set correct in the response
+    long responsePrevKey = (long) responseMap.get("lastKey");
+    assertEquals(containerDiscrepancyInfoList.get(containerDiscrepancyInfoList.size() - 1).getContainerID(),
+        responsePrevKey);
+    assertEquals(2, responsePrevKey);
+
+    assertEquals(omContainers.get(2L).getNumberOfKeys(), containerDiscrepancyInfoList.get(0).getNumberOfKeys());
+    assertEquals(1, containerDiscrepancyInfoList.size());
+  }
+
+
+  @Test
   public void testGetOmContainersDeletedInSCMLimitParam() throws Exception {
     Map<Long, ContainerMetadata> omContainers =
         reconContainerMetadataManager.getContainers(-1, 0);
@@ -1605,9 +1630,7 @@ public class TestContainerEndpoint {
     // and then to DELETED
     updateContainerStateToDeleted(1);
 
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
@@ -1649,9 +1672,7 @@ public class TestContainerEndpoint {
     updateContainerStateToDeleted(1);
     updateContainerStateToDeleted(2);
 
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
@@ -1680,4 +1701,122 @@ public class TestContainerEndpoint {
     assertEquals(1, containerDiscrepancyInfoList.size());
     assertEquals(2, containerDiscrepancyInfoList.get(0).getContainerID());
   }
+
+  /**
+   * Helper method that creates duplicate FSO file keys – two keys having the same file
+   * name but under different directories. It creates the necessary volume, bucket, and
+   * directory entries, and then writes two keys using writeKeyToOm.
+   */
+  private void setUpDuplicateFSOFileKeys() throws IOException {
+    // Ensure the volume exists.
+    String volumeKey = reconOMMetadataManager.getVolumeKey(VOLUME_NAME);
+    OmVolumeArgs volArgs = OmVolumeArgs.newBuilder()
+        .setVolume(VOLUME_NAME)
+        .setAdminName("TestUser")
+        .setOwnerName("TestUser")
+        .setObjectID(VOL_OBJECT_ID)
+        .build();
+    reconOMMetadataManager.getVolumeTable().put(volumeKey, volArgs);
+
+    // Ensure the bucket exists.
+    OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .setObjectID(BUCKET_OBJECT_ID)
+        .build();
+    String bucketKey = reconOMMetadataManager.getBucketKey(VOLUME_NAME, BUCKET_NAME);
+    reconOMMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
+
+    // Create two directories: "dirA" and "dirB" with unique object IDs.
+    // For a top-level directory in a bucket, the parent's object id is the bucket's id.
+    OmDirectoryInfo dirA = OmDirectoryInfo.newBuilder()
+        .setName("dirA")
+        .setParentObjectID(BUCKET_OBJECT_ID)
+        .setUpdateID(1L)
+        .setObjectID(5L)   // Unique object id for dirA.
+        .build();
+    OmDirectoryInfo dirB = OmDirectoryInfo.newBuilder()
+        .setName("dirB")
+        .setParentObjectID(BUCKET_OBJECT_ID)
+        .setUpdateID(1L)
+        .setObjectID(6L)   // Unique object id for dirB.
+        .build();
+    // Build DB directory keys. (The third parameter is used to form a unique key.)
+    String dirKeyA = reconOMMetadataManager.getOzonePathKey(VOL_OBJECT_ID, BUCKET_OBJECT_ID, 5L, "dirA");
+    String dirKeyB = reconOMMetadataManager.getOzonePathKey(VOL_OBJECT_ID, BUCKET_OBJECT_ID, 6L, "dirB");
+    reconOMMetadataManager.getDirectoryTable().put(dirKeyA, dirA);
+    reconOMMetadataManager.getDirectoryTable().put(dirKeyB, dirB);
+
+    // Use a common OmKeyLocationInfoGroup.
+    OmKeyLocationInfoGroup locationInfoGroup = getLocationInfoGroup1();
+
+    // Write two FSO keys with the same file name ("dupFile") but in different directories.
+    // The file name stored in OM is the full path (e.g., "dirA/dupFile" vs. "dirB/dupFile").
+    writeKeyToOm(reconOMMetadataManager,
+        "dupFileKey1",           // internal key name for the first key
+        BUCKET_NAME,
+        VOLUME_NAME,
+        "dupFileKey1",          // full file path for the first key
+        100L,                    // object id (example)
+        5L,                      // parent's object id for dirA (same as dirA's object id)
+        BUCKET_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(locationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        "dupFileKey1",           // internal key name for the second key
+        BUCKET_NAME,
+        VOLUME_NAME,
+        "dupFileKey1",          // full file path for the second key
+        100L,
+        6L,                      // parent's object id for dirB
+        BUCKET_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(locationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+  }
+
+  /**
+   * Test method that sets up two duplicate FSO file keys (same file name but in different directories)
+   * and then verifies that the ContainerEndpoint returns two distinct key records.
+   */
+  @Test
+  public void testDuplicateFSOKeysForContainerEndpoint() throws IOException {
+    // Set up duplicate FSO file keys.
+    setUpDuplicateFSOFileKeys();
+    NSSummaryTaskWithFSO nSSummaryTaskWithFso =
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
+            reconOMMetadataManager, 10);
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+    // Reprocess the container key mappings so that the new keys are loaded.
+    reprocessContainerKeyMapper();
+
+    // Assume that FSO keys are mapped to container ID 20L (as in previous tests for FSO).
+    Response response = containerEndpoint.getKeysForContainer(20L, -1, "");
+    KeysResponse keysResponse = (KeysResponse) response.getEntity();
+    Collection<KeyMetadata> keyMetadataList = keysResponse.getKeys();
+
+    // We expect two distinct keys.
+    assertEquals(2, keysResponse.getTotalCount());
+    assertEquals(2, keyMetadataList.size());
+
+    for (KeyMetadata km : keyMetadataList) {
+      String completePath = km.getCompletePath();
+      assertNotNull(completePath);
+      // Verify that the complete path reflects either directory "dirA" or "dirB"
+      if (completePath.contains("dirA")) {
+        assertEquals(VOLUME_NAME + "/" + BUCKET_NAME + "/dirA/dupFileKey1", completePath);
+      } else if (completePath.contains("dirB")) {
+        assertEquals(VOLUME_NAME + "/" + BUCKET_NAME + "/dirB/dupFileKey1", completePath);
+      } else {
+        throw new AssertionError("Unexpected complete path: " + completePath);
+      }
+    }
+  }
+
+
 }

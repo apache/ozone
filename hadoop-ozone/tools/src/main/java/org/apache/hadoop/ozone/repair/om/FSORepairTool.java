@@ -1,30 +1,39 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.repair.om;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+
+import jakarta.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Objects;
+import java.util.Stack;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -41,15 +50,6 @@ import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Objects;
-import java.util.Stack;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * Base Tool to identify and repair disconnected FSO trees across all buckets.
@@ -85,11 +85,6 @@ public class FSORepairTool extends RepairTool {
       description = "Path to OM RocksDB")
   private String omDBPath;
 
-  @CommandLine.Option(names = {"-r", "--repair"},
-      defaultValue = "false",
-      description = "Run in repair mode to move unreferenced files and directories to deleted tables.")
-  private boolean repair;
-
   @CommandLine.Option(names = {"-v", "--volume"},
       description = "Filter by volume name. Add '/' before the volume name.")
   private String volumeFilter;
@@ -98,20 +93,14 @@ public class FSORepairTool extends RepairTool {
       description = "Filter by bucket name")
   private String bucketFilter;
 
-  @CommandLine.Option(names = {"--verbose"},
-      description = "Verbose output. Show all intermediate steps and deleted keys info.")
-  private boolean verbose;
+  @Nonnull
+  @Override
+  protected Component serviceToBeOffline() {
+    return Component.OM;
+  }
 
   @Override
   public void execute() throws Exception {
-    if (checkIfServiceIsRunning("OM")) {
-      return;
-    }
-    if (repair) {
-      info("FSO Repair Tool is running in repair mode");
-    } else {
-      info("FSO Repair Tool is running in debug mode");
-    }
     try {
       Impl repairTool = new Impl();
       repairTool.run();
@@ -119,7 +108,7 @@ public class FSORepairTool extends RepairTool {
       throw new IllegalArgumentException("FSO repair failed: " + ex.getMessage());
     }
 
-    if (verbose) {
+    if (isVerbose()) {
       info("FSO repair finished.");
     }
   }
@@ -274,18 +263,12 @@ public class FSORepairTool extends RepairTool {
     }
 
     private void processBucket(OmVolumeArgs volume, OmBucketInfo bucketInfo) throws IOException {
-      info("Processing bucket: " + volume.getVolume() + "/" + bucketInfo.getBucketName());
       if (checkIfSnapshotExistsForBucket(volume.getVolume(), bucketInfo.getBucketName())) {
-        if (!repair) {
-          info(
-              "Snapshot detected in bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "'. ");
-        } else {
-          info(
-              "Skipping repair for bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "' " +
-                  "due to snapshot presence.");
-          return;
-        }
+        info("Skipping repair for bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "' " +
+                "due to snapshot presence.");
+        return;
       }
+      info("Processing bucket: " + volume.getVolume() + "/" + bucketInfo.getBucketName());
       markReachableObjectsInBucket(volume, bucketInfo);
       handleUnreachableAndUnreferencedObjects(volume, bucketInfo);
     }
@@ -359,15 +342,10 @@ public class FSORepairTool extends RepairTool {
 
           if (!isReachable(dirKey)) {
             if (!isDirectoryInDeletedDirTable(dirKey)) {
-              info("Found unreferenced directory: " + dirKey);
               unreferencedStats.addDir();
 
-              if (!repair) {
-                if (verbose) {
-                  info("Marking unreferenced directory " + dirKey + " for deletion.");
-                }
-              } else {
-                info("Deleting unreferenced directory " + dirKey);
+              info("Deleting unreferenced directory " + dirKey);
+              if (!isDryRun()) {
                 OmDirectoryInfo dirInfo = dirEntry.getValue();
                 markDirectoryForDeletion(volume.getVolume(), bucket.getBucketName(), dirKey, dirInfo);
               }
@@ -393,15 +371,10 @@ public class FSORepairTool extends RepairTool {
           OmKeyInfo fileInfo = fileEntry.getValue();
           if (!isReachable(fileKey)) {
             if (!isFileKeyInDeletedTable(fileKey)) {
-              info("Found unreferenced file: " + fileKey);
               unreferencedStats.addFile(fileInfo.getDataSize());
 
-              if (!repair) {
-                if (verbose) {
-                  info("Marking unreferenced file " + fileKey + " for deletion." + fileKey);
-                }
-              } else {
-                info("Deleting unreferenced file " + fileKey);
+              info("Deleting unreferenced file " + fileKey);
+              if (!isDryRun()) {
                 markFileForDeletion(fileKey, fileInfo);
               }
             } else {
@@ -423,14 +396,14 @@ public class FSORepairTool extends RepairTool {
 
         RepeatedOmKeyInfo originalRepeatedKeyInfo = deletedTable.get(fileKey);
         RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            fileInfo, fileInfo.getUpdateID(), true);
+            fileInfo, fileInfo.getUpdateID());
         // NOTE: The FSO code seems to write the open key entry with the whole
         // path, using the object's names instead of their ID. This would only
         // be possible when the file is deleted explicitly, and not part of a
         // directory delete. It is also not possible here if the file's parent
         // is gone. The name of the key does not matter so just use IDs.
         deletedTable.putWithBatch(batch, fileKey, updatedRepeatedOmKeyInfo);
-        if (verbose) {
+        if (isVerbose()) {
           info("Added entry " + fileKey + " to open key table: " + updatedRepeatedOmKeyInfo);
         }
         store.commitBatchOperation(batch);
@@ -613,6 +586,7 @@ public class FSORepairTool extends RepairTool {
       return unreferenced;
     }
 
+    @Override
     public String toString() {
       return "Reachable:" + reachable + "\nUnreachable:" + unreachable + "\nUnreferenced:" + unreferenced;
     }

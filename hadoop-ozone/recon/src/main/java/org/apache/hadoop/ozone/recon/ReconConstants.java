@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,6 +16,8 @@
  */
 
 package org.apache.hadoop.ozone.recon;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Recon Server constants file.
@@ -90,4 +91,18 @@ public final class ReconConstants {
       (double) MAX_CONTAINER_SIZE_UPPER_BOUND /
           MIN_CONTAINER_SIZE_UPPER_BOUND) /
       Math.log(2)) + 1;
+
+  // For file-size count reprocessing: ensure only one task truncates the table.
+  public static final AtomicBoolean FILE_SIZE_COUNT_TABLE_TRUNCATED = new AtomicBoolean(false);
+
+  public static final AtomicBoolean CONTAINER_KEY_TABLES_TRUNCATED = new AtomicBoolean(false);
+
+  /**
+   * Resets the table truncated flag for the given tables. This should be called once per reprocess cycle,
+   * for example by the OM task controller, before the tasks run.
+   */
+  public static void resetTableTruncatedFlags() {
+    FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
+    CONTAINER_KEY_TABLES_TRUNCATED.set(false);
+  }
 }

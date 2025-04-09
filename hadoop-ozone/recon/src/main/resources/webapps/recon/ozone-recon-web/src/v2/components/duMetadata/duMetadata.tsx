@@ -137,8 +137,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
      */
     const selectedInfoKeys = [
       'bucketName', 'bucketLayout', 'encInfo', 'fileName', 'keyName',
-      'name', 'owner', 'sourceBucket', 'sourceVolume', 'storageType',
-      'usedNamespace', 'volumeName', 'volume'
+      'name', 'owner', 'storageType', 'usedNamespace', 'volumeName', 'volume'
     ] as const;
     const objectInfo: ObjectInfo = summaryResponse.objectInfo ?? {};
 
@@ -154,6 +153,22 @@ const DUMetadata: React.FC<MetadataProps> = ({
         });
       }
     });
+
+    // Source Volume and Source Bucket are present for linked buckets and volumes.
+    // If it is not linked it will be null and should not be shown
+    if (objectInfo?.sourceBucket !== undefined && objectInfo?.sourceBucket !== null) {
+      data.push({
+        key: 'Source Bucket',
+        value: objectInfo.sourceBucket
+      });
+    }
+
+    if(objectInfo?.sourceVolume !== undefined && objectInfo?.sourceVolume !== null) {
+      data.push({
+        key: 'Source Volume',
+        value: objectInfo.sourceVolume
+      });
+    }
 
     if (objectInfo?.creationTime !== undefined && objectInfo?.creationTime !== -1) {
       data.push({
@@ -186,7 +201,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
     if (objectInfo?.quotaInNamespace !== undefined && objectInfo?.quotaInNamespace !== -1) {
       data.push({
         key: 'Quota In Namespace',
-        value: byteToSize(objectInfo.quotaInNamespace, 3)
+        value: objectInfo.quotaInNamespace
       });
     }
 

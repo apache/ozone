@@ -1,24 +1,31 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Supplier;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
@@ -36,15 +43,6 @@ import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.util.Arrays;
-import java.util.List;
-import java.util.function.Supplier;
-
 /**
  * An {@link InputStream} called from BlockInputStream to read a chunk from the local
  * block replica directly. Each chunk may contain multiple underlying {@link ByteBuffer}
@@ -54,10 +52,8 @@ public class LocalChunkInputStream extends ChunkInputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable {
 
   private final ChunkInfo chunkInfo;
-  private final FileInputStream blockInputStream;
   private final FileChannel dataIn;
   private final ShortCircuitValidator validator;
-  private final XceiverClientShortCircuit xceiverClientShortCircuit;
   private final boolean verifyChecksum;
   public static final Logger LOG =
       LoggerFactory.getLogger(LocalChunkInputStream.class);
@@ -68,9 +64,7 @@ public class LocalChunkInputStream extends ChunkInputStream
       XceiverClientShortCircuit xceiverClientShortCircuit, FileInputStream blockInputStream) {
     super(chunkInfo, blockId, xceiverClientFactory, pipelineSupplier, verifyChecksum, tokenSupplier);
     this.chunkInfo = chunkInfo;
-    this.blockInputStream = blockInputStream;
     this.dataIn = blockInputStream.getChannel();
-    this.xceiverClientShortCircuit = xceiverClientShortCircuit;
     this.validator = this::validateChunk;
     this.verifyChecksum = verifyChecksum;
     if (LOG.isDebugEnabled()) {

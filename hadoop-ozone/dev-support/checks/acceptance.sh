@@ -22,7 +22,7 @@ cd "$DIR/../../.." || exit 1
 OZONE_ROOT=$(pwd -P)
 
 : ${HADOOP_AWS_DIR:=""}
-: ${OZONE_ACCEPTANCE_SUITE:=""}
+: ${OZONE_ACCEPTANCE_SUITE:="${1:-}"}
 : ${OZONE_TEST_SELECTOR:=""}
 : ${OZONE_ACCEPTANCE_TEST_TYPE:="robot"}
 : ${OZONE_WITH_COVERAGE:="false"}
@@ -39,6 +39,8 @@ if [ ! -d "$DIST_DIR" ]; then
     echo "Distribution dir is missing. Doing a full build"
     "$DIR/build.sh" -Pcoverage
 fi
+
+create_aws_dir
 
 mkdir -p "$REPORT_DIR"
 

@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.safemode;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -32,11 +32,10 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,8 +91,8 @@ public class SCMSafeModeManager implements SafeModeManager {
   private Map<String, SafeModeExitRule> exitRules = new HashMap<>(1);
   private Set<String> preCheckRules = new HashSet<>(1);
   private ConfigurationSource config;
-  private static final String CONT_EXIT_RULE = "ContainerSafeModeRule";
   private static final String DN_EXIT_RULE = "DataNodeSafeModeRule";
+  private static final String CONT_EXIT_RULE = "ContainerSafeModeRule";
   private static final String HEALTHY_PIPELINE_EXIT_RULE =
       "HealthyPipelineSafeModeRule";
   private static final String ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE =
@@ -108,12 +107,10 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   private final SafeModeMetrics safeModeMetrics;
 
-
-  // TODO: Remove allContainers argument. (HDDS-11795)
   public SCMSafeModeManager(ConfigurationSource conf,
              ContainerManager containerManager, PipelineManager pipelineManager,
-             EventQueue eventQueue, SCMServiceManager serviceManager,
-             SCMContext scmContext) {
+             NodeManager nodeManager, EventQueue eventQueue,
+             SCMServiceManager serviceManager, SCMContext scmContext) {
     this.config = conf;
     this.eventPublisher = eventQueue;
     this.serviceManager = serviceManager;
@@ -127,7 +124,7 @@ public class SCMSafeModeManager implements SafeModeManager {
 
       // TODO: Remove the cyclic ("this") dependency (HDDS-11797)
       SafeModeRuleFactory.initialize(config, scmContext, eventQueue,
-          this, pipelineManager, containerManager);
+          this, pipelineManager, containerManager, nodeManager);
       SafeModeRuleFactory factory = SafeModeRuleFactory.getInstance();
 
       exitRules = factory.getSafeModeRules().stream().collect(
@@ -347,6 +344,10 @@ public class SCMSafeModeManager implements SafeModeManager {
   public OneReplicaPipelineSafeModeRule getOneReplicaPipelineSafeModeRule() {
     return (OneReplicaPipelineSafeModeRule)
         exitRules.get(ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE);
+  }
+
+  public DataNodeSafeModeRule getDataNodeSafeModeRule() {
+    return (DataNodeSafeModeRule) exitRules.get(DN_EXIT_RULE);
   }
 
 

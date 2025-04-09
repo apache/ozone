@@ -150,6 +150,7 @@ message CommandQueueReportProto {
  * A group of commands for the datanode to execute
  */
 message SCMHeartbeatResponseProto {
+  // TODO: change this to DatanodeID
   required string datanodeUUID = 1;
   repeated SCMCommandProto commands = 2;
 
@@ -192,16 +193,6 @@ message MetadataStorageReportProto {
   optional bool failed = 6 [default = false];
 }
 
-/**
- * Types of recognized storage media.
- */
-enum StorageTypeProto {
-  DISK = 1;
-  SSD = 2;
-  ARCHIVE = 3;
-  RAM_DISK = 4;
-  PROVIDED = 5;
-}
 
 message ContainerReportsProto {
   repeated ContainerReplicaProto reports = 1;

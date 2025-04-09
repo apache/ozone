@@ -1,37 +1,31 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.admin.om;
 
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitCancellationMsg;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitExitMsg;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitFinishedMsg;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.emitGeneralErrorMsg;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.handleInvalidRequestAfterInitiatingFinalization;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isFinalized;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isInprogress;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
-
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import picocli.CommandLine;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.emitCancellationMsg;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.emitExitMsg;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.emitFinishedMsg;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.emitGeneralErrorMsg;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.handleInvalidRequestAfterInitiatingFinalization;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isDone;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isFinalized;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isInprogress;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isStarting;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -41,6 +35,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
+import picocli.CommandLine;
 
 /**
  * Handler of ozone admin om finalizeUpgrade command.
@@ -86,7 +85,7 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
         parent.createOmClient(omServiceId, omHost, forceHA);
     String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID().toString();
     try {
-      UpgradeFinalizer.StatusAndMessages finalizationResponse =
+      UpgradeFinalization.StatusAndMessages finalizationResponse =
           client.finalizeUpgrade(upgradeClientID);
       if (isFinalized(finalizationResponse.status())) {
         System.out.println("Upgrade has already been finalized.");
@@ -150,7 +149,7 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
         Thread.sleep(500);
         // do not check for exceptions, if one happens during monitoring we
         // should report it and exit.
-        UpgradeFinalizer.StatusAndMessages progress =
+        UpgradeFinalization.StatusAndMessages progress =
             client.queryUpgradeFinalizationProgress(upgradeClientID, force,
                 false);
         // this can happen after trying to takeover the request after the fact

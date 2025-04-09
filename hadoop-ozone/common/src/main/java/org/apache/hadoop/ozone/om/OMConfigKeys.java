@@ -1,24 +1,23 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om;
 
 import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -113,9 +112,6 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
       "ozone.om.volume.listall.allowed";
   public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
-  public static final String OZONE_OM_USER_MAX_VOLUME =
-      "ozone.om.user.max.volume";
-  public static final int OZONE_OM_USER_MAX_VOLUME_DEFAULT = 1024;
 
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
@@ -173,6 +169,10 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
       "ozone.om.save.metrics.interval";
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT = "5m";
+  public static final String OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED =
+      "ozone.om.snapshot.rocksdb.metrics.enabled";
+  public static final boolean
+      OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT = false;
 
   /**
    * OM Ratis related configurations.
@@ -318,11 +318,6 @@ public final class OMConfigKeys {
   public static final long    DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT =
       7 * 24 * 60 * 60 * 1000; // 7 days
 
-  public static final String OZONE_DB_CHECKPOINT_TRANSFER_RATE_KEY =
-      "ozone.manager.db.checkpoint.transfer.bandwidthPerSec";
-  public static final long OZONE_DB_CHECKPOINT_TRANSFER_RATE_DEFAULT =
-      0;  //no throttling
-
   // Comma separated acls (users, groups) allowing clients accessing
   // OM client protocol
   // when hadoop.security.authorization is true, this needs to be set in
@@ -342,12 +337,12 @@ public final class OMConfigKeys {
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
           false;
 
-  // This config needs to be enabled, when S3G created objects used via
-  // FileSystem API.
+  @Deprecated
   public static final String OZONE_OM_ENABLE_FILESYSTEM_PATHS =
-      "ozone.om.enable.filesystem.paths";
+      OmConfig.Keys.ENABLE_FILESYSTEM_PATHS;
+  @Deprecated
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
-      false;
+      OmConfig.Defaults.ENABLE_FILESYSTEM_PATHS;
 
   public static final String OZONE_SERVER_DEFAULT_REPLICATION_KEY =
       "ozone.server.default.replication";
@@ -409,13 +404,6 @@ public final class OMConfigKeys {
       "ozone.snapshot.directory.service.timeout";
   public static final String
       OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT = "300s";
-
-  public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
-      "ozone.path.deleting.limit.per.task";
-  // default is 6000 taking account of 32MB buffer size, and assuming
-  // 4KB size (considering acls, key/file name, and other meata)  * 6000
-  // resulting 24MB
-  public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 6000;
 
   public static final String OZONE_THREAD_NUMBER_DIR_DELETION =
       "ozone.thread.number.dir.deletion";
@@ -626,9 +614,17 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MAX_BUCKET =
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
-  /**
-   * Configuration property to configure the max server side response size for list calls.
-   */
-  public static final String OZONE_OM_SERVER_LIST_MAX_SIZE = "ozone.om.server.list.max.size";
-  public static final int OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT = 1000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY =
+      "ozone.om.edekcacheloader.initial.delay.ms";
+
+  public static final int OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT = 3000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_KEY = "ozone.om.edekcacheloader.interval.ms";
+
+  public static final int OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT = 1000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_KEY =
+      "ozone.om.edekcacheloader.max-retries";
+  public static final int OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT = 10;
 }

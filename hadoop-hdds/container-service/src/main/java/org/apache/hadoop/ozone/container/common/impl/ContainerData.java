@@ -1,47 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.impl;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.util.List;
-
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
-    ContainerType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-
-import java.util.Collections;
-import java.util.Map;
-import java.util.Optional;
-import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicLong;
-import org.yaml.snakeyaml.Yaml;
-
-import jakarta.annotation.Nullable;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CHECKSUM;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_ID;
@@ -53,6 +27,28 @@ import static org.apache.hadoop.ozone.OzoneConsts.METADATA;
 import static org.apache.hadoop.ozone.OzoneConsts.ORIGIN_NODE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.ORIGIN_PIPELINE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STATE;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import jakarta.annotation.Nullable;
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * ContainerData is the in-memory representation of container metadata and is
@@ -85,9 +81,9 @@ public abstract class ContainerData {
   private boolean committedSpace;
 
   //ID of the pipeline where this container is created
-  private String originPipelineId;
+  private final String originPipelineId;
   //ID of the datanode where this container is created
-  private String originNodeId;
+  private final String originNodeId;
 
   /** parameters for read/write statistics on the container. **/
   private final AtomicLong readBytes;
@@ -229,6 +225,11 @@ public abstract class ContainerData {
       Preconditions.checkState(getMaxSize() > 0);
       commitSpace();
     }
+  }
+
+  @VisibleForTesting
+  void setCommittedSpace(boolean committedSpace) {
+    this.committedSpace = committedSpace;
   }
 
   /**
@@ -436,8 +437,6 @@ public abstract class ContainerData {
    * @param bytes the number of bytes write into the container.
    */
   public void incrWriteBytes(long bytes) {
-    long unused = getMaxSize() - getBytesUsed();
-
     this.writeBytes.addAndGet(bytes);
     /*
        Increase the cached Used Space in VolumeInfo as it
@@ -445,11 +444,16 @@ public abstract class ContainerData {
        periodically to update the Used Space in VolumeInfo.
      */
     this.getVolume().incrementUsedSpace(bytes);
-    // only if container size < max size
-    if (committedSpace && unused > 0) {
-      //with this write, container size might breach max size
-      long decrement = Math.min(bytes, unused);
-      this.getVolume().incCommittedBytes(0 - decrement);
+    // Calculate bytes used before this write operation.
+    // Note that getBytesUsed() already includes the 'bytes' from the current write.
+    long bytesUsedBeforeWrite = getBytesUsed() - bytes;
+    // Calculate how much space was available within the max size limit before this write
+    long availableSpaceBeforeWrite = getMaxSize() - bytesUsedBeforeWrite;
+    if (committedSpace && availableSpaceBeforeWrite > 0) {
+      // Decrement committed space only by the portion of the write that fits within the originally committed space,
+      // up to maxSize
+      long decrement = Math.min(bytes, availableSpaceBeforeWrite);
+      this.getVolume().incCommittedBytes(-decrement);
     }
   }
 
@@ -672,4 +676,12 @@ public abstract class ContainerData {
     incrWriteBytes(bytesWritten);
   }
 
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + " #" + containerID
+        + " (" + state
+        + ", " + (isEmpty ? "empty" : "non-empty")
+        + ", ri=" + replicaIndex
+        + ", origin=[dn_" + originNodeId + ", pipeline_" + originPipelineId + "])";
+  }
 }

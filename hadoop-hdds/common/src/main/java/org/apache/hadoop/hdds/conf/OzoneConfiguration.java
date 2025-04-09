@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,13 +17,12 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
+import static java.util.Collections.unmodifiableSortedSet;
+import static java.util.stream.Collectors.toCollection;
+import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
+
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -41,21 +39,20 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Unmarshaller;
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ratis.server.RaftServerConfigKeys;
-
-import static java.util.Collections.unmodifiableSortedSet;
-import static java.util.stream.Collectors.toCollection;
-import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
 
 /**
  * Configuration for ozone.
@@ -318,7 +315,7 @@ public class OzoneConfiguration extends Configuration
            HDDS_DATANODE_RATIS_PREFIX_KEY + "."
            + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout"),
         new DeprecationDelta("dfs.datanode.keytab.file",
-            DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
+            HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
         new DeprecationDelta("ozone.scm.chunk.layout",
             ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY),
         new DeprecationDelta("hdds.datanode.replication.work.dir",
@@ -382,7 +379,35 @@ public class OzoneConfiguration extends Configuration
         new DeprecationDelta("dfs.ratis.server.retry-cache.timeout.duration",
             ScmConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY),
         new DeprecationDelta("dfs.ratis.snapshot.threshold",
-            ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY)
+            ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY),
+        new DeprecationDelta("dfs.datanode.dns.interface",
+            HddsConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY),
+        new DeprecationDelta("dfs.datanode.dns.nameserver",
+            HddsConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY),
+        new DeprecationDelta("dfs.datanode.hostname",
+            HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY),
+        new DeprecationDelta("dfs.datanode.data.dir",
+            ScmConfigKeys.HDDS_DATANODE_DIR_KEY),
+        new DeprecationDelta("dfs.datanode.use.datanode.hostname",
+            HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME),
+        new DeprecationDelta("dfs.xframe.enabled",
+            HddsConfigKeys.HDDS_XFRAME_OPTION_ENABLED),
+        new DeprecationDelta("dfs.xframe.value",
+            HddsConfigKeys.HDDS_XFRAME_OPTION_VALUE),
+        new DeprecationDelta("dfs.metrics.session-id",
+            HddsConfigKeys.HDDS_METRICS_SESSION_ID_KEY),
+        new DeprecationDelta("dfs.client.https.keystore.resource",
+            OzoneConfigKeys.OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY),
+        new DeprecationDelta("dfs.https.server.keystore.resource",
+            OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY),
+        new DeprecationDelta("dfs.http.policy",
+            OzoneConfigKeys.OZONE_HTTP_POLICY_KEY),
+        new DeprecationDelta("dfs.datanode.kerberos.principal",
+            HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY),
+        new DeprecationDelta("dfs.datanode.kerberos.keytab.file",
+            HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
+        new DeprecationDelta("dfs.metrics.percentiles.intervals",
+            HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY),
     });
   }
 

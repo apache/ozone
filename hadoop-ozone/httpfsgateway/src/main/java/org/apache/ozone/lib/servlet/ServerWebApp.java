@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,18 +17,15 @@
 
 package org.apache.ozone.lib.servlet;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.ozone.lib.server.Server;
-import org.apache.ozone.lib.server.ServerException;
-
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.text.MessageFormat;
+import javax.servlet.ServletContextEvent;
+import javax.servlet.ServletContextListener;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.ozone.lib.server.Server;
+import org.apache.ozone.lib.server.ServerException;
 
 /**
  * {@link Server} subclass that implements <code>ServletContextListener</code>
@@ -46,34 +42,11 @@ public abstract class ServerWebApp
   private static final String TEMP_DIR = ".temp.dir";
   private static final String HTTP_HOSTNAME = ".http.hostname";
   private static final String HTTP_PORT = ".http.port";
-  public static final String SSL_ENABLED = ".ssl.enabled";
 
   private static final ThreadLocal<String> HOME_DIR_TL =
       new ThreadLocal<String>();
 
   private InetSocketAddress authority;
-
-  /**
-   * Method for testing purposes.
-   */
-  public static void setHomeDirForCurrentThread(String homeDir) {
-    HOME_DIR_TL.set(homeDir);
-  }
-
-  /**
-   * Constructor for testing purposes.
-   */
-  protected ServerWebApp(String name, String homeDir, String configDir,
-                         String logDir, String tempDir, Configuration config) {
-    super(name, homeDir, configDir, logDir, tempDir, config);
-  }
-
-  /**
-   * Constructor for testing purposes.
-   */
-  protected ServerWebApp(String name, String homeDir, Configuration config) {
-    super(name, homeDir, config);
-  }
 
   /**
    * Constructor. Subclasses must have a default constructor specifying
@@ -218,28 +191,7 @@ public abstract class ServerWebApp
       if (authority == null) {
         authority = resolveAuthority();
       }
+      return authority;
     }
-    return authority;
-  }
-
-  /**
-   * Sets an alternate hostname:port InetSocketAddress to use.
-   * <p>
-   * For testing purposes.
-   * 
-   * @param authority alterante authority.
-   */
-  @VisibleForTesting
-  public void setAuthority(InetSocketAddress authority) {
-    this.authority = authority;
-  }
-
-
-  /**
-   *
-   */
-  public boolean isSslEnabled() {
-    return Boolean.parseBoolean(
-      System.getProperty(getName() + SSL_ENABLED, "false"));
   }
 }

@@ -1,54 +1,23 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
-import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.container.replication.ContainerImporter;
-import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
-import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
-import org.apache.hadoop.ozone.container.replication.ReplicationServer;
-import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
-import org.apache.hadoop.ozone.container.replication.ReplicationTask;
-import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.kohsuke.MetaInfServices;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -62,6 +31,42 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
+import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
+import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
+import org.apache.hadoop.ozone.container.replication.ReplicationTask;
+import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.kohsuke.MetaInfServices;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 
 /**
  * Utility to replicated closed container with datanode code.
@@ -89,6 +94,9 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
 
   private List<ReplicationTask> replicationTasks;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ClosedContainerReplicator.class);
 
   @Override
   public Void call() throws Exception {
@@ -124,16 +132,9 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     replicationTasks = new ArrayList<>();
 
     for (ContainerInfo container : containerInfos) {
-
-      final ContainerWithPipeline containerWithPipeline =
-          containerOperationClient
-              .getContainerWithPipeline(container.getContainerID());
-
       if (container.getState() == LifeCycleState.CLOSED) {
-
-        final List<DatanodeDetails> datanodesWithContainer =
-            containerWithPipeline.getPipeline().getNodes();
-
+        final Pipeline pipeline = containerOperationClient.getPipeline(container.getPipelineID().getProtobuf());
+        final List<DatanodeDetails> datanodesWithContainer = pipeline.getNodes();
         final List<String> datanodeUUIDs =
             datanodesWithContainer
                 .stream().map(DatanodeDetails::getUuidString)
@@ -183,6 +184,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
   private void initializeReplicationSupervisor(
       ConfigurationSource conf, int queueSize) throws IOException {
+    String scmID = UUID.randomUUID().toString();
+    String clusterID = UUID.randomUUID().toString();
     String fakeDatanodeUuid = datanode;
 
     if (fakeDatanodeUuid.isEmpty()) {
@@ -191,12 +194,26 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     WitnessedContainerMetadataStore referenceCountedDS =
         WitnessedContainerMetadataStoreImpl.get(conf);
     this.witnessedContainerMetadataStore = referenceCountedDS;
-    ContainerSet containerSet = new ContainerSet(referenceCountedDS.getContainerIdsTable(), 1000);
+    ContainerSet containerSet = ContainerSet.newRwContainerSet(referenceCountedDS.getContainerIdsTable(), 1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
     MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
+
+    if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
+      MutableVolumeSet dbVolumeSet =
+          HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
+          new MutableVolumeSet(fakeDatanodeUuid, conf, null,
+              StorageVolume.VolumeType.DB_VOLUME, null);
+      // load rocksDB with readOnly mode, otherwise it will fail.
+      HddsVolumeUtil.loadAllHddsVolumeDbStore(
+          volumeSet, dbVolumeSet, false, LOG);
+
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        StorageVolumeUtil.checkVolume(volume, scmID, clusterID, conf, LOG, dbVolumeSet);
+      }
+    }
 
     Map<ContainerType, Handler> handlers = new HashMap<>();
 
@@ -211,7 +228,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               metrics,
               containerReplicaProto -> {
               });
-      handler.setClusterID(UUID.randomUUID().toString());
+      handler.setClusterID(clusterID);
       handlers.put(containerType, handler);
     }
 
@@ -238,6 +255,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     timer.time(() -> {
       final ReplicationTask replicationTask =
           replicationTasks.get((int) counter);
+      supervisor.initCounters(replicationTask);
       supervisor.new TaskRunner(replicationTask).run();
       return null;
     });

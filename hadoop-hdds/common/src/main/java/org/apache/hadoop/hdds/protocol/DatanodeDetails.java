@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +17,18 @@
 
 package org.apache.hadoop.hdds.protocol;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS;
+import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.ByteString;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -25,36 +36,25 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.collect.ImmutableSet;
-import com.google.protobuf.ByteString;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.scm.net.NetUtils;
-import org.apache.hadoop.ozone.util.StringWithByteString;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
+import org.apache.hadoop.hdds.scm.net.NetUtils;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.upgrade.BelongsToHDDSLayoutVersion;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.util.StringWithByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS;
-import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
 /**
  * DatanodeDetails class contains details about DataNode like:
@@ -86,8 +86,7 @@ public class DatanodeDetails extends NodeImpl implements
   /**
    * DataNode's unique identifier in the cluster.
    */
-  private final UUID uuid;
-  private final StringWithByteString uuidString;
+  private final DatanodeID id;
   private final String threadNamePrefix;
   private StringWithByteString ipAddress;
   private StringWithByteString hostName;
@@ -103,9 +102,8 @@ public class DatanodeDetails extends NodeImpl implements
 
   private DatanodeDetails(Builder b) {
     super(b.hostName, b.networkLocation, NetConstants.NODE_COST_DEFAULT);
-    uuid = b.id;
-    uuidString = StringWithByteString.valueOf(uuid.toString());
-    threadNamePrefix = HddsUtils.threadNamePrefix(uuidString);
+    id = b.id;
+    threadNamePrefix = HddsUtils.threadNamePrefix(id.toString());
     ipAddress = b.ipAddress;
     hostName = b.hostName;
     ports = b.ports;
@@ -129,9 +127,8 @@ public class DatanodeDetails extends NodeImpl implements
     super(datanodeDetails.getHostNameAsByteString(), datanodeDetails.getNetworkLocationAsByteString(),
         datanodeDetails.getParent(), datanodeDetails.getLevel(),
         datanodeDetails.getCost());
-    this.uuid = datanodeDetails.uuid;
-    this.uuidString = datanodeDetails.uuidString;
-    threadNamePrefix = HddsUtils.threadNamePrefix(uuidString);
+    this.id = datanodeDetails.id;
+    threadNamePrefix = HddsUtils.threadNamePrefix(id.toString());
     this.ipAddress = datanodeDetails.ipAddress;
     this.hostName = datanodeDetails.hostName;
     this.ports = datanodeDetails.ports;
@@ -148,13 +145,19 @@ public class DatanodeDetails extends NodeImpl implements
     this.currentVersion = datanodeDetails.getCurrentVersion();
   }
 
+  public DatanodeID getID() {
+    return id;
+  }
+
   /**
    * Returns the DataNode UUID.
    *
    * @return UUID of DataNode
    */
+  // TODO: Remove this in follow-up Jira (HDDS-12015)
+  @Deprecated
   public UUID getUuid() {
-    return uuid;
+    return id.getUuid();
   }
 
   /**
@@ -163,7 +166,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return UUID of DataNode
    */
   public String getUuidString() {
-    return uuidString.getString();
+    return id.toString();
   }
 
   /**
@@ -176,12 +179,40 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
+   * Resolves and validates the IP address of the datanode based on its hostname.
+   * If the resolved IP address differs from the current IP address,
+   * it updates the IP address to the newly resolved value.
+   */
+  public void validateDatanodeIpAddress() {
+    final String oldIP = getIpAddress();
+    final String hostname = getHostName();
+    if (StringUtils.isBlank(hostname)) {
+      LOG.warn("Could not resolve IP address of datanode '{}'", this);
+      return;
+    }
+
+    try {
+      final String newIP = InetAddress.getByName(hostname).getHostAddress();
+      if (StringUtils.isBlank(newIP)) {
+        throw new UnknownHostException("New IP address is invalid: " + newIP);
+      }
+
+      if (!newIP.equals(oldIP)) {
+        LOG.info("Updating IP address of datanode {} to {}", this, newIP);
+        setIpAddress(newIP);
+      }
+    } catch (UnknownHostException e) {
+      LOG.warn("Could not resolve IP address of datanode '{}'", this, e);
+    }
+  }
+
+  /**
    * Returns IP address of DataNode.
    *
    * @return IP address
    */
   public String getIpAddress() {
-    return ipAddress.getString();
+    return ipAddress == null ? null : ipAddress.getString();
   }
 
   /**
@@ -208,7 +239,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return Hostname
    */
   public String getHostName() {
-    return hostName.getString();
+    return hostName == null ? null : hostName.getString();
   }
 
   /**
@@ -392,11 +423,16 @@ public class DatanodeDetails extends NodeImpl implements
   public static DatanodeDetails.Builder newBuilder(
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto) {
     DatanodeDetails.Builder builder = newBuilder();
-    if (datanodeDetailsProto.hasUuid128()) {
+
+    if (datanodeDetailsProto.hasId()) {
+      builder.setID(DatanodeID.fromProto(datanodeDetailsProto.getId()));
+      // The else parts are for backward compatibility.
+    } else if (datanodeDetailsProto.hasUuid128()) {
       HddsProtos.UUID uuid = datanodeDetailsProto.getUuid128();
-      builder.setUuid(new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits()));
+      builder.setID(DatanodeID.of(new UUID(
+          uuid.getMostSigBits(), uuid.getLeastSigBits())));
     } else if (datanodeDetailsProto.hasUuid()) {
-      builder.setUuid(UUID.fromString(datanodeDetailsProto.getUuid()));
+      builder.setID(DatanodeID.fromUuidString(datanodeDetailsProto.getUuid()));
     }
 
     if (datanodeDetailsProto.hasIpAddress()) {
@@ -504,20 +540,17 @@ public class DatanodeDetails extends NodeImpl implements
    *                        If empty, all available ports will be included.
    * @return A {@link HddsProtos.DatanodeDetailsProto.Builder} Object.
    */
-
   public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
       int clientVersion, Set<Port.Name> filterPorts) {
 
-    HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
-        .setMostSigBits(uuid.getMostSignificantBits())
-        .setLeastSigBits(uuid.getLeastSignificantBits())
-        .build();
+    final HddsProtos.DatanodeIDProto idProto = id.toProto();
+    final HddsProtos.DatanodeDetailsProto.Builder builder =
+        HddsProtos.DatanodeDetailsProto.newBuilder();
 
-    HddsProtos.DatanodeDetailsProto.Builder builder =
-        HddsProtos.DatanodeDetailsProto.newBuilder()
-            .setUuid128(uuid128);
-
-    builder.setUuidBytes(uuidString.getBytes());
+    builder.setId(idProto);
+    // Both are deprecated.
+    builder.setUuid128(idProto.getUuid());
+    builder.setUuidBytes(id.getByteString());
 
     if (ipAddress != null) {
       builder.setIpAddressBytes(ipAddress.getBytes());
@@ -619,11 +652,11 @@ public class DatanodeDetails extends NodeImpl implements
 
   @Override
   public String toString() {
-    return uuidString + "(" + hostName + "/" + ipAddress + ")";
+    return id + "(" + hostName + "/" + ipAddress + ")";
   }
 
   public String toDebugString() {
-    return uuid.toString() + "{" +
+    return id + "{" +
         "ip: " +
         ipAddress +
         ", host: " +
@@ -639,13 +672,13 @@ public class DatanodeDetails extends NodeImpl implements
 
   @Override
   public int compareTo(DatanodeDetails that) {
-    return this.getUuid().compareTo(that.getUuid());
+    return this.id.compareTo(that.id);
   }
 
   @Override
   public boolean equals(Object obj) {
     return obj instanceof DatanodeDetails &&
-        uuid.equals(((DatanodeDetails) obj).uuid);
+        id.equals(((DatanodeDetails) obj).id);
   }
 
 
@@ -664,7 +697,7 @@ public class DatanodeDetails extends NodeImpl implements
 
   @Override
   public int hashCode() {
-    return uuid.hashCode();
+    return id.hashCode();
   }
 
   /**
@@ -685,7 +718,7 @@ public class DatanodeDetails extends NodeImpl implements
    * Builder class for building DatanodeDetails.
    */
   public static final class Builder {
-    private UUID id;
+    private DatanodeID id;
     private StringWithByteString ipAddress;
     private StringWithByteString hostName;
     private StringWithByteString networkName;
@@ -716,7 +749,7 @@ public class DatanodeDetails extends NodeImpl implements
      * @return DatanodeDetails.Builder
      */
     public Builder setDatanodeDetails(DatanodeDetails details) {
-      this.id = details.getUuid();
+      this.id = details.id;
       this.ipAddress = details.getIpAddressAsByteString();
       this.hostName = details.getHostNameAsByteString();
       this.networkName = details.getHostNameAsByteString();
@@ -740,7 +773,12 @@ public class DatanodeDetails extends NodeImpl implements
      * @return DatanodeDetails.Builder
      */
     public Builder setUuid(UUID uuid) {
-      this.id = uuid;
+      this.id = DatanodeID.of(uuid);
+      return this;
+    }
+
+    public Builder setID(DatanodeID dnId) {
+      this.id = dnId;
       return this;
     }
 
