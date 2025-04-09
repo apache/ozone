@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.graph;
+package org.apache.hadoop.ozone.graph;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
