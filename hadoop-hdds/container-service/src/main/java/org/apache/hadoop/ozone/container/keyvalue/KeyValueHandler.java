@@ -136,7 +136,7 @@ import org.slf4j.LoggerFactory;
  */
 public class KeyValueHandler extends Handler {
 
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
 
   private final BlockManager blockManager;
@@ -1577,10 +1577,6 @@ public class KeyValueHandler extends Handler {
       }
     }
     return null;
-  }
-
-  public static Logger getLogger() {
-    return LOG;
   }
 
   @VisibleForTesting

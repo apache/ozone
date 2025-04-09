@@ -71,7 +71,7 @@ import org.slf4j.LoggerFactory;
 public class SCMBlockDeletingService extends BackgroundService
     implements SCMService {
 
-  public static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(SCMBlockDeletingService.class);
 
   private static final int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 1;

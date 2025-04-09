@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * for supporting RocksDB direct {@link ByteBuffer} APIs.
  */
 public class CodecBuffer implements UncheckedAutoCloseable {
-  public static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
 
   /** To create {@link CodecBuffer} instances. */
   private static class Factory {

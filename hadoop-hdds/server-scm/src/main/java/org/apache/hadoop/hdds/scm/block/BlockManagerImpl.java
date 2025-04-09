@@ -280,11 +280,4 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   public SCMBlockDeletingService getSCMBlockDeletingService() {
     return this.blockDeletingService;
   }
-
-  /**
-   * Get class logger.
-   * */
-  public static Logger getLogger() {
-    return LOG;
-  }
 }

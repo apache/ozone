@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
 @Timeout(300)
 public abstract class TestSCMNodeManagerMXBean implements NonHATests.TestCase {
 
-  public static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
   private StorageContainerManager scm;
   private MBeanServer mbs;
 
