@@ -1850,7 +1850,7 @@
     <value>0.0.0.0:9879</value>
     <tag>OZONE, S3GATEWAY</tag>
     <description>
-      Ozone S3Gateway serverHTTPS server address and port.
+      Ozone S3Gateway HTTPS server address and port.
     </description>
   </property>
 
@@ -3970,16 +3970,6 @@
     <tag>OZONE, OM, S3GATEWAY</tag>
     <description>
       Property to enable or disable Ozone Manager gRPC endpoint for clients.  Right now, it is used by S3 Gateway only.
-    </description>
-  </property>
-
-
-  <property>
-    <name>ozone.om.grpc.port</name>
-    <value></value>
-    <tag>OZONE, OM, S3GATEWAY</tag>
-    <description>
-      gRPC endpoint for clients to connect to Ozone Manager.
     </description>
   </property>
 
