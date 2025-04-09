@@ -17,28 +17,31 @@
 
 package org.apache.hadoop.hdds.scm.cli.container;
 
-import org.apache.hadoop.hdds.cli.AdminSubcommand;
+import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.kohsuke.MetaInfServices;
-import picocli.CommandLine.Command;
+import picocli.CommandLine;
 
 /**
- * Subcommand to group container related operations.
+ * @deprecated by {@code ozone repair datanode upgrade-container-schema}
  */
-@Command(
-    name = "container",
-    description = "Container specific operations",
+@CommandLine.Command(
+    name = "upgrade",
+    description = "Please see `ozone repair datanode upgrade-container-schema`.",
     mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class,
-    subcommands = {
-        ListSubcommand.class,
-        InfoSubcommand.class,
-        CreateSubcommand.class,
-        CloseSubcommand.class,
-        ReportSubcommand.class,
-        UpgradeSubcommand.class,
-    })
-@MetaInfServices(AdminSubcommand.class)
-public class ContainerCommands implements AdminSubcommand {
+    versionProvider = HddsVersionProvider.class)
+@Deprecated
+public class UpgradeSubcommand extends AbstractSubcommand implements Callable<Void> {
 
+  @CommandLine.Option(names = {"--volume"}, description = "ignored")
+  private String volume;
+
+  @CommandLine.Option(names = {"-y", "--yes"}, description = "ignored")
+  private boolean yes;
+
+  @Override
+  public Void call() throws Exception {
+    throw new IllegalStateException(
+        "This command was moved, please use it via `ozone repair datanode upgrade-container-schema` instead.");
+  }
 }
