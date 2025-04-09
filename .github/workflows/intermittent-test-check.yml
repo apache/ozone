@@ -147,6 +147,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:

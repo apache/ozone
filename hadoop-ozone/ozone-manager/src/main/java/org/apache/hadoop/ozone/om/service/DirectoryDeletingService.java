@@ -70,7 +70,7 @@ import org.slf4j.LoggerFactory;
  * components of an orphan directory is visited.
  */
 public class DirectoryDeletingService extends AbstractKeyDeletingService {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DirectoryDeletingService.class);
 
   // Using multi thread for DirDeletion. Multiple threads would read

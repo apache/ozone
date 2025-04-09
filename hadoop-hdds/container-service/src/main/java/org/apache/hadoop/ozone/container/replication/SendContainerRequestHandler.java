@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContai
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.volume.AvailableSpaceFilter;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
@@ -89,11 +89,11 @@ class SendContainerRequestHandler
         volume = importer.chooseNextVolume();
         // Increment committed bytes and verify if it doesn't cross the space left.
         volume.incCommittedBytes(importer.getDefaultContainerSize() * 2);
+        StorageLocationReport volumeReport = volume.getReport();
         // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
-        AvailableSpaceFilter filter = new AvailableSpaceFilter(0);
-        if (!filter.test(volume)) {
+        if (volumeReport.getUsableSpace() <= 0) {
           volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
-          LOG.warn("Container {} import was unsuccessful, due to no space left", containerId);
+          LOG.warn("Container {} import was unsuccessful, no space left on volume {}", containerId, volumeReport);
           volume = null;
           throw new DiskChecker.DiskOutOfSpaceException("No more available volumes");
         }

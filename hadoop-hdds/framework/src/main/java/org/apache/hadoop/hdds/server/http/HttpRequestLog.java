@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class HttpRequestLog {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(HttpRequestLog.class);
   private static final HashMap<String, String> SERVER_TO_COMPONENT;
 

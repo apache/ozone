@@ -86,6 +86,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -114,6 +115,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -882,8 +884,7 @@ public class TestSCMNodeManager {
     // than SCM should not be found in the cluster.
     DatanodeDetails node1 =
         HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(SCMNodeManager.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(SCMNodeManager.class);
     int scmMlv =
         nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
     int scmSlv =
@@ -2037,5 +2038,65 @@ public class TestSCMNodeManager {
       assertEquals(emptyList(), nodeManager.getNodesByAddress(hostName));
       assertEquals(emptyList(), nodeManager.getNodesByAddress(ipAddress));
     }
+  }
+
+  private static Stream<Arguments> nodeStateTransitions() {
+    return Stream.of(
+        // start decommissioning or entering maintenance
+        Arguments.of(HddsProtos.NodeOperationalState.IN_SERVICE,
+                    HddsProtos.NodeOperationalState.DECOMMISSIONING, true),
+        Arguments.of(HddsProtos.NodeOperationalState.IN_SERVICE,
+                    HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, true),
+        // back to service (DataNodeAdminMonitor abort workflow, maintenance end time expired or node is dead)
+        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+                    HddsProtos.NodeOperationalState.IN_SERVICE, true),
+        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+                    HddsProtos.NodeOperationalState.IN_SERVICE, true),
+        Arguments.of(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+                    HddsProtos.NodeOperationalState.IN_SERVICE, true),
+        Arguments.of(HddsProtos.NodeOperationalState.IN_MAINTENANCE,
+                    HddsProtos.NodeOperationalState.IN_SERVICE, true),
+        // there is no under/over replicated containers on the node, completed the admin workflow
+        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+                    HddsProtos.NodeOperationalState.DECOMMISSIONED, false),
+        Arguments.of(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+                    HddsProtos.NodeOperationalState.IN_MAINTENANCE, false)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("nodeStateTransitions")
+  public void testNodeOperationalStateChange(
+      HddsProtos.NodeOperationalState oldState,
+      HddsProtos.NodeOperationalState newState,
+      boolean shouldNotify)
+      throws IOException, NodeNotFoundException, AuthenticationException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
+    EventPublisher eventPublisher = mock(EventPublisher.class);
+    HDDSLayoutVersionManager lvm = new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    createNodeManager(getConf());
+    SCMNodeManager nodeManager = new SCMNodeManager(conf,
+        scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
+        scmContext, lvm);
+
+    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    datanode.setPersistedOpState(oldState);
+    nodeManager.register(datanode, null, HddsTestUtils.getRandomPipelineReports());
+
+    nodeManager.setNodeOperationalState(datanode, newState, 0);
+    verify(eventPublisher, times(0)).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode);
+
+    DatanodeDetails reportedDatanode = MockDatanodeDetails.createDatanodeDetails(
+        datanode.getUuid());
+    reportedDatanode.setPersistedOpState(newState);
+
+    nodeManager.processHeartbeat(reportedDatanode);
+
+    verify(eventPublisher, times(shouldNotify ? 1 : 0)).fireEvent(
+        SCMEvents.REPLICATION_MANAGER_NOTIFY, reportedDatanode);
+
+    nodeManager.close();
   }
 }

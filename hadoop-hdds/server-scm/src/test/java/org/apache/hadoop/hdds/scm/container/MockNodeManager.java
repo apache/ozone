@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -698,10 +699,9 @@ public class MockNodeManager implements NodeManager {
                                     NodeReportProto nodeReport,
                                     PipelineReportsProto pipelineReportsProto,
                                     LayoutVersionProto layoutInfo) {
+    final DatanodeInfo info = new DatanodeInfo(datanodeDetails, NodeStatus.inServiceHealthy(), layoutInfo);
     try {
-      node2ContainerMap.addNode(datanodeDetails,
-          NodeStatus.inServiceHealthy(),
-          layoutInfo);
+      node2ContainerMap.addNode(info);
       addEntryTodnsToUuidMap(datanodeDetails.getIpAddress(),
           datanodeDetails.getUuidString());
       if (clusterMap != null) {
@@ -831,8 +831,8 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public DatanodeDetails getNodeByUuid(String uuid) {
-    Node node = clusterMap.getNode(NetConstants.DEFAULT_RACK + "/" + uuid);
+  public DatanodeDetails getNode(DatanodeID id) {
+    Node node = clusterMap.getNode(NetConstants.DEFAULT_RACK + "/" + id);
     return node == null ? null : (DatanodeDetails)node;
   }
 
@@ -844,7 +844,7 @@ public class MockNodeManager implements NodeManager {
       return results;
     }
     for (String uuid : uuids) {
-      DatanodeDetails dn = getNodeByUuid(uuid);
+      DatanodeDetails dn = getNode(DatanodeID.fromUuidString(uuid));
       if (dn != null) {
         results.add(dn);
       }

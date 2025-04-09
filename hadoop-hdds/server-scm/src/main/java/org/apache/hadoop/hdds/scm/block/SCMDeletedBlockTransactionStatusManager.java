@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
  * DeletedBlockTransaction sent to the DN.
  */
 public class SCMDeletedBlockTransactionStatusManager {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMDeletedBlockTransactionStatusManager.class);
   // Maps txId to set of DNs which are successful in committing the transaction
   private final Map<Long, Set<UUID>> transactionToDNsCommitMap;
@@ -98,7 +98,7 @@ public class SCMDeletedBlockTransactionStatusManager {
    * on DeleteBlocksCommand.
    */
   protected static class SCMDeleteBlocksCommandStatusManager {
-    public static final Logger LOG =
+    private static final Logger LOG =
         LoggerFactory.getLogger(SCMDeleteBlocksCommandStatusManager.class);
     private final Map<UUID, Map<Long, CmdStatusData>> scmCmdStatusRecord;
 

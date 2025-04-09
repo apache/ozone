@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -416,6 +417,7 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void openPipeline(PipelineID pipelineId)
       throws IOException {
+    long startNanos = Time.monotonicNowNanos();
     HddsProtos.PipelineID pipelineIdProtobuf = pipelineId.getProtobuf();
     acquireWriteLock();
     final Pipeline pipeline;
@@ -431,6 +433,7 @@ public class PipelineManagerImpl implements PipelineManager {
     } finally {
       releaseWriteLock();
     }
+    metrics.updatePipelineCreationLatencyNs(startNanos);
     metrics.incNumPipelineCreated();
     metrics.createPerPipelineMetrics(pipeline);
   }
@@ -637,7 +640,7 @@ public class PipelineManagerImpl implements PipelineManager {
       return false;
     }
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (nodeManager.getNodeByUuid(dn.getUuid()) == null) {
+      if (nodeManager.getNode(dn.getID()) == null) {
         return true;
       }
     }

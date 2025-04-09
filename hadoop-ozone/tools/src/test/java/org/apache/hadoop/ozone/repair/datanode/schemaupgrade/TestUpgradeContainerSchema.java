@@ -25,7 +25,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
-import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
+import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
 import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -84,7 +84,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
-import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.junit.jupiter.api.AfterEach;
@@ -248,9 +247,11 @@ class TestUpgradeContainerSchema {
     return subject.getLastResults();
   }
 
-  private Map<String, BlockData> putAnyBlockData(KeyValueContainerData data,
-                                                 KeyValueContainer container,
-                                                 int numBlocks) {
+  private Map<String, BlockData> putAnyBlockData(
+      KeyValueContainerData data,
+      KeyValueContainer container,
+      int numBlocks
+  ) throws IOException {
     // v3 key ==> block data
     final Map<String, BlockData> containerBlockDataMap = new HashMap<>();
 
@@ -264,44 +265,37 @@ class TestUpgradeContainerSchema {
       putChunksInBlock(1, i, chunks, container, blockID);
       kd.setChunks(chunks);
 
-      try {
-        final String localIDKey = Long.toString(blockID.getLocalID());
-        final String blockKey = DatanodeSchemaThreeDBDefinition
-            .getContainerKeyPrefix(data.getContainerID()) + localIDKey;
-        blockManager.putBlock(container, kd);
-        containerBlockDataMap.put(blockKey, kd);
-      } catch (IOException exception) {
-        LOG.warn("Failed to put block: " + blockID.getLocalID()
-            + " in BlockDataTable.", exception);
-      }
+      final String localIDKey = Long.toString(blockID.getLocalID());
+      final String blockKey = getContainerKeyPrefix(data.getContainerID()) + localIDKey;
+      blockManager.putBlock(container, kd);
+      containerBlockDataMap.put(blockKey, kd);
     }
 
     return containerBlockDataMap;
   }
 
-  private void putChunksInBlock(int numOfChunksPerBlock, int i,
-                                List<ContainerProtos.ChunkInfo> chunks,
-                                KeyValueContainer container, BlockID blockID) {
+  private void putChunksInBlock(
+      int numOfChunksPerBlock,
+      int i,
+      List<ContainerProtos.ChunkInfo> chunks,
+      KeyValueContainer container,
+      BlockID blockID
+  ) throws IOException {
     final long chunkLength = 100;
-    try {
-      for (int k = 0; k < numOfChunksPerBlock; k++) {
-        final String chunkName = String.format("%d_chunk_%d_block_%d",
-            blockID.getContainerBlockID().getLocalID(), k, i);
-        final long offset = k * chunkLength;
-        ContainerProtos.ChunkInfo info =
-            ContainerProtos.ChunkInfo.newBuilder().setChunkName(chunkName)
-                .setLen(chunkLength).setOffset(offset)
-                .setChecksumData(Checksum.getNoChecksumDataProto()).build();
-        chunks.add(info);
-        ChunkInfo chunkInfo = new ChunkInfo(chunkName, offset, chunkLength);
-        try (ChunkBuffer chunkData = ChunkBuffer.allocate((int) chunkLength)) {
-          chunkManager.writeChunk(container, blockID, chunkInfo, chunkData, WRITE_STAGE);
-          chunkManager.writeChunk(container, blockID, chunkInfo, chunkData, COMMIT_STAGE);
-        }
+    for (int k = 0; k < numOfChunksPerBlock; k++) {
+      final String chunkName = String.format("%d_chunk_%d_block_%d",
+          blockID.getContainerBlockID().getLocalID(), k, i);
+      final long offset = k * chunkLength;
+      ContainerProtos.ChunkInfo info =
+          ContainerProtos.ChunkInfo.newBuilder().setChunkName(chunkName)
+              .setLen(chunkLength).setOffset(offset)
+              .setChecksumData(Checksum.getNoChecksumDataProto()).build();
+      chunks.add(info);
+      ChunkInfo chunkInfo = new ChunkInfo(chunkName, offset, chunkLength);
+      try (ChunkBuffer chunkData = ChunkBuffer.allocate((int) chunkLength)) {
+        chunkManager.writeChunk(container, blockID, chunkInfo, chunkData, WRITE_STAGE);
+        chunkManager.writeChunk(container, blockID, chunkInfo, chunkData, COMMIT_STAGE);
       }
-    } catch (IOException ex) {
-      LOG.warn("Putting chunks in blocks was not successful for BlockID: "
-          + blockID);
     }
   }
 

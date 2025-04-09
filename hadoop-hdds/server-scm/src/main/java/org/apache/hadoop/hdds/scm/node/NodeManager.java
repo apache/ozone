@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -360,17 +361,8 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   // TODO: We can give better name to this method!
   List<SCMCommand<?>> getCommandQueue(UUID dnID);
 
-  /**
-   * Given datanode uuid, returns the DatanodeDetails for the node.
-   *
-   * @param uuid datanode uuid
-   * @return the given datanode, or null if not found
-   */
-  @Nullable DatanodeDetails getNodeByUuid(@Nullable String uuid);
-
-  default @Nullable DatanodeDetails getNodeByUuid(@Nullable UUID uuid) {
-    return uuid != null ? getNodeByUuid(uuid.toString()) : null;
-  };
+  /** @return the datanode of the given id if it exists; otherwise, return null. */
+  @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of
