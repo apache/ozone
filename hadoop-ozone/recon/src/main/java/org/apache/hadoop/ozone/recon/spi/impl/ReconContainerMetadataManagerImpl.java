@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
+import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequestPath;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.KEY_CONTAINER;
@@ -88,6 +89,9 @@ public class ReconContainerMetadataManagerImpl
 
   @Inject
   private ReconOMMetadataManager omMetadataManager;
+
+  @Inject
+  private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
 
   @Inject
   public ReconContainerMetadataManagerImpl(ReconDBProvider reconDBProvider,
@@ -674,6 +678,60 @@ public class ReconContainerMetadataManagerImpl
     }
     return containers;
   }
+
+  /**
+   * Get container key records from the containerKeyTable that exactly match the given
+   * startPrefix for the provided containerId.
+   *
+   * @param containerId the container ID.
+   * @param startPrefix the key prefix to search for.
+   * @return A List of ContainerKeyPrefix records if found; an empty list otherwise.
+   * @throws IOException if a DB operation fails.
+   */
+  @Override
+  public List<ContainerKeyPrefix> getKeyRecordsForPrefix(long containerId,
+                                                         String startPrefix,
+                                                         int limit,
+                                                         boolean isFSO)
+      throws IOException {
+    List<ContainerKeyPrefix> records = new ArrayList<>();
+    List<String> subPaths = new ArrayList<>();
+    subPaths.add(startPrefix);
+
+    if (isFSO) {
+      String[] names = parseRequestPath(startPrefix);
+      long parentId = Long.parseLong(names[names.length - 1]);
+      ReconUtils.gatherSubPaths(parentId, subPaths,
+          Long.parseLong(names[0]),
+          Long.parseLong(names[1]),
+          reconNamespaceSummaryManager);
+    }
+
+    try (TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix, Integer>> containerIterator =
+             containerKeyTable.iterator()) {
+      // Seek to the first subPath (they are all prefixed similarly)
+      ContainerKeyPrefix seekKey = ContainerKeyPrefix.get(containerId, startPrefix);
+      KeyValue<ContainerKeyPrefix, Integer> seekKeyValue = containerIterator.seek(seekKey);
+
+      while (seekKeyValue != null && records.size() < limit) {
+        ContainerKeyPrefix currentKey = seekKeyValue.getKey();
+        if (!subPaths.stream().anyMatch(prefix -> currentKey.getKeyPrefix().startsWith(prefix))) {
+          break; // No more relevant records
+        }
+
+        records.add(currentKey);
+
+        if (containerIterator.hasNext()) {
+          seekKeyValue = containerIterator.next();
+        } else {
+          break;
+        }
+      }
+    }
+
+    return records;
+  }
+
 
   private void initializeKeyContainerTable() throws IOException {
     Instant start = Instant.now();

@@ -436,7 +436,7 @@ public class TestContainerEndpoint {
 
   @Test
   public void testGetKeysForContainer() throws IOException {
-    Response response = containerEndpoint.getKeysForContainer(1L, -1, "");
+    Response response = containerEndpoint.getKeysForContainer(1L, -1, "", "");
 
     KeysResponse data = (KeysResponse) response.getEntity();
     Collection<KeyMetadata> keyMetadataList = data.getKeys();
@@ -463,14 +463,14 @@ public class TestContainerEndpoint {
     assertEquals(103, blockIds.get(0L).iterator().next().getLocalID());
     assertEquals(104, blockIds.get(1L).iterator().next().getLocalID());
 
-    response = containerEndpoint.getKeysForContainer(3L, -1, "");
+    response = containerEndpoint.getKeysForContainer(3L, -1, "", "");
     data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
     assertThat(keyMetadataList).isEmpty();
     assertEquals(0, data.getTotalCount());
 
     // test if limit works as expected
-    response = containerEndpoint.getKeysForContainer(1L, 1, "");
+    response = containerEndpoint.getKeysForContainer(1L, 1, "", "");
     data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
     assertEquals(1, keyMetadataList.size());
@@ -485,7 +485,7 @@ public class TestContainerEndpoint {
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
-    response = containerEndpoint.getKeysForContainer(20L, -1, "");
+    response = containerEndpoint.getKeysForContainer(20L, -1, "", "");
 
     // Ensure that the expected number of keys is returned
     data = (KeysResponse) response.getEntity();
@@ -516,7 +516,7 @@ public class TestContainerEndpoint {
   public void testGetKeysForContainerWithPrevKey() throws IOException {
     // test if prev-key param works as expected
     Response response = containerEndpoint.getKeysForContainer(
-        1L, -1, "/sampleVol/bucketOne/key_one");
+        1L, -1, "/sampleVol/bucketOne/key_one", "");
 
     KeysResponse data =
         (KeysResponse) response.getEntity();
@@ -536,7 +536,7 @@ public class TestContainerEndpoint {
 
     // test for an empty prev-key parameter
     response = containerEndpoint.getKeysForContainer(
-        1L, -1, StringUtils.EMPTY);
+        1L, -1, StringUtils.EMPTY, "");
     data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
 
@@ -548,7 +548,7 @@ public class TestContainerEndpoint {
 
     // test for negative cases
     response = containerEndpoint.getKeysForContainer(
-        1L, -1, "/sampleVol/bucketOne/invalid_key");
+        1L, -1, "/sampleVol/bucketOne/invalid_key", "");
     data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
     assertEquals(3, data.getTotalCount());
@@ -556,7 +556,7 @@ public class TestContainerEndpoint {
 
     // test for a container ID that does not exist
     response = containerEndpoint.getKeysForContainer(
-        5L, -1, "");
+        5L, -1, "", "");
     data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
     assertEquals(0, keyMetadataList.size());
@@ -571,7 +571,7 @@ public class TestContainerEndpoint {
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
             reconOMMetadataManager, 10);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
-    response = containerEndpoint.getKeysForContainer(20L, -1, "/0/1/2/file7");
+    response = containerEndpoint.getKeysForContainer(20L, -1, "/0/1/2/file7", "");
 
     // Ensure that the expected number of keys is returned
     data = (KeysResponse) response.getEntity();
@@ -1796,7 +1796,7 @@ public class TestContainerEndpoint {
     reprocessContainerKeyMapper();
 
     // Assume that FSO keys are mapped to container ID 20L (as in previous tests for FSO).
-    Response response = containerEndpoint.getKeysForContainer(20L, -1, "");
+    Response response = containerEndpoint.getKeysForContainer(20L, -1, "", "");
     KeysResponse keysResponse = (KeysResponse) response.getEntity();
     Collection<KeyMetadata> keyMetadataList = keysResponse.getKeys();
 
