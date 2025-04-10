@@ -61,7 +61,7 @@ public class HttpFSServerWebServer {
 
   private static final String HTTP_ADMINS_KEY = "httpfs.http.administrators";
 
-  private static final String NAME = "webhdfs";
+  private static final String NAME = "httpfs";
   private static final String SERVLET_PATH = "/webhdfs";
 
   static {
