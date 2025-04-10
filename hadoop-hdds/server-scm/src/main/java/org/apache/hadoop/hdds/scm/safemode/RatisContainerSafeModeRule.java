@@ -134,7 +134,7 @@ public class RatisContainerSafeModeRule extends SafeModeExitRule<NodeRegistratio
     if (scmInSafeMode()) {
       SCMSafeModeManager.getLogger().info(
           "SCM in safe mode. {} % containers [Ratis] have at least one reported replica",
-          getCurrentContainerThreshold() * 100);
+          String.format("%.2f", getCurrentContainerThreshold() * 100));
     }
   }
 

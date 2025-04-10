@@ -54,6 +54,7 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
 
   private static final Logger LOG = LoggerFactory.getLogger(ECContainerSafeModeRule.class);
   private static final String NAME = "ECContainerSafeModeRule";
+  private static final int DEFAULT_MIN_REPLICA = 1;
 
   private final ContainerManager containerManager;
   private final double safeModeCutoff;
@@ -142,7 +143,7 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
       LOG.error("containerId = {} not found.", pContainerID, e);
     }
 
-    return 1;
+    return DEFAULT_MIN_REPLICA;
   }
 
   @Override
@@ -168,8 +169,7 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
   private void putInContainerDNsMap(long containerID,
       Map<Long, Set<UUID>> containerDNsMap,
       UUID datanodeUUID) {
-    containerDNsMap.computeIfAbsent(containerID, key -> Sets.newHashSet());
-    containerDNsMap.get(containerID).add(datanodeUUID);
+    containerDNsMap.computeIfAbsent(containerID, key -> Sets.newHashSet()).add(datanodeUUID);
   }
 
   /**
