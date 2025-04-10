@@ -748,12 +748,10 @@ public class DatanodeStateMachine implements Closeable {
     return reconfigurationHandler;
   }
 
-  @VisibleForTesting
   public Thread getStateMachineThread() {
     return stateMachineThread;
   }
 
-  @VisibleForTesting
   public Thread getCmdProcessThread() {
     return cmdProcessThread;
   }
