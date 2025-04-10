@@ -1604,8 +1604,6 @@ public class KeyValueHandler extends Handler {
     }
     ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager
         .writeContainerDataTree(containerData, merkleTree);
-    // TODO: Remove this as this is being set in writeContainerDataTree by HDDS-12745
-    containerData.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
     return checksumInfo;
   }
 

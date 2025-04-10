@@ -364,6 +364,8 @@ public class ContainerChecksumTreeManager {
       throw new IOException("Error occurred when writing container merkle tree for containerID "
           + data.getContainerID(), ex);
     }
+    // Set in-memory data checksum.
+    data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
   }
 
   /**

@@ -90,6 +90,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerT
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
@@ -603,11 +604,12 @@ public class TestKeyValueHandler {
     // Without reconciliation, checksums should be different because of the corruption.
     Set<Long> checksumsBeforeReconciliation = new HashSet<>();
     for (KeyValueContainer kvContainer : containers) {
-      kvHandler.createContainerMerkleTree(kvContainer);
       Optional<ContainerProtos.ContainerChecksumInfo> containerChecksumInfo =
           checksumManager.read(kvContainer.getContainerData());
       assertTrue(containerChecksumInfo.isPresent());
-      checksumsBeforeReconciliation.add(containerChecksumInfo.get().getContainerMerkleTree().getDataChecksum());
+      long dataChecksum = containerChecksumInfo.get().getContainerMerkleTree().getDataChecksum();
+      assertEquals(kvContainer.getContainerData().getDataChecksum(), dataChecksum);
+      checksumsBeforeReconciliation.add(dataChecksum);
     }
     // There should be more than 1 checksum because of the corruption.
     assertTrue(checksumsBeforeReconciliation.size() > 1);
@@ -622,40 +624,7 @@ public class TestKeyValueHandler {
     // Setup mock for each datanode network calls needed for reconciliation.
     try (MockedStatic<ContainerProtocolCalls> containerProtocolMock =
              Mockito.mockStatic(ContainerProtocolCalls.class)) {
-      // Mock getContainerChecksumInfo
-      containerProtocolMock.when(() -> ContainerProtocolCalls.getContainerChecksumInfo(any(), anyLong(), any()))
-          .thenAnswer(inv -> {
-            XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
-            DatanodeDetails dn = xceiverClientSpi.getPipeline().getClosestNode();
-            KeyValueContainer container = dnToContainerMap.get(dn.getUuidString());
-            ByteString checksumInfo = checksumManager.getContainerChecksumInfo(container.getContainerData());
-            return ContainerProtos.GetContainerChecksumInfoResponseProto.newBuilder()
-                .setContainerID(containerID)
-                .setContainerChecksumInfo(checksumInfo)
-                .build();
-          });
-
-      // Mock getBlock
-      containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(any(), any(), any(), any(), anyMap()))
-          .thenAnswer(inv -> {
-            XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
-            DatanodeDetails dn = xceiverClientSpi.getPipeline().getClosestNode();
-            KeyValueContainer container = dnToContainerMap.get(dn.getUuidString());
-            ContainerProtos.BlockData blockData = kvHandler.getBlockManager().getBlock(container, inv.getArgument(2))
-                  .getProtoBufMessage();
-            return ContainerProtos.GetBlockResponseProto.newBuilder()
-                .setBlockData(blockData)
-                .build();
-          });
-
-      // Mock readChunk
-      containerProtocolMock.when(() -> ContainerProtocolCalls.readChunk(any(), any(), any(), any(), any()))
-          .thenAnswer(inv -> {
-            XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
-            DatanodeDetails dn = xceiverClientSpi.getPipeline().getClosestNode();
-            KeyValueContainer container = dnToContainerMap.get(dn.getUuidString());
-            return createReadChunkResponse(inv, container, kvHandler);
-          });
+      mockContainerProtocolCalls(containerProtocolMock, dnToContainerMap, checksumManager, kvHandler, containerID);
 
       kvHandler.reconcileContainer(dnClient, containers.get(0), Sets.newHashSet(datanodes));
       kvHandler.reconcileContainer(dnClient, containers.get(1), Sets.newHashSet(datanodes));
@@ -668,13 +637,60 @@ public class TestKeyValueHandler {
         Optional<ContainerProtos.ContainerChecksumInfo> containerChecksumInfo =
             checksumManager.read(kvContainer.getContainerData());
         assertTrue(containerChecksumInfo.isPresent());
+        long dataChecksum = containerChecksumInfo.get().getContainerMerkleTree().getDataChecksum();
+        assertEquals(kvContainer.getContainerData().getDataChecksum(), dataChecksum);
         if (prevContainerChecksumInfo != null) {
-          assertEquals(prevContainerChecksumInfo.getContainerMerkleTree().getDataChecksum(),
-              containerChecksumInfo.get().getContainerMerkleTree().getDataChecksum());
+          assertEquals(prevContainerChecksumInfo.getContainerMerkleTree().getDataChecksum(), dataChecksum);
         }
         prevContainerChecksumInfo = containerChecksumInfo.get();
       }
     }
+  }
+  private void mockContainerProtocolCalls(MockedStatic<ContainerProtocolCalls> containerProtocolMock,
+                                          Map<String, KeyValueContainer> dnToContainerMap,
+                                          ContainerChecksumTreeManager checksumManager,
+                                          KeyValueHandler kvHandler,
+                                          long containerID) {
+    // Mock getContainerChecksumInfo
+    containerProtocolMock.when(() -> ContainerProtocolCalls.getContainerChecksumInfo(any(), anyLong(), any()))
+        .thenAnswer(inv -> {
+          XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
+          Pipeline pipeline = xceiverClientSpi.getPipeline();
+          assertEquals(1, pipeline.size());
+          DatanodeDetails dn = pipeline.getFirstNode();
+          KeyValueContainer container = dnToContainerMap.get(dn.getUuidString());
+          ByteString checksumInfo = checksumManager.getContainerChecksumInfo(container.getContainerData());
+          return ContainerProtos.GetContainerChecksumInfoResponseProto.newBuilder()
+              .setContainerID(containerID)
+              .setContainerChecksumInfo(checksumInfo)
+              .build();
+        });
+
+    // Mock getBlock
+    containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(any(), any(), any(), any(), anyMap()))
+        .thenAnswer(inv -> {
+          XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
+          Pipeline pipeline = xceiverClientSpi.getPipeline();
+          assertEquals(1, pipeline.size());
+          DatanodeDetails dn = pipeline.getFirstNode();
+          KeyValueContainer container = dnToContainerMap.get(dn.getUuidString());
+          ContainerProtos.BlockData blockData = kvHandler.getBlockManager().getBlock(container, inv.getArgument(2))
+                .getProtoBufMessage();
+          return ContainerProtos.GetBlockResponseProto.newBuilder()
+              .setBlockData(blockData)
+              .build();
+        });
+
+    // Mock readChunk
+    containerProtocolMock.when(() -> ContainerProtocolCalls.readChunk(any(), any(), any(), any(), any()))
+        .thenAnswer(inv -> {
+          XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
+          Pipeline pipeline = xceiverClientSpi.getPipeline();
+          assertEquals(1, pipeline.size());
+          DatanodeDetails dn = pipeline.getFirstNode();
+          KeyValueContainer container = dnToContainerMap.get(dn.getUuidString());
+          return createReadChunkResponse(inv, container, kvHandler);
+        });
   }
 
   // Helper method to create readChunk responses
@@ -873,7 +889,7 @@ public class TestKeyValueHandler {
       }
 
       ContainerLayoutTestInfo.FILE_PER_BLOCK.validateFileCount(chunksPath, blocks, (long) blocks * CHUNKS_PER_BLOCK);
-      container.close();
+      container.markContainerForClose();
       kvHandler.closeContainer(container);
       containers.add(container);
     }

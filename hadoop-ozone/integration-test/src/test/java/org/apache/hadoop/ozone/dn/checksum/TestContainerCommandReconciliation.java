@@ -76,6 +76,7 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -108,7 +109,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -147,8 +147,6 @@ public class TestContainerCommandReconciliation {
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE,  512 * 1024, StorageUnit.BYTES);
     // Disable the container scanner so it does not create merkle tree files that interfere with this test.
     conf.getObject(ContainerScannerConfiguration.class).setEnabled(false);
-
-    ExitUtils.disableSystemExit();
 
     startMiniKdc();
     setSecureConfig();
@@ -334,7 +332,7 @@ public class TestContainerCommandReconciliation {
   @Test
   public void testContainerChecksumWithBlockMissing() throws Exception {
     // 1. Write data to a container.
-    // Read the key back check it's hash.
+    // Read the key back and check its hash.
     String volume = UUID.randomUUID().toString();
     String bucket = UUID.randomUUID().toString();
     Pair<Long, byte[]> containerAndData = getDataAndContainer(true, 20 * 1024 * 1024, volume, bucket);
@@ -383,11 +381,17 @@ public class TestContainerCommandReconciliation {
     Assertions.assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
 
     // 3. Reconcile the container.
-    cluster.getStorageContainerLocationClient().reconcileContainer(containerID);
+    StorageContainerLocationProtocolClientSideTranslatorPB scmClient = cluster.getStorageContainerLocationClient();
+    long lastHeartbeat = cluster.getStorageContainerManager().getScmNodeManager()
+        .getLastHeartbeat(dataNodeDetails.get(0));
+    scmClient.reconcileContainer(containerID);
     GenericTestUtils.waitFor(() -> {
       try {
         ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
-        return newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum() == oldDataChecksum;
+        long newHeartbeat = cluster.getStorageContainerManager().getScmNodeManager()
+            .getLastHeartbeat(dataNodeDetails.get(0));
+        return newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum() == oldDataChecksum &&
+            newHeartbeat > lastHeartbeat;
       } catch (Exception ex) {
         return false;
       }
@@ -395,8 +399,8 @@ public class TestContainerCommandReconciliation {
     ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
     assertTreesSortedAndMatch(oldContainerChecksumInfo.getContainerMerkleTree(),
         newContainerChecksumInfo.getContainerMerkleTree());
-    List<HddsProtos.SCMContainerReplicaProto> containerReplicas = cluster.getStorageContainerManager()
-        .getClientProtocolServer().getContainerReplicas(containerID, ClientVersion.CURRENT_VERSION);
+    List<HddsProtos.SCMContainerReplicaProto> containerReplicas = scmClient.getContainerReplicas(containerID,
+        ClientVersion.CURRENT_VERSION);
     // Compare and check if dataChecksum is same on all replicas.
     Set<Long> dataChecksums = containerReplicas.stream()
         .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
@@ -495,11 +499,17 @@ public class TestContainerCommandReconciliation {
     writeContainerDataTreeProto(container.getContainerData(), builder.getContainerMerkleTree());
 
     // 4. Reconcile the container.
-    cluster.getStorageContainerLocationClient().reconcileContainer(containerID);
+    StorageContainerLocationProtocolClientSideTranslatorPB scmClient = cluster.getStorageContainerLocationClient();
+    long lastHeartbeat = cluster.getStorageContainerManager().getScmNodeManager()
+        .getLastHeartbeat(dataNodeDetails.get(0));
+    scmClient.reconcileContainer(containerID);
     GenericTestUtils.waitFor(() -> {
       try {
         ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
-        return newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum() == oldDataChecksum;
+        long newHeartbeat = cluster.getStorageContainerManager().getScmNodeManager()
+            .getLastHeartbeat(dataNodeDetails.get(0));
+        return newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum() == oldDataChecksum &&
+            newHeartbeat > lastHeartbeat;
       } catch (Exception ex) {
         return false;
       }
@@ -508,8 +518,8 @@ public class TestContainerCommandReconciliation {
     assertTreesSortedAndMatch(oldContainerChecksumInfo.getContainerMerkleTree(),
         newContainerChecksumInfo.getContainerMerkleTree());
     Assertions.assertEquals(oldDataChecksum, newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum());
-    List<HddsProtos.SCMContainerReplicaProto> containerReplicas = cluster.getStorageContainerManager()
-        .getClientProtocolServer().getContainerReplicas(containerID, ClientVersion.CURRENT_VERSION);
+    List<HddsProtos.SCMContainerReplicaProto> containerReplicas = scmClient.getContainerReplicas(containerID,
+        ClientVersion.CURRENT_VERSION);
     // Compare and check if dataChecksum is same on all replicas.
     Set<Long> dataChecksums = containerReplicas.stream()
         .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
