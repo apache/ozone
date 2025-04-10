@@ -52,6 +52,7 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
   private final ColumnFamily family;
   private final RDBMetrics rdbMetrics;
   private final RDBParallelTableOperator<byte[], byte[]> parallelTableOperator;
+  private final ThrottledThreadpoolExecutor executor;
 
   /**
    * Constructs a TableStore.
@@ -63,6 +64,7 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
     this.db = db;
     this.family = family;
     this.rdbMetrics = rdbMetrics;
+    this.executor = executor;
     this.parallelTableOperator = new RDBParallelTableOperator<>(executor, this, ByteArrayCodec.get());
   }
 
@@ -227,8 +229,61 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
   @Override
   public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix)
       throws IOException {
-    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
-        prefix);
+    TableIterator<byte[], AutoCloseSupplier<RawKeyValue<byte[]>>> itr  =
+        new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
+    return new TableIterator<byte[], KeyValue<byte[], byte[]>>() {
+      @Override
+      public void seekToFirst() {
+        itr.seekToFirst();
+      }
+
+      @Override
+      public void seekToLast() {
+        itr.seekToLast();
+      }
+
+      @Override
+      public KeyValue<byte[], byte[]> seek(byte[] bytes) throws IOException {
+        try (AutoCloseSupplier<RawKeyValue<byte[]>> kv = itr.seek(bytes)) {
+          return kv.get();
+        }
+      }
+
+      @Override
+      public void removeFromDB() {
+        itr.remove();
+      }
+
+      @Override
+      public void close() throws IOException {
+        itr.close();
+      }
+
+      @Override
+      public boolean hasNext() {
+        return itr.hasNext();
+      }
+
+      @Override
+      public KeyValue<byte[], byte[]> next() {
+        try (AutoCloseSupplier<RawKeyValue<byte[]>> kv = itr.next()) {
+          return kv.get();
+        }
+      }
+    };
+  }
+
+  public TableIterator<byte[], AutoCloseSupplier<RawKeyValue<byte[]>>> closeableSupplierIterator(byte[] prefix)
+      throws IOException {
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
+  }
+
+  @Override
+  public void splitTableOperation(byte[] startKey, byte[] endKey,
+                                  CheckedFunction<KeyValue<byte[], byte[]>, Void, IOException> operation,
+                                  Logger logger, int logPercentageThreshold)
+      throws IOException, ExecutionException, InterruptedException {
+    this.parallelTableOperator.performTaskOnTableVals(startKey, endKey, operation, logger, logPercentageThreshold);
   }
 
   @Override
@@ -236,13 +291,18 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
                                      CheckedFunction<KeyValue<byte[], byte[]>, Void, IOException> operation,
                                      Logger logger, int logPercentageThreshold)
       throws IOException, ExecutionException, InterruptedException {
-    this.parallelTableOperator.performTaskOnTableVals(startKey, endKey, operation, logger, logPercentageThreshold);
+    try (TableIterator<byte[], KeyValue<byte[], byte[]>> itr = iterator()) {
+      ParallelTableIterOperator<byte[], byte[]> parallelTableIterOperator =
+          new ParallelTableIterOperator<>(this.getName(), executor, itr, ByteArrayCodec.get().comparator());
+      long logCountThreshold = Math.max((this.getEstimatedKeyCount() * logPercentageThreshold) / 100, 1L);
+      parallelTableIterOperator.performTaskOnTableVals(startKey, endKey, operation, logger, logCountThreshold);
+    }
   }
 
-  TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> iterator(
+  TableIterator<CodecBuffer, AutoCloseSupplier<RawKeyValue<CodecBuffer>>> iterator(
       CodecBuffer prefix) throws IOException {
     return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
-        this, prefix);
+        this, prefix, executor.getMaxNumberOfThreads());
   }
 
   @Override

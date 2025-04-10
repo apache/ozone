@@ -93,9 +93,17 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void parallelTableOperation(
+  public void splitTableOperation(
       KEY startKey, KEY endKey, CheckedFunction<KeyValue<KEY, VALUE>, Void, IOException> operation,
       Logger logger, int logPercentageThreshold)
+      throws IOException, ExecutionException, InterruptedException {
+    table.splitTableOperation(startKey, endKey, operation, logger, logPercentageThreshold);
+  }
+
+  @Override
+  public void parallelTableOperation(KEY startKey, KEY endKey,
+                                     CheckedFunction<KeyValue<KEY, VALUE>, Void, IOException> operation, Logger logger,
+                                     int logPercentageThreshold)
       throws IOException, ExecutionException, InterruptedException {
     table.parallelTableOperation(startKey, endKey, operation, logger, logPercentageThreshold);
   }

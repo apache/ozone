@@ -151,4 +151,8 @@ public class RocksDBConfiguration {
   public int getParallelIteratorMaxPoolSize() {
     return parallelIteratorMaxPoolSize;
   }
+
+  public void setParallelIteratorMaxPoolSize(int parallelIteratorMaxPoolSize) {
+    this.parallelIteratorMaxPoolSize = parallelIteratorMaxPoolSize;
+  }
 }

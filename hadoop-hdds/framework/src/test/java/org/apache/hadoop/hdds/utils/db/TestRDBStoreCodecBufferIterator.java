@@ -73,12 +73,12 @@ public class TestRDBStoreCodecBufferIterator {
   }
 
   RDBStoreCodecBufferIterator newIterator() {
-    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null);
+    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null, 1);
   }
 
   RDBStoreCodecBufferIterator newIterator(CodecBuffer prefix) {
     return new RDBStoreCodecBufferIterator(
-        managedRocksIterator, rdbTableMock, prefix);
+        managedRocksIterator, rdbTableMock, prefix, 1);
   }
 
   Answer<Integer> newAnswerInt(String name, int b) {
@@ -116,12 +116,15 @@ public class TestRDBStoreCodecBufferIterator {
 
     List<Table.KeyValue<byte[], byte[]>> remaining = new ArrayList<>();
     try (RDBStoreCodecBufferIterator i = newIterator()) {
-      i.forEachRemaining(kv -> {
+      i.forEachRemaining(kvSupplier -> {
         try {
+          Table.KeyValue<CodecBuffer, CodecBuffer> kv = kvSupplier.get();
           remaining.add(RawKeyValue.create(
               kv.getKey().getArray(), kv.getValue().getArray()));
         } catch (IOException e) {
           throw new RuntimeException(e);
+        } finally {
+          kvSupplier.close();
         }
       });
 
@@ -205,9 +208,8 @@ public class TestRDBStoreCodecBufferIterator {
         .then(newAnswerInt("val1", 0x7f));
 
     try (RDBStoreCodecBufferIterator i = newIterator();
-         CodecBuffer target = CodecBuffer.wrap(new byte[]{0x55})) {
-      final Table.KeyValue<CodecBuffer, CodecBuffer> val = i.seek(target);
-
+         CodecBuffer target = CodecBuffer.wrap(new byte[] {0x55});
+         AutoCloseSupplier<Table.KeyValue<CodecBuffer, CodecBuffer>> valSupplier = i.seek(target)) {
       InOrder verifier = inOrder(rocksIteratorMock);
 
       verify(rocksIteratorMock, times(1)).seekToFirst(); //at construct time
@@ -217,8 +219,8 @@ public class TestRDBStoreCodecBufferIterator {
       verifier.verify(rocksIteratorMock, times(1)).isValid();
       verifier.verify(rocksIteratorMock, times(1)).key(any());
       verifier.verify(rocksIteratorMock, times(1)).value(any());
-      assertArrayEquals(new byte[]{0x00}, val.getKey().getArray());
-      assertArrayEquals(new byte[]{0x7f}, val.getValue().getArray());
+      assertArrayEquals(new byte[] {0x00}, valSupplier.get().getKey().getArray());
+      assertArrayEquals(new byte[] {0x7f}, valSupplier.get().getValue().getArray());
     }
 
     CodecTestUtil.gc();
@@ -233,7 +235,9 @@ public class TestRDBStoreCodecBufferIterator {
     byte[] key = null;
     try (RDBStoreCodecBufferIterator i = newIterator()) {
       if (i.hasNext()) {
-        key = i.next().getKey().getArray();
+        try (AutoCloseSupplier<Table.KeyValue<CodecBuffer, CodecBuffer>> kv = i.next()) {
+          key = kv.get().getKey().getArray();
+        }
       }
     }
 
@@ -258,9 +262,10 @@ public class TestRDBStoreCodecBufferIterator {
     byte[] value = null;
     try (RDBStoreCodecBufferIterator i = newIterator()) {
       if (i.hasNext()) {
-        Table.KeyValue<CodecBuffer, CodecBuffer> entry = i.next();
-        key = entry.getKey().getArray();
-        value = entry.getValue().getArray();
+        try (AutoCloseSupplier<Table.KeyValue<CodecBuffer, CodecBuffer>> entry = i.next()) {
+          key = entry.get().getKey().getArray();
+          value = entry.get().getValue().getArray();
+        }
       }
     }
 

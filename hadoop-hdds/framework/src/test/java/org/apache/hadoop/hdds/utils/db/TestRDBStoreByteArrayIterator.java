@@ -77,7 +77,7 @@ public class TestRDBStoreByteArrayIterator {
   }
 
   @Test
-  public void testForeachRemainingCallsConsumerWithAllElements() {
+  public void testForeachRemainingCallsConsumerWithAllElements() throws IOException {
     when(rocksDBIteratorMock.isValid())
         .thenReturn(true, true, true, true, true, true, true, false);
     when(rocksDBIteratorMock.key())
@@ -89,27 +89,27 @@ public class TestRDBStoreByteArrayIterator {
             new byte[]{0x7d})
         .thenThrow(new NoSuchElementException());
 
-    final Consumer<Table.KeyValue<byte[], byte[]>> consumerStub
+    final Consumer<AutoCloseSupplier<Table.KeyValue<byte[], byte[]>>> consumerStub
         = mock(Consumer.class);
 
     RDBStoreByteArrayIterator iter = newIterator();
     iter.forEachRemaining(consumerStub);
 
-    ArgumentCaptor<RawKeyValue.ByteArray> capture =
-        forClass(RawKeyValue.ByteArray.class);
+    ArgumentCaptor<AutoCloseSupplier<Table.KeyValue<byte[], byte[]>>> capture =
+        forClass(AutoCloseSupplier.class);
     verify(consumerStub, times(3)).accept(capture.capture());
     assertArrayEquals(
-        new byte[]{0x00}, capture.getAllValues().get(0).getKey());
+        new byte[]{0x00}, capture.getAllValues().get(0).get().getKey());
     assertArrayEquals(
-        new byte[]{0x7f}, capture.getAllValues().get(0).getValue());
+        new byte[]{0x7f}, capture.getAllValues().get(0).get().getValue());
     assertArrayEquals(
-        new byte[]{0x01}, capture.getAllValues().get(1).getKey());
+        new byte[]{0x01}, capture.getAllValues().get(1).get().getKey());
     assertArrayEquals(
-        new byte[]{0x7e}, capture.getAllValues().get(1).getValue());
+        new byte[]{0x7e}, capture.getAllValues().get(1).get().getValue());
     assertArrayEquals(
-        new byte[]{0x02}, capture.getAllValues().get(2).getKey());
+        new byte[]{0x02}, capture.getAllValues().get(2).get().getKey());
     assertArrayEquals(
-        new byte[]{0x7d}, capture.getAllValues().get(2).getValue());
+        new byte[]{0x7d}, capture.getAllValues().get(2).get().getValue());
   }
 
   @Test
@@ -169,7 +169,7 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x7f});
 
     RDBStoreByteArrayIterator iter = newIterator();
-    final Table.KeyValue<byte[], byte[]> val = iter.seek(new byte[]{0x55});
+    final AutoCloseSupplier<Table.KeyValue<byte[], byte[]>> val = iter.seek(new byte[]{0x55});
 
     InOrder verifier = inOrder(rocksDBIteratorMock);
 
@@ -179,8 +179,8 @@ public class TestRDBStoreByteArrayIterator {
     verifier.verify(rocksDBIteratorMock, times(1)).isValid();
     verifier.verify(rocksDBIteratorMock, times(1)).key();
     verifier.verify(rocksDBIteratorMock, times(1)).value();
-    assertArrayEquals(new byte[]{0x00}, val.getKey());
-    assertArrayEquals(new byte[]{0x7f}, val.getValue());
+    assertArrayEquals(new byte[]{0x00}, val.get().getKey());
+    assertArrayEquals(new byte[]{0x7f}, val.get().getValue());
   }
 
   @Test
@@ -191,8 +191,8 @@ public class TestRDBStoreByteArrayIterator {
     RDBStoreByteArrayIterator iter = newIterator();
     byte[] key = null;
     if (iter.hasNext()) {
-      final Table.KeyValue<byte[], byte[]> entry = iter.next();
-      key = entry.getKey();
+      final AutoCloseSupplier<Table.KeyValue<byte[], byte[]>> entry = iter.next();
+      key = entry.get().getKey();
     }
 
     InOrder verifier = inOrder(rocksDBIteratorMock);
@@ -209,13 +209,13 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x7f});
 
     RDBStoreByteArrayIterator iter = newIterator();
-    Table.KeyValue<byte[], byte[]> entry;
+    AutoCloseSupplier<Table.KeyValue<byte[], byte[]>> entry;
     byte[] key = null;
     byte[] value = null;
     if (iter.hasNext()) {
       entry = iter.next();
-      key = entry.getKey();
-      value = entry.getValue();
+      key = entry.get().getKey();
+      value = entry.get().getValue();
     }
 
     InOrder verifier = inOrder(rocksDBIteratorMock);

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
@@ -98,9 +99,17 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void parallelTableOperation(
+  public void splitTableOperation(
       KEY startKey, KEY endKey, CheckedFunction<KeyValue<KEY, VALUE>, Void, IOException> operation,
       Logger logger, int logPercentageThreshold) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void parallelTableOperation(KEY startKey, KEY endKey,
+                                     CheckedFunction<KeyValue<KEY, VALUE>, Void, IOException> operation, Logger logger,
+                                     int logPercentageThreshold)
+      throws IOException, ExecutionException, InterruptedException {
     throw new UnsupportedOperationException();
   }
 

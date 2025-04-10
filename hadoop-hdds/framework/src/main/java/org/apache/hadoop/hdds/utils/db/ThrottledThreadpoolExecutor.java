@@ -32,6 +32,7 @@ import org.apache.ratis.util.function.CheckedRunnable;
 public class ThrottledThreadpoolExecutor implements Closeable {
   private final ThreadPoolExecutor pool;
   private final AtomicInteger availableTaskSlots;
+  private final int maxNumberOfThreads;
   private final Object lock;
 
   public ThrottledThreadpoolExecutor(int maxNumberOfThreads) {
@@ -41,6 +42,7 @@ public class ThrottledThreadpoolExecutor implements Closeable {
     int maxNumberOfTasks = 2 * maxNumberOfThreads;
     availableTaskSlots = new AtomicInteger(maxNumberOfTasks);
     lock = new Object();
+    this.maxNumberOfThreads = maxNumberOfThreads;
   }
 
   public CompletableFuture<Void> submit(CheckedRunnable<?> task) throws InterruptedException {
@@ -78,5 +80,9 @@ public class ThrottledThreadpoolExecutor implements Closeable {
 
   public long getTaskCount() {
     return pool.getTaskCount();
+  }
+
+  public int getMaxNumberOfThreads() {
+    return maxNumberOfThreads;
   }
 }
