@@ -79,14 +79,13 @@ public class TestRDBStoreByteArrayIterator {
   @Test
   public void testForeachRemainingCallsConsumerWithAllElements() throws IOException {
     when(rocksDBIteratorMock.isValid())
-        .thenReturn(true, true, true, true, true, true, true, false);
+        .thenReturn(true, true, true, false);
     when(rocksDBIteratorMock.key())
-        .thenReturn(new byte[]{0x00}, new byte[]{0x00}, new byte[]{0x01},
+        .thenReturn(new byte[]{0x00}, new byte[]{0x01},
             new byte[]{0x02})
         .thenThrow(new NoSuchElementException());
     when(rocksDBIteratorMock.value())
-        .thenReturn(new byte[]{0x7f}, new byte[]{0x7f}, new byte[]{0x7e},
-            new byte[]{0x7d})
+        .thenReturn(new byte[]{0x7f}, new byte[]{0x7e}, new byte[]{0x7d})
         .thenThrow(new NoSuchElementException());
 
     final Consumer<AutoCloseSupplier<RawKeyValue<byte[]>>> consumerStub
@@ -113,13 +112,17 @@ public class TestRDBStoreByteArrayIterator {
   }
 
   @Test
-  public void testHasNextDependsOnIsvalid() {
-    when(rocksDBIteratorMock.isValid()).thenReturn(true, true, false);
+  public void testHasNextDoesNotDependsOnIsvalid() {
+    when(rocksDBIteratorMock.isValid()).thenReturn(true, false);
 
-    RDBStoreByteArrayIterator iter = newIterator();
-
-    assertTrue(iter.hasNext());
-    assertFalse(iter.hasNext());
+    try (RDBStoreByteArrayIterator iter = newIterator()) {
+      assertTrue(iter.hasNext());
+      assertTrue(iter.hasNext());
+      iter.next();
+      assertFalse(iter.hasNext());
+      assertThrows(NoSuchElementException.class, iter::next);
+      assertFalse(iter.hasNext());
+    }
   }
 
   @Test
@@ -261,14 +264,14 @@ public class TestRDBStoreByteArrayIterator {
     RDBStoreByteArrayIterator iter = newIterator(null);
     verify(rocksDBIteratorMock, times(1)).seekToFirst();
     clearInvocations(rocksDBIteratorMock);
-
+    when(rocksDBIteratorMock.isValid()).thenReturn(true);
     iter.seekToFirst();
+    verify(rocksDBIteratorMock, times(1)).isValid();
+    verify(rocksDBIteratorMock, times(1)).key();
     verify(rocksDBIteratorMock, times(1)).seekToFirst();
     clearInvocations(rocksDBIteratorMock);
-
-    when(rocksDBIteratorMock.isValid()).thenReturn(true);
     assertTrue(iter.hasNext());
-    verify(rocksDBIteratorMock, times(1)).isValid();
+    verify(rocksDBIteratorMock, times(0)).isValid();
     verify(rocksDBIteratorMock, times(0)).key();
 
     iter.seekToLast();
@@ -283,16 +286,17 @@ public class TestRDBStoreByteArrayIterator {
     RDBStoreByteArrayIterator iter = newIterator(testPrefix);
     verify(rocksDBIteratorMock, times(1)).seek(testPrefix);
     clearInvocations(rocksDBIteratorMock);
-
-    iter.seekToFirst();
-    verify(rocksDBIteratorMock, times(1)).seek(testPrefix);
-    clearInvocations(rocksDBIteratorMock);
-
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
     when(rocksDBIteratorMock.key()).thenReturn(testPrefix);
-    assertTrue(iter.hasNext());
+    iter.seekToFirst();
     verify(rocksDBIteratorMock, times(1)).isValid();
     verify(rocksDBIteratorMock, times(1)).key();
+    verify(rocksDBIteratorMock, times(1)).seek(testPrefix);
+    clearInvocations(rocksDBIteratorMock);
+    assertTrue(iter.hasNext());
+    // hasNext shouldn't make isValid() redundant calls.
+    verify(rocksDBIteratorMock, times(0)).isValid();
+    verify(rocksDBIteratorMock, times(0)).key();
     Exception e =
         assertThrows(Exception.class, () -> iter.seekToLast(), "Prefixed iterator does not support seekToLast");
     assertInstanceOf(UnsupportedOperationException.class, e);

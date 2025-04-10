@@ -142,6 +142,7 @@ class RDBStoreCodecBufferIterator
                                                                 Set<K> inUseSet,
                                                                 Object lock,
                                                                 Function<K, V> transformer) {
+    V value = transformer.apply(key);
     return new AutoCloseSupplier<V>() {
 
       @Override
@@ -155,7 +156,7 @@ class RDBStoreCodecBufferIterator
 
       @Override
       public V get() {
-        return transformer.apply(key);
+        return value;
       }
     };
   }
@@ -197,7 +198,7 @@ class RDBStoreCodecBufferIterator
 
   private <V> void release(Stack<V> valueStack, Set<V> inUseSet, Object lock, Function<V, Void> releaser) {
     synchronized (Objects.requireNonNull(lock)) {
-      while (valueStack.isEmpty()) {
+      while (!valueStack.isEmpty()) {
         V popped = valueStack.pop();
         releaser.apply(popped);
       }
@@ -209,7 +210,7 @@ class RDBStoreCodecBufferIterator
   }
 
   @Override
-  public void close() {
+  public synchronized void close() {
     if (closed.compareAndSet(false, true)) {
       super.close();
       Optional.ofNullable(getPrefix()).ifPresent(CodecBuffer::release);
