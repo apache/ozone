@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.HddsUtils.formatStackTrace;
+
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Objects;
@@ -28,6 +30,8 @@ import java.util.function.Function;
 import org.apache.commons.lang3.exception.UncheckedInterruptedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.ratis.util.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implement {@link RDBStoreAbstractIterator} using {@link CodecBuffer}.
@@ -35,6 +39,7 @@ import org.apache.ratis.util.Preconditions;
  */
 class RDBStoreCodecBufferIterator
     extends RDBStoreAbstractIterator<CodecBuffer> {
+  private static final Logger LOG = LoggerFactory.getLogger(RDBStoreCodecBufferIterator.class);
   static class Buffer {
     private final CodecBuffer.Capacity initialCapacity;
     private final PutToByteBuffer<RuntimeException> source;
@@ -138,24 +143,39 @@ class RDBStoreCodecBufferIterator
     }
   }
 
-  private <K, V> AutoCloseSupplier<V> getCloseableValueSupplier(K key, Stack<K> stack,
-                                                                Set<K> inUseSet,
-                                                                Object lock,
-                                                                Function<K, V> transformer) {
-    V value = transformer.apply(key);
-    return new AutoCloseSupplier<V>() {
+  private AutoCloseSupplier<RawKeyValue<CodecBuffer>> getCloseableValueSupplier(
+      RawKeyValue<Buffer> key, Stack<RawKeyValue<Buffer>> stack, Set<RawKeyValue<Buffer>> inUseSet,
+      Object lock, Function<RawKeyValue<Buffer>, RawKeyValue<CodecBuffer>> transformer) {
+    RawKeyValue<CodecBuffer> value = transformer.apply(key);
+    return new AutoCloseSupplier<RawKeyValue<CodecBuffer>>() {
+      private boolean isClosed;
+      private StackTraceElement[] closedStackTrace;
 
       @Override
       public void close() {
         synchronized (lock) {
-          stack.push(key);
-          inUseSet.remove(key);
-          lock.notify();
+          if (!isClosed) {
+            isClosed = true;
+            if (LOG.isDebugEnabled()) {
+              closedStackTrace = Thread.currentThread().getStackTrace();
+            }
+            stack.push(key);
+            inUseSet.remove(key);
+            lock.notify();
+          } else {
+            StackTraceElement[] stackTraceElements = null;
+            if (LOG.isDebugEnabled()) {
+              stackTraceElements = Thread.currentThread().getStackTrace();
+            }
+            LOG.warn("Codec Buffer has already been closed. Prev Close Stacktrace: {}. \n Current Close Stacktrace: " +
+                    "{}", formatStackTrace(closedStackTrace, 0),
+                formatStackTrace(stackTraceElements, 0));
+          }
         }
       }
 
       @Override
-      public V get() {
+      public RawKeyValue<CodecBuffer> get() {
         return value;
       }
     };

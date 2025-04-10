@@ -38,7 +38,7 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   private final ManagedRocksIterator rocksDBIterator;
   private final RDBTable rocksDBTable;
-  private AtomicReference<AutoCloseSupplier<RawKeyValue<RAW>>> currentEntry;
+  private final AtomicReference<AutoCloseSupplier<RawKeyValue<RAW>>> currentEntry;
   // This is for schemas that use a fixed-length
   // prefix for each key.
   private final RAW prefix;
@@ -49,6 +49,7 @@ abstract class RDBStoreAbstractIterator<RAW>
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
     this.prefix = prefix;
+    this.currentEntry = new AtomicReference<>();
     this.hasNext = false;
   }
 
@@ -143,7 +144,8 @@ abstract class RDBStoreAbstractIterator<RAW>
   public final synchronized AutoCloseSupplier<RawKeyValue<RAW>> seek(RAW key) {
     seek0(key);
     setCurrentEntry();
-    return currentEntry.get();
+    // Current entry should be only closed when the next() and thus closing the returned entry should be a noop.
+    return () -> new RawKeyValue<>(currentEntry.get().get().getKey(), currentEntry.get().get().getValue());
   }
 
   @Override
