@@ -427,9 +427,12 @@ class TestOzoneAtRestEncryption {
     String keyName = UUID.randomUUID().toString();
     Map<String, String> keyMetadata = new HashMap<>();
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
-    TestDataUtil.createKey(bucket, keyName,
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(StandardCharsets.UTF_8).length,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-        value.getBytes(StandardCharsets.UTF_8));
+        keyMetadata)) {
+      out.write(value.getBytes(StandardCharsets.UTF_8));
+    }
 
     OzoneKeyDetails key = bucket.getKey(keyName);
     assertEquals(keyName, key.getName());
