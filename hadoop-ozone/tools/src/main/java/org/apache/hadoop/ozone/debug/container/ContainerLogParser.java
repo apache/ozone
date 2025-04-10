@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.debug.container;
 
 import java.sql.SQLException;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerLogFileParser;
 import picocli.CommandLine;
@@ -51,44 +50,19 @@ public class ContainerLogParser implements Callable<Void> {
 
       ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
       ContainerLogFileParser parser = new ContainerLogFileParser();
-      AtomicBoolean isProcessingSuccessful = new AtomicBoolean(true);
 
       try {
-        // Try creating the table, if this fails, mark the process as unsuccessful
-        try {
-          cdd.createDatanodeContainerLogTable();
-        } catch (SQLException e) {
-          isProcessingSuccessful.set(false);
-          System.err.println("Error occurred while creating the Datanode Container Log Table: " + e.getMessage());
-        }
 
-        // If the table creation was successful, proceed with processing the log entries
-        if (isProcessingSuccessful.get()) {
-          try {
-            parser.processLogEntries(path, cdd, threadCount);
-          } catch (Exception e) {
-            isProcessingSuccessful.set(false);
-            System.err.println("Error occurred during processing logs: " + e.getMessage());
-          }
+        cdd.createDatanodeContainerLogTable();
 
-          // Insert the latest log data, if processing was successful
-          if (isProcessingSuccessful.get()) {
-            try {
-              cdd.insertLatestContainerLogData();
-            } catch (SQLException e) {
-              isProcessingSuccessful.set(false);
-              System.err.println("Error occurred while inserting container log data: " + e.getMessage());
-            }
-          }
+        parser.processLogEntries(path, cdd, threadCount);
 
-          if (isProcessingSuccessful.get()) {
-            System.out.println("Successfully parsed the log files and updated the respective tables");
-          } else {
-            System.err.println("Log processing failed.");
-          }
-        }
+        cdd.insertLatestContainerLogData();
+        System.out.println("Successfully parsed the log files and updated the respective tables");
+
+      } catch (SQLException e) {
+        System.err.println("Error occurred while processing logs or inserting data into the database: " + e.getMessage());
       } catch (Exception e) {
-        isProcessingSuccessful.set(false);
         System.err.println("An unexpected error occurred: " + e.getMessage());
       }
 

@@ -23,6 +23,8 @@ package org.apache.hadoop.ozone.containerlog.parser;
 
 public class DatanodeContainerInfo {
 
+  private long containerId;
+  private long datanodeId;
   private String timestamp;
   private String state;
   private long bcsid;
@@ -32,14 +34,31 @@ public class DatanodeContainerInfo {
 
   public DatanodeContainerInfo() {
   }
-  public DatanodeContainerInfo(String timestamp, String state, long bcsid, String errorMessage,
-                               String logLevel, int indexValue) {
+  public DatanodeContainerInfo(long containerId, long datanodeId, String timestamp, String state, long bcsid, String errorMessage, String logLevel, int indexValue) {
+    this.containerId=containerId;
+    this.datanodeId=datanodeId;
     this.timestamp = timestamp;
     this.state = state;
     this.bcsid = bcsid;
     this.errorMessage = errorMessage;
     this.logLevel = logLevel;
     this.indexValue = indexValue;
+  }
+
+  public long getContainerId() {
+    return containerId;
+  }
+
+  public void setContainerId(long containerId) {
+    this.containerId = containerId;
+  }
+
+  public long getDatanodeId() {
+    return datanodeId;
+  }
+
+  public void setDatanodeId(long datanodeId) {
+    this.datanodeId = datanodeId;
   }
 
   public String getTimestamp() {

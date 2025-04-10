@@ -25,9 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -42,9 +40,8 @@ import java.util.stream.Stream;
 
 public class ContainerLogFileParser {
 
-  private  ExecutorService executorService;
-  private final Map<String, List<DatanodeContainerInfo>> batchMap = new HashMap<>(500);
-  private final Map<String, ReentrantLock> locks = new HashMap<>(500);
+  private ExecutorService executorService;
+  private final List<DatanodeContainerInfo> batchList = new ArrayList<>(500);
   private final ReentrantLock globalLock = new ReentrantLock();
   private static final int MAX_KEYS_IN_MAP = 400;
   private final AtomicBoolean isGlobalLockHeld = new AtomicBoolean(false);
@@ -75,30 +72,21 @@ public class ContainerLogFileParser {
           continue;
         }
 
-        long datanodeId = 0;
         String datanodeIdStr = parts[2];
         if (datanodeIdStr.contains(".log")) {
           datanodeIdStr = datanodeIdStr.split(DATANODE_ID_REGEX)[0];
         }
 
-        try {
-          datanodeId = Long.parseLong(datanodeIdStr);
-
-        } catch (NumberFormatException e) {
-          System.out.println("Invalid datanode ID in filename: " + fileName);
-          continue;
-        }
-
-        long finalDatanodeId = datanodeId;
+        long datanodeId = Long.parseLong(datanodeIdStr);
 
         executorService.submit(() -> {
 
           String threadName = Thread.currentThread().getName();
           try {
             System.out.println(threadName + " is starting to process file: " + file.toString());
-            processFile(file.toString(), dbstore, finalDatanodeId);
+            processFile(file.toString(), dbstore, datanodeId);
           } catch (Exception e) {
-            System.out.println("Thread " + threadName + " is stopping to process the file: " + file.toString() +
+            System.err.println("Thread " + threadName + " is stopping to process the file: " + file.toString() +
                 " due to SQLException: " + e.getMessage());
             executorService.shutdown();
           } finally {
@@ -114,8 +102,7 @@ public class ContainerLogFileParser {
       }
       latch.await();
 
-
-      if (!batchMap.isEmpty()) {
+      if (!batchList.isEmpty()) {
         processAndClearAllBatches(dbstore);
       }
 
@@ -123,156 +110,127 @@ public class ContainerLogFileParser {
 
     } catch (IOException | InterruptedException e) {
       e.printStackTrace();
+    } catch (NumberFormatException e) {
+      System.err.println("Invalid datanode ID");
     } catch (SQLException e) {
-      System.out.println("Thread " + Thread.currentThread().getName() +
+      System.err.println("Thread " + Thread.currentThread().getName() +
           " is stopping due to SQLException: " + e.getMessage());
       executorService.shutdown();
       throw e;
     }
   }
 
+  private synchronized void processAndClearAllBatches(ContainerDatanodeDatabase dbstore) throws SQLException {
+    List<DatanodeContainerInfo> localBatchList = null;
 
-  private synchronized void  processAndClearAllBatches(ContainerDatanodeDatabase dbstore) throws SQLException {
     globalLock.lock();
     try {
       isGlobalLockHeld.set(true);
-      for (Map.Entry<String, List<DatanodeContainerInfo>> entry : batchMap.entrySet()) {
-        String key = entry.getKey();
-        List<DatanodeContainerInfo> transitionList = entry.getValue();
 
-        dbstore.insertContainerDatanodeData(key, transitionList);
-        transitionList.clear();
-      }
-      batchMap.clear();
-      locks.clear();
+      localBatchList = new ArrayList<>(batchList);
+      batchList.clear();
 
-    }  finally {
+    } finally {
       globalLock.unlock();
       isGlobalLockHeld.set(false);
       synchronized (globalLockNotifier) {
         globalLockNotifier.notifyAll();
       }
     }
+
+    if (localBatchList != null && !localBatchList.isEmpty()) {
+      dbstore.insertContainerDatanodeData(localBatchList);
+      localBatchList.clear();
+    }
   }
 
-  public void processFile(String logFilePath, ContainerDatanodeDatabase dbstore, long datanodeId) throws SQLException {
+
+  private void processFile(String logFilePath, ContainerDatanodeDatabase dbstore, long datanodeId) throws SQLException {
     try (BufferedReader reader = Files.newBufferedReader(Paths.get(logFilePath), StandardCharsets.UTF_8)) {
       String line;
       while ((line = reader.readLine()) != null) {
         String[] parts = line.split(LOG_LINE_SPLIT_REGEX);
-        String timestamp = parts[0];
-        String logLevel = parts[1];
+        String timestamp = parts[0].trim();
+        String logLevel = parts[1].trim();
         String id = null, bcsid = null, state = null, index = null;
+        String errorMessage = "No error";
 
-        for (String part : parts) {
-          part = part.trim();
+        for (int i = 2; i < parts.length; i++) {
+          String part = parts[i].trim();
 
           if (part.contains(KEY_VALUE_SPLIT_REGEX)) {
-            String[] keyValue = part.split(KEY_VALUE_SPLIT_REGEX);
+            String[] keyValue = part.split(KEY_VALUE_SPLIT_REGEX, 2);
             if (keyValue.length == 2) {
               String key = keyValue[0].trim();
               String value = keyValue[1].trim();
 
               switch (key) {
-              case "ID":
-                id = value;
-                break;
-              case "BCSID":
-                bcsid = value;
-                break;
-              case "State":
-                state = value.replace("|", "").trim();
-                break;
-              case "Index":
-                index = value;
-                break;
-              default:
-                System.out.println("Unexpected key: " + key);
-                break;
+                case "ID":
+                  id = value;
+                  break;
+                case "BCSID":
+                  bcsid = value;
+                  break;
+                case "State":
+                  state = value.replace("|", "").trim();
+                  break;
+                case "Index":
+                  index = value;
+                  break;
+                default:
+                  break;
               }
             }
-          }
-
-        }
-
-        if (index == null || !index.equals("0")) {
-          continue;
-        }
-
-        String errorMessage = "No error";
-        if (line.contains("ERROR") || line.contains("WARN")) {
-          errorMessage = null;
-          for (int i = parts.length - 1; i >= 0; i--) {
-            String part = parts[i].trim();
-
-            if (part.isEmpty()) {
-              continue;
+          } else {
+            if (!part.isEmpty()) {
+              errorMessage = part.replace("|", "").trim();
             }
-
-            if (part.startsWith("State=") || part.startsWith("ID=") || part.startsWith("BCSID=") ||
-                part.startsWith("Index=")  || part.equals("ERROR") || part.equals("INFO")
-                || part.equals("WARN") || part.equals(timestamp)) {
-              continue;
-            }
-            if (part.endsWith("|")) {
-              part = part.replace("|", "").trim();
-            }
-            errorMessage = part;
-
-            break;
           }
         }
 
-        if (id != null && bcsid != null && state != null) {
-          try {
-            long containerId = Long.parseLong(id);
-            long bcsidValue = Long.parseLong(bcsid);
+          if (index == null || !index.equals("0")) {
+            continue; //Currently only ratis replicated containers are considered.
+          }
 
-            String key = containerId + "#" + datanodeId;
-
+          if (id != null && bcsid != null && state != null) {
             try {
-              synchronized (globalLockNotifier) {
-                while (isGlobalLockHeld.get()) {
-                  try {
-                    globalLockNotifier.wait();
-                  } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+              long containerId = Long.parseLong(id);
+              long bcsidValue = Long.parseLong(bcsid);
+
+              try {
+                synchronized (globalLockNotifier) {
+                  while (isGlobalLockHeld.get()) {
+                    try {
+                      globalLockNotifier.wait();
+                    } catch (InterruptedException e) {
+                      Thread.currentThread().interrupt();
+                    }
                   }
-                }
 
-                if (!isGlobalLockHeld.get()) {
-                  ReentrantLock lock = locks.computeIfAbsent(key, k -> new ReentrantLock());
-                  lock.lock();
+                  if (!isGlobalLockHeld.get()) {
 
-                  try {
-                    List<DatanodeContainerInfo> currentBatch = batchMap.computeIfAbsent(key, k -> new ArrayList<>());
+                    batchList.add(new DatanodeContainerInfo(containerId, datanodeId, timestamp, state, bcsidValue, errorMessage, logLevel, Integer.parseInt(index)));
 
-                    currentBatch.add(new DatanodeContainerInfo(timestamp, state, bcsidValue, errorMessage,
-                        logLevel, Integer.parseInt(index)));
-
-                    if (batchMap.size() >= MAX_KEYS_IN_MAP) {
+                    if (batchList.size() >= MAX_KEYS_IN_MAP) {
                       processAndClearAllBatches(dbstore);
                     }
-                  } finally {
-                    lock.unlock();
                   }
                 }
+              } catch (SQLException e) {
+                throw new SQLException(e.getMessage());
+              } catch (Exception e) {
+                System.err.println("Error processing the batch for container: " + containerId + " at datanode: " + datanodeId);
+                e.printStackTrace();
               }
-            } catch (SQLException e) {
-              throw new SQLException(e.getMessage());
-            } catch (Exception e) {
-              System.out.println("Error processing the batch for key: " + key);
-              e.printStackTrace();
+            } catch (NumberFormatException e) {
+              System.err.println("Error parsing ID or BCSID as Long: " + line);
             }
-          } catch (NumberFormatException e) {
-            System.out.println("Error parsing ID or BCSID as Long: " + line);
+          } else {
+            System.err.println("Log line does not have all required fields: " + line);
           }
-        } else {
-          System.out.println("Log line does not have all required fields: " + line);
         }
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
+      } catch (IOException e) {
+        e.printStackTrace();
     }
   }
-}
+  }

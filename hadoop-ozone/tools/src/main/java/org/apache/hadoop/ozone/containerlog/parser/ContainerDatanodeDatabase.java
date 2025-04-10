@@ -117,15 +117,7 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  public void insertContainerDatanodeData(String key, List<DatanodeContainerInfo> transitionList) throws SQLException {
-    String[] parts = key.split(CONTAINER_KEY_DELIMITER);
-    if (parts.length != 2) {
-      System.err.println("Invalid key format: " + key);
-      return;
-    }
-
-    long containerId = Long.parseLong(parts[0]);
-    long datanodeId = Long.parseLong(parts[1]);
+  public void insertContainerDatanodeData(List<DatanodeContainerInfo> transitionList) throws SQLException {
 
     String insertSQL = queries.get("INSERT_DATANODE_CONTAINER_LOG");
 
@@ -135,8 +127,8 @@ public class ContainerDatanodeDatabase {
       int count = 0;
 
       for (DatanodeContainerInfo info : transitionList) {
-        preparedStatement.setLong(1, datanodeId);
-        preparedStatement.setLong(2, containerId);
+        preparedStatement.setLong(1, info.getDatanodeId());
+        preparedStatement.setLong(2, info.getContainerId());
         preparedStatement.setString(3, info.getTimestamp());
         preparedStatement.setString(4, info.getState());
         preparedStatement.setLong(5, info.getBcsid());
@@ -157,7 +149,7 @@ public class ContainerDatanodeDatabase {
         preparedStatement.executeBatch();
       }
     } catch (SQLException e) {
-      LOG.error("Failed to insert container log for container {} on datanode {}", containerId, datanodeId, e);
+      LOG.error("Failed to insert container log", e);
       throw e;
     } catch (Exception e) {
       LOG.error(e.getMessage());
