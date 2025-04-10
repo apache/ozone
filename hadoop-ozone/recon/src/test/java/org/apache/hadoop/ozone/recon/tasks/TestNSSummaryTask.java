@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -28,14 +26,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
-import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -50,35 +45,25 @@ import org.junit.jupiter.api.io.TempDir;
  * for the OBS bucket is null.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestNSSummaryTask extends AbstractTestNSSummaryTask {
+public class TestNSSummaryTask extends TestNSSummaryTaskBase {
 
   private NSSummaryTask nSSummaryTask;
 
   @BeforeAll
   void setUp(@TempDir File tmpDir) throws Exception {
-    initializeNewOmMetadataManager(new File(tmpDir, "om"), null);
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        getMockOzoneManagerServiceProvider();
-    setReconOMMetadataManager(getTestReconOmMetadataManager(getOmMetadataManager(),
-        new File(tmpDir, "recon")));
+    commonSetup(tmpDir,
+        new OMConfigParameter(false,
+            false,
+            null, 0,
+            false,
+            true,
+            false));
 
-    ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(tmpDir)
-            .withReconOm(getReconOMMetadataManager())
-            .withOmServiceProvider(ozoneManagerServiceProvider)
-            .withReconSqlDb()
-            .withContainerDB()
-            .build();
-    setReconNamespaceSummaryManager(reconTestInjector.getInstance(ReconNamespaceSummaryManager.class));
-
-    NSSummary nonExistentSummary =
-        getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
-    assertNull(nonExistentSummary);
-
-    populateOMDBCommon();
-
-    nSSummaryTask = new NSSummaryTask(getReconNamespaceSummaryManager(),
-        getReconOMMetadataManager(), getOmConfiguration());
+    nSSummaryTask = new NSSummaryTask(
+        getReconNamespaceSummaryManager(),
+        getReconOMMetadataManager(),
+        getOmConfiguration()
+    );
   }
 
   /**
@@ -93,29 +78,14 @@ public class TestNSSummaryTask extends AbstractTestNSSummaryTask {
 
     @BeforeEach
     public void setUp() throws Exception {
-      // write a NSSummary prior to reprocess
-      // verify it got cleaned up after.
-      NSSummary staleNSSummary = new NSSummary();
-      RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
-      getReconNamespaceSummaryManager().batchStoreNSSummaries(rdbBatchOperation, -1L,
-          staleNSSummary);
-      getReconNamespaceSummaryManager().commitBatchOperation(rdbBatchOperation);
-
-      // Verify commit
-      assertNotNull(getReconNamespaceSummaryManager().getNSSummary(-1L));
-
-      nSSummaryTask.reprocess(getReconOMMetadataManager());
-      assertNull(getReconNamespaceSummaryManager().getNSSummary(-1L));
-
-      nsSummaryForBucket1 =
-          getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
-      nsSummaryForBucket2 =
-          getReconNamespaceSummaryManager().getNSSummary(BUCKET_TWO_OBJECT_ID);
-      nsSummaryForBucket3 =
-          getReconNamespaceSummaryManager().getNSSummary(BUCKET_THREE_OBJECT_ID);
-      assertNotNull(nsSummaryForBucket1);
-      assertNotNull(nsSummaryForBucket2);
-      assertNotNull(nsSummaryForBucket3);
+      List<NSSummary> result = commonSetUpTestReprocess(
+          () -> nSSummaryTask.reprocess(getReconOMMetadataManager()),
+          BUCKET_ONE_OBJECT_ID,
+          BUCKET_TWO_OBJECT_ID,
+          BUCKET_THREE_OBJECT_ID);
+      nsSummaryForBucket1 = result.get(0);
+      nsSummaryForBucket2 = result.get(1);
+      nsSummaryForBucket3 = result.get(2);
     }
 
     @Test
@@ -127,9 +97,11 @@ public class TestNSSummaryTask extends AbstractTestNSSummaryTask {
     public void testReprocessGetFiles() {
       assertEquals(1, nsSummaryForBucket1.getNumOfFiles());
       assertEquals(1, nsSummaryForBucket2.getNumOfFiles());
+      assertEquals(1, nsSummaryForBucket3.getNumOfFiles());
 
       assertEquals(KEY_ONE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
       assertEquals(KEY_TWO_SIZE, nsSummaryForBucket2.getSizeOfFiles());
+      assertEquals(KEY_THREE_SIZE, nsSummaryForBucket3.getSizeOfFiles());
     }
 
     @Test

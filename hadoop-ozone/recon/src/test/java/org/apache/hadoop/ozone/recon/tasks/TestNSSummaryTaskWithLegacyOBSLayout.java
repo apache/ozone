@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
@@ -43,15 +43,25 @@ import org.junit.jupiter.api.io.TempDir;
  * Test for NSSummaryTaskWithLegacy focusing on the OBS (Object Store) layout.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestNSSummaryTaskWithLegacyOBSLayout extends AbstractTestNSSummaryTask {
+public class TestNSSummaryTaskWithLegacyOBSLayout extends TestNSSummaryTaskBase {
 
   private NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
 
   @BeforeAll
   void setUp(@TempDir File tmpDir) throws Exception {
-    commonSetup(tmpDir, true, true, getBucketLayout(), 10, true, false, false);
+    commonSetup(tmpDir,
+        new OMConfigParameter(true,
+          true,
+          getBucketLayout(),
+          10,
+          true,
+          false,
+          false));
     long threshold = getOzoneConfiguration().getLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 10);
-    nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(getReconNamespaceSummaryManager(), getReconOMMetadataManager(), getOzoneConfiguration(), threshold);
+    nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(getReconNamespaceSummaryManager(),
+        getReconOMMetadataManager(),
+        getOzoneConfiguration(),
+        threshold);
   }
 
   /**
@@ -65,29 +75,11 @@ public class TestNSSummaryTaskWithLegacyOBSLayout extends AbstractTestNSSummaryT
 
     @BeforeEach
     public void setUp() throws IOException {
-      // write a NSSummary prior to reprocess
-      // verify it got cleaned up after.
-      NSSummary staleNSSummary = new NSSummary();
-      RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
-      getReconNamespaceSummaryManager().batchStoreNSSummaries(rdbBatchOperation, -1L,
-          staleNSSummary);
-      getReconNamespaceSummaryManager().commitBatchOperation(rdbBatchOperation);
-
-      // Verify commit
-      assertNotNull(getReconNamespaceSummaryManager().getNSSummary(-1L));
-
-      // reinit Recon RocksDB's namespace CF.
-      getReconNamespaceSummaryManager().clearNSSummaryTable();
-
-      nSSummaryTaskWithLegacy.reprocessWithLegacy(getReconOMMetadataManager());
-      assertNull(getReconNamespaceSummaryManager().getNSSummary(-1L));
-
-      nsSummaryForBucket1 =
-          getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
-      nsSummaryForBucket2 =
-          getReconNamespaceSummaryManager().getNSSummary(BUCKET_TWO_OBJECT_ID);
-      assertNotNull(nsSummaryForBucket1);
-      assertNotNull(nsSummaryForBucket2);
+      List<NSSummary> result = commonSetUpTestReprocess(() ->
+          nSSummaryTaskWithLegacy.reprocessWithLegacy(getReconOMMetadataManager()),
+          BUCKET_ONE_OBJECT_ID, BUCKET_TWO_OBJECT_ID);
+      nsSummaryForBucket1 = result.get(0);
+      nsSummaryForBucket2 = result.get(1);
     }
 
     @Test

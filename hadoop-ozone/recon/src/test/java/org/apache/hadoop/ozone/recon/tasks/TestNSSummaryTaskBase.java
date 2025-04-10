@@ -19,15 +19,23 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.*;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -48,8 +56,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 /**
  * Abstract Class created to handle common objects and methods.
  */
-public class AbstractTestNSSummaryTask {
-
+public class TestNSSummaryTaskBase {
   // User and Volume Constants
   protected static final String TEST_USER = "TestUser";
   protected static final String VOL = "vol";
@@ -112,29 +119,20 @@ public class AbstractTestNSSummaryTask {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   // Helper Methods
+  protected void commonSetup(File tmpDir, OMConfigParameter configParameter) throws Exception {
 
-  protected void commonSetup(File tmpDir,
-                                     boolean isFSO,
-                                     boolean isOBS,
-                                     BucketLayout layout,
-                                     long flushThreshold,
-                                     boolean overrideConfig,
-                                     boolean enableFSPaths,
-                                     boolean legacyPopulate) throws Exception {
-
-    if (overrideConfig) {
+    if (configParameter.overrideConfig) {
       setOzoneConfiguration(new OzoneConfiguration());
-      getOzoneConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enableFSPaths);
-      getOzoneConfiguration().setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, flushThreshold);
+      getOzoneConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, configParameter.enableFSPaths);
+      getOzoneConfiguration().setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, configParameter.flushThreshold);
     }
 
-    initializeNewOmMetadataManager(new File(tmpDir, "om"), layout);
+    initializeNewOmMetadataManager(new File(tmpDir, "om"), configParameter.layout);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        isFSO ? getMockOzoneManagerServiceProviderWithFSO()
+        configParameter.isFSO ? getMockOzoneManagerServiceProviderWithFSO()
             : getMockOzoneManagerServiceProvider();
 
     setReconOMMetadataManager(getTestReconOmMetadataManager(getOmMetadataManager(), new File(tmpDir, "recon")));
-
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(tmpDir)
             .withReconOm(getReconOMMetadataManager())
@@ -144,18 +142,52 @@ public class AbstractTestNSSummaryTask {
             .build();
 
     setReconNamespaceSummaryManager(reconTestInjector.getInstance(ReconNamespaceSummaryManager.class));
+    assertNull(getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID));
 
-    NSSummary nonExistentSummary =
-        getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
-    assertNull(nonExistentSummary);
-
-    if (isOBS) {
-      populateOMDBOBS(layout);
-    } else if (legacyPopulate) {
-      populateOMDB(layout, true);
+    if (!configParameter.legacyPopulate && !configParameter.isFSO && !configParameter.isOBS) {
+      populateOMDBCommon();
+    } else if (configParameter.isOBS) {
+      populateOMDBOBS(configParameter.layout);
+    } else if (configParameter.legacyPopulate) {
+      populateOMDB(configParameter.layout, true);
     } else {
-      populateOMDB(layout, false);
+      populateOMDB(configParameter.layout, false);
     }
+  }
+
+  public List<NSSummary> commonSetUpTestReprocess(Runnable reprocessTask, long... bucketObjectIds) throws IOException {
+
+    List<NSSummary> result = new ArrayList<>();
+    NSSummary staleNSSummary = new NSSummary();
+    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    getReconNamespaceSummaryManager().batchStoreNSSummaries(rdbBatchOperation, -1L, staleNSSummary);
+    getReconNamespaceSummaryManager().commitBatchOperation(rdbBatchOperation);
+
+    // Verify commit
+    assertNotNull(getReconNamespaceSummaryManager().getNSSummary(-1L));
+    // Reinitialize Recon RocksDB's namespace CF.
+    getReconNamespaceSummaryManager().clearNSSummaryTable();
+    // Run specific reprocess task
+    reprocessTask.run();
+    // Verify cleanup
+    assertNull(getReconNamespaceSummaryManager().getNSSummary(-1L));
+    // Assign and verify NSSummaries for buckets
+    if (bucketObjectIds.length > 0) {
+      NSSummary nsSummaryForBucket1 = getReconNamespaceSummaryManager().getNSSummary(bucketObjectIds[0]);
+      assertNotNull(nsSummaryForBucket1);
+      result.add(nsSummaryForBucket1);
+    }
+    if (bucketObjectIds.length > 1) {
+      NSSummary nsSummaryForBucket2 = getReconNamespaceSummaryManager().getNSSummary(bucketObjectIds[1]);
+      assertNotNull(nsSummaryForBucket2);
+      result.add(nsSummaryForBucket2);
+    }
+    if (bucketObjectIds.length > 2) {
+      NSSummary nsSummaryForBucket3 = getReconNamespaceSummaryManager().getNSSummary(bucketObjectIds[2]);
+      assertNotNull(nsSummaryForBucket3);
+      result.add(nsSummaryForBucket3);
+    }
+    return result;
   }
 
   /**
@@ -700,5 +732,35 @@ public class AbstractTestNSSummaryTask {
 
   public void setReconNamespaceSummaryManager(ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
+  }
+
+  /**
+   * Class for storing configuration to identify layout.
+   */
+  public static class OMConfigParameter {
+
+    private final boolean isFSO;
+    private final boolean isOBS;
+    private final BucketLayout layout;
+    private final long flushThreshold;
+    private final boolean overrideConfig;
+    private final boolean enableFSPaths;
+    private final boolean legacyPopulate;
+
+    public OMConfigParameter(boolean isFSO,
+                             boolean isOBS,
+                             BucketLayout layout,
+                             long flushThreshold,
+                             boolean overrideConfig,
+                             boolean enableFSPaths,
+                             boolean legacyPopulate) {
+      this.isFSO = isFSO;
+      this.isOBS = isOBS;
+      this.layout = layout;
+      this.flushThreshold = flushThreshold;
+      this.overrideConfig = overrideConfig;
+      this.enableFSPaths = enableFSPaths;
+      this.legacyPopulate = legacyPopulate;
+    }
   }
 }

@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -29,15 +27,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
-import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -49,7 +44,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Test for NSSummaryTaskWithLegacy.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestNSSummaryTaskWithLegacy extends AbstractTestNSSummaryTask {
+public class TestNSSummaryTaskWithLegacy extends TestNSSummaryTaskBase {
 
   private NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
   // Answer Sets
@@ -59,9 +54,18 @@ public class TestNSSummaryTaskWithLegacy extends AbstractTestNSSummaryTask {
 
   @BeforeAll
   void setUp(@TempDir File tmpDir) throws Exception {
-    commonSetup(tmpDir, false, false, getBucketLayout(), 10, false, true, true);
+    commonSetup(tmpDir,
+          new OMConfigParameter(false,
+          false,
+          getBucketLayout(),
+          10,
+          false,
+          true,
+          true));
     long threshold = getOmConfiguration().getLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 10);
-    nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(getReconNamespaceSummaryManager(), getReconOMMetadataManager(), getOmConfiguration(), threshold);
+    nSSummaryTaskWithLegacy =
+        new NSSummaryTaskWithLegacy(getReconNamespaceSummaryManager(), getReconOMMetadataManager(),
+            getOmConfiguration(), threshold);
   }
 
   /**
@@ -75,29 +79,11 @@ public class TestNSSummaryTaskWithLegacy extends AbstractTestNSSummaryTask {
 
     @BeforeEach
     public void setUp() throws IOException {
-      // write a NSSummary prior to reprocess
-      // verify it got cleaned up after.
-      NSSummary staleNSSummary = new NSSummary();
-      RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
-      getReconNamespaceSummaryManager().batchStoreNSSummaries(rdbBatchOperation, -1L,
-          staleNSSummary);
-      getReconNamespaceSummaryManager().commitBatchOperation(rdbBatchOperation);
-
-      // Verify commit
-      assertNotNull(getReconNamespaceSummaryManager().getNSSummary(-1L));
-
-      // reinit Recon RocksDB's namespace CF.
-      getReconNamespaceSummaryManager().clearNSSummaryTable();
-
-      nSSummaryTaskWithLegacy.reprocessWithLegacy(getReconOMMetadataManager());
-      assertNull(getReconNamespaceSummaryManager().getNSSummary(-1L));
-
-      nsSummaryForBucket1 =
-          getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
-      nsSummaryForBucket2 =
-          getReconNamespaceSummaryManager().getNSSummary(BUCKET_TWO_OBJECT_ID);
-      assertNotNull(nsSummaryForBucket1);
-      assertNotNull(nsSummaryForBucket2);
+      List<NSSummary> result =
+          commonSetUpTestReprocess(() -> nSSummaryTaskWithLegacy.reprocessWithLegacy(getReconOMMetadataManager()),
+              BUCKET_ONE_OBJECT_ID, BUCKET_TWO_OBJECT_ID);
+      nsSummaryForBucket1 = result.get(0);
+      nsSummaryForBucket2 = result.get(1);
     }
 
     @Test
@@ -172,8 +158,7 @@ public class TestNSSummaryTaskWithLegacy extends AbstractTestNSSummaryTask {
       int[] fileDistForDir2 = nsSummaryInDir2.getFileSizeBucket();
       assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
           fileDistForDir2.length);
-      assertEquals(1,
-          fileDistForDir2[fileDistForDir2.length - 1]);
+      assertEquals(1, fileDistForDir2[fileDistForDir2.length - 1]);
       for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS - 1; ++i) {
         assertEquals(0, fileDistForDir2[i]);
       }

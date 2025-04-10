@@ -31,9 +31,9 @@ import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -53,20 +53,35 @@ import org.mockito.Mockito;
  * Test for NSSummaryTaskWithFSO.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestNSSummaryTaskWithFSO extends AbstractTestNSSummaryTask {
+public class TestNSSummaryTaskWithFSO extends TestNSSummaryTaskBase {
 
-  private NSSummaryTaskWithFSO nSSummaryTaskWithFso;
   // Answer Sets
   private static Set<Long> bucketOneAns = new HashSet<>();
   private static Set<Long> bucketTwoAns = new HashSet<>();
   private static Set<Long> dirOneAns = new HashSet<>();
+  private NSSummaryTaskWithFSO nSSummaryTaskWithFso;
+
+  private static BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
 
   @BeforeAll
   void setUp(@TempDir File tmpDir) throws Exception {
-    commonSetup(tmpDir, true, false, getBucketLayout(), 3, true, true, false);
+    commonSetup(tmpDir,
+        new OMConfigParameter(true,
+          false,
+          getBucketLayout(),
+          3,
+          true,
+          true,
+          false));
     long threshold = getOzoneConfiguration().getLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 3);
-    nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(getReconNamespaceSummaryManager(), getReconOMMetadataManager(), threshold);
+    nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
+        getReconNamespaceSummaryManager(),
+        getReconOMMetadataManager(),
+        threshold);
   }
+
   /**
    * Nested class for testing NSSummaryTaskWithFSO reprocess.
    */
@@ -80,27 +95,11 @@ public class TestNSSummaryTaskWithFSO extends AbstractTestNSSummaryTask {
     public void setUp() throws IOException {
       // write a NSSummary prior to reprocess
       // verify it got cleaned up after.
-      NSSummary staleNSSummary = new NSSummary();
-      RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
-      getReconNamespaceSummaryManager().batchStoreNSSummaries(rdbBatchOperation, -1L,
-          staleNSSummary);
-      getReconNamespaceSummaryManager().commitBatchOperation(rdbBatchOperation);
-
-      // Verify commit
-      assertNotNull(getReconNamespaceSummaryManager().getNSSummary(-1L));
-
-      // reinit Recon RocksDB's namespace CF.
-      getReconNamespaceSummaryManager().clearNSSummaryTable();
-
-      nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager());
-      assertNull(getReconNamespaceSummaryManager().getNSSummary(-1L));
-
-      nsSummaryForBucket1 =
-          getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
-      nsSummaryForBucket2 =
-          getReconNamespaceSummaryManager().getNSSummary(BUCKET_TWO_OBJECT_ID);
-      assertNotNull(nsSummaryForBucket1);
-      assertNotNull(nsSummaryForBucket2);
+      List<NSSummary> result =
+          commonSetUpTestReprocess(() -> nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager()),
+              BUCKET_ONE_OBJECT_ID, BUCKET_TWO_OBJECT_ID);
+      nsSummaryForBucket1 = result.get(0);
+      nsSummaryForBucket2 = result.get(1);
     }
 
     @Test
@@ -525,9 +524,5 @@ public class TestNSSummaryTaskWithFSO extends AbstractTestNSSummaryTask {
       Mockito.verify(mockIterator, Mockito.times(3)).next();
       Mockito.verify(taskSpy, Mockito.times(1)).flushAndCommitNSToDB(Mockito.anyMap());
     }
-  }
-
-  private static BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
