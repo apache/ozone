@@ -18,21 +18,26 @@
 package org.apache.hadoop.hdds.server;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.Reader;
 import java.util.List;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +81,10 @@ public final class JsonUtils {
     return MAPPER.writeValueAsString(obj);
   }
 
+  public static SequenceWriter getSequenceWriter(OutputStream stream) throws IOException {
+    return WRITER.writeValuesAsArray(stream);
+  }
+
   public static String toJsonStringWIthIndent(Object obj)  {
     try {
       return INDENT_OUTPUT_MAPPER.writeValueAsString(obj);
@@ -107,6 +116,10 @@ public final class JsonUtils {
     return MAPPER.readValue(reader, valueType);
   }
 
+  public static ObjectMapper getDefaultMapper() {
+    return MAPPER;
+  }
+
   /**
    * Utility to sequentially write a large collection of items to a file.
    */
@@ -132,4 +145,13 @@ public final class JsonUtils {
     }
   }
 
+  /**
+   * Serializes a checksum stored as a long into its json string representation.
+   */
+  public static class ChecksumSerializer extends JsonSerializer<Long> {
+    @Override
+    public void serialize(Long value, JsonGenerator gen, SerializerProvider provider) throws IOException {
+      gen.writeString(HddsUtils.checksumToString(value));
+    }
+  }
 }
