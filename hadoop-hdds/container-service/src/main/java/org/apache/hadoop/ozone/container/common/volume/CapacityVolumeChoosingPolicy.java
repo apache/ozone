@@ -92,10 +92,7 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
           - firstVolume.getCommittedBytes();
       long secondAvailable = secondVolume.getCurrentUsage().getAvailable()
           - secondVolume.getCommittedBytes();
-      HddsVolume selectedVolume = firstAvailable < secondAvailable ? secondVolume : firstVolume;
-
-      selectedVolume.incCommittedBytes(maxContainerSize);
-      return selectedVolume;
+      return firstAvailable < secondAvailable ? secondVolume : firstVolume;
     }
   }
 }
