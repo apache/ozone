@@ -133,14 +133,11 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
    * @return MinReplica.
    */
   private int getMinReplica(long pContainerID) {
-
     try {
       ContainerID containerID = ContainerID.valueOf(pContainerID);
       ContainerInfo container = containerManager.getContainer(containerID);
       ReplicationConfig replicationConfig = container.getReplicationConfig();
       return replicationConfig.getMinimumNodes();
-    } catch (ContainerNotFoundException e) {
-      LOG.error("containerId = {} not found.", pContainerID, e);
     } catch (Exception e) {
       LOG.error("containerId = {} not found.", pContainerID, e);
     }
