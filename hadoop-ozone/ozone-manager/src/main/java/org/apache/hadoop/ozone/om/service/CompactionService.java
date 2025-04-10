@@ -63,7 +63,7 @@ public class CompactionService extends BackgroundService {
 
     this.numCompactions = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
-    for(String table : tables) {
+    for (String table : tables) {
       if (!omMetadataManager.listTableNames().contains(table)) {
         throw new IllegalArgumentException();
       }
@@ -115,12 +115,18 @@ public class CompactionService extends BackgroundService {
     LOG.info("Compacting column family: {}", tableName);
     try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
       options.setBottommostLevelCompaction(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
-      // Find CF Handler
       RocksDatabase rocksDatabase = ((RDBStore) omMetadataManager.getStore()).getDb();
-      RocksDatabase.ColumnFamily columnFamily = rocksDatabase.getColumnFamily(tableName);
-      rocksDatabase.compactRange(columnFamily, null, null, options);
-      LOG.info("Compaction of column family: {} completed in {} ms",
-          tableName, Time.monotonicNow() - startTime);
+
+      try {
+        // Find CF Handler
+        RocksDatabase.ColumnFamily columnFamily = rocksDatabase.getColumnFamily(tableName);
+        rocksDatabase.compactRange(columnFamily, null, null, options);
+        LOG.info("Compaction of column family: {} completed in {} ms",
+            tableName, Time.monotonicNow() - startTime);
+      } catch (NullPointerException ex) {
+        LOG.error("Unable to trigger compaction for \"{}\". Column family not found ", tableName);
+        throw new IOException("Column family \"" + tableName + "\" not found.");
+      }
     }
   }
 

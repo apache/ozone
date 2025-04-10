@@ -631,18 +631,18 @@ public final class OMConfigKeys {
   /**
    * Configuration properties for Compaction Service.
    */
-  public static final String OZONE_COMPACTION_SERVICE_ENABLED = "ozone.compaction.service.enabled";
-  public static final boolean OZONE_COMPACTION_SERVICE_ENABLED_DEFAULT = true;
+  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.compaction.service.enabled";
+  public static final boolean OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT = true;
   public static final String OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL =
       "ozone.om.compaction.service.run.interval";
   public static final long OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.MINUTES.toMillis(5);
+      = TimeUnit.HOURS.toMillis(6);
 
   public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT
       = "ozone.om.compaction.service.timeout";
-  public static final String OZONE_COMPACTION_SERVICE_TIMEOUT_DEFAULT = "10m";
+  public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT_DEFAULT = "10m";
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES
       = "ozone.om.compaction.service.columnfamilies";
-  public static final String OZONE_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
+  public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
       "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable";
 }
