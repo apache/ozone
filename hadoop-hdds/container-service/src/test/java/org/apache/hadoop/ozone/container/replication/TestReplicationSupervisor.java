@@ -104,6 +104,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -337,8 +338,7 @@ public class TestReplicationSupervisor {
 
     replicatorRef.set(replicator);
 
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(DownloadAndImportReplicator.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(DownloadAndImportReplicator.class);
 
     supervisor.addTask(createTask(1L));
     assertEquals(1, supervisor.getReplicationFailureCount());
@@ -406,8 +406,7 @@ public class TestReplicationSupervisor {
         new DownloadAndImportReplicator(conf, set, importer, moc);
     replicatorRef.set(replicator);
 
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(DownloadAndImportReplicator.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(DownloadAndImportReplicator.class);
 
     // Acquire semaphore so that container import will pause after reserving space.
     semaphore.acquire();

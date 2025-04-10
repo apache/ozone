@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
  * if there is more than 1 origin. If there is only 1 origin, then we need to maintain 3 copies.
  */
 public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
-  public static final Logger LOG = LoggerFactory.getLogger(QuasiClosedStuckReplicationCheck.class);
+  private static final Logger LOG = LoggerFactory.getLogger(QuasiClosedStuckReplicationCheck.class);
 
   public static boolean shouldHandleAsQuasiClosedStuck(ContainerInfo containerInfo, Set<ContainerReplica> replicas) {
     if (containerInfo.getState() != QUASI_CLOSED) {

@@ -80,7 +80,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
     FAILED
   }
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
 
   private volatile boolean closed;

@@ -120,9 +120,9 @@ class TestContainerReplication {
 
   @BeforeAll
   static void setUp() {
-    setLogLevel(SCMContainerPlacementCapacity.LOG, Level.DEBUG);
-    setLogLevel(SCMContainerPlacementRackAware.LOG, Level.DEBUG);
-    setLogLevel(SCMContainerPlacementRandom.LOG, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementCapacity.class, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementRackAware.class, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementRandom.class, Level.DEBUG);
   }
 
   @ParameterizedTest

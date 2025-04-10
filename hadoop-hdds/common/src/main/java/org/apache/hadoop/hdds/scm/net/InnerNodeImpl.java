@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  */
 public class InnerNodeImpl extends NodeImpl implements InnerNode {
   // LOGGER
-  public static final Logger LOG = LoggerFactory.getLogger(InnerNodeImpl.class);
+  private static final Logger LOG = LoggerFactory.getLogger(InnerNodeImpl.class);
 
   public static final Factory FACTORY = new Factory();
   // a map of node's network name to Node for quick search and keep

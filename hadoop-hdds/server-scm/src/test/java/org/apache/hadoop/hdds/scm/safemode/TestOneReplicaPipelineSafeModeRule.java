@@ -55,10 +55,10 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class tests OneReplicaPipelineSafeModeRule.
@@ -133,9 +133,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     int pipelineCountOne = 0;
     setup(nodes, pipelineFactorThreeCount, pipelineCountOne);
 
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(SCMSafeModeManager.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(SCMSafeModeManager.class);
 
     List<Pipeline> pipelines = pipelineManager.getPipelines();
     firePipelineEvent(pipelines.subList(0, pipelineFactorThreeCount - 1));
@@ -168,9 +166,7 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     setup(nodes, pipelineCountThree, pipelineCountOne);
 
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(SCMSafeModeManager.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(SCMSafeModeManager.class);
 
     List<Pipeline> pipelines =
         pipelineManager.getPipelines(RatisReplicationConfig.getInstance(

@@ -70,7 +70,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -440,8 +440,7 @@ public class TestKeyValueHandler {
 
       // Case 3:  Delete Container on a failed volume
       hddsVolume.failVolume();
-      GenericTestUtils.LogCapturer kvHandlerLogs =
-          GenericTestUtils.LogCapturer.captureLogs(KeyValueHandler.getLogger());
+      LogCapturer kvHandlerLogs = LogCapturer.captureLogs(KeyValueHandler.class);
       // add the container back to containerSet as removed in previous delete
       containerSet.addContainer(container);
       kvHandler.deleteContainer(container, true);
