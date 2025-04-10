@@ -1869,44 +1869,67 @@
   },
   "taskStatus": [
     {
+      "taskName": "OmSnapshotRequest",
+      "lastUpdatedTimestamp": 1739440826117,
+      "lastUpdatedSeqNumber": 2,
+      "lastTaskRunStatus": 0,
+      "isCurrentTaskRunning": 0
+    },
+    {
+      "taskName": "OmTableInsightTask",
+      "lastUpdatedTimestamp": 1739440826210,
+      "lastUpdatedSeqNumber": 2,
+      "lastTaskRunStatus": 0,
+      "isCurrentTaskRunning": 0
+    },
+    {
+      "taskName": "NSSummaryTask",
+      "lastUpdatedTimestamp": 1739440826215,
+      "lastUpdatedSeqNumber": 2,
+      "lastTaskRunStatus": 0,
+      "isCurrentTaskRunning": 0
+    },
+    {
       "taskName": "ContainerKeyMapperTask",
-      "lastUpdatedTimestamp": 0,
-      "lastUpdatedSeqNumber": 0
+      "lastUpdatedTimestamp": 1739440826220,
+      "lastUpdatedSeqNumber": 2,
+      "lastTaskRunStatus": 0,
+      "isCurrentTaskRunning": 0
     },
     {
       "taskName": "FileSizeCountTask",
-      "lastUpdatedTimestamp": 0,
-      "lastUpdatedSeqNumber": 0
-    },
-    {
-      "taskName": "TableCountTask",
-      "lastUpdatedTimestamp": 0,
-      "lastUpdatedSeqNumber": 0
-    },
-    {
-      "taskName": "NSSummaryTaskWithFSO",
-      "lastUpdatedTimestamp": 0,
-      "lastUpdatedSeqNumber": 0
+      "lastUpdatedTimestamp": 1739440826231,
+      "lastUpdatedSeqNumber": 2,
+      "lastTaskRunStatus": 0,
+      "isCurrentTaskRunning": 0
     },
     {
       "taskName": "OmDeltaRequest",
-      "lastUpdatedTimestamp": 1663421088035,
-      "lastUpdatedSeqNumber": 0
-    },
-    {
-      "taskName": "OmSnapshotRequest",
-      "lastUpdatedTimestamp": 1663421088035,
-      "lastUpdatedSeqNumber": 0
-    },
-    {
-      "taskName": "ContainerHealthTask",
-      "lastUpdatedTimestamp": 0,
-      "lastUpdatedSeqNumber": 0
+      "lastUpdatedTimestamp": 1739472227610,
+      "lastUpdatedSeqNumber": 2,
+      "lastTaskRunStatus": 0,
+      "isCurrentTaskRunning": 0
     },
     {
       "taskName": "PipelineSyncTask",
-      "lastUpdatedTimestamp": 1663421094507,
-      "lastUpdatedSeqNumber": 0
+      "lastUpdatedTimestamp": 1739472179607,
+      "lastUpdatedSeqNumber": 0,
+      "lastTaskRunStatus": 0,
+      "isCurrentTaskRunning": 0
+    },
+    {
+      "taskName": "ContainerHealthTask",
+      "lastUpdatedTimestamp": 1739472179055,
+      "lastUpdatedSeqNumber": 0,
+      "lastTaskRunStatus": 0,
+      "isCurrentTaskRunning": 0
+    },
+    {
+      "taskName": "ContainerSizeCountTask",
+      "lastUpdatedTimestamp": 1739472242852,
+      "lastUpdatedSeqNumber": 0,
+      "lastTaskRunStatus": 0,
+      "isCurrentTaskRunning": 1
     }
   ],
   "unhealthyContainers": {
