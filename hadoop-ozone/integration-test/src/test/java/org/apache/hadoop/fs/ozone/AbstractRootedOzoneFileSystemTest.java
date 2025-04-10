@@ -1495,6 +1495,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
       // add key in source bucket
       final String key = "object-dir/object-name1";
       byte[] bytes = new byte[1];
+      random.nextBytes(bytes);
       TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
           key, bytes);
       assertEquals(objectStore.getVolume(srcVolume)
