@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
@@ -179,7 +180,11 @@ public class TestOzoneManagerServiceProviderImpl {
             reconOMMetadataManager, reconTaskController, reconUtilsMock, ozoneManagerProtocol,
             reconContext, getMockTaskStatusUpdaterManager());
 
-    assertFalse(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
+    Exception exception = assertThrows(RuntimeException.class, () -> {
+      ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot();
+    });
+
+    assertTrue(exception.getCause() instanceof IOException);
 
     // Verifying if context error GET_OM_DB_SNAPSHOT_FAILED is added
     assertTrue(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
