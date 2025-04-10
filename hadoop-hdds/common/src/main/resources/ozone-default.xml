@@ -2681,6 +2681,14 @@
     </description>
   </property>
   <property>
+    <name>rocks.db.config.path</name>
+    <value/>
+    <tag>OZONE, OM</tag>
+    <description>
+      Path to an ini configuration file for RocksDB.
+    </description>
+  </property>
+  <property>
     <name>hdds.priv.key.file.name</name>
     <value>private.pem</value>
     <tag>X509, SECURITY</tag>
