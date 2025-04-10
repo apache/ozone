@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,10 +32,7 @@ import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
-import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -55,35 +50,9 @@ public class TestNSSummaryTaskWithOBS extends AbstractTestNSSummaryTask {
 
   @BeforeAll
   void setUp(@TempDir File tmpDir) throws Exception {
-    initializeNewOmMetadataManager(new File(tmpDir, "om"), getBucketLayout());
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        getMockOzoneManagerServiceProviderWithFSO();
-    setReconOMMetadataManager(getTestReconOmMetadataManager(getOmMetadataManager(),
-        new File(tmpDir, "recon")));
-
-    ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(tmpDir)
-            .withReconOm(getReconOMMetadataManager())
-            .withOmServiceProvider(ozoneManagerServiceProvider)
-            .withReconSqlDb()
-            .withContainerDB()
-            .build();
-    setReconNamespaceSummaryManager(reconTestInjector.getInstance(ReconNamespaceSummaryManager.class));
-
-
-    NSSummary nonExistentSummary =
-        getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
-    assertNull(nonExistentSummary);
-
-    populateOMDB(getBucketLayout(), false);
-
-    long nsSummaryFlushToDBMaxThreshold = getOmConfiguration().getLong(
-        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
-        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
-    nSSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
-        getReconNamespaceSummaryManager(),
-        getReconOMMetadataManager(),
-        nsSummaryFlushToDBMaxThreshold);
+    commonSetup(tmpDir, true, false, getBucketLayout(), OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT, false, true, false);
+    long threshold = getOmConfiguration().getLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
+    nSSummaryTaskWithOBS = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(), getReconOMMetadataManager(), threshold);
   }
 
   /**

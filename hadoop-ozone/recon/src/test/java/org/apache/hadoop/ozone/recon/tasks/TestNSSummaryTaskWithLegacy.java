@@ -59,32 +59,9 @@ public class TestNSSummaryTaskWithLegacy extends AbstractTestNSSummaryTask {
 
   @BeforeAll
   void setUp(@TempDir File tmpDir) throws Exception {
-    initializeNewOmMetadataManager(new File(tmpDir, "om"), getBucketLayout());
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        getMockOzoneManagerServiceProvider();
-    setReconOMMetadataManager(getTestReconOmMetadataManager(getOmMetadataManager(),
-        new File(tmpDir, "recon")));
-
-    ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(tmpDir)
-            .withReconOm(getReconOMMetadataManager())
-            .withOmServiceProvider(ozoneManagerServiceProvider)
-            .withReconSqlDb()
-            .withContainerDB()
-            .build();
-    setReconNamespaceSummaryManager(reconTestInjector.getInstance(ReconNamespaceSummaryManager.class));
-
-    NSSummary nonExistentSummary =
-        getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
-    assertNull(nonExistentSummary);
-
-    populateOMDB(getBucketLayout(), true);
-
-    long nsSummaryFlushToDBMaxThreshold = getOmConfiguration().getLong(
-        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 10);
-    nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
-        getReconNamespaceSummaryManager(),
-        getReconOMMetadataManager(), getOmConfiguration(), nsSummaryFlushToDBMaxThreshold);
+    commonSetup(tmpDir, false, false, getBucketLayout(), 10, false, true, true);
+    long threshold = getOmConfiguration().getLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 10);
+    nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(getReconNamespaceSummaryManager(), getReconOMMetadataManager(), getOmConfiguration(), threshold);
   }
 
   /**

@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.*;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,8 +39,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils;
 import org.apache.hadoop.ozone.recon.ReconConstants;
+import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 
 /**
  * Abstract Class created to handle common objects and methods.
@@ -109,6 +112,52 @@ public class AbstractTestNSSummaryTask {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   // Helper Methods
+
+  protected void commonSetup(File tmpDir,
+                                     boolean isFSO,
+                                     boolean isOBS,
+                                     BucketLayout layout,
+                                     long flushThreshold,
+                                     boolean overrideConfig,
+                                     boolean enableFSPaths,
+                                     boolean legacyPopulate) throws Exception {
+
+    if (overrideConfig) {
+      setOzoneConfiguration(new OzoneConfiguration());
+      getOzoneConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enableFSPaths);
+      getOzoneConfiguration().setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, flushThreshold);
+    }
+
+    initializeNewOmMetadataManager(new File(tmpDir, "om"), layout);
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+        isFSO ? getMockOzoneManagerServiceProviderWithFSO()
+            : getMockOzoneManagerServiceProvider();
+
+    setReconOMMetadataManager(getTestReconOmMetadataManager(getOmMetadataManager(), new File(tmpDir, "recon")));
+
+    ReconTestInjector reconTestInjector =
+        new ReconTestInjector.Builder(tmpDir)
+            .withReconOm(getReconOMMetadataManager())
+            .withOmServiceProvider(ozoneManagerServiceProvider)
+            .withReconSqlDb()
+            .withContainerDB()
+            .build();
+
+    setReconNamespaceSummaryManager(reconTestInjector.getInstance(ReconNamespaceSummaryManager.class));
+
+    NSSummary nonExistentSummary =
+        getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
+    assertNull(nonExistentSummary);
+
+    if (isOBS) {
+      populateOMDBOBS(layout);
+    } else if (legacyPopulate) {
+      populateOMDB(layout, true);
+    } else {
+      populateOMDB(layout, false);
+    }
+  }
+
   /**
    * Build a key info for put/update action.
    *
