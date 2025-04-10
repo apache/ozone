@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,9 +34,11 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -71,37 +74,50 @@ public final class BenchmarkOmDBCreate {
   public static void main(String[] args) throws IOException, ExecutionException, InterruptedException {
     Long numberOfKeys = Long.parseLong(args[2]);
     Integer keyLength = Integer.parseInt(args[3]);
+    Long logThreshold = Long.parseLong(args[4]);
+    Long flushBatchSize = Long.parseLong(args[5]);
     randomString = RandomStringUtils.random(keyLength);
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, -1);
+    ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS, args[0]);
     RocksDBConfiguration rocksDBConfiguration = ozoneConfiguration.getObject(RocksDBConfiguration.class);
     int maxThreads = Integer.parseInt(args[1]);
     rocksDBConfiguration.setParallelIteratorMaxPoolSize(maxThreads);
+    rocksDBConfiguration.setWalTTL(1);
     ozoneConfiguration.setFromObject(rocksDBConfiguration);
-    Path input = Paths.get(args[0]);
-    Path rocksdbPath = input.resolve("om.db");
-    OmMetadataManagerImpl omMetadataManager = OmMetadataManagerImpl.createCheckpointMetadataManager(ozoneConfiguration,
-        new RocksDBCheckpoint(rocksdbPath));
+    OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     AtomicLong counter = new AtomicLong();
     ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(maxThreads, maxThreads, 5,
-        TimeUnit.MINUTES, new LinkedBlockingDeque<>());
+        TimeUnit.MINUTES, new LinkedBlockingQueue<>());
     CompletableFuture<Boolean> future = CompletableFuture.completedFuture(true);
     for (int i = 0; i < maxThreads; i++) {
-      CompletableFuture<Boolean> stat = CompletableFuture.completedFuture(true);
+      CompletableFuture<Boolean> stat = new CompletableFuture<>();
       threadPoolExecutor.submit(() -> {
         long id;
-        while ((id = counter.incrementAndGet()) < numberOfKeys) {
-          try {
-            OmKeyInfo keyInfo = getOmKeyInfo(id);
-            omMetadataManager.getFileTable().put("key/" + id + "/" + id, keyInfo);
-          } catch (IOException e) {
-            stat.completeExceptionally(e);
+        try {
+          while (counter.get() < numberOfKeys) {
+            try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+              long count = 0;
+              while (count < flushBatchSize && (id = counter.getAndIncrement()) < numberOfKeys) {
+                if (id % logThreshold == 0) {
+                  System.out.println("Created " + id + " of " + numberOfKeys);
+                }
+                OmKeyInfo keyInfo = getOmKeyInfo(id);
+                omMetadataManager.getFileTable().putWithBatch(batchOperation, "key/" + id + "/" + id, keyInfo);
+                count++;
+              }
+              omMetadataManager.getStore().commitBatchOperation(batchOperation);
+            }
           }
+        } catch (IOException e) {
+          stat.completeExceptionally(e);
         }
         return stat.complete(true);
       });
       future = future.thenCombine(stat, (v1, v2) -> null);
     }
     future.get();
+    omMetadataManager.getStore().close();
   }
+
 }

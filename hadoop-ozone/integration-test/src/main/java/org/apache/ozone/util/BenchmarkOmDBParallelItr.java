@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -46,14 +47,12 @@ public final class BenchmarkOmDBParallelItr {
   public static void main(String[] args) throws IOException, ExecutionException, InterruptedException {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, -1);
+    ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS, args[0]);
     RocksDBConfiguration rocksDBConfiguration = ozoneConfiguration.getObject(RocksDBConfiguration.class);
     int maxThreads = Integer.parseInt(args[1]);
     rocksDBConfiguration.setParallelIteratorMaxPoolSize(maxThreads);
     ozoneConfiguration.setFromObject(rocksDBConfiguration);
-    Path input = Paths.get(args[0]);
-    Path rocksdbPath = input.resolve("om.db");
-    OmMetadataManagerImpl omMetadataManager = OmMetadataManagerImpl.createCheckpointMetadataManager(ozoneConfiguration,
-        new RocksDBCheckpoint(rocksdbPath));
+    OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     AtomicLong counter = new AtomicLong();
     long startTime = System.currentTimeMillis();
     CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Void, IOException> func = kv -> {
