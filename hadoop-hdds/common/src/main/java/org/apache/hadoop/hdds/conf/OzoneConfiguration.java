@@ -360,8 +360,6 @@ public class OzoneConfiguration extends Configuration
             ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY),
         new DeprecationDelta("dfs.container.ratis.num.write.chunk.threads.per.volume",
             ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME),
-        new DeprecationDelta("dfs.container.ratis.replication.level",
-            ScmConfigKeys.HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY),
         new DeprecationDelta("dfs.container.ratis.rpc.type",
             ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY),
         new DeprecationDelta("dfs.container.ratis.segment.preallocated.size",
