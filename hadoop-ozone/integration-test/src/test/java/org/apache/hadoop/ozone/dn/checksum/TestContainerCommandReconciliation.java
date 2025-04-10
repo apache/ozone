@@ -76,7 +76,6 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -104,6 +103,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
+import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
@@ -380,32 +380,19 @@ public class TestContainerCommandReconciliation {
     // Checksum should have changed after block delete.
     Assertions.assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
 
+    // Since the container is already closed, we have manually updated the container checksum file.
+    // This doesn't update the checksum reported to SCM, and we need to trigger an ICR.
+    // Marking a container unhealthy will send an ICR.
+    kvHandler.markContainerUnhealthy(container, MetadataScanResult.deleted());
+    waitForDataChecksumsAtSCM(containerID, 2);
+
     // 3. Reconcile the container.
-    StorageContainerLocationProtocolClientSideTranslatorPB scmClient = cluster.getStorageContainerLocationClient();
-    long lastHeartbeat = cluster.getStorageContainerManager().getScmNodeManager()
-        .getLastHeartbeat(dataNodeDetails.get(0));
-    scmClient.reconcileContainer(containerID);
-    GenericTestUtils.waitFor(() -> {
-      try {
-        ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
-        long newHeartbeat = cluster.getStorageContainerManager().getScmNodeManager()
-            .getLastHeartbeat(dataNodeDetails.get(0));
-        return newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum() == oldDataChecksum &&
-            newHeartbeat > lastHeartbeat;
-      } catch (Exception ex) {
-        return false;
-      }
-    }, 500, 20000);
+    cluster.getStorageContainerLocationClient().reconcileContainer(containerID);
+    // Compare and check if dataChecksum is same on all replicas.
+    waitForDataChecksumsAtSCM(containerID, 1);
     ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
     assertTreesSortedAndMatch(oldContainerChecksumInfo.getContainerMerkleTree(),
         newContainerChecksumInfo.getContainerMerkleTree());
-    List<HddsProtos.SCMContainerReplicaProto> containerReplicas = scmClient.getContainerReplicas(containerID,
-        ClientVersion.CURRENT_VERSION);
-    // Compare and check if dataChecksum is same on all replicas.
-    Set<Long> dataChecksums = containerReplicas.stream()
-        .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
-        .collect(Collectors.toSet());
-    assertEquals(1, dataChecksums.size());
     TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
   }
 
@@ -498,34 +485,35 @@ public class TestContainerCommandReconciliation {
     Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
     writeContainerDataTreeProto(container.getContainerData(), builder.getContainerMerkleTree());
 
+    // Since the container is already closed, we have manually updated the container checksum file.
+    // This doesn't update the checksum reported to SCM, and we need to trigger an ICR.
+    // Marking a container unhealthy will send an ICR.
+    kvHandler.markContainerUnhealthy(container, MetadataScanResult.deleted());
+    waitForDataChecksumsAtSCM(containerID, 2);
+
     // 4. Reconcile the container.
-    StorageContainerLocationProtocolClientSideTranslatorPB scmClient = cluster.getStorageContainerLocationClient();
-    long lastHeartbeat = cluster.getStorageContainerManager().getScmNodeManager()
-        .getLastHeartbeat(dataNodeDetails.get(0));
-    scmClient.reconcileContainer(containerID);
-    GenericTestUtils.waitFor(() -> {
-      try {
-        ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
-        long newHeartbeat = cluster.getStorageContainerManager().getScmNodeManager()
-            .getLastHeartbeat(dataNodeDetails.get(0));
-        return newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum() == oldDataChecksum &&
-            newHeartbeat > lastHeartbeat;
-      } catch (Exception ex) {
-        return false;
-      }
-    }, 500, 20000);
+    cluster.getStorageContainerLocationClient().reconcileContainer(containerID);
+    // Compare and check if dataChecksum is same on all replicas.
+    waitForDataChecksumsAtSCM(containerID, 1);
     ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
     assertTreesSortedAndMatch(oldContainerChecksumInfo.getContainerMerkleTree(),
         newContainerChecksumInfo.getContainerMerkleTree());
     Assertions.assertEquals(oldDataChecksum, newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum());
-    List<HddsProtos.SCMContainerReplicaProto> containerReplicas = scmClient.getContainerReplicas(containerID,
-        ClientVersion.CURRENT_VERSION);
-    // Compare and check if dataChecksum is same on all replicas.
-    Set<Long> dataChecksums = containerReplicas.stream()
-        .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
-        .collect(Collectors.toSet());
-    assertEquals(1, dataChecksums.size());
     TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
+  }
+
+  private void waitForDataChecksumsAtSCM(long containerID, int expectedSize) throws Exception {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Set<Long> dataChecksums = cluster.getStorageContainerLocationClient().getContainerReplicas(containerID,
+                ClientVersion.CURRENT_VERSION).stream()
+            .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
+            .collect(Collectors.toSet());
+        return dataChecksums.size() == expectedSize;
+      } catch (Exception ex) {
+        return false;
+      }
+    }, 500, 20000);
   }
 
   private Pair<Long, byte[]> getDataAndContainer(boolean close, int dataLen, String volumeName, String bucketName)
