@@ -220,10 +220,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_SCM_HTTP_BIND_PORT_DEFAULT = 9876;
   public static final int OZONE_SCM_HTTPS_BIND_PORT_DEFAULT = 9877;
-
-  public static final String HDDS_REST_HTTP_ADDRESS_KEY =
-      "hdds.rest.http-address";
-  public static final String HDDS_REST_HTTP_ADDRESS_DEFAULT = "0.0.0.0:9880";
   public static final String HDDS_DATANODE_DIR_KEY = "hdds.datanode.dir";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED =
       "hdds.datanode.dir.du.reserved";
