@@ -41,7 +41,6 @@ import org.sqlite.SQLiteConfig;
 public class ContainerDatanodeDatabase {
 
   private static Map<String, String> queries;
-  public static final String CONTAINER_KEY_DELIMITER = "#";
 
   static {
     loadProperties();
@@ -117,7 +116,7 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  public void insertContainerDatanodeData(List<DatanodeContainerInfo> transitionList) throws SQLException {
+  public synchronized void insertContainerDatanodeData(List<DatanodeContainerInfo> transitionList) throws SQLException {
 
     String insertSQL = queries.get("INSERT_DATANODE_CONTAINER_LOG");
 
@@ -171,9 +170,9 @@ public class ContainerDatanodeDatabase {
          PreparedStatement selectStmt = connection.prepareStatement(selectSQL);
          ResultSet resultSet = selectStmt.executeQuery();
          PreparedStatement insertStmt = connection.prepareStatement(insertSQL)) {
-      
+
       int count = 0;
-      
+
       while (resultSet.next()) {
         long datanodeId = resultSet.getLong("datanode_id");
         long containerId = resultSet.getLong("container_id");

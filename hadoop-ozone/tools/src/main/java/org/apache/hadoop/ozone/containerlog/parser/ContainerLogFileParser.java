@@ -29,8 +29,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -41,11 +39,7 @@ import java.util.stream.Stream;
 public class ContainerLogFileParser {
 
   private ExecutorService executorService;
-  private final List<DatanodeContainerInfo> batchList = new ArrayList<>(500);
-  private final ReentrantLock globalLock = new ReentrantLock();
-  private static final int MAX_KEYS_IN_MAP = 400;
-  private final AtomicBoolean isGlobalLockHeld = new AtomicBoolean(false);
-  private final Object globalLockNotifier = new Object();
+  private static final int MAX_OBJ_IN_LIST = 5000;
 
   private static final String FILENAME_PARTS_REGEX = "-";
   private static final String DATANODE_ID_REGEX = "\\.";
@@ -61,7 +55,6 @@ public class ContainerLogFileParser {
       executorService = Executors.newFixedThreadPool(threadCount);
 
       CountDownLatch latch = new CountDownLatch(files.size());
-
       for (Path file : files) {
         Path fileNamePath = file.getFileName();
         String fileName = (fileNamePath != null) ? fileNamePath.toString() : "";
@@ -102,50 +95,18 @@ public class ContainerLogFileParser {
       }
       latch.await();
 
-      if (!batchList.isEmpty()) {
-        processAndClearAllBatches(dbstore);
-      }
-
       executorService.shutdown();
 
     } catch (IOException | InterruptedException e) {
       e.printStackTrace();
     } catch (NumberFormatException e) {
       System.err.println("Invalid datanode ID");
-    } catch (SQLException e) {
-      System.err.println("Thread " + Thread.currentThread().getName() +
-          " is stopping due to SQLException: " + e.getMessage());
-      executorService.shutdown();
-      throw e;
     }
   }
-
-  private synchronized void processAndClearAllBatches(ContainerDatanodeDatabase dbstore) throws SQLException {
-    List<DatanodeContainerInfo> localBatchList = null;
-
-    globalLock.lock();
-    try {
-      isGlobalLockHeld.set(true);
-
-      localBatchList = new ArrayList<>(batchList);
-      batchList.clear();
-
-    } finally {
-      globalLock.unlock();
-      isGlobalLockHeld.set(false);
-      synchronized (globalLockNotifier) {
-        globalLockNotifier.notifyAll();
-      }
-    }
-
-    if (localBatchList != null && !localBatchList.isEmpty()) {
-      dbstore.insertContainerDatanodeData(localBatchList);
-      localBatchList.clear();
-    }
-  }
-
 
   private void processFile(String logFilePath, ContainerDatanodeDatabase dbstore, long datanodeId) throws SQLException {
+    List<DatanodeContainerInfo> batchList = new ArrayList<>(5100);
+
     try (BufferedReader reader = Files.newBufferedReader(Paths.get(logFilePath), StandardCharsets.UTF_8)) {
       String line;
       while ((line = reader.readLine()) != null) {
@@ -165,20 +126,20 @@ public class ContainerLogFileParser {
               String value = keyValue[1].trim();
 
               switch (key) {
-                case "ID":
-                  id = value;
-                  break;
-                case "BCSID":
-                  bcsid = value;
-                  break;
-                case "State":
-                  state = value.replace("|", "").trim();
-                  break;
-                case "Index":
-                  index = value;
-                  break;
-                default:
-                  break;
+              case "ID":
+                id = value;
+                break;
+              case "BCSID":
+                bcsid = value;
+                break;
+              case "State":
+                state = value.replace("|", "").trim();
+                break;
+              case "Index":
+                index = value;
+                break;
+              default:
+                break;
               }
             }
           } else {
@@ -188,49 +149,54 @@ public class ContainerLogFileParser {
           }
         }
 
-          if (index == null || !index.equals("0")) {
-            continue; //Currently only ratis replicated containers are considered.
-          }
-
-          if (id != null && bcsid != null && state != null) {
-            try {
-              long containerId = Long.parseLong(id);
-              long bcsidValue = Long.parseLong(bcsid);
-
-              try {
-                synchronized (globalLockNotifier) {
-                  while (isGlobalLockHeld.get()) {
-                    try {
-                      globalLockNotifier.wait();
-                    } catch (InterruptedException e) {
-                      Thread.currentThread().interrupt();
-                    }
-                  }
-
-                  if (!isGlobalLockHeld.get()) {
-
-                    batchList.add(new DatanodeContainerInfo(containerId, datanodeId, timestamp, state, bcsidValue, errorMessage, logLevel, Integer.parseInt(index)));
-
-                    if (batchList.size() >= MAX_KEYS_IN_MAP) {
-                      processAndClearAllBatches(dbstore);
-                    }
-                  }
-                }
-              } catch (SQLException e) {
-                throw new SQLException(e.getMessage());
-              } catch (Exception e) {
-                System.err.println("Error processing the batch for container: " + containerId + " at datanode: " + datanodeId);
-                e.printStackTrace();
-              }
-            } catch (NumberFormatException e) {
-              System.err.println("Error parsing ID or BCSID as Long: " + line);
-            }
-          } else {
-            System.err.println("Log line does not have all required fields: " + line);
-          }
+        if (index == null || !index.equals("0")) {
+          continue; //Currently only ratis replicated containers are considered.
         }
-      } catch (IOException e) {
-        e.printStackTrace();
+
+        if (id != null && bcsid != null && state != null) {
+          try {
+            long containerId = Long.parseLong(id);
+            long bcsidValue = Long.parseLong(bcsid);
+
+            try {
+              batchList.add(
+                  new DatanodeContainerInfo.Builder()
+                      .setContainerId(containerId)
+                      .setDatanodeId(datanodeId)
+                      .setTimestamp(timestamp)
+                      .setState(state)
+                      .setBcsid(bcsidValue)
+                      .setErrorMessage(errorMessage)
+                      .setLogLevel(logLevel)
+                      .setIndexValue(Integer.parseInt(index))
+                      .build()
+              );
+
+              if (batchList.size() >= MAX_OBJ_IN_LIST) {
+                dbstore.insertContainerDatanodeData(batchList);
+                batchList.clear();
+              }
+            } catch (SQLException e) {
+              throw new SQLException(e.getMessage());
+            } catch (Exception e) {
+              System.err.println(
+                  "Error processing the batch for container: " + containerId + " at datanode: " + datanodeId);
+              e.printStackTrace();
+            }
+          } catch (NumberFormatException e) {
+            System.err.println("Error parsing ID or BCSID as Long: " + line);
+          }
+        } else {
+          System.err.println("Log line does not have all required fields: " + line);
+        }
+      }
+      if (!batchList.isEmpty()) {
+        dbstore.insertContainerDatanodeData(batchList);
+        batchList.clear();
+      }
+
+    } catch (IOException e) {
+      e.printStackTrace();
     }
   }
-  }
+}

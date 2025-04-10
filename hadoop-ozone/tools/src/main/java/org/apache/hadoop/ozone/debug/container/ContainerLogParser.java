@@ -61,7 +61,8 @@ public class ContainerLogParser implements Callable<Void> {
         System.out.println("Successfully parsed the log files and updated the respective tables");
 
       } catch (SQLException e) {
-        System.err.println("Error occurred while processing logs or inserting data into the database: " + e.getMessage());
+        System.err.println("Error occurred while processing logs or inserting data into the database: "
+            + e.getMessage());
       } catch (Exception e) {
         System.err.println("An unexpected error occurred: " + e.getMessage());
       }
