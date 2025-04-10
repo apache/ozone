@@ -56,6 +56,16 @@ public class RawKeyValue<RAW> implements KeyValue<RAW, RAW> {
     public byte[] getValue() {
       return copy(super.getValue());
     }
+
+    @Override
+    String getKeyString() {
+      return Arrays.toString(getKey());
+    }
+
+    @Override
+    String getValueString() {
+      return Arrays.toString(getValue());
+    }
   }
 
   private final RAW key;
@@ -80,5 +90,18 @@ public class RawKeyValue<RAW> implements KeyValue<RAW, RAW> {
   @Override
   public RAW getValue() {
     return value;
+  }
+
+  String getKeyString() {
+    return key.toString();
+  }
+
+  String getValueString() {
+    return value.toString();
+  }
+
+  @Override
+  public String toString() {
+    return "(key=" + getKeyString() + ", value=" + getValueString() + ")";
   }
 }

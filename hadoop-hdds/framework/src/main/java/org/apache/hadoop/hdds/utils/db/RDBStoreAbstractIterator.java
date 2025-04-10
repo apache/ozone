@@ -79,13 +79,14 @@ abstract class RDBStoreAbstractIterator<RAW>
   public final synchronized void forEachRemaining(
       Consumer<? super AutoCloseSupplier<RawKeyValue<RAW>>> action) {
     while (hasNext()) {
-      action.accept(next());
+      AutoCloseSupplier<RawKeyValue<RAW>> entry = next();
+      action.accept(entry);
     }
   }
 
   private void setCurrentEntry() {
     boolean isValid = rocksDBIterator.get().isValid();
-    if (rocksDBIterator.get().isValid()) {
+    if (isValid) {
       currentEntry = getKeyValue();
     } else {
       currentEntry = null;

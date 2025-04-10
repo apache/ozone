@@ -99,6 +99,8 @@ class RDBStoreCodecBufferIterator
   RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
       CodecBuffer prefix, int maxNumberOfBuffersInMemory) {
     super(iterator, table, prefix);
+    // We need atleast 2 buffers one for setting next value and one for sending the current value.
+    maxNumberOfBuffersInMemory = Math.max(2, maxNumberOfBuffersInMemory);
     final String name = table != null ? table.getName() : null;
     this.availableBufferStack = new Stack<>();
     this.inUseBuffers = new HashSet<>();
