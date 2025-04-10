@@ -117,7 +117,7 @@ public class TestMultiSnapshotLocks {
   }
 
   @Test
-  void testAcquireLockWhenAlreadyAcquiredThrowsException() throws Exception {
+  void testAcquireLockWhenLockIsAlreadyAcquired() throws Exception {
     List<UUID> objects = Collections.singletonList(obj1);
     OMLockDetails mockLockDetails = mock(OMLockDetails.class);
     when(mockLockDetails.isLockAcquired()).thenReturn(true);
