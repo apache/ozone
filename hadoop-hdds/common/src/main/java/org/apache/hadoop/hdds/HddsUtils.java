@@ -882,6 +882,11 @@ public final class HddsUtils {
         : null;
   }
 
+  /** @return Hex string representation of {@code value} */
+  public static String checksumToString(long value) {
+    return Long.toHexString(value);
+  }
+
   /**
    * Logs a warning to report that the class is not closed properly.
    */

@@ -353,5 +353,6 @@ public final class ContainerMerkleTreeTestUtils {
       throw new IOException("Error occurred when writing container merkle tree for containerID "
           + data.getContainerID(), ex);
     }
+    data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
   }
 }
