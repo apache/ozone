@@ -188,6 +188,23 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   long getEstimatedKeyCount() throws IOException;
 
   /**
+   * Count the number of keys in this table.  Note: this operation may be expensive, prefer
+   * {@link #getEstimatedKeyCount()}.
+   *
+   * @return Exact key count of this Table
+   * @throws IOException on failure
+   */
+  default long getExactKeyCount() throws IOException {
+    try (TableIterator<?, ?> iterator = iterator()) {
+      long keyCount = 0;
+      for (iterator.seekToFirst(); iterator.hasNext(); iterator.next()) {
+        keyCount++;
+      }
+      return keyCount;
+    }
+  }
+
+  /**
    * Add entry to the table cache.
    *
    * If the cacheKey already exists, it will override the entry.
