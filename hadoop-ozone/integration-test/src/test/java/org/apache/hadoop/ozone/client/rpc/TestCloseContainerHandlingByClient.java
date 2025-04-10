@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -74,6 +75,7 @@ public abstract class TestCloseContainerHandlingByClient implements NonHATests.T
   void init() throws Exception {
     chunkSize = (int) cluster().getConf().getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 1024 * 1024, StorageUnit.BYTES);
     blockSize = (int) cluster().getConf().getStorageSize(OZONE_SCM_BLOCK_SIZE, 4 * chunkSize, StorageUnit.BYTES);
+    cluster().getConf().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, false);
 
     cluster = cluster();
     client = cluster().newClient();
