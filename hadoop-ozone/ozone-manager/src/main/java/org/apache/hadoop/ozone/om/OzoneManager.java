@@ -2597,7 +2597,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return checkAcls(resType, store, acl, vol, bucket, key,
           UserGroupInformation.createRemoteUser(userName),
           ProtobufRpcEngine.Server.getRemoteIp(),
-          ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
+          // We set Address directly to avoid reverse DNS lookup
+          ProtobufRpcEngine.Server.getRemoteIp().getHostAddress(),
           false, getVolumeOwner(vol, acl, resType));
     } catch (OMException ex) {
       // Should not trigger exception here at all
