@@ -59,7 +59,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
 
   private S3GatewayHttpServer httpServer;
   /** Servlets and static content on separate port. */
-  private BaseHttpServer adminHttpServer;
+  private BaseHttpServer contentServer;
   private S3GatewayMetrics metrics;
 
   private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
@@ -81,7 +81,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
     loginS3GUser(OzoneConfigurationHolder.configuration());
     setHttpBaseDir(OzoneConfigurationHolder.configuration());
     httpServer = new S3GatewayHttpServer(OzoneConfigurationHolder.configuration(), "s3gateway");
-    adminHttpServer = new S3GatewayWebAdminServer(OzoneConfigurationHolder.configuration(), "s3g-admin");
+    contentServer = new S3GatewayWebAdminServer(OzoneConfigurationHolder.configuration(), "s3g-web");
     metrics = S3GatewayMetrics.create(OzoneConfigurationHolder.configuration());
     start();
 
@@ -105,13 +105,13 @@ public class Gateway extends GenericCli implements Callable<Void> {
     HddsServerUtil.initializeMetrics(OzoneConfigurationHolder.configuration(), "S3Gateway");
     jvmPauseMonitor.start();
     httpServer.start();
-    adminHttpServer.start();
+    contentServer.start();
   }
 
   public void stop() throws Exception {
     LOG.info("Stopping Ozone S3 gateway");
     httpServer.stop();
-    adminHttpServer.stop();
+    contentServer.stop();
     jvmPauseMonitor.stop();
     S3GatewayMetrics.unRegister();
   }
