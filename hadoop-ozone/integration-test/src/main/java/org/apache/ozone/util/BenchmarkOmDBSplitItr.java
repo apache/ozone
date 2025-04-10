@@ -50,15 +50,21 @@ public final class BenchmarkOmDBSplitItr {
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS, args[0]);
     RocksDBConfiguration rocksDBConfiguration = ozoneConfiguration.getObject(RocksDBConfiguration.class);
     int maxThreads = Integer.parseInt(args[1]);
+    long loggingThreshold = Long.parseLong(args[2]);
     rocksDBConfiguration.setParallelIteratorMaxPoolSize(maxThreads);
     ozoneConfiguration.setFromObject(rocksDBConfiguration);
     OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     AtomicLong counter = new AtomicLong();
     long startTime = System.currentTimeMillis();
     CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Void, IOException> func = kv -> {
-      LOG.info(counter.incrementAndGet() + "\t" + (System.currentTimeMillis() - startTime));
+      long id = counter.incrementAndGet();
+      if (id % loggingThreshold == 0) {
+        LOG.info("Benchmark: " + id + "\t" + (System.currentTimeMillis() - startTime) + "\t" + kv.getKey());
+      }
       return null;
     };
-    omMetadataManager.getFileTable().splitTableOperation(null, null, func, LOG, 1);
+    omMetadataManager.getFileTable().splitTableOperation(null, null, func,
+        LOG, 1);
+    omMetadataManager.getStore().close();
   }
 }
