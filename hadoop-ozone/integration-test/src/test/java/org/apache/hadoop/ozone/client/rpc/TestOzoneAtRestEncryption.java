@@ -86,6 +86,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -298,22 +299,19 @@ class TestOzoneAtRestEncryption {
     Instant testStartTime = getTestStartTime();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
-    try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(StandardCharsets.UTF_8).length,
+
+    TestDataUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-        new HashMap<>())) {
-      out.write(value.getBytes(StandardCharsets.UTF_8));
-    }
+        value.getBytes(StandardCharsets.UTF_8));
+
     verifyKeyData(bucket, keyName, value, testStartTime);
     OzoneKeyDetails key1 = bucket.getKey(keyName);
 
     // Overwrite the key
-    try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(StandardCharsets.UTF_8).length,
+    TestDataUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-        new HashMap<>())) {
-      out.write(value.getBytes(StandardCharsets.UTF_8));
-    }
+        value.getBytes(StandardCharsets.UTF_8));
+
     OzoneKeyDetails key2 = bucket.getKey(keyName);
     assertNotEquals(key1.getFileEncryptionInfo().toString(), key2.getFileEncryptionInfo().toString());
   }
@@ -429,12 +427,9 @@ class TestOzoneAtRestEncryption {
     String keyName = UUID.randomUUID().toString();
     Map<String, String> keyMetadata = new HashMap<>();
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
-    try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(StandardCharsets.UTF_8).length,
+    TestDataUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-        keyMetadata)) {
-      out.write(value.getBytes(StandardCharsets.UTF_8));
-    }
+        value.getBytes(StandardCharsets.UTF_8));
 
     OzoneKeyDetails key = bucket.getKey(keyName);
     assertEquals(keyName, key.getName());
