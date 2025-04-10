@@ -162,10 +162,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
   }
 
-  public static Logger getLogger() {
-    return LOG;
-  }
-
   @Override
   public Void call() throws Exception {
     OzoneConfiguration configuration = getOzoneConf();

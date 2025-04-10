@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationContainerReport> {
 
-  public static final Logger LOG = LoggerFactory.getLogger(ECContainerSafeModeRule.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ECContainerSafeModeRule.class);
   private static final String NAME = "ECContainerSafeModeRule";
 
   private final ContainerManager containerManager;

@@ -275,9 +275,8 @@ public final class TestDelegationToken {
 
     // Capture logs for assertions
     LogCapturer logs = LogCapturer.captureLogs(Server.AUDITLOG);
-    LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.getLogger());
-    GenericTestUtils
-        .setLogLevel(LoggerFactory.getLogger(Server.class.getName()), INFO);
+    LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.class);
+    GenericTestUtils.setLogLevel(Server.class, INFO);
     SecurityUtil.setTokenServiceUseIp(useIp);
 
     // Setup secure OM for start

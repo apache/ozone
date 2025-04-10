@@ -119,7 +119,7 @@ import org.slf4j.LoggerFactory;
 public class BasicRootedOzoneClientAdapterImpl
     implements OzoneClientAdapter {
 
-  static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BasicRootedOzoneClientAdapterImpl.class);
 
   private OzoneClient ozoneClient;

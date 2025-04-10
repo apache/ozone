@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class SCMDatanodeHeartbeatDispatcher {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMDatanodeHeartbeatDispatcher.class);
 
   private final NodeManager nodeManager;

@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RatisContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationContainerReport> {
 
-  public static final Logger LOG = LoggerFactory.getLogger(RatisContainerSafeModeRule.class);
+  private static final Logger LOG = LoggerFactory.getLogger(RatisContainerSafeModeRule.class);
   private static final String NAME = "RatisContainerSafeModeRule";
 
   private final ContainerManager containerManager;

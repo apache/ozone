@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, BUCKET_TABLE})
 public class OMKeyCreateResponse extends OmKeyResponse {
 
-  public static final Logger LOG =
+  protected static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateResponse.class);
   private OmKeyInfo omKeyInfo;
   private long openKeySessionID;

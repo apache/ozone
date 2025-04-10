@@ -103,7 +103,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ReplicationManager implements SCMService, ContainerReplicaPendingOpsSubscriber {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
 
   /**
@@ -115,7 +115,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   /**
    * SCMContext from StorageContainerManager.
    */
-  private final SCMContext scmContext;
+  private SCMContext scmContext;
 
 
   /**
@@ -918,6 +918,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     return containerReport;
   }
 
+  public boolean isThreadWaiting() {
+    return replicationMonitor.getState() == Thread.State.TIMED_WAITING;
+  }
+
   /**
    * ReplicationMonitor thread runnable. This wakes up at configured
    * interval and processes all the containers in the system.
@@ -1410,6 +1414,11 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     }
   }
 
+  @VisibleForTesting
+  public void setScmContext(SCMContext context) {
+    scmContext = context;
+  }
+
   @Override
   public String getServiceName() {
     return ReplicationManager.class.getSimpleName();
@@ -1489,6 +1498,37 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       return scmContext.getScm().getPipelineManager()
           .getPipeline(container.getPipelineID()) != null;
     } catch (PipelineNotFoundException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Notify the ReplicationManager that a node state has changed, which might
+   * require container replication. This will wake up the replication monitor
+   * thread if it's sleeping and there's no active replication work in progress.
+   * 
+   * @return true if the replication monitor was woken up, false otherwise
+   */
+  public synchronized boolean notifyNodeStateChange() {
+    if (!running || serviceStatus == ServiceStatus.PAUSING) {
+      return false;
+    }
+
+    if (!isThreadWaiting()) {
+      LOG.debug("Replication monitor is running, not need to wake it up");
+      return false;
+    }
+
+    // Only wake up the thread if there's no active replication work
+    // This prevents creating a new replication queue over and over
+    // when multiple nodes change state in quick succession
+    if (getQueue().isEmpty()) {
+      LOG.debug("Waking up replication monitor due to node state change");
+      // Notify the replication monitor thread to wake up
+      notify();
+      return true;
+    } else {
+      LOG.debug("Replication queue is not empty, not waking up replication monitor");
       return false;
     }
   }

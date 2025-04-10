@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  */
 public class UpgradeManager {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(UpgradeManager.class);
 
   private final Map<String, DatanodeStoreSchemaThreeImpl>

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -192,11 +191,6 @@ public class ContainerStateMap {
    * Create a ContainerStateMap.
    */
   public ContainerStateMap() {
-  }
-
-  @VisibleForTesting
-  public static Logger getLogger() {
-    return LOG;
   }
 
   /**

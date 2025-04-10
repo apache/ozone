@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 public class StorageInfo {
 
-  public static final Logger LOG = LoggerFactory.getLogger(StorageInfo.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StorageInfo.class);
 
   private Properties properties = new Properties();
 

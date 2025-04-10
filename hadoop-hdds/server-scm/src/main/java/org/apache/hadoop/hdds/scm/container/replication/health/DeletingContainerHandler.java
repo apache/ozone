@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 public class DeletingContainerHandler extends AbstractCheck {
   private final ReplicationManager replicationManager;
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeletingContainerHandler.class);
 
   public DeletingContainerHandler(ReplicationManager replicationManager) {
