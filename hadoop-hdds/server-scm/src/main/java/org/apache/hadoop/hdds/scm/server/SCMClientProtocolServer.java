@@ -402,21 +402,15 @@ public class SCMClientProtocolServer implements
   public List<ContainerWithPipeline> getExistContainerWithPipelinesInBatch(
       List<Long> containerIDs) {
     List<ContainerWithPipeline> cpList = new ArrayList<>();
-    List<Long> succeededContainers = new ArrayList<>();
     for (Long containerID : containerIDs) {
       try {
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
-        succeededContainers.add(containerID);
       } catch (IOException ex) {
-        AUDIT.logReadFailure(buildAuditMessageForFailure(
-            SCMAction.GET_EXIST_CONTAINER_WITH_PIPELINE_BATCH,
-            Collections.singletonMap("containerID", String.valueOf(containerID)), ex));
+        //not found , just go ahead
+        LOG.error("Container with common pipeline not found: {}", ex);
       }
     }
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-        SCMAction.GET_EXIST_CONTAINER_WITH_PIPELINE_BATCH,
-        Collections.singletonMap("containerIDs", succeededContainers.toString())));
     return cpList;
   }
 
