@@ -116,7 +116,7 @@ public class TestDiskBalancerSubCommand {
 
     // Return error
     Mockito.when(scmClient.startDiskBalancer(Mockito.any(), Mockito.any(),
-            Mockito.any(), Mockito.any()))
+            Mockito.any(), Mockito.any(), Mockito.any()))
         .thenReturn(generateError(10));
 
     try {
@@ -127,7 +127,7 @@ public class TestDiskBalancerSubCommand {
 
     // Do not return error
     Mockito.when(scmClient.startDiskBalancer(Mockito.any(), Mockito.any(),
-            Mockito.any(), Mockito.any()))
+            Mockito.any(), Mockito.any(), Mockito.any()))
         .thenReturn(generateError(0));
 
     try {
@@ -146,7 +146,7 @@ public class TestDiskBalancerSubCommand {
 
     // Return error
     Mockito.when(scmClient.updateDiskBalancerConfiguration(Mockito.any(),
-            Mockito.any(), Mockito.any(), Mockito.any()))
+            Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
         .thenReturn(generateError(10));
 
     try {
@@ -157,7 +157,7 @@ public class TestDiskBalancerSubCommand {
 
     // Do not return error
     Mockito.when(scmClient.updateDiskBalancerConfiguration(Mockito.any(),
-            Mockito.any(), Mockito.any(), Mockito.any()))
+            Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
         .thenReturn(generateError(0));
 
     try {

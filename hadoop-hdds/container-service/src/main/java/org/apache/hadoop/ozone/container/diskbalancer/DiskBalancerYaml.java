@@ -76,6 +76,7 @@ public final class DiskBalancerYaml {
           diskBalancerInfoYaml.getThreshold(),
           diskBalancerInfoYaml.getBandwidthInMB(),
           diskBalancerInfoYaml.getParallelThread(),
+          diskBalancerInfoYaml.isStopAfterDiskEven(),
           DiskBalancerVersion.getDiskBalancerVersion(
               diskBalancerInfoYaml.version));
     }
@@ -91,6 +92,7 @@ public final class DiskBalancerYaml {
     private double threshold;
     private long bandwidthInMB;
     private int parallelThread;
+    private boolean stopAfterDiskEven;
 
     private int version;
 
@@ -99,11 +101,12 @@ public final class DiskBalancerYaml {
     }
 
     private DiskBalancerInfoYaml(boolean shouldRun, double threshold,
-        long bandwidthInMB, int parallelThread, int version) {
+        long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, int version) {
       this.shouldRun = shouldRun;
       this.threshold = threshold;
       this.bandwidthInMB = bandwidthInMB;
       this.parallelThread = parallelThread;
+      this.stopAfterDiskEven = stopAfterDiskEven;
       this.version = version;
     }
 
@@ -139,6 +142,14 @@ public final class DiskBalancerYaml {
       return this.parallelThread;
     }
 
+    public boolean isStopAfterDiskEven() {
+      return stopAfterDiskEven;
+    }
+
+    public void setStopAfterDiskEven(boolean stopAfterDiskEven) {
+      this.stopAfterDiskEven = stopAfterDiskEven;
+    }
+
     public void setVersion(int version) {
       this.version = version;
     }
@@ -156,6 +167,7 @@ public final class DiskBalancerYaml {
         diskBalancerInfo.getThreshold(),
         diskBalancerInfo.getBandwidthInMB(),
         diskBalancerInfo.getParallelThread(),
+        diskBalancerInfo.isStopAfterDiskEven(),
         diskBalancerInfo.getVersion().getVersion());
   }
 }

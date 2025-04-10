@@ -146,15 +146,31 @@ public final class DiskBalancerConfiguration {
     return containerChoosingPolicyClass;
   }
 
+  @Config(key = "stop.after.disk.even",
+      type = ConfigType.BOOLEAN,
+      defaultValue = "true",
+      tags = {ConfigTag.DISKBALANCER},
+      description = "If true, the DiskBalancer will automatically stop once disks are balanced.")
+  private boolean stopAfterDiskEven = true;
+
+  public boolean getStopAfterDiskEven() {
+    return stopAfterDiskEven;
+  }
+
+  public void setStopAfterDiskEven(boolean stopAfterDiskEven) {
+    this.stopAfterDiskEven = stopAfterDiskEven;
+  }
+
   public DiskBalancerConfiguration() {
   }
 
   public DiskBalancerConfiguration(Optional<Double> threshold,
       Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread) {
+      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven) {
     threshold.ifPresent(aDouble -> this.threshold = aDouble);
     bandwidthInMB.ifPresent(aLong -> this.diskBandwidthInMB = aLong);
     parallelThread.ifPresent(integer -> this.parallelThread = integer);
+    stopAfterDiskEven.ifPresent(bool -> this.stopAfterDiskEven = bool);
   }
 
   /**
@@ -234,10 +250,11 @@ public final class DiskBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
+            "%-50s %s%n" +
             "%-50s %s%n",
             "Key", "Value",
         "Threshold", threshold, "Max disk bandwidth", diskBandwidthInMB,
-        "Parallel Thread", parallelThread);
+        "Parallel Thread", parallelThread, "Stop After Disk Even", stopAfterDiskEven);
   }
 
   public HddsProtos.DiskBalancerConfigurationProto.Builder toProtobufBuilder() {
@@ -246,7 +263,8 @@ public final class DiskBalancerConfiguration {
 
     builder.setThreshold(threshold)
         .setDiskBandwidthInMB(diskBandwidthInMB)
-        .setParallelThread(parallelThread);
+        .setParallelThread(parallelThread)
+        .setStopAfterDiskEven(stopAfterDiskEven);
     return builder;
   }
 
@@ -261,6 +279,9 @@ public final class DiskBalancerConfiguration {
     }
     if (proto.hasParallelThread()) {
       config.setParallelThread(proto.getParallelThread());
+    }
+    if (proto.hasStopAfterDiskEven()) {
+      config.setStopAfterDiskEven(proto.getStopAfterDiskEven());
     }
     return config;
   }

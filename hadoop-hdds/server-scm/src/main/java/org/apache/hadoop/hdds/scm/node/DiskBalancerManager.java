@@ -139,8 +139,8 @@ public class DiskBalancerManager {
    */
   public List<DatanodeAdminError> startDiskBalancer(
       Optional<Double> threshold, Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread, Optional<List<String>> hosts)
-      throws IOException {
+      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven,
+      Optional<List<String>> hosts) throws IOException {
     List<DatanodeDetails> dns;
     if (hosts.isPresent()) {
       dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
@@ -160,7 +160,7 @@ public class DiskBalancerManager {
         // If command doesn't have configuration change, then we reuse the
         // latest configuration reported from Datnaodes
         DiskBalancerConfiguration updateConf = attachDiskBalancerConf(dn,
-            threshold, bandwidthInMB, parallelThread);
+            threshold, bandwidthInMB, parallelThread, stopAfterDiskEven);
         DiskBalancerCommand command = new DiskBalancerCommand(
             HddsProtos.DiskBalancerOpType.START, updateConf);
         sendCommand(dn, command);
@@ -213,7 +213,7 @@ public class DiskBalancerManager {
    */
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
       Optional<Double> threshold, Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread, Optional<List<String>> hosts)
+      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
       throws IOException {
     List<DatanodeDetails> dns;
     if (hosts.isPresent()) {
@@ -229,7 +229,7 @@ public class DiskBalancerManager {
         // If command doesn't have configuration change, then we reuse the
         // latest configuration reported from Datnaodes
         DiskBalancerConfiguration updateConf = attachDiskBalancerConf(dn,
-            threshold, bandwidthInMB, parallelThread);
+            threshold, bandwidthInMB, parallelThread, stopAfterDiskEven);
         DiskBalancerCommand command = new DiskBalancerCommand(
             HddsProtos.DiskBalancerOpType.UPDATE, updateConf);
         sendCommand(dn, command);
@@ -335,13 +335,14 @@ public class DiskBalancerManager {
 
   private DiskBalancerConfiguration attachDiskBalancerConf(
       DatanodeDetails dn, Optional<Double> threshold,
-      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread) {
+      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven) {
     DiskBalancerConfiguration baseConf = statusMap.containsKey(dn) ?
         statusMap.get(dn).getDiskBalancerConfiguration() :
         new DiskBalancerConfiguration();
     threshold.ifPresent(baseConf::setThreshold);
     bandwidthInMB.ifPresent(baseConf::setDiskBandwidthInMB);
     parallelThread.ifPresent(baseConf::setParallelThread);
+    stopAfterDiskEven.ifPresent(baseConf::setStopAfterDiskEven);
     return baseConf;
   }
 

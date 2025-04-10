@@ -1347,7 +1347,8 @@ public class SCMClientProtocolServer implements
   @Override
   public List<DatanodeAdminError> startDiskBalancer(Optional<Double> threshold,
       Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
-      Optional<List<String>> hosts) throws IOException {
+      Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
+      throws IOException {
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
     } catch (IOException e) {
@@ -1356,7 +1357,7 @@ public class SCMClientProtocolServer implements
     }
 
     return scm.getDiskBalancerManager()
-        .startDiskBalancer(threshold, bandwidthInMB, parallelThread, hosts);
+        .startDiskBalancer(threshold, bandwidthInMB, parallelThread, stopAfterDiskEven, hosts);
   }
 
   @Override
@@ -1375,7 +1376,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
       Optional<Double> threshold, Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread, Optional<List<String>> hosts)
+      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
       throws IOException {
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
@@ -1385,7 +1386,7 @@ public class SCMClientProtocolServer implements
     }
 
     return scm.getDiskBalancerManager().updateDiskBalancerConfiguration(
-        threshold, bandwidthInMB, parallelThread, hosts);
+        threshold, bandwidthInMB, parallelThread, stopAfterDiskEven, hosts);
   }
 
   /**
