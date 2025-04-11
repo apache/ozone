@@ -17,6 +17,7 @@
 
 #suite:upgrade
 
+set -u -o pipefail
 
 TEST_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 source "$TEST_DIR/testlib.sh"
