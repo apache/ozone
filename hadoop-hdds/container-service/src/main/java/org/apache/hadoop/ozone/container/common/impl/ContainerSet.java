@@ -37,9 +37,11 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.ToLongFunction;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -60,7 +62,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     return new ContainerSet(null, recoveringTimeout);
   }
 
-  public static ContainerSet newRwContainerSet(Table<Long, String> containerIdsTable, long recoveringTimeout) {
+  public static ContainerSet newRwContainerSet(Table<ContainerID, String> containerIdsTable, long recoveringTimeout) {
     Objects.requireNonNull(containerIdsTable, "containerIdsTable == null");
     return new ContainerSet(containerIdsTable, recoveringTimeout);
   }
@@ -73,13 +75,13 @@ public class ContainerSet implements Iterable<Container<?>> {
       new ConcurrentSkipListMap<>();
   private final Clock clock;
   private long recoveringTimeout;
-  private final Table<Long, String> containerIdsTable;
+  private final Table<ContainerID, String> containerIdsTable;
 
-  private ContainerSet(Table<Long, String> continerIdsTable, long recoveringTimeout) {
+  private ContainerSet(Table<ContainerID, String> continerIdsTable, long recoveringTimeout) {
     this(continerIdsTable, recoveringTimeout, null);
   }
 
-  ContainerSet(Table<Long, String> continerIdsTable, long recoveringTimeout, Clock clock) {
+  ContainerSet(Table<ContainerID, String> continerIdsTable, long recoveringTimeout, Clock clock) {
     this.clock = clock != null ? clock : Clock.systemUTC();
     this.containerIdsTable = continerIdsTable;
     this.recoveringTimeout = recoveringTimeout;
@@ -146,7 +148,7 @@ public class ContainerSet implements Iterable<Container<?>> {
       }
       try {
         if (containerIdsTable != null) {
-          containerIdsTable.put(containerId, containerState.toString());
+          containerIdsTable.put(ContainerID.valueOf(containerId), containerState.toString());
         }
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
@@ -230,7 +232,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     if (removeFromDB) {
       try {
         if (containerIdsTable != null) {
-          containerIdsTable.delete(containerId);
+          containerIdsTable.delete(ContainerID.valueOf(containerId));
         }
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
@@ -461,7 +463,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     return missingContainerSet;
   }
 
-  public Table<Long, String> getContainerIdsTable() {
+  public Table<ContainerID, String> getContainerIdsTable() {
     return containerIdsTable;
   }
 
@@ -475,10 +477,9 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @param container2BCSIDMap Map of containerId to BCSID persisted in the
    *                           Ratis snapshot
    */
-  public void buildMissingContainerSetAndValidate(
-      Map<Long, Long> container2BCSIDMap) {
+  public <T> void buildMissingContainerSetAndValidate(Map<T, Long> container2BCSIDMap, ToLongFunction<T> getId) {
     container2BCSIDMap.entrySet().parallelStream().forEach((mapEntry) -> {
-      long id = mapEntry.getKey();
+      final long id = getId.applyAsLong(mapEntry.getKey());
       if (!containerMap.containsKey(id)) {
         LOG.warn("Adding container {} to missing container set.", id);
         missingContainerSet.add(id);

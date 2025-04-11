@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
@@ -339,13 +340,13 @@ public class OzoneContainer {
       for (Thread volumeThread : volumeThreads) {
         volumeThread.join();
       }
-      try (TableIterator<Long, ? extends Table.KeyValue<Long, String>> itr =
+      try (TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, String>> itr =
                containerSet.getContainerIdsTable().iterator()) {
-        Map<Long, Long> containerIds = new HashMap<>();
+        final Map<ContainerID, Long> containerIds = new HashMap<>();
         while (itr.hasNext()) {
           containerIds.put(itr.next().getKey(), 0L);
         }
-        containerSet.buildMissingContainerSetAndValidate(containerIds);
+        containerSet.buildMissingContainerSetAndValidate(containerIds, ContainerID::getId);
       }
     } catch (InterruptedException ex) {
       LOG.error("Volume Threads Interrupted exception", ex);
