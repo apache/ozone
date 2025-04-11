@@ -102,7 +102,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final long serialVersionUID = 1L;
   private transient BootstrapStateHandler.Lock lock;
   private long maxTotalSstSize = 0;
-  private OMMetadataManager omMetadataManager;
+  private transient OMMetadataManager omMetadataManager;
   private static final PathFilter SST_FILE_FILTER =
       new SuffixFileFilter(ROCKSDB_SST_SUFFIX, IOCase.INSENSITIVE);
 

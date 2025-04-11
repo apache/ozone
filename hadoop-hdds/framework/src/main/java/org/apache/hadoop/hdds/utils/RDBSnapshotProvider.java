@@ -114,7 +114,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
       File targetFile = new File(snapshotDir, snapshotFileName);
       try {
         downloadSnapshot(leaderNodeID, targetFile);
-      } catch (IOException ioe){
+      } catch (IOException ioe) {
         LOG.error("Failed to download DB Snapshot", ioe);
         throw ioe;
       }
