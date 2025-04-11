@@ -208,7 +208,7 @@
           <artifactId>jersey-bundle</artifactId>
         </exclusion>
         <exclusion>
-          <!-- depend on commons-logging-api instead -->
+          <!-- depend on jcl-over-slf4j instead -->
           <groupId>commons-logging</groupId>
           <artifactId>commons-logging</artifactId>
         </exclusion>

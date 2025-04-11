@@ -55,7 +55,6 @@
     <commons-fileupload.version>1.5</commons-fileupload.version>
     <commons-io.version>2.18.0</commons-io.version>
     <commons-lang3.version>3.17.0</commons-lang3.version>
-    <commons-logging-api.version>1.1</commons-logging-api.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-text.version>1.12.0</commons-text.version>
@@ -310,7 +309,7 @@
         <version>${aws-java-sdk.version}</version>
         <exclusions>
           <exclusion>
-            <!-- depend on commons-logging-api instead -->
+            <!-- depend on jcl-over-slf4j instead -->
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
           </exclusion>
@@ -459,7 +458,7 @@
         <version>${commons-beanutils.version}</version>
         <exclusions>
           <exclusion>
-            <!-- depend on commons-logging-api instead -->
+            <!-- depend on jcl-over-slf4j instead -->
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
           </exclusion>
@@ -496,11 +495,6 @@
         <version>${commons-io.version}</version>
       </dependency>
       <dependency>
-        <groupId>commons-logging</groupId>
-        <artifactId>commons-logging-api</artifactId>
-        <version>${commons-logging-api.version}</version>
-      </dependency>
-      <dependency>
         <groupId>commons-net</groupId>
         <artifactId>commons-net</artifactId>
         <version>${commons-net.version}</version>
@@ -511,7 +505,7 @@
         <version>${commons-validator.version}</version>
         <exclusions>
           <exclusion>
-            <!-- depend on commons-logging-api instead -->
+            <!-- depend on jcl-over-slf4j instead -->
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
           </exclusion>
@@ -682,7 +676,7 @@
         <version>${commons-configuration2.version}</version>
         <exclusions>
           <exclusion>
-            <!-- depend on commons-logging-api instead -->
+            <!-- depend on jcl-over-slf4j instead -->
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
           </exclusion>
@@ -765,7 +759,7 @@
         <type>test-jar</type>
         <exclusions>
           <exclusion>
-            <!-- depend on commons-logging-api instead -->
+            <!-- depend on jcl-over-slf4j instead -->
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
           </exclusion>
@@ -840,7 +834,7 @@
         <version>${httpclient.version}</version>
         <exclusions>
           <exclusion>
-            <!-- depend on commons-logging-api instead -->
+            <!-- depend on jcl-over-slf4j instead -->
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
           </exclusion>
@@ -1231,6 +1225,11 @@
         <groupId>org.rocksdb</groupId>
         <artifactId>rocksdbjni</artifactId>
         <version>${rocksdb.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>jcl-over-slf4j</artifactId>
+        <version>${slf4j.version}</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
