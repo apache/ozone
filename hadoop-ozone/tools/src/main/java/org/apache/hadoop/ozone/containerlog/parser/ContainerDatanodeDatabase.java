@@ -250,7 +250,7 @@ public class ContainerDatanodeDatabase {
         Set<Long> bcsids = new HashSet<>();
         Set<Long> deletedReplicas = new HashSet<>();
 
-        System.out.printf("%-12s | %-10s | %-10s | %-25s | %-30s | %-20s | %-12s\n",
+        System.out.printf("%-12s | %-10s | %-10s | %-25s | %-30s | %-20s | %-12s%n",
             "Datanode ID", "State", "BCSID", "Timestamp", "Error Message", "Index Value", "Log Level");
         System.out.println("-------------------------------------------------------------------------" +
             "---------------------------------------------------------------------------------------------");
@@ -281,7 +281,7 @@ public class ContainerDatanodeDatabase {
             deletedReplicas.add(datanodeId);
             bcsids.add(latestBcsid);
           }
-          System.out.printf("%-12d | %-10s | %-10d | %-25s | %-30s | %-20s | %-12s\n",
+          System.out.printf("%-12d | %-10s | %-10d | %-25s | %-30s | %-20s | %-12s%n",
               datanodeId, latestState, latestBcsid, timestamp, errorMessage, indexValue, logLevel);
 
         }
@@ -305,7 +305,7 @@ public class ContainerDatanodeDatabase {
           System.out.println("Container " + containerID + " is both UNHEALTHY and UNDER-REPLICATED.");
         } else if (unhealthyCount == 1 && closedReplicas.size() == replicaCount - unhealthyCount) {
           System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
-        } else if ((openReplicas.size() > 0 && openReplicas.size() < 3) &&
+        } else if ((!openReplicas.isEmpty() && openReplicas.size() < 3) &&
             (closedReplicas.size() == replicaCount - openReplicas.size() ||
                 unhealthyCount == replicaCount - openReplicas.size())) {
           System.out.println("Container " + containerID + " is OPEN_UNHEALTHY.");
@@ -373,14 +373,14 @@ public class ContainerDatanodeDatabase {
 
         if (issueFound) {
           System.out.println("Issue found: Container " + containerID + " has duplicate OPEN state.");
-          System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s\n",
+          System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s%n",
               "Timestamp", "Container ID", "Datanode ID", "Container State", "BCSID", "Error Message", "Index Value",
               "Log Level");
           System.out.println("-------------------------------------------------------------------------" +
               "---------------------------------------------------------------------------------------------");
 
           for (String[] row : allRows) {
-            System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s\n",
+            System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s%n",
                 row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]);
           }
           return true;
