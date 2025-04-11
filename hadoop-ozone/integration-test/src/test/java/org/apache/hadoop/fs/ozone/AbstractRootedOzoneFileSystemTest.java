@@ -62,6 +62,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -112,6 +113,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -340,8 +342,12 @@ abstract class AbstractRootedOzoneFileSystemTest {
     String key = "object-dir/object-name1";
 
     // write some test data into bucket
-    TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName), key,
-        new ECReplicationConfig("RS-3-2-1024k"), RandomUtils.nextBytes(1));
+    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
+        getBucket(bucketName).createKey(key, 1,
+            new ECReplicationConfig("RS-3-2-1024k"),
+            new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
 
     List<String> dirs = Arrays.asList(volumeName, bucketName, "object-dir",
             "object-name1");
@@ -1489,8 +1495,11 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
       // add key in source bucket
       final String key = "object-dir/object-name1";
-      TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
-          key, RandomUtils.nextBytes(1));
+      try (OzoneOutputStream outputStream = objectStore.getVolume(srcVolume)
+          .getBucket(srcBucket)
+          .createKey(key, 1)) {
+        outputStream.write(RandomUtils.nextBytes(1));
+      }
       assertEquals(objectStore.getVolume(srcVolume)
           .getBucket(srcBucket).getKey(key).getName(), key);
 
@@ -1537,8 +1546,11 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
       // add key to srcBucket
       final String key = "object-dir/object-name1";
-      TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
-          key, RandomUtils.nextBytes(1));
+      try (OzoneOutputStream outputStream = objectStore.getVolume(srcVolume)
+          .getBucket(srcBucket)
+          .createKey(key, 1)) {
+        outputStream.write(RandomUtils.nextBytes(1));
+      }
       assertEquals(objectStore.getVolume(srcVolume)
           .getBucket(srcBucket).getKey(key).getName(), key);
 
@@ -2219,8 +2231,12 @@ abstract class AbstractRootedOzoneFileSystemTest {
     Path bucketPathTest = new Path(volPathTest, bucketName);
 
     // write some test data into bucket
-    TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
-        key, new ECReplicationConfig("RS-3-2-1024k"), RandomUtils.nextBytes(1));
+    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
+        getBucket(bucketName).createKey(key, 1,
+            new ECReplicationConfig("RS-3-2-1024k"),
+            new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
     // make sure the disk usage matches the expected value
     Path filePath = new Path(bucketPathTest, key);
     ContentSummary contentSummary = ofs.getContentSummary(filePath);
@@ -2242,9 +2258,13 @@ abstract class AbstractRootedOzoneFileSystemTest {
     Path filePathTest = new Path(bucketPathTest, key);
 
     // write some test data into bucket
-    byte[] bytes = new byte[1];
-    TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
-        key, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), bytes);
+    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
+        getBucket(bucketName).createKey(key, 1,
+            RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE),
+            new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
     // make sure the disk usage matches the expected value
     ContentSummary contentSummary = ofs.getContentSummary(filePathTest);
     long length = contentSummary.getLength();
