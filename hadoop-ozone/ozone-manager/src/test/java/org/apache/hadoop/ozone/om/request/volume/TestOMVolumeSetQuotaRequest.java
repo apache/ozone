@@ -23,8 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.UUID;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -153,16 +155,10 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     // Creating OMVolumeSetQuotaRequest with SetProperty request set with owner.
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
-
-    omVolumeSetQuotaRequest.preExecute(ozoneManager);
-    OMClientResponse omClientResponse =
-        omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1);
-
-    OzoneManagerProtocolProtos.OMResponse omResponse =
-        omClientResponse.getOMResponse();
-    assertNotNull(omResponse.getCreateVolumeResponse());
-    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
-        omResponse.getStatus());
+    OMException exception = assertThrows(OMException.class,
+        () -> omVolumeSetQuotaRequest.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST,
+        exception.getResult());
   }
 
   @Test
