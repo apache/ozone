@@ -295,7 +295,7 @@ public class DiskBalancerManager {
 
     double volumeDensitySum = datanodeInfo.getStorageReports().stream()
         .map(report ->
-            Math.abs((double) ((report.getCapacity() - report.getRemaining()) / report.getCapacity())
+            Math.abs(((double) (report.getCapacity() - report.getRemaining())) / report.getCapacity()
                 - idealUsage))
         .mapToDouble(Double::valueOf).sum();
 

@@ -45,9 +45,9 @@ public class DefaultVolumeChoosingPolicy implements VolumeChoosingPolicy {
         .stream()
         .filter(volume ->
             Math.abs(
-                (double) (((volume.getCurrentUsage().getCapacity() - volume.getCurrentUsage().getAvailable())
-                    + deltaMap.getOrDefault(volume, 0L))
-                    / volume.getCurrentUsage().getCapacity()) - idealUsage) >= threshold)
+                ((double)((volume.getCurrentUsage().getCapacity() - volume.getCurrentUsage().getAvailable())
+                    + deltaMap.getOrDefault(volume, 0L)))
+                    / volume.getCurrentUsage().getCapacity() - idealUsage) >= threshold)
         .sorted((v1, v2) ->
             Double.compare(
                 (double) ((v2.getCurrentUsage().getCapacity() - v2.getCurrentUsage().getAvailable())
