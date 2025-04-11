@@ -154,27 +154,27 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
+    RocksDBCheckpointDiffer differ =
+        getDbStore().getRocksDBCheckpointDiffer();
+    DirectoryData sstBackupDir = new DirectoryData(tmpdir,
+        differ.getSSTBackupDir());
+    DirectoryData compactionLogDir = new DirectoryData(tmpdir,
+        differ.getCompactionLogDir());
+    // Files to be excluded from tarball
+    Map<String, Map<Path, Path>> sstFilesToExclude = normalizeExcludeList(toExcludeList,
+        checkpoint.getCheckpointLocation(), sstBackupDir);
+    boolean completed = getFilesForArchive(checkpoint, copyFiles,
+        hardLinkFiles, sstFilesToExclude, includeSnapshotData(request),
+        excludedList, sstBackupDir, compactionLogDir);
+    Map<Path, Path> flatCopyFiles = copyFiles.values().stream().flatMap(map -> map.entrySet().stream())
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
     try (TarArchiveOutputStream archiveOutputStream =
              new TarArchiveOutputStream(destination)) {
       archiveOutputStream
           .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
       archiveOutputStream
           .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
-      RocksDBCheckpointDiffer differ =
-          getDbStore().getRocksDBCheckpointDiffer();
-      DirectoryData sstBackupDir = new DirectoryData(tmpdir,
-          differ.getSSTBackupDir());
-      DirectoryData compactionLogDir = new DirectoryData(tmpdir,
-          differ.getCompactionLogDir());
-
-      // Files to be excluded from tarball
-      Map<String, Map<Path, Path>> sstFilesToExclude = normalizeExcludeList(toExcludeList,
-          checkpoint.getCheckpointLocation(), sstBackupDir);
-      boolean completed = getFilesForArchive(checkpoint, copyFiles,
-          hardLinkFiles, sstFilesToExclude, includeSnapshotData(request),
-          excludedList, sstBackupDir, compactionLogDir);
-      Map<Path, Path> flatCopyFiles = copyFiles.values().stream().flatMap(map -> map.entrySet().stream())
-          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       writeFilesToArchive(flatCopyFiles, hardLinkFiles, archiveOutputStream,
           completed, checkpoint.getCheckpointLocation());
     } catch (Exception e) {
