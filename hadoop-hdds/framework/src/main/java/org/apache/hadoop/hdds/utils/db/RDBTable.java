@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
@@ -51,7 +52,6 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
   private final RocksDatabase db;
   private final ColumnFamily family;
   private final RDBMetrics rdbMetrics;
-  private final RDBParallelTableOperator<byte[], byte[]> parallelTableOperator;
   private final ThrottledThreadpoolExecutor executor;
 
   /**
@@ -65,7 +65,6 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
     this.family = family;
     this.rdbMetrics = rdbMetrics;
     this.executor = executor;
-    this.parallelTableOperator = new RDBParallelTableOperator<>(executor, this, ByteArrayCodec.get());
   }
 
   public ColumnFamily getColumnFamily() {
@@ -221,16 +220,16 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
   }
 
   @Override
-  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator()
+  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(ManagedSnapshot snapshot)
       throws IOException {
-    return iterator((byte[])null);
+    return iterator((byte[])null, snapshot);
   }
 
   @Override
-  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix)
+  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix, ManagedSnapshot snapshot)
       throws IOException {
     TableIterator<byte[], AutoCloseSupplier<RawKeyValue<byte[]>>> itr  =
-        new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
+        new RDBStoreByteArrayIterator(db.newIterator(family, false, snapshot), this, prefix);
     return new TableIterator<byte[], KeyValue<byte[], byte[]>>() {
       @Override
       public void seekToFirst() {
@@ -273,9 +272,21 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
     };
   }
 
-  public TableIterator<byte[], AutoCloseSupplier<RawKeyValue<byte[]>>> closeableSupplierIterator(byte[] prefix)
+  @Override
+  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator()
       throws IOException {
-    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
+    return iterator((byte[])null);
+  }
+
+  @Override
+  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix)
+      throws IOException {
+    return iterator(prefix, null);
+  }
+
+  public TableIterator<byte[], AutoCloseSupplier<RawKeyValue<byte[]>>> closeableSupplierIterator(
+      byte[] prefix, ManagedSnapshot snapshot) throws IOException {
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false, snapshot), this, prefix);
   }
 
   @Override
@@ -283,7 +294,10 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
                                   CheckedFunction<KeyValue<byte[], byte[]>, Void, IOException> operation,
                                   Logger logger, int logPercentageThreshold)
       throws IOException, ExecutionException, InterruptedException {
-    this.parallelTableOperator.performTaskOnTableVals(startKey, endKey, operation, logger, logPercentageThreshold);
+    try(RDBSplitTableIteratorOp<byte[], byte[]> parallelTableOperator = new RDBSplitTableIteratorOp<>(executor, this,
+        ByteArrayCodec.get())) {
+      parallelTableOperator.performTaskOnTableVals(startKey, endKey, operation, logger, logPercentageThreshold);
+    }
   }
 
   @Override
@@ -300,8 +314,8 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
   }
 
   TableIterator<CodecBuffer, AutoCloseSupplier<RawKeyValue<CodecBuffer>>> iterator(
-      CodecBuffer prefix) throws IOException {
-    return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
+      CodecBuffer prefix, ManagedSnapshot snapshot) throws IOException {
+    return new RDBStoreCodecBufferIterator(db.newIterator(family, false, snapshot),
         this, prefix, executor.getMaxNumberOfThreads());
   }
 
@@ -444,5 +458,10 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
     return this.db.getSstFileList().stream()
         .filter(liveFileMetaData -> getName().equals(bytes2String(liveFileMetaData.columnFamilyName())))
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public ManagedSnapshot takeTableSnapshot() throws IOException {
+    return db.takeSnapshot();
   }
 }

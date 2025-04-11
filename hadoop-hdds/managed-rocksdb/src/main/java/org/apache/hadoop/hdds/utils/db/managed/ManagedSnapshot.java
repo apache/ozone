@@ -17,44 +17,25 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
+import java.util.function.Consumer;
+import org.rocksdb.Snapshot;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import org.apache.ratis.util.UncheckedAutoCloseable;
-import org.rocksdb.RocksObject;
+public class ManagedSnapshot extends ManagedObject<Snapshot> {
 
-/**
- * General template for a managed RocksObject.
- * @param <T>
- */
-class ManagedObject<T extends RocksObject> implements AutoCloseable {
-  private final T original;
-  private final UncheckedAutoCloseable leakTracker = track(this);
-  private volatile boolean isClosed = false;
+  private Consumer<ManagedSnapshot> snapshotCloseHandler;
 
-  ManagedObject(T original) {
-    this.original = original;
+  private ManagedSnapshot(Snapshot snapshot, Consumer<ManagedSnapshot> snapshotCloseHandler) {
+    super(snapshot);
+    this.snapshotCloseHandler = snapshotCloseHandler;
   }
 
-  public T get() {
-    return original;
+  public static ManagedSnapshot newManagedSnapshots(Snapshot snapshot, Consumer<ManagedSnapshot> snapshotCloseHandler) {
+    return new ManagedSnapshot(snapshot, snapshotCloseHandler);
   }
-
   @Override
   public void close() {
-    if (!isClosed) {
-      try {
-        original.close();
-      } finally {
-        leakTracker.close();
-      }
-      isClosed = true;
-    }
+    this.snapshotCloseHandler.accept(this);
+    super.close();
   }
 
-  public boolean isClosed() {
-    return isClosed;
-  }
 }

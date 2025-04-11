@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -32,14 +33,14 @@ import org.slf4j.Logger;
 /**
  * Class to iterate through a table in parallel by breaking table into multiple iterators for RDB store.
  */
-public abstract class ParallelTableOperator<TABLE extends Table<K, V>, K, V> {
+public abstract class SplitTableIteratorOp<TABLE extends Table<K, V>, K, V> {
   private final TABLE table;
   private final Codec<K> keyCodec;
   private final Comparator<K> comparator;
   private final ThrottledThreadpoolExecutor executor;
 
-  public ParallelTableOperator(ThrottledThreadpoolExecutor throttledThreadpoolExecutor,
-                               TABLE table, Codec<K> keyCodec) {
+  public SplitTableIteratorOp(ThrottledThreadpoolExecutor throttledThreadpoolExecutor,
+                              TABLE table, Codec<K> keyCodec) {
     this.executor = throttledThreadpoolExecutor;
     this.table = table;
     this.keyCodec = keyCodec;
@@ -52,13 +53,17 @@ public abstract class ParallelTableOperator<TABLE extends Table<K, V>, K, V> {
    */
   protected abstract List<K> getBounds(K startKey, K endKey) throws IOException;
 
+  protected TableIterator<K, ? extends Table.KeyValue<K, V>> newIterator() throws IOException {
+    return table.iterator();
+  }
+
   @SuppressWarnings("parameternumber")
   private <THROWABLE extends Throwable> CompletableFuture<Void> submit(
       CheckedFunction<Table.KeyValue<K, V>, Void, THROWABLE> keyOperation, K beg, K end,
       AtomicLong keyCounter, AtomicLong prevLogCounter, long logCountThreshold, Logger log,
       AtomicBoolean cancelled) throws InterruptedException {
     return executor.submit(() -> {
-      try (TableIterator<K, ? extends Table.KeyValue<K, V>> iter  = table.iterator()) {
+      try (TableIterator<K, ? extends Table.KeyValue<K, V>> iter  = newIterator()) {
         if (beg != null) {
           iter.seek(beg);
         } else {

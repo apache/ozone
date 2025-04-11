@@ -74,10 +74,9 @@ public class ParallelTableIterOperator<K, V> {
     });
   }
 
-  public  <THROWABLE extends Throwable> void performTaskOnTableVals(K startKey,
-      K endKey, CheckedFunction<Table.KeyValue<K, V>, Void, THROWABLE> keyOperation,
-      Logger log, long logCountThreshold)
-      throws ExecutionException, InterruptedException, IOException {
+  public <THROWABLE extends Throwable> void performTaskOnTableVals(
+      K startKey, K endKey, CheckedFunction<Table.KeyValue<K, V>, Void, THROWABLE> keyOperation,
+      Logger log, long logCountThreshold) throws ExecutionException, InterruptedException, IOException {
     AtomicLong keyCounter = new AtomicLong();
     AtomicLong prevLogCounter = new AtomicLong();
     if (startKey != null) {

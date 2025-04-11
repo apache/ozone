@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
 import org.rocksdb.LiveFileMetaData;
 
 /**
@@ -26,4 +28,27 @@ import org.rocksdb.LiveFileMetaData;
  */
 public interface BaseRDBTable<KEY, VALUE> extends Table<KEY, VALUE> {
   List<LiveFileMetaData> getTableSstFiles() throws IOException;
+
+  /**
+   * Take snapshot of the table.
+   */
+  ManagedSnapshot takeTableSnapshot() throws IOException;
+
+  /**
+   * Returns the iterator for this metadata store from a rocksdb snapshot.
+   *
+   * @return MetaStoreIterator
+   * @throws IOException on failure.
+   */
+  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(ManagedSnapshot snapshot)
+      throws IOException;
+
+  /**
+   * Returns a prefixed iterator for this metadata store to read from a snapshot.
+   * @param prefix
+   * @return MetaStoreIterator
+   */
+  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix, ManagedSnapshot snapshot)
+      throws IOException;
+
 }

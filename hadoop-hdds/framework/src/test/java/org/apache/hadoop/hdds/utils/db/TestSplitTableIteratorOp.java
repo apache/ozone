@@ -50,10 +50,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Test class for ParallelTableOperator.
  */
-public class TestParallelTableOperator {
+public class TestSplitTableIteratorOp {
 
   private static ThrottledThreadpoolExecutor executor;
-  private static final Logger LOG = LoggerFactory.getLogger(TestParallelTableOperator.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestSplitTableIteratorOp.class);
   private Map<Integer, Integer> visited;
 
   @BeforeAll
@@ -95,7 +95,7 @@ public class TestParallelTableOperator {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private void testParallelTableOperator(Table<Integer, Integer> intTable,
-      ParallelTableOperator<Table<Integer, Integer>, Integer, Integer> parallelTableOperator,
+      SplitTableIteratorOp<Table<Integer, Integer>, Integer, Integer> parallelTableOperator,
       int maxKeyIdx, int keyJumps, Integer start, Integer end, List<Integer> bounds,
       CheckedFunction<Table.KeyValue<Integer, Integer>, Void, IOException> opr, Supplier<Exception> expectedException)
       throws IOException, ExecutionException, InterruptedException {
@@ -164,14 +164,14 @@ public class TestParallelTableOperator {
       return null;
     };
 
-    ParallelTableOperator<Table<Integer, Integer>, Integer, Integer> parallelTableOperator =
-        new ParallelTableOperator<Table<Integer, Integer>, Integer, Integer>(executor, intTable, IntegerCodec.get()) {
+    SplitTableIteratorOp<Table<Integer, Integer>, Integer, Integer> splitTableIteratorOp =
+        new SplitTableIteratorOp<Table<Integer, Integer>, Integer, Integer>(executor, intTable, IntegerCodec.get()) {
           @Override
           protected List<Integer> getBounds(Integer startKey, Integer endKey) {
             return bounds;
           }
         };
-    testParallelTableOperator(intTable, parallelTableOperator, maxKeyIdx, keyJumps, start, end, bounds, opr, null);
+    testParallelTableOperator(intTable, splitTableIteratorOp, maxKeyIdx, keyJumps, start, end, bounds, opr, null);
   }
 
 
@@ -190,14 +190,14 @@ public class TestParallelTableOperator {
       return null;
     };
 
-    ParallelTableOperator<Table<Integer, Integer>, Integer, Integer> parallelTableOperator =
-        new ParallelTableOperator<Table<Integer, Integer>, Integer, Integer>(executor, intTable, IntegerCodec.get()) {
+    SplitTableIteratorOp<Table<Integer, Integer>, Integer, Integer> splitTableIteratorOp =
+        new SplitTableIteratorOp<Table<Integer, Integer>, Integer, Integer>(executor, intTable, IntegerCodec.get()) {
           @Override
           protected List<Integer> getBounds(Integer startKey, Integer endKey) throws IOException {
             throw new IOException("Exception while getting bounds");
           }
         };
-    testParallelTableOperator(intTable, parallelTableOperator, maxKeyIdx, keyJumps, start, end, bounds, opr, null);
+    testParallelTableOperator(intTable, splitTableIteratorOp, maxKeyIdx, keyJumps, start, end, bounds, opr, null);
   }
 
   @ParameterizedTest
@@ -224,14 +224,14 @@ public class TestParallelTableOperator {
       return null;
     };
 
-    ParallelTableOperator<Table<Integer, Integer>, Integer, Integer> parallelTableOperator =
-        new ParallelTableOperator<Table<Integer, Integer>, Integer, Integer>(executor, intTable, IntegerCodec.get()) {
+    SplitTableIteratorOp<Table<Integer, Integer>, Integer, Integer> splitTableIteratorOp =
+        new SplitTableIteratorOp<Table<Integer, Integer>, Integer, Integer>(executor, intTable, IntegerCodec.get()) {
           @Override
           protected List<Integer> getBounds(Integer startKey, Integer endKey) {
             return bounds;
           }
         };
-    testParallelTableOperator(intTable, parallelTableOperator, maxKeyIdx, keyJumps, start, end, bounds, opr,
+    testParallelTableOperator(intTable, splitTableIteratorOp, maxKeyIdx, keyJumps, start, end, bounds, opr,
         () -> new IOException("Exception while getting bounds for key " + minException.get()));
   }
 }

@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -71,7 +72,6 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
   private final CodecBuffer.Capacity bufferCapacity
       = new CodecBuffer.Capacity(this, BUFFER_SIZE_DEFAULT);
   private final TableCache<KEY, VALUE> cache;
-  private final RDBParallelTableOperator<KEY, VALUE> parallelTableOperator;
   private final ThrottledThreadpoolExecutor executor;
 
   /**
@@ -143,7 +143,6 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
     } else {
       cache = TableNoCache.instance();
     }
-    this.parallelTableOperator = new RDBParallelTableOperator<>(throttledThreadpoolExecutor, this, keyCodec);
     executor = throttledThreadpoolExecutor;
   }
 
@@ -432,16 +431,26 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
 
   @Override
   public Table.KeyValueIterator<KEY, VALUE> iterator() throws IOException {
-    return iterator(null);
+    return iterator((KEY)null);
   }
 
   @Override
-  public Table.KeyValueIterator<KEY, VALUE> iterator(KEY prefix)
+  public Table.KeyValueIterator<KEY, VALUE> iterator(KEY prefix) throws IOException {
+    return iterator(prefix, null);
+  }
+
+  @Override
+  public Table.KeyValueIterator<KEY, VALUE> iterator(ManagedSnapshot snapshot) throws IOException {
+    return iterator(null, snapshot);
+  }
+
+  @Override
+  public Table.KeyValueIterator<KEY, VALUE> iterator(KEY prefix, ManagedSnapshot snapshot)
       throws IOException {
     if (supportCodecBuffer) {
       final CodecBuffer prefixBuffer = encodeKeyCodecBuffer(prefix);
       try {
-        return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer));
+        return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer, snapshot));
       } catch (Throwable t) {
         if (prefixBuffer != null) {
           prefixBuffer.release();
@@ -450,7 +459,7 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
       }
     } else {
       final byte[] prefixBytes = encodeKey(prefix);
-      return new TypedTableIterator(rawTable.closeableSupplierIterator(prefixBytes));
+      return new TypedTableIterator(rawTable.closeableSupplierIterator(prefixBytes, snapshot));
     }
   }
 
@@ -458,7 +467,10 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
   public void splitTableOperation(
       KEY startKey, KEY endKey, CheckedFunction<KeyValue<KEY, VALUE>, Void, IOException> operation,
       Logger logger, int logPercentageThreshold) throws IOException, ExecutionException, InterruptedException {
-    this.parallelTableOperator.performTaskOnTableVals(startKey, endKey, operation, logger, logPercentageThreshold);
+    try (RDBSplitTableIteratorOp<KEY, VALUE> splitTableIteratorOp = new RDBSplitTableIteratorOp<>(executor, this,
+        keyCodec)) {
+      splitTableIteratorOp.performTaskOnTableVals(startKey, endKey, operation, logger, logPercentageThreshold);
+    }
   }
 
   @Override
@@ -466,7 +478,7 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
                                      CheckedFunction<KeyValue<KEY, VALUE>, Void, IOException> operation, Logger logger,
                                      int logPercentageThreshold)
       throws IOException, ExecutionException, InterruptedException {
-    try (TableIterator<KEY, KeyValue<KEY, VALUE>> itr = iterator()) {
+    try (TableIterator<KEY, KeyValue<KEY, VALUE>> itr = iterator((KEY)null)) {
       ParallelTableIterOperator<KEY, VALUE> parallelTableIterOperator =
           new ParallelTableIterOperator<>(this.getName(), executor, itr, keyCodec.comparator());
       long logCountThreshold = Math.max((this.getEstimatedKeyCount() * logPercentageThreshold) / 100, 1L);
@@ -591,6 +603,11 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
   @Override
   public List<LiveFileMetaData> getTableSstFiles() throws IOException {
     return rawTable.getTableSstFiles();
+  }
+
+  @Override
+  public ManagedSnapshot takeTableSnapshot() throws IOException {
+    return rawTable.takeTableSnapshot();
   }
 
   /**

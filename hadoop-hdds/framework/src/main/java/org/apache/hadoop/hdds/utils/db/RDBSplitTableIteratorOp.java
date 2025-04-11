@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -24,16 +25,22 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
 import org.rocksdb.LiveFileMetaData;
+import org.rocksdb.RocksDBException;
 
 /**
  * Class to iterate through a table in parallel by breaking table into multiple iterators for RDB store.
  */
-public class RDBParallelTableOperator<K, V> extends ParallelTableOperator<BaseRDBTable<K, V>, K, V> {
+public class RDBSplitTableIteratorOp<K, V> extends SplitTableIteratorOp<BaseRDBTable<K, V>, K, V> implements Closeable {
 
-  public RDBParallelTableOperator(ThrottledThreadpoolExecutor throttledThreadpoolExecutor,
-                                  BaseRDBTable<K, V> table, Codec<K> keyCodec) {
+  private final ManagedSnapshot snapshot;
+
+  public RDBSplitTableIteratorOp(
+      ThrottledThreadpoolExecutor throttledThreadpoolExecutor,
+      BaseRDBTable<K, V> table, Codec<K> keyCodec) throws IOException {
     super(throttledThreadpoolExecutor, table, keyCodec);
+    this.snapshot = getTable().takeTableSnapshot();
   }
 
   @Override
@@ -51,5 +58,15 @@ public class RDBParallelTableOperator<K, V> extends ParallelTableOperator<BaseRD
             .collect(Collectors.toList()));
     boundKeys.add(endKey);
     return boundKeys;
+  }
+
+  @Override
+  protected final TableIterator<K, ? extends Table.KeyValue<K, V>> newIterator() throws IOException {
+    return getTable().iterator(this.snapshot);
+  }
+
+  @Override
+  public void close() throws IOException {
+    this.snapshot.close();
   }
 }

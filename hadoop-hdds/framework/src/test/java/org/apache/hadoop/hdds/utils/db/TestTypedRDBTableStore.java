@@ -248,7 +248,7 @@ public class TestTypedRDBTableStore {
   @Test
   public void testIteratorOnException() throws Exception {
     RDBTable rdbTable = mock(RDBTable.class);
-    when(rdbTable.iterator((CodecBuffer) null))
+    when(rdbTable.iterator((CodecBuffer) null, null))
         .thenThrow(new IOException());
     try (Table<String, String> testTable = new TypedTable<>(rdbTable,
         codecRegistry, String.class, String.class, rdbStore.getParallelTableIteratorPool())) {
