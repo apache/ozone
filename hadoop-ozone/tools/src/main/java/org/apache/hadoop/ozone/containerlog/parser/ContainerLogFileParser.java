@@ -80,7 +80,7 @@ public class ContainerLogFileParser {
         
         String datanodeId = fileName.substring(pos + 5);
         
-        if (datanodeId.trim().isEmpty()) {
+        if (datanodeId.isEmpty()) {
           System.out.println("Filename format is incorrect, datanodeId is missing or empty: " + fileName);
           continue;
         }
