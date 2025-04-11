@@ -19,6 +19,9 @@ package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.io.Serializable;
+import java.util.Comparator;
+import java.util.Objects;
 
 /**
  * Codec interface to serialize/deserialize objects to/from bytes.
@@ -29,6 +32,7 @@ import java.io.IOException;
  */
 public interface Codec<T> {
   byte[] EMPTY_BYTE_ARRAY = {};
+  ByteArrayComparator COMPARATOR = new ByteArrayComparator();
 
   /** @return the class of the {@link T}. */
   Class<T> getTypeClass();
@@ -112,4 +116,36 @@ public interface Codec<T> {
    *         the returned object can possibly be the same as the given object.
    */
   T copyObject(T object);
+
+  /**
+   * @return Comparator for the given type of object.
+   */
+  default Comparator<T> comparator() {
+    return (o1, o2) -> {
+      try {
+        byte[] a1 = o1 == null ? null : toPersistedFormat(o1);
+        byte[] a2 = o2 == null ? null : toPersistedFormat(o2);
+        return Objects.compare(a1, a2, COMPARATOR);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    };
+  }
+
+  /**
+   * Comparator to compare 2 byte arrays based on their relative lexicographical ordering.
+   */
+  class ByteArrayComparator implements Comparator<byte[]>, Serializable {
+    @Override
+    public int compare(byte[] o1, byte[] o2) {
+      int len = Math.min(o1.length, o2.length);
+      for (int i = 0; i < len; i++) {
+        int cmp = Byte.toUnsignedInt(o1[i]) - Byte.toUnsignedInt(o2[i]);
+        if (cmp != 0) {
+          return cmp;
+        }
+      }
+      return Integer.compare(o1.length, o2.length);
+    }
+  }
 }

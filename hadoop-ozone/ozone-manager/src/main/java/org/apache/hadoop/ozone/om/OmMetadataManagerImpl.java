@@ -25,6 +25,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_PARALLEL_ITERATOR_MAX_POOL_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_PARALLEL_ITERATOR_MAX_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
@@ -393,7 +395,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     int maxOpenFiles = conf.getInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
     setStore(loadDB(conf, dir, name, true, Optional.of(Boolean.TRUE),
-        maxOpenFiles, false, false, true));
+        maxOpenFiles, false, false, true, Optional.empty()));
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
   }
@@ -425,10 +427,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         // Check if the snapshot directory exists.
         checkSnapshotDirExist(checkpoint);
       }
+      int parallelTableIteratorMaxPoolSize = conf.getInt(OZONE_OM_SNAPSHOT_DB_PARALLEL_ITERATOR_MAX_POOL_SIZE,
+          OZONE_OM_SNAPSHOT_DB_PARALLEL_ITERATOR_MAX_POOL_SIZE_DEFAULT);
       setStore(loadDB(conf, metaDir, dbName, false,
           java.util.Optional.of(Boolean.TRUE), maxOpenFiles, false, false,
           conf.getBoolean(OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED,
-              OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT)));
+              OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT), Optional.of(parallelTableIteratorMaxPoolSize)));
       initializeOmTables(CacheType.PARTIAL_CACHE, false);
     } catch (IOException e) {
       stop();
@@ -572,7 +576,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles) throws IOException {
     return loadDB(configuration, metaDir, OM_DB_NAME, false,
-        java.util.Optional.empty(), maxOpenFiles, true, true, true);
+        java.util.Optional.empty(), maxOpenFiles, true, true, true, Optional.empty());
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
@@ -582,7 +586,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       int maxOpenFiles,
       boolean enableCompactionDag,
       boolean createCheckpointDirs,
-      boolean enableRocksDBMetrics)
+      boolean enableRocksDBMetrics,
+      Optional<Integer> parallelTableIteratorMaxPoolSize)
       throws IOException {
     RocksDBConfiguration rocksDBConfiguration =
         configuration.getObject(RocksDBConfiguration.class);
@@ -596,6 +601,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setEnableRocksDbMetrics(enableRocksDBMetrics);
     disableAutoCompaction.ifPresent(
             dbStoreBuilder::disableDefaultCFAutoCompaction);
+    parallelTableIteratorMaxPoolSize.ifPresent(dbStoreBuilder::setParallelTableIteratorMaxPoolSize);
     return addOMTablesAndCodecs(dbStoreBuilder).build();
   }
 

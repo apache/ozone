@@ -19,12 +19,15 @@ package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
 import java.nio.ByteBuffer;
+import java.util.Comparator;
+import java.util.Objects;
 
 /**
  * Codec to serialize/deserialize {@link Long}.
  */
 public final class LongCodec implements Codec<Long> {
   private static final LongCodec CODEC = new LongCodec();
+  private static final Comparator<Long> COMPARATOR = (o1, o2) -> Objects.compare(o1, o2, Long::compare);
 
   public static LongCodec get() {
     return CODEC;
@@ -73,5 +76,10 @@ public final class LongCodec implements Codec<Long> {
   @Override
   public Long copyObject(Long object) {
     return object;
+  }
+
+  @Override
+  public Comparator<Long> comparator() {
+    return COMPARATOR;
   }
 }

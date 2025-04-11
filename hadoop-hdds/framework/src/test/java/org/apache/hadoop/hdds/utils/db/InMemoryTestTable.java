@@ -23,12 +23,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.ratis.util.function.CheckedFunction;
+import org.slf4j.Logger;
 
 /**
  * InMemory Table implementation for tests.
  */
 public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
-  private final Map<KEY, VALUE> map = new ConcurrentHashMap<>();
+  private final Map<KEY, VALUE> map;
+  private final Codec<KEY> keyCodec;
+
+  public InMemoryTestTable(Codec<KEY> keyCodec) {
+    this.keyCodec = keyCodec;
+    this.map = new ConcurrentHashMap<>();
+  }
 
   @Override
   public void close() {
@@ -80,12 +88,19 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator() {
-    throw new UnsupportedOperationException();
+  public TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator() throws IOException {
+    return new InMemoryTestTableIterator<>(this.map, null, this.keyCodec);
   }
 
   @Override
-  public TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix) {
+  public TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix) throws IOException {
+    return new InMemoryTestTableIterator<>(this.map, prefix, this.keyCodec);
+  }
+
+  @Override
+  public void parallelTableOperation(
+      KEY startKey, KEY endKey, CheckedFunction<KeyValue<KEY, VALUE>, Void, IOException> operation,
+      Logger logger, int logPercentageThreshold) {
     throw new UnsupportedOperationException();
   }
 

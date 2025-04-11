@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.metadata;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.util.Comparator;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
 /**
@@ -27,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 public final class BigIntegerCodec implements Codec<BigInteger> {
 
   private static final Codec<BigInteger> INSTANCE = new BigIntegerCodec();
+  private static final Comparator<BigInteger> COMPARATOR = (o1, o2) -> Objects.compare(o1, o2, BigInteger::compareTo);
 
   public static Codec<BigInteger> get() {
     return INSTANCE;
@@ -54,5 +57,10 @@ public final class BigIntegerCodec implements Codec<BigInteger> {
   @Override
   public BigInteger copyObject(BigInteger object) {
     return object;
+  }
+
+  @Override
+  public Comparator<BigInteger> comparator() {
+    return COMPARATOR;
   }
 }

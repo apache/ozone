@@ -23,12 +23,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.ratis.util.function.CheckedFunction;
+import org.slf4j.Logger;
 
 /**
  * Interface for key-value store that stores ozone metadata. Ozone metadata is
@@ -172,6 +175,22 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix)
       throws IOException;
+
+  /**
+   * Performs an operation by parallely iterating through the table by splitting table into multiple threads.
+   * To be used where order of keys don't matter while operating on the table key value.
+   * @param startKey startKey to begin iteration from. When null iteration should happen from the smallest key in the
+   *                 table.
+   * @param endKey endKey to end(exclusive) iteration. When null iteration will happen till the largest key in the
+   *               table.
+   * @param operation operation to be performed on the key value.
+   *                  @param logger Logger to log iterator status.
+   * @param logPercentageThreshold Percentage b/w [1-100] which would be used to log table iteration.
+   */
+  void parallelTableOperation(
+      KEY startKey, KEY endKey, CheckedFunction<KeyValue<KEY, VALUE>, Void, IOException> operation,
+      Logger logger, int logPercentageThreshold)
+      throws IOException, ExecutionException, InterruptedException;
 
   /**
    * Returns the Name of this Table.

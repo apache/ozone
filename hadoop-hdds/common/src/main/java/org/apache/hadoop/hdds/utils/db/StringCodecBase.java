@@ -26,6 +26,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
+import java.util.Comparator;
 import java.util.Objects;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.StringUtils;
@@ -39,6 +40,7 @@ import org.slf4j.LoggerFactory;
  */
 abstract class StringCodecBase implements Codec<String> {
   static final Logger LOG = LoggerFactory.getLogger(StringCodecBase.class);
+  private static final Comparator<String> COMPARATOR = (o1, o2) -> Objects.compare(o1, o2, String::compareTo);
 
   private final Charset charset;
   private final boolean fixedLength;
@@ -196,5 +198,10 @@ abstract class StringCodecBase implements Codec<String> {
   @Override
   public String copyObject(String object) {
     return object;
+  }
+
+  @Override
+  public Comparator<String> comparator() {
+    return COMPARATOR;
   }
 }

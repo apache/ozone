@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
@@ -43,6 +44,9 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
+import org.apache.ratis.util.function.CheckedFunction;
+import org.rocksdb.LiveFileMetaData;
+import org.slf4j.Logger;
 
 /**
  * Strongly typed table implementation.
@@ -53,7 +57,7 @@ import org.apache.ratis.util.function.CheckedBiFunction;
  * @param <KEY>   type of the keys in the store.
  * @param <VALUE> type of the values in the store.
  */
-public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
+public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
   private static final long EPOCH_DEFAULT = -1L;
   static final int BUFFER_SIZE_DEFAULT = 4 << 10; // 4 KB
 
@@ -67,14 +71,16 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   private final CodecBuffer.Capacity bufferCapacity
       = new CodecBuffer.Capacity(this, BUFFER_SIZE_DEFAULT);
   private final TableCache<KEY, VALUE> cache;
+  private final RDBParallelTableOperator<KEY, VALUE> parallelTableOperator;
 
   /**
    * The same as this(rawTable, codecRegistry, keyType, valueType,
    *                  CacheType.PARTIAL_CACHE).
    */
-  TypedTable(RDBTable rawTable, CodecRegistry codecRegistry, Class<KEY> keyType, Class<VALUE> valueType)
+  TypedTable(RDBTable rawTable, CodecRegistry codecRegistry, Class<KEY> keyType, Class<VALUE> valueType,
+             ThrottledThreadpoolExecutor throttledThreadpoolExecutor)
       throws IOException {
-    this(rawTable, codecRegistry, keyType, valueType, CacheType.PARTIAL_CACHE);
+    this(rawTable, codecRegistry, keyType, valueType, CacheType.PARTIAL_CACHE, throttledThreadpoolExecutor);
   }
 
   /**
@@ -88,9 +94,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * @throws IOException if failed to iterate the raw table.
    */
   TypedTable(RDBTable rawTable, CodecRegistry codecRegistry, Class<KEY> keyType, Class<VALUE> valueType,
-      CacheType cacheType) throws IOException {
+      CacheType cacheType, ThrottledThreadpoolExecutor throttledThreadpoolExecutor) throws IOException {
     this(rawTable, codecRegistry.getCodecFromClass(keyType), codecRegistry.getCodecFromClass(valueType),
-        cacheType);
+        cacheType, throttledThreadpoolExecutor);
   }
 
   /**
@@ -102,8 +108,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * @param cacheType How to cache the entries?
    * @throws IOException
    */
-  public TypedTable(
-      RDBTable rawTable, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, CacheType cacheType) throws IOException {
+  public TypedTable(RDBTable rawTable, Codec<KEY> keyCodec, Codec<VALUE> valueCodec,
+                    CacheType cacheType,
+                    ThrottledThreadpoolExecutor throttledThreadpoolExecutor) throws IOException {
     this.rawTable = Objects.requireNonNull(rawTable, "rawTable==null");
     this.keyCodec = Objects.requireNonNull(keyCodec, "keyCodec == null");
     this.valueCodec = Objects.requireNonNull(valueCodec, "valueCodec == null");
@@ -135,6 +142,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     } else {
       cache = TableNoCache.instance();
     }
+    this.parallelTableOperator = new RDBParallelTableOperator<>(throttledThreadpoolExecutor, this, keyCodec);
   }
 
   private CodecBuffer encodeKeyCodecBuffer(KEY key) throws IOException {
@@ -445,6 +453,13 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public void parallelTableOperation(
+      KEY startKey, KEY endKey, CheckedFunction<KeyValue<KEY, VALUE>, Void, IOException> operation,
+      Logger logger, int logPercentageThreshold) throws IOException, ExecutionException, InterruptedException {
+    this.parallelTableOperator.performTaskOnTableVals(startKey, endKey, operation, logger, logPercentageThreshold);
+  }
+
+  @Override
   public String getName() {
     return rawTable.getName();
   }
@@ -556,6 +571,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @VisibleForTesting
   TableCache<KEY, VALUE> getCache() {
     return cache;
+  }
+
+  @Override
+  public List<LiveFileMetaData> getTableSstFiles() throws IOException {
+    return rawTable.getTableSstFiles();
   }
 
   /**

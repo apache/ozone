@@ -19,6 +19,9 @@ package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.Comparator;
+import java.util.Objects;
 import org.apache.ratis.util.function.CheckedFunction;
 
 /**
@@ -127,5 +130,19 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
     } catch (IOException e) {
       throw new IllegalStateException("Failed to copyObject", e);
     }
+  }
+
+  @Override
+  public Comparator<T> comparator() {
+    return (o1, o2) -> {
+      try {
+        DELEGATE d1 = o1 == null ? null : backward.apply(o1);
+        DELEGATE d2 = o2 == null ? null : backward.apply(o2);
+        return Objects.compare(d1, d2, delegate.comparator());
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+
+    };
   }
 }

@@ -62,7 +62,7 @@ public class TestRDBStore {
       throws IOException {
     return new RDBStore(dbFile, options, null, new ManagedWriteOptions(), families,
         CodecRegistry.newBuilder().build(), false, null, false,
-        maxDbUpdatesSizeThreshold, true, null, true);
+        maxDbUpdatesSizeThreshold, true, null, true, 5);
   }
 
   public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;

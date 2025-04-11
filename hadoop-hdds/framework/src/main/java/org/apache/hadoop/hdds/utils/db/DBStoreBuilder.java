@@ -106,6 +106,7 @@ public final class DBStoreBuilder {
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
   private Integer maxNumberOfOpenFiles = null;
+  private int parallelTableIteratorMaxPoolSize;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -156,7 +157,10 @@ public final class DBStoreBuilder {
     this.maxDbUpdatesSizeThreshold = (long) configuration.getStorageSize(
         OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT,
         OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT, StorageUnit.BYTES);
+    this.parallelTableIteratorMaxPoolSize = rocksDBConfiguration.getParallelIteratorMaxPoolSize();
   }
+
+
 
   public static File getDBDirPath(DBDefinition definition,
                                   ConfigurationSource configuration) {
@@ -201,6 +205,10 @@ public final class DBStoreBuilder {
     }
   }
 
+  public void setParallelTableIteratorMaxPoolSize(int parallelTableIteratorMaxPoolSize) {
+    this.parallelTableIteratorMaxPoolSize = parallelTableIteratorMaxPoolSize;
+  }
+
   /**
    * Builds a DBStore instance and returns that.
    *
@@ -227,11 +235,13 @@ public final class DBStoreBuilder {
       if (!dbFile.getParentFile().exists()) {
         throw new IOException("The DB destination directory should exist.");
       }
-
+      if (this.parallelTableIteratorMaxPoolSize == 0) {
+        throw new IOException("The parallel table iterator max pool size cannot be zero.");
+      }
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
           registry.build(), openReadOnly, dbJmxBeanNameName, enableCompactionDag,
           maxDbUpdatesSizeThreshold, createCheckpointDirs, configuration,
-          enableRocksDbMetrics);
+          enableRocksDbMetrics, this.parallelTableIteratorMaxPoolSize);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }

@@ -211,6 +211,11 @@ public interface DBStore extends Closeable, BatchOperationHandler {
       throws IOException;
 
   /**
+   * Gets the executor pool parallel table iterator.
+   */
+  ThrottledThreadpoolExecutor getParallelTableIteratorPool();
+
+  /**
    * Return if the underlying DB is closed. This call is thread safe.
    * @return true if the DB is closed.
    */

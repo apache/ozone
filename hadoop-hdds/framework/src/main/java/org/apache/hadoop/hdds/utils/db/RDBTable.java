@@ -17,16 +17,22 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.utils.db.RocksDatabase.bytes2String;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.ratis.util.function.CheckedFunction;
+import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * metadata store content. All other user's using Table should use TypedTable.
  */
 @InterfaceAudience.Private
-class RDBTable implements Table<byte[], byte[]> {
+class RDBTable implements BaseRDBTable<byte[], byte[]> {
 
 
   private static final Logger LOG =
@@ -45,6 +51,7 @@ class RDBTable implements Table<byte[], byte[]> {
   private final RocksDatabase db;
   private final ColumnFamily family;
   private final RDBMetrics rdbMetrics;
+  private final RDBParallelTableOperator<byte[], byte[]> parallelTableOperator;
 
   /**
    * Constructs a TableStore.
@@ -52,11 +59,11 @@ class RDBTable implements Table<byte[], byte[]> {
    * @param db - DBstore that we are using.
    * @param family - ColumnFamily Handle.
    */
-  RDBTable(RocksDatabase db, ColumnFamily family,
-      RDBMetrics rdbMetrics) {
+  RDBTable(RocksDatabase db, ColumnFamily family, RDBMetrics rdbMetrics, ThrottledThreadpoolExecutor executor) {
     this.db = db;
     this.family = family;
     this.rdbMetrics = rdbMetrics;
+    this.parallelTableOperator = new RDBParallelTableOperator<>(executor, this, ByteArrayCodec.get());
   }
 
   public ColumnFamily getColumnFamily() {
@@ -224,6 +231,14 @@ class RDBTable implements Table<byte[], byte[]> {
         prefix);
   }
 
+  @Override
+  public void parallelTableOperation(byte[] startKey, byte[] endKey,
+                                     CheckedFunction<KeyValue<byte[], byte[]>, Void, IOException> operation,
+                                     Logger logger, int logPercentageThreshold)
+      throws IOException, ExecutionException, InterruptedException {
+    this.parallelTableOperator.performTaskOnTableVals(startKey, endKey, operation, logger, logPercentageThreshold);
+  }
+
   TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> iterator(
       CodecBuffer prefix) throws IOException {
     return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
@@ -362,5 +377,12 @@ class RDBTable implements Table<byte[], byte[]> {
       }
     }
     return result;
+  }
+
+  @Override
+  public List<LiveFileMetaData> getTableSstFiles() throws IOException {
+    return this.db.getSstFileList().stream()
+        .filter(liveFileMetaData -> getName().equals(bytes2String(liveFileMetaData.columnFamilyName())))
+        .collect(Collectors.toList());
   }
 }
