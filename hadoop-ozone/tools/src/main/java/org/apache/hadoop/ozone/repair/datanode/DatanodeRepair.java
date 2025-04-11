@@ -15,7 +15,22 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.repair.datanode;
+
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
+import org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeContainerSchema;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
+
 /**
- * Contains all of the container related scm commands.
+ * Ozone Repair CLI for Datanode.
  */
-package org.apache.hadoop.hdds.scm.cli.container.upgrade;
+@CommandLine.Command(name = "datanode",
+    subcommands = {
+        UpgradeContainerSchema.class,
+    },
+    description = "Tools to repair Datanode")
+@MetaInfServices(RepairSubcommand.class)
+public class DatanodeRepair implements RepairSubcommand {
+
+}
