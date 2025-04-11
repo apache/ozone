@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +79,7 @@ public final class ReplicationManagerUtil {
     // Ensure that target datanodes have enough space to hold a complete
     // container.
     final long dataSizeRequired =
-        Math.max(container.getUsedBytes(), defaultContainerSize);
+        HddsServerUtil.requiredReplicationSpace(Math.max(container.getUsedBytes(), defaultContainerSize));
 
     int mutableRequiredNodes = requiredNodes;
     while (mutableRequiredNodes > 0) {

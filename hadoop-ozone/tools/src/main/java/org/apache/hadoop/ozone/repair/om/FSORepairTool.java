@@ -77,7 +77,7 @@ import picocli.CommandLine;
         "OM should be stopped while this tool is run."
 )
 public class FSORepairTool extends RepairTool {
-  public static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
+  private static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
   private static final String REACHABLE_TABLE = "reachable";
 
   @CommandLine.Option(names = {"--db"},
@@ -92,10 +92,6 @@ public class FSORepairTool extends RepairTool {
   @CommandLine.Option(names = {"-b", "--bucket"},
       description = "Filter by bucket name")
   private String bucketFilter;
-
-  @CommandLine.Option(names = {"--verbose"},
-      description = "Verbose output. Show all intermediate steps.")
-  private boolean verbose;
 
   @Nonnull
   @Override
@@ -112,7 +108,7 @@ public class FSORepairTool extends RepairTool {
       throw new IllegalArgumentException("FSO repair failed: " + ex.getMessage());
     }
 
-    if (verbose) {
+    if (isVerbose()) {
       info("FSO repair finished.");
     }
   }
@@ -407,7 +403,7 @@ public class FSORepairTool extends RepairTool {
         // directory delete. It is also not possible here if the file's parent
         // is gone. The name of the key does not matter so just use IDs.
         deletedTable.putWithBatch(batch, fileKey, updatedRepeatedOmKeyInfo);
-        if (verbose) {
+        if (isVerbose()) {
           info("Added entry " + fileKey + " to open key table: " + updatedRepeatedOmKeyInfo);
         }
         store.commitBatchOperation(batch);

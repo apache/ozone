@@ -17,11 +17,11 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone-fault-injection-test</artifactId>
-    <version>2.0.0-SNAPSHOT</version>
+    <version>2.1.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>mini-chaos-tests</artifactId>
-  <version>2.0.0-SNAPSHOT</version>
+  <version>2.1.0-SNAPSHOT</version>
   <name>Apache Ozone Mini Ozone Chaos Tests</name>
   <description>Apache Ozone Mini Ozone Chaos Tests</description>
 
@@ -67,12 +67,22 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-mini-cluster</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-recon</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-tools</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

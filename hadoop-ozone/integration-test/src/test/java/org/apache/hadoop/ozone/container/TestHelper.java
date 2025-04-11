@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.security.MessageDigest;
@@ -36,6 +37,7 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -443,5 +445,31 @@ public final class TestHelper {
       MiniOzoneCluster cluster) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
         200, 30000);
+  }
+
+  /** Helper to set config even if {@code value} is null, which
+   * {@link OzoneConfiguration#set(String, String) does not allow. */
+  public static void setConfig(OzoneConfiguration conf, String key, String value) {
+    if (value == null) {
+      conf.unset(key);
+    } else {
+      conf.set(key, value);
+    }
+  }
+
+  public static void waitForContainerStateInSCM(StorageContainerManager scm,
+      ContainerID containerID, HddsProtos.LifeCycleState expectedState)
+      throws TimeoutException, InterruptedException {
+    ContainerManager containerManager = scm.getContainerManager();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return containerManager.getContainer(containerID).getState() == expectedState;
+      } catch (ContainerNotFoundException e) {
+        LOG.error("Container {} not found while waiting for state {}", 
+            containerID, expectedState, e);
+        fail("Container " + containerID + " not found while waiting for state " + expectedState + ": " + e);
+        return false;
+      }
+    }, 2000, 20000);
   }
 }

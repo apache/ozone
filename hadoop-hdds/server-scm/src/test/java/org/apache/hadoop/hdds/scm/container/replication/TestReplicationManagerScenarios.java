@@ -130,6 +130,7 @@ public class TestReplicationManagerScenarios {
 
   private static List<Scenario> loadTestsInFile(URI testFile)
       throws IOException {
+    System.out.println("Loading test file: " + testFile);
     ObjectReader reader = new ObjectMapper().readerFor(Scenario.class);
     try (InputStream stream = testFile.toURL().openStream()) {
       try (MappingIterator<Scenario> iterator = reader.readValues(stream)) {
@@ -332,11 +333,10 @@ public class TestReplicationManagerScenarios {
       boolean found = false;
       for (Pair<UUID, SCMCommand<?>> command : commandsSent) {
         if (command.getRight().getType() == expectedCommand.getType()) {
-          DatanodeDetails targetDatanode = expectedCommand.getTargetDatanode();
-          if (targetDatanode != null) {
+          if (expectedCommand.hasExpectedDatanode()) {
             // We need to assert against the command the datanode is sent to
             DatanodeDetails commandDatanode = findDatanodeFromUUID(command.getKey());
-            if (commandDatanode != null && commandDatanode.equals(targetDatanode)) {
+            if (commandDatanode != null && expectedCommand.isTargetExpected(commandDatanode)) {
               found = true;
               commandsSent.remove(command);
               break;
@@ -447,12 +447,12 @@ public class TestReplicationManagerScenarios {
     public ContainerReplica buildContainerReplica() {
       createDatanodeDetails();
       createOrigin();
-      NODE_STATUS_MAP.put(datanodeDetails, new NodeStatus(operationalState, healthState));
+      NODE_STATUS_MAP.put(datanodeDetails, NodeStatus.valueOf(operationalState, healthState));
       datanodeDetails.setPersistedOpState(operationalState);
 
       ContainerReplica.ContainerReplicaBuilder builder = new ContainerReplica.ContainerReplicaBuilder();
       return builder.setReplicaIndex(index)
-          .setContainerID(new ContainerID(containerId))
+          .setContainerID(ContainerID.valueOf(containerId))
           .setContainerState(state)
           .setSequenceId(sequenceId)
           .setDatanodeDetails(datanodeDetails)
@@ -550,6 +550,7 @@ public class TestReplicationManagerScenarios {
   public static class ExpectedCommands {
     private SCMCommandProto.Type type;
     private String datanode;
+    private Set<DatanodeDetails> expectedDatanodes;
 
     public void setDatanode(String datanode) {
       this.datanode = datanode;
@@ -564,15 +565,33 @@ public class TestReplicationManagerScenarios {
       return type;
     }
 
-    public DatanodeDetails getTargetDatanode() {
+    public boolean hasExpectedDatanode() {
+      createExpectedDatanodes();
+      return !expectedDatanodes.isEmpty();
+    }
+
+    public boolean isTargetExpected(DatanodeDetails dn) {
+      createExpectedDatanodes();
+      return expectedDatanodes.contains(dn);
+    }
+
+    private void createExpectedDatanodes() {
+      if (expectedDatanodes != null) {
+        return;
+      }
+      this.expectedDatanodes = new HashSet<>();
       if (datanode == null) {
-        return null;
+        return;
       }
-      DatanodeDetails datanodeDetails = DATANODE_ALIASES.get(this.datanode);
-      if (datanodeDetails == null) {
-        fail("Unable to find a datanode for the alias: " + datanode + " in the expected commands.");
+      String[] nodes = datanode.split("\\|");
+      for (String n : nodes) {
+        DatanodeDetails dn = DATANODE_ALIASES.get(n);
+        if (dn != null) {
+          expectedDatanodes.add(dn);
+        } else {
+          fail("Expected datanode not found: " + datanode);
+        }
       }
-      return datanodeDetails;
     }
   }
 

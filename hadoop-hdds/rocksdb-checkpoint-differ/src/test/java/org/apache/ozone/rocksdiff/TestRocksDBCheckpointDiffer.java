@@ -47,9 +47,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -155,9 +155,9 @@ public class TestRocksDBCheckpointDiffer {
   @BeforeEach
   public void init() throws RocksDBException {
     // Checkpoint differ log level. Set to DEBUG for verbose output
-    GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.getLog(), Level.INFO);
+    GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.class, Level.INFO);
     // Test class log level. Set to DEBUG for verbose output
-    GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.LOG, Level.INFO);
+    GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.class, Level.INFO);
 
     activeDbDir = new File(ACTIVE_DB_DIR_NAME);
     createDir(activeDbDir, ACTIVE_DB_DIR_NAME);
@@ -1698,7 +1698,7 @@ public class TestRocksDBCheckpointDiffer {
 
   private void createFileWithContext(String fileName, String context)
       throws IOException {
-    try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
+    try (OutputStream fileOutputStream = Files.newOutputStream(Paths.get(fileName))) {
       fileOutputStream.write(context.getBytes(UTF_8));
     }
   }

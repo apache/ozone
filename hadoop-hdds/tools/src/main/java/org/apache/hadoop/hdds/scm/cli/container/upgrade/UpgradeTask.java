@@ -63,7 +63,7 @@ import org.slf4j.LoggerFactory;
  */
 public class UpgradeTask {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(UpgradeTask.class);
 
   private final ConfigurationSource config;
@@ -345,9 +345,7 @@ public class UpgradeTask {
       result.setBackupContainerFilePath(bakFile.getAbsolutePath());
 
       // gen new v3 container data file
-      ContainerDataYaml.createContainerFile(
-          ContainerProtos.ContainerType.KeyValueContainer,
-          copyContainerData, originContainerFile);
+      ContainerDataYaml.createContainerFile(copyContainerData, originContainerFile);
 
       result.setNewContainerData(copyContainerData);
       result.setNewContainerFilePath(originContainerFile.getAbsolutePath());

@@ -226,11 +226,11 @@ public final class S3Acl {
       if (identityType != null && identityType.isSupported()) {
         String permission = grant.getPermission();
         EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnBucketFromS3Permission(permission);
-        OzoneAcl defaultOzoneAcl = new OzoneAcl(
+        OzoneAcl defaultOzoneAcl = OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.DEFAULT, acls
         );
-        OzoneAcl accessOzoneAcl = new OzoneAcl(
+        OzoneAcl accessOzoneAcl = OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
         );
@@ -290,7 +290,7 @@ public final class S3Acl {
       if (identityType != null && identityType.isSupported()) {
         String permission = grant.getPermission();
         EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnVolumeFromS3Permission(permission);
-        OzoneAcl accessOzoneAcl = new OzoneAcl(
+        OzoneAcl accessOzoneAcl = OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
         );

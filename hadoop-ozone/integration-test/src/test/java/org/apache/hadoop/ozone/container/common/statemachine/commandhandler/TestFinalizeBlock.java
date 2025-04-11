@@ -29,6 +29,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -173,15 +174,11 @@ public class TestFinalizeBlock {
     ContainerProtos.ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request);
 
-    assertTrue(response.getFinalizeBlock()
-        .getBlockData().getBlockID().getLocalID()
-        == omKeyLocationInfoGroupList.get(0)
-        .getLocationList().get(0).getLocalID());
+    assertEquals(response.getFinalizeBlock().getBlockData().getBlockID().getLocalID(),
+        omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID());
 
-    assertTrue(((KeyValueContainerData)getContainerfromDN(
-        cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData())
-        .getFinalizedBlockSet().size() == 1);
+    assertEquals(1, ((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
+        containerId.getId()).getContainerData()).getFinalizedBlockSet().size());
 
     testRejectPutAndWriteChunkAfterFinalizeBlock(containerId, pipeline, xceiverClient, omKeyLocationInfoGroupList);
     testFinalizeBlockReloadAfterDNRestart(containerId);
@@ -196,10 +193,8 @@ public class TestFinalizeBlock {
     }
 
     // After restart DN, finalizeBlock should be loaded into memory
-    assertTrue(((KeyValueContainerData)
-        getContainerfromDN(cluster.getHddsDatanodes().get(0),
-            containerId.getId()).getContainerData())
-        .getFinalizedBlockSet().size() == 1);
+    assertEquals(1, ((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
+            containerId.getId()).getContainerData()).getFinalizedBlockSet().size());
   }
 
   private void testFinalizeBlockClearAfterCloseContainer(ContainerID containerId)

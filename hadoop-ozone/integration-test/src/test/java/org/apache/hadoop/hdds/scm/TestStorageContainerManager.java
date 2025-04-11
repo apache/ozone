@@ -141,6 +141,7 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
@@ -358,14 +359,10 @@ public class TestStorageContainerManager {
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
           endpoint.getState());
     }
-    GenericTestUtils.LogCapturer scmDnHBDispatcherLog =
-        GenericTestUtils.LogCapturer.captureLogs(
-            SCMDatanodeHeartbeatDispatcher.LOG);
+    LogCapturer scmDnHBDispatcherLog = LogCapturer.captureLogs(SCMDatanodeHeartbeatDispatcher.class);
     LogManager.getLogger(HeartbeatEndpointTask.class).setLevel(Level.DEBUG);
-    GenericTestUtils.LogCapturer heartbeatEndpointTaskLog =
-        GenericTestUtils.LogCapturer.captureLogs(HeartbeatEndpointTask.LOG);
-    GenericTestUtils.LogCapturer versionEndPointTaskLog =
-        GenericTestUtils.LogCapturer.captureLogs(VersionEndpointTask.LOG);
+    LogCapturer heartbeatEndpointTaskLog = LogCapturer.captureLogs(HeartbeatEndpointTask.class);
+    LogCapturer versionEndPointTaskLog = LogCapturer.captureLogs(VersionEndpointTask.class);
     // Initially empty
     assertThat(scmDnHBDispatcherLog.getOutput()).isEmpty();
     assertThat(versionEndPointTaskLog.getOutput()).isEmpty();
@@ -454,10 +451,10 @@ public class TestStorageContainerManager {
       GenericTestUtils.waitFor(() -> {
         NodeManager nodeManager = cluster.getStorageContainerManager()
             .getScmNodeManager();
-        List<SCMCommand> commands = nodeManager.processHeartbeat(
+        List<SCMCommand<?>> commands = nodeManager.processHeartbeat(
             nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0));
         if (commands != null) {
-          for (SCMCommand cmd : commands) {
+          for (SCMCommand<?> cmd : commands) {
             if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
               List<DeletedBlocksTransaction> deletedTXs =
                   ((DeleteBlocksCommand) cmd).blocksTobeDeleted();
@@ -639,7 +636,7 @@ public class TestStorageContainerManager {
     assertEquals(cluster.getHddsDatanodes().size(), allNodes.size());
 
     for (DatanodeDetails node : allNodes) {
-      DatanodeInfo datanodeInfo = assertInstanceOf(DatanodeInfo.class, nodeManager.getNodeByUuid(node.getUuid()));
+      DatanodeInfo datanodeInfo = assertInstanceOf(DatanodeInfo.class, nodeManager.getNode(node.getID()));
       assertNotNull(datanodeInfo);
       assertThat(datanodeInfo.getLastHeartbeatTime()).isPositive();
       assertEquals(datanodeInfo.getUuidString(), datanodeInfo.getNetworkName());

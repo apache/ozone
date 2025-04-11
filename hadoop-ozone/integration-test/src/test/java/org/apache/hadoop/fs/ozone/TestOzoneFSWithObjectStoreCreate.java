@@ -21,13 +21,13 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
-import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -68,6 +68,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Class tests create with object store and getFileStatus.
@@ -352,13 +354,9 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     keys.add(OmUtils.normalizeKey(key2, false));
     keys.add(OmUtils.normalizeKey(key3, false));
 
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte)96);
-
-    createAndAssertKey(ozoneBucket, key1, 10, input);
-    createAndAssertKey(ozoneBucket, key2, 10, input);
-    createAndAssertKey(ozoneBucket, key3, 10, input);
+    createAndAssertKey(ozoneBucket, key1, 10);
+    createAndAssertKey(ozoneBucket, key2, 10);
+    createAndAssertKey(ozoneBucket, key3, 10);
 
     // Iterator with key name as prefix.
 
@@ -391,6 +389,38 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     checkKeyList(ozoneKeyIterator, keys);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {2, 3, 4})
+  public void testDoubleSlashPrefixPathNormalization(int slashCount) throws Exception {
+    OzoneVolume ozoneVolume = client.getObjectStore().getVolume(volumeName);
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    // Generate a path with the specified number of leading slashes
+    StringBuilder keyPrefix = new StringBuilder();
+    for (int i = 0; i < slashCount; i++) {
+      keyPrefix.append('/');
+    }
+    String dirPath = "dir" + slashCount + "/";
+    String keyName = "key" + slashCount;
+    String slashyKey = keyPrefix + dirPath + keyName;
+    String normalizedKey = dirPath + keyName;
+    byte[] data = new byte[10];
+    Arrays.fill(data, (byte)96);
+    ArrayList<String> expectedKeys = new ArrayList<>();
+    expectedKeys.add(dirPath);
+    expectedKeys.add(normalizedKey);
+    TestDataUtil.createKey(ozoneBucket, slashyKey, data);
+
+    try {
+      ozoneBucket.readKey(slashyKey).close();
+      ozoneBucket.readKey(normalizedKey).close();
+    } catch (Exception e) {
+      fail("Should be able to read key " + e.getMessage());
+    }
+
+    Iterator<? extends OzoneKey> it = ozoneBucket.listKeys(dirPath);
+    checkKeyList(it, expectedKeys);
+  }
+
   private void checkKeyList(Iterator<? extends OzoneKey > ozoneKeyIterator,
       List<String> keys) {
 
@@ -403,10 +433,10 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     assertEquals(keys, outputKeys);
   }
 
-  private void createAndAssertKey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
+  private void createAndAssertKey(OzoneBucket ozoneBucket, String key, int length)
       throws Exception {
     
-    createKey(ozoneBucket, key, input);
+    byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, length);
     // Read the key with given key name.
     readKey(ozoneBucket, key, length, input);
 

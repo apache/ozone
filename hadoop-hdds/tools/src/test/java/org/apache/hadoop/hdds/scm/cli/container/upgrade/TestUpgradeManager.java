@@ -21,7 +21,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
-import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
@@ -71,6 +71,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Tests for UpgradeManager class.
@@ -78,6 +80,7 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestUpgradeManager {
   private static final String SCM_ID = UUID.randomUUID().toString();
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static final Logger LOG = LoggerFactory.getLogger(TestUpgradeManager.class);
 
   @TempDir
   private File testRoot;
@@ -132,7 +135,7 @@ public class TestUpgradeManager {
           return volumes.get(ii);
         });
 
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
 
     blockManager = new BlockManagerImpl(CONF);
     chunkManager = new FilePerBlockStrategy(true, blockManager);

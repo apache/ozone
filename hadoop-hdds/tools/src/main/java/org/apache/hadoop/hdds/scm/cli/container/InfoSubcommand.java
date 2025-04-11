@@ -25,7 +25,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -43,7 +42,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
 
 /**
  * This is the handler that process container info command.
@@ -60,40 +58,20 @@ public class InfoSubcommand extends ScmSubcommand {
       description = "Format output as JSON")
   private boolean json;
 
-  @Parameters(description = "One or more container IDs separated by spaces. " +
-      "To read from stdin, specify '-' and supply the container IDs " +
-      "separated by newlines.",
-      arity = "1..*",
-      paramLabel = "<container ID>")
-  private String[] containerList;
+  @CommandLine.Mixin
+  private ContainerIDParameters containerList;
 
   private boolean multiContainer = false;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean first = true;
-    boolean stdin = false;
-    if (containerList.length > 1) {
-      multiContainer = true;
-    } else if (containerList[0].equals("-")) {
-      stdin = true;
-      // Assume multiple containers if reading from stdin
-      multiContainer = true;
-    }
+    multiContainer = containerList.size() > 1;
 
     printHeader();
-    if (stdin) {
-      Scanner scanner = new Scanner(System.in, "UTF-8");
-      while (scanner.hasNextLine()) {
-        String id = scanner.nextLine().trim();
-        printOutput(scmClient, id, first);
-        first = false;
-      }
-    } else {
-      for (String id : containerList) {
-        printOutput(scmClient, id, first);
-        first = false;
-      }
+    for (String id : containerList) {
+      printOutput(scmClient, id, first);
+      first = false;
     }
     printFooter();
   }
@@ -216,14 +194,13 @@ public class InfoSubcommand extends ScmSubcommand {
   }
 
   private static String buildReplicaDetails(ContainerReplicaInfo replica) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("State: " + replica.getState() + ";");
+    StringBuilder sb = new StringBuilder()
+        .append("State: ").append(replica.getState()).append(";");
     if (replica.getReplicaIndex() != -1) {
-      sb.append(" ReplicaIndex: " + replica.getReplicaIndex() + ";");
+      sb.append(" ReplicaIndex: ").append(replica.getReplicaIndex()).append(";");
     }
-    sb.append(" Origin: " + replica.getPlaceOfBirth().toString() + ";");
-    sb.append(" Location: "
-        + buildDatanodeDetails(replica.getDatanodeDetails()));
+    sb.append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(";")
+        .append(" Location: ").append(buildDatanodeDetails(replica.getDatanodeDetails()));
     return sb.toString();
   }
 

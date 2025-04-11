@@ -1396,42 +1396,42 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     ContainerManager containerManager = mock(ContainerManager.class);
 
     // Container 1 is 3-way replicated
-    ContainerID containerID1 = new ContainerID(CONTAINER_ONE_ID);
+    ContainerID containerID1 = ContainerID.valueOf(CONTAINER_ONE_ID);
     Set<ContainerReplica> containerReplicas1 = generateMockContainerReplicas(
         CONTAINER_ONE_REPLICA_COUNT, containerID1);
     when(containerManager.getContainerReplicas(containerID1))
         .thenReturn(containerReplicas1);
 
     // Container 2 is under replicated with 2 replica
-    ContainerID containerID2 = new ContainerID(CONTAINER_TWO_ID);
+    ContainerID containerID2 = ContainerID.valueOf(CONTAINER_TWO_ID);
     Set<ContainerReplica> containerReplicas2 = generateMockContainerReplicas(
         CONTAINER_TWO_REPLICA_COUNT, containerID2);
     when(containerManager.getContainerReplicas(containerID2))
         .thenReturn(containerReplicas2);
 
     // Container 3 is over replicated with 4 replica
-    ContainerID containerID3 = new ContainerID(CONTAINER_THREE_ID);
+    ContainerID containerID3 = ContainerID.valueOf(CONTAINER_THREE_ID);
     Set<ContainerReplica> containerReplicas3 = generateMockContainerReplicas(
         CONTAINER_THREE_REPLICA_COUNT, containerID3);
     when(containerManager.getContainerReplicas(containerID3))
         .thenReturn(containerReplicas3);
 
     // Container 4 is replicated with 5 replica
-    ContainerID containerID4 = new ContainerID(CONTAINER_FOUR_ID);
+    ContainerID containerID4 = ContainerID.valueOf(CONTAINER_FOUR_ID);
     Set<ContainerReplica> containerReplicas4 = generateMockContainerReplicas(
         CONTAINER_FOUR_REPLICA_COUNT, containerID4);
     when(containerManager.getContainerReplicas(containerID4))
         .thenReturn(containerReplicas4);
 
     // Container 5 is replicated with 2 replica
-    ContainerID containerID5 = new ContainerID(CONTAINER_FIVE_ID);
+    ContainerID containerID5 = ContainerID.valueOf(CONTAINER_FIVE_ID);
     Set<ContainerReplica> containerReplicas5 = generateMockContainerReplicas(
         CONTAINER_FIVE_REPLICA_COUNT, containerID5);
     when(containerManager.getContainerReplicas(containerID5))
         .thenReturn(containerReplicas5);
 
     // Container 6 is replicated with 3 replica
-    ContainerID containerID6 = new ContainerID(CONTAINER_SIX_ID);
+    ContainerID containerID6 = ContainerID.valueOf(CONTAINER_SIX_ID);
     Set<ContainerReplica> containerReplicas6 = generateMockContainerReplicas(
         CONTAINER_SIX_REPLICA_COUNT, containerID6);
     when(containerManager.getContainerReplicas(containerID6))

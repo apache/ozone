@@ -106,7 +106,7 @@ public final class  ReconServerConfigKeys {
 
   public static final String OZONE_RECON_TASK_THREAD_COUNT_KEY =
       "ozone.recon.task.thread.count";
-  public static final int OZONE_RECON_TASK_THREAD_COUNT_DEFAULT = 5;
+  public static final int OZONE_RECON_TASK_THREAD_COUNT_DEFAULT = 8;
 
   public static final String OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX =
       "ozone.recon.http.auth.";

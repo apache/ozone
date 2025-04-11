@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -246,8 +247,7 @@ public class TestScmSafeMode {
     });
     cluster.stop();
 
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(SCMSafeModeManager.getLogger());
+    LogCapturer logCapturer = LogCapturer.captureLogs(SCMSafeModeManager.getLogger());
     logCapturer.clearOutput();
 
     cluster = builder.build();

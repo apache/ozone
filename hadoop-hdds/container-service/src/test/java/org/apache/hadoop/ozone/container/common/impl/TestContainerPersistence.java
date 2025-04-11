@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getData;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -151,7 +152,7 @@ public class TestContainerPersistence {
 
   @BeforeEach
   public void setupPaths() throws IOException {
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
     volumeSet = new MutableVolumeSet(DATANODE_UUID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     // Initialize volume directories.
@@ -626,12 +627,159 @@ public class TestContainerPersistence {
   }
 
   /**
-   * Writes many chunks of the same block into different chunk files and
-   * verifies that we have that data in many files.
+   * Tests that committed space is correctly decremented when a write fits entirely within the available space under
+   * max container size. It should be decremented by the number of bytes written.
    *
-   * @throws IOException
-   * @throws NoSuchAlgorithmException
+   * Before write: Container size is less than max size
+   * After write: Container size is still less than max size
    */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testIncrWriteBytesDecrementsCommittedWhenWriteFits(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    BlockID blockID = ContainerTestHelper.
+        getTestBlockID(getTestContainerID());
+    long testContainerID = blockID.getContainerID();
+    Container container = containerSet.getContainer(testContainerID);
+    if (container == null) {
+      container = addContainer(containerSet, testContainerID);
+    }
+
+    long commitBytesBefore = container.getContainerData().getVolume().getCommittedBytes();
+    long writeBytes = 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+    long commitBytesAfter = container.getContainerData().getVolume().getCommittedBytes();
+    long commitDecrement = commitBytesBefore - commitBytesAfter;
+    // did we decrement commit bytes by the amount of data we wrote?
+    assertEquals(writeBytes, commitDecrement);
+  }
+
+  /**
+   * Tests the scenario where a write operation causes the container usage to exceed max container size.
+   * The committed space should only be decremented by the amount of the write that fit within the max limit.
+   *
+   * Before Write: Container size is within max size
+   * After Write: Container size exceeds max size
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testIncrWriteBytesDecrementsCommittedCorrectlyWhenWriteExceedsMax(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    BlockID blockID = ContainerTestHelper.
+        getTestBlockID(getTestContainerID());
+    long testContainerID = blockID.getContainerID();
+    Container container = containerSet.getContainer(testContainerID);
+    if (container == null) {
+      container = addContainer(containerSet, testContainerID);
+    }
+
+    // fill the container close to the max size first
+    long writeBytes = container.getContainerData().getMaxSize() - 100;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+
+    // the next write will make the container size exceed max size
+    long commitBytesBefore = container.getContainerData().getVolume().getCommittedBytes();
+    writeBytes = 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+    long commitBytesAfter = container.getContainerData().getVolume().getCommittedBytes();
+    long commitDecrement = commitBytesBefore - commitBytesAfter;
+    // did we decrement commit bytes by the amount that was remaining, ie, 100 bytes?
+    assertEquals(100, commitDecrement);
+  }
+
+  /**
+   * Tests that committed space is not decremented if the container was already
+   * full (or overfull) before the write operation.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testIncrWriteBytesDoesNotDecrementCommittedWhenContainerFull(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    BlockID blockID = ContainerTestHelper.
+        getTestBlockID(getTestContainerID());
+    long testContainerID = blockID.getContainerID();
+    Container container = containerSet.getContainer(testContainerID);
+    if (container == null) {
+      container = addContainer(containerSet, testContainerID);
+    }
+
+    // fill the container completely first
+    long writeBytes = container.getContainerData().getMaxSize();
+    container.getContainerData().updateWriteStats(writeBytes, false);
+
+    // the next write will make the container size exceed max size
+    long commitBytesBefore = container.getContainerData().getVolume().getCommittedBytes();
+    writeBytes = 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+    long commitBytesAfter = container.getContainerData().getVolume().getCommittedBytes();
+    long commitDecrement = commitBytesBefore - commitBytesAfter;
+    // decrement should be 0, as the container was already full before the write
+    assertEquals(0, commitDecrement);
+  }
+
+  /**
+   * In this test, the write fills the container exactly to max size. Committed space should be decremented by the
+   * amount of bytes written.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testIncrWriteBytesDecrementsCommittedCorrectlyWhenWrittenToBrim(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    BlockID blockID = ContainerTestHelper.
+        getTestBlockID(getTestContainerID());
+    long testContainerID = blockID.getContainerID();
+    Container container = containerSet.getContainer(testContainerID);
+    if (container == null) {
+      container = addContainer(containerSet, testContainerID);
+    }
+
+    // fill the container completely first
+    long writeBytes = container.getContainerData().getMaxSize() - 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+
+    // the next write will make the container size exactly equal to max size
+    long commitBytesBefore = container.getContainerData().getVolume().getCommittedBytes();
+    writeBytes = 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+    long commitBytesAfter = container.getContainerData().getVolume().getCommittedBytes();
+    long commitDecrement = commitBytesBefore - commitBytesAfter;
+    // decrement should be writeBytes, as the write does not exceed max size
+    assertEquals(writeBytes, commitDecrement);
+  }
+
+  /**
+   * Commited space should not change when committedSpace is set to false.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testIncrWriteBytesDoesNotChangeCommittedSpaceWhenItsDisabled(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    BlockID blockID = ContainerTestHelper.
+        getTestBlockID(getTestContainerID());
+    long testContainerID = blockID.getContainerID();
+    Container container = containerSet.getContainer(testContainerID);
+    if (container == null) {
+      container = addContainer(containerSet, testContainerID);
+    }
+
+    // For setup, we need to set committedSpace to false first
+    container.getContainerData().setCommittedSpace(false);
+    long commitBytesBefore = container.getContainerData().getVolume().getCommittedBytes();
+    long writeBytes = 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+    long commitBytesAfter = container.getContainerData().getVolume().getCommittedBytes();
+    long commitDecrement = commitBytesBefore - commitBytesAfter;
+    // decrement should be 0, as commit space is disabled for this container
+    assertEquals(0, commitDecrement);
+  }
+
+  /**
+     * Writes many chunks of the same block into different chunk files and
+     * verifies that we have that data in many files.
+     *
+     * @throws IOException
+     * @throws NoSuchAlgorithmException
+     */
   @ContainerTestVersionInfo.ContainerTest
   public void testWritReadManyChunks(ContainerTestVersionInfo versionInfo)
       throws IOException {

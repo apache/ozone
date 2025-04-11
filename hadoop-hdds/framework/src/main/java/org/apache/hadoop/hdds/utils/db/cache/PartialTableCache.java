@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
 @Evolving
 public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(PartialTableCache.class);
 
   private final Map<CacheKey<KEY>, CacheValue<VALUE>> cache;
@@ -161,8 +161,7 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
     CacheValue<VALUE> cachevalue = cache.get(cachekey);
     statsRecorder.recordValue(cachevalue);
     if (cachevalue == null) {
-      return new CacheResult<>(CacheResult.CacheStatus.MAY_EXIST,
-            null);
+      return (CacheResult<VALUE>) MAY_EXIST;
     } else {
       if (cachevalue.getCacheValue() != null) {
         return new CacheResult<>(CacheResult.CacheStatus.EXISTS, cachevalue);
