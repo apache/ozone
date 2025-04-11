@@ -33,7 +33,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Container log file Parsing logic.
+ * Parses container log files and stores container details into a database.
+ * Uses multithreading to process multiple log files concurrently.
  */
 
 public class ContainerLogFileParser {
@@ -49,6 +50,15 @@ public class ContainerLogFileParser {
   private static final String KEY_BCSID = "BCSID";
   private static final String KEY_STATE = "State";
   private static final String KEY_INDEX = "Index";
+
+  /**
+   * Scans the specified log directory, processes each file in a separate thread.
+   * Expects each log filename to follow the format: dn-container-datanodeId.log
+   *
+   * @param logDirectoryPath Path to the directory containing container log files.
+   * @param dbstore Database object used to persist parsed container data.
+   * @param threadCount Number of threads to use for parallel processing.
+   */
 
   public void processLogEntries(String logDirectoryPath, ContainerDatanodeDatabase dbstore, int threadCount)
       throws SQLException {
@@ -108,6 +118,15 @@ public class ContainerLogFileParser {
     }
   }
 
+  /**
+   * Processes a single container log file and extracts container details.
+   * Parses, batches, and writes valid container log entries into the database.
+   *
+   * @param logFilePath Path to the log file.
+   * @param dbstore Database object used to persist parsed container data.
+   * @param datanodeId Datanode ID derived from the log filename.
+   */
+  
   private void processFile(String logFilePath, ContainerDatanodeDatabase dbstore, long datanodeId) throws SQLException {
     List<DatanodeContainerInfo> batchList = new ArrayList<>(5100);
 

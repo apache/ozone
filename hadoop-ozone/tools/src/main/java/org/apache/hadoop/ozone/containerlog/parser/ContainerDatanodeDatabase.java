@@ -35,7 +35,8 @@ import org.sqlite.SQLiteConfig;
 
 
 /**
- * Datanode container Database.
+ * Handles creation and interaction with the database.
+ * Provides methods for table creation, log data insertion, and index setup.
  */
 
 public class ContainerDatanodeDatabase {
@@ -116,6 +117,12 @@ public class ContainerDatanodeDatabase {
     }
   }
 
+  /**
+   * Inserts a list of container log entries into the DatanodeContainerLogTable.
+   *
+   * @param transitionList List of container log entries to insert into the table.
+   */
+  
   public synchronized void insertContainerDatanodeData(List<DatanodeContainerInfo> transitionList) throws SQLException {
 
     String insertSQL = queries.get("INSERT_DATANODE_CONTAINER_LOG");
@@ -160,6 +167,11 @@ public class ContainerDatanodeDatabase {
     String createIndexSQL = queries.get("CREATE_DATANODE_CONTAINER_INDEX");
     stmt.execute(createIndexSQL);
   }
+
+  /**
+   * Extracts the latest container log data from the DatanodeContainerLogTable
+   * and inserts it into ContainerLogTable.
+   */
 
   public void insertLatestContainerLogData() throws SQLException {
     createContainerLogTable();
