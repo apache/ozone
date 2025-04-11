@@ -17,9 +17,8 @@
 
 package org.apache.hadoop.ozone.containerlog.parser;
 
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -27,47 +26,54 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.sqlite.SQLiteConfig;
 
-/**
- * Handles creation and interaction with the database.
- * Provides methods for table creation, log data insertion, and index setup.
- */
-public class ContainerDatanodeDatabase {
-  
-  private static String databasePath;
-  private static final int DEFAULT_REPLICATION_FACTOR;
-  static {
-    OzoneConfiguration configuration = new OzoneConfiguration();
-    final String replication = configuration.getTrimmed(
-        OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY,
-        OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
 
-    DEFAULT_REPLICATION_FACTOR = Integer.parseInt(replication.toUpperCase());
+/**
+ * Datanode container Database.
+ */
+
+public class ContainerDatanodeDatabase {
+
+  private static Map<String, String> queries;
+  public static final String CONTAINER_KEY_DELIMITER = "#";
+
+  static {
+    loadProperties();
   }
-  
-  public static void setDatabasePath(String dbPath) {
-    if (databasePath == null) {
-      databasePath = dbPath;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerDatanodeDatabase.class);
+
+  private static void loadProperties() {
+    Properties props = new Properties();
+    try (InputStream inputStream = ContainerDatanodeDatabase.class.getClassLoader()
+        .getResourceAsStream(DBConsts.PROPS_FILE)) {
+
+      if (inputStream != null) {
+        props.load(inputStream);
+        queries = props.entrySet().stream()
+            .collect(Collectors.toMap(
+                e -> e.getKey().toString(),
+                e -> e.getValue().toString()
+            ));
+      } else {
+        throw new FileNotFoundException("Property file '" + DBConsts.PROPS_FILE + "' not found.");
+      }
+    } catch (Exception e) {
+      LOG.error(e.getMessage());
     }
   }
 
   private static Connection getConnection() throws Exception {
-    if (databasePath == null) {
-      throw new IllegalStateException("Database path not set");
-    }
-    
     Class.forName(DBConsts.DRIVER);
 
     SQLiteConfig config = new SQLiteConfig();
@@ -78,11 +84,11 @@ public class ContainerDatanodeDatabase {
     config.setSynchronous(SQLiteConfig.SynchronousMode.OFF);
     config.setTempStore(SQLiteConfig.TempStore.MEMORY);
 
-    return DriverManager.getConnection(DBConsts.CONNECTION_PREFIX + databasePath, config.toProperties());
+    return DriverManager.getConnection(DBConsts.CONNECTION_PREFIX + DBConsts.DATABASE_NAME, config.toProperties());
   }
 
   public void createDatanodeContainerLogTable() throws SQLException {
-    String createTableSQL = DBConsts.CREATE_DATANODE_CONTAINER_LOG_TABLE;
+    String createTableSQL = queries.get("CREATE_DATANODE_CONTAINER_LOG_TABLE");
     try (Connection connection = getConnection();
          Statement dropStmt = connection.createStatement();
          Statement createStmt = connection.createStatement()) {
@@ -90,53 +96,49 @@ public class ContainerDatanodeDatabase {
       createStmt.execute(createTableSQL);
       createDatanodeContainerIndex(createStmt);
     } catch (SQLException e) {
-      System.err.println("Error while creating the table: " + e.getMessage());
+      LOG.error("Error while creating the table: {}", e.getMessage());
       throw e;
     } catch (Exception e) {
-      System.err.println("Unexpected error: " + e.getMessage());
+      LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
 
   private void createContainerLogTable() throws SQLException {
-    String createTableSQL = DBConsts.CREATE_CONTAINER_LOG_TABLE;
+    String createTableSQL = queries.get("CREATE_CONTAINER_LOG_TABLE");
     try (Connection connection = getConnection();
          Statement dropStmt = connection.createStatement();
          Statement createStmt = connection.createStatement()) {
       dropTable(DBConsts.CONTAINER_LOG_TABLE_NAME, dropStmt);
       createStmt.execute(createTableSQL);
     } catch (SQLException e) {
-      System.err.println("Error while creating the table: " + e.getMessage());
+      LOG.error("Error while creating the table: {}", e.getMessage());
       throw e;
     } catch (Exception e) {
-      System.err.println("Unexpected error: " + e.getMessage());
+      LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
 
-  /**
-   * Inserts a list of container log entries into the DatanodeContainerLogTable.
-   *
-   * @param transitionList List of container log entries to insert into the table.
-   */
-  
-  public synchronized void insertContainerDatanodeData(List<DatanodeContainerInfo> transitionList) throws SQLException {
+  public void insertContainerDatanodeData(String key, List<DatanodeContainerInfo> transitionList) throws SQLException {
+    String[] parts = key.split(CONTAINER_KEY_DELIMITER);
+    if (parts.length != 2) {
+      System.err.println("Invalid key format: " + key);
+      return;
+    }
 
-    String insertSQL = DBConsts.INSERT_DATANODE_CONTAINER_LOG;
+    long containerId = Long.parseLong(parts[0]);
+    long datanodeId = Long.parseLong(parts[1]);
 
-    long containerId = 0;
-    String datanodeId = null;
-    
+    String insertSQL = queries.get("INSERT_DATANODE_CONTAINER_LOG");
+
     try (Connection connection = getConnection();
          PreparedStatement preparedStatement = connection.prepareStatement(insertSQL)) {
 
       int count = 0;
 
       for (DatanodeContainerInfo info : transitionList) {
-        datanodeId = info.getDatanodeId();
-        containerId = info.getContainerId();
-
-        preparedStatement.setString(1, datanodeId);
+        preparedStatement.setLong(1, datanodeId);
         preparedStatement.setLong(2, containerId);
         preparedStatement.setString(3, info.getTimestamp());
         preparedStatement.setString(4, info.getState());
@@ -158,28 +160,23 @@ public class ContainerDatanodeDatabase {
         preparedStatement.executeBatch();
       }
     } catch (SQLException e) {
-      System.err.println("Failed to insert container log for container " + containerId + " on datanode " + datanodeId);
+      LOG.error("Failed to insert container log for container {} on datanode {}", containerId, datanodeId, e);
       throw e;
     } catch (Exception e) {
-      System.err.println("Unexpected error: " + e.getMessage());
+      LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
 
   private void createDatanodeContainerIndex(Statement stmt) throws SQLException {
-    String createIndexSQL = DBConsts.CREATE_DATANODE_CONTAINER_INDEX;
+    String createIndexSQL = queries.get("CREATE_DATANODE_CONTAINER_INDEX");
     stmt.execute(createIndexSQL);
   }
 
-  /**
-   * Extracts the latest container log data from the DatanodeContainerLogTable
-   * and inserts it into ContainerLogTable.
-   */
-
   public void insertLatestContainerLogData() throws SQLException {
     createContainerLogTable();
-    String selectSQL = DBConsts.SELECT_LATEST_CONTAINER_LOG;
-    String insertSQL = DBConsts.INSERT_CONTAINER_LOG;
+    String selectSQL = queries.get("SELECT_LATEST_CONTAINER_LOG");
+    String insertSQL = queries.get("INSERT_CONTAINER_LOG");
 
     try (Connection connection = getConnection();
          PreparedStatement selectStmt = connection.prepareStatement(selectSQL);
@@ -189,12 +186,12 @@ public class ContainerDatanodeDatabase {
       int count = 0;
       
       while (resultSet.next()) {
-        String datanodeId = resultSet.getString("datanode_id");
+        long datanodeId = resultSet.getLong("datanode_id");
         long containerId = resultSet.getLong("container_id");
         String containerState = resultSet.getString("container_state");
         long bcsid = resultSet.getLong("bcsid");
         try {
-          insertStmt.setString(1, datanodeId);
+          insertStmt.setLong(1, datanodeId);
           insertStmt.setLong(2, containerId);
           insertStmt.setString(3, containerState);
           insertStmt.setLong(4, bcsid);
@@ -207,8 +204,8 @@ public class ContainerDatanodeDatabase {
             count = 0;
           }
         } catch (SQLException e) {
-          System.err.println("Failed to insert container log entry for container " + containerId + " on datanode "
-              + datanodeId);
+          LOG.error("Failed to insert container log entry for container {} on datanode {} ",
+              containerId, datanodeId, e);
           throw e;
         }
       }
@@ -217,302 +214,184 @@ public class ContainerDatanodeDatabase {
         insertStmt.executeBatch();
       }
     } catch (SQLException e) {
-      System.err.println("Failed to insert container log entry: " + e.getMessage());
+      LOG.error("Failed to insert container log entry: {}", e.getMessage());
       throw e;
     } catch (Exception e) {
-      System.err.println("Unexpected error: " + e.getMessage());
+      LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
 
   private void dropTable(String tableName, Statement stmt) throws SQLException {
-    String dropTableSQL = DBConsts.DROP_TABLE.replace("{table_name}", tableName);
+    String dropTableSQL = queries.get("DROP_TABLE").replace("{table_name}", tableName);
     stmt.executeUpdate(dropTableSQL);
   }
 
-  private void createContainerLogIndex(Statement stmt) throws SQLException {
-    String createIndexSQL = DBConsts.CREATE_INDEX_LATEST_STATE;
-    stmt.execute(createIndexSQL);
-  }
-
-  /**
-   * Lists containers filtered by the specified state and writes their details to stdout 
-   * unless redirected to a file explicitly.
-   * The output includes timestamp, datanode ID, container ID, BCSID, error message, and index value,
-   * written in a human-readable table format to a file or console.
-   * Behavior based on the {@code limit} parameter:
-   * If {@code limit} is provided, only up to the specified number of rows are printed.
-   * If the number of matching containers exceeds the {@code limit},
-   * a note is printed indicating more containers exist.
-   *
-   * @param state the container state to filter by (e.g., "OPEN", "CLOSED", "QUASI_CLOSED")
-   * @param limit the maximum number of rows to display; use {@link Integer#MAX_VALUE} to fetch all rows
-   */
-
-  public void listContainersByState(String state, Integer limit) throws SQLException {
-    int count = 0;
-
-    boolean limitProvided = limit != Integer.MAX_VALUE;
-
-    String baseQuery = DBConsts.SELECT_LATEST_CONTAINER_LOGS_BY_STATE;
-    String finalQuery = limitProvided ? baseQuery + " LIMIT ?" : baseQuery;
+  public void showContainerDetails(Long containerID) {
+    String query = queries.get("CONTAINER_SELECT_QUERY");
 
     try (Connection connection = getConnection();
-         Statement stmt = connection.createStatement()) {
+         PreparedStatement statement = connection.prepareStatement(query)) {
 
-      createContainerLogIndex(stmt);
+      statement.setLong(1, containerID);
 
-      try (PreparedStatement pstmt = connection.prepareStatement(finalQuery)) {
-        pstmt.setString(1, state);
-        if (limitProvided) {
-          pstmt.setInt(2, limit + 1);
+      if (checkForMultipleOpenStates(containerID, connection)) {
+        return;
+      }
+
+      try (ResultSet resultSet = statement.executeQuery()) {
+
+        boolean foundit = false;
+        Set<Long> datanodeIds = new HashSet<>();
+        Set<Long> unhealthyReplicas = new HashSet<>();
+        Set<Long> closedReplicas = new HashSet<>();
+        Set<Long> openReplicas = new HashSet<>();
+        Set<Long> quasiclosedReplicas = new HashSet<>();
+        Set<Long> bcsids = new HashSet<>();
+        Set<Long> deletedReplicas = new HashSet<>();
+
+        System.out.printf("%-12s | %-10s | %-10s | %-25s | %-30s | %-20s | %-12s\n",
+            "Datanode ID", "State", "BCSID", "Timestamp", "Error Message", "Index Value", "Log Level");
+        System.out.println("-------------------------------------------------------------------------" +
+            "---------------------------------------------------------------------------------------------");
+
+        while (resultSet.next()) {
+          foundit = true;
+
+          long datanodeId = resultSet.getLong("datanode_id");
+          String latestState = resultSet.getString("latest_state");
+          long latestBcsid = resultSet.getLong("latest_bcsid");
+          String timestamp = resultSet.getString("timestamp");
+          String errorMessage = resultSet.getString("error_message");
+          int indexValue = resultSet.getInt("index_value");
+          String logLevel = resultSet.getString("log_level");
+
+          datanodeIds.add(datanodeId);
+
+          if ("UNHEALTHY".equalsIgnoreCase(latestState)) {
+            unhealthyReplicas.add(datanodeId);
+          } else if ("CLOSED".equalsIgnoreCase(latestState)) {
+            closedReplicas.add(datanodeId);
+            bcsids.add(latestBcsid);
+          } else if ("OPEN".equalsIgnoreCase(latestState)) {
+            openReplicas.add(datanodeId);
+          } else if ("QUASI_CLOSED".equalsIgnoreCase(latestState)) {
+            quasiclosedReplicas.add(datanodeId);
+          } else if ("DELETED".equalsIgnoreCase(latestState)) {
+            deletedReplicas.add(datanodeId);
+            bcsids.add(latestBcsid);
+          }
+          System.out.printf("%-12d | %-10s | %-10d | %-25s | %-30s | %-20s | %-12s\n",
+              datanodeId, latestState, latestBcsid, timestamp, errorMessage, indexValue, logLevel);
+
         }
 
-        try (ResultSet rs = pstmt.executeQuery();
-             PrintWriter writer = new PrintWriter(new OutputStreamWriter(System.out,
-                 StandardCharsets.UTF_8), true)) {
+        if (!foundit) {
+          System.out.println("Missing container with ID: " + containerID);
+          return;
+        }
 
-          writer.printf("%-25s | %-35s | %-15s | %-15s | %-40s | %-12s%n",
-              "Timestamp", "Datanode ID", "Container ID", "BCSID", "Message", "Index Value");
-          writer.println("-------------------------------------------------------------------------------------" +
-              "---------------------------------------------------------------------------------------");
+        if (!deletedReplicas.isEmpty() && !closedReplicas.isEmpty() && bcsids.size() > 1) {
+          System.out.println("Container " + containerID + " has MISMATCHED REPLICATION.");
+          return;
+        }
 
-          while (rs.next()) {
-            if (limitProvided && count >= limit) {
-              writer.println("Note: There might be more containers. Use -all option to list all entries");
-              break;
-            }
-            String timestamp = rs.getString("timestamp");
-            String datanodeId = rs.getString("datanode_id");
-            long containerId = rs.getLong("container_id");
-            long latestBcsid = rs.getLong("latest_bcsid");
-            String errorMessage = rs.getString("error_message");
-            int indexValue = rs.getInt("index_value");
-            count++;
+        int unhealthyCount = unhealthyReplicas.size();
+        int replicaCount = datanodeIds.size();
 
-            writer.printf("%-25s | %-35s | %-15d | %-15d | %-40s | %-12d%n",
-                timestamp, datanodeId, containerId, latestBcsid, errorMessage, indexValue);
-          }
-          
-          if (count == 0) {
-            writer.printf("No containers found for state: %s%n", state);
+        if (unhealthyCount == replicaCount) {
+          System.out.println("Container " + containerID + " is UNHEALTHY across all datanodes.");
+        } else if (unhealthyCount >= 2 && closedReplicas.size() == replicaCount - unhealthyCount) {
+          System.out.println("Container " + containerID + " is both UNHEALTHY and UNDER-REPLICATED.");
+        } else if (unhealthyCount == 1 && closedReplicas.size() == replicaCount - unhealthyCount) {
+          System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
+        } else if ((openReplicas.size() > 0 && openReplicas.size() < 3) &&
+            (closedReplicas.size() == replicaCount - openReplicas.size() ||
+                unhealthyCount == replicaCount - openReplicas.size())) {
+          System.out.println("Container " + containerID + " is OPEN_UNHEALTHY.");
+        } else if (quasiclosedReplicas.size() >= 3) {
+          System.out.println("Container " + containerID + " is OUASI_CLOSED_STUCK.");
+        } else {
+          int expectedReplicationFactor = 3;
+          if (replicaCount - deletedReplicas.size() < expectedReplicationFactor) {
+            System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
+          } else if (replicaCount - deletedReplicas.size() > expectedReplicationFactor) {
+            System.out.println("Container " + containerID + " is OVER-REPLICATED.");
           } else {
-            writer.printf("Number of containers listed: %d%n", count);
+            System.out.println("Container " + containerID + " has enough replicas.");
           }
         }
       }
     } catch (SQLException e) {
-      throw new SQLException("Error while retrieving containers with state " + state);
+      e.printStackTrace();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
-  private void createIdxDclContainerStateTime(Connection conn) throws SQLException {
-    String sql = DBConsts.CREATE_DCL_CONTAINER_STATE_TIME_INDEX;
-    try (Statement stmt = conn.createStatement()) {
-      stmt.execute(sql);
-    }
-  }
+  private boolean checkForMultipleOpenStates(Long containerID, Connection connection) {
+    String openCheckQuery = queries.get("OPEN_CHECK_QUERY");
+    try (PreparedStatement openCheckStatement = connection.prepareStatement(openCheckQuery)) {
+      openCheckStatement.setLong(1, containerID);
 
-  /**
-   * Displays detailed information about a container based on its ID, including its state, BCSID, 
-   * timestamp, message, and index value. It also checks for issues such as UNHEALTHY 
-   * replicas, under-replication, over-replication, OPEN_UNHEALTHY, OUASI_CLOSED_STUCK, mismatched replication
-   * and duplicate open.
-   *
-   * @param containerID The ID of the container to display details for.
-   */
+      try (ResultSet openCheckResult = openCheckStatement.executeQuery()) {
+        List<String> firstOpenTimestamps = new ArrayList<>();
+        Set<Long> firstOpenDatanodes = new HashSet<>();
+        List<String[]> allRows = new ArrayList<>();
+        boolean issueFound = false;
 
-  public void showContainerDetails(Long containerID) throws SQLException {
+        while (openCheckResult.next()) {
+          String timestamp = openCheckResult.getString("timestamp");
+          long datanodeId = openCheckResult.getLong("datanode_id");
+          String state = openCheckResult.getString("container_state");
+          String errorMessage = openCheckResult.getString("error_message");
+          long bcsid = openCheckResult.getLong("bcsid");
+          int indexValue = openCheckResult.getInt("index_value");
+          String logLevel = openCheckResult.getString("log_level");
 
-    try (Connection connection = getConnection()) {
-      createIdxDclContainerStateTime(connection);
-      List<DatanodeContainerInfo> logEntries = getContainerLogData(containerID, connection);
+          String[] row = new String[]{
+              timestamp,
+              String.valueOf(containerID),
+              String.valueOf(datanodeId),
+              state,
+              String.valueOf(bcsid),
+              errorMessage,
+              String.valueOf(indexValue),
+              logLevel
+          };
+          allRows.add(row);
 
-      if (logEntries.isEmpty()) {
-        System.out.println("Missing container with ID: " + containerID);
-        return;
-      }
+          if ("OPEN".equalsIgnoreCase(state)) {
+            if (firstOpenTimestamps.size() < 3 && !firstOpenDatanodes.contains(datanodeId)) {
+              firstOpenTimestamps.add(timestamp);
+              firstOpenDatanodes.add(datanodeId);
+            } else if (isTimestampAfterFirstOpens(timestamp, firstOpenTimestamps)) {
+              issueFound = true;
+            }
+          }
+        }
 
-      System.out.printf("%-25s | %-15s | %-35s | %-20s | %-10s | %-30s | %-12s%n",
-          "Timestamp", "Container ID", "Datanode ID", "Container State", "BCSID", "Message", "Index Value");
-      System.out.println("-----------------------------------------------------------------------------------" +
-          "-------------------------------------------------------------------------------------------------");
+        if (issueFound) {
+          System.out.println("Issue found: Container " + containerID + " has duplicate OPEN state.");
+          System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s\n",
+              "Timestamp", "Container ID", "Datanode ID", "Container State", "BCSID", "Error Message", "Index Value",
+              "Log Level");
+          System.out.println("-------------------------------------------------------------------------" +
+              "---------------------------------------------------------------------------------------------");
 
-      for (DatanodeContainerInfo entry : logEntries) {
-        System.out.printf("%-25s | %-15d | %-35s | %-20s | %-10d | %-30s | %-12d%n",
-            entry.getTimestamp(),
-            entry.getContainerId(),
-            entry.getDatanodeId(),
-            entry.getState(),
-            entry.getBcsid(),
-            entry.getErrorMessage(),
-            entry.getIndexValue());
-      }
-
-      logEntries.sort(Comparator.comparing(DatanodeContainerInfo::getTimestamp));
-
-      if (checkForMultipleOpenStates(logEntries)) {
-        System.out.println("Container " + containerID + " might have duplicate OPEN state.");
-        return;
-      }
-
-      Map<String, DatanodeContainerInfo> latestPerDatanode = new HashMap<>();
-      for (DatanodeContainerInfo entry : logEntries) {
-        String datanodeId = entry.getDatanodeId();
-        DatanodeContainerInfo existing = latestPerDatanode.get(datanodeId);
-        if (existing == null || entry.getTimestamp().compareTo(existing.getTimestamp()) > 0) {
-          latestPerDatanode.put(datanodeId, entry);
+          for (String[] row : allRows) {
+            System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s\n",
+                row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]);
+          }
+          return true;
+        } else {
+          return false;
         }
       }
-
-      analyzeContainerHealth(containerID, latestPerDatanode);
-
     } catch (SQLException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+      e.printStackTrace();
+      return false;
     }
-  }
-
-  private void analyzeContainerHealth(Long containerID,
-                                      Map<String, DatanodeContainerInfo> latestPerDatanode) {
-
-    Set<String> lifeCycleStates = new HashSet<>();
-    for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
-      lifeCycleStates.add(state.name());
-    }
-
-    Set<String> healthStates = new HashSet<>();
-    for (ReplicationManagerReport.HealthState state : ReplicationManagerReport.HealthState.values()) {
-      healthStates.add(state.name());
-    }
-
-    Set<String> unhealthyReplicas = new HashSet<>();
-    Set<String> closedReplicas = new HashSet<>();
-    Set<String> openReplicas = new HashSet<>();
-    Set<String> quasiclosedReplicas = new HashSet<>();
-    Set<String> deletedReplicas = new HashSet<>();
-    Set<Long> bcsids = new HashSet<>();
-    Set<String> datanodeIds = new HashSet<>();
-    List<String> unhealthyTimestamps = new ArrayList<>();
-    List<String> closedTimestamps = new ArrayList<>();
-
-    for (DatanodeContainerInfo entry : latestPerDatanode.values()) {
-      String datanodeId = entry.getDatanodeId();
-      String state = entry.getState();
-      long bcsid = entry.getBcsid();
-      String stateTimestamp = entry.getTimestamp();
-
-      datanodeIds.add(datanodeId);
-
-
-
-      if (healthStates.contains(state.toUpperCase())) {
-
-        ReplicationManagerReport.HealthState healthState =
-            ReplicationManagerReport.HealthState.valueOf(state.toUpperCase());
-
-        if (healthState == ReplicationManagerReport.HealthState.UNHEALTHY) {
-          unhealthyReplicas.add(datanodeId);
-          unhealthyTimestamps.add(stateTimestamp);
-        }
-
-      } else if (lifeCycleStates.contains(state.toUpperCase())) {
-
-        HddsProtos.LifeCycleState lifeCycleState = HddsProtos.LifeCycleState.valueOf(state.toUpperCase());
-
-        switch (lifeCycleState) {
-        case OPEN:
-          openReplicas.add(datanodeId);
-          break;
-        case CLOSED:
-          closedReplicas.add(datanodeId);
-          bcsids.add(bcsid);
-          closedTimestamps.add(stateTimestamp);
-          break;
-        case QUASI_CLOSED:
-          quasiclosedReplicas.add(datanodeId);
-          break;
-        case DELETED:
-          deletedReplicas.add(datanodeId);
-          break;
-        default:
-          break;
-        }
-
-      }
-    }
-
-    int unhealthyCount = unhealthyReplicas.size();
-    int replicaCount = datanodeIds.size();
-    int openReplicasCount = openReplicas.size();
-    int closedReplicasCount = closedReplicas.size();
-
-    if (bcsids.size() > 1) {
-      System.out.println("Container " + containerID + " has MISMATCHED REPLICATION as there are multiple" +
-          " CLOSED containers with varying BCSIDs.");
-    } else if (!closedReplicas.isEmpty()
-        && closedReplicasCount < DEFAULT_REPLICATION_FACTOR) {
-      System.out.println("Container " + containerID + " has fewer CLOSED replicas than required so container" +
-          " is UNDER-REPLICATED.");
-    } else if (!unhealthyReplicas.isEmpty()
-        && closedReplicasCount == DEFAULT_REPLICATION_FACTOR) {
-
-      String latestUnhealthy = Collections.max(unhealthyTimestamps);
-      boolean allClosedNewer = closedTimestamps.stream()
-          .allMatch(ct -> ct.compareTo(latestUnhealthy) > 0);
-
-      if (allClosedNewer) {
-        System.out.println("Container " + containerID + " has newer CLOSED replicas so its not UNHEALTHY.");
-      }
-    } else if (unhealthyCount == replicaCount && replicaCount >= DEFAULT_REPLICATION_FACTOR) {
-      System.out.println("Container " + containerID + " is UNHEALTHY across all datanodes.");
-    } else if (unhealthyCount >= 2 && closedReplicasCount == replicaCount - unhealthyCount) {
-      System.out.println("Container " + containerID + " is both UNHEALTHY and UNDER-REPLICATED.");
-    } else if (unhealthyCount == 1 && closedReplicasCount == replicaCount - unhealthyCount) {
-      System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
-    } else if (openReplicasCount > 0 &&
-        (closedReplicasCount > 0 || unhealthyCount > 0) &&
-        (replicaCount - deletedReplicas.size()) >= DEFAULT_REPLICATION_FACTOR) {
-      System.out.println("Container " + containerID + " is OPEN_UNHEALTHY.");
-    } else if (quasiclosedReplicas.size() >= DEFAULT_REPLICATION_FACTOR) {
-      System.out.println("Container " + containerID + " is QUASI_CLOSED_STUCK.");
-    } else if (replicaCount - deletedReplicas.size() < DEFAULT_REPLICATION_FACTOR) {
-      System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
-    } else if (replicaCount - deletedReplicas.size() > DEFAULT_REPLICATION_FACTOR) {
-      System.out.println("Container " + containerID + " is OVER-REPLICATED.");
-    } else {
-      System.out.println("Container " + containerID + " has enough replicas.");
-    }
-  }
-
-  /**
-   * Checks whether the specified container has multiple "OPEN" states.
-   * If multiple "OPEN" states are found, it returns {@code true}.
-   *
-   * @param entries The list of {@link DatanodeContainerInfo} entries to check for multiple "OPEN" states.
-   * @return {@code true} if multiple "OPEN" states are found, {@code false} otherwise.
-   */
-
-  private boolean checkForMultipleOpenStates(List<DatanodeContainerInfo> entries) {
-    List<String> firstOpenTimestamps = new ArrayList<>();
-    Set<String> firstOpenDatanodes = new HashSet<>();
-    boolean issueFound = false;
-
-    for (DatanodeContainerInfo entry : entries) {
-      if ("OPEN".equalsIgnoreCase(entry.getState())) {
-        if (firstOpenTimestamps.size() < DEFAULT_REPLICATION_FACTOR &&
-            !firstOpenDatanodes.contains(entry.getDatanodeId())) {
-          firstOpenTimestamps.add(entry.getTimestamp());
-          firstOpenDatanodes.add(entry.getDatanodeId());
-        } else if (isTimestampAfterFirstOpens(entry.getTimestamp(), firstOpenTimestamps)) {
-          issueFound = true;
-        }
-      }
-    }
-    return issueFound;
   }
 
   private boolean isTimestampAfterFirstOpens(String timestamp, List<String> firstOpenTimestamps) {
@@ -524,31 +403,5 @@ public class ContainerDatanodeDatabase {
     return false;
   }
 
-  private List<DatanodeContainerInfo> getContainerLogData(Long containerID, Connection connection)
-      throws SQLException {
-    String query = DBConsts.CONTAINER_DETAILS_QUERY;
-    List<DatanodeContainerInfo> logEntries = new ArrayList<>();
-
-    try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-      preparedStatement.setLong(1, containerID);
-      try (ResultSet rs = preparedStatement.executeQuery()) {
-        while (rs.next()) {
-          DatanodeContainerInfo entry = new DatanodeContainerInfo.Builder()
-              .setTimestamp(rs.getString("timestamp"))
-              .setContainerId(rs.getLong("container_id"))
-              .setDatanodeId(rs.getString("datanode_id"))
-              .setState(rs.getString("container_state"))
-              .setBcsid(rs.getLong("bcsid"))
-              .setErrorMessage(rs.getString("error_message"))
-              .setIndexValue(rs.getInt("index_value"))
-              .build();
-
-          logEntries.add(entry);
-        }
-      }
-    }
-
-    return logEntries;
-  }
 }
 
