@@ -170,9 +170,9 @@ public class ContainerDatanodeDatabase {
          PreparedStatement selectStmt = connection.prepareStatement(selectSQL);
          ResultSet resultSet = selectStmt.executeQuery();
          PreparedStatement insertStmt = connection.prepareStatement(insertSQL)) {
-
+      
       int count = 0;
-
+      
       while (resultSet.next()) {
         long datanodeId = resultSet.getLong("datanode_id");
         long containerId = resultSet.getLong("container_id");
