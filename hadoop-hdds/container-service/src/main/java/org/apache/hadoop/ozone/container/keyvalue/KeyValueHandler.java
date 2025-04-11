@@ -74,6 +74,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -1508,7 +1509,7 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
-                                 Set<DatanodeDetails> peers) throws IOException {
+                                 Collection<DatanodeDetails> peers) throws IOException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
     Optional<ContainerProtos.ContainerChecksumInfo> optionalChecksumInfo = checksumManager.read(containerData);

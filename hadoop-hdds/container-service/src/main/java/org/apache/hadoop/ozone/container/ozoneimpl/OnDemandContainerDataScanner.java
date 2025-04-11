@@ -87,7 +87,7 @@ public final class OnDemandContainerDataScanner {
     }
     long containerID = container.getContainerData().getContainerID();
     if (instance == null) {
-      LOG.debug("Skipping on demand scan for container {} since scanner was " +
+      LOG.warn("Skipping on demand scan for container {} since scanner was " +
           "not initialized.", containerID);
       return false;
     }

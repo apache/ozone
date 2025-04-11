@@ -27,8 +27,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
-import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.getContainerChecksumFile;
-import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.writeContainerDataTreeProto;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
@@ -72,8 +70,10 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -120,6 +120,9 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.hadoop.util.Sets;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -131,6 +134,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
@@ -156,6 +160,7 @@ public class TestKeyValueHandler {
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;
   private OzoneConfiguration conf;
+  private ContainerSet mockContainerSet;
 
   /**
    * Number of corrupt blocks and chunks.
@@ -188,9 +193,11 @@ public class TestKeyValueHandler {
     HashMap<ContainerType, Handler> handlers = new HashMap<>();
     handlers.put(ContainerType.KeyValueContainer, handler);
 
+    mockContainerSet = Mockito.mock(ContainerSet.class);
+
     dispatcher = new HddsDispatcher(
         new OzoneConfiguration(),
-        mock(ContainerSet.class),
+        mockContainerSet,
         mock(VolumeSet.class),
         handlers,
         mock(StateContext.class),
@@ -591,6 +598,11 @@ public class TestKeyValueHandler {
   public void testFullContainerReconciliation(int numBlocks, int numChunks) throws Exception {
     KeyValueHandler kvHandler = createKeyValueHandler(tempDir);
     ContainerChecksumTreeManager checksumManager = kvHandler.getChecksumManager();
+
+    ContainerController controller = new ContainerController(mockContainerSet,
+        Collections.singletonMap(ContainerType.KeyValueContainer, kvHandler));
+    OnDemandContainerDataScanner.init(conf.getObject(ContainerScannerConfiguration.class), controller, checksumManager);
+
     DNContainerOperationClient dnClient = new DNContainerOperationClient(conf, null, null);
     final long containerID = 100L;
     // Create 3 containers with 15 blocks each and 3 replicas.
@@ -600,6 +612,8 @@ public class TestKeyValueHandler {
     // Introduce corruption in each container on different replicas.
     introduceCorruption(kvHandler, containers.get(1), numBlocks, numChunks, false);
     introduceCorruption(kvHandler, containers.get(2), numBlocks, numChunks, true);
+    // Use synchronous on-demand scans to re-build the merkle trees after corruption.
+    waitForContainerScans(containers);
 
     // Without reconciliation, checksums should be different because of the corruption.
     Set<Long> checksumsBeforeReconciliation = new HashSet<>();
@@ -626,11 +640,13 @@ public class TestKeyValueHandler {
              Mockito.mockStatic(ContainerProtocolCalls.class)) {
       mockContainerProtocolCalls(containerProtocolMock, dnToContainerMap, checksumManager, kvHandler, containerID);
 
-      kvHandler.reconcileContainer(dnClient, containers.get(0), Sets.newHashSet(datanodes));
-      kvHandler.reconcileContainer(dnClient, containers.get(1), Sets.newHashSet(datanodes));
-      kvHandler.reconcileContainer(dnClient, containers.get(2), Sets.newHashSet(datanodes));
+      kvHandler.reconcileContainer(dnClient, containers.get(0), datanodes);
+      kvHandler.reconcileContainer(dnClient, containers.get(1), datanodes);
+      kvHandler.reconcileContainer(dnClient, containers.get(2), datanodes);
 
       // After reconciliation, checksums should be the same for all containers.
+      // Reconciliation should have updated the tree based on the updated metadata that was obtained for the
+      // previously corrupted data. We do not need to wait for the full data scan to complete.
       ContainerProtos.ContainerChecksumInfo prevContainerChecksumInfo = null;
       for (KeyValueContainer kvContainer : containers) {
         kvHandler.createContainerMerkleTreeFromMetadata(kvContainer);
@@ -646,6 +662,21 @@ public class TestKeyValueHandler {
       }
     }
   }
+
+  public void waitForContainerScans(List<KeyValueContainer> containers) throws Exception {
+    for (KeyValueContainer container: containers) {
+      // The on-demand scanner has been initialized to pull from the mock container set.
+      // Make it pull the corresponding container instance to scan in this run based on ID.
+      long containerID = container.getContainerData().getContainerID();
+      Mockito.doReturn(container).when(mockContainerSet).getContainer(containerID);
+
+      Optional<Future<?>> scanFuture = OnDemandContainerDataScanner.scanContainer(container);
+      assertTrue(scanFuture.isPresent());
+      // Wait for on-demand scan to complete.
+      scanFuture.get().get();
+    }
+  }
+
   private void mockContainerProtocolCalls(MockedStatic<ContainerProtocolCalls> containerProtocolMock,
                                           Map<String, KeyValueContainer> dnToContainerMap,
                                           ContainerChecksumTreeManager checksumManager,
@@ -920,8 +951,8 @@ public class TestKeyValueHandler {
       }
       handle.getStore().getBatchHandler().commitBatchOperation(batch);
     }
-    Files.deleteIfExists(getContainerChecksumFile(keyValueContainer.getContainerData()).toPath());
-    kvHandler.createContainerMerkleTreeFromMetadata(keyValueContainer);
+//    Files.deleteIfExists(getContainerChecksumFile(keyValueContainer.getContainerData()).toPath());
+//    kvHandler.createContainerMerkleTreeFromMetadata(keyValueContainer);
 
     // Corrupt chunks at an offset.
     List<BlockData> blockDataList = kvHandler.getBlockManager().listBlock(keyValueContainer, -1, 100);
@@ -936,26 +967,26 @@ public class TestKeyValueHandler {
       corruptFileAtOffset(blockFile, (int) chunkInfo.getOffset(), (int) chunkInfo.getLen());
 
       // TODO: On-demand scanner (HDDS-10374) should detect this corruption and generate container merkle tree.
-      ContainerProtos.ContainerChecksumInfo.Builder builder = kvHandler.getChecksumManager()
-          .read(containerData).get().toBuilder();
-      List<ContainerProtos.BlockMerkleTree> blockMerkleTreeList = builder.getContainerMerkleTree()
-          .getBlockMerkleTreeList();
-      assertEquals(size, blockMerkleTreeList.size());
+//      ContainerProtos.ContainerChecksumInfo.Builder builder = kvHandler.getChecksumManager()
+//          .read(containerData).get().toBuilder();
+//      List<ContainerProtos.BlockMerkleTree> blockMerkleTreeList = builder.getContainerMerkleTree()
+//          .getBlockMerkleTreeList();
+//      assertEquals(size, blockMerkleTreeList.size());
 
-      builder.getContainerMerkleTreeBuilder().clearBlockMerkleTree();
-      for (int j = 0; j < blockMerkleTreeList.size(); j++) {
-        ContainerProtos.BlockMerkleTree.Builder blockMerkleTreeBuilder = blockMerkleTreeList.get(j).toBuilder();
-        if (j == blockIndex) {
-          List<ContainerProtos.ChunkMerkleTree.Builder> chunkMerkleTreeBuilderList =
-              blockMerkleTreeBuilder.getChunkMerkleTreeBuilderList();
-          chunkMerkleTreeBuilderList.get(chunkIndex).setIsHealthy(false).setDataChecksum(random.nextLong());
-          blockMerkleTreeBuilder.setDataChecksum(random.nextLong());
-        }
-        builder.getContainerMerkleTreeBuilder().addBlockMerkleTree(blockMerkleTreeBuilder.build());
-      }
-      builder.getContainerMerkleTreeBuilder().setDataChecksum(random.nextLong());
-      Files.deleteIfExists(getContainerChecksumFile(keyValueContainer.getContainerData()).toPath());
-      writeContainerDataTreeProto(keyValueContainer.getContainerData(), builder.getContainerMerkleTree());
+//      builder.getContainerMerkleTreeBuilder().clearBlockMerkleTree();
+//      for (int j = 0; j < blockMerkleTreeList.size(); j++) {
+//        ContainerProtos.BlockMerkleTree.Builder blockMerkleTreeBuilder = blockMerkleTreeList.get(j).toBuilder();
+//        if (j == blockIndex) {
+//          List<ContainerProtos.ChunkMerkleTree.Builder> chunkMerkleTreeBuilderList =
+//              blockMerkleTreeBuilder.getChunkMerkleTreeBuilderList();
+//          chunkMerkleTreeBuilderList.get(chunkIndex).setIsHealthy(false).setDataChecksum(random.nextLong());
+//          blockMerkleTreeBuilder.setDataChecksum(random.nextLong());
+//        }
+//        builder.getContainerMerkleTreeBuilder().addBlockMerkleTree(blockMerkleTreeBuilder.build());
+//      }
+//      builder.getContainerMerkleTreeBuilder().setDataChecksum(random.nextLong());
+//      Files.deleteIfExists(getContainerChecksumFile(keyValueContainer.getContainerData()).toPath());
+//      writeContainerDataTreeProto(keyValueContainer.getContainerData(), builder.getContainerMerkleTree());
     }
   }
 
