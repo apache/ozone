@@ -50,7 +50,7 @@ public class ContainerLogFileParser {
   private static final String KEY_BCSID = "BCSID";
   private static final String KEY_STATE = "State";
   private static final String KEY_INDEX = "Index";
-  AtomicBoolean hasErrorOccurred = new AtomicBoolean(false);
+  private final AtomicBoolean hasErrorOccurred = new AtomicBoolean(false);
   
   /**
    * Scans the specified log directory, processes each file in a separate thread.
