@@ -19,6 +19,9 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksObject;
 
@@ -29,6 +32,7 @@ import org.rocksdb.RocksObject;
 class ManagedObject<T extends RocksObject> implements AutoCloseable {
   private final T original;
   private final UncheckedAutoCloseable leakTracker = track(this);
+  private volatile boolean isClosed = false;
 
   ManagedObject(T original) {
     this.original = original;
@@ -40,10 +44,17 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable {
 
   @Override
   public void close() {
-    try {
-      original.close();
-    } finally {
-      leakTracker.close();
+    if (!isClosed) {
+      try {
+        original.close();
+      } finally {
+        leakTracker.close();
+      }
+      isClosed = true;
     }
+  }
+
+  public boolean isClosed() {
+    return isClosed;
   }
 }

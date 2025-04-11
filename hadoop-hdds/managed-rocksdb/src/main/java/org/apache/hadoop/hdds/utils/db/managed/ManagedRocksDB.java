@@ -17,10 +17,15 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -42,8 +47,13 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
 
   static final Logger LOG = LoggerFactory.getLogger(ManagedRocksDB.class);
 
+  private Set<ManagedSnapshot> snapshots;
+  private ReadWriteLock dbHandleLock;
+
   ManagedRocksDB(RocksDB original) {
     super(original);
+    snapshots = Sets.newConcurrentHashSet();
+    dbHandleLock = new ReentrantReadWriteLock();
   }
 
   public static ManagedRocksDB openReadOnly(
@@ -114,6 +124,37 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
   }
 
+
+  /**
+   * Get a point in time view of the rocksdb based on the Sequence number of rocksdb.
+   * @return Handle to the Snapshot taken which can be used to view at a consistent view of the db.
+   * @throws RocksDBException
+   */
+  public ManagedSnapshot takeSnapshot() throws RocksDBException {
+    dbHandleLock.readLock().lock();
+    try {
+      if (isClosed()) {
+        return null;
+      }
+      Consumer<ManagedSnapshot> snapshotCloseHandler = managedSnapshot -> {
+        dbHandleLock.readLock().unlock();
+        try {
+          if (!isClosed() && !managedSnapshot.isClosed()) {
+            this.get().releaseSnapshot(managedSnapshot.get());
+            this.snapshots.remove(managedSnapshot);
+          }
+        } finally {
+          dbHandleLock.readLock().unlock();
+        }
+      };
+      ManagedSnapshot snapshot = ManagedSnapshot.newManagedSnapshots(this.get().getSnapshot(), snapshotCloseHandler);
+      this.snapshots.add(snapshot);
+      return snapshot;
+    } finally {
+      dbHandleLock.readLock().unlock();
+    }
+  }
+
   public static Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles(RocksDB db) {
     return db.getLiveFilesMetaData().stream().collect(
             Collectors.toMap(liveFileMetaData -> FilenameUtils.getBaseName(liveFileMetaData.fileName()),
@@ -122,5 +163,20 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
 
   public Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles() {
     return getLiveMetadataForSSTFiles(this.get());
+  }
+
+  @Override
+  public synchronized void close() {
+    dbHandleLock.writeLock().lock();
+    try {
+      for (ManagedSnapshot snapshot : snapshots) {
+        snapshot.close();
+      }
+      super.close();
+    } finally {
+      dbHandleLock.writeLock().unlock();
+    }
+
+
   }
 }

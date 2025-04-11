@@ -15,22 +15,27 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.hdds.utils.db.managed;
 
-import java.io.IOException;
-import java.util.List;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
-import org.rocksdb.LiveFileMetaData;
+import java.util.function.Consumer;
+import org.rocksdb.Snapshot;
 
-/**
- * Base table interface for Rocksdb.
- */
-public interface BaseRDBTable<KEY, VALUE> extends Table<KEY, VALUE> {
-  List<LiveFileMetaData> getTableSstFiles() throws IOException;
+public class ManagedSnapshot extends ManagedObject<Snapshot> {
 
-  /**
-   * Take snapshot of the table.
-   */
-  ManagedSnapshot takeTableSnapshot() throws IOException;
+  private Consumer<ManagedSnapshot> snapshotCloseHandler;
+
+  private ManagedSnapshot(Snapshot snapshot, Consumer<ManagedSnapshot> snapshotCloseHandler) {
+    super(snapshot);
+    this.snapshotCloseHandler = snapshotCloseHandler;
+  }
+
+  public static ManagedSnapshot newManagedSnapshots(Snapshot snapshot, Consumer<ManagedSnapshot> snapshotCloseHandler) {
+    return new ManagedSnapshot(snapshot, snapshotCloseHandler);
+  }
+  @Override
+  public void close() {
+    this.snapshotCloseHandler.accept(this);
+    super.close();
+  }
+
 }

@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -759,11 +760,18 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
+  public ManagedRocksIterator newIterator(ColumnFamily family, boolean fillCache) throws RocksDatabaseException {
+    return newIterator(family, fillCache, null);
+  }
+
   public ManagedRocksIterator newIterator(ColumnFamily family,
-      boolean fillCache) throws RocksDatabaseException {
+      boolean fillCache, ManagedSnapshot snapshot) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire();
          ManagedReadOptions readOptions = new ManagedReadOptions()) {
       readOptions.setFillCache(fillCache);
+      if (snapshot != null) {
+        readOptions.setSnapshot(snapshot.get());
+      }
       return managed(db.get().newIterator(family.getHandle(), readOptions));
     }
   }
@@ -811,6 +819,15 @@ public final class RocksDatabase implements Closeable {
       closeOnError(e);
       final String message = "delete range " + bytes2String(beginKey) +
           " to " + bytes2String(endKey) + " from " + family;
+      throw toRocksDatabaseException(this, message, e);
+    }
+  }
+
+  public ManagedSnapshot takeSnapshot() throws RocksDatabaseException {
+    try {
+      return db.takeSnapshot();
+    } catch (RocksDBException e) {
+      final String message = "Failed to take snapshot of the db";
       throw toRocksDatabaseException(this, message, e);
     }
   }

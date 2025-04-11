@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRawKeyValue;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
 import org.apache.hadoop.util.Time;
 import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
@@ -391,6 +392,11 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
     return this.db.getSstFileList().stream()
         .filter(liveFileMetaData -> getName().equals(bytes2String(liveFileMetaData.columnFamilyName())))
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public ManagedSnapshot takeTableSnapshot() throws IOException {
+    return this.db.takeSnapshot();
   }
 
   private final class ByteArrayRawSpliterator extends RawSpliterator<byte[], byte[], byte[]> {
