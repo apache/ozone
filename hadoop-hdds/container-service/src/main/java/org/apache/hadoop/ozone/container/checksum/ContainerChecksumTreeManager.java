@@ -383,6 +383,21 @@ public class ContainerChecksumTreeManager {
     }
   }
 
+  public static Optional<ContainerProtos.ContainerChecksumInfo> readChecksumInfo(KeyValueContainerData data) {
+    File checksumFile = getContainerChecksumFile(data);
+    if (!checksumFile.exists()) {
+      LOG.error("Checksum file not found for container {}", data.getContainerID());
+      return Optional.empty();
+    }
+
+    try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+      return Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
+    } catch (IOException ex) {
+      LOG.error("Error while reading the checksum file for container {}", data.getContainerID(), ex);
+      return Optional.empty();
+    }
+  }
+
   @VisibleForTesting
   public ContainerMerkleTreeMetrics getMetrics() {
     return this.metrics;

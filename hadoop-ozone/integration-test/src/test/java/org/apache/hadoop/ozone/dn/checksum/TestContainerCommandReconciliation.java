@@ -50,6 +50,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -76,7 +77,9 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -84,6 +87,7 @@ import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -120,7 +124,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestContainerCommandReconciliation {
 
-  private static MiniOzoneCluster cluster;
+  private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient rpcClient;
   private static ObjectStore store;
   private static OzoneConfiguration conf;
@@ -147,6 +151,7 @@ public class TestContainerCommandReconciliation {
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE,  512 * 1024, StorageUnit.BYTES);
     // Disable the container scanner so it does not create merkle tree files that interfere with this test.
     conf.getObject(ContainerScannerConfiguration.class).setEnabled(false);
+    conf.setBoolean("hdds.container.scrub.enabled", false);
 
     startMiniKdc();
     setSecureConfig();
@@ -502,6 +507,96 @@ public class TestContainerCommandReconciliation {
     TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
   }
 
+  @Test
+  public void testDataChecksumReportedAtSCM() throws Exception {
+    // 1. Write data to a container.
+    // Read the key back and check its hash.
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    Pair<Long, byte[]> containerAndData = getDataAndContainer(true, 20 * 1024 * 1024, volume, bucket);
+    long containerID = containerAndData.getLeft();
+    byte[] data = containerAndData.getRight();
+    // Get the datanodes where the container replicas are stored.
+    List<DatanodeDetails> dataNodeDetails = cluster.getStorageContainerManager().getContainerManager()
+        .getContainerReplicas(ContainerID.valueOf(containerID))
+        .stream().map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
+    Assertions.assertEquals(3, dataNodeDetails.size());
+    HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanode(dataNodeDetails.get(0));
+    DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
+    Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+    ContainerProtos.ContainerChecksumInfo oldContainerChecksumInfo = readChecksumFile(container.getContainerData());
+    KeyValueHandler kvHandler = (KeyValueHandler) datanodeStateMachine.getContainer().getDispatcher()
+        .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
+
+    BlockManager blockManager = kvHandler.getBlockManager();
+    List<BlockData> blockDataList = blockManager.listBlock(container, -1, 100);
+    String chunksPath = container.getContainerData().getChunksPath();
+    long oldDataChecksum = oldContainerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+    // Check non-zero checksum after container close
+    StorageContainerLocationProtocolClientSideTranslatorPB scmClient = cluster.getStorageContainerLocationClient();
+    List<HddsProtos.SCMContainerReplicaProto> containerReplicas = scmClient.getContainerReplicas(containerID,
+        ClientVersion.CURRENT_VERSION);
+    assertEquals(3, containerReplicas.size());
+    for (HddsProtos.SCMContainerReplicaProto containerReplica: containerReplicas) {
+      assertNotEquals(0, containerReplica.getDataChecksum());
+    }
+
+    // 2. Delete some blocks to simulate missing blocks.
+    try (DBHandle db = BlockUtils.getDB(containerData, conf);
+         BatchOperation op = db.getStore().getBatchHandler().initBatchOperation()) {
+      for (int i = 0; i < blockDataList.size(); i += 2) {
+        BlockData blockData = blockDataList.get(i);
+        // Delete the block metadata from the container db
+        db.getStore().getBlockDataTable().deleteWithBatch(op, containerData.getBlockKey(blockData.getLocalID()));
+        // Delete the block file.
+        Files.deleteIfExists(Paths.get(chunksPath + "/" + blockData.getBlockID().getLocalID() + ".block"));
+      }
+      db.getStore().getBatchHandler().commitBatchOperation(op);
+      db.getStore().flushDB();
+    }
+
+    // TODO: Use On-demand container scanner to build the new container merkle tree. (HDDS-10374)
+    Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
+    kvHandler.createContainerMerkleTree(container);
+    ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
+        readChecksumFile(container.getContainerData());
+    long dataChecksumAfterBlockDelete = containerChecksumAfterBlockDelete.getContainerMerkleTree().getDataChecksum();
+    // Checksum should have changed after block delete.
+    Assertions.assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
+
+    // Since the container is already closed, we have manually updated the container checksum file.
+    // This doesn't update the checksum reported to SCM, and we need to trigger an ICR.
+    // Marking a container unhealthy will send an ICR.
+    kvHandler.markContainerUnhealthy(container, MetadataScanResult.deleted());
+    waitForDataChecksumsAtSCM(containerID, 2);
+    scmClient.reconcileContainer(containerID);
+
+    waitForDataChecksumsAtSCM(containerID, 1);
+    // Check non-zero checksum after container reconciliation
+    containerReplicas = scmClient.getContainerReplicas(containerID, ClientVersion.CURRENT_VERSION);
+    assertEquals(3, containerReplicas.size());
+    for (HddsProtos.SCMContainerReplicaProto containerReplica: containerReplicas) {
+      assertNotEquals(0, containerReplica.getDataChecksum());
+    }
+
+    // Check non-zero checksum after datanode restart
+    // Restarting all the nodes take more time in mini ozone cluster, so restarting only one node
+    cluster.restartHddsDatanode(0, true);
+    for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
+      cluster.restartStorageContainerManager(scm, false);
+    }
+    cluster.waitForClusterToBeReady();
+    waitForDataChecksumsAtSCM(containerID, 1);
+    containerReplicas = scmClient.getContainerReplicas(containerID, ClientVersion.CURRENT_VERSION);
+    assertEquals(3, containerReplicas.size());
+    for (HddsProtos.SCMContainerReplicaProto containerReplica: containerReplicas) {
+      assertNotEquals(0, containerReplica.getDataChecksum());
+    }
+    TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
+  }
+
   private void waitForDataChecksumsAtSCM(long containerID, int expectedSize) throws Exception {
     GenericTestUtils.waitFor(() -> {
       try {
@@ -622,7 +717,6 @@ public class TestContainerCommandReconciliation {
         .setSCMServiceId("SecureSCM")
         .setNumOfStorageContainerManagers(3)
         .setNumOfOzoneManagers(1)
-        .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
     rpcClient = OzoneClientFactory.getRpcClient(conf);
