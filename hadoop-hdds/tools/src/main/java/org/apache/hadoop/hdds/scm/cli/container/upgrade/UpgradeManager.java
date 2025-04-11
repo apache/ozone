@@ -125,7 +125,7 @@ public class UpgradeManager {
     }
 
     public void success() {
-      this.endTimeMs = System.currentTimeMillis();
+      this.endTimeMs = Time.monotonicNow();
       this.status = Status.SUCCESS;
     }
 
