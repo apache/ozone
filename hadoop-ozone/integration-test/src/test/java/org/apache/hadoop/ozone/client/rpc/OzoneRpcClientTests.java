@@ -1,29 +1,73 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.client.rpc;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.singletonMap;
+import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
+import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.corruptData;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByID;
+import static org.apache.hadoop.ozone.OmUtils.LOG;
+import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.slf4j.event.Level.DEBUG;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedExceptionAction;
@@ -32,12 +76,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -46,10 +92,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
-
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -84,11 +131,12 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
+import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -107,16 +155,16 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -128,70 +176,24 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ozone.test.tag.Flaky;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.RandomUtils;
-
-import static java.util.Collections.singletonMap;
-import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
-import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
-import static org.apache.hadoop.ozone.OmUtils.LOG;
-import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
-import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
-import static org.apache.hadoop.ozone.OzoneConsts.GB;
-import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
-import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.corruptData;
-import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByID;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
-
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
-import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assumptions.assumeThat;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.slf4j.event.Level.DEBUG;
-
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -221,10 +223,14 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private static OzoneAcl inheritedGroupAcl = new OzoneAcl(GROUP,
       remoteGroupName, ACCESS, READ);
   private static MessageDigest eTagProvider;
+  private static Set<OzoneClient> ozoneClients = new HashSet<>();
+  private static GenericTestUtils.PrintStreamCapturer output;
 
   @BeforeAll
-  public static void initialize() throws NoSuchAlgorithmException {
+  public static void initialize() throws NoSuchAlgorithmException, UnsupportedEncodingException {
     eTagProvider = MessageDigest.getInstance(MD5_HASH);
+    AuditLogTestUtils.enableAuditLog();
+    output = GenericTestUtils.captureOut();
   }
 
   /**
@@ -250,6 +256,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
+    ozoneClients.add(ozClient);
     store = ozClient.getObjectStore();
     storageContainerLocationClient =
         cluster.getStorageContainerLocationClient();
@@ -259,10 +266,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
-  static void shutdownCluster() throws IOException {
-    if (ozClient != null) {
-      ozClient.close();
-    }
+  static void shutdownCluster() {
+    org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(ozoneClients);
+    ozoneClients.clear();
+    org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(output);
 
     if (storageContainerLocationClient != null) {
       storageContainerLocationClient.close();
@@ -274,6 +281,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   private static void setOzClient(OzoneClient ozClient) {
+    ozoneClients.add(ozClient);
     OzoneRpcClientTests.ozClient = ozClient;
   }
 
@@ -388,10 +396,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           .setVolumeName(volumeName).setBucketName(bucketName)
           .setStoreType(OzoneObj.StoreType.OZONE)
           .setResType(OzoneObj.ResourceType.BUCKET).build();
-      store.addAcl(volumeObj, new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
-      store.addAcl(volumeObj, new OzoneAcl(USER, "user2", ACCESS, ACLType.ALL));
-      store.addAcl(bucketObj, new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
-      store.addAcl(bucketObj, new OzoneAcl(USER, "user2", ACCESS, ACLType.ALL));
+      store.addAcl(volumeObj, new OzoneAcl(USER, "user1", ACCESS, ALL));
+      store.addAcl(volumeObj, new OzoneAcl(USER, "user2", ACCESS, ALL));
+      store.addAcl(bucketObj, new OzoneAcl(USER, "user1", ACCESS, ALL));
+      store.addAcl(bucketObj, new OzoneAcl(USER, "user2", ACCESS, ALL));
 
       createKeyForUser(volumeName, bucketName, key1, content, user1);
       createKeyForUser(volumeName, bucketName, key2, content, user2);
@@ -619,7 +627,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testCreateVolumeWithMetadata()
-      throws IOException, OzoneClientException {
+      throws IOException {
     String volumeName = UUID.randomUUID().toString();
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addMetadata("key1", "val1")
@@ -634,7 +642,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testCreateBucketWithMetadata()
-      throws IOException, OzoneClientException {
+      throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
@@ -773,7 +781,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
-        ACCESS, ACLType.ALL);
+        ACCESS, ALL);
     ReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
@@ -812,7 +820,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     List<OzoneAcl> acls = new ArrayList<>();
-    acls.add(new OzoneAcl(USER, "test", ACCESS, ACLType.ALL));
+    acls.add(new OzoneAcl(USER, "test", ACCESS, ALL));
     OzoneBucket bucket = volume.getBucket(bucketName);
     for (OzoneAcl acl : acls) {
       assertTrue(bucket.addAcl(acl));
@@ -828,7 +836,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
-        ACCESS, ACLType.ALL);
+        ACCESS, ALL);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder()
@@ -847,9 +855,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
-        ACCESS, ACLType.ALL);
+        ACCESS, ALL);
     OzoneAcl acl2 = new OzoneAcl(USER, "test1",
-        ACCESS, ACLType.ALL);
+        ACCESS, ALL);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder()
@@ -905,6 +913,64 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     List<OzoneAcl> aclsAfterSet = newBucket.getAcls();
     assertEquals(currentAcls, aclsAfterSet);
 
+  }
+
+  @Test
+  public void testAclDeDuplication()
+      throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneAcl userAcl1 = new OzoneAcl(USER, "test", DEFAULT, READ);
+    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
+    OzoneAcl currentUserAcl = new OzoneAcl(USER, currentUser.getShortUserName(), ACCESS, ALL);
+    OzoneAcl currentUserPrimaryGroupAcl = new OzoneAcl(GROUP, currentUser.getPrimaryGroupName(), ACCESS, READ, LIST);
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner(currentUser.getShortUserName())
+        .setAdmin(currentUser.getShortUserName())
+        .addAcl(userAcl1)
+        .addAcl(currentUserAcl)
+        .addAcl(currentUserPrimaryGroupAcl)
+        .build();
+
+    store.createVolume(volumeName, createVolumeArgs);
+    OzoneVolume volume = store.getVolume(volumeName);
+    List<OzoneAcl> volumeAcls = volume.getAcls();
+    assertEquals(3, volumeAcls.size());
+    assertTrue(volumeAcls.contains(userAcl1));
+    assertTrue(volumeAcls.contains(currentUserAcl));
+    assertTrue(volumeAcls.contains(currentUserPrimaryGroupAcl));
+
+    // normal bucket
+    BucketArgs.Builder builder = BucketArgs.newBuilder()
+        .addAcl(currentUserAcl).addAcl(currentUserPrimaryGroupAcl);
+    volume.createBucket(bucketName, builder.build());
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    List<OzoneAcl> bucketAcls = bucket.getAcls();
+    assertEquals(bucketName, bucket.getName());
+    assertEquals(3, bucketAcls.size());
+    assertTrue(bucketAcls.contains(currentUserAcl));
+    assertTrue(bucketAcls.contains(currentUserPrimaryGroupAcl));
+    assertTrue(bucketAcls.get(2).getName().equals(userAcl1.getName()));
+    assertTrue(bucketAcls.get(2).getAclList().equals(userAcl1.getAclList()));
+    assertTrue(bucketAcls.get(2).getAclScope().equals(ACCESS));
+
+    // link bucket
+    OzoneAcl userAcl2 = new OzoneAcl(USER, "test-link", DEFAULT, READ);
+    String linkBucketName =  "link-" + bucketName;
+    builder = BucketArgs.newBuilder().setSourceVolume(volumeName).setSourceBucket(bucketName)
+        .addAcl(currentUserAcl).addAcl(currentUserPrimaryGroupAcl).addAcl(userAcl2);
+    volume.createBucket(linkBucketName, builder.build());
+    OzoneBucket linkBucket = volume.getBucket(linkBucketName);
+    List<OzoneAcl> linkBucketAcls = linkBucket.getAcls();
+    assertEquals(linkBucketName, linkBucket.getName());
+    assertEquals(5, linkBucketAcls.size());
+    assertTrue(linkBucketAcls.contains(currentUserAcl));
+    assertTrue(linkBucketAcls.contains(currentUserPrimaryGroupAcl));
+    assertTrue(linkBucketAcls.contains(userAcl2));
+    assertTrue(linkBucketAcls.contains(OzoneAcl.LINK_BUCKET_DEFAULT_ACL));
+    assertTrue(linkBucketAcls.get(4).getName().equals(userAcl1.getName()));
+    assertTrue(linkBucketAcls.get(4).getAclList().equals(userAcl1.getAclList()));
+    assertTrue(linkBucketAcls.get(4).getAclScope().equals(ACCESS));
   }
 
   @Test
@@ -1008,6 +1074,64 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     );
 
     store.deleteVolume(volumeName);
+  }
+
+  @Test
+  public void testDeleteAuditLog() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = "sample value";
+    int valueLength = value.getBytes(UTF_8).length;
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // create a three replica file
+    String keyName1 = "key1";
+    TestDataUtil.createKey(bucket, keyName1, THREE, RATIS, value);
+
+    // create a EC replica file
+    String keyName2 = "key2";
+    ReplicationConfig replicationConfig = new ECReplicationConfig("rs-3-2-1024k");
+    TestDataUtil.createKey(bucket, keyName2, replicationConfig, value);
+
+    // create a directory and a file
+    String dirName = "dir1";
+    bucket.createDirectory(dirName);
+    String keyName3 = "key3";
+    TestDataUtil.createKey(bucket, keyName3, THREE, RATIS, value);
+
+    // delete files and directory
+    output.reset();
+    bucket.deleteKey(keyName1);
+    bucket.deleteKey(keyName2);
+    bucket.deleteDirectory(dirName, true);
+
+    // create keys for deleteKeys case
+    String keyName4 = "key4";
+    TestDataUtil.createKey(bucket, dirName + "/" + keyName4, THREE, RATIS, value);
+
+    String keyName5 = "key5";
+    TestDataUtil.createKey(bucket, dirName + "/" + keyName5, replicationConfig, value);
+
+    List<String> keysToDelete = new ArrayList<>();
+    keysToDelete.add(dirName + "/" + keyName4);
+    keysToDelete.add(dirName + "/" + keyName5);
+    bucket.deleteKeys(keysToDelete);
+
+    String consoleOutput = output.get();
+    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
+        ", key=key1, dataSize=" + valueLength + ", replicationConfig=RATIS/THREE");
+    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
+        ", key=key2, dataSize=" + valueLength + ", replicationConfig=EC{rs-3-2-1024k}");
+    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
+        ", key=dir1, Transaction");
+    assertThat(consoleOutput).contains("op=DELETE_KEYS {volume=" + volumeName + ", bucket=" + bucketName +
+        ", deletedKeysList={key=dir1/key4, dataSize=" + valueLength +
+        ", replicationConfig=RATIS/THREE}, {key=dir1/key5, dataSize=" + valueLength +
+        ", replicationConfig=EC{rs-3-2-1024k}}, unDeletedKeysList=");
   }
 
   protected void verifyReplication(String volumeName, String bucketName,
@@ -1611,8 +1735,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     if (layout.equals(BucketLayout.LEGACY)) {
-      OzoneConfiguration conf = cluster.getConf();
-      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+      cluster.getOzoneManager().getConfig().setFileSystemPathEnabled(true);
     }
 
     // the directory "/dir1", ""/dir1/dir2/", "/dir1/dir2/dir3/"
@@ -3023,10 +3146,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     // Add ACL on Bucket
-    OzoneAcl acl1 = new OzoneAcl(USER, "Monday", DEFAULT, ACLType.ALL);
-    OzoneAcl acl2 = new OzoneAcl(USER, "Friday", DEFAULT, ACLType.ALL);
-    OzoneAcl acl3 = new OzoneAcl(USER, "Jan", ACCESS, ACLType.ALL);
-    OzoneAcl acl4 = new OzoneAcl(USER, "Feb", ACCESS, ACLType.ALL);
+    OzoneAcl acl1 = new OzoneAcl(USER, "Monday", DEFAULT, ALL);
+    OzoneAcl acl2 = new OzoneAcl(USER, "Friday", DEFAULT, ALL);
+    OzoneAcl acl3 = new OzoneAcl(USER, "Jan", ACCESS, ALL);
+    OzoneAcl acl4 = new OzoneAcl(USER, "Feb", ACCESS, ALL);
     bucket.addAcl(acl1);
     bucket.addAcl(acl2);
     bucket.addAcl(acl3);
@@ -3140,6 +3263,37 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     doMultipartUpload(bucket, keyName, (byte)97, replication);
 
   }
+
+  /**
+   * This test prints out that there is a memory leak in the test logs
+   * which during post-processing is caught by the CI thereby failing the
+   * CI run. Hence, disabling this for CI.
+   */
+  @Unhealthy
+  public void testClientLeakDetector() throws Exception {
+    OzoneClient client = OzoneClientFactory.getRpcClient(cluster.getConf());
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    GenericTestUtils.LogCapturer ozoneClientFactoryLogCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(
+            OzoneClientFactory.getLogger());
+
+    client.getObjectStore().createVolume(volumeName);
+    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    byte[] data = new byte[10];
+    Arrays.fill(data, (byte) 1);
+    try (OzoneOutputStream out = bucket.createKey(keyName, 10,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE), new HashMap<>())) {
+      out.write(data);
+    }
+    client = null;
+    System.gc();
+    GenericTestUtils.waitFor(() -> ozoneClientFactoryLogCapturer.getOutput()
+        .contains("is not closed properly"), 100, 2000);
+  }
   @Test
   public void testMultipartUploadOwner() throws Exception {
     // Save the old user, and switch to the old user after test
@@ -3166,10 +3320,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           .setVolumeName(volumeName).setBucketName(bucketName)
           .setStoreType(OzoneObj.StoreType.OZONE)
           .setResType(OzoneObj.ResourceType.BUCKET).build();
-      store.addAcl(volumeObj, new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
-      store.addAcl(volumeObj, new OzoneAcl(USER, "awsUser1", ACCESS, ACLType.ALL));
-      store.addAcl(bucketObj, new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
-      store.addAcl(bucketObj, new OzoneAcl(USER, "awsUser1", ACCESS, ACLType.ALL));
+      store.addAcl(volumeObj, new OzoneAcl(USER, "user1", ACCESS, ALL));
+      store.addAcl(volumeObj, new OzoneAcl(USER, "awsUser1", ACCESS, ALL));
+      store.addAcl(bucketObj, new OzoneAcl(USER, "user1", ACCESS, ALL));
+      store.addAcl(bucketObj, new OzoneAcl(USER, "awsUser1", ACCESS, ALL));
 
       // user1 MultipartUpload a key
       UserGroupInformation.setLoginUser(user1);
@@ -3906,7 +4060,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     aclsGet = store.getAcl(prefixObj);
     assertEquals(0, aclsGet.size());
 
-    OzoneAcl group1Acl = new OzoneAcl(GROUP, "group1", ACCESS, ACLType.ALL);
+    OzoneAcl group1Acl = new OzoneAcl(GROUP, "group1", ACCESS, ALL);
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(user1Acl);
     acls.add(group1Acl);
@@ -3943,14 +4097,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     //User ACL
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-    ACLType userRights = aclConfig.getUserDefaultRights();
-    ACLType groupRights = aclConfig.getGroupDefaultRights();
+    ACLType[] userRights = aclConfig.getUserDefaultRights();
+    ACLType[] groupRights = aclConfig.getGroupDefaultRights();
 
-    listOfAcls.add(new OzoneAcl(USER, ugi.getUserName(), ACCESS, userRights));
-    //Group ACLs of the User
-    List<String> userGroups = Arrays.asList(ugi.getGroupNames());
-    userGroups.stream().forEach((group) -> listOfAcls.add(
-        new OzoneAcl(GROUP, group, ACCESS, groupRights)));
+    listOfAcls.add(new OzoneAcl(USER, ugi.getShortUserName(), ACCESS, userRights));
+    //Group ACL of the User
+    listOfAcls.add(new OzoneAcl(GROUP, ugi.getPrimaryGroupName(), ACCESS, groupRights));
     return listOfAcls;
   }
 
@@ -4019,7 +4171,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneAcl ua = new OzoneAcl(USER, "userx",
         ACCESS, ACLType.READ_ACL);
     OzoneAcl ug = new OzoneAcl(GROUP, "userx",
-        ACCESS, ACLType.ALL);
+        ACCESS, ALL);
     store.setAcl(ozObj, Arrays.asList(ua, ug));
     newAcls = store.getAcl(ozObj);
     assertEquals(2, newAcls.size());
@@ -4774,17 +4926,13 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
-  public void testUploadWithStreamAndMemoryMappedBuffer() throws IOException {
-    // create a local dir
-    final String dir = GenericTestUtils.getTempPath(
-        getClass().getSimpleName());
-    GenericTestUtils.assertDirCreation(new File(dir));
+  public void testUploadWithStreamAndMemoryMappedBuffer(@TempDir Path dir) throws IOException {
 
     // create a local file
     final int chunkSize = 1024;
     final byte[] data = new byte[8 * chunkSize];
     ThreadLocalRandom.current().nextBytes(data);
-    final File file = new File(dir, "data");
+    final File file = new File(dir.toString(), "data");
     try (FileOutputStream out = new FileOutputStream(file)) {
       out.write(data);
     }
@@ -4843,8 +4991,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testParallelDeleteBucketAndCreateKey() throws IOException,
       InterruptedException, TimeoutException {
-    assumeThat(getCluster().getOzoneManager().isRatisEnabled()).isTrue();
-
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -4954,5 +5100,137 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     public void reset() throws IOException {
       init();
     }
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testPutObjectTagging(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    String keyName = UUID.randomUUID().toString();
+
+    OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, anyReplication(), new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    OzoneKey key = bucket.getKey(keyName);
+    assertTrue(key.getTags().isEmpty());
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key-1", "tag-value-1");
+    tags.put("tag-key-2", "tag-value-2");
+
+    bucket.putObjectTagging(keyName, tags);
+
+    OzoneKey updatedKey = bucket.getKey(keyName);
+    assertEquals(tags.size(), updatedKey.getTags().size());
+    assertEquals(key.getModificationTime(), updatedKey.getModificationTime());
+    assertThat(updatedKey.getTags()).containsAllEntriesOf(tags);
+
+    // Do another putObjectTagging, it should override the previous one
+    Map<String, String> secondTags = new HashMap<>();
+    secondTags.put("tag-key-3", "tag-value-3");
+
+    bucket.putObjectTagging(keyName, secondTags);
+
+    updatedKey = bucket.getKey(keyName);
+    assertEquals(secondTags.size(), updatedKey.getTags().size());
+    assertThat(updatedKey.getTags()).containsAllEntriesOf(secondTags);
+    assertThat(updatedKey.getTags()).doesNotContainKeys("tag-key-1", "tag-key-2");
+
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      String dirKey = "dir1/";
+      bucket.createDirectory(dirKey);
+      OMException exception = assertThrows(OMException.class,
+          () -> bucket.putObjectTagging(dirKey, tags));
+      assertThat(exception.getResult()).isEqualTo(ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteObjectTagging(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    String keyName = UUID.randomUUID().toString();
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key-1", "tag-value-1");
+    tags.put("tag-key-2", "tag-value-2");
+
+    OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, anyReplication(), new HashMap<>(), tags);
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    OzoneKey key = bucket.getKey(keyName);
+    assertFalse(key.getTags().isEmpty());
+
+    bucket.deleteObjectTagging(keyName);
+
+    OzoneKey updatedKey = bucket.getKey(keyName);
+    assertEquals(0, updatedKey.getTags().size());
+    assertEquals(key.getModificationTime(), updatedKey.getModificationTime());
+
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      String dirKey = "dir1/";
+      bucket.createDirectory(dirKey);
+      OMException exception = assertThrows(OMException.class,
+          () -> bucket.deleteObjectTagging(dirKey));
+      assertThat(exception.getResult()).isEqualTo(ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testGetObjectTagging(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    String keyName = UUID.randomUUID().toString();
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key-1", "tag-value-1");
+    tags.put("tag-key-2", "tag-value-2");
+
+    OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, anyReplication(), new HashMap<>(), tags);
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    OzoneKey key = bucket.getKey(keyName);
+    assertEquals(tags.size(), key.getTags().size());
+
+    Map<String, String> tagsRetrieved = bucket.getObjectTagging(keyName);
+
+    assertEquals(tags.size(), tagsRetrieved.size());
+    assertThat(tagsRetrieved).containsAllEntriesOf(tags);
   }
 }

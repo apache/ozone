@@ -1,22 +1,37 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.stream.Stream;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -24,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -43,22 +59,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
-import java.util.stream.Stream;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test for FilePerBlockStrategy.
@@ -113,7 +113,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     // Request to read the whole data in a single go.
     ChunkInfo largeChunk = getChunk(blockID.getLocalID(), 0, 0,
         datalen * chunkCount);
-    ChunkBuffer chunk =
+    final ChunkBufferToByteString chunk =
         subject.readChunk(container, blockID, largeChunk,
             null);
     ByteBuffer newdata = chunk.toByteString().asReadOnlyByteBuffer();
@@ -140,18 +140,16 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkManager subject = createTestSubject();
     subject.writeChunk(container, blockID, info, data, WRITE_STAGE);
 
-    ChunkBuffer readData = subject.readChunk(container, blockID, info, null);
+    final ChunkBufferToByteString readData = subject.readChunk(container, blockID, info, null);
     // data will be ChunkBufferImplWithByteBuffer and readData will return
     // ChunkBufferImplWithByteBufferList. Hence, convert both ByteStrings
     // before comparing.
-    assertEquals(data.rewind().toByteString(),
-        readData.rewind().toByteString());
+    assertEquals(data.rewind().toByteString(), readData.toByteString());
 
     ChunkInfo info2 = getChunk(blockID.getLocalID(), 0, start, length);
-    ChunkBuffer readData2 = subject.readChunk(container, blockID, info2, null);
+    final ChunkBufferToByteString readData2 = subject.readChunk(container, blockID, info2, null);
     assertEquals(length, info2.getLen());
-    assertEquals(data.rewind().toByteString().substring(start, start + length),
-        readData2.rewind().toByteString());
+    assertEquals(data.rewind().toByteString().substring(start, start + length), readData2.toByteString());
   }
 
   @ParameterizedTest
@@ -166,8 +164,8 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkBuffer.wrap(getData());
     Assertions.assertThrows(IOException.class, () -> keyValueHandler.writeChunkForClosedContainer(
         getChunkInfo(), getBlockID(), ChunkBuffer.wrap(getData()), keyValueContainer));
-    Assertions.assertThrows(IOException.class, () -> keyValueHandler.putBlockForClosedContainer(
-        null, keyValueContainer, new BlockData(getBlockID()), 0L));
+    Assertions.assertThrows(IOException.class, () -> keyValueHandler.putBlockForClosedContainer(keyValueContainer,
+            new BlockData(getBlockID()), 0L, true));
   }
 
   @Test
@@ -181,7 +179,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
     keyValueHandler.writeChunkForClosedContainer(getChunkInfo(), getBlockID(), writeChunkData, kvContainer);
-    ChunkBuffer readChunkData = keyValueHandler.getChunkManager().readChunk(kvContainer,
+    ChunkBufferToByteString readChunkData = keyValueHandler.getChunkManager().readChunk(kvContainer,
         getBlockID(), getChunkInfo(), WRITE_STAGE);
     rewindBufferToDataStart();
     Assertions.assertEquals(writeChunkData, readChunkData);
@@ -227,37 +225,72 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
     List<ContainerProtos.ChunkInfo> chunkInfoList = new ArrayList<>();
-    chunkInfoList.add(getChunkInfo().getProtoBufMessage());
+    ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 0), 0L, 20L);
+
+    chunkInfoList.add(info.getProtoBufMessage());
     BlockData putBlockData = new BlockData(getBlockID());
-    keyValueHandler.putBlockForClosedContainer(chunkInfoList, kvContainer, putBlockData, 1L);
-    Assertions.assertEquals(containerData.getBlockCommitSequenceId(), 1L);
-    Assertions.assertEquals(containerData.getBlockCount(), 1L);
+    putBlockData.setChunks(chunkInfoList);
+
+    ChunkBuffer chunkData = ContainerTestHelper.getData(20);
+    keyValueHandler.writeChunkForClosedContainer(info, getBlockID(), chunkData, kvContainer);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 1L, true);
+    assertEquals(1L, containerData.getBlockCommitSequenceId());
+    assertEquals(1L, containerData.getBlockCount());
+    assertEquals(20L, containerData.getBytesUsed());
 
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
+      assertEquals(20L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
     }
 
     // Add another chunk and check the put block data
-    ChunkInfo newChunkInfo = new ChunkInfo(String.format("%d.data.%d", getBlockID()
-        .getLocalID(), 1L), 0, 20L);
+    ChunkInfo newChunkInfo = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 1L), 20L, 20L);
     chunkInfoList.add(newChunkInfo.getProtoBufMessage());
-    keyValueHandler.putBlockForClosedContainer(chunkInfoList, kvContainer, putBlockData, 2L);
-    Assertions.assertEquals(containerData.getBlockCommitSequenceId(), 2L);
-    Assertions.assertEquals(containerData.getBlockCount(), 1L);
+    putBlockData.setChunks(chunkInfoList);
+
+    chunkData = ContainerTestHelper.getData(20);
+    keyValueHandler.writeChunkForClosedContainer(newChunkInfo, getBlockID(), chunkData, kvContainer);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    assertEquals(2L, containerData.getBlockCommitSequenceId());
+    assertEquals(1L, containerData.getBlockCount());
+    assertEquals(40L, containerData.getBytesUsed());
 
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
+      assertEquals(40L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
     }
 
-    // Put block on bcsId <= containerBcsId should be a no-op
-    keyValueHandler.putBlockForClosedContainer(chunkInfoList, kvContainer, putBlockData, 2L);
-    Assertions.assertEquals(containerData.getBlockCommitSequenceId(), 2L);
+    // Replace the last chunk with a chunk of greater size, This should only update the bytesUsed with
+    // difference in length between the old last chunk and new last chunk
+    newChunkInfo = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 1L), 20L, 30L);
+    chunkInfoList.remove(chunkInfoList.size() - 1);
+    chunkInfoList.add(newChunkInfo.getProtoBufMessage());
+    putBlockData.setChunks(chunkInfoList);
+
+    chunkData = ContainerTestHelper.getData(30);
+    keyValueHandler.writeChunkForClosedContainer(newChunkInfo, getBlockID(), chunkData, kvContainer);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    assertEquals(2L, containerData.getBlockCommitSequenceId());
+    assertEquals(1L, containerData.getBlockCount());
+    // Old chunk size 20, new chunk size 30, difference 10. So bytesUsed should be 40 + 10 = 50
+    assertEquals(50L, containerData.getBytesUsed());
+
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
+      long localID = putBlockData.getLocalID();
+      BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
+          .get(containerData.getBlockKey(localID));
+      Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
+      assertEquals(50L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
+    }
+
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    assertEquals(2L, containerData.getBlockCommitSequenceId());
   }
 
   private boolean blockDataEquals(BlockData putBlockData, BlockData getBlockData) {

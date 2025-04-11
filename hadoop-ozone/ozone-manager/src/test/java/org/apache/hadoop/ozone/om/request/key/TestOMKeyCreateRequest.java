@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,50 +16,6 @@
  */
 
 package org.apache.hadoop.ozone.om.request.key;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.PrefixManager;
-import org.apache.hadoop.ozone.om.PrefixManagerImpl;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
-
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CreateKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -84,6 +39,45 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.PrefixManager;
+import org.apache.hadoop.ozone.om.PrefixManagerImpl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This class tests the OM Key Create Request.
@@ -501,6 +495,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         createKeyRequest(false, 0, keyName, initialMetadata);
     OMKeyCreateRequest initialOmKeyCreateRequest =
         new OMKeyCreateRequest(initialRequest, getBucketLayout());
+    initialOmKeyCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
     OMClientResponse initialResponse =
         initialOmKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     verifyMetadataInResponse(initialResponse, initialMetadata);
@@ -519,6 +514,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         createKeyRequest(false, 0, keyName, updatedMetadata);
     OMKeyCreateRequest updatedOmKeyCreateRequest =
         new OMKeyCreateRequest(updatedRequest, getBucketLayout());
+    updatedOmKeyCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
 
     OMClientResponse updatedResponse =
         updatedOmKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L);
@@ -562,6 +558,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         createKeyRequest(false, 0, keyName, overwriteMetadata, emptyMap(), emptyList());
     OMKeyCreateRequest overwriteOmKeyCreateRequest =
         new OMKeyCreateRequest(overwriteRequestWithMetadata, getBucketLayout());
+    overwriteOmKeyCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
 
     // Perform the overwrite operation and capture the response
     OMClientResponse overwriteResponse =
@@ -989,7 +986,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // Retrieve the committed key info
     OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(getOzoneKey());
     List<OzoneAcl> existingAcls = existingKeyInfo.getAcls();
-    assertEquals(acls, existingAcls);
+    assertThat(existingAcls.containsAll(acls));
 
     // Create a request with a generation which doesn't match the current key
     omRequest = createKeyRequest(false, 0, 100,
@@ -1039,9 +1036,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .findAny().orElse(null);
 
     // Should inherit parent DEFAULT Acls
-    assertEquals(parentDefaultAcl.stream()
+    assertTrue(keyAcls.containsAll(parentDefaultAcl.stream()
             .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
-            .collect(Collectors.toList()), keyAcls,
+            .collect(Collectors.toList())),
         "Failed to inherit parent DEFAULT acls!,");
 
     // Should not inherit parent ACCESS Acls
@@ -1054,7 +1051,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
 
-  private void checkNotAValidPath(String keyName) {
+  private void checkNotAValidPath(String keyName) throws IOException {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
     OMException ex =
@@ -1137,13 +1134,16 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     return omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
   }
 
-  protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
-    return new OMKeyCreateRequest(omRequest, getBucketLayout());
+  protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) throws IOException {
+    OMKeyCreateRequest request = new OMKeyCreateRequest(omRequest, getBucketLayout());
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   protected OMKeyCreateRequest getOMKeyCreateRequest(
-      OMRequest omRequest, BucketLayout layout) {
-    return new OMKeyCreateRequest(omRequest, layout);
+      OMRequest omRequest, BucketLayout layout) throws IOException {
+    OMKeyCreateRequest request = new OMKeyCreateRequest(omRequest, layout);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
-
 }

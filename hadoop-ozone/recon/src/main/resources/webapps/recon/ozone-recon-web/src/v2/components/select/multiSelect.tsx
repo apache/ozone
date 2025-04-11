@@ -23,7 +23,8 @@ import {
   components,
   OptionProps,
   ValueType,
-  ValueContainerProps
+  ValueContainerProps,
+  StylesConfig
 } from 'react-select';
 
 import { selectStyles } from "@/v2/constants/select.constants";
@@ -41,6 +42,7 @@ interface MultiSelectProps extends ReactSelectProps<Option, true> {
   placeholder: string;
   fixedColumn: string;
   columnLength: number;
+  style?: StylesConfig<Option, true>;
   onChange: (arg0: ValueType<Option, true>) => void;
   onTagClose: (arg0: string) => void;
 }
@@ -59,7 +61,8 @@ const Option: React.FC<OptionProps<Option, true>> = (props) => {
             marginRight: '8px',
             accentColor: '#1AA57A'
           }}
-          onChange={() => null} />
+          onChange={() => null}
+          disabled={props.isDisabled} />
         <label>{props.label}</label>
       </components.Option>
     </div>
@@ -72,9 +75,11 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   selected = [],
   maxSelected = 5,
   placeholder = 'Columns',
+  isDisabled = false,
   fixedColumn,
   columnLength,
   tagRef,
+  style,
   onTagClose = () => { },  // Assign default value as a void function
   onChange = () => { },  // Assign default value as a void function
   ...props
@@ -90,34 +95,39 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
           ? child
           : null
         )}
-        {placeholder}: {selected.length} selected
+        {isDisabled
+          ? placeholder
+          : `${placeholder}: ${selected.length} selected`
+}
       </components.ValueContainer>
     );
   };
 
+  const finalStyles = {...selectStyles, ...style ?? {}}
+
   return (
     <ReactSelect
-    {...props}
-    isMulti={true}
-    closeMenuOnSelect={false}
-    hideSelectedOptions={false}
-    isClearable={false}
-    isSearchable={false}
-    controlShouldRenderValue={false}
-    classNamePrefix='multi-select'
-    options={options}
-    components={{
-      ValueContainer,
-      Option
-    }}
-    placeholder={placeholder}
-    value={selected}
-    isOptionDisabled={(option) => option.value === fixedColumn}
-    onChange={(selected: ValueType<Option, true>) => {
-      if (selected?.length === options.length) return onChange!(options);
-      return onChange!(selected);
-    }}
-    styles={selectStyles} />
+      {...props}
+      isMulti={true}
+      closeMenuOnSelect={false}
+      hideSelectedOptions={false}
+      isClearable={false}
+      isSearchable={false}
+      controlShouldRenderValue={false}
+      classNamePrefix='multi-select'
+      options={options.map((opt) => ({...opt, isDisabled: (opt.value === fixedColumn)}))}
+      components={{
+        ValueContainer,
+        Option
+      }}
+      placeholder={placeholder}
+      value={selected}
+      isDisabled={isDisabled}
+      onChange={(selected: ValueType<Option, true>) => {
+        if (selected?.length === options.length) return onChange!(options);
+        return onChange!(selected);
+      }}
+      styles={finalStyles} />
   )
 }
 

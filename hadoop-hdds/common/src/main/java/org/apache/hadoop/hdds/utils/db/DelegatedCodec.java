@@ -1,26 +1,25 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.ratis.util.function.CheckedFunction;
+package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import org.apache.ratis.util.function.CheckedFunction;
 
 /**
  * A {@link org.apache.hadoop.hdds.utils.db.Codec} to serialize/deserialize objects by delegation.
@@ -47,6 +46,7 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
   private final Codec<DELEGATE> delegate;
   private final CheckedFunction<DELEGATE, T, IOException> forward;
   private final CheckedFunction<T, DELEGATE, IOException> backward;
+  private final Class<T> clazz;
   private final CopyType copyType;
 
   /**
@@ -60,18 +60,25 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
   public DelegatedCodec(Codec<DELEGATE> delegate,
       CheckedFunction<DELEGATE, T, IOException> forward,
       CheckedFunction<T, DELEGATE, IOException> backward,
-      CopyType copyType) {
+      Class<T> clazz, CopyType copyType) {
     this.delegate = delegate;
     this.forward = forward;
     this.backward = backward;
+    this.clazz = clazz;
     this.copyType = copyType;
   }
 
   /** The same as new DelegatedCodec(delegate, forward, backward, DEEP). */
   public DelegatedCodec(Codec<DELEGATE> delegate,
       CheckedFunction<DELEGATE, T, IOException> forward,
-      CheckedFunction<T, DELEGATE, IOException> backward) {
-    this(delegate, forward, backward, CopyType.DEEP);
+      CheckedFunction<T, DELEGATE, IOException> backward,
+      Class<T> clazz) {
+    this(delegate, forward, backward, clazz, CopyType.DEEP);
+  }
+
+  @Override
+  public Class<T> getTypeClass() {
+    return clazz;
   }
 
   @Override

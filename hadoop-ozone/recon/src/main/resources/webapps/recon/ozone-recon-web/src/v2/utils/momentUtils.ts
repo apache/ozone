@@ -61,3 +61,8 @@ export function getDurationFromTimestamp(timestamp: number): string {
 
   return (elapsedTime.length === 0) ? 'Just now' : elapsedTime.join(' ');
 }
+
+export function getFormattedTime(time: number | string, format: string) {
+  if (typeof time === 'string') return moment(time).format(format);
+  return (time > 0) ? moment(time).format(format) : 'N/A';
+}

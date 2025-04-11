@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,13 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_KEYS;
+import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_USED_BYTES;
+import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING;
+
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,8 +34,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -45,21 +49,15 @@ import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.hadoop.ozone.recon.schema.tables.records.UnhealthyContainersRecord;
 import org.jooq.Cursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_KEYS;
-import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_USED_BYTES;
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING;
-
 
 /**
  * Class that scans the list of containers and keeps track of containers with
@@ -86,17 +84,18 @@ public class ContainerHealthTask extends ReconScmTask {
 
   private final OzoneConfiguration conf;
 
+  private final ReconTaskStatusUpdater taskStatusUpdater;
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTask(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
-      ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       PlacementPolicy placementPolicy,
       ReconTaskConfig reconTaskConfig,
       ReconContainerMetadataManager reconContainerMetadataManager,
-      OzoneConfiguration conf) {
-    super(reconTaskStatusDao);
+      OzoneConfiguration conf, ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
+    super(taskStatusUpdaterManager);
     this.scmClient = scmClient;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
@@ -104,24 +103,28 @@ public class ContainerHealthTask extends ReconScmTask {
     this.containerManager = containerManager;
     this.conf = conf;
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
+    this.taskStatusUpdater = getTaskStatusUpdater();
   }
 
   @Override
   public void run() {
     try {
       while (canRun()) {
-        triggerContainerHealthCheck();
+        initializeAndRunTask();
         Thread.sleep(interval);
       }
     } catch (Throwable t) {
-      LOG.error("Exception in Missing Container task Thread.", t);
+      LOG.error("Exception in Container Health task thread.", t);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+      taskStatusUpdater.recordRunCompletion();
     }
   }
 
-  public void triggerContainerHealthCheck() {
+  @Override
+  protected void runTask() throws Exception {
     lock.writeLock().lock();
     // Map contains all UNHEALTHY STATES as keys and value is another map
     // with 3 keys (CONTAINER_COUNT, TOTAL_KEYS, TOTAL_USED_BYTES) and value
@@ -144,7 +147,11 @@ public class ContainerHealthTask extends ReconScmTask {
               " process {} existing database records.",
           Time.monotonicNow() - start, existingCount);
 
+      start = Time.monotonicNow();
       checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
+      LOG.debug("Container Health Task thread took {} milliseconds to process containers",
+          Time.monotonicNow() - start);
+      taskStatusUpdater.setLastTaskRunStatus(0);
       processedContainers.clear();
     } finally {
       lock.writeLock().unlock();
@@ -165,7 +172,6 @@ public class ContainerHealthTask extends ReconScmTask {
           .filter(c -> !processedContainers.contains(c))
           .forEach(c -> processContainer(c, currentTime,
               unhealthyContainerStateStatsMap));
-      recordSingleRunCompletion();
       LOG.debug("Container Health task thread took {} milliseconds for" +
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
@@ -225,6 +231,8 @@ public class ContainerHealthTask extends ReconScmTask {
         UnHealthyContainerStates.MIS_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.NEGATIVE_SIZE, new HashMap<>());
+    unhealthyContainerStateStatsMap.put(
+            UnHealthyContainerStates.REPLICA_MISMATCH, new HashMap<>());
   }
 
   private ContainerHealthStatus setCurrentContainer(long recordId)
@@ -343,7 +351,7 @@ public class ContainerHealthTask extends ReconScmTask {
           containerReplicas, placementPolicy,
           reconContainerMetadataManager, conf);
 
-      if (h.isHealthilyReplicated() || h.isDeleted()) {
+      if ((h.isHealthilyReplicated() && !h.isDataChecksumMismatched()) || h.isDeleted()) {
         return;
       }
       // For containers deleted in SCM, we sync the container state here.
@@ -477,7 +485,7 @@ public class ContainerHealthTask extends ReconScmTask {
      */
     public static boolean retainOrUpdateRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
-      boolean returnValue = false;
+      boolean returnValue;
       switch (UnHealthyContainerStates.valueOf(rec.getContainerState())) {
       case MISSING:
         returnValue = container.isMissing() && !container.isEmpty();
@@ -490,6 +498,9 @@ public class ContainerHealthTask extends ReconScmTask {
         break;
       case OVER_REPLICATED:
         returnValue = keepOverReplicatedRecord(container, rec);
+        break;
+      case REPLICA_MISMATCH:
+        returnValue = keepReplicaMismatchRecord(container, rec);
         break;
       default:
         returnValue = false;
@@ -519,7 +530,7 @@ public class ContainerHealthTask extends ReconScmTask {
         Map<UnHealthyContainerStates, Map<String, Long>>
             unhealthyContainerStateStatsMap) {
       List<UnhealthyContainers> records = new ArrayList<>();
-      if (container.isHealthilyReplicated() || container.isDeleted()) {
+      if ((container.isHealthilyReplicated() && !container.isDataChecksumMismatched()) || container.isDeleted()) {
         return records;
       }
 
@@ -584,6 +595,16 @@ public class ContainerHealthTask extends ReconScmTask {
             unhealthyContainerStateStatsMap);
       }
 
+      if (container.isDataChecksumMismatched()
+              && !recordForStateExists.contains(
+              UnHealthyContainerStates.REPLICA_MISMATCH.toString())) {
+        records.add(recordForState(
+                container, UnHealthyContainerStates.REPLICA_MISMATCH, time));
+        populateContainerStats(container,
+                UnHealthyContainerStates.REPLICA_MISMATCH,
+                unhealthyContainerStateStatsMap);
+      }
+
       return records;
     }
 
@@ -636,6 +657,17 @@ public class ContainerHealthTask extends ReconScmTask {
         updateActualReplicaCount(rec, container.actualPlacementCount());
         updateReplicaDelta(rec, container.misReplicatedDelta());
         updateReason(rec, container.misReplicatedReason());
+        return true;
+      }
+      return false;
+    }
+
+    private static boolean keepReplicaMismatchRecord(
+            ContainerHealthStatus container, UnhealthyContainersRecord rec) {
+      if (container.isDataChecksumMismatched()) {
+        updateExpectedReplicaCount(rec, container.getReplicationFactor());
+        updateActualReplicaCount(rec, container.getReplicaCount());
+        updateReplicaDelta(rec, container.replicaDelta());
         return true;
       }
       return false;

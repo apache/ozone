@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,40 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone;
-
-import com.google.common.collect.Maps;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
-import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
-import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.minikdc.MiniKdc;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.util.ExitUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static java.time.Duration.between;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
@@ -72,10 +39,41 @@ import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMeth
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import com.google.common.collect.Maps;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.minikdc.MiniKdc;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Integration test class to verify block token CLI commands functionality in a
@@ -86,10 +84,12 @@ import org.junit.jupiter.api.Timeout;
 public final class TestBlockTokensCLI {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestBlockTokensCLI.class);
+
+  @TempDir
+  private static File workDir;
   private static MiniKdc miniKdc;
   private static OzoneAdmin ozoneAdmin;
   private static OzoneConfiguration conf;
-  private static File workDir;
   private static File ozoneKeytab;
   private static File spnegoKeytab;
   private static String host;
@@ -100,13 +100,12 @@ public final class TestBlockTokensCLI {
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    ozoneAdmin = new OzoneAdmin();
+    conf = ozoneAdmin.getOzoneConf();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
     ExitUtils.disableSystemExit();
 
-    workDir =
-        GenericTestUtils.getTestDir(TestBlockTokens.class.getSimpleName());
     omServiceId = "om-service-test";
     scmServiceId = "scm-service-test";
 
@@ -116,7 +115,6 @@ public final class TestBlockTokensCLI {
     setSecretKeysConfig();
     startCluster();
     client = cluster.newClient();
-    ozoneAdmin = new OzoneAdmin(conf);
   }
 
   @AfterAll
@@ -126,7 +124,6 @@ public final class TestBlockTokensCLI {
     if (cluster != null) {
       cluster.stop();
     }
-    DefaultConfigManager.clearDefaultConfigs();
   }
 
   private SecretKeyManager getScmSecretKeyManager() {
@@ -303,7 +300,7 @@ public final class TestBlockTokensCLI {
    * format.
    */
   private String[] createArgsForCommand(String[] additionalArgs) {
-    OzoneConfiguration defaultConf = ozoneAdmin.createOzoneConfiguration();
+    OzoneConfiguration defaultConf = ozoneAdmin.getOzoneConf();
     Map<String, String> diff = Maps.difference(defaultConf.getOzoneProperties(),
         conf.getOzoneProperties()).entriesOnlyOnRight();
     String[] args = new String[diff.size() + additionalArgs.length];

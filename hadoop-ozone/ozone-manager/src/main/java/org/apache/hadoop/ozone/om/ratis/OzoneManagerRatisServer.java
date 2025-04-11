@@ -1,28 +1,32 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om.ratis;
+
+import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
+import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
+import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createServerTlsConfig;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.protobuf.ServiceException;
-
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -37,11 +41,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.RatisConfUtils;
@@ -64,18 +67,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
-
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.SetConfigurationRequest;
-import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
-import org.apache.ratis.protocol.exceptions.LeaderSteppingDownException;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.apache.ratis.protocol.exceptions.StateMachineException;
+import org.apache.ratis.protocol.ClientInvocationId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftClientRequest;
@@ -83,10 +81,16 @@ import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.SetConfigurationRequest;
+import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
+import org.apache.ratis.protocol.exceptions.LeaderSteppingDownException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.RetryCache;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.util.LifeCycle;
@@ -96,12 +100,6 @@ import org.apache.ratis.util.StringUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
-import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
-import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createServerTlsConfig;
-import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -460,21 +458,49 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createRaftRequestImpl(OMRequest omRequest) {
-    if (!ozoneManager.isTestSecureOmFlag()) {
-      Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
-      Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
-    }
     return RaftClientRequest.newBuilder()
-        .setClientId(
-            ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())))
+        .setClientId(getClientId())
         .setServerId(server.getId())
         .setGroupId(raftGroupId)
-        .setCallId(Server.getCallId())
+        .setCallId(getCallId())
         .setMessage(
             Message.valueOf(
                 OMRatisHelper.convertRequestToByteString(omRequest)))
         .setType(RaftClientRequest.writeRequestType())
         .build();
+  }
+
+  private ClientId getClientId() {
+    final byte[] clientIdBytes = Server.getClientId();
+    if (!ozoneManager.isTestSecureOmFlag()) {
+      Preconditions.checkArgument(clientIdBytes != DUMMY_CLIENT_ID);
+    }
+    return ClientId.valueOf(UUID.nameUUIDFromBytes(clientIdBytes));
+  }
+
+  private long getCallId() {
+    final long callId = Server.getCallId();
+    if (!ozoneManager.isTestSecureOmFlag()) {
+      Preconditions.checkArgument(callId != INVALID_CALL_ID);
+    }
+    return callId;
+  }
+
+  public OMResponse checkRetryCache() throws ServiceException {
+    final ClientInvocationId invocationId = ClientInvocationId.valueOf(getClientId(), getCallId());
+    final RetryCache.Entry cacheEntry = getServerDivision().getRetryCache().getIfPresent(invocationId);
+    if (cacheEntry == null) {
+      return null;  //cache miss
+    }
+    //cache hit
+    try {
+      return getOMResponse(cacheEntry.getReplyFuture().get());
+    } catch (ExecutionException ex) {
+      throw new ServiceException(ex.getMessage(), ex);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      throw new ServiceException(ex.getMessage(), ex);
+    }
   }
 
   /**
@@ -538,6 +564,10 @@ public final class OzoneManagerRatisServer {
       }
     }
 
+    return getOMResponse(reply);
+  }
+
+  private OMResponse getOMResponse(RaftClientReply reply) throws ServiceException {
     try {
       return OMRatisHelper.getOMResponseFromRaftClientReply(reply);
     } catch (IOException ex) {
@@ -547,9 +577,6 @@ public final class OzoneManagerRatisServer {
         throw new ServiceException(ex);
       }
     }
-
-    // TODO: Still need to handle RaftRetry failure exception and
-    //  NotReplicated exception.
   }
 
   /**

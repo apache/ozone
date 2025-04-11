@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,12 +17,11 @@
 
 package org.apache.hadoop.ozone.client.protocol;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
-
-import jakarta.annotation.Nonnull;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -668,7 +666,7 @@ public interface ClientProtocol {
    * Return with the inflight multipart uploads.
    */
   OzoneMultipartUploadList listMultipartUploads(String volumename,
-      String bucketName, String prefix) throws IOException;
+      String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException;
 
   /**
    * Get a valid Delegation Token.
@@ -1311,4 +1309,38 @@ public interface ClientProtocol {
    * @throws IOException
    */
   void recoverKey(OmKeyArgs args, long clientID) throws IOException;
+
+  /**
+   * Gets the tags for an existing key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @return tags for the specified key.
+   * @throws IOException
+   */
+  Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName)
+      throws IOException;
+
+  /**
+   * Sets the tags to an existing key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @param tags Tags to set on the key.
+   * @throws IOException
+   */
+  void putObjectTagging(String volumeName, String bucketName, String keyName,
+                        Map<String, String> tags) throws IOException;
+
+
+  /**
+   * Removes all the tags from the specified key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @throws IOException
+   */
+  void deleteObjectTagging(String volumeName, String bucketName, String keyName)
+      throws IOException;
+
 }

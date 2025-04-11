@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,9 +17,11 @@
 
 package org.apache.hadoop.ozone.container.common.helpers;
 
+import java.io.Closeable;
+import java.util.EnumMap;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -30,8 +31,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
-
-import java.util.EnumMap;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  *
@@ -47,7 +47,7 @@ import java.util.EnumMap;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Storage Container DataNode Metrics", context = "dfs")
-public class ContainerMetrics {
+public class ContainerMetrics implements Closeable {
   public static final String STORAGE_CONTAINER_METRICS =
       "StorageContainerMetrics";
   @Metric private MutableCounterLong numOps;
@@ -56,6 +56,8 @@ public class ContainerMetrics {
   @Metric private MutableCounterLong containerForceDelete;
   @Metric private MutableCounterLong numReadStateMachine;
   @Metric private MutableCounterLong bytesReadStateMachine;
+  @Metric private MutableCounterLong numContainerReconciledWithoutChanges;
+  @Metric private MutableCounterLong numContainerReconciledWithChanges;
 
 
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
@@ -107,6 +109,11 @@ public class ContainerMetrics {
   public static void remove() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(STORAGE_CONTAINER_METRICS);
+  }
+
+  @Override
+  public void close() {
+    opsLatQuantiles.values().forEach(MetricUtil::stop);
   }
 
   public void incContainerOpsMetrics(ContainerProtos.Type type) {
@@ -166,5 +173,13 @@ public class ContainerMetrics {
 
   public long getBytesReadStateMachine() {
     return bytesReadStateMachine.value();
+  }
+
+  public void incContainerReconciledWithoutChanges() {
+    numContainerReconciledWithoutChanges.incr();
+  }
+
+  public void incContainerReconciledWithChanges() {
+    numContainerReconciledWithChanges.incr();
   }
 }

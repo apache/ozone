@@ -1,32 +1,37 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.replication;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isDecommission;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isMaintenance;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
-import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -37,24 +42,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntConsumer;
-
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isDecommission;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isMaintenance;
 
 /**
  * Single point to schedule the downloading tasks based on priorities.
@@ -77,6 +78,10 @@ public final class ReplicationSupervisor {
   private final Map<String, AtomicLong> failureCounter = new ConcurrentHashMap<>();
   private final Map<String, AtomicLong> timeoutCounter = new ConcurrentHashMap<>();
   private final Map<String, AtomicLong> skippedCounter = new ConcurrentHashMap<>();
+  private final Map<String, AtomicLong> queuedCounter = new ConcurrentHashMap<>();
+
+  private final MetricsRegistry registry;
+  private final Map<String, MutableRate> opsLatencyMs = new ConcurrentHashMap<>();
 
   private static final Map<String, String> METRICS_MAP;
 
@@ -218,20 +223,31 @@ public final class ReplicationSupervisor {
         nodeStateUpdated(dn.getPersistedOpState());
       }
     }
+    registry = new MetricsRegistry(ReplicationSupervisor.class.getSimpleName());
   }
 
   /**
    * Queue an asynchronous download of the given container.
    */
   public void addTask(AbstractReplicationTask task) {
+    if (queueHasRoomFor(task)) {
+      initCounters(task);
+      addToQueue(task);
+    }
+  }
+
+  private boolean queueHasRoomFor(AbstractReplicationTask task) {
     final int max = maxQueueSize;
     if (getTotalInFlightReplications() >= max) {
       LOG.warn("Ignored {} command for container {} in Replication Supervisor"
               + "as queue reached max size of {}.",
           task.getClass(), task.getContainerId(), max);
-      return;
+      return false;
     }
+    return true;
+  }
 
+  public void initCounters(AbstractReplicationTask task) {
     if (requestCounter.get(task.getMetricName()) == null) {
       synchronized (this) {
         if (requestCounter.get(task.getMetricName()) == null) {
@@ -240,11 +256,16 @@ public final class ReplicationSupervisor {
           failureCounter.put(task.getMetricName(), new AtomicLong(0));
           timeoutCounter.put(task.getMetricName(), new AtomicLong(0));
           skippedCounter.put(task.getMetricName(), new AtomicLong(0));
+          queuedCounter.put(task.getMetricName(), new AtomicLong(0));
+          opsLatencyMs.put(task.getMetricName(), registry.newRate(
+              task.getClass().getSimpleName() + "Ms"));
           METRICS_MAP.put(task.getMetricName(), task.getMetricDescriptionSegment());
         }
       }
     }
+  }
 
+  private void addToQueue(AbstractReplicationTask task) {
     if (inFlight.add(task)) {
       if (task.getPriority() != ReplicationCommandPriority.LOW) {
         // Low priority tasks are not included in the replication queue sizes
@@ -253,6 +274,7 @@ public final class ReplicationSupervisor {
         taskCounter.computeIfAbsent(task.getClass(),
             k -> new AtomicInteger()).incrementAndGet();
       }
+      queuedCounter.get(task.getMetricName()).incrementAndGet();
       executor.execute(new TaskRunner(task));
     }
   }
@@ -353,6 +375,7 @@ public final class ReplicationSupervisor {
 
     @Override
     public void run() {
+      final long startTime = Time.monotonicNow();
       try {
         requestCounter.get(task.getMetricName()).incrementAndGet();
 
@@ -401,6 +424,8 @@ public final class ReplicationSupervisor {
         LOG.warn("Failed {}", this, e);
         failureCounter.get(task.getMetricName()).incrementAndGet();
       } finally {
+        queuedCounter.get(task.getMetricName()).decrementAndGet();
+        opsLatencyMs.get(task.getMetricName()).add(Time.monotonicNow() - startTime);
         inFlight.remove(task);
         decrementTaskCounter(task);
       }
@@ -511,4 +536,22 @@ public final class ReplicationSupervisor {
     return counter != null ? counter.get() : 0;
   }
 
+  public long getReplicationQueuedCount() {
+    return getCount(queuedCounter);
+  }
+
+  public long getReplicationQueuedCount(String metricsName) {
+    AtomicLong counter = queuedCounter.get(metricsName);
+    return counter != null ? counter.get() : 0;
+  }
+
+  public long getReplicationRequestAvgTime(String metricsName) {
+    MutableRate rate = opsLatencyMs.get(metricsName);
+    return rate != null ? (long) Math.ceil(rate.lastStat().mean()) : 0;
+  }
+
+  public long getReplicationRequestTotalTime(String metricsName) {
+    MutableRate rate = opsLatencyMs.get(metricsName);
+    return rate != null ? (long) Math.ceil(rate.lastStat().total()) : 0;
+  }
 }

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,40 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -62,10 +95,12 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,41 +108,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Test for container endpoint.
@@ -121,6 +121,7 @@ public class TestContainerEndpoint {
       LoggerFactory.getLogger(TestContainerEndpoint.class);
 
   private OzoneStorageContainerManager ozoneStorageContainerManager;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconContainerManager reconContainerManager;
   private ContainerStateManager containerStateManager;
   private ReconPipelineManager reconPipelineManager;
@@ -198,6 +199,8 @@ public class TestContainerEndpoint {
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
+    this.reconNamespaceSummaryManager =
+        reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
 
     pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
@@ -472,6 +475,10 @@ public class TestContainerEndpoint {
     // Now to check if the ContainerEndpoint also reads the File table
     // Set up test data for FSO keys
     setUpFSOData();
+    NSSummaryTaskWithFSO nSSummaryTaskWithFso =
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
+            reconOMMetadataManager, new OzoneConfiguration());
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
     response = containerEndpoint.getKeysForContainer(20L, -1, "");
@@ -556,6 +563,10 @@ public class TestContainerEndpoint {
     setUpFSOData();
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
+    NSSummaryTaskWithFSO nSSummaryTaskWithFso =
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
+            reconOMMetadataManager, new OzoneConfiguration());
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     response = containerEndpoint.getKeysForContainer(20L, -1, "/0/1/2/file7");
 
     // Ensure that the expected number of keys is returned
@@ -720,7 +731,7 @@ public class TestContainerEndpoint {
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
-    createUnhealthyRecords(5, 0, 0, 0);
+    createUnhealthyRecords(5, 0, 0, 0, 0);
 
     Response responseWithLimit = containerEndpoint.getMissingContainers(3);
     MissingContainersResponse responseWithLimitObject
@@ -733,6 +744,9 @@ public class TestContainerEndpoint {
     assertTrue(containerWithLimit.getReplicas().stream()
         .map(ContainerHistory::getState)
         .allMatch(s -> s.equals("UNHEALTHY")));
+    assertTrue(containerWithLimit.getReplicas().stream()
+            .map(ContainerHistory::getDataChecksum)
+            .allMatch(s -> s.equals(1234L)));
 
     Collection<MissingContainerMetadata> recordsWithLimit
         = responseWithLimitObject.getContainers();
@@ -797,12 +811,12 @@ public class TestContainerEndpoint {
 
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
-    putContainerInfos(14);
+    putContainerInfos(15);
     uuid1 = newDatanode("host1", "127.0.0.1");
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
-    createUnhealthyRecords(5, 4, 3, 2);
+    createUnhealthyRecords(5, 4, 3, 2, 1);
 
     response = containerEndpoint.getUnhealthyContainers(1000, 1);
 
@@ -811,6 +825,7 @@ public class TestContainerEndpoint {
     assertEquals(4, responseObject.getOverReplicatedCount());
     assertEquals(3, responseObject.getUnderReplicatedCount());
     assertEquals(2, responseObject.getMisReplicatedCount());
+    assertEquals(1, responseObject.getReplicaMismatchCount());
 
     Collection<UnhealthyContainerMetadata> records
         = responseObject.getContainers();
@@ -879,6 +894,21 @@ public class TestContainerEndpoint {
     assertEquals(12345L, misRep.get(0).getUnhealthySince());
     assertEquals(13L, misRep.get(0).getContainerID());
     assertEquals("some reason", misRep.get(0).getReason());
+
+    List<UnhealthyContainerMetadata> replicaMismatch = records
+        .stream()
+        .filter(r -> r.getContainerState()
+            .equals(UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
+        .collect(Collectors.toList());
+    assertEquals(1, replicaMismatch.size());
+    assertEquals(3, replicaMismatch.get(0).getExpectedReplicaCount());
+    assertEquals(3, replicaMismatch.get(0).getActualReplicaCount());
+    assertEquals(0, replicaMismatch.get(0).getReplicaDeltaCount());
+    assertEquals(12345L, replicaMismatch.get(0).getUnhealthySince());
+    assertEquals(15L, replicaMismatch.get(0).getContainerID());
+    List<ContainerHistory> replicas = replicaMismatch.get(0).getReplicas();
+    assertTrue(replicas.stream().anyMatch(checksum -> checksum.getDataChecksum() == 1234L));
+    assertTrue(replicas.stream().anyMatch(checksum -> checksum.getDataChecksum() == 2345L));
   }
 
   @Test
@@ -907,7 +937,7 @@ public class TestContainerEndpoint {
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
-    createUnhealthyRecords(5, 4, 3, 2);
+    createUnhealthyRecords(5, 4, 3, 2, 1);
     createEmptyMissingUnhealthyRecords(2); // For EMPTY_MISSING state
     createNegativeSizeUnhealthyRecords(2); // For NEGATIVE_SIZE state
 
@@ -921,6 +951,7 @@ public class TestContainerEndpoint {
     assertEquals(4, responseObject.getOverReplicatedCount());
     assertEquals(3, responseObject.getUnderReplicatedCount());
     assertEquals(2, responseObject.getMisReplicatedCount());
+    assertEquals(1, responseObject.getReplicaMismatchCount());
 
     Collection<UnhealthyContainerMetadata> records = responseObject.getContainers();
     assertTrue(records.stream()
@@ -965,7 +996,7 @@ public class TestContainerEndpoint {
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
-    createUnhealthyRecords(5, 4, 3, 2);
+    createUnhealthyRecords(5, 4, 3, 2, 0);
     UnhealthyContainersResponse firstBatch =
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
             3, 1).getEntity();
@@ -1000,12 +1031,12 @@ public class TestContainerEndpoint {
     final UUID u2 = newDatanode("host2", "127.0.0.2");
     final UUID u3 = newDatanode("host3", "127.0.0.3");
     final UUID u4 = newDatanode("host4", "127.0.0.4");
-    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN");
-    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN");
-    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN");
-    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L, "OPEN");
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L, "OPEN", 1234L);
 
-    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L, "OPEN");
+    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L, "OPEN", 1234L);
 
     Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
     List<ContainerHistory> histories =
@@ -1013,6 +1044,9 @@ public class TestContainerEndpoint {
     assertTrue(histories.stream()
         .map(ContainerHistory::getState)
         .allMatch(s -> s.equals("OPEN")));
+    assertTrue(histories.stream()
+            .map(ContainerHistory::getDataChecksum)
+            .allMatch(s -> s.equals(1234L)));
     Set<String> datanodes = Collections.unmodifiableSet(
         new HashSet<>(Arrays.asList(
             u1.toString(), u2.toString(), u3.toString(), u4.toString())));
@@ -1052,7 +1086,7 @@ public class TestContainerEndpoint {
     int cid = 0;
     for (int i = 0; i < emptyMissing; i++) {
       createUnhealthyRecord(++cid, UnHealthyContainerStates.EMPTY_MISSING.toString(),
-          3, 3, 0, null);
+          3, 3, 0, null, false);
     }
   }
 
@@ -1060,37 +1094,42 @@ public class TestContainerEndpoint {
     int cid = 0;
     for (int i = 0; i < negativeSize; i++) {
       createUnhealthyRecord(++cid, UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
-          3, 3, 0, null); // Added for NEGATIVE_SIZE state
+          3, 3, 0, null, false); // Added for NEGATIVE_SIZE state
     }
   }
 
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
-                                      int misRep) {
+                                      int misRep, int dataChecksum) {
     int cid = 0;
     for (int i = 0; i < missing; i++) {
       createUnhealthyRecord(++cid, UnHealthyContainerStates.MISSING.toString(),
-          3, 0, 3, null);
+          3, 0, 3, null, false);
     }
     for (int i = 0; i < overRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.OVER_REPLICATED.toString(),
-          3, 5, -2, null);
+          3, 5, -2, null, false);
     }
     for (int i = 0; i < underRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.UNDER_REPLICATED.toString(),
-          3, 1, 2, null);
+          3, 1, 2, null, false);
     }
     for (int i = 0; i < misRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.MIS_REPLICATED.toString(),
-          2, 1, 1, "some reason");
+          2, 1, 1, "some reason", false);
+    }
+    for (int i = 0; i < dataChecksum; i++) {
+      createUnhealthyRecord(++cid,
+          UnHealthyContainerStates.REPLICA_MISMATCH.toString(),
+          3, 3, 0, null, true);
     }
   }
 
   private void createUnhealthyRecord(int id, String state, int expected,
-                                     int actual, int delta, String reason) {
+                                     int actual, int delta, String reason, boolean dataChecksumMismatch) {
     long cID = Integer.toUnsignedLong(id);
     UnhealthyContainers missing = new UnhealthyContainers();
     missing.setContainerId(cID);
@@ -1105,14 +1144,16 @@ public class TestContainerEndpoint {
     missingList.add(missing);
     containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
 
+    long differentChecksum = dataChecksumMismatch ? 2345L : 1234L;
+
     reconContainerManager.upsertContainerHistory(cID, uuid1, 1L, 1L,
-        "UNHEALTHY");
+        "UNHEALTHY", differentChecksum);
     reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L,
-        "UNHEALTHY");
+        "UNHEALTHY", differentChecksum);
     reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L,
-        "UNHEALTHY");
+        "UNHEALTHY", 1234L);
     reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L,
-        "UNHEALTHY");
+        "UNHEALTHY", 1234L);
   }
 
   protected ContainerWithPipeline getTestContainer(

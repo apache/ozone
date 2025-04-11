@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
-
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -103,6 +102,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numSetTime;
   private @Metric MutableCounterLong numGetKeyInfo;
 
+  private @Metric MutableCounterLong numGetObjectTagging;
+  private @Metric MutableCounterLong numPutObjectTagging;
+  private @Metric MutableCounterLong numDeleteObjectTagging;
+
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
   private @Metric MutableCounterLong numVolumeUpdateFails;
@@ -184,6 +187,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numListOpenFilesFails;
   private @Metric MutableCounterLong getNumGetKeyInfoFails;
 
+  private @Metric MutableCounterLong numGetObjectTaggingFails;
+  private @Metric MutableCounterLong numPutObjectTaggingFails;
+  private @Metric MutableCounterLong numDeleteObjectTaggingFails;
+
   private @Metric MutableCounterLong numRecoverLeaseFails;
 
   // Metrics for total amount of data written
@@ -235,7 +242,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong ecKeyCreateFailsTotal;
   private @Metric MutableCounterLong ecBucketCreateTotal;
   private @Metric MutableCounterLong ecBucketCreateFailsTotal;
-
   private final DBCheckpointMetrics dbCheckpointMetrics;
 
   public OMMetrics() {
@@ -911,6 +917,35 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   @Override
   public void incNumGetKeyInfoFails() {
     getNumGetKeyInfoFails.incr();
+  }
+
+  @Override
+  public void incNumGetObjectTagging() {
+    numGetObjectTagging.incr();
+    numKeyOps.incr();
+  }
+
+  @Override
+  public void incNumGetObjectTaggingFails() {
+    numGetObjectTaggingFails.incr();
+  }
+
+  public void incNumPutObjectTagging() {
+    numPutObjectTagging.incr();
+    numKeyOps.incr();
+  }
+
+  public void incNumPutObjectTaggingFails() {
+    numPutObjectTaggingFails.incr();
+  }
+
+  public void incNumDeleteObjectTagging() {
+    numDeleteObjectTagging.incr();
+    numKeyOps.incr();
+  }
+
+  public void incNumDeleteObjectTaggingFails() {
+    numDeleteObjectTaggingFails.incr();
   }
 
   @VisibleForTesting

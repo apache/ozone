@@ -1,23 +1,36 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.debug;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import static java.util.Collections.emptySet;
+import static java.util.Comparator.comparing;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -54,31 +67,14 @@ import org.apache.hadoop.util.StringUtils;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import static java.util.Collections.emptySet;
-import static java.util.Comparator.comparing;
-
 /**
  * Find EC keys affected by missing padding blocks (HDDS-10681).
  */
 @CommandLine.Command(name = "find-missing-padding",
     aliases = { "fmp" },
     description = "List all keys with any missing padding, optionally limited to a volume/bucket/key URI.")
-@MetaInfServices(SubcommandWithParent.class)
-public class FindMissingPadding extends Handler implements SubcommandWithParent {
-
-  @CommandLine.ParentCommand
-  private OzoneDebug parent;
+@MetaInfServices(DebugSubcommand.class)
+public class FindMissingPadding extends Handler implements DebugSubcommand {
 
   @CommandLine.Mixin
   private ScmOption scmOption;
@@ -98,11 +94,6 @@ public class FindMissingPadding extends Handler implements SubcommandWithParent 
   @Override
   protected OzoneAddress getAddress() throws OzoneClientException {
     return new OzoneAddress(uri);
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
   }
 
   @Override

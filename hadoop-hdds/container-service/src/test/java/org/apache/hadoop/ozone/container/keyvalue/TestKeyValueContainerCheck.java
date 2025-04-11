@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -49,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -197,10 +197,13 @@ public class TestKeyValueContainerCheck
 
     // Write the new tree into the container, as the scanner would do.
     ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
-    checksumManager.writeContainerDataTree(container.getContainerData(), result.getDataTree());
+    KeyValueContainerData containerData = container.getContainerData();
+    checksumManager.writeContainerDataTree(containerData, result.getDataTree());
     // This will read the corrupted tree from the disk, which represents the current state of the container, and
     // compare it against the original healthy tree. The diff we get back should match the failures we injected.
-    ContainerDiffReport diffReport = checksumManager.diff(container.getContainerData(), healthyChecksumInfo);
+    Optional<ContainerProtos.ContainerChecksumInfo> generatedChecksumInfo = checksumManager.read(containerData);
+    assertTrue(generatedChecksumInfo.isPresent());
+    ContainerDiffReport diffReport = checksumManager.diff(generatedChecksumInfo.get(), healthyChecksumInfo);
 
     LOG.info("Diff of healthy container with actual container {}", diffReport);
 

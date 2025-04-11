@@ -1,29 +1,46 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
@@ -39,7 +56,9 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -47,6 +66,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -63,6 +83,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
@@ -73,20 +94,6 @@ import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClient
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.mockito.Mockito;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Helper utility to test containers.
@@ -163,11 +170,11 @@ public final class ContainerTestUtils {
             .nextInt(256) + "." + random.nextInt(256);
 
     DatanodeDetails.Port containerPort =
-        DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 0);
+        DatanodeDetails.newStandalonePort(0);
     DatanodeDetails.Port ratisPort =
-        DatanodeDetails.newPort(DatanodeDetails.Port.Name.RATIS, 0);
+        DatanodeDetails.newRatisPort(0);
     DatanodeDetails.Port restPort =
-        DatanodeDetails.newPort(DatanodeDetails.Port.Name.REST, 0);
+        DatanodeDetails.newRestPort(0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
     builder.setUuid(UUID.randomUUID())
         .setHostName("localhost")
@@ -277,14 +284,14 @@ public final class ContainerTestUtils {
   }
 
   public static DataScanResult getHealthyDataScanResult() {
-    return DataScanResult.fromErrors(Collections.emptyList(), new ContainerMerkleTree());
+    return DataScanResult.fromErrors(Collections.emptyList(), new ContainerMerkleTreeWriter());
   }
 
   /**
    * Construct an unhealthy scan result to use for testing purposes.
    */
   public static DataScanResult getUnhealthyDataScanResult() {
-    return DataScanResult.fromErrors(Collections.singletonList(getDataScanError()), new ContainerMerkleTree());
+    return DataScanResult.fromErrors(Collections.singletonList(getDataScanError()), new ContainerMerkleTreeWriter());
   }
 
   public static MetadataScanResult getHealthyMetadataScanResult() {
@@ -414,10 +421,33 @@ public final class ContainerTestUtils {
   public static XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
     conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
-        dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
+        dn.getRatisPort().getValue());
 
     return XceiverServerRatis.newXceiverServerRatis(null, dn, conf,
         getNoopContainerDispatcher(), getEmptyContainerController(),
         null, null);
+  }
+
+  /**
+   * Creates block metadata for the given container with the specified number of blocks and chunks per block.
+   */
+  public static void createBlockMetaData(KeyValueContainerData data, int numOfBlocksPerContainer,
+                                         int numOfChunksPerBlock) throws IOException {
+    try (DBHandle metadata = BlockUtils.getDB(data, new OzoneConfiguration())) {
+      for (int j = 0; j < numOfBlocksPerContainer; j++) {
+        BlockID blockID = new BlockID(data.getContainerID(), j);
+        String blockKey = data.getBlockKey(blockID.getLocalID());
+        BlockData kd = new BlockData(blockID);
+        List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
+        for (int k = 0; k < numOfChunksPerBlock; k++) {
+          long dataLen = 10L;
+          ChunkInfo chunkInfo = ContainerTestHelper.getChunk(blockID.getLocalID(), k, k * dataLen, dataLen);
+          ContainerTestHelper.setDataChecksum(chunkInfo, ContainerTestHelper.getData((int) dataLen));
+          chunks.add(chunkInfo.getProtoBufMessage());
+        }
+        kd.setChunks(chunks);
+        metadata.getStore().getBlockDataTable().put(blockKey, kd);
+      }
+    }
   }
 }

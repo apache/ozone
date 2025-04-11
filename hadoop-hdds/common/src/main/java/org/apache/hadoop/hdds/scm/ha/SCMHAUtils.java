@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,14 +17,22 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -45,18 +52,6 @@ import org.apache.ratis.protocol.exceptions.ResourceUnavailableException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_RATIS_SNAPSHOT_DIR;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
 /**
  * Utility class used by SCM HA.
@@ -87,21 +82,12 @@ public final class SCMHAUtils {
     // not used
   }
 
-  // Check if SCM HA is enabled.
-  public static boolean isSCMHAEnabled(ConfigurationSource conf) {
-    return conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-        DefaultConfigManager.getValue(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-            ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT));
-  }
-
   public static String getPrimordialSCM(ConfigurationSource conf) {
     return conf.get(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY);
   }
 
   public static boolean isPrimordialSCM(ConfigurationSource conf,
       String selfNodeId, String hostName) {
-    // This should only be called if SCM HA is enabled.
-    Preconditions.checkArgument(isSCMHAEnabled(conf));
     String primordialNode = getPrimordialSCM(conf);
     return primordialNode != null && (primordialNode
         .equals(selfNodeId) || primordialNode.equals(hostName));
@@ -159,7 +145,7 @@ public final class SCMHAUtils {
           OZONE_METADATA_DIRS);
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       snapshotDir =
-          Paths.get(metaDirPath.getPath(), SCM_RATIS_SNAPSHOT_DIR).toString();
+          Paths.get(metaDirPath.getPath(), OZONE_RATIS_SNAPSHOT_DIR).toString();
     }
     return snapshotDir;
   }

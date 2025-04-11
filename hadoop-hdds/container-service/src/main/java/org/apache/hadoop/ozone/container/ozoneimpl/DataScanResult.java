@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
-
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 
 /**
  * Represents the result of a container data scan.
@@ -31,12 +30,12 @@ import java.util.List;
  */
 public final class DataScanResult extends MetadataScanResult {
 
-  private final ContainerMerkleTree dataTree;
+  private final ContainerMerkleTreeWriter dataTree;
   // Only deleted results can be interned. Healthy results will still have different trees.
   private static final DataScanResult DELETED = new DataScanResult(Collections.emptyList(),
-      new ContainerMerkleTree(), true);
+      new ContainerMerkleTreeWriter(), true);
 
-  private DataScanResult(List<ContainerScanError> errors, ContainerMerkleTree dataTree, boolean deleted) {
+  private DataScanResult(List<ContainerScanError> errors, ContainerMerkleTreeWriter dataTree, boolean deleted) {
     super(errors, deleted);
     this.dataTree = dataTree;
   }
@@ -47,7 +46,7 @@ public final class DataScanResult extends MetadataScanResult {
    */
   public static DataScanResult unhealthyMetadata(MetadataScanResult result) {
     Preconditions.checkArgument(!result.isHealthy());
-    return new DataScanResult(result.getErrors(), new ContainerMerkleTree(), false);
+    return new DataScanResult(result.getErrors(), new ContainerMerkleTreeWriter(), false);
   }
 
   /**
@@ -60,11 +59,11 @@ public final class DataScanResult extends MetadataScanResult {
   /**
    * Constructs a data scan result whose health will be determined based on the presence of errors.
    */
-  public static DataScanResult fromErrors(List<ContainerScanError> errors, ContainerMerkleTree dataTree) {
+  public static DataScanResult fromErrors(List<ContainerScanError> errors, ContainerMerkleTreeWriter dataTree) {
     return new DataScanResult(errors, dataTree, false);
   }
 
-  public ContainerMerkleTree getDataTree() {
+  public ContainerMerkleTreeWriter getDataTree() {
     return dataTree;
   }
 }

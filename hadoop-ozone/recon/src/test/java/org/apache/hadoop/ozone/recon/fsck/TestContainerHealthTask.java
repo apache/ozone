@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,13 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
 
 import java.io.IOException;
 import java.time.Duration;
@@ -43,7 +42,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -60,14 +58,16 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
@@ -109,7 +109,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     // Create 7 containers. The first 5 will have various unhealthy states
     // defined below. The container with ID=6 will be healthy and
     // container with ID=7 will be EMPTY_MISSING (but not inserted into DB)
-    List<ContainerInfo> mockContainers = getMockContainers(7);
+    List<ContainerInfo> mockContainers = getMockContainers(8);
     when(scmMock.getScmServiceProvider()).thenReturn(scmClientMock);
     when(scmMock.getContainerManager()).thenReturn(containerManagerMock);
     when(containerManagerMock.getContainers(any(ContainerID.class),
@@ -178,6 +178,15 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(reconContainerMetadataManager.getKeyCountForContainer(
         7L)).thenReturn(5L);  // Indicates non-empty container 7 for now
 
+    // container ID 8 - REPLICA_MISMATCH
+    ContainerInfo containerInfo8 =
+        TestContainerInfo.newBuilderForTest().setContainerID(8).setReplicationConfig(replicationConfig).build();
+    when(containerManagerMock.getContainer(ContainerID.valueOf(8L))).thenReturn(containerInfo8);
+    Set<ContainerReplica> mismatchReplicas = getMockReplicasChecksumMismatch(8L,
+        State.CLOSED, State.CLOSED, State.CLOSED);
+    when(containerManagerMock.getContainerReplicas(containerInfo8.containerID()))
+        .thenReturn(mismatchReplicas);
+
     List<UnhealthyContainers> all = unHealthyContainersTableHandle.findAll();
     assertThat(all).isEmpty();
 
@@ -189,15 +198,14 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     // Start container health task
     ContainerHealthTask containerHealthTask =
         new ContainerHealthTask(scmMock.getContainerManager(),
-            scmMock.getScmServiceProvider(),
-            reconTaskStatusDao, containerHealthSchemaManager,
-            placementMock, reconTaskConfig,
-            reconContainerMetadataManager, new OzoneConfiguration());
+            scmMock.getScmServiceProvider(), containerHealthSchemaManager,
+            placementMock, reconTaskConfig, reconContainerMetadataManager,
+            new OzoneConfiguration(), getMockTaskStatusUpdaterManager());
     containerHealthTask.start();
 
     // Ensure unhealthy container count in DB matches expected
     LambdaTestUtils.await(60000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 5));
+        (unHealthyContainersTableHandle.count() == 6));
 
     // Check for UNDER_REPLICATED container states
     UnhealthyContainers rec =
@@ -238,6 +246,12 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals(1, rec.getActualReplicaCount().intValue());
     assertNotNull(rec.getReason());
 
+    rec = unHealthyContainersTableHandle.fetchByContainerId(8L).get(0);
+    assertEquals("REPLICA_MISMATCH", rec.getContainerState());
+    assertEquals(0, rec.getReplicaDelta().intValue());
+    assertEquals(3, rec.getExpectedReplicaCount().intValue());
+    assertEquals(3, rec.getActualReplicaCount().intValue());
+
     ReconTaskStatus taskStatus =
         reconTaskStatusDao.findById(containerHealthTask.getTaskName());
     assertThat(taskStatus.getLastUpdatedTimestamp())
@@ -269,7 +283,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     // Ensure count is reduced after EMPTY_MISSING containers are not inserted
     LambdaTestUtils.await(60000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 2));
+        (unHealthyContainersTableHandle.count() == 3));
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(1L).get(0);
     assertEquals("UNDER_REPLICATED", rec.getContainerState());
@@ -293,7 +307,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     // Just check once again that count remains consistent
     LambdaTestUtils.await(60000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 2));
+        (unHealthyContainersTableHandle.count() == 3));
   }
 
   @Test
@@ -362,10 +376,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         1L)).thenReturn(5L);
     ContainerHealthTask containerHealthTask =
         new ContainerHealthTask(scmMock.getContainerManager(),
-            scmMock.getScmServiceProvider(),
-            reconTaskStatusDao, containerHealthSchemaManager,
-            placementMock, reconTaskConfig,
-            reconContainerMetadataManager, new OzoneConfiguration());
+            scmMock.getScmServiceProvider(), containerHealthSchemaManager,
+            placementMock, reconTaskConfig, reconContainerMetadataManager,
+            new OzoneConfiguration(), getMockTaskStatusUpdaterManager());
     containerHealthTask.start();
     LambdaTestUtils.await(6000, 1000, () ->
         (unHealthyContainersTableHandle.count() == 1));
@@ -421,6 +434,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
       case MIS_REPLICATED:
       case NEGATIVE_SIZE:
+      case REPLICA_MISMATCH:
         unhealthyContainer.setExpectedReplicaCount(3);
         unhealthyContainer.setActualReplicaCount(3);
         unhealthyContainer.setReplicaDelta(0);
@@ -543,15 +557,13 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(reconContainerMetadataManager.getKeyCountForContainer(2L)).thenReturn(0L);
 
     // Start the container health task
-    ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
     reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(2));
     ContainerHealthTask containerHealthTask =
         new ContainerHealthTask(scmMock.getContainerManager(),
-            scmMock.getScmServiceProvider(),
-            reconTaskStatusDao, containerHealthSchemaManager,
-            placementMock, reconTaskConfig,
-            reconContainerMetadataManager, new OzoneConfiguration());
+            scmMock.getScmServiceProvider(), containerHealthSchemaManager,
+            placementMock, reconTaskConfig, reconContainerMetadataManager,
+            new OzoneConfiguration(), getMockTaskStatusUpdaterManager());
 
     containerHealthTask.start();
 
@@ -566,6 +578,15 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     });
   }
 
+  private ReconTaskStatusUpdaterManager getMockTaskStatusUpdaterManager() {
+    ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
+    when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenAnswer(inv -> {
+      String taskName = inv.getArgument(0);
+      return new ReconTaskStatusUpdater(getDao(ReconTaskStatusDao.class), taskName);
+    });
+    return reconTaskStatusUpdaterManager;
+  }
+
   private Set<ContainerReplica> getMockReplicas(
       long containerId, State...states) {
     Set<ContainerReplica> replicas = new HashSet<>();
@@ -575,7 +596,25 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
           .setContainerState(s)
           .setContainerID(ContainerID.valueOf(containerId))
           .setSequenceId(1)
+          .setDataChecksum(1234L)
           .build());
+    }
+    return replicas;
+  }
+
+  private Set<ContainerReplica> getMockReplicasChecksumMismatch(
+      long containerId, State...states) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    long checksum = 1234L;
+    for (State s : states) {
+      replicas.add(ContainerReplica.newBuilder()
+          .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .setContainerState(s)
+          .setContainerID(ContainerID.valueOf(containerId))
+          .setSequenceId(1)
+          .setDataChecksum(checksum)
+          .build());
+      checksum++;
     }
     return replicas;
   }

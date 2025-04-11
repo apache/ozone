@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,45 +17,10 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.client.DecommissionUtils;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
-import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
-import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
-import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
-import org.apache.hadoop.ozone.recon.api.types.RemoveDataNodesResponseWrapper;
-import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
-import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
-
-import javax.inject.Inject;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -69,12 +33,45 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.DecommissionUtils;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
+import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
+import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
+import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
+import org.apache.hadoop.ozone.recon.api.types.RemoveDataNodesResponseWrapper;
+import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
+import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 
 /**
  * Endpoint to fetch details about datanodes.
@@ -152,29 +149,28 @@ public class NodeEndpoint {
         }
       });
       try {
-        builder.withContainers(nodeManager.getContainerCount(datanode));
-        builder.withOpenContainers(openContainers.get());
+        builder.setContainers(nodeManager.getContainerCount(datanode));
+        builder.setOpenContainers(openContainers.get());
       } catch (NodeNotFoundException ex) {
         LOG.warn("Cannot get containers, datanode {} not found.",
             datanode.getUuid(), ex);
       }
 
       DatanodeInfo dnInfo = (DatanodeInfo) datanode;
-      datanodes.add(builder.withHostname(nodeManager.getHostName(datanode))
-          .withDatanodeStorageReport(storageReport)
-          .withLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
-          .withState(nodeState)
-          .withOperationalState(nodeOpState)
-          .withPipelines(pipelines)
-          .withLeaderCount(leaderCount.get())
-          .withUUid(datanode.getUuidString())
-          .withVersion(nodeManager.getVersion(datanode))
-          .withSetupTime(nodeManager.getSetupTime(datanode))
-          .withRevision(nodeManager.getRevision(datanode))
-          .withBuildDate(nodeManager.getBuildDate(datanode))
-          .withLayoutVersion(
+      datanodes.add(builder.setHostname(nodeManager.getHostName(datanode))
+          .setDatanodeStorageReport(storageReport)
+          .setLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
+          .setState(nodeState)
+          .setOperationalState(nodeOpState)
+          .setPipelines(pipelines)
+          .setLeaderCount(leaderCount.get())
+          .setUuid(datanode.getUuidString())
+          .setVersion(nodeManager.getVersion(datanode))
+          .setSetupTime(nodeManager.getSetupTime(datanode))
+          .setRevision(nodeManager.getRevision(datanode))
+          .setLayoutVersion(
               dnInfo.getLastKnownLayoutVersion().getMetadataLayoutVersion())
-          .withNetworkLocation(datanode.getNetworkLocation())
+          .setNetworkLocation(datanode.getNetworkLocation())
           .build());
     });
 
@@ -221,26 +217,26 @@ public class NodeEndpoint {
         try {
           if (preChecksSuccess(nodeByUuid, failedNodeErrorResponseMap)) {
             removedDatanodes.add(DatanodeMetadata.newBuilder()
-                .withHostname(nodeManager.getHostName(nodeByUuid))
-                .withUUid(uuid)
-                .withState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
+                .setHostname(nodeManager.getHostName(nodeByUuid))
+                .setUuid(uuid)
+                .setState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
                 .build());
             nodeManager.removeNode(nodeByUuid);
             LOG.info("Node {} removed successfully !!!", uuid);
           } else {
             failedDatanodes.add(DatanodeMetadata.newBuilder()
-                .withHostname(nodeManager.getHostName(nodeByUuid))
-                .withUUid(uuid)
-                .withOperationalState(nodeByUuid.getPersistedOpState())
-                .withState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
+                .setHostname(nodeManager.getHostName(nodeByUuid))
+                .setUuid(uuid)
+                .setOperationalState(nodeByUuid.getPersistedOpState())
+                .setState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
                 .build());
           }
         } catch (NodeNotFoundException nnfe) {
           LOG.error("Selected node {} not found : {} ", uuid, nnfe);
           notFoundDatanodes.add(DatanodeMetadata.newBuilder()
-                  .withHostname("")
-                  .withState(NodeState.DEAD)
-              .withUUid(uuid).build());
+                  .setHostname("")
+                  .setState(NodeState.DEAD)
+              .setUuid(uuid).build());
         }
       }
     } catch (Exception exp) {
