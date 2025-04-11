@@ -91,8 +91,9 @@ public class SCMSafeModeManager implements SafeModeManager {
   private Map<String, SafeModeExitRule> exitRules = new HashMap<>(1);
   private Set<String> preCheckRules = new HashSet<>(1);
   private ConfigurationSource config;
+  private static final String RATIS_CONTAINER_EXIT_RULE = "RatisContainerSafeModeRule";
+  private static final String EC_CONTAINER_EXIT_RULE = "ECContainerSafeModeRule";
   private static final String DN_EXIT_RULE = "DataNodeSafeModeRule";
-  private static final String CONT_EXIT_RULE = "ContainerSafeModeRule";
   private static final String HEALTHY_PIPELINE_EXIT_RULE =
       "HealthyPipelineSafeModeRule";
   private static final String ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE =
@@ -319,19 +320,24 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   @VisibleForTesting
   public double getCurrentContainerThreshold() {
-    return ((ContainerSafeModeRule) exitRules.get(CONT_EXIT_RULE))
+    return ((RatisContainerSafeModeRule) exitRules.get(RATIS_CONTAINER_EXIT_RULE))
         .getCurrentContainerThreshold();
   }
 
   @VisibleForTesting
   public double getCurrentECContainerThreshold() {
-    return ((ContainerSafeModeRule) exitRules.get(CONT_EXIT_RULE))
-        .getCurrentECContainerThreshold();
+    return ((ECContainerSafeModeRule) exitRules.get(EC_CONTAINER_EXIT_RULE))
+        .getCurrentContainerThreshold();
   }
 
   @VisibleForTesting
-  public ContainerSafeModeRule getContainerSafeModeRule() {
-    return (ContainerSafeModeRule) exitRules.get(CONT_EXIT_RULE);
+  public RatisContainerSafeModeRule getRatisContainerSafeModeRule() {
+    return (RatisContainerSafeModeRule) exitRules.get(RATIS_CONTAINER_EXIT_RULE);
+  }
+
+  @VisibleForTesting
+  public ECContainerSafeModeRule getECContainerSafeModeRule() {
+    return (ECContainerSafeModeRule) exitRules.get(EC_CONTAINER_EXIT_RULE);
   }
 
   @VisibleForTesting
