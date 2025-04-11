@@ -313,7 +313,7 @@ Apache License 2.0
    commons-httpclient:commons-httpclient
    commons-io:commons-io
    commons-lang:commons-lang
-   commons-logging:commons-logging
+   commons-logging:commons-logging-api
    commons-net:commons-net
    commons-validator:commons-validator
    commons-fileupload:commons-fileupload

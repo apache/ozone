@@ -80,6 +80,11 @@
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
+          <!-- depend on commons-logging-api instead -->
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-annotations</artifactId>
         </exclusion>

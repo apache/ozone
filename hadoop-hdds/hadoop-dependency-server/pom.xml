@@ -41,6 +41,10 @@
       <artifactId>commons-cli</artifactId>
     </dependency>
     <dependency>
+      <groupId>commons-logging</groupId>
+      <artifactId>commons-logging-api</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-annotations</artifactId>
     </dependency>
@@ -51,6 +55,10 @@
         <exclusion>
           <groupId>ch.qos.reload4j</groupId>
           <artifactId>reload4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
         </exclusion>
         <exclusion>
           <groupId>log4j</groupId>

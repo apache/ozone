@@ -56,7 +56,6 @@
     <commons-io.version>2.18.0</commons-io.version>
     <commons-lang3.version>3.17.0</commons-lang3.version>
     <commons-logging-api.version>1.1</commons-logging-api.version>
-    <commons-logging.version>1.2</commons-logging.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-text.version>1.12.0</commons-text.version>
@@ -309,6 +308,13 @@
         <groupId>com.amazonaws</groupId>
         <artifactId>aws-java-sdk-core</artifactId>
         <version>${aws-java-sdk.version}</version>
+        <exclusions>
+          <exclusion>
+            <!-- depend on commons-logging-api instead -->
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.amazonaws</groupId>
@@ -451,6 +457,13 @@
         <groupId>commons-beanutils</groupId>
         <artifactId>commons-beanutils</artifactId>
         <version>${commons-beanutils.version}</version>
+        <exclusions>
+          <exclusion>
+            <!-- depend on commons-logging-api instead -->
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>commons-cli</groupId>
@@ -484,25 +497,6 @@
       </dependency>
       <dependency>
         <groupId>commons-logging</groupId>
-        <artifactId>commons-logging</artifactId>
-        <version>${commons-logging.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>avalon-framework</groupId>
-            <artifactId>avalon-framework</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>logkit</groupId>
-            <artifactId>logkit</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>commons-logging</groupId>
         <artifactId>commons-logging-api</artifactId>
         <version>${commons-logging-api.version}</version>
       </dependency>
@@ -515,6 +509,13 @@
         <groupId>commons-validator</groupId>
         <artifactId>commons-validator</artifactId>
         <version>${commons-validator.version}</version>
+        <exclusions>
+          <exclusion>
+            <!-- depend on commons-logging-api instead -->
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>dnsjava</groupId>
@@ -681,6 +682,11 @@
         <version>${commons-configuration2.version}</version>
         <exclusions>
           <exclusion>
+            <!-- depend on commons-logging-api instead -->
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
           </exclusion>
@@ -757,6 +763,13 @@
         <artifactId>hadoop-common</artifactId>
         <version>${hadoop.version}</version>
         <type>test-jar</type>
+        <exclusions>
+          <exclusion>
+            <!-- depend on commons-logging-api instead -->
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -825,6 +838,13 @@
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpclient</artifactId>
         <version>${httpclient.version}</version>
+        <exclusions>
+          <exclusion>
+            <!-- depend on commons-logging-api instead -->
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>

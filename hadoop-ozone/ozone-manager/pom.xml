@@ -208,6 +208,11 @@
           <artifactId>jersey-bundle</artifactId>
         </exclusion>
         <exclusion>
+          <!-- depend on commons-logging-api instead -->
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
