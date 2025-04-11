@@ -1374,6 +1374,7 @@ public class RpcClient implements ClientProtocol {
     }
 
     String ownerName = getRealUserInfo().getShortUserName();
+    String groupName = getRealUserInfo().getPrimaryGroupName();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1384,7 +1385,8 @@ public class RpcClient implements ClientProtocol {
         .addAllMetadataGdpr(metadata)
         .addAllTags(tags)
         .setLatestVersionLocation(getLatestVersionLocation)
-        .setOwnerName(ownerName);
+        .setOwnerName(ownerName)
+        .setGroupName(groupName);
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
     // For bucket with layout OBJECT_STORE, when create an empty file (size=0),
@@ -1481,6 +1483,7 @@ public class RpcClient implements ClientProtocol {
     }
 
     String ownerName = getRealUserInfo().getShortUserName();
+    String groupName = getRealUserInfo().getPrimaryGroupName();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1491,7 +1494,8 @@ public class RpcClient implements ClientProtocol {
         .addAllMetadataGdpr(metadata)
         .addAllTags(tags)
         .setSortDatanodesInPipeline(true)
-        .setOwnerName(ownerName);
+        .setOwnerName(ownerName)
+        .setGroupName(groupName);
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
     return createDataStreamOutput(openKey);
@@ -1623,6 +1627,7 @@ public class RpcClient implements ClientProtocol {
             .setParentObjectID(keyInfo.getParentObjectID())
             .setFileChecksum(keyInfo.getFileChecksum())
             .setOwnerName(keyInfo.getOwnerName())
+            .setGroupName(keyInfo.getGroupName())
             .build();
         dnKeyInfo.setMetadata(keyInfo.getMetadata());
         dnKeyInfo.setKeyLocationVersions(keyLocationInfoGroups);
@@ -1725,7 +1730,8 @@ public class RpcClient implements ClientProtocol {
               key.getModificationTime(),
               key.getReplicationConfig(),
               key.isFile(),
-              key.getOwnerName()))
+              key.getOwnerName(),
+              key.getGroupName()))
           .collect(Collectors.toList());
     } else {
       List<OmKeyInfo> keys = ozoneManagerClient.listKeys(
@@ -1738,7 +1744,8 @@ public class RpcClient implements ClientProtocol {
               key.getModificationTime(),
               key.getReplicationConfig(),
               key.isFile(),
-              key.getOwnerName()))
+              key.getOwnerName(),
+              key.getGroupName()))
           .collect(Collectors.toList());
     }
   }
@@ -1771,7 +1778,7 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
         () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(),
-        keyInfo.getOwnerName(), keyInfo.getTags(),
+        keyInfo.getOwnerName(), keyInfo.getGroupName(), keyInfo.getTags(),
         keyInfo.getGeneration()
     );
   }
@@ -1934,6 +1941,7 @@ public class RpcClient implements ClientProtocol {
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName);
     String ownerName = getRealUserInfo().getShortUserName();
+    String groupName = getRealUserInfo().getPrimaryGroupName();
     if (omVersion
         .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
       if (replicationConfig != null && replicationConfig.getReplicationType()
@@ -1957,6 +1965,7 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .addAllMetadataGdpr(metadata)
         .setOwnerName(ownerName)
+        .setGroupName(groupName)
         .addAllTags(tags)
         .build();
     OmMultipartInfo multipartInfo = ozoneManagerClient
@@ -1982,6 +1991,7 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(size >= 0, "size should be greater than or " +
         "equal to zero");
     String ownerName = getRealUserInfo().getShortUserName();
+    String groupName = getRealUserInfo().getPrimaryGroupName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1992,6 +2002,7 @@ public class RpcClient implements ClientProtocol {
         .setMultipartUploadPartNumber(partNumber)
         .setSortDatanodesInPipeline(sortDatanodesInPipeline)
         .setOwnerName(ownerName)
+        .setGroupName(groupName)
         .build();
     return ozoneManagerClient.openKey(keyArgs);
   }
@@ -2056,6 +2067,7 @@ public class RpcClient implements ClientProtocol {
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName, uploadID);
     String ownerName = getRealUserInfo().getShortUserName();
+    String groupName = getRealUserInfo().getPrimaryGroupName();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -2063,6 +2075,7 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setMultipartUploadID(uploadID)
         .setOwnerName(ownerName)
+        .setGroupName(groupName)
         .build();
 
     OmMultipartUploadCompleteList
@@ -2172,10 +2185,12 @@ public class RpcClient implements ClientProtocol {
   public void createDirectory(String volumeName, String bucketName,
       String keyName) throws IOException {
     String ownerName = getRealUserInfo().getShortUserName();
+    String groupName = getRealUserInfo().getPrimaryGroupName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setOwnerName(ownerName)
+        .setGroupName(groupName)
         .build();
     ozoneManagerClient.createDirectory(keyArgs);
   }
@@ -2249,6 +2264,7 @@ public class RpcClient implements ClientProtocol {
       }
     }
     String ownerName = getRealUserInfo().getShortUserName();
+    String groupName = getRealUserInfo().getPrimaryGroupName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -2257,6 +2273,7 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .setLatestVersionLocation(getLatestVersionLocation)
         .setOwnerName(ownerName)
+        .setGroupName(groupName)
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
@@ -2280,6 +2297,7 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig, boolean overWrite, boolean recursive)
       throws IOException {
     String ownerName = getRealUserInfo().getShortUserName();
+    String groupName = getRealUserInfo().getPrimaryGroupName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -2289,6 +2307,7 @@ public class RpcClient implements ClientProtocol {
         .setLatestVersionLocation(getLatestVersionLocation)
         .setSortDatanodesInPipeline(true)
         .setOwnerName(ownerName)
+        .setGroupName(groupName)
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);

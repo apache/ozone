@@ -47,6 +47,10 @@ public class OzoneKey {
    */
   private final String owner;
   /**
+   * Name of the Key group.
+   */
+  private final String group;
+  /**
    * Size of the data.
    */
   private final long dataSize;
@@ -74,7 +78,7 @@ public class OzoneKey {
   public OzoneKey(String volumeName, String bucketName,
       String keyName, long size, long creationTime,
       long modificationTime, ReplicationConfig replicationConfig,
-      boolean isFile, String owner) {
+      boolean isFile, String owner, String group) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
@@ -84,6 +88,7 @@ public class OzoneKey {
     this.replicationConfig = replicationConfig;
     this.isFile = isFile;
     this.owner = owner;
+    this.group = group;
   }
 
   @SuppressWarnings("parameternumber")
@@ -91,9 +96,9 @@ public class OzoneKey {
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig,
                   Map<String, String> metadata, boolean isFile, String owner,
-                  Map<String, String> tags) {
+                  String group, Map<String, String> tags) {
     this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, isFile, owner);
+        modificationTime, replicationConfig, isFile, owner, group);
     this.metadata.putAll(metadata);
     this.tags.putAll(tags);
   }
@@ -128,10 +133,19 @@ public class OzoneKey {
   /**
    * Returns the Owner Name.
    *
-   * @return keyName
+   * @return ownerName
    */
   public String getOwner() {
     return owner;
+  }
+
+  /**
+   * Returns the Group Name.
+   *
+   * @return groupName
+   */
+  public String getGroup() {
+    return group;
   }
 
   /**
@@ -222,7 +236,7 @@ public class OzoneKey {
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
         keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getOwnerName(),
-        keyInfo.getTags());
+        keyInfo.getGroupName(), keyInfo.getTags());
   }
 
 }

@@ -184,6 +184,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
               .setReplicationConfig(
                   RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
               .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+              .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
               .build();
 
       OpenKeySession openKey = writeClient.openKey(partKeyArgs);
@@ -454,6 +455,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setAcls(new ArrayList<>())
         .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+        .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
         .build();
     OmMultipartInfo omMultipartInfo = omtest.initiateMultipartUpload(key1);
     return omMultipartInfo;

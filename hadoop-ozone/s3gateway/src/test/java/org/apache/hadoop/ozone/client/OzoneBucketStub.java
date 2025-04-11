@@ -148,6 +148,7 @@ public final class OzoneBucketStub extends OzoneBucket {
                 new ArrayList<>(), finalReplicationCon, metadata, null,
                 () -> readKey(key), true,
                 UserGroupInformation.getCurrentUser().getShortUserName(),
+                UserGroupInformation.getCurrentUser().getPrimaryGroupName(),
                 tags
             ));
             super.close();
@@ -180,7 +181,7 @@ public final class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), finalReplicationCon, metadata, null,
-                () -> readKey(keyName), true, null, null
+                () -> readKey(keyName), true, null, null, null
             ));
             super.close();
           }
@@ -222,6 +223,7 @@ public final class OzoneBucketStub extends OzoneBucket {
                 new ArrayList<>(), rConfig, objectMetadata, null,
                 null, false,
                 UserGroupInformation.getCurrentUser().getShortUserName(),
+                UserGroupInformation.getCurrentUser().getPrimaryGroupName(),
                 tags
             ));
           }
@@ -316,6 +318,7 @@ public final class OzoneBucketStub extends OzoneBucket {
           ozoneKeyDetails.getMetadata(),
           ozoneKeyDetails.isFile(),
           ozoneKeyDetails.getOwner(),
+          ozoneKeyDetails.getGroup(),
           ozoneKeyDetails.getTags());
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
@@ -372,7 +375,8 @@ public final class OzoneBucketStub extends OzoneBucket {
               key.getDataSize(),
               key.getCreationTime().getEpochSecond() * 1000,
               key.getModificationTime().getEpochSecond() * 1000,
-              key.getReplicationConfig(), key.isFile(), key.getOwner());
+              key.getReplicationConfig(), key.isFile(), key.getOwner(),
+              key.getGroup());
         }).collect(Collectors.toList());
 
     if (prevKey != null) {
@@ -498,6 +502,7 @@ public final class OzoneBucketStub extends OzoneBucket {
           keyToMultipartUpload.get(key).getMetadata(), null,
           () -> readKey(key), true,
           UserGroupInformation.getCurrentUser().getShortUserName(),
+          UserGroupInformation.getCurrentUser().getPrimaryGroupName(),
           keyToMultipartUpload.get(key).getTags()
       ));
     }
@@ -679,6 +684,7 @@ public final class OzoneBucketStub extends OzoneBucket {
         new ArrayList<>(), replicationConfig, new HashMap<>(), null,
         () -> readKey(keyName), false,
         UserGroupInformation.getCurrentUser().getShortUserName(),
+        UserGroupInformation.getCurrentUser().getPrimaryGroupName(),
         Collections.emptyMap()));
   }
 

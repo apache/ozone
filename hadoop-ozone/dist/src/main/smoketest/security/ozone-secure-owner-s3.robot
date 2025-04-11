@@ -61,3 +61,5 @@ Verify Owner of Uploaded S3 Object By testuser
                     Execute and checkrc    aws s3api --endpoint-url ${ENDPOINT_URL} put-object --bucket bucket-test-owner1 --key mykey --body /tmp/testfile  0
     ${result} =     Execute    ozone sh key info /s3v/bucket-test-owner1/mykey | jq -r '.owner'
                     Should Be Equal    ${result}    testuser
+    ${result} =     Execute    ozone sh key info /s3v/bucket-test-owner1/mykey | jq -r '.group'
+                    Should Be Equal    ${result}    testuser

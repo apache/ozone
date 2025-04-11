@@ -637,6 +637,7 @@ public abstract class TestOmSnapshotFileSystem {
         .setAcls(Collections.emptyList())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+        .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
         .setLocationInfoList(new ArrayList<>()).build();
 
     OpenKeySession session = writeClient.openKey(keyArgs);

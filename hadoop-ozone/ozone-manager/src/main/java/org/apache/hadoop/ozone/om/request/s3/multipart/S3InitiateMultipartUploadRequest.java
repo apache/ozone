@@ -214,6 +214,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
               OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
           .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
           .setOwnerName(keyArgs.getOwnerName())
+          .setGroupName(keyArgs.getGroupName())
           .addAllTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
           .build();
 

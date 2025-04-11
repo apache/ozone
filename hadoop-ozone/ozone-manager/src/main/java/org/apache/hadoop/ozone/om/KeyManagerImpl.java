@@ -1494,6 +1494,7 @@ public class KeyManagerImpl implements KeyManager {
         .setFileEncryptionInfo(encInfo)
         .setAcls(keyInfo.getAcls())
         .setOwnerName(keyInfo.getOwnerName())
+        .setGroupName(keyInfo.getGroupName())
         .build();
   }
   /**
