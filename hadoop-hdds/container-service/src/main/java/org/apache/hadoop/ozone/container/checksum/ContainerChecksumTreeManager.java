@@ -318,21 +318,11 @@ public class ContainerChecksumTreeManager {
    * swapped into place.
    */
   public Optional<ContainerProtos.ContainerChecksumInfo> read(ContainerData data) throws IOException {
-    long containerID = data.getContainerID();
-    File checksumFile = getContainerChecksumFile(data);
     try {
-      if (!checksumFile.exists()) {
-        LOG.debug("No checksum file currently exists for container {} at the path {}", containerID, checksumFile);
-        return Optional.empty();
-      }
-      try (FileInputStream inStream = new FileInputStream(checksumFile)) {
-        return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(),
-            () -> Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream)));
-      }
+      return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(), () -> readChecksumInfo(data));
     } catch (IOException ex) {
       metrics.incrementMerkleTreeReadFailures();
-      throw new IOException("Error occurred when reading container merkle tree for containerID "
-              + data.getContainerID() + " at path " + checksumFile, ex);
+      throw new IOException(ex);
     }
   }
 
@@ -383,18 +373,21 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  public static Optional<ContainerProtos.ContainerChecksumInfo> readChecksumInfo(KeyValueContainerData data) {
+  public static Optional<ContainerProtos.ContainerChecksumInfo> readChecksumInfo(ContainerData data)
+      throws IOException {
+    long containerID = data.getContainerID();
     File checksumFile = getContainerChecksumFile(data);
-    if (!checksumFile.exists()) {
-      LOG.error("Checksum file not found for container {}", data.getContainerID());
-      return Optional.empty();
-    }
-
-    try (FileInputStream inStream = new FileInputStream(checksumFile)) {
-      return Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
+    try {
+      if (!checksumFile.exists()) {
+        LOG.debug("No checksum file currently exists for container {} at the path {}", containerID, checksumFile);
+        return Optional.empty();
+      }
+      try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+        return Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
+      }
     } catch (IOException ex) {
-      LOG.error("Error while reading the checksum file for container {}", data.getContainerID(), ex);
-      return Optional.empty();
+      throw new IOException("Error occurred when reading container merkle tree for containerID "
+          + data.getContainerID() + " at path " + checksumFile, ex);
     }
   }
 

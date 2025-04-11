@@ -285,11 +285,15 @@ public final class KeyValueContainerUtil {
       return;
     }
 
-    Optional<ContainerChecksumInfo> optionalContainerChecksumInfo = ContainerChecksumTreeManager
-        .readChecksumInfo(kvContainerData);
-    if (optionalContainerChecksumInfo.isPresent()) {
-      ContainerChecksumInfo containerChecksumInfo = optionalContainerChecksumInfo.get();
-      kvContainerData.setDataChecksum(containerChecksumInfo.getContainerMerkleTree().getDataChecksum());
+    try {
+      Optional<ContainerChecksumInfo> optionalContainerChecksumInfo = ContainerChecksumTreeManager
+          .readChecksumInfo(kvContainerData);
+      if (optionalContainerChecksumInfo.isPresent()) {
+        ContainerChecksumInfo containerChecksumInfo = optionalContainerChecksumInfo.get();
+        kvContainerData.setDataChecksum(containerChecksumInfo.getContainerMerkleTree().getDataChecksum());
+      }
+    } catch (IOException ex) {
+      LOG.warn("Failed to read checksum info for container {}", kvContainerData.getContainerID(), ex);
     }
   }
 

@@ -114,7 +114,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -150,6 +149,7 @@ public class TestContainerCommandReconciliation {
     conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 128 * 1024, StorageUnit.BYTES);
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE,  512 * 1024, StorageUnit.BYTES);
     // Disable the container scanner so it does not create merkle tree files that interfere with this test.
+    // TODO: Currently container scrub sets the checksum to 0, Revert this after HDDS-10374 is merged.
     conf.getObject(ContainerScannerConfiguration.class).setEnabled(false);
     conf.setBoolean("hdds.container.scrub.enabled", false);
 
@@ -348,7 +348,7 @@ public class TestContainerCommandReconciliation {
         .getContainerReplicas(ContainerID.valueOf(containerID))
         .stream().map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
-    Assertions.assertEquals(3, dataNodeDetails.size());
+    assertEquals(3, dataNodeDetails.size());
     HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanode(dataNodeDetails.get(0));
     DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
     Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
@@ -383,7 +383,7 @@ public class TestContainerCommandReconciliation {
         readChecksumFile(container.getContainerData());
     long dataChecksumAfterBlockDelete = containerChecksumAfterBlockDelete.getContainerMerkleTree().getDataChecksum();
     // Checksum should have changed after block delete.
-    Assertions.assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
+    assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
 
     // Since the container is already closed, we have manually updated the container checksum file.
     // This doesn't update the checksum reported to SCM, and we need to trigger an ICR.
@@ -414,7 +414,7 @@ public class TestContainerCommandReconciliation {
         .getContainerReplicas(ContainerID.valueOf(containerID))
         .stream().map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
-    Assertions.assertEquals(3, dataNodeDetails.size());
+    assertEquals(3, dataNodeDetails.size());
     HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanode(dataNodeDetails.get(0));
     DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
     Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
@@ -468,11 +468,11 @@ public class TestContainerCommandReconciliation {
     long dataChecksumAfterAfterChunkCorruption = containerChecksumAfterChunkCorruption
         .getContainerMerkleTree().getDataChecksum();
     // Checksum should have changed after chunk corruption.
-    Assertions.assertNotEquals(oldDataChecksum, dataChecksumAfterAfterChunkCorruption);
+    assertNotEquals(oldDataChecksum, dataChecksumAfterAfterChunkCorruption);
 
     // 3. Set Unhealthy for first chunk of all blocks. This should be done by the scanner, Until then this is a
     // manual step.
-    // // TODO: Use On-demand container scanner to build the new container merkle tree (HDDS-10374)
+    // TODO: Use On-demand container scanner to build the new container merkle tree (HDDS-10374)
     Random random = new Random();
     ContainerProtos.ContainerChecksumInfo.Builder builder = containerChecksumAfterChunkCorruption.toBuilder();
     List<ContainerProtos.BlockMerkleTree> blockMerkleTreeList = builder.getContainerMerkleTree()
@@ -503,7 +503,7 @@ public class TestContainerCommandReconciliation {
     ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
     assertTreesSortedAndMatch(oldContainerChecksumInfo.getContainerMerkleTree(),
         newContainerChecksumInfo.getContainerMerkleTree());
-    Assertions.assertEquals(oldDataChecksum, newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum());
+    assertEquals(oldDataChecksum, newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum());
     TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
   }
 
@@ -521,7 +521,7 @@ public class TestContainerCommandReconciliation {
         .getContainerReplicas(ContainerID.valueOf(containerID))
         .stream().map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
-    Assertions.assertEquals(3, dataNodeDetails.size());
+    assertEquals(3, dataNodeDetails.size());
     HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanode(dataNodeDetails.get(0));
     DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
     Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
@@ -564,7 +564,7 @@ public class TestContainerCommandReconciliation {
         readChecksumFile(container.getContainerData());
     long dataChecksumAfterBlockDelete = containerChecksumAfterBlockDelete.getContainerMerkleTree().getDataChecksum();
     // Checksum should have changed after block delete.
-    Assertions.assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
+    assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
 
     // Since the container is already closed, we have manually updated the container checksum file.
     // This doesn't update the checksum reported to SCM, and we need to trigger an ICR.
