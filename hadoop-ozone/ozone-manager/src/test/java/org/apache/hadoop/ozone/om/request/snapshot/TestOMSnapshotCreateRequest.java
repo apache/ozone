@@ -264,6 +264,28 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     assertEquals(2, getOmMetrics().getNumSnapshotCreates());
   }
 
+  @Test
+  public void testSnapshotLimit() throws Exception {
+    when(getOzoneManager().isAdmin(any())).thenReturn(true);
+    getOmSnapshotManager().setFsSnapshotMaxLimit(1);
+
+    String key1 = getTableKey(getVolumeName(), getBucketName(), snapshotName1);
+
+    OMRequest omRequest =
+        createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName1);
+    OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
+
+    assertNull(getOmMetadataManager().getSnapshotInfoTable().get(key1));
+    omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 1);
+
+    assertNotNull(getOmMetadataManager().getSnapshotInfoTable().get(key1));
+
+    // Should fail as snapshot limit is 1
+    OMRequest snapshotRequest = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName2);
+    OMException omException = assertThrows(OMException.class, () -> doPreExecute(snapshotRequest));
+    assertEquals(OMException.ResultCodes.TOO_MANY_SNAPSHOTS, omException.getResult());
+  }
+
   private void renameKey(String fromKey, String toKey, long offset)
       throws IOException {
     OmKeyInfo toKeyInfo = addKey(toKey, offset + 1L);

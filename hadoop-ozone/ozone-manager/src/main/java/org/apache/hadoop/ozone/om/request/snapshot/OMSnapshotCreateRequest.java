@@ -104,6 +104,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   @RequireSnapshotFeatureState(true)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final OMRequest omRequest = super.preExecute(ozoneManager);
+    // verify snapshot limit
+    ozoneManager.getOmSnapshotManager().snapshotLimitCheck();
     // Verify name
     OmUtils.validateSnapshotName(snapshotName);
     // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
