@@ -24,7 +24,7 @@ package org.apache.hadoop.ozone.containerlog.parser;
 public final class DatanodeContainerInfo {
 
   private final long containerId;
-  private final long datanodeId;
+  private final String datanodeId;
   private final String timestamp;
   private final String state;
   private final long bcsid;
@@ -44,12 +44,12 @@ public final class DatanodeContainerInfo {
   }
 
   /**
-   * Builder for DatanodeContainerInfo..
+   * Builder for DatanodeContainerInfo.
    */
 
   public static class Builder {
     private long containerId;
-    private long datanodeId;
+    private String datanodeId;
     private String timestamp;
     private String state;
     private long bcsid;
@@ -62,7 +62,7 @@ public final class DatanodeContainerInfo {
       return this;
     }
 
-    public Builder setDatanodeId(long datanodeId) {
+    public Builder setDatanodeId(String datanodeId) {
       this.datanodeId = datanodeId;
       return this;
     }
@@ -106,7 +106,7 @@ public final class DatanodeContainerInfo {
     return containerId;
   }
 
-  public long getDatanodeId() {
+  public String getDatanodeId() {
     return datanodeId;
   }
 

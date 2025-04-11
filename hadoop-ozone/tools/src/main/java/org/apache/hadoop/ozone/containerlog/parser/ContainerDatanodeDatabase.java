@@ -133,7 +133,7 @@ public class ContainerDatanodeDatabase {
       int count = 0;
 
       for (DatanodeContainerInfo info : transitionList) {
-        preparedStatement.setLong(1, info.getDatanodeId());
+        preparedStatement.setString(1, info.getDatanodeId());
         preparedStatement.setLong(2, info.getContainerId());
         preparedStatement.setString(3, info.getTimestamp());
         preparedStatement.setString(4, info.getState());
@@ -186,12 +186,12 @@ public class ContainerDatanodeDatabase {
       int count = 0;
       
       while (resultSet.next()) {
-        long datanodeId = resultSet.getLong("datanode_id");
+        String datanodeId = resultSet.getString("datanode_id");
         long containerId = resultSet.getLong("container_id");
         String containerState = resultSet.getString("container_state");
         long bcsid = resultSet.getLong("bcsid");
         try {
-          insertStmt.setLong(1, datanodeId);
+          insertStmt.setString(1, datanodeId);
           insertStmt.setLong(2, containerId);
           insertStmt.setString(3, containerState);
           insertStmt.setLong(4, bcsid);

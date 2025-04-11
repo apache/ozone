@@ -42,8 +42,7 @@ public class ContainerLogFileParser {
   private ExecutorService executorService;
   private static final int MAX_OBJ_IN_LIST = 5000;
 
-  private static final String FILENAME_PARTS_REGEX = "-";
-  private static final String DATANODE_ID_REGEX = "\\.";
+  private static final String LOG_FILE_MARKER = ".log.";
   private static final String LOG_LINE_SPLIT_REGEX = " \\| ";
   private static final String KEY_VALUE_SPLIT_REGEX = "=";
   private static final String KEY_ID = "ID";
@@ -53,7 +52,7 @@ public class ContainerLogFileParser {
 
   /**
    * Scans the specified log directory, processes each file in a separate thread.
-   * Expects each log filename to follow the format: dn-container-datanodeId.log
+   * Expects each log filename to follow the format: dn-container-<roll over number>.log.<datanodeId>
    *
    * @param logDirectoryPath Path to the directory containing container log files.
    * @param dbstore Database object used to persist parsed container data.
@@ -72,20 +71,20 @@ public class ContainerLogFileParser {
       for (Path file : files) {
         Path fileNamePath = file.getFileName();
         String fileName = (fileNamePath != null) ? fileNamePath.toString() : "";
-        String[] parts = fileName.split(FILENAME_PARTS_REGEX);
-
-        if (parts.length < 3) {
-          System.out.println("Filename format is incorrect (not enough parts): " + fileName);
+        
+        int pos = fileName.indexOf(LOG_FILE_MARKER);
+        if (pos == -1) {
+          System.out.println("Filename format is incorrect (missing .log.): " + fileName);
           continue;
         }
-
-        String datanodeIdStr = parts[2];
-        if (datanodeIdStr.contains(".log")) {
-          datanodeIdStr = datanodeIdStr.split(DATANODE_ID_REGEX)[0];
+        
+        String datanodeId = fileName.substring(pos + 5);
+        
+        if (datanodeId.trim().isEmpty()) {
+          System.out.println("Filename format is incorrect, datanodeId is missing or empty: " + fileName);
+          continue;
         }
-
-        long datanodeId = Long.parseLong(datanodeIdStr);
-
+        
         executorService.submit(() -> {
 
           String threadName = Thread.currentThread().getName();
@@ -127,7 +126,8 @@ public class ContainerLogFileParser {
    * @param datanodeId Datanode ID derived from the log filename.
    */
   
-  private void processFile(String logFilePath, ContainerDatanodeDatabase dbstore, long datanodeId) throws SQLException {
+  private void processFile(String logFilePath, ContainerDatanodeDatabase dbstore, String datanodeId) 
+      throws SQLException {
     List<DatanodeContainerInfo> batchList = new ArrayList<>(5100);
 
     try (BufferedReader reader = Files.newBufferedReader(Paths.get(logFilePath), StandardCharsets.UTF_8)) {
