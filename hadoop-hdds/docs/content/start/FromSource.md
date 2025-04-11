@@ -97,6 +97,7 @@ mvn install:install-file -DgroupId=com.google.protobuf -DartifactId=protoc -Dver
 cp $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64 $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64.exe
 ```
 
+## Build Ozone
 Run the ozone build command.
 
 ```bash
