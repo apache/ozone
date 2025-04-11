@@ -32,6 +32,15 @@ import org.slf4j.LoggerFactory;
  */
 public class ManagedRawSSTFileReader<T> implements Closeable {
 
+  public static boolean tryLoadLibrary() {
+    try {
+      loadLibrary();
+      return true;
+    } catch (NativeLibraryNotLoadedException ignored) {
+      return false;
+    }
+  }
+
   public static boolean loadLibrary() throws NativeLibraryNotLoadedException {
     ManagedRocksObjectUtils.loadRocksDBLibrary();
     if (!NativeLibraryLoader.getInstance().loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME, Arrays.asList(

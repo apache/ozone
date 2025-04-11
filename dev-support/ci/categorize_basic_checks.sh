@@ -30,7 +30,7 @@ if [[ -n "${SPACE_DELIMITED_ALL_CHECKS}" ]]; then
   # add framing blanks
   SPACE_DELIMITED_ALL_CHECKS=" ${SPACE_DELIMITED_ALL_CHECKS[*]} "
 
-  for check in basic native; do
+  for check in basic; do
     CHECKS=$(grep -lr "^#checks:${check}$" hadoop-ozone/dev-support/checks \
       | sort -u \
       | xargs -n1 basename \

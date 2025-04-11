@@ -27,7 +27,7 @@ on:
         default: ''
         required: false
 env:
-  BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true"
+  BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
   # Minimum required Java version for running Ozone is defined in pom.xml (javac.version).
   TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml, please keep in sync
@@ -44,7 +44,6 @@ jobs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
       integration-suites: ${{ steps.integration-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
-      needs-native-check: ${{ steps.categorize-basic-checks.outputs.needs-native-check }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
       needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
@@ -174,21 +173,6 @@ jobs:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
       fail-fast: false
 
-  native:
-    needs:
-      - build-info
-      - basic
-    if: needs.build-info.outputs.needs-native-check == 'true'
-    uses: ./.github/workflows/check.yml
-    secrets: inherit
-    with:
-      java-version: ${{ needs.build-info.outputs.java-version }}
-      ratis-args: ${{ inputs.ratis_args }}
-      script: native
-      sha: ${{ needs.build-info.outputs.sha }}
-      timeout-minutes: 150
-      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
-
   dependency:
     needs:
       - build-info
@@ -289,7 +273,7 @@ jobs:
       java-version: ${{ needs.build-info.outputs.java-version }}
       ratis-args: ${{ inputs.ratis_args }}
       script: integration
-      script-args: -Ptest-${{ matrix.profile }}
+      script-args: -Ptest-${{ matrix.profile }} -Drocks_tools_native
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.profile }}
       timeout-minutes: 150
@@ -307,7 +291,6 @@ jobs:
       - build-info
       - acceptance
       - integration
-      - native
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
