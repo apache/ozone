@@ -92,7 +92,7 @@ public class UpgradeManager {
   public static class Result {
     private Map<Long, UpgradeTask.UpgradeContainerResult> resultMap;
     private final HddsVolume hddsVolume;
-    private final long startTimeMs = Time.monotonicNow();
+    private final long startTimeMs = System.currentTimeMillis();
     private long endTimeMs = 0L;
     private Exception e = null;
     private Status status = Status.FAIL;

@@ -384,7 +384,7 @@ public class UpgradeTask {
     private final ContainerData originContainerData;
     private ContainerData newContainerData;
     private long totalRow = 0L;
-    private final long startTimeMs = Time.monotonicNow();
+    private final long startTimeMs = System.currentTimeMillis();
     private long endTimeMs = 0L;
     private Status status;
 
