@@ -523,7 +523,7 @@ public class DiskBalancerService extends BackgroundService {
     long totalCapacity = 0;
 
     for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(inputVolumeSet.getVolumesList())) {
-      totalUsedSpace += volume.getCurrentUsage().getUsedSpace();
+      totalUsedSpace += (volume.getCurrentUsage().getCapacity() - volume.getCurrentUsage().getAvailable());
       totalCapacity += volume.getCurrentUsage().getCapacity();
     }
 
@@ -538,7 +538,7 @@ public class DiskBalancerService extends BackgroundService {
 
     // Calculate excess data in overused volumes
     for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(inputVolumeSet.getVolumesList())) {
-      long usedSpace = volume.getCurrentUsage().getUsedSpace();
+      long usedSpace = volume.getCurrentUsage().getCapacity() - volume.getCurrentUsage().getAvailable();
       long capacity = volume.getCurrentUsage().getCapacity();
       double volumeUtilization = (double) usedSpace / capacity;
 
