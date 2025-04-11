@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.initPerDiskDBStore;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -275,6 +277,7 @@ public class HddsVolume extends StorageVolume {
           "the volume might not have been loaded properly.", getStorageDir());
       return VolumeCheckResult.FAILED;
     }
+
     if (result != VolumeCheckResult.HEALTHY ||
         !getDatanodeConfig().getContainerSchemaV3Enabled() || !isDbLoaded()) {
       return result;
@@ -285,6 +288,17 @@ public class HddsVolume extends StorageVolume {
     if (!dbFile.exists() || !dbFile.canRead()) {
       LOG.warn("Volume {} failed health check. Could not access RocksDB at " +
           "{}", getStorageDir(), dbFile);
+      return VolumeCheckResult.FAILED;
+    }
+
+    DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
+    Preconditions.checkNotNull(cache);
+    try {
+      RawDB db = cache.getDB(String.valueOf(dbFile), getConf());
+      RDBStore store = (RDBStore)db.getStore().getStore();
+      store.getDb().getManagedRocksDb().get().getLiveFiles();
+    } catch (IOException e) {
+      LOG.error("Could not open Volume DB located at {}", dbFile, e);
       return VolumeCheckResult.FAILED;
     }
 

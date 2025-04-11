@@ -24,9 +24,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -61,9 +63,11 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
+import org.apache.hadoop.util.Timer;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -231,6 +235,67 @@ class TestDatanodeHddsVolumeFailureDetection {
           // should trigger CheckVolumeAsync and
           // a failed volume should be detected
           DatanodeTestUtils.waitForCheckVolume(volSet, 1L);
+          DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
+        } finally {
+          // restore all
+          DatanodeTestUtils.restoreBadVolume(vol0);
+          DatanodeTestUtils.restoreDataDirFromFailure(dbDir);
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true})
+  void corruptDbFileWithoutDbHandleCacheInvalidation(boolean schemaV3) throws Exception {
+    try (MiniOzoneCluster cluster = newCluster(schemaV3)) {
+      try (OzoneClient client = cluster.newClient()) {
+        OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+
+        // write a file, will create container1
+        String keyName = UUID.randomUUID().toString();
+        long containerId = createKey(bucket, keyName);
+
+        // close container1
+        HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
+        OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
+        Container<?> c1 = oc.getContainerSet().getContainer(containerId);
+        c1.close();
+
+        // create container2, and container1 is kicked out of cache
+        OzoneConfiguration conf = cluster.getConf();
+        try (ScmClient scmClient = new ContainerOperationClient(conf)) {
+          ContainerWithPipeline c2 = scmClient.createContainer(
+              ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+              OzoneConsts.OZONE);
+          assertEquals(c2.getContainerInfo().getState(), LifeCycleState.OPEN);
+        }
+
+        // corrupt db by rename dir->file
+        File dbDir;
+        if (schemaV3) {
+          dbDir = new File(((KeyValueContainerData) (c1.getContainerData()))
+              .getDbFile().getAbsolutePath());
+        } else {
+          File metadataDir = new File(c1.getContainerFile().getParent());
+          dbDir = new File(metadataDir, "1" + OzoneConsts.DN_CONTAINER_DB);
+        }
+
+        MutableVolumeSet volSet = oc.getVolumeSet();
+        StorageVolume vol0 = volSet.getVolumesList().get(0);
+
+        try {
+          DatanodeTestUtils.injectDataDirFailure(dbDir);
+
+          // simulate bad volume by removing write permission on root dir
+          // refer to HddsVolume.check()
+          DatanodeTestUtils.simulateBadVolume(vol0);
+
+          assertFalse(vol0.isFailed());
+          StorageVolumeChecker storageVolumeChecker = new StorageVolumeChecker(conf, new Timer(), "");
+          storageVolumeChecker.registerVolumeSet(volSet);
+          storageVolumeChecker.checkAllVolumeSets();
+          assertTrue(vol0.isFailed());
           DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
         } finally {
           // restore all
