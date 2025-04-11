@@ -42,6 +42,16 @@ import org.slf4j.LoggerFactory;
 public class Checksum {
   private static final Logger LOG = LoggerFactory.getLogger(Checksum.class);
 
+  private final ChecksumType checksumType;
+
+  private final int bytesPerChecksum;
+
+  /**
+   * Caches computeChecksum() result when requested.
+   * This must be manually cleared when a new block chunk has been started.
+   */
+  private final ChecksumCache checksumCache;
+
   private static Function<ByteBuffer, ByteString> newMessageDigestFunction(
       String algorithm) {
     final MessageDigest md;
@@ -96,14 +106,6 @@ public class Checksum {
       return constructor.get();
     }
   }
-
-  private final ChecksumType checksumType;
-  private final int bytesPerChecksum;
-  /**
-   * Caches computeChecksum() result when requested.
-   * This must be manually cleared when a new block chunk has been started.
-   */
-  private final ChecksumCache checksumCache;
 
   /**
    * BlockOutputStream needs to call this method to clear the checksum cache
