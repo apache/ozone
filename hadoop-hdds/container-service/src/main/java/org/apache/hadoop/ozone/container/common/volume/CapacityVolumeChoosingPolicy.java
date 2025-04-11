@@ -46,6 +46,7 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
   // Stores the index of the next volume to be returned.
   private final Random random = new Random();
+
   @Override
   public HddsVolume chooseVolume(List<HddsVolume> volumes,
       long maxContainerSize) throws IOException {
