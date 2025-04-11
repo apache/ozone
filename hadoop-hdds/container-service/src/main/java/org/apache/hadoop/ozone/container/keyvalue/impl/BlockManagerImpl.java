@@ -112,8 +112,6 @@ public class BlockManagerImpl implements BlockManager {
     // We are not locking the key manager since RocksDB serializes all actions
     // against a single DB. We rely on DB level locking to avoid conflicts.
     try (DBHandle db = BlockUtils.getDB(containerData, config)) {
-      // This is a post condition that acts as a hint to the user.
-      // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
 
       long blockBcsID = data.getBlockCommitSequenceId();
@@ -438,6 +436,19 @@ public class BlockManagerImpl implements BlockManager {
       }
     } finally {
       container.readUnlock();
+    }
+  }
+
+  @Override
+  public boolean blockExists(Container container, BlockID blockID) throws IOException {
+    KeyValueContainerData containerData = (KeyValueContainerData) container
+        .getContainerData();
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      // This is a post condition that acts as a hint to the user.
+      // Should never fail.
+      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+      String blockKey = containerData.getBlockKey(blockID.getLocalID());
+      return db.getStore().getBlockDataTable().isExist(blockKey);
     }
   }
 

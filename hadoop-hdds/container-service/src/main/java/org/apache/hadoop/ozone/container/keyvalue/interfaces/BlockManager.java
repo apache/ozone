@@ -95,6 +95,15 @@ public interface BlockManager {
       throws IOException;
 
   /**
+   * Check if a block exists in the container.
+   *
+   * @param container - Container from which blocks need to be listed.
+   * @param blockID - BlockID of the Block.
+   * @return True if block exists, false otherwise.
+   */
+  boolean blockExists(Container container, BlockID blockID) throws IOException;
+
+  /**
    * Returns last committed length of the block.
    *
    * @param container - Container from which block need to be fetched.

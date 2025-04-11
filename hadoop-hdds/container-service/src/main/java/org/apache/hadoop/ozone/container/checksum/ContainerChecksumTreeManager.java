@@ -82,7 +82,9 @@ public class ContainerChecksumTreeManager {
    * file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
    */
-  public void writeContainerDataTree(ContainerData data, ContainerMerkleTreeWriter tree) throws IOException {
+  public ContainerProtos.ContainerChecksumInfo writeContainerDataTree(ContainerData data,
+                                                                      ContainerMerkleTreeWriter tree)
+      throws IOException {
     long containerID = data.getContainerID();
     Lock writeLock = getLock(containerID);
     writeLock.lock();
@@ -98,11 +100,13 @@ public class ContainerChecksumTreeManager {
         checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
       }
 
-      checksumInfoBuilder
+      ContainerProtos.ContainerChecksumInfo checksumInfo = checksumInfoBuilder
           .setContainerID(containerID)
-          .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto));
-      write(data, checksumInfoBuilder.build());
+          .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto))
+          .build();
+      write(data, checksumInfo);
       LOG.debug("Data merkle tree for container {} updated", containerID);
+      return checksumInfo;
     } finally {
       writeLock.unlock();
     }
@@ -146,33 +150,32 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  public ContainerDiffReport diff(KeyValueContainerData thisContainer,
+  /**
+   * Compares the checksum info of the container with the peer's checksum info and returns a report of the differences.
+   * @param thisChecksumInfo The checksum info of the container on this datanode.
+   * @param peerChecksumInfo The checksum info of the container on the peer datanode.
+   */
+  public ContainerDiffReport diff(ContainerProtos.ContainerChecksumInfo thisChecksumInfo,
                                   ContainerProtos.ContainerChecksumInfo peerChecksumInfo) throws
       StorageContainerException {
 
     ContainerDiffReport report = new ContainerDiffReport();
     try {
       captureLatencyNs(metrics.getMerkleTreeDiffLatencyNS(), () -> {
-        Preconditions.assertNotNull(thisContainer, "Container data is null");
-        Preconditions.assertNotNull(peerChecksumInfo, "Peer checksum info is null");
-        Optional<ContainerProtos.ContainerChecksumInfo> thisContainerChecksumInfo = read(thisContainer);
-        if (!thisContainerChecksumInfo.isPresent()) {
-          throw new StorageContainerException("The container #" + thisContainer.getContainerID() +
-              " doesn't have container checksum", ContainerProtos.Result.IO_EXCEPTION);
+        Preconditions.assertNotNull(thisChecksumInfo, "Datanode's checksum info is null.");
+        Preconditions.assertNotNull(peerChecksumInfo, "Peer checksum info is null.");
+        if (thisChecksumInfo.getContainerID() != peerChecksumInfo.getContainerID()) {
+          throw new StorageContainerException("Container ID does not match. Local container ID "
+              + thisChecksumInfo.getContainerID() + " , Peer container ID " + peerChecksumInfo.getContainerID(),
+              ContainerProtos.Result.CONTAINER_ID_MISMATCH);
         }
 
-        if (thisContainer.getContainerID() != peerChecksumInfo.getContainerID()) {
-          throw new StorageContainerException("Container Id does not match for container "
-              + thisContainer.getContainerID(), ContainerProtos.Result.CONTAINER_ID_MISMATCH);
-        }
-
-        ContainerProtos.ContainerChecksumInfo thisChecksumInfo = thisContainerChecksumInfo.get();
         compareContainerMerkleTree(thisChecksumInfo, peerChecksumInfo, report);
       });
     } catch (IOException ex) {
       metrics.incrementMerkleTreeDiffFailures();
-      throw new StorageContainerException("Container Diff failed for container #" + thisContainer.getContainerID(), ex,
-          ContainerProtos.Result.IO_EXCEPTION);
+      throw new StorageContainerException("Container Diff failed for container #" + thisChecksumInfo.getContainerID(),
+          ex, ContainerProtos.Result.IO_EXCEPTION);
     }
 
     // Update Container Diff metrics based on the diff report.
@@ -314,7 +317,7 @@ public class ContainerChecksumTreeManager {
    * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
    * swapped into place.
    */
-  private Optional<ContainerProtos.ContainerChecksumInfo> read(ContainerData data) throws IOException {
+  public Optional<ContainerProtos.ContainerChecksumInfo> read(ContainerData data) throws IOException {
     long containerID = data.getContainerID();
     File checksumFile = getContainerChecksumFile(data);
     try {
