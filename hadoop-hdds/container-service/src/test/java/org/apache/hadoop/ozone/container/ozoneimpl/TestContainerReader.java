@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -450,7 +451,7 @@ public class TestContainerReader {
           (HddsVolume) volumes.get(i), containerSet, conf, true);
       threads[i] = new Thread(containerReaders[i]);
     }
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     for (int i = 0; i < volumeNum; i++) {
       threads[i].start();
     }
@@ -458,7 +459,7 @@ public class TestContainerReader {
       threads[i].join();
     }
     System.out.println("Open " + volumeNum + " Volume with " + containerCount +
-        " costs " + (System.currentTimeMillis() - startTime) / 1000 + "s");
+        " costs " + (Time.monotonicNow() - startTime) / 1000 + "s");
     assertEquals(containerCount,
         containerSet.getContainerMap().entrySet().size());
     assertEquals(volumeSet.getFailedVolumesList().size(), 0);
