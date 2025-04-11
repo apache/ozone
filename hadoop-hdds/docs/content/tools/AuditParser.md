@@ -40,25 +40,25 @@ UNIQUE(datetime,level,logger,user,ip,op,params,result))
 
 Usage:
 {{< highlight bash >}}
-ozone auditparser <path to db file> [COMMAND] [PARAM]
+ozone debug auditparser <path to db file> [COMMAND] [PARAM]
 {{< /highlight >}}
 
 To load an audit log to database:
 {{< highlight bash >}}
-ozone auditparser <path to db file> load <path to audit log>
+ozone debug auditparser <path to db file> load <path to audit log>
 {{< /highlight >}}
 Load command creates the audit table described above.
 
 To run a custom read-only query:
 {{< highlight bash >}}
-ozone auditparser <path to db file> query <select query enclosed within double quotes>
+ozone debug auditparser <path to db file> query <select query enclosed within double quotes>
 {{< /highlight >}}
 
 Audit Parser comes with a set of templates(most commonly used queries).
 
 To run a template query:
 {{< highlight bash >}}
-ozone auditparser <path to db file> template <templateName>
+ozone debug auditparser <path to db file> template <templateName>
 {{< /highlight >}}
 
 Following templates are available:

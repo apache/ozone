@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,8 +16,25 @@
  */
 
 package org.apache.hadoop.ozone.recon.tasks;
+
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
+
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.commons.lang3.tuple.ImmutablePair;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import javax.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -27,18 +43,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
@@ -70,7 +74,6 @@ public class NSSummaryTask implements ReconOmTask {
   private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
   private final NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
-  private final OzoneConfiguration ozoneConfiguration;
 
   @Inject
   public NSSummaryTask(ReconNamespaceSummaryManager
@@ -81,16 +84,18 @@ public class NSSummaryTask implements ReconOmTask {
                        ozoneConfiguration) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
-    this.ozoneConfiguration = ozoneConfiguration;
+    long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
+
     this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconNamespaceSummaryManager, reconOMMetadataManager,
+        nsSummaryFlushToDBMaxThreshold);
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
-        reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconNamespaceSummaryManager, reconOMMetadataManager,
+        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
     this.nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
-        reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold);
   }
 
   @Override
@@ -98,28 +103,68 @@ public class NSSummaryTask implements ReconOmTask {
     return "NSSummaryTask";
   }
 
-  @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
-    long startTime = System.currentTimeMillis();
-    boolean success = nsSummaryTaskWithFSO.processWithFSO(events);
-    if (!success) {
-      LOG.error("processWithFSO failed.");
+  /**
+   * Bucket Type Enum which mimic subtasks for their data processing.
+   */
+  public enum BucketType {
+    FSO("File System Optimized Bucket"),
+    OBS("Object Store Bucket"),
+    LEGACY("Legacy Bucket");
+
+    private final String description;
+
+    BucketType(String description) {
+      this.description = description;
     }
-    success = nsSummaryTaskWithLegacy.processWithLegacy(events);
-    if (!success) {
-      LOG.error("processWithLegacy failed.");
+
+    public String getDescription() {
+      return description;
     }
-    success = nsSummaryTaskWithOBS.processWithOBS(events);
-    if (!success) {
-      LOG.error("processWithOBS failed.");
-    }
-    LOG.debug("{} successfully processed in {} milliseconds",
-        getTaskName(), (System.currentTimeMillis() - startTime));
-    return new ImmutablePair<>(getTaskName(), success);
   }
 
   @Override
-  public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+  public TaskResult process(
+      OMUpdateEventBatch events, Map<String, Integer> subTaskSeekPosMap) {
+    boolean anyFailure = false; // Track if any bucket fails
+    Map<String, Integer> updatedSeekPositions = new HashMap<>();
+
+    // Process FSO bucket
+    Integer bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.FSO.name(), 0);
+    Pair<Integer, Boolean> bucketResult = nsSummaryTaskWithFSO.processWithFSO(events, bucketSeek);
+    updatedSeekPositions.put(BucketType.FSO.name(), bucketResult.getLeft());
+    if (!bucketResult.getRight()) {
+      LOG.error("processWithFSO failed.");
+      anyFailure = true;
+    }
+
+    // Process Legacy bucket
+    bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.LEGACY.name(), 0);
+    bucketResult = nsSummaryTaskWithLegacy.processWithLegacy(events, bucketSeek);
+    updatedSeekPositions.put(BucketType.LEGACY.name(), bucketResult.getLeft());
+    if (!bucketResult.getRight()) {
+      LOG.error("processWithLegacy failed.");
+      anyFailure = true;
+    }
+
+    // Process OBS bucket
+    bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.OBS.name(), 0);
+    bucketResult = nsSummaryTaskWithOBS.processWithOBS(events, bucketSeek);
+    updatedSeekPositions.put(BucketType.OBS.name(), bucketResult.getLeft());
+    if (!bucketResult.getRight()) {
+      LOG.error("processWithOBS failed.");
+      anyFailure = true;
+    }
+
+    // Return task failure if any bucket failed, while keeping each bucket's latest seek position
+    return new TaskResult.Builder()
+        .setTaskName(getTaskName())
+        .setSubTaskSeekPositions(updatedSeekPositions)
+        .setTaskSuccess(!anyFailure)
+        .build();
+  }
+
+  @Override
+  public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     // Initialize a list of tasks to run in parallel
     Collection<Callable<Boolean>> tasks = new ArrayList<>();
 
@@ -131,7 +176,7 @@ public class NSSummaryTask implements ReconOmTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to clear NSSummary table in Recon DB. ",
           ioEx);
-      return new ImmutablePair<>(getTaskName(), false);
+      return buildTaskResult(false);
     }
 
     tasks.add(() -> nsSummaryTaskWithFSO
@@ -149,17 +194,14 @@ public class NSSummaryTask implements ReconOmTask {
         threadFactory);
     try {
       results = executorService.invokeAll(tasks);
-      for (int i = 0; i < results.size(); i++) {
-        if (results.get(i).get().equals(false)) {
-          return new ImmutablePair<>(getTaskName(), false);
+      for (Future<Boolean> result : results) {
+        if (result.get().equals(false)) {
+          return buildTaskResult(false);
         }
       }
-    } catch (InterruptedException ex) {
+    } catch (InterruptedException | ExecutionException ex) {
       LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
-      return new ImmutablePair<>(getTaskName(), false);
-    } catch (ExecutionException ex2) {
-      LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex2);
-      return new ImmutablePair<>(getTaskName(), false);
+      return buildTaskResult(false);
     } finally {
       executorService.shutdown();
 
@@ -172,7 +214,7 @@ public class NSSummaryTask implements ReconOmTask {
       LOG.debug("Task execution time: {} milliseconds", durationInMillis);
     }
 
-    return new ImmutablePair<>(getTaskName(), true);
+    return buildTaskResult(true);
   }
 
 }

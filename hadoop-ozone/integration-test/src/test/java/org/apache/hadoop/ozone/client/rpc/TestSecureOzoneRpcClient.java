@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,28 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.TestDataUtil.cleanupDeletedTable;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
+import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.io.File;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -38,14 +59,13 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -72,29 +92,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.io.File;
-import java.io.IOException;
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.TestDataUtil.cleanupDeletedTable;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
-import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 /**
  * Test Ozone Client with block tokens enabled.
  */
@@ -102,7 +99,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
 
   @TempDir
   private static File testDir;
-  private static String keyProviderUri = "kms://http@kms:9600/kms";
+  private static String keyProviderUri = "kms://http@localhost:9600/kms";
 
   @BeforeAll
   public static void init() throws Exception {
@@ -117,11 +114,6 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     CertificateClientTestImpl certificateClientTest =
         new CertificateClientTestImpl(conf);
-    // These tests manually insert keys into RocksDB. This is easier to do
-    // with object store layout so keys with path IDs do not need to be
-    // constructed.
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        OMConfigKeys.OZONE_BUCKET_LAYOUT_OBJECT_STORE);
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
@@ -238,26 +230,27 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     // force recovery file
     System.setProperty(FORCE_LEASE_RECOVERY_ENV, String.valueOf(forceRecovery));
     conf.setBoolean(String.format("fs.%s.impl.disable.cache", OZONE_OFS_URI_SCHEME), true);
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(conf);
-    OzoneOutputStream out = null;
-    try {
-      out = bucket.createKey(keyName, value.getBytes(UTF_8).length, ReplicationType.RATIS,
-          ReplicationFactor.THREE, new HashMap<>());
-      out.write(value.getBytes(UTF_8));
-      out.hsync();
+    try (RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(conf)) {
+      OzoneOutputStream out = null;
+      try {
+        out = bucket.createKey(keyName, value.getBytes(UTF_8).length, ReplicationType.RATIS,
+            ReplicationFactor.THREE, new HashMap<>());
+        out.write(value.getBytes(UTF_8));
+        out.hsync();
 
-      if (forceRecovery) {
-        fs.recoverLease(file);
-      } else {
-        assertThrows(OMException.class, () -> fs.recoverLease(file));
-      }
-    } finally {
-      if (out != null) {
         if (forceRecovery) {
-          // close failure because the key is already committed
-          assertThrows(OMException.class, out::close);
+          fs.recoverLease(file);
         } else {
-          out.close();
+          assertThrows(OMException.class, () -> fs.recoverLease(file));
+        }
+      } finally {
+        if (out != null) {
+          if (forceRecovery) {
+            // close failure because the key is already committed
+            assertThrows(OMException.class, out::close);
+          } else {
+            out.close();
+          }
         }
       }
     }
@@ -290,51 +283,52 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(conf);
-    OzoneOutputStream out = null;
-    long totalBlock = 10;
-    long usedBlock = (dataSize - 1) / fs.getDefaultBlockSize() + 1;
-    long fileSize = fs.getDefaultBlockSize() * totalBlock;
-    OMMetrics metrics = getCluster().getOzoneManager().getMetrics();
-    long committedBytes = metrics.getDataCommittedBytes();
-    try {
-      out = bucket.createKey(keyName, fileSize, ReplicationType.RATIS,
-          ReplicationFactor.THREE, new HashMap<>());
-      // init used quota check
-      bucket = volume.getBucket(bucketName);
-      assertEquals(0, bucket.getUsedNamespace());
-      assertEquals(0, bucket.getUsedBytes());
+    try (RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(conf)) {
+      OzoneOutputStream out = null;
+      long totalBlock = 10;
+      long usedBlock = (dataSize - 1) / fs.getDefaultBlockSize() + 1;
+      long fileSize = fs.getDefaultBlockSize() * totalBlock;
+      OMMetrics metrics = getCluster().getOzoneManager().getMetrics();
+      long committedBytes = metrics.getDataCommittedBytes();
+      try {
+        out = bucket.createKey(keyName, fileSize, ReplicationType.RATIS,
+            ReplicationFactor.THREE, new HashMap<>());
+        // init used quota check
+        bucket = volume.getBucket(bucketName);
+        assertEquals(0, bucket.getUsedNamespace());
+        assertEquals(0, bucket.getUsedBytes());
 
-      out.write(data);
-      out.hsync();
-      fs.recoverLease(file);
+        out.write(data);
+        out.hsync();
+        fs.recoverLease(file);
 
-      // check file length
-      FileStatus fileStatus = fs.getFileStatus(file);
-      assertEquals(dataSize, fileStatus.getLen());
-      // check committed bytes
-      assertEquals(committedBytes + dataSize,
-          getCluster().getOzoneManager().getMetrics().getDataCommittedBytes());
-      // check used quota
-      bucket = volume.getBucket(bucketName);
-      assertEquals(1, bucket.getUsedNamespace());
-      assertEquals(dataSize * ReplicationFactor.THREE.getValue(), bucket.getUsedBytes());
+        // check file length
+        FileStatus fileStatus = fs.getFileStatus(file);
+        assertEquals(dataSize, fileStatus.getLen());
+        // check committed bytes
+        assertEquals(committedBytes + dataSize,
+            getCluster().getOzoneManager().getMetrics().getDataCommittedBytes());
+        // check used quota
+        bucket = volume.getBucket(bucketName);
+        assertEquals(1, bucket.getUsedNamespace());
+        assertEquals(dataSize * ReplicationFactor.THREE.getValue(), bucket.getUsedBytes());
 
-      // check unused pre-allocated blocks are reclaimed
-      Table<String, RepeatedOmKeyInfo> deletedTable =
-          getCluster().getOzoneManager().getMetadataManager().getDeletedTable();
-      try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-               keyIter = deletedTable.iterator()) {
-        while (keyIter.hasNext()) {
-          Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
-          OmKeyInfo key = kv.getValue().getOmKeyInfoList().get(0);
-          assertEquals(totalBlock - usedBlock, key.getKeyLocationVersions().get(0).getLocationListCount());
+        // check unused pre-allocated blocks are reclaimed
+        Table<String, RepeatedOmKeyInfo> deletedTable =
+            getCluster().getOzoneManager().getMetadataManager().getDeletedTable();
+        try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+                 keyIter = deletedTable.iterator()) {
+          while (keyIter.hasNext()) {
+            Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
+            OmKeyInfo key = kv.getValue().getOmKeyInfoList().get(0);
+            assertEquals(totalBlock - usedBlock, key.getKeyLocationVersions().get(0).getLocationListCount());
+          }
         }
-      }
-    } finally {
-      if (out != null) {
-        // close failure because the key is already committed
-        assertThrows(OMException.class, out::close);
+      } finally {
+        if (out != null) {
+          // close failure because the key is already committed
+          assertThrows(OMException.class, out::close);
+        }
       }
     }
   }
@@ -440,6 +434,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
   public void testZReadKeyWithUnhealthyContainerReplica() {
   }
 
+  @Override
   @Test
   public void testGetServerDefaults() throws IOException {
     assertNotNull(getClient().getProxy().getServerDefaults());

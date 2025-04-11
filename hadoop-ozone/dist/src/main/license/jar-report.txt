@@ -217,6 +217,7 @@ share/ozone/lib/opentracing-util.jar
 share/ozone/lib/orc-core.jar
 share/ozone/lib/osgi-resource-locator.jar
 share/ozone/lib/ozone-client.jar
+share/ozone/lib/ozone-cli-shell.jar
 share/ozone/lib/ozone-common.jar
 share/ozone/lib/ozone-csi.jar
 share/ozone/lib/ozone-datanode.jar

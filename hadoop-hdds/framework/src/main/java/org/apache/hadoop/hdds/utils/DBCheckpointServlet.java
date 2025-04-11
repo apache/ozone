@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.utils;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -35,7 +36,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
-
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.fileupload.FileItemIterator;
 import org.apache.commons.fileupload.FileItemStream;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
@@ -49,11 +53,6 @@ import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
-import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
 /**
  * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar)
@@ -107,6 +106,14 @@ public class DBCheckpointServlet extends HttpServlet
     }
     bootstrapTempData = Paths.get(tempData,
         "temp-bootstrap-data").toFile();
+    if (bootstrapTempData.exists()) {
+      try {
+        FileUtils.cleanDirectory(bootstrapTempData);
+      } catch (IOException e) {
+        LOG.error("Failed to clean-up: {} dir.", bootstrapTempData);
+        throw new ServletException("Failed to clean-up: " + bootstrapTempData);
+      }
+    }
     if (!bootstrapTempData.exists() &&
         !bootstrapTempData.mkdirs()) {
       throw new ServletException("Failed to make:" + bootstrapTempData);
@@ -120,6 +127,18 @@ public class DBCheckpointServlet extends HttpServlet
       return admins.isAdmin(user);
     } else {
       return true;
+    }
+  }
+
+  private static void logSstFileList(List<String>sstList, String msg, int sampleSize) {
+    int count = sstList.size();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(msg, count, "", sstList);
+    } else if (count > sampleSize) {
+      List<String> sample = sstList.subList(0, sampleSize);
+      LOG.info(msg, count, ", sample", sample);
+    } else {
+      LOG.info(msg, count, "", sstList);
     }
   }
 
@@ -188,7 +207,8 @@ public class DBCheckpointServlet extends HttpServlet
               .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
               .distinct()
               .collect(Collectors.toList()));
-      LOG.info("Received excluding SST {}", receivedSstList);
+      logSstFileList(receivedSstList,
+          "Received list of {} SST files to be excluded{}: {}", 5);
     }
 
     Path tmpdir = null;
@@ -222,9 +242,8 @@ public class DBCheckpointServlet extends HttpServlet
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
-
-      LOG.info("Excluded SST {} from the latest checkpoint.",
-          excludedSstList);
+      logSstFileList(excludedSstList,
+          "Excluded {} SST files from the latest checkpoint{}: {}", 5);
       if (!excludedSstList.isEmpty()) {
         dbMetrics.incNumIncrementalCheckpoint();
       }

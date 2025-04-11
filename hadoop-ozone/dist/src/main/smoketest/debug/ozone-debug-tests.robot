@@ -37,18 +37,11 @@ Write keys
 
 *** Test Cases ***
 Test ozone debug read-replicas
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     Set Test Variable    ${DIR}         ${directory}
 
     ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     7
-
-    ${json} =                           Read Replicas Manifest
-    ${md5sum} =                         Execute     md5sum ${TEMP_DIR}/${TESTFILE} | awk '{print $1}'
-
-    FOR    ${replica}    IN RANGE    3
-        Verify Healthy Replica   ${json}    ${replica}    ${md5sum}
-    END
+    Should Be Equal As Integers         ${count_files}     1
 
 
 Test ozone debug version

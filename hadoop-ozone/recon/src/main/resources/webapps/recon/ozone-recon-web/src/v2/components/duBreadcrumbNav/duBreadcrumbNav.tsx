@@ -164,10 +164,10 @@ const DUBreadcrumbNav: React.FC<File> = ({
   return (
     <div id='breadcrumb-container'>
       <Breadcrumb
-      separator={'/'}
-      className='breadcrumb-nav'>
-      {generateBreadCrumbs()}
-    </Breadcrumb>
+        separator={'/'}
+        className='breadcrumb-nav'>
+          {generateBreadCrumbs()}
+      </Breadcrumb>
     </div>
   )
 }

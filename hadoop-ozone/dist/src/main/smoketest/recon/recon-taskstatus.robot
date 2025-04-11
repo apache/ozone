@@ -105,6 +105,8 @@ Validate All Tasks Updated After Sync
 
 Validate Sequence number is updated after sync
     Log To Console          Triggering OM DB sync for updates
+    Log To Console          Wait for few seconds to let previous OM DB Sync thread to finish
+    Sleep  2s               # Waits for 2 seconds
     Sync OM Data
     ${tasks} =              Fetch Task Status
     Should Not Be Empty     ${tasks}

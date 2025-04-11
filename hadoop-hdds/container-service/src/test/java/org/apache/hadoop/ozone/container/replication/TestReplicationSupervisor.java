@@ -1,62 +1,98 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.replication;
 
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
+import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
+import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import com.google.protobuf.Proto2Utils;
+import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Clock;
-import java.util.ArrayList;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-
-import com.google.protobuf.Proto2Utils;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCommandInfo;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
@@ -64,7 +100,6 @@ import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetri
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -74,34 +109,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 
-import jakarta.annotation.Nonnull;
-
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
-import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 /**
  * Test the replication supervisor.
  */
 public class TestReplicationSupervisor {
 
   private static final long CURRENT_TERM = 1;
+
+  @TempDir
+  private File tempDir;
 
   private final ContainerReplicator noopReplicator = task -> { };
   private final ContainerReplicator throwingReplicator = task -> {
@@ -129,7 +145,7 @@ public class TestReplicationSupervisor {
   @BeforeEach
   public void setUp() throws Exception {
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    set = new ContainerSet(1000);
+    set = newContainerSet();
     DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
     context = new StateContext(
         new OzoneConfiguration(),
@@ -329,6 +345,126 @@ public class TestReplicationSupervisor {
     assertEquals(0, supervisor.getReplicationSuccessCount());
     assertThat(logCapturer.getOutput())
         .contains("Container 1 replication was unsuccessful.");
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testReplicationImportReserveSpace(ContainerLayoutVersion layout)
+      throws IOException, InterruptedException, TimeoutException {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.getAbsolutePath());
+
+    long containerSize = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .executor(newDirectExecutorService())
+        .clock(clock)
+        .build();
+
+    long containerId = 1;
+    // create container
+    KeyValueContainerData containerData = new KeyValueContainerData(containerId,
+        ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
+    HddsVolume vol = mock(HddsVolume.class);
+    containerData.setVolume(vol);
+    containerData.incrBytesUsed(100);
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    ContainerController controllerMock = mock(ContainerController.class);
+    Semaphore semaphore = new Semaphore(1);
+    when(controllerMock.importContainer(any(), any(), any()))
+        .thenAnswer((invocation) -> {
+          semaphore.acquire();
+          return container;
+        });
+    MutableVolumeSet volumeSet = new MutableVolumeSet(datanode.getUuidString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    File tarFile = containerTarFile(containerId, containerData);
+
+    SimpleContainerDownloader moc =
+        mock(SimpleContainerDownloader.class);
+    when(
+        moc.getContainerDataFromReplicas(anyLong(), anyList(),
+            any(Path.class), any()))
+        .thenReturn(tarFile.toPath());
+
+    ContainerImporter importer =
+        new ContainerImporter(conf, set, controllerMock, volumeSet);
+
+    HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
+    // Initially volume has 0 commit space
+    assertEquals(0, vol1.getCommittedBytes());
+    long usedSpace = vol1.getCurrentUsage().getUsedSpace();
+    // Initially volume has 0 used space
+    assertEquals(0, usedSpace);
+    // Increase committed bytes so that volume has only remaining 3 times container size space
+    long initialCommittedBytes = vol1.getCurrentUsage().getCapacity() - containerSize * 3;
+    vol1.incCommittedBytes(initialCommittedBytes);
+    ContainerReplicator replicator =
+        new DownloadAndImportReplicator(conf, set, importer, moc);
+    replicatorRef.set(replicator);
+
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(DownloadAndImportReplicator.LOG);
+
+    // Acquire semaphore so that container import will pause after reserving space.
+    semaphore.acquire();
+    CompletableFuture.runAsync(() -> {
+      try {
+        supervisor.addTask(createTask(containerId));
+      } catch (Exception ex) {
+      }
+    });
+
+    // Wait such that first container import reserve space
+    GenericTestUtils.waitFor(() ->
+        vol1.getCommittedBytes() > vol1.getCurrentUsage().getCapacity() - containerSize * 3,
+        1000, 50000);
+
+    // Volume has reserved space of 2 * containerSize
+    assertEquals(vol1.getCommittedBytes(), initialCommittedBytes + 2 * containerSize);
+    // Container 2 import will fail as container 1 has reserved space and no space left to import new container
+    // New container import requires at least (2 * container size)
+    long containerId2 = 2;
+    supervisor.addTask(createTask(containerId2));
+    GenericTestUtils.waitFor(() -> 1 == supervisor.getReplicationFailureCount(),
+        1000, 50000);
+    assertThat(logCapturer.getOutput()).contains("No volumes have enough space for a new container");
+    // Release semaphore so that first container import will pass
+    semaphore.release();
+    GenericTestUtils.waitFor(() ->
+        1 == supervisor.getReplicationSuccessCount(), 1000, 50000);
+
+    usedSpace = vol1.getCurrentUsage().getUsedSpace();
+    // After replication, volume used space should be increased by container used bytes
+    assertEquals(100, usedSpace);
+
+    // Volume committed bytes should become initial committed bytes which was before replication
+    assertEquals(initialCommittedBytes, vol1.getCommittedBytes());
+
+  }
+
+
+  private File containerTarFile(
+      long containerId, ContainerData containerData) throws IOException {
+    File yamlFile = new File(tempDir, "container.yaml");
+    ContainerDataYaml.createContainerFile(containerData,
+        yamlFile);
+    File tarFile = new File(tempDir,
+        ContainerUtils.getContainerTarName(containerId));
+    try (OutputStream output = Files.newOutputStream(tarFile.toPath())) {
+      ArchiveOutputStream<TarArchiveEntry> archive = new TarArchiveOutputStream(output);
+      TarArchiveEntry entry = archive.createArchiveEntry(yamlFile,
+          "container.yaml");
+      archive.putArchiveEntry(entry);
+      try (InputStream input = Files.newInputStream(yamlFile.toPath())) {
+        IOUtils.copy(input, archive);
+      }
+      archive.closeArchiveEntry();
+    }
+    return tarFile;
   }
 
   @ContainerLayoutTestInfo.ContainerTest

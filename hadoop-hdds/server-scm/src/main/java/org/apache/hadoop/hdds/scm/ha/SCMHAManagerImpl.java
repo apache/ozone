@@ -1,69 +1,62 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * <p>http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * <p>Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForScm;
+
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.HAUtils;
-
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.List;
-
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForScm;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT;
-
 /**
  * SCMHAManagerImpl uses Apache Ratis for HA implementation. We will have 2N+1
  * node Ratis ring. The Ratis ring will have one Leader node and 2N follower
  * nodes.
- *
- * TODO
- *
  */
 public class SCMHAManagerImpl implements SCMHAManager {
 
@@ -74,7 +67,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   private final ConfigurationSource conf;
   private final OzoneConfiguration ozoneConf;
   private final SecurityConfig securityConfig;
-  private final DBTransactionBuffer transactionBuffer;
+  private final SCMHADBTransactionBufferImpl transactionBuffer;
   private final SCMSnapshotProvider scmSnapshotProvider;
   private final StorageContainerManager scm;
   private ExitManager exitManager;
@@ -94,18 +87,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
     this.securityConfig = securityConfig;
     this.scm = scm;
     this.exitManager = new ExitManager();
-    if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
-      this.ratisServer = new SCMRatisServerImpl(conf, scm,
-          (SCMHADBTransactionBuffer) transactionBuffer);
-      this.scmSnapshotProvider = newScmSnapshotProvider(scm);
-      grpcServer = new InterSCMGrpcProtocolService(conf, scm);
-    } else {
-      this.transactionBuffer = new SCMDBTransactionBufferImpl();
-      this.scmSnapshotProvider = null;
-      this.grpcServer = null;
-      this.ratisServer = null;
-    }
+    this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
+    this.ratisServer = new SCMRatisServerImpl(conf, scm, transactionBuffer);
+    this.scmSnapshotProvider = newScmSnapshotProvider(scm);
+    this.grpcServer = new InterSCMGrpcProtocolService(conf, scm);
 
   }
 
@@ -158,7 +143,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
         TimeUnit.MILLISECONDS);
     SCMHATransactionBufferMonitorTask monitorTask
         = new SCMHATransactionBufferMonitorTask(
-        (SCMHADBTransactionBuffer) transactionBuffer, ratisServer, interval);
+        transactionBuffer, ratisServer, interval);
     trxBufferMonitorService =
         new BackgroundSCMService.Builder().setClock(scm.getSystemClock())
             .setScmContext(scm.getScmContext())
@@ -170,6 +155,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
     trxBufferMonitorService.start();
   }
 
+  @Override
   public SCMRatisServer getRatisServer() {
     return ratisServer;
   }
@@ -186,9 +172,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   @Override
   public SCMHADBTransactionBuffer asSCMHADBTransactionBuffer() {
-    Preconditions
-        .checkArgument(transactionBuffer instanceof SCMHADBTransactionBuffer);
-    return (SCMHADBTransactionBuffer)transactionBuffer;
+    return transactionBuffer;
 
   }
 

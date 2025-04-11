@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,10 +13,23 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameFormat;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.security.KeyPair;
+import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
@@ -37,21 +49,6 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.security.KeyPair;
-import java.util.Iterator;
-import java.util.UUID;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameFormat;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Certificate Signing Request.
@@ -267,18 +264,17 @@ public class TestCertificateSignRequest {
         GeneralNames.fromExtensions(
             extensions, Extension.subjectAlternativeName);
     GeneralName[] names = gns.getNames();
-    for (int i = 0; i < names.length; i++) {
-      if (names[i].getTagNo() == GeneralName.otherName) {
-        ASN1Encodable asn1Encodable = names[i].getName();
-        Iterator iterator = ((DLSequence) asn1Encodable).iterator();
-        while (iterator.hasNext()) {
-          Object o = iterator.next();
-          if (o instanceof ASN1ObjectIdentifier) {
-            String oid = o.toString();
+    for (GeneralName name : names) {
+      if (name.getTagNo() == GeneralName.otherName) {
+        ASN1Encodable asn1Encodable = name.getName();
+
+        for (Object sequence : (DLSequence) asn1Encodable) {
+          if (sequence instanceof ASN1ObjectIdentifier) {
+            String oid = sequence.toString();
             assertEquals("2.16.840.1.113730.3.1.34", oid);
           }
-          if (o instanceof DERTaggedObject) {
-            String serviceName = ((DERTaggedObject)o).toASN1Primitive().toString();
+          if (sequence instanceof DERTaggedObject) {
+            String serviceName = ((DERTaggedObject) sequence).toASN1Primitive().toString();
             assertEquals("OzoneMarketingCluster003", serviceName);
           }
         }

@@ -124,7 +124,7 @@ run cp -r "${ROOT}/dev-support/byteman" "share/ozone/"
 #Copy docker compose files
 #compose files are preprocessed: properties (eg. project.version) are replaced first by maven.
 run cp -p -R "${ROOT}/hadoop-ozone/dist/target/compose" .
-run cp -p -r "${ROOT}/hadoop-ozone/dist/src/main/smoketest" .
+run cp -p -r "${ROOT}/hadoop-ozone/dist/target/smoketest" .
 run cp -p -r "${ROOT}/hadoop-ozone/dist/target/k8s" kubernetes
 run cp -p -r "${ROOT}/hadoop-ozone/dist/target/Dockerfile" .
 

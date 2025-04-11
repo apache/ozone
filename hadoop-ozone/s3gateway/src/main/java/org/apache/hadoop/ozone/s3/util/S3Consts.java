@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,13 +13,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.ozone.s3.util;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-
 import java.util.regex.Pattern;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
  * Set of constants used for S3 implementation.
@@ -38,6 +36,20 @@ public final class S3Consts {
       "x-amz-copy-source-range";
   public static final String STORAGE_CLASS_HEADER = "x-amz-storage-class";
   public static final String ENCODING_TYPE = "url";
+
+  // Constants related to Signature calculation
+  // https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-auth-using-authorization-header.html
+  public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
+
+  public static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
+  public static final String STREAMING_UNSIGNED_PAYLOAD_TRAILER = "STREAMING-UNSIGNED-PAYLOAD-TRAILER";
+  public static final String STREAMING_AWS4_HMAC_SHA256_PAYLOAD = "STREAMING-AWS4-HMAC-SHA256-PAYLOAD";
+  public static final String STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER =
+      "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER";
+  public static final String STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD = "STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD";
+  public static final String STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER =
+      "STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER";
+
 
   // Constants related to Range Header
   public static final String COPY_SOURCE_IF_PREFIX = "x-amz-copy-source-if-";

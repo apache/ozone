@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.helpers;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.metrics2.MetricsCollector;
@@ -26,18 +29,6 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CommandHandler;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.TotalRunTimeMs;
-import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.QueueWaitingTaskCount;
-import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.InvocationCount;
-import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.AvgRunTimeMs;
-import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.ThreadPoolActivePoolSize;
-import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.ThreadPoolMaxPoolSize;
-import static org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics.CommandMetricsMetricsInfo.CommandReceivedCount;
 
 /**
  * This class collects and exposes metrics for CommandHandlerMetrics.
@@ -109,19 +100,19 @@ public final class CommandHandlerMetrics implements MetricsSource {
           .tag(CommandMetricsMetricsInfo.Command,
               commandHandler.getCommandType().name());
 
-      builder.addGauge(TotalRunTimeMs, commandHandler.getTotalRunTime());
-      builder.addGauge(AvgRunTimeMs, commandHandler.getAverageRunTime());
-      builder.addGauge(QueueWaitingTaskCount, commandHandler.getQueuedCount());
-      builder.addGauge(InvocationCount, commandHandler.getInvocationCount());
+      builder.addGauge(CommandMetricsMetricsInfo.TotalRunTimeMs, commandHandler.getTotalRunTime());
+      builder.addGauge(CommandMetricsMetricsInfo.AvgRunTimeMs, commandHandler.getAverageRunTime());
+      builder.addGauge(CommandMetricsMetricsInfo.QueueWaitingTaskCount, commandHandler.getQueuedCount());
+      builder.addGauge(CommandMetricsMetricsInfo.InvocationCount, commandHandler.getInvocationCount());
       int activePoolSize = commandHandler.getThreadPoolActivePoolSize();
       if (activePoolSize >= 0) {
-        builder.addGauge(ThreadPoolActivePoolSize, activePoolSize);
+        builder.addGauge(CommandMetricsMetricsInfo.ThreadPoolActivePoolSize, activePoolSize);
       }
       int maxPoolSize = commandHandler.getThreadPoolMaxPoolSize();
       if (maxPoolSize >= 0) {
-        builder.addGauge(ThreadPoolMaxPoolSize, maxPoolSize);
+        builder.addGauge(CommandMetricsMetricsInfo.ThreadPoolMaxPoolSize, maxPoolSize);
       }
-      builder.addGauge(CommandReceivedCount,
+      builder.addGauge(CommandMetricsMetricsInfo.CommandReceivedCount,
           commandCount.get(commandHandler.getCommandType()).get());
     }
   }

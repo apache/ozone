@@ -1,40 +1,41 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.replication;
 
+import static org.apache.ratis.util.Preconditions.assertSame;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.util.DiskChecker;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
-import static org.apache.ratis.util.Preconditions.assertSame;
 
 /**
  * Handles incoming container pushed by other datanode.
@@ -51,7 +52,7 @@ class SendContainerRequestHandler
   private long containerId = -1;
   private long nextOffset;
   private OutputStream output;
-  private HddsVolume volume;
+  private HddsVolume volume = null;
   private Path path;
   private CopyContainerCompression compression;
   private final ZeroCopyMessageMarshaller<SendContainerRequest> marshaller;
@@ -86,6 +87,17 @@ class SendContainerRequestHandler
       if (containerId == -1) {
         containerId = req.getContainerID();
         volume = importer.chooseNextVolume();
+        // Increment committed bytes and verify if it doesn't cross the space left.
+        volume.incCommittedBytes(importer.getDefaultContainerSize() * 2);
+        StorageLocationReport volumeReport = volume.getReport();
+        // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
+        if (volumeReport.getUsableSpace() <= 0) {
+          volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
+          LOG.warn("Container {} import was unsuccessful, no space left on volume {}", containerId, volumeReport);
+          volume = null;
+          throw new DiskChecker.DiskOutOfSpaceException("No more available volumes");
+        }
+
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);
         path = dir.resolve(ContainerUtils.getContainerTarName(containerId));
@@ -111,32 +123,44 @@ class SendContainerRequestHandler
 
   @Override
   public void onError(Throwable t) {
-    LOG.warn("Error receiving container {} at {}", containerId, nextOffset, t);
-    closeOutput();
-    deleteTarball();
-    responseObserver.onError(t);
+    try {
+      LOG.warn("Error receiving container {} at {}", containerId, nextOffset, t);
+      closeOutput();
+      deleteTarball();
+      responseObserver.onError(t);
+    } finally {
+      if (volume != null) {
+        volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
+      }
+    }
   }
 
   @Override
   public void onCompleted() {
-    if (output == null) {
-      LOG.warn("Received container without any parts");
-      return;
-    }
-
-    LOG.info("Container {} is downloaded with size {}, starting to import.",
-        containerId, nextOffset);
-    closeOutput();
-
     try {
-      importer.importContainer(containerId, path, volume, compression);
-      LOG.info("Container {} is replicated successfully", containerId);
-      responseObserver.onNext(SendContainerResponse.newBuilder().build());
-      responseObserver.onCompleted();
-    } catch (Throwable t) {
-      LOG.warn("Failed to import container {}", containerId, t);
-      deleteTarball();
-      responseObserver.onError(t);
+      if (output == null) {
+        LOG.warn("Received container without any parts");
+        return;
+      }
+
+      LOG.info("Container {} is downloaded with size {}, starting to import.",
+          containerId, nextOffset);
+      closeOutput();
+
+      try {
+        importer.importContainer(containerId, path, volume, compression);
+        LOG.info("Container {} is replicated successfully", containerId);
+        responseObserver.onNext(SendContainerResponse.newBuilder().build());
+        responseObserver.onCompleted();
+      } catch (Throwable t) {
+        LOG.warn("Failed to import container {}", containerId, t);
+        deleteTarball();
+        responseObserver.onError(t);
+      }
+    } finally {
+      if (volume != null) {
+        volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
+      }
     }
   }
 

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,16 +20,16 @@ package org.apache.hadoop.ozone.recon.spi;
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
-
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
+import org.apache.hadoop.ozone.util.SeekableIterator;
 
 /**
  * The Recon Container DB Service interface.
@@ -173,7 +172,7 @@ public interface ReconContainerMetadataManager {
    * @return Map of Key prefix -&gt; count.
    */
   Map<ContainerKeyPrefix, Integer> getKeyPrefixesForContainer(
-      long containerId, String prevKeyPrefix) throws IOException;
+      long containerId, String prevKeyPrefix, int limit) throws IOException;
 
   /**
    * Get a Map of containerID, containerMetadata of Containers only for the
@@ -187,6 +186,9 @@ public interface ReconContainerMetadataManager {
    */
   Map<Long, ContainerMetadata> getContainers(int limit, long prevContainer)
       throws IOException;
+
+
+  SeekableIterator<Long, ContainerMetadata> getContainersIterator() throws IOException;
 
   /**
    * Delete an entry in the container DB.

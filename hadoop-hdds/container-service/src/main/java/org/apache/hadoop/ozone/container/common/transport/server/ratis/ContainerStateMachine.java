@@ -1,50 +1,58 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.nio.file.StandardOpenOption.WRITE;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.SortedMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -98,6 +106,7 @@ import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
+import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.TaskQueue;
@@ -183,13 +192,38 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
   }
 
+  static class WriteFutures {
+    private final Future<ContainerCommandResponseProto> writeChunkFuture;
+    private final CompletableFuture<Message> raftFuture;
+    private final long startTime;
+
+    WriteFutures(Future<ContainerCommandResponseProto> writeChunkFuture,
+                 CompletableFuture<Message> raftFuture, long startTime) {
+      this.writeChunkFuture = writeChunkFuture;
+      this.raftFuture = raftFuture;
+      this.startTime = startTime;
+    }
+
+    public Future<ContainerCommandResponseProto> getWriteChunkFuture() {
+      return writeChunkFuture;
+    }
+
+    public CompletableFuture<Message> getRaftFuture() {
+      return raftFuture;
+    }
+
+    long getStartTime() {
+      return startTime;
+    }
+  }
+
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private final XceiverServerRatis ratisServer;
-  private final ConcurrentHashMap<Long,
-      CompletableFuture<ContainerCommandResponseProto>> writeChunkFutureMap;
+  private final NavigableMap<Long, WriteFutures> writeChunkFutureMap;
+  private final long writeChunkWaitMaxNs;
 
   // keeps track of the containers created per pipeline
   private final Map<Long, Long> container2BCSIDMap;
@@ -197,6 +231,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final ExecutorService executor;
   private final List<ThreadPoolExecutor> chunkExecutors;
   private final Map<Long, Long> applyTransactionCompletionMap;
+  private final Set<Long> unhealthyContainers;
   private final Cache<Long, ByteString> stateMachineDataCache;
   private final AtomicBoolean stateMachineHealthy;
 
@@ -224,8 +259,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.containerController = containerController;
     this.ratisServer = ratisServer;
     metrics = CSMMetrics.create(gid);
-    this.writeChunkFutureMap = new ConcurrentHashMap<>();
+    this.writeChunkFutureMap = new ConcurrentSkipListMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
+    this.unhealthyContainers = ConcurrentHashMap.newKeySet();
     long pendingRequestsBytesLimit = (long)conf.getStorageSize(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
@@ -267,6 +303,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.waitOnBothFollowers = conf.getObject(
         DatanodeConfiguration.class).waitOnAllFollowers();
 
+    this.writeChunkWaitMaxNs = conf.getTimeDuration(ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL,
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_NS_DEFAULT, TimeUnit.NANOSECONDS);
   }
 
   private void validatePeers() throws IOException {
@@ -329,7 +367,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   public void buildMissingContainerSet(File snapshotFile) throws IOException {
     // initialize the dispatcher with snapshot so that it build the missing
     // container list
-    try (FileInputStream fin = new FileInputStream(snapshotFile)) {
+    try (InputStream fin = Files.newInputStream(snapshotFile.toPath())) {
       ContainerProtos.Container2BCSIDMapProto proto =
               ContainerProtos.Container2BCSIDMapProto
                       .parseFrom(fin);
@@ -360,6 +398,17 @@ public class ContainerStateMachine extends BaseStateMachine {
     return stateMachineHealthy.get();
   }
 
+  private void checkContainerHealthy(long containerId, boolean skipContainerUnhealthyCheck)
+      throws StorageContainerException {
+    if (!isStateMachineHealthy() && unhealthyContainers.contains(containerId)) {
+      throw new StorageContainerException(String.format("Prev writes to container %d failed, stopping all writes to " +
+              "container", containerId), ContainerProtos.Result.CONTAINER_UNHEALTHY);
+    } else if (!isStateMachineHealthy() && skipContainerUnhealthyCheck) {
+      throw new StorageContainerException(String.format("Prev writes to containers %s failed, stopping all writes to " +
+          "container", unhealthyContainers.toString()), ContainerProtos.Result.CONTAINER_UNHEALTHY);
+    }
+  }
+
   @Override
   public long takeSnapshot() throws IOException {
     TermIndex ti = getLastAppliedTermIndex();
@@ -376,11 +425,9 @@ public class ContainerStateMachine extends BaseStateMachine {
       final File snapshotFile =
           storage.getSnapshotFile(ti.getTerm(), ti.getIndex());
       LOG.info("{}: Taking a snapshot at:{} file {}", getGroupId(), ti, snapshotFile);
-      try (FileOutputStream fos = new FileOutputStream(snapshotFile)) {
+      try (OutputStream fos = FileUtils.newOutputStreamForceAtClose(snapshotFile, CREATE, TRUNCATE_EXISTING, WRITE)) {
         persistContainerSet(fos);
         fos.flush();
-        // make sure the snapshot file is synced
-        fos.getFD().sync();
       } catch (IOException ioe) {
         LOG.error("{}: Failed to write snapshot at:{} file {}", getGroupId(), ti,
             snapshotFile);
@@ -527,6 +574,16 @@ public class ContainerStateMachine extends BaseStateMachine {
   private CompletableFuture<Message> writeStateMachineData(
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
+    final WriteFutures previous = writeChunkFutureMap.get(entryIndex);
+    if (previous != null) {
+      // generally state machine will wait forever, for precaution, a check is added if retry happens.
+      return previous.getRaftFuture();
+    }
+    try {
+      validateLongRunningWrite();
+    } catch (StorageContainerException e) {
+      return completeExceptionally(e);
+    }
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
     RaftServer server = ratisServer.getServer();
     Preconditions.checkArgument(!write.getData().isEmpty());
@@ -549,14 +606,22 @@ public class ContainerStateMachine extends BaseStateMachine {
             .setContainer2BCSIDMap(container2BCSIDMap)
             .build();
     CompletableFuture<Message> raftFuture = new CompletableFuture<>();
-    // ensure the write chunk happens asynchronously in writeChunkExecutor pool
-    // thread.
-    CompletableFuture<ContainerCommandResponseProto> writeChunkFuture =
-        CompletableFuture.supplyAsync(() -> {
+    // ensure the write chunk happens asynchronously in writeChunkExecutor pool thread.
+    Future<ContainerCommandResponseProto> future = getChunkExecutor(
+        requestProto.getWriteChunk()).submit(() -> {
           try {
+            try {
+              checkContainerHealthy(write.getBlockID().getContainerID(), true);
+            } catch (StorageContainerException e) {
+              ContainerCommandResponseProto result = ContainerUtils.logAndReturnError(LOG, e, requestProto);
+              handleCommandResult(requestProto, entryIndex, startTime, result, write, raftFuture);
+              return result;
+            }
             metrics.recordWriteStateMachineQueueingLatencyNs(
                 Time.monotonicNowNanos() - startTime);
-            return dispatchCommand(requestProto, context);
+            ContainerCommandResponseProto result = dispatchCommand(requestProto, context);
+            handleCommandResult(requestProto, entryIndex, startTime, result, write, raftFuture);
+            return result;
           } catch (Exception e) {
             LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
                 "{} logIndex {} chunkName {}", getGroupId(), write.getBlockID(),
@@ -564,57 +629,91 @@ public class ContainerStateMachine extends BaseStateMachine {
             metrics.incNumWriteDataFails();
             // write chunks go in parallel. It's possible that one write chunk
             // see the stateMachine is marked unhealthy by other parallel thread
+            unhealthyContainers.add(write.getBlockID().getContainerID());
             stateMachineHealthy.set(false);
             raftFuture.completeExceptionally(e);
             throw e;
+          } finally {
+            // Remove the future once it finishes execution from the
+            writeChunkFutureMap.remove(entryIndex);
           }
-        }, getChunkExecutor(requestProto.getWriteChunk()));
+        });
 
-    writeChunkFutureMap.put(entryIndex, writeChunkFuture);
+    writeChunkFutureMap.put(entryIndex, new WriteFutures(future, raftFuture, startTime));
     if (LOG.isDebugEnabled()) {
       LOG.debug("{}: writeChunk writeStateMachineData : blockId" +
               "{} logIndex {} chunkName {}", getGroupId(), write.getBlockID(),
           entryIndex, write.getChunkData().getChunkName());
     }
-    // Remove the future once it finishes execution from the
-    // writeChunkFutureMap.
-    writeChunkFuture.thenApply(r -> {
-      if (r.getResult() != ContainerProtos.Result.SUCCESS
-          && r.getResult() != ContainerProtos.Result.CONTAINER_NOT_OPEN
-          && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO
-          // After concurrent flushes are allowed on the same key, chunk file inconsistencies can happen and
-          // that should not crash the pipeline.
-          && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
-        StorageContainerException sce =
-            new StorageContainerException(r.getMessage(), r.getResult());
-        LOG.error(getGroupId() + ": writeChunk writeStateMachineData failed: blockId" +
-            write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
-            write.getChunkData().getChunkName() + " Error message: " +
-            r.getMessage() + " Container Result: " + r.getResult());
-        metrics.incNumWriteDataFails();
-        // If the write fails currently we mark the stateMachine as unhealthy.
-        // This leads to pipeline close. Any change in that behavior requires
-        // handling the entry for the write chunk in cache.
-        stateMachineHealthy.set(false);
-        raftFuture.completeExceptionally(sce);
-      } else {
-        metrics.incNumBytesWrittenCount(
-            requestProto.getWriteChunk().getChunkData().getLen());
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(getGroupId() +
-              ": writeChunk writeStateMachineData  completed: blockId" +
-              write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
-              write.getChunkData().getChunkName());
-        }
-        raftFuture.complete(r::toByteString);
-        metrics.recordWriteStateMachineCompletionNs(
-            Time.monotonicNowNanos() - startTime);
-      }
-
-      writeChunkFutureMap.remove(entryIndex);
-      return r;
-    });
     return raftFuture;
+  }
+
+  private void handleCommandResult(ContainerCommandRequestProto requestProto, long entryIndex, long startTime,
+                                   ContainerCommandResponseProto r, WriteChunkRequestProto write,
+                                   CompletableFuture<Message> raftFuture) {
+    if (r.getResult() != ContainerProtos.Result.SUCCESS
+        && r.getResult() != ContainerProtos.Result.CONTAINER_NOT_OPEN
+        && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO
+        // After concurrent flushes are allowed on the same key, chunk file inconsistencies can happen and
+        // that should not crash the pipeline.
+        && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
+      StorageContainerException sce =
+          new StorageContainerException(r.getMessage(), r.getResult());
+      LOG.error(getGroupId() + ": writeChunk writeStateMachineData failed: blockId" +
+          write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
+          write.getChunkData().getChunkName() + " Error message: " +
+          r.getMessage() + " Container Result: " + r.getResult());
+      metrics.incNumWriteDataFails();
+      // If the write fails currently we mark the stateMachine as unhealthy.
+      // This leads to pipeline close. Any change in that behavior requires
+      // handling the entry for the write chunk in cache.
+      stateMachineHealthy.set(false);
+      unhealthyContainers.add(write.getBlockID().getContainerID());
+      raftFuture.completeExceptionally(sce);
+    } else {
+      metrics.incNumBytesWrittenCount(
+          requestProto.getWriteChunk().getChunkData().getLen());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(getGroupId() +
+            ": writeChunk writeStateMachineData  completed: blockId" +
+            write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
+            write.getChunkData().getChunkName());
+      }
+      raftFuture.complete(r::toByteString);
+      metrics.recordWriteStateMachineCompletionNs(
+          Time.monotonicNowNanos() - startTime);
+    }
+  }
+
+  private void validateLongRunningWrite() throws StorageContainerException {
+    // get min valid write chunk operation's future context
+    Map.Entry<Long, WriteFutures> writeFutureContextEntry = null;
+    for (boolean found = false; !found;) {
+      writeFutureContextEntry = writeChunkFutureMap.firstEntry();
+      if (null == writeFutureContextEntry) {
+        return;
+      }
+      if (writeFutureContextEntry.getValue().getWriteChunkFuture().isDone()) {
+        // there is a possibility that writeChunkFutureMap may have dangling entry, as remove is done before add future
+        writeChunkFutureMap.remove(writeFutureContextEntry.getKey());
+      } else {
+        found = true;
+      }
+    }
+    // validate for timeout in milli second
+    long waitTime = Time.monotonicNowNanos() - writeFutureContextEntry.getValue().getStartTime();
+    if (waitTime > writeChunkWaitMaxNs) {
+      LOG.error("Write chunk has taken {}ns crossing threshold {}ns for index {} groupId {}, " +
+              "cancelling pending write chunk for this group", waitTime, writeChunkWaitMaxNs,
+          writeFutureContextEntry.getKey(), getGroupId());
+      stateMachineHealthy.set(false);
+      writeChunkFutureMap.forEach((key, value) -> {
+        value.getWriteChunkFuture().cancel(true);
+      });
+      throw new StorageContainerException("Write chunk has taken " + waitTime + "ns crossing threshold "
+          + writeChunkWaitMaxNs + "ns for index " + writeFutureContextEntry.getKey() + " groupId " + getGroupId(),
+          ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+    }
   }
 
   private StateMachine.DataChannel getStreamDataChannel(
@@ -763,6 +862,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               + "{} Container Result: {}", getGroupId(), response.getCmdType(), index,
           response.getMessage(), response.getResult());
       stateMachineHealthy.set(false);
+      unhealthyContainers.add(requestProto.getContainerID());
       throw sce;
     }
 
@@ -796,9 +896,13 @@ public class ContainerStateMachine extends BaseStateMachine {
    */
   @Override
   public CompletableFuture<Void> flush(long index) {
-    return CompletableFuture.allOf(
-        writeChunkFutureMap.entrySet().stream().filter(x -> x.getKey() <= index)
-            .map(Map.Entry::getValue).toArray(CompletableFuture[]::new));
+    final SortedMap<Long, WriteFutures> head = writeChunkFutureMap.headMap(index, true);
+    if (head.isEmpty()) {
+      return CompletableFuture.completedFuture(null);
+    }
+    return CompletableFuture.allOf(head.values().stream()
+        .map(WriteFutures::getRaftFuture)
+        .toArray(CompletableFuture[]::new));
   }
 
   /**
@@ -945,6 +1049,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           try {
             try {
               this.validatePeers();
+              this.checkContainerHealthy(containerId, false);
             } catch (StorageContainerException e) {
               return ContainerUtils.logAndReturnError(LOG, e, request);
             }
@@ -1031,6 +1136,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         LOG.error(getGroupId() + ": failed to applyTransaction at logIndex " + index
             + " for " + requestProto.getCmdType(), e);
         stateMachineHealthy.compareAndSet(true, false);
+        unhealthyContainers.add(requestProto.getContainerID());
         metrics.incNumApplyTransactionsFails();
         applyTransactionFuture.completeExceptionally(e);
       };
@@ -1065,6 +1171,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           // shutdown.
           applyTransactionFuture.completeExceptionally(sce);
           stateMachineHealthy.compareAndSet(true, false);
+          unhealthyContainers.add(requestProto.getContainerID());
           ratisServer.handleApplyTransactionFailure(getGroupId(), trx.getServerRole());
         } else {
           if (LOG.isDebugEnabled()) {

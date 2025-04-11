@@ -1,30 +1,28 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm;
 
+import java.time.Duration;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
-
-import java.time.Duration;
-
 
 /**
  * The configuration class for the SCM service.
@@ -76,7 +74,7 @@ public class ScmConfig extends ReconfigurableConfig {
       + " : chooses a pipeline in a round robin fashion. Intended for troubleshooting and testing purposes only.";
 
   // hdds.scm.pipeline.choose.policy.impl
-  @Config(key = "pipeline.choose.policy.impl",
+  @Config(key = "hdds.scm.pipeline.choose.policy.impl",
       type = ConfigType.STRING,
       defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy",
       tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
@@ -90,7 +88,7 @@ public class ScmConfig extends ReconfigurableConfig {
   private String pipelineChoosePolicyName;
 
   // hdds.scm.ec.pipeline.choose.policy.impl
-  @Config(key = "ec.pipeline.choose.policy.impl",
+  @Config(key = "hdds.scm.ec.pipeline.choose.policy.impl",
       type = ConfigType.STRING,
       defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy",
       tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
@@ -103,7 +101,7 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private String ecPipelineChoosePolicyName;
 
-  @Config(key = "block.deletion.per-interval.max",
+  @Config(key = "hdds.scm.block.deletion.per-interval.max",
       type = ConfigType.INT,
       defaultValue = "100000",
       reconfigurable = true,
@@ -117,7 +115,7 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private int blockDeletionLimit;
 
-  @Config(key = "block.deleting.service.interval",
+  @Config(key = "hdds.scm.block.deleting.service.interval",
       defaultValue = "60s",
       type = ConfigType.TIME,
       tags = { ConfigTag.SCM, ConfigTag.DELETION },

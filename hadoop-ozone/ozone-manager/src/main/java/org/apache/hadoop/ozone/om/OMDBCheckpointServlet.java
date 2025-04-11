@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,32 +17,24 @@
 
 package org.apache.hadoop.ozone.om;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.recon.ReconConfig;
-import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import static org.apache.commons.io.filefilter.TrueFileFilter.TRUE;
+import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
+import static org.apache.hadoop.hdds.utils.Archiver.tar;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.createHardLinkList;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -62,19 +53,33 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeFile;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
-import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
-import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.createHardLinkList;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
-import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOCase;
+import org.apache.commons.io.file.Counters;
+import org.apache.commons.io.file.CountingPathVisitor;
+import org.apache.commons.io.file.PathFilter;
+import org.apache.commons.io.filefilter.SuffixFileFilter;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfig;
+import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
@@ -96,7 +101,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final long serialVersionUID = 1L;
   private transient BootstrapStateHandler.Lock lock;
   private long maxTotalSstSize = 0;
-  private static final AtomicLong PAUSE_COUNTER = new AtomicLong(0);
+  private static final PathFilter SST_FILE_FILTER =
+      new SuffixFileFilter(ROCKSDB_SST_SUFFIX, IOCase.INSENSITIVE);
 
   @Override
   public void init() throws ServletException {
@@ -155,12 +161,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    try (TarArchiveOutputStream archiveOutputStream =
-             new TarArchiveOutputStream(destination)) {
-      archiveOutputStream
-          .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-      archiveOutputStream
-          .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+    try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream = tar(destination)) {
       RocksDBCheckpointDiffer differ =
           getDbStore().getRocksDBCheckpointDiffer();
       DirectoryData sstBackupDir = new DirectoryData(tmpdir,
@@ -171,6 +172,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // Files to be excluded from tarball
       Map<String, Map<Path, Path>> sstFilesToExclude = normalizeExcludeList(toExcludeList,
           checkpoint.getCheckpointLocation(), sstBackupDir);
+
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, sstFilesToExclude, includeSnapshotData(request),
           excludedList, sstBackupDir, compactionLogDir);
@@ -274,13 +276,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private boolean getFilesForArchive(DBCheckpoint checkpoint,
-                                  Map<String, Map<Path, Path>> copyFiles,
-                                  Map<Path, Path> hardLinkFiles,
-                                  Map<String, Map<Path, Path>> sstFilesToExclude,
-                                  boolean includeSnapshotData,
-                                  List<String> excluded,
-                                  DirectoryData sstBackupDir,
-                                  DirectoryData compactionLogDir)
+      Map<String, Map<Path, Path>> copyFiles,
+      Map<Path, Path> hardLinkFiles,
+      Map<String, Map<Path, Path>> sstFilesToExclude,
+      boolean includeSnapshotData,
+      List<String> excluded,
+      DirectoryData sstBackupDir,
+      DirectoryData compactionLogDir)
       throws IOException {
 
     maxTotalSstSize = getConf().getLong(
@@ -294,6 +296,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     AtomicLong copySize = new AtomicLong(0L);
+
+    // Log estimated total data transferred on first request.
+    if (sstFilesToExclude.isEmpty()) {
+      logEstimatedTarballSize(checkpoint, includeSnapshotData);
+    }
+
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
     if (!processDir(dir, copyFiles, hardLinkFiles, sstFilesToExclude,
@@ -306,7 +314,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     // Get the snapshot files.
-    Set<Path> snapshotPaths = waitForSnapshotDirs(checkpoint);
+    Set<Path> snapshotPaths = getSnapshotDirs(checkpoint, true);
     Path snapshotDir = getSnapshotDir();
     if (!processDir(snapshotDir, copyFiles, hardLinkFiles, sstFilesToExclude,
         snapshotPaths, excluded, copySize, null)) {
@@ -324,16 +332,40 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         hardLinkFiles, sstFilesToExclude,
         new HashSet<>(), excluded, copySize,
         compactionLogDir.getOriginalDir().toPath());
+  }
 
+  private void logEstimatedTarballSize(
+      DBCheckpoint checkpoint, boolean includeSnapshotData) {
+    try {
+      Counters.PathCounters counters = Counters.longPathCounters();
+      CountingPathVisitor visitor = new CountingPathVisitor(
+          counters, SST_FILE_FILTER, TRUE);
+      Files.walkFileTree(checkpoint.getCheckpointLocation(), visitor);
+      int totalSnapshots = 0;
+      if (includeSnapshotData) {
+        Set<Path> snapshotPaths = getSnapshotDirs(checkpoint, false);
+        totalSnapshots = snapshotPaths.size();
+        for (Path snapshotDir: snapshotPaths) {
+          Files.walkFileTree(snapshotDir, visitor);
+        }
+      }
+      LOG.info("Estimates for Checkpoint Tarball Stream - Data size: {} KB, " + "SST files: {}{}",
+          counters.getByteCounter().get() / (1024),
+          counters.getFileCounter().get(),
+          (includeSnapshotData ? ", snapshots: " + totalSnapshots : ""));
+    } catch (Exception e) {
+      LOG.error("Could not estimate size of transfer to Checkpoint Tarball Stream.", e);
+    }
   }
 
   /**
    * The snapshotInfo table may contain a snapshot that
    * doesn't yet exist on the fs, so wait a few seconds for it.
    * @param checkpoint Checkpoint containing snapshot entries expected.
+   * @param waitForDir Wait for dir to exist on fs.
    * @return Set of expected snapshot dirs.
    */
-  private Set<Path> waitForSnapshotDirs(DBCheckpoint checkpoint)
+  private Set<Path> getSnapshotDirs(DBCheckpoint checkpoint, boolean waitForDir)
       throws IOException {
 
     OzoneConfiguration conf = getConf();
@@ -352,7 +384,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
         Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
-        waitForDirToExist(path);
+        if (waitForDir) {
+          waitForDirToExist(path);
+        }
         snapshotPaths.add(path);
       }
     } finally {
@@ -544,7 +578,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private void writeFilesToArchive(
       Map<Path, Path> copyFiles,
       Map<Path, Path> hardLinkFiles,
-      ArchiveOutputStream archiveOutputStream,
+      ArchiveOutputStream<TarArchiveEntry> archiveOutputStream,
       boolean completed,
       Path checkpointLocation)
       throws IOException {
@@ -556,17 +590,21 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         e.getKey().getFileName().toString().toLowerCase().endsWith(".sst")).
         collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
+    long bytesWritten = 0L;
+    int filesWritten = 0;
+    long lastLoggedTime = Time.monotonicNow();
+
     // Go through each of the files to be copied and add to archive.
     for (Map.Entry<Path, Path> entry : filteredCopyFiles.entrySet()) {
-      Path file = entry.getValue();
+      Path path = entry.getValue();
 
       // Confirm the data is in the right place.
-      if (!file.toString().startsWith(metaDirPath.toString())) {
+      if (!path.toString().startsWith(metaDirPath.toString())) {
         throw new IOException("tarball file not in metadata dir: "
-            + file + ": " + metaDirPath);
+            + path + ": " + metaDirPath);
       }
 
-      String fixedFile = truncateFileName(truncateLength, file);
+      String fixedFile = truncateFileName(truncateLength, path);
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
         // checkpoint files go to root of tarball
         Path f = Paths.get(fixedFile).getFileName();
@@ -574,7 +612,17 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           fixedFile = f.toString();
         }
       }
-      includeFile(entry.getKey().toFile(), fixedFile, archiveOutputStream);
+      File file = entry.getKey().toFile();
+      if (!file.isDirectory()) {
+        filesWritten++;
+      }
+      bytesWritten += includeFile(file, fixedFile, archiveOutputStream);
+      // Log progress every 30 seconds
+      if (Time.monotonicNow() - lastLoggedTime >= 30000) {
+        LOG.info("Transferred {} KB, #files {} to checkpoint tarball stream...",
+            bytesWritten / (1024), filesWritten);
+        lastLoggedTime = Time.monotonicNow();
+      }
     }
 
     if (completed) {
@@ -599,6 +647,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // Mark tarball completed.
       includeRatisSnapshotCompleteFlag(archiveOutputStream);
     }
+    LOG.info("Completed transfer of {} KB, #files {} " +
+            "to checkpoint tarball stream.{}",
+        bytesWritten / (1024), filesWritten, (completed) ?
+            " Checkpoint tarball is complete." : "");
   }
 
   @Nonnull
@@ -653,8 +705,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       locks = Stream.of(
           om.getKeyManager().getDeletingService(),
           om.getKeyManager().getSnapshotSstFilteringService(),
-          om.getMetadataManager().getStore().getRocksDBCheckpointDiffer(),
-          om.getKeyManager().getSnapshotDeletingService()
+          om.getKeyManager().getSnapshotDeletingService(),
+          om.getKeyManager().getSnapshotDirectoryService(),
+          om.getMetadataManager().getStore().getRocksDBCheckpointDiffer()
       )
           .filter(Objects::nonNull)
           .map(BootstrapStateHandler::getBootstrapStateLock)

@@ -56,7 +56,7 @@ scrape_configs:
 
 ## Grafana
 
-Once Prometheus is up and running, Grana can be configured to monitor and visualize Ozone metrics.
+Once Prometheus is up and running, Grafana can be configured to monitor and visualize Ozone metrics.
 
 ### Add Prometheus as a data source
 

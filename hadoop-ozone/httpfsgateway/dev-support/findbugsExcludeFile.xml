@@ -15,27 +15,4 @@
    limitations under the License.
 -->
 <FindBugsFilter>
-  <Match>
-    <Class name="org.apache.ozone.lib.service.instrumentation.InstrumentationService" />
-    <Method name="getToAdd" />
-    <Bug pattern="UL_UNRELEASED_LOCK" />
-  </Match>
-  <Match>
-    <Class name="org.apache.ozone.fs.http.server.HttpFSServerWebApp" />
-    <Method name="destroy" />
-    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.ozone.lib.servlet.ServerWebApp" />
-    <Field name="authority" />
-    <Bug pattern="IS2_INCONSISTENT_SYNC" />
-  </Match>
-  <Match>
-    <Class name="org.apache.ozone.lib.service.hadoop.FileSystemAccessService" />
-    <Method name="closeFileSystem" />
-    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
-  </Match>
-  <Match>
-    <Source name="~.*Test.*\.java" />
-  </Match>
 </FindBugsFilter>

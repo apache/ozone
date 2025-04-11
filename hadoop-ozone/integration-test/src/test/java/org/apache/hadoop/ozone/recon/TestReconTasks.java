@@ -1,26 +1,33 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
+import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -38,23 +45,15 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
-import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * Integration Tests for Recon's tasks.
@@ -137,7 +136,7 @@ public class TestReconTasks {
 
     // Make sure Recon's pipeline state is initialized.
     LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() >= 1));
+        () -> (!reconPipelineManager.getPipelines().isEmpty()));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
@@ -217,7 +216,7 @@ public class TestReconTasks {
 
     // Make sure Recon's pipeline state is initialized.
     LambdaTestUtils.await(60000, 1000,
-        () -> (reconPipelineManager.getPipelines().size() >= 1));
+        () -> (!reconPipelineManager.getPipelines().isEmpty()));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
@@ -255,7 +254,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 1;
@@ -293,7 +292,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 0 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 0;
@@ -322,7 +321,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 1;

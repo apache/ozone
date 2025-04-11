@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,11 +13,23 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT;
+import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
+
+import com.google.common.base.Preconditions;
+import com.google.protobuf.MessageLite;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -31,24 +42,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-
-import com.google.protobuf.MessageLite;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-
-import com.google.common.base.Preconditions;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT;
-import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
-
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
@@ -102,15 +98,14 @@ public final class DBStoreBuilder {
   private RocksDBConfiguration rocksDBConfiguration;
   // Flag to indicate if the RocksDB should be opened readonly.
   private boolean openReadOnly = false;
-  private int maxFSSnapshots = 0;
   private final DBProfile defaultCfProfile;
   private boolean enableCompactionDag;
   private boolean createCheckpointDirs = true;
+  private boolean enableRocksDbMetrics = true;
   // this is to track the total size of dbUpdates data since sequence
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
   private Integer maxNumberOfOpenFiles = null;
-  private String threadNamePrefix = "";
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -234,18 +229,14 @@ public final class DBStoreBuilder {
       }
 
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
-          registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
-          enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
-          configuration, threadNamePrefix);
+          registry.build(), openReadOnly, dbJmxBeanNameName, enableCompactionDag,
+          maxDbUpdatesSizeThreshold, createCheckpointDirs, configuration,
+          enableRocksDbMetrics);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
   }
 
-  public DBStoreBuilder setMaxFSSnapshots(int maxFSSnapshots) {
-    this.maxFSSnapshots = maxFSSnapshots;
-    return this;
-  }
   public DBStoreBuilder setName(String name) {
     dbname = name;
     return this;
@@ -306,6 +297,11 @@ public final class DBStoreBuilder {
     this.createCheckpointDirs = createCheckpointDirs;
     return this;
   }
+
+  public DBStoreBuilder setEnableRocksDbMetrics(boolean enableRocksDbMetrics) {
+    this.enableRocksDbMetrics = enableRocksDbMetrics;
+    return this;
+  }
   /**
    * Set the {@link ManagedDBOptions} and default
    * {@link ManagedColumnFamilyOptions} based on {@code prof}.
@@ -318,11 +314,6 @@ public final class DBStoreBuilder {
 
   public DBStoreBuilder setMaxNumberOfOpenFiles(Integer maxNumberOfOpenFiles) {
     this.maxNumberOfOpenFiles = maxNumberOfOpenFiles;
-    return this;
-  }
-
-  public DBStoreBuilder setThreadNamePrefix(String prefix) {
-    this.threadNamePrefix = prefix;
     return this;
   }
 
@@ -448,7 +439,7 @@ public final class DBStoreBuilder {
         columnFamilyDescriptors.add(tc.getDescriptor());
       }
 
-      if (columnFamilyDescriptors.size() > 0) {
+      if (!columnFamilyDescriptors.isEmpty()) {
         try {
           option = DBConfigFromFile.readFromFile(dbname,
               columnFamilyDescriptors);

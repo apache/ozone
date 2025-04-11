@@ -17,10 +17,10 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>2.0.0-SNAPSHOT</version>
+    <version>2.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-dist</artifactId>
-  <version>2.0.0-SNAPSHOT</version>
+  <version>2.1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone Distribution</name>
   <properties>
@@ -55,6 +55,10 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-tools</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-shell</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -147,6 +151,7 @@
         </executions>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-resources-plugin</artifactId>
         <executions>
           <execution>
@@ -197,17 +202,21 @@
               </resources>
             </configuration>
           </execution>
-        </executions>
-      </plugin>
-      <!-- there is no problem to have multiple versions of the jar files from
-      here. As the dependencies will be handled in a separated way with
-      separated classpath definitions-->
-      <plugin>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
           <execution>
-            <id>depcheck</id>
-            <phase />
+            <id>copy-smoketest-files</id>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <phase>compile</phase>
+            <configuration>
+              <outputDirectory>${basedir}/target/smoketest</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>src/main/smoketest</directory>
+                  <filtering>true</filtering>
+                </resource>
+              </resources>
+            </configuration>
           </execution>
         </executions>
       </plugin>
@@ -278,6 +287,7 @@
                     <artifactItem>
                       <groupId>org.apache.ozone</groupId>
                       <artifactId>hdds-test-utils</artifactId>
+                      <classifier>tests</classifier>
                     </artifactItem>
                   </artifactItems>
                 </configuration>

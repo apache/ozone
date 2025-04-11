@@ -1,190 +1,145 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.freon;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.server.RaftServer;
-import org.apache.ratis.server.raftlog.RaftLog;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.Iterator;
-
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.freon.TestOmBucketReadWriteFileOps.ParameterBuilder;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
+import org.apache.ozone.test.NonHATests;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test for OmBucketReadWriteKeyOps.
  */
-public class TestOmBucketReadWriteKeyOps {
+public abstract class TestOmBucketReadWriteKeyOps implements NonHATests.TestCase {
 
-  // TODO: Remove code duplication of TestOmBucketReadWriteKeyOps with
-  //  TestOmBucketReadWriteFileOps.
-  @TempDir
-  private Path path;
-  private OzoneConfiguration conf = null;
-  private MiniOzoneCluster cluster = null;
-  private ObjectStore store = null;
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmBucketReadWriteKeyOps.class);
   private OzoneClient client;
 
   @BeforeEach
-  public void setup() {
-    GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
+  void setup() throws Exception {
+    client = cluster().newClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
-  private void shutdown() {
+  @AfterEach
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
-  private void startCluster(boolean fsPathsEnabled) throws Exception {
-    conf = getOzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, fsPathsEnabled);
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.OBJECT_STORE.name());
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
-    cluster.waitForClusterToBeReady();
-    cluster.waitTobeOutOfSafeMode();
-
-    client = OzoneClientFactory.getRpcClient(conf);
-    store = client.getObjectStore();
-  }
-
-  private OzoneConfiguration getOzoneConfiguration() {
-    return new OzoneConfiguration();
+  static List<ParameterBuilder> parameters() {
+    return Arrays.asList(
+        new ParameterBuilder()
+            .setLength(16)
+            .setTotalThreadCount(10)
+            .setNumOfReadOperations(10)
+            .setNumOfWriteOperations(5)
+            .setReadThreadPercentage(80)
+            .setCountForRead(10)
+            .setCountForWrite(5),
+        new ParameterBuilder()
+            .setLength(32)
+            .setTotalThreadCount(10)
+            .setNumOfReadOperations(10)
+            .setNumOfWriteOperations(5)
+            .setReadThreadPercentage(70)
+            .setCountForRead(10)
+            .setCountForWrite(5),
+        new ParameterBuilder()
+            .setTotalThreadCount(15)
+            .setNumOfReadOperations(5)
+            .setNumOfWriteOperations(3)
+            .setCountForRead(5)
+            .setCountForWrite(3),
+        new ParameterBuilder()
+            .setTotalThreadCount(10)
+            .setNumOfReadOperations(5)
+            .setNumOfWriteOperations(3)
+            .setCountForRead(5)
+            .setCountForWrite(3)
+            .setDataSize("64B")
+            .setBufferSize(16),
+        new ParameterBuilder()
+            .setTotalThreadCount(10)
+            .setNumOfReadOperations(5)
+            .setNumOfWriteOperations(0)
+            .setCountForRead(5),
+        new ParameterBuilder()
+            .setTotalThreadCount(20)
+            .setNumOfReadOperations(0)
+            .setNumOfWriteOperations(5)
+            .setCountForRead(0)
+            .setCountForWrite(5)
+    );
   }
 
   @ParameterizedTest(name = "Filesystem Paths Enabled: {0}")
-  @ValueSource(booleans = {false, true})
-  public void testOmBucketReadWriteKeyOps(boolean fsPathsEnabled) throws Exception {
-    try {
-      startCluster(fsPathsEnabled);
-      FileOutputStream out = FileUtils.openOutputStream(new File(path.toString(),
-          "conf"));
-      cluster.getConf().writeXml(out);
-      out.getFD().sync();
-      out.close();
-
-      verifyFreonCommand(new ParameterBuilder().setTotalThreadCount(10)
-          .setNumOfReadOperations(10).setNumOfWriteOperations(5)
-          .setKeyCountForRead(10).setKeyCountForWrite(5));
-      verifyFreonCommand(
-          new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket1")
-              .setTotalThreadCount(10).setNumOfReadOperations(10)
-              .setNumOfWriteOperations(5).setKeyCountForRead(10)
-              .setKeyCountForWrite(5));
-      verifyFreonCommand(
-          new ParameterBuilder().setVolumeName("vol3").setBucketName("bucket1")
-              .setTotalThreadCount(15).setNumOfReadOperations(5)
-              .setNumOfWriteOperations(3).setKeyCountForRead(5)
-              .setKeyCountForWrite(3));
-      verifyFreonCommand(
-          new ParameterBuilder().setVolumeName("vol4").setBucketName("bucket1")
-              .setTotalThreadCount(10).setNumOfReadOperations(5)
-              .setNumOfWriteOperations(3).setKeyCountForRead(5)
-              .setKeyCountForWrite(3).setKeySize("64B")
-              .setBufferSize(16));
-      verifyFreonCommand(
-          new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
-              .setTotalThreadCount(10).setNumOfReadOperations(5)
-              .setNumOfWriteOperations(0).setKeyCountForRead(5));
-      verifyFreonCommand(
-          new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
-              .setTotalThreadCount(20).setNumOfReadOperations(0)
-              .setNumOfWriteOperations(5).setKeyCountForRead(0)
-              .setKeyCountForWrite(5));
-
-    } finally {
-      shutdown();
-    }
-  }
-
-  private void verifyFreonCommand(ParameterBuilder parameterBuilder)
-      throws IOException {
-    store.createVolume(parameterBuilder.volumeName);
-    OzoneVolume volume = store.getVolume(parameterBuilder.volumeName);
-    volume.createBucket(parameterBuilder.bucketName);
-    OzoneBucket bucket = volume.getBucket(parameterBuilder.bucketName);
-    String confPath = new File(path.toString(), "conf").getAbsolutePath();
+  @MethodSource("parameters")
+  void testOmBucketReadWriteKeyOps(ParameterBuilder parameterBuilder) throws Exception {
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
+        parameterBuilder.getVolumeName(),
+        parameterBuilder.getBucketName(),
+        parameterBuilder.getBucketArgs().setBucketLayout(BucketLayout.OBJECT_STORE).build()
+    );
 
     long startTime = System.currentTimeMillis();
-    new Freon().execute(
-        new String[]{"-conf", confPath, "obrwk",
-            "-v", parameterBuilder.volumeName,
-            "-b", parameterBuilder.bucketName,
-            "-k", String.valueOf(parameterBuilder.keyCountForRead),
-            "-w", String.valueOf(parameterBuilder.keyCountForWrite),
-            "-g", parameterBuilder.keySize,
-            "--buffer", String.valueOf(parameterBuilder.bufferSize),
-            "-l", String.valueOf(parameterBuilder.length),
-            "-c", String.valueOf(parameterBuilder.totalThreadCount),
-            "-T", String.valueOf(parameterBuilder.readThreadPercentage),
-            "-R", String.valueOf(parameterBuilder.numOfReadOperations),
-            "-W", String.valueOf(parameterBuilder.numOfWriteOperations),
-            "-n", String.valueOf(1)});
+    String om = cluster().getConf().get(OZONE_OM_ADDRESS_KEY);
+    new Freon().getCmd().execute(
+        "-D", OZONE_OM_ADDRESS_KEY + "=" + om,
+        "obrwk",
+        "-v", parameterBuilder.getVolumeName(),
+        "-b", parameterBuilder.getBucketName(),
+        "-k", String.valueOf(parameterBuilder.getCountForRead()),
+        "-w", String.valueOf(parameterBuilder.getCountForWrite()),
+        "-g", parameterBuilder.getDataSize(),
+        "--buffer", String.valueOf(parameterBuilder.getBufferSize()),
+        "-l", String.valueOf(parameterBuilder.getLength()),
+        "-c", String.valueOf(parameterBuilder.getTotalThreadCount()),
+        "-T", String.valueOf(parameterBuilder.getReadThreadPercentage()),
+        "-R", String.valueOf(parameterBuilder.getNumOfReadOperations()),
+        "-W", String.valueOf(parameterBuilder.getNumOfWriteOperations()),
+        "-n", String.valueOf(1));
     long totalTime = System.currentTimeMillis() - startTime;
     LOG.info("Total Execution Time: " + totalTime);
 
     LOG.info("Started verifying OM bucket read/write ops key generation...");
-    verifyKeyCreation(parameterBuilder.keyCountForRead, bucket, "/readPath/");
+    verifyKeyCreation(parameterBuilder.getCountForRead(), bucket, "/readPath/");
+    verifyKeyCreation(parameterBuilder.getExpectedWriteCount(), bucket, "/writePath/");
 
-    int readThreadCount = (parameterBuilder.readThreadPercentage *
-        parameterBuilder.totalThreadCount) / 100;
-    int writeThreadCount = parameterBuilder.totalThreadCount - readThreadCount;
-    verifyKeyCreation(writeThreadCount * parameterBuilder.keyCountForWrite *
-        parameterBuilder.numOfWriteOperations, bucket, "/writePath/");
-
-    verifyOMLockMetrics(cluster.getOzoneManager().getMetadataManager().getLock()
+    verifyOMLockMetrics(cluster().getOzoneManager().getMetadataManager().getLock()
         .getOMLockMetrics());
   }
 
@@ -235,76 +190,4 @@ public class TestOmBucketReadWriteKeyOps {
     assertThat(writeHeldSamples).isGreaterThan(0);
   }
 
-  private static class ParameterBuilder {
-
-    private String volumeName = "vol1";
-    private String bucketName = "bucket1";
-    private int keyCountForRead = 100;
-    private int keyCountForWrite = 10;
-    private String keySize = "256B";
-    private int bufferSize = 64;
-    private int length = 10;
-    private int totalThreadCount = 100;
-    private int readThreadPercentage = 90;
-    private int numOfReadOperations = 50;
-    private int numOfWriteOperations = 10;
-
-    private ParameterBuilder setVolumeName(String volumeNameParam) {
-      volumeName = volumeNameParam;
-      return this;
-    }
-
-    private ParameterBuilder setBucketName(String bucketNameParam) {
-      bucketName = bucketNameParam;
-      return this;
-    }
-
-    private ParameterBuilder setKeyCountForRead(int keyCountForReadParam) {
-      keyCountForRead = keyCountForReadParam;
-      return this;
-    }
-
-    private ParameterBuilder setKeyCountForWrite(int keyCountForWriteParam) {
-      keyCountForWrite = keyCountForWriteParam;
-      return this;
-    }
-
-    private ParameterBuilder setKeySize(String keySizeParam) {
-      keySize = keySizeParam;
-      return this;
-    }
-
-    private ParameterBuilder setBufferSize(int bufferSizeParam) {
-      bufferSize = bufferSizeParam;
-      return this;
-    }
-
-    private ParameterBuilder setLength(int lengthParam) {
-      length = lengthParam;
-      return this;
-    }
-
-    private ParameterBuilder setTotalThreadCount(int totalThreadCountParam) {
-      totalThreadCount = totalThreadCountParam;
-      return this;
-    }
-
-    private ParameterBuilder setReadThreadPercentage(
-        int readThreadPercentageParam) {
-      readThreadPercentage = readThreadPercentageParam;
-      return this;
-    }
-
-    private ParameterBuilder setNumOfReadOperations(
-        int numOfReadOperationsParam) {
-      numOfReadOperations = numOfReadOperationsParam;
-      return this;
-    }
-
-    private ParameterBuilder setNumOfWriteOperations(
-        int numOfWriteOperationsParam) {
-      numOfWriteOperations = numOfWriteOperationsParam;
-      return this;
-    }
-  }
 }

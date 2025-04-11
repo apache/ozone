@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,11 +13,22 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.google.protobuf.ByteString;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -29,9 +39,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
@@ -39,23 +50,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for RocksDBTable Store.
@@ -71,7 +70,8 @@ public class TestRDBTableStore {
           "First", "Second", "Third",
           "Fourth", "Fifth",
           "Sixth", "Seventh",
-          "Eighth", "Ninth");
+          "Eighth", "Ninth",
+          "Ten");
   private final List<String> prefixedFamilies = Arrays.asList(
       "PrefixFirst",
       "PrefixTwo", "PrefixThree",
@@ -217,13 +217,13 @@ public class TestRDBTableStore {
     try (Table testTable = rdbStore.getTable("Ninth")) {
 
       // Write keys to the table
-      for (int x = 0; x < keys.size(); x++) {
-        testTable.put(keys.get(x), val);
+      for (byte[] key : keys) {
+        testTable.put(key, val);
       }
 
       // All keys should exist at this point
-      for (int x = 0; x < keys.size(); x++) {
-        assertNotNull(testTable.get(keys.get(x)));
+      for (byte[] key : keys) {
+        assertNotNull(testTable.get(key));
       }
 
       // Delete a range of keys: [10th, 20th), zero-indexed
@@ -304,6 +304,19 @@ public class TestRDBTableStore {
 
       //then
       assertNull(testTable.get(key));
+    }
+  }
+
+  @Test
+  public void putGetTypedTableCodec() throws Exception {
+    try (Table<String, String> testTable = rdbStore.getTable("Ten", String.class, String.class)) {
+      testTable.put("test1", "123");
+      assertFalse(testTable.isEmpty());
+      assertEquals("123", testTable.get("test1"));
+    }
+    try (Table<String, ByteString> testTable = rdbStore.getTable("Ten",
+        StringCodec.get(), ByteStringCodec.get(), TableCache.CacheType.NO_CACHE)) {
+      assertEquals("123", testTable.get("test1").toStringUtf8());
     }
   }
 
@@ -600,8 +613,11 @@ public class TestRDBTableStore {
     try (Table.KeyValueIterator<String, String> i = table.iterator(prefix)) {
       int keyCount = 0;
       for (; i.hasNext(); keyCount++) {
+        Table.KeyValue<String, String> entry = i.next();
         assertEquals(prefix,
-            i.next().getKey().substring(0, PREFIX_LENGTH));
+            entry.getKey().substring(0, PREFIX_LENGTH));
+        assertEquals(entry.getValue().getBytes(StandardCharsets.UTF_8).length,
+            entry.getRawSize());
       }
       assertEquals(expectedCount, keyCount);
 

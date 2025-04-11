@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test read-replicas in case of one datanode is stale
+Documentation       Test checksums in case of one datanode is stale
 Library             OperatingSystem
 Resource            ../lib/os.robot
 Resource            ozone-debug.robot
@@ -27,12 +27,12 @@ ${TESTFILE}         testfile
 ${STALE_DATANODE}   ozone_datanode_1.ozone_default
 
 *** Test Cases ***
-Test ozone debug read-replicas with one datanode STALE
-    ${directory} =                 Execute read-replicas CLI tool
+Test ozone debug checksums with one datanode STALE
+    ${directory} =                 Execute replicas verify checksums CLI tool
     Set Test Variable    ${DIR}         ${directory}
 
     ${count_files} =               Count Files In Directory    ${directory}
-    Should Be Equal As Integers    ${count_files}     7
+    Should Be Equal As Integers    ${count_files}     1
 
     ${json} =                      Read Replicas Manifest
     ${md5sum} =                    Execute     md5sum ${TEMP_DIR}/${TESTFILE} | awk '{print $1}'
@@ -42,7 +42,5 @@ Test ozone debug read-replicas with one datanode STALE
 
         IF    '${datanode}' == '${STALE_DATANODE}'
             Verify Stale Replica     ${json}    ${replica}
-        ELSE
-            Verify Healthy Replica   ${json}    ${replica}    ${md5sum}
         END
     END

@@ -1,50 +1,72 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsInfo;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
-
 
 /**
  * This class is used to track Volume Info stats for each HDDS Volume.
  */
 @Metrics(about = "Ozone Volume Information Metrics",
     context = OzoneConsts.OZONE)
-public class VolumeInfoMetrics {
+public class VolumeInfoMetrics implements MetricsSource {
 
-  private String metricsSourceName = VolumeInfoMetrics.class.getSimpleName();
+  private static final String SOURCE_BASENAME =
+      VolumeInfoMetrics.class.getSimpleName();
+
+  private static final MetricsInfo CAPACITY =
+      Interns.info("Capacity", "Capacity");
+  private static final MetricsInfo AVAILABLE =
+      Interns.info("Available", "Available Space");
+  private static final MetricsInfo USED =
+      Interns.info("Used", "Used Space");
+  private static final MetricsInfo RESERVED =
+      Interns.info("Reserved", "Reserved Space");
+  private static final MetricsInfo TOTAL_CAPACITY =
+      Interns.info("TotalCapacity", "Total Capacity");
+
+  private final MetricsRegistry registry;
+  private final String metricsSourceName;
   private final HddsVolume volume;
   @Metric("Returns the RocksDB compact times of the Volume")
   private MutableRate dbCompactLatency;
-  private long containers;
 
   /**
    * @param identifier Typically, path to volume root. E.g. /data/hdds
    */
-  public VolumeInfoMetrics(String identifier, HddsVolume ref) {
-    this.metricsSourceName += '-' + identifier;
-    this.volume = ref;
+  public VolumeInfoMetrics(String identifier, HddsVolume volume) {
+    this.volume = volume;
+
+    metricsSourceName = SOURCE_BASENAME + '-' + identifier;
+    registry = new MetricsRegistry(metricsSourceName);
+
     init();
   }
 
@@ -88,63 +110,6 @@ public class VolumeInfoMetrics {
     return volume.getType().name();
   }
 
-  public String getMetricsSourceName() {
-    return metricsSourceName;
-  }
-
-  /**
-   * Test conservative avail space.
-   * |----used----|   (avail)   |++++++++reserved++++++++|
-   * |<------- capacity ------->|
-   * |<------------------- Total capacity -------------->|
-   * A) avail = capacity - used
-   * B) capacity = used + avail
-   * C) Total capacity = used + avail + reserved
-   */
-
-  /**
-   * Return the Storage type for the Volume.
-   */
-  @Metric("Returns the Used space")
-  public long getUsed() {
-    return volume.getVolumeInfo().map(VolumeInfo::getScmUsed)
-            .orElse(0L);
-  }
-
-  /**
-   * Return the Total Available capacity of the Volume.
-   */
-  @Metric("Returns the Available space")
-  public long getAvailable() {
-    return volume.getVolumeInfo().map(VolumeInfo::getAvailable)
-            .orElse(0L);
-  }
-
-  /**
-   * Return the Total Reserved of the Volume.
-   */
-  @Metric("Fetches the Reserved Space")
-  public long getReserved() {
-    return volume.getVolumeInfo().map(VolumeInfo::getReservedInBytes)
-            .orElse(0L);
-  }
-
-  /**
-   * Return the Total capacity of the Volume.
-   */
-  @Metric("Returns the Capacity of the Volume")
-  public long getCapacity() {
-    return getUsed() + getAvailable();
-  }
-
-  /**
-   * Return the Total capacity of the Volume.
-   */
-  @Metric("Returns the Total Capacity of the Volume")
-  public long getTotalCapacity() {
-    return (getUsed() + getAvailable() + getReserved());
-  }
-
   @Metric("Returns the Committed bytes of the Volume")
   public long getCommitted() {
     return volume.getCommittedBytes();
@@ -160,5 +125,21 @@ public class VolumeInfoMetrics {
   @Metric("Returns the Container Count of the Volume")
   public long getContainers() {
     return volume.getContainers();
+  }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    MetricsRecordBuilder builder = collector.addRecord(metricsSourceName);
+    registry.snapshot(builder, all);
+    volume.getVolumeUsage().ifPresent(volumeUsage -> {
+      SpaceUsageSource usage = volumeUsage.getCurrentUsage();
+      long reserved = volumeUsage.getReservedInBytes();
+      builder
+          .addGauge(CAPACITY, usage.getCapacity())
+          .addGauge(AVAILABLE, usage.getAvailable())
+          .addGauge(USED, usage.getUsedSpace())
+          .addGauge(RESERVED, reserved)
+          .addGauge(TOTAL_CAPACITY, usage.getCapacity() + reserved);
+    });
   }
 }

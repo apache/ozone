@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,16 +16,6 @@
  */
 
 package org.apache.hadoop.hdds.scm.ha;
-
-import org.apache.hadoop.hdds.conf.ConfigurationException;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.OptionalInt;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
@@ -48,21 +37,33 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_NODEID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.OptionalInt;
+import net.jcip.annotations.Immutable;
+import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Class which builds SCM Node Information.
  *
  * This class is used by SCM clients like OzoneManager, Client, Admin
  * commands to figure out SCM Node Information to make contact to SCM.
  */
+@Immutable
 public class SCMNodeInfo {
 
   private static final Logger LOG = LoggerFactory.getLogger(SCMNodeInfo.class);
-  private String serviceId;
-  private String nodeId;
-  private String blockClientAddress;
-  private String scmClientAddress;
-  private String scmSecurityAddress;
-  private String scmDatanodeAddress;
+  private final String serviceId;
+  private final String nodeId;
+  private final String blockClientAddress;
+  private final String scmClientAddress;
+  private final String scmSecurityAddress;
+  private final String scmDatanodeAddress;
 
   /**
    * Build SCM Node information from configuration.
@@ -74,11 +75,11 @@ public class SCMNodeInfo {
     // If service Id is not defined, fall back to non-HA config.
 
     List<SCMNodeInfo> scmNodeInfoList = new ArrayList<>();
-    String scmServiceId = SCMHAUtils.getScmServiceId(conf);
+    String scmServiceId = HddsUtils.getScmServiceId(conf);
     if (scmServiceId != null) {
       ArrayList< String > scmNodeIds = new ArrayList<>(
-          SCMHAUtils.getSCMNodeIds(conf, scmServiceId));
-      if (scmNodeIds.size() == 0) {
+          HddsUtils.getSCMNodeIds(conf, scmServiceId));
+      if (scmNodeIds.isEmpty()) {
         throw new ConfigurationException(
             String.format("Configuration does not have any value set for %s " +
                     "for the SCM serviceId %s. List of SCM Node ID's should " +

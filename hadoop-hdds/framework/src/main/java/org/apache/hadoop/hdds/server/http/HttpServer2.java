@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,19 +14,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.server.http;
 
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
-import javax.servlet.http.HttpServletResponse;
+import static org.apache.hadoop.hdds.server.http.ServletElementsFactory.createFilterHolder;
+import static org.apache.hadoop.hdds.server.http.ServletElementsFactory.createFilterMapping;
+import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilterConfigMap;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -50,7 +47,17 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletRequestWrapper;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.ConfServlet;
@@ -79,11 +86,6 @@ import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.Connector;
@@ -115,10 +117,6 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.server.http.ServletElementsFactory.createFilterHolder;
-import static org.apache.hadoop.hdds.server.http.ServletElementsFactory.createFilterMapping;
-import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilterConfigMap;
 
 /**
  * Create a Jetty embedded server to answer http requests. The primary goal is
@@ -896,19 +894,18 @@ public final class HttpServer2 implements FilterContainer {
     // Jetty doesn't like the same path spec mapping to different servlets, so
     // if there's already a mapping for this pathSpec, remove it and assume that
     // the newest one is the one we want
-    final ServletMapping[] servletMappings =
-        webAppContext.getServletHandler().getServletMappings();
-    for (int i = 0; i < servletMappings.length; i++) {
-      if (servletMappings[i].containsPathSpec(pathSpec)) {
+    final ServletMapping[] servletMappings = webAppContext.getServletHandler().getServletMappings();
+
+    for (ServletMapping servletMapping : servletMappings) {
+      if (servletMapping.containsPathSpec(pathSpec)) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Found existing " + servletMappings[i].getServletName() +
+          LOG.debug("Found existing " + servletMapping.getServletName() +
               " servlet at path " + pathSpec + "; will replace mapping" +
               " with " + holder.getName() + " servlet");
         }
-        ServletMapping[] newServletMappings =
-            ArrayUtil.removeFromArray(servletMappings, servletMappings[i]);
-        webAppContext.getServletHandler()
-            .setServletMappings(newServletMappings);
+
+        ServletMapping[] newServletMappings = ArrayUtil.removeFromArray(servletMappings, servletMapping);
+        webAppContext.getServletHandler().setServletMappings(newServletMappings);
         break;
       }
     }
@@ -918,20 +915,23 @@ public final class HttpServer2 implements FilterContainer {
     // Kerberos replay error.
     FilterMapping[] filterMappings = webAppContext.getServletHandler().
         getFilterMappings();
-    for (int i = 0; i < filterMappings.length; i++) {
-      if (filterMappings[i].getPathSpecs() == null) {
-        LOG.debug("Skip checking {} filterMappings {} without a path spec.",
-            filterMappings[i].getFilterName(), filterMappings[i]);
+    for (FilterMapping filterMapping : filterMappings) {
+      if (filterMapping.getPathSpecs() == null) {
+        LOG.debug(
+            "Skip checking {} filterMappings {} without a path spec.",
+            filterMapping.getFilterName(),
+            filterMapping
+        );
         continue;
       }
-      int oldPathSpecsLen = filterMappings[i].getPathSpecs().length;
-      String[] newPathSpecs =
-          ArrayUtil.removeFromArray(filterMappings[i].getPathSpecs(), pathSpec);
+
+      int oldPathSpecsLen = filterMapping.getPathSpecs().length;
+      String[] newPathSpecs = ArrayUtil.removeFromArray(filterMapping.getPathSpecs(), pathSpec);
+
       if (newPathSpecs.length == 0) {
-        webAppContext.getServletHandler().setFilterMappings(
-            ArrayUtil.removeFromArray(filterMappings, filterMappings[i]));
+        webAppContext.getServletHandler().setFilterMappings(ArrayUtil.removeFromArray(filterMappings, filterMapping));
       } else if (newPathSpecs.length != oldPathSpecsLen) {
-        filterMappings[i].setPathSpecs(newPathSpecs);
+        filterMapping.setPathSpecs(newPathSpecs);
       }
     }
 
@@ -968,15 +968,15 @@ public final class HttpServer2 implements FilterContainer {
     sh.setInitParameters(params);
     final ServletMapping[] servletMappings =
         webAppContext.getServletHandler().getServletMappings();
-    for (int i = 0; i < servletMappings.length; i++) {
-      if (servletMappings[i].containsPathSpec(pathSpec)) {
+    for (ServletMapping servletMapping : servletMappings) {
+      if (servletMapping.containsPathSpec(pathSpec)) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Found existing " + servletMappings[i].getServletName() +
+          LOG.debug("Found existing " + servletMapping.getServletName() +
               " servlet at path " + pathSpec + "; will replace mapping" +
               " with " + sh.getName() + " servlet");
         }
-        ServletMapping[] newServletMappings =
-            ArrayUtil.removeFromArray(servletMappings, servletMappings[i]);
+
+        ServletMapping[] newServletMappings = ArrayUtil.removeFromArray(servletMappings, servletMapping);
         webAppContext.getServletHandler()
             .setServletMappings(newServletMappings);
         break;

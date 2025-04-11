@@ -1,22 +1,34 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.cli;
 
+import static org.apache.hadoop.hdds.util.DurationUtil.getPrettyDuration;
+import static org.apache.hadoop.util.StringUtils.byteDesc;
+
+import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
@@ -27,18 +39,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
-import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.util.DurationUtil.getPrettyDuration;
-import static org.apache.hadoop.util.StringUtils.byteDesc;
-
 /**
  * Handler to query status of container balancer.
  */
@@ -48,10 +48,6 @@ import static org.apache.hadoop.util.StringUtils.byteDesc;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
-
-  @CommandLine.Option(names = {"-v", "--verbose"},
-          description = "Verbose output. Show current iteration info.")
-  private boolean verbose;
 
   @CommandLine.Option(names = {"-H", "--history"},
       description = "Verbose output with history. Show current iteration info and history of iterations. " +
@@ -69,8 +65,10 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
           LocalDateTime.ofInstant(startedAtInstant, ZoneId.systemDefault());
       System.out.println("ContainerBalancer is Running.");
 
-      if (verbose) {
-        System.out.printf("Started at: %s %s%n", dateTime.toLocalDate(), dateTime.toLocalTime());
+      if (isVerbose()) {
+        System.out.printf("Started at: %s %s%n",
+            dateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
+            dateTime.toLocalTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
         Duration balancingDuration = Duration.between(startedAtInstant, OffsetDateTime.now());
         System.out.printf("Balancing duration: %s%n%n", getPrettyDuration(balancingDuration));
         System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));

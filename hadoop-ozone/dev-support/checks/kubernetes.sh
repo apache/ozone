@@ -24,28 +24,6 @@ export KUBECONFIG
 source "${DIR}/_lib.sh"
 source "${DIR}/install/flekszible.sh"
 
-# TODO these functions will be removed in HDDS-12099
-install_virtualenv() {
-  _install_tool virtualenv
-}
-
-_install_virtualenv() {
-  sudo pip3 install virtualenv
-}
-
-install_robot() {
-  _install_tool robot venv/bin
-}
-
-_install_robot() {
-  virtualenv venv
-  source venv/bin/activate
-  pip install robotframework
-}
-
-install_virtualenv
-install_robot
-
 if [[ "$(uname -s)" = "Darwin" ]]; then
   echo "Skip installing k3s, not supported on Mac.  Make sure a working Kubernetes cluster is available." >&2
 else
@@ -62,6 +40,8 @@ if [ ! -d "$DIST_DIR" ]; then
     echo "Distribution dir is missing. Doing a full build"
     "$DIR/build.sh" -Pcoverage
 fi
+
+create_aws_dir
 
 mkdir -p "$REPORT_DIR"
 

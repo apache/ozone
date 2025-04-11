@@ -1,22 +1,43 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.node;
 
+import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -25,8 +46,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -40,37 +61,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import java.util.UUID;
-import java.util.Arrays;
-import java.util.ArrayList;
-import java.util.Set;
-import java.util.HashSet;
-
-import static java.util.Collections.singletonList;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 /**
  * Unit tests for the decommission manager.
  */
-
 public class TestNodeDecommissionManager {
 
   private NodeDecommissionManager decom;
   private StorageContainerManager scm;
-  private NodeManager nodeManager;
+  private SCMNodeManager nodeManager;
   private ContainerManager containerManager;
   private OzoneConfiguration conf;
   private static int id = 1;
@@ -80,13 +78,17 @@ public class TestNodeDecommissionManager {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     scm = HddsTestUtils.getScm(conf);
-    nodeManager = scm.getScmNodeManager();
+    nodeManager = (SCMNodeManager)scm.getScmNodeManager();
     containerManager = mock(ContainerManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
     when(containerManager.allocateContainer(any(ReplicationConfig.class), anyString()))
         .thenAnswer(invocation -> createMockContainer((ReplicationConfig)invocation.getArguments()[0],
             (String) invocation.getArguments()[1]));
+  }
+
+  void setContainers(DatanodeDetails datanode, Set<ContainerID> containers) throws NodeNotFoundException {
+    ScmNodeTestUtil.setContainers(nodeManager, datanode, containers);
   }
 
   private ContainerInfo createMockContainer(ReplicationConfig rep, String owner) {
@@ -428,7 +430,7 @@ public class TestNodeDecommissionManager {
     }
 
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
@@ -482,7 +484,7 @@ public class TestNodeDecommissionManager {
     }
 
     for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
-      nodeManager.setContainers(dn, idsEC);
+      setContainers(dn, idsEC);
     }
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
@@ -531,10 +533,10 @@ public class TestNodeDecommissionManager {
         });
 
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
-      nodeManager.setContainers(dn, idsEC);
+      setContainers(dn, idsEC);
     }
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
@@ -575,7 +577,7 @@ public class TestNodeDecommissionManager {
     }
 
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
 
     // decommission one node successfully
@@ -610,7 +612,7 @@ public class TestNodeDecommissionManager {
       idsRatis.add(container.containerID());
     }
 
-    nodeManager = mock(NodeManager.class);
+    nodeManager = mock(SCMNodeManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
     when(containerManager.getContainer(any(ContainerID.class)))
@@ -671,7 +673,7 @@ public class TestNodeDecommissionManager {
       idsRatis.add(container.containerID());
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
 
     decom.setMaintenanceConfigs(2, 1); // default config
@@ -771,7 +773,7 @@ public class TestNodeDecommissionManager {
       idsEC.add(container.containerID());
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
-      nodeManager.setContainers(dn, idsEC);
+      setContainers(dn, idsEC);
     }
 
     decom.setMaintenanceConfigs(2, 1); // default config
@@ -854,10 +856,10 @@ public class TestNodeDecommissionManager {
               (ContainerID)invocation.getArguments()[0]);
         });
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
-      nodeManager.setContainers(dn, idsEC);
+      setContainers(dn, idsEC);
     }
 
     decom.setMaintenanceConfigs(2, 1); // default config
@@ -928,7 +930,7 @@ public class TestNodeDecommissionManager {
       idsRatis.add(container.containerID());
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
-      nodeManager.setContainers(dn, idsRatis);
+      setContainers(dn, idsRatis);
     }
 
     // put 2 nodes into maintenance successfully
@@ -968,7 +970,7 @@ public class TestNodeDecommissionManager {
       idsRatis.add(container.containerID());
     }
 
-    nodeManager = mock(NodeManager.class);
+    nodeManager = mock(SCMNodeManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
     when(containerManager.getContainer(any(ContainerID.class)))
@@ -1042,11 +1044,11 @@ public class TestNodeDecommissionManager {
 
   private NodeStatus getNodeOpState(DatanodeDetails dn, List<DatanodeDetails> dns) throws NodeNotFoundException {
     if (dn.equals(dns.get(0))) {
-      throw new NodeNotFoundException();
+      throw new NodeNotFoundException(dn.getID());
     }
     for (DatanodeDetails datanode : dns) {
       if (datanode.equals(dn)) {
-        return new NodeStatus(datanode.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
+        return NodeStatus.valueOf(datanode.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
       }
     }
     return null;

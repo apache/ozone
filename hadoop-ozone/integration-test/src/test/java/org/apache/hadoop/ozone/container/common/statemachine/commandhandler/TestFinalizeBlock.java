@@ -1,23 +1,46 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import jakarta.annotation.Nonnull;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -26,7 +49,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -41,7 +63,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -51,35 +72,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Stream;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.params.provider.Arguments.arguments;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests FinalizeBlock.
@@ -94,16 +87,7 @@ public class TestFinalizeBlock {
   private static String volumeName = UUID.randomUUID().toString();
   private static String bucketName = UUID.randomUUID().toString();
 
-  public static Stream<Arguments> dnLayoutParams() {
-    return Stream.of(
-        arguments(false, FILE_PER_CHUNK),
-        arguments(true, FILE_PER_CHUNK),
-        arguments(false, FILE_PER_BLOCK),
-        arguments(true, FILE_PER_BLOCK)
-    );
-  }
-
-  private void setup(boolean enableSchemaV3, ContainerLayoutVersion version) throws Exception {
+  private void setup(boolean enableSchemaV3) throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
@@ -116,7 +100,6 @@ public class TestFinalizeBlock {
     conf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setBoolean(CONTAINER_SCHEMA_V3_ENABLED, enableSchemaV3);
-    conf.setEnum(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY, version);
 
     DatanodeConfiguration datanodeConfiguration = conf.getObject(
         DatanodeConfiguration.class);
@@ -150,10 +133,9 @@ public class TestFinalizeBlock {
   }
 
   @ParameterizedTest
-  @MethodSource("dnLayoutParams")
-  public void testFinalizeBlock(boolean enableSchemaV3, ContainerLayoutVersion version)
-      throws Exception {
-    setup(enableSchemaV3, version);
+  @ValueSource(booleans = {false, true})
+  public void testFinalizeBlock(boolean enableSchemaV3) throws Exception {
+    setup(enableSchemaV3);
     String keyName = UUID.randomUUID().toString();
     // create key
     createKey(keyName);
@@ -192,15 +174,11 @@ public class TestFinalizeBlock {
     ContainerProtos.ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request);
 
-    assertTrue(response.getFinalizeBlock()
-        .getBlockData().getBlockID().getLocalID()
-        == omKeyLocationInfoGroupList.get(0)
-        .getLocationList().get(0).getLocalID());
+    assertEquals(response.getFinalizeBlock().getBlockData().getBlockID().getLocalID(),
+        omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID());
 
-    assertTrue(((KeyValueContainerData)getContainerfromDN(
-        cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData())
-        .getFinalizedBlockSet().size() == 1);
+    assertEquals(1, ((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
+        containerId.getId()).getContainerData()).getFinalizedBlockSet().size());
 
     testRejectPutAndWriteChunkAfterFinalizeBlock(containerId, pipeline, xceiverClient, omKeyLocationInfoGroupList);
     testFinalizeBlockReloadAfterDNRestart(containerId);
@@ -215,10 +193,8 @@ public class TestFinalizeBlock {
     }
 
     // After restart DN, finalizeBlock should be loaded into memory
-    assertTrue(((KeyValueContainerData)
-        getContainerfromDN(cluster.getHddsDatanodes().get(0),
-            containerId.getId()).getContainerData())
-        .getFinalizedBlockSet().size() == 1);
+    assertEquals(1, ((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
+            containerId.getId()).getContainerData()).getFinalizedBlockSet().size());
   }
 
   private void testFinalizeBlockClearAfterCloseContainer(ContainerID containerId)
@@ -228,8 +204,8 @@ public class TestFinalizeBlock {
 
     // Finalize Block should be cleared from container data.
     GenericTestUtils.waitFor(() -> (
-        (KeyValueContainerData) getContainerfromDN(cluster.getHddsDatanodes().get(0),
-            containerId.getId()).getContainerData()).getFinalizedBlockSet().size() == 0,
+            (KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
+                containerId.getId()).getContainerData()).getFinalizedBlockSet().isEmpty(),
         100, 10 * 1000);
     try {
       // Restart DataNode
@@ -242,7 +218,7 @@ public class TestFinalizeBlock {
     assertTrue(((KeyValueContainerData)getContainerfromDN(
         cluster.getHddsDatanodes().get(0),
         containerId.getId()).getContainerData())
-        .getFinalizedBlockSet().size() == 0);
+        .getFinalizedBlockSet().isEmpty());
   }
 
   private void testRejectPutAndWriteChunkAfterFinalizeBlock(ContainerID containerId, Pipeline pipeline,

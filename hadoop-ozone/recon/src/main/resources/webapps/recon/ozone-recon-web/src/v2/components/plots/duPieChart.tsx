@@ -203,7 +203,7 @@ const DUPieChart: React.FC<PieChartProps> = ({
     <EChart
       loading={loading}
       option={eChartsOptions}
-      style={{ flex: '0 1 90%', height: '50vh' }}
+      style={{ flex: '1 3 80%', height: '50vh' }}
       eventHandler={{name: 'legendselectchanged', handler: handleLegendChange}}/>
   );
 }

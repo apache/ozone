@@ -1,22 +1,56 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
+import static org.apache.hadoop.hdds.scm.XceiverClientShortCircuit.vintPrefixed;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.google.common.collect.Maps;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.InetSocketAddress;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -56,39 +90,6 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.EOFException;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.net.ConnectException;
-import java.net.InetSocketAddress;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
-import static org.apache.hadoop.hdds.scm.XceiverClientShortCircuit.vintPrefixed;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests the XceiverServerDomainSocket class.
@@ -697,7 +698,7 @@ public class TestXceiverServerDomainSocket {
       assertEquals(ContainerProtos.Type.ReadChunk.getNumber(), ret);
       ContainerProtos.ContainerCommandResponseProto responseProto =
           ContainerProtos.ContainerCommandResponseProto.parseFrom(vintPrefixed(inputStream));
-      assertTrue(responseProto.getResult() == ContainerProtos.Result.UNSUPPORTED_REQUEST);
+      assertSame(ContainerProtos.Result.UNSUPPORTED_REQUEST, responseProto.getResult());
     } finally {
       factory.close();
       IOUtils.closeQuietly(sock);
@@ -706,21 +707,6 @@ public class TestXceiverServerDomainSocket {
   }
 
   private ContainerProtos.ContainerCommandRequestProto getBlockRequest() {
-    long value = 1;
-    String datanodeUUID = UUID.randomUUID().toString();
-    ContainerProtos.GetBlockRequestProto.Builder getBlock =
-        ContainerProtos.GetBlockRequestProto.newBuilder()
-            .setBlockID(new BlockID(value, value).getDatanodeBlockIDProtobuf())
-            .setRequestShortCircuitAccess(true);
-    return ContainerProtos.ContainerCommandRequestProto.newBuilder()
-        .setCmdType(GetBlock)
-        .setContainerID(value)
-        .setGetBlock(getBlock)
-        .setDatanodeUuid(datanodeUUID)
-        .build();
-  }
-
-  private ContainerProtos.ContainerCommandRequestProto getReadChunkRequest() {
     long value = 1;
     String datanodeUUID = UUID.randomUUID().toString();
     ContainerProtos.GetBlockRequestProto.Builder getBlock =
@@ -746,8 +732,8 @@ public class TestXceiverServerDomainSocket {
     HddsVolume dataVolume = (HddsVolume) volumeSet.getVolumesList().get(0);
     dataVolume.format(cID);
     dataVolume.setDbParentDir(volume);
-    assertTrue(dataVolume.getDbParentDir() != null);
-    ContainerSet containerSet = new ContainerSet(1000);
+    assertNotNull(dataVolume.getDbParentDir());
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
 
     // create HddsDispatcher
     StateContext context = ContainerTestUtils.getMockContext(datanodeDetails, conf);
