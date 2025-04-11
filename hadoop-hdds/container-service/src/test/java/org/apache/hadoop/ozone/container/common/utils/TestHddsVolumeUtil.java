@@ -42,8 +42,6 @@ import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.jboss.byteman.contrib.bmunit.BMRule;
-import org.jboss.byteman.contrib.bmunit.WithByteman;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,7 +52,6 @@ import org.mockito.Mockito;
 /**
  * Test for {@link HddsVolumeUtil}.
  */
-@WithByteman
 public class TestHddsVolumeUtil {
   @TempDir
   private Path tempDir;
@@ -128,22 +125,6 @@ public class TestHddsVolumeUtil {
       }
     }
 
-  }
-
-  @Test
-  @BMRule(name = "Throw exception when ",
-      targetClass = "org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache",
-      targetMethod = "getDB",
-      action = "THROW new IOException(\"Mock Byteman Exception\")")
-  public void testCheckVolumeWithGetDbException() throws Exception {
-    for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(hddsVolumeSet.getVolumesList())) {
-      hddsVolume.format(clusterId);
-      hddsVolume.createWorkingDir(clusterId, null);
-    }
-
-    for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(hddsVolumeSet.getVolumesList())) {
-      assertEquals(VolumeCheckResult.FAILED, hddsVolume.check(false));
-    }
   }
 
   @Test

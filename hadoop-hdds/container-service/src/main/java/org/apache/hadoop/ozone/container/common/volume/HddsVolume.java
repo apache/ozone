@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -277,7 +278,8 @@ public class HddsVolume extends StorageVolume {
       return VolumeCheckResult.FAILED;
     }
 
-    if (!getDatanodeConfig().getContainerSchemaV3Enabled()) {
+    if (result != VolumeCheckResult.HEALTHY ||
+        !getDatanodeConfig().getContainerSchemaV3Enabled() || !isDbLoaded()) {
       return result;
     }
 
@@ -292,7 +294,9 @@ public class HddsVolume extends StorageVolume {
     DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
     Preconditions.checkNotNull(cache);
     try {
-      cache.getDB(String.valueOf(dbFile), getConf());
+      RawDB db = cache.getDB(String.valueOf(dbFile), getConf());
+      RDBStore store = (RDBStore)db.getStore().getStore();
+      store.getDb().getManagedRocksDb().get().getLiveFiles();
     } catch (IOException e) {
       LOG.error("Could not open Volume DB located at {}", dbFile, e);
       return VolumeCheckResult.FAILED;

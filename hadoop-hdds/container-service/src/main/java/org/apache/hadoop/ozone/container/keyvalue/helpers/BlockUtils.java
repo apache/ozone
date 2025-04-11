@@ -136,7 +136,6 @@ public final class BlockUtils {
             containerData.getSchemaVersion(), conf);
       }
     } catch (IOException ex) {
-//      TODO: does the volume scanner get triggered twice? here and upon receiving the exception?
       onFailure(containerData.getVolume());
       String message = String.format("Error opening DB. Container:%s " +
           "ContainerPath:%s", containerData.getContainerID(), containerData
