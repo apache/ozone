@@ -57,7 +57,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -221,7 +220,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
       .createUserForTesting(USER1,  new String[] {"usergroup"});
   // Non-privileged OFS instance
   private RootedOzoneFileSystem userOfs;
-  private SecureRandom random;
 
   @BeforeAll
   void initClusterAndEnv() throws IOException, InterruptedException, TimeoutException {
@@ -274,7 +272,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     userOfs = UGI_USER1.doAs(
         (PrivilegedExceptionAction<RootedOzoneFileSystem>)()
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
-    random = new SecureRandom();
   }
 
   protected OMMetrics getOMMetrics() {
@@ -343,10 +340,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
     String key = "object-dir/object-name1";
 
     // write some test data into bucket
-    byte[] bytes = new byte[1];
-    random.nextBytes(bytes);
     TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName), key,
-        new ECReplicationConfig("RS-3-2-1024k"), bytes);
+        new ECReplicationConfig("RS-3-2-1024k"), RandomUtils.nextBytes(1));
 
     List<String> dirs = Arrays.asList(volumeName, bucketName, "object-dir",
             "object-name1");
@@ -1494,10 +1489,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
       // add key in source bucket
       final String key = "object-dir/object-name1";
-      byte[] bytes = new byte[1];
-      random.nextBytes(bytes);
       TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
-          key, bytes);
+          key, RandomUtils.nextBytes(1));
       assertEquals(objectStore.getVolume(srcVolume)
           .getBucket(srcBucket).getKey(key).getName(), key);
 
@@ -1544,10 +1537,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
       // add key to srcBucket
       final String key = "object-dir/object-name1";
-      byte[] bytes = new byte[1];
-      random.nextBytes(bytes);
       TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
-          key, bytes);
+          key, RandomUtils.nextBytes(1));
       assertEquals(objectStore.getVolume(srcVolume)
           .getBucket(srcBucket).getKey(key).getName(), key);
 
@@ -2228,10 +2219,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
     Path bucketPathTest = new Path(volPathTest, bucketName);
 
     // write some test data into bucket
-    byte[] bytes = new byte[1];
-    random.nextBytes(bytes);
     TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
-        key, new ECReplicationConfig("RS-3-2-1024k"), bytes);
+        key, new ECReplicationConfig("RS-3-2-1024k"), RandomUtils.nextBytes(1));
     // make sure the disk usage matches the expected value
     Path filePath = new Path(bucketPathTest, key);
     ContentSummary contentSummary = ofs.getContentSummary(filePath);
