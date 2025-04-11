@@ -25,9 +25,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -222,6 +225,182 @@ public class ContainerDatanodeDatabase {
   private void dropTable(String tableName, Statement stmt) throws SQLException {
     String dropTableSQL = queries.get("DROP_TABLE").replace("{table_name}", tableName);
     stmt.executeUpdate(dropTableSQL);
+  }
+
+  public void showContainerDetails(Long containerID) {
+    String query = queries.get("CONTAINER_SELECT_QUERY");
+
+    try (Connection connection = getConnection();
+         PreparedStatement statement = connection.prepareStatement(query)) {
+
+      statement.setLong(1, containerID);
+
+      if (checkForMultipleOpenStates(containerID, connection)) {
+        return;
+      }
+
+      try (ResultSet resultSet = statement.executeQuery()) {
+
+        boolean foundit = false;
+        Set<Long> datanodeIds = new HashSet<>();
+        Set<Long> unhealthyReplicas = new HashSet<>();
+        Set<Long> closedReplicas = new HashSet<>();
+        Set<Long> openReplicas = new HashSet<>();
+        Set<Long> quasiclosedReplicas = new HashSet<>();
+        Set<Long> bcsids = new HashSet<>();
+        Set<Long> deletedReplicas = new HashSet<>();
+
+        System.out.printf("%-12s | %-10s | %-10s | %-25s | %-30s | %-20s | %-12s%n",
+            "Datanode ID", "State", "BCSID", "Timestamp", "Error Message", "Index Value", "Log Level");
+        System.out.println("-------------------------------------------------------------------------" +
+            "---------------------------------------------------------------------------------------------");
+
+        while (resultSet.next()) {
+          foundit = true;
+
+          long datanodeId = resultSet.getLong("datanode_id");
+          String latestState = resultSet.getString("latest_state");
+          long latestBcsid = resultSet.getLong("latest_bcsid");
+          String timestamp = resultSet.getString("timestamp");
+          String errorMessage = resultSet.getString("error_message");
+          int indexValue = resultSet.getInt("index_value");
+          String logLevel = resultSet.getString("log_level");
+
+          datanodeIds.add(datanodeId);
+
+          if ("UNHEALTHY".equalsIgnoreCase(latestState)) {
+            unhealthyReplicas.add(datanodeId);
+          } else if ("CLOSED".equalsIgnoreCase(latestState)) {
+            closedReplicas.add(datanodeId);
+            bcsids.add(latestBcsid);
+          } else if ("OPEN".equalsIgnoreCase(latestState)) {
+            openReplicas.add(datanodeId);
+          } else if ("QUASI_CLOSED".equalsIgnoreCase(latestState)) {
+            quasiclosedReplicas.add(datanodeId);
+          } else if ("DELETED".equalsIgnoreCase(latestState)) {
+            deletedReplicas.add(datanodeId);
+            bcsids.add(latestBcsid);
+          }
+          System.out.printf("%-12d | %-10s | %-10d | %-25s | %-30s | %-20s | %-12s%n",
+              datanodeId, latestState, latestBcsid, timestamp, errorMessage, indexValue, logLevel);
+
+        }
+
+        if (!foundit) {
+          System.out.println("Missing container with ID: " + containerID);
+          return;
+        }
+
+        if (!deletedReplicas.isEmpty() && !closedReplicas.isEmpty() && bcsids.size() > 1) {
+          System.out.println("Container " + containerID + " has MISMATCHED REPLICATION.");
+          return;
+        }
+
+        int unhealthyCount = unhealthyReplicas.size();
+        int replicaCount = datanodeIds.size();
+
+        if (unhealthyCount == replicaCount) {
+          System.out.println("Container " + containerID + " is UNHEALTHY across all datanodes.");
+        } else if (unhealthyCount >= 2 && closedReplicas.size() == replicaCount - unhealthyCount) {
+          System.out.println("Container " + containerID + " is both UNHEALTHY and UNDER-REPLICATED.");
+        } else if (unhealthyCount == 1 && closedReplicas.size() == replicaCount - unhealthyCount) {
+          System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
+        } else if ((!openReplicas.isEmpty() && openReplicas.size() < 3) &&
+            (closedReplicas.size() == replicaCount - openReplicas.size() ||
+                unhealthyCount == replicaCount - openReplicas.size())) {
+          System.out.println("Container " + containerID + " is OPEN_UNHEALTHY.");
+        } else if (quasiclosedReplicas.size() >= 3) {
+          System.out.println("Container " + containerID + " is OUASI_CLOSED_STUCK.");
+        } else {
+          int expectedReplicationFactor = 3;
+          if (replicaCount - deletedReplicas.size() < expectedReplicationFactor) {
+            System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
+          } else if (replicaCount - deletedReplicas.size() > expectedReplicationFactor) {
+            System.out.println("Container " + containerID + " is OVER-REPLICATED.");
+          } else {
+            System.out.println("Container " + containerID + " has enough replicas.");
+          }
+        }
+      }
+    } catch (SQLException e) {
+      e.printStackTrace();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private boolean checkForMultipleOpenStates(Long containerID, Connection connection) {
+    String openCheckQuery = queries.get("OPEN_CHECK_QUERY");
+    try (PreparedStatement openCheckStatement = connection.prepareStatement(openCheckQuery)) {
+      openCheckStatement.setLong(1, containerID);
+
+      try (ResultSet openCheckResult = openCheckStatement.executeQuery()) {
+        List<String> firstOpenTimestamps = new ArrayList<>();
+        Set<Long> firstOpenDatanodes = new HashSet<>();
+        List<String[]> allRows = new ArrayList<>();
+        boolean issueFound = false;
+
+        while (openCheckResult.next()) {
+          String timestamp = openCheckResult.getString("timestamp");
+          long datanodeId = openCheckResult.getLong("datanode_id");
+          String state = openCheckResult.getString("container_state");
+          String errorMessage = openCheckResult.getString("error_message");
+          long bcsid = openCheckResult.getLong("bcsid");
+          int indexValue = openCheckResult.getInt("index_value");
+          String logLevel = openCheckResult.getString("log_level");
+
+          String[] row = new String[]{
+              timestamp,
+              String.valueOf(containerID),
+              String.valueOf(datanodeId),
+              state,
+              String.valueOf(bcsid),
+              errorMessage,
+              String.valueOf(indexValue),
+              logLevel
+          };
+          allRows.add(row);
+
+          if ("OPEN".equalsIgnoreCase(state)) {
+            if (firstOpenTimestamps.size() < 3 && !firstOpenDatanodes.contains(datanodeId)) {
+              firstOpenTimestamps.add(timestamp);
+              firstOpenDatanodes.add(datanodeId);
+            } else if (isTimestampAfterFirstOpens(timestamp, firstOpenTimestamps)) {
+              issueFound = true;
+            }
+          }
+        }
+
+        if (issueFound) {
+          System.out.println("Issue found: Container " + containerID + " has duplicate OPEN state.");
+          System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s%n",
+              "Timestamp", "Container ID", "Datanode ID", "Container State", "BCSID", "Error Message", "Index Value",
+              "Log Level");
+          System.out.println("-------------------------------------------------------------------------" +
+              "---------------------------------------------------------------------------------------------");
+
+          for (String[] row : allRows) {
+            System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s%n",
+                row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]);
+          }
+          return true;
+        } else {
+          return false;
+        }
+      }
+    } catch (SQLException e) {
+      e.printStackTrace();
+      return false;
+    }
+  }
+
+  private boolean isTimestampAfterFirstOpens(String timestamp, List<String> firstOpenTimestamps) {
+    for (String firstTimestamp : firstOpenTimestamps) {
+      if (timestamp.compareTo(firstTimestamp) > 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
 }
