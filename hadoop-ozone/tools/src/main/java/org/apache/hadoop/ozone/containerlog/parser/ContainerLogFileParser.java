@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -49,7 +50,8 @@ public class ContainerLogFileParser {
   private static final String KEY_BCSID = "BCSID";
   private static final String KEY_STATE = "State";
   private static final String KEY_INDEX = "Index";
-
+  AtomicBoolean hasErrorOccurred = new AtomicBoolean(false);
+  
   /**
    * Scans the specified log directory, processes each file in a separate thread.
    * Expects each log filename to follow the format: dn-container-<roll over number>.log.<datanodeId>
@@ -94,6 +96,7 @@ public class ContainerLogFileParser {
           } catch (Exception e) {
             System.err.println("Thread " + threadName + " is stopping to process the file: " + file.toString() +
                 " due to SQLException: " + e.getMessage());
+            hasErrorOccurred.set(true);
             executorService.shutdown();
           } finally {
             try {
@@ -109,6 +112,10 @@ public class ContainerLogFileParser {
       latch.await();
 
       executorService.shutdown();
+      
+      if (hasErrorOccurred.get()) {
+        throw new SQLException("Log file processing failed.");
+      }
 
     } catch (IOException | InterruptedException e) {
       e.printStackTrace();
