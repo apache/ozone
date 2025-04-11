@@ -15,24 +15,24 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.containerlog.parser;
+package org.apache.hadoop.ozone.debug.container;
+
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 
 /**
- * Constants used for ContainerDatanodeDatabase.
+ * A controller for managing container log operations like parsing and listing containers.
  */
-public final class DBConsts {
 
-  private DBConsts() {
-    //Never constructed
-  }
-
-  public static final String DRIVER = "org.sqlite.JDBC";
-  public static final String CONNECTION_PREFIX = "jdbc:sqlite:";
-  public static final String DATABASE_NAME = "container_datanode.db";
-  public static final String PROPS_FILE = "container-log-db-queries.properties";
-  public static final int CACHE_SIZE = 1000000;
-  public static final int BATCH_SIZE = 2500;
-  public static final String DATANODE_CONTAINER_LOG_TABLE_NAME = "DatanodeContainerLogTable";
-  public static final String CONTAINER_LOG_TABLE_NAME = "ContainerLogTable";
+@CommandLine.Command(
+    name = "container",
+    subcommands = {
+        ContainerLogParser.class
+    },
+    description = "Parse, Store, Retrieve"
+)
+@MetaInfServices(DebugSubcommand.class)
+public class ContainerLogController implements DebugSubcommand  {
 
 }
