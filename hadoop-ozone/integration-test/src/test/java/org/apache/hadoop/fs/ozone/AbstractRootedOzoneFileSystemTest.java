@@ -216,7 +216,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
   private String rootPath;
   private final BucketLayout bucketLayout;
   private SecureRandom random;
-  private OzoneBucket bucket;
 
   private static final String USER1 = "regularuser1";
   private static final UserGroupInformation UGI_USER1 = UserGroupInformation
@@ -276,7 +275,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
         (PrivilegedExceptionAction<RootedOzoneFileSystem>)()
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
     random = new SecureRandom();
-    bucket = objectStore.getVolume(volumeName).getBucket(bucketName);
   }
 
   protected OMMetrics getOMMetrics() {
@@ -347,7 +345,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // write some test data into bucket
     byte[] bytes = new byte[1];
     random.nextBytes(bytes);
-    TestDataUtil.createKey(bucket, key,
+    TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName), key,
         new ECReplicationConfig("RS-3-2-1024k"), bytes);
 
     List<String> dirs = Arrays.asList(volumeName, bucketName, "object-dir",
@@ -1498,9 +1496,10 @@ abstract class AbstractRootedOzoneFileSystemTest {
       final String key = "object-dir/object-name1";
       byte[] bytes = new byte[1];
       random.nextBytes(bytes);
-      TestDataUtil.createKey(bucket, key, bytes);
-      assertEquals(objectStore.getVolume(srcVolume)
-          .getBucket(srcBucket).getKey(key).getName(), key);
+      TestDataUtil.createKey(objectStore.getVolume(volumeName).
+          getBucket(bucketName), key, bytes);
+      assertEquals(key, objectStore.getVolume(srcVolume)
+          .getBucket(srcBucket).getKey(key).getName());
 
       // test ls -R /destVol/destBucket, srcBucket with key (non-empty)
       try (GenericTestUtils.SystemOutCapturer capture =
@@ -1547,8 +1546,10 @@ abstract class AbstractRootedOzoneFileSystemTest {
       final String key = "object-dir/object-name1";
       byte[] bytes = new byte[1];
       random.nextBytes(bytes);
-      TestDataUtil.createKey(bucket, key, bytes);
-      assertEquals(key, bucket.getKey(key).getName());
+      TestDataUtil.createKey(objectStore.getVolume(volumeName).
+          getBucket(bucketName), key, bytes);
+      assertEquals(key, objectStore.getVolume(volumeName).
+          getBucket(bucketName).getKey(key).getName());
 
       // test symlink -rm destVol/destBucket -> srcVol/srcBucket
       // should delete only link, srcBucket and key unaltered
@@ -2229,7 +2230,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // write some test data into bucket
     byte[] bytes = new byte[1];
     random.nextBytes(bytes);
-    TestDataUtil.createKey(bucket, key,
+    TestDataUtil.createKey(objectStore.getVolume(volumeName).
+            getBucket(bucketName), key,
         new ECReplicationConfig("RS-3-2-1024k"), bytes);
     // make sure the disk usage matches the expected value
     Path filePath = new Path(bucketPathTest, key);
@@ -2254,7 +2256,9 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // write some test data into bucket
     byte[] bytes = new byte[1];
     random.nextBytes(bytes);
-    TestDataUtil.createKey(bucket, key, RatisReplicationConfig.getInstance(
+    TestDataUtil.createKey(objectStore.
+        getVolume(volumeName).getBucket(bucketName), key,
+        RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE),bytes);
     // make sure the disk usage matches the expected value
     ContentSummary contentSummary = ofs.getContentSummary(filePathTest);
