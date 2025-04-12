@@ -1496,8 +1496,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
       final String key = "object-dir/object-name1";
       byte[] bytes = new byte[1];
       random.nextBytes(bytes);
-      TestDataUtil.createKey(objectStore.getVolume(volumeName).
-          getBucket(bucketName), key, bytes);
+      TestDataUtil.createKey(objectStore.getVolume(srcVolume).
+          getBucket(srcBucket), key, bytes);
       assertEquals(key, objectStore.getVolume(srcVolume)
           .getBucket(srcBucket).getKey(key).getName());
 
@@ -1546,8 +1546,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
       final String key = "object-dir/object-name1";
       byte[] bytes = new byte[1];
       random.nextBytes(bytes);
-      TestDataUtil.createKey(objectStore.getVolume(volumeName).
-          getBucket(bucketName), key, bytes);
+      TestDataUtil.createKey(objectStore.getVolume(srcVolume).
+          getBucket(srcBucket), key, bytes);
       assertEquals(key, objectStore.getVolume(volumeName).
           getBucket(bucketName).getKey(key).getName());
 
