@@ -1548,8 +1548,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
       random.nextBytes(bytes);
       TestDataUtil.createKey(objectStore.getVolume(srcVolume).
           getBucket(srcBucket), key, bytes);
-      assertEquals(key, objectStore.getVolume(volumeName).
-          getBucket(bucketName).getKey(key).getName());
+      assertEquals(key, objectStore.getVolume(srcVolume).
+          getBucket(srcBucket).getKey(key).getName());
 
       // test symlink -rm destVol/destBucket -> srcVol/srcBucket
       // should delete only link, srcBucket and key unaltered
