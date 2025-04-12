@@ -2259,7 +2259,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     TestDataUtil.createKey(objectStore.
         getVolume(volumeName).getBucket(bucketName), key,
         RatisReplicationConfig.getInstance(
-        HddsProtos.ReplicationFactor.THREE),bytes);
+        HddsProtos.ReplicationFactor.THREE), bytes);
     // make sure the disk usage matches the expected value
     ContentSummary contentSummary = ofs.getContentSummary(filePathTest);
     long length = contentSummary.getLength();
