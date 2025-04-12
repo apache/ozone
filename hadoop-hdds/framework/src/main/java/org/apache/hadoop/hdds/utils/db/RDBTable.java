@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -221,14 +222,59 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix)
       throws IOException {
-    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
-        prefix);
+    TableIterator<byte[], UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>>> itr  =
+        new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
+    return new TableIterator<byte[], KeyValue<byte[], byte[]>>() {
+      @Override
+      public void seekToFirst() {
+        itr.seekToFirst();
+      }
+
+      @Override
+      public void seekToLast() {
+        itr.seekToLast();
+      }
+
+      @Override
+      public KeyValue<byte[], byte[]> seek(byte[] bytes) throws IOException {
+        try (UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> kv = itr.seek(bytes)) {
+          return kv.get();
+        }
+      }
+
+      @Override
+      public void removeFromDB() {
+        itr.remove();
+      }
+
+      @Override
+      public void close() throws IOException {
+        itr.close();
+      }
+
+      @Override
+      public boolean hasNext() {
+        return itr.hasNext();
+      }
+
+      @Override
+      public KeyValue<byte[], byte[]> next() {
+        try (UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> kv = itr.next()) {
+          return kv.get();
+        }
+      }
+    };
   }
 
-  TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> iterator(
+  public TableIterator<byte[], UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>>> closeableSupplierIterator(
+      byte[] prefix) throws IOException {
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
+  }
+
+  TableIterator<CodecBuffer, UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>>> iterator(
       CodecBuffer prefix) throws IOException {
     return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
-        this, prefix);
+        this, prefix, 2);
   }
 
   @Override

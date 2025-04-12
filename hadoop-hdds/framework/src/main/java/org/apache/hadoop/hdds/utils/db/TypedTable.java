@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Strongly typed table implementation.
@@ -440,7 +441,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       }
     } else {
       final byte[] prefixBytes = encodeKey(prefix);
-      return new TypedTableIterator(rawTable.iterator(prefixBytes));
+      return new TypedTableIterator(rawTable.closeableSupplierIterator(prefixBytes));
     }
   }
 
@@ -581,7 +582,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   RawIterator<CodecBuffer> newCodecBufferTableIterator(
-      TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> i) {
+      TableIterator<CodecBuffer, UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>>> i) {
     return new RawIterator<CodecBuffer>(i) {
       @Override
       AutoCloseSupplier<CodecBuffer> convert(KEY key) throws IOException {
@@ -600,7 +601,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       }
 
       @Override
-      KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw)
+      KeyValue<KEY, VALUE> convert(RawKeyValue<CodecBuffer> raw)
           throws IOException {
         final int rawSize = raw.getValue().readableBytes();
         final KEY key = keyCodec.fromCodecBuffer(raw.getKey());
@@ -615,7 +616,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    */
   public class TypedTableIterator extends RawIterator<byte[]> {
     TypedTableIterator(
-        TableIterator<byte[], KeyValue<byte[], byte[]>> rawIterator) {
+        TableIterator<byte[], UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>>> rawIterator) {
       super(rawIterator);
     }
 
@@ -626,7 +627,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
 
     @Override
-    KeyValue<KEY, VALUE> convert(KeyValue<byte[], byte[]> raw) {
+    KeyValue<KEY, VALUE> convert(RawKeyValue<byte[]> raw) {
       return new TypedKeyValue(raw);
     }
   }
@@ -638,9 +639,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    */
   abstract class RawIterator<RAW>
       implements Table.KeyValueIterator<KEY, VALUE> {
-    private final TableIterator<RAW, KeyValue<RAW, RAW>> rawIterator;
+    private final TableIterator<RAW, UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>> rawIterator;
 
-    RawIterator(TableIterator<RAW, KeyValue<RAW, RAW>> rawIterator) {
+    RawIterator(TableIterator<RAW, UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>> rawIterator) {
       this.rawIterator = rawIterator;
     }
 
@@ -648,10 +649,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     abstract AutoCloseSupplier<RAW> convert(KEY key) throws IOException;
 
     /**
-     * Covert the given {@link Table.KeyValue}
+     * Covert the given {@link RawKeyValue}
      * from ({@link RAW}, {@link RAW}) to ({@link KEY}, {@link VALUE}).
      */
-    abstract KeyValue<KEY, VALUE> convert(KeyValue<RAW, RAW> raw)
+    abstract KeyValue<KEY, VALUE> convert(RawKeyValue<RAW> raw)
         throws IOException;
 
     @Override
@@ -666,9 +667,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     public KeyValue<KEY, VALUE> seek(KEY key) throws IOException {
-      try (AutoCloseSupplier<RAW> rawKey = convert(key)) {
-        final KeyValue<RAW, RAW> result = rawIterator.seek(rawKey.get());
-        return result == null ? null : convert(result);
+      try (AutoCloseSupplier<RAW> rawKey = convert(key);
+           UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> result = rawIterator.seek(rawKey.get())) {
+        return result == null ? null : convert(result.get());
       }
     }
 
@@ -684,8 +685,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     public KeyValue<KEY, VALUE> next() {
-      try {
-        return convert(rawIterator.next());
+      try (UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> kv = rawIterator.next()) {
+        return convert(kv.get());
       } catch (IOException e) {
         throw new IllegalStateException("Failed next()", e);
       }

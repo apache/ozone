@@ -18,16 +18,27 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
+import org.apache.commons.lang3.exception.UncheckedInterruptedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.ReferenceCountedObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implement {@link RDBStoreAbstractIterator} using {@link CodecBuffer}.
+ * Any Key or Value returned will be only valid within the lifecycle of this iterator.
  */
 class RDBStoreCodecBufferIterator
     extends RDBStoreAbstractIterator<CodecBuffer> {
+  private static final Logger LOG = LoggerFactory.getLogger(RDBStoreCodecBufferIterator.class);
   static class Buffer {
     private final CodecBuffer.Capacity initialCapacity;
     private final PutToByteBuffer<RuntimeException> source;
@@ -84,21 +95,30 @@ class RDBStoreCodecBufferIterator
     }
   }
 
-  private final Buffer keyBuffer;
-  private final Buffer valueBuffer;
+  private final Stack<RawKeyValue<Buffer>> availableBufferStack;
+  private final Set<RawKeyValue<Buffer>> inUseBuffers;
+  private final Object bufferLock;
   private final AtomicBoolean closed = new AtomicBoolean();
 
   RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
-      CodecBuffer prefix) {
+      CodecBuffer prefix, int maxNumberOfBuffersInMemory) {
     super(iterator, table, prefix);
-
+    // We need atleast 2 buffers one for setting next value and one for sending the current value.
+    maxNumberOfBuffersInMemory = Math.max(2, maxNumberOfBuffersInMemory);
     final String name = table != null ? table.getName() : null;
-    this.keyBuffer = new Buffer(
-        new CodecBuffer.Capacity(name + "-iterator-key", 1 << 10),
-        buffer -> getRocksDBIterator().get().key(buffer));
-    this.valueBuffer = new Buffer(
-        new CodecBuffer.Capacity(name + "-iterator-value", 4 << 10),
-        buffer -> getRocksDBIterator().get().value(buffer));
+    this.availableBufferStack = new Stack<>();
+    this.inUseBuffers = new HashSet<>();
+    for (int i = 0; i < maxNumberOfBuffersInMemory; i++) {
+      Buffer keyBuffer = new Buffer(
+          new CodecBuffer.Capacity(name + "-iterator-key-" + i, 1 << 10),
+          buffer -> getRocksDBIterator().get().key(buffer));
+      Buffer valueBuffer = new Buffer(
+          new CodecBuffer.Capacity(name + "-iterator-value-" + i, 4 << 10),
+          buffer -> getRocksDBIterator().get().value(buffer));
+      availableBufferStack.push(new RawKeyValue<>(keyBuffer, valueBuffer));
+    }
+
+    this.bufferLock = new Object();
     seekToFirst();
   }
 
@@ -106,16 +126,46 @@ class RDBStoreCodecBufferIterator
     Preconditions.assertTrue(!closed.get(), "Already closed");
   }
 
-  @Override
-  CodecBuffer key() {
-    assertOpen();
-    return keyBuffer.getFromDb();
+  private <V> V getFromStack(Object lock, Stack<V> stack, Set<V> inUseSet) {
+    synchronized (Objects.requireNonNull(lock)) {
+      while (stack.isEmpty()) {
+        try {
+          assertOpen();
+          lock.wait(1000);
+        } catch (InterruptedException e) {
+          throw new UncheckedInterruptedException(e);
+        }
+      }
+      V popped = stack.pop();
+      inUseSet.add(popped);
+      return popped;
+    }
+  }
+
+  private ReferenceCountedObject<RawKeyValue<CodecBuffer>> getReferenceCountedBuffer(
+      RawKeyValue<Buffer> key, Stack<RawKeyValue<Buffer>> stack, Set<RawKeyValue<Buffer>> inUseSet,
+      Object lock, Function<RawKeyValue<Buffer>, RawKeyValue<CodecBuffer>> transformer) {
+    RawKeyValue<CodecBuffer> value = transformer.apply(key);
+    return ReferenceCountedObject.wrap(value, () -> {
+    }, completelyReleased -> {
+      if (!completelyReleased) {
+        return;
+      }
+      synchronized (lock) {
+        stack.push(key);
+        inUseSet.remove(key);
+        lock.notify();
+      }
+    });
   }
 
   @Override
-  Table.KeyValue<CodecBuffer, CodecBuffer> getKeyValue() {
+  ReferenceCountedObject<RawKeyValue<CodecBuffer>> getKeyValue() {
     assertOpen();
-    return Table.newKeyValue(key(), valueBuffer.getFromDb());
+    RawKeyValue<Buffer> kvBuffer = getFromStack(bufferLock, availableBufferStack, inUseBuffers);
+    Function<RawKeyValue<Buffer>, RawKeyValue<CodecBuffer>> transformer =
+        kv -> new RawKeyValue<>(kv.getKey().getFromDb(), kv.getValue().getFromDb());
+    return getReferenceCountedBuffer(kvBuffer, availableBufferStack, inUseBuffers, bufferLock, transformer);
   }
 
   @Override
@@ -143,13 +193,29 @@ class RDBStoreCodecBufferIterator
     return key.startsWith(prefix);
   }
 
+  private <V> void release(Stack<V> valueStack, Set<V> inUseSet, Object lock, Function<V, Void> releaser) {
+    synchronized (Objects.requireNonNull(lock)) {
+      while (!valueStack.isEmpty()) {
+        V popped = valueStack.pop();
+        releaser.apply(popped);
+      }
+
+      for (V inUseValue : inUseSet) {
+        releaser.apply(inUseValue);
+      }
+    }
+  }
+
   @Override
-  public void close() {
+  public synchronized void close() {
     if (closed.compareAndSet(false, true)) {
       super.close();
       Optional.ofNullable(getPrefix()).ifPresent(CodecBuffer::release);
-      keyBuffer.release();
-      valueBuffer.release();
+      release(availableBufferStack, inUseBuffers, bufferLock, kv -> {
+        kv.getKey().release();
+        kv.getValue().release();
+        return null;
+      });
     }
   }
 }
