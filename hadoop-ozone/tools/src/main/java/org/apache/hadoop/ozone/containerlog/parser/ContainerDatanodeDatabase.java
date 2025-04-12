@@ -127,14 +127,20 @@ public class ContainerDatanodeDatabase {
 
     String insertSQL = queries.get("INSERT_DATANODE_CONTAINER_LOG");
 
+    long containerId = 0;
+    String datanodeId = null;
+    
     try (Connection connection = getConnection();
          PreparedStatement preparedStatement = connection.prepareStatement(insertSQL)) {
 
       int count = 0;
 
       for (DatanodeContainerInfo info : transitionList) {
-        preparedStatement.setString(1, info.getDatanodeId());
-        preparedStatement.setLong(2, info.getContainerId());
+        datanodeId = info.getDatanodeId();
+        containerId = info.getContainerId();
+
+        preparedStatement.setString(1, datanodeId);
+        preparedStatement.setLong(2, containerId);
         preparedStatement.setString(3, info.getTimestamp());
         preparedStatement.setString(4, info.getState());
         preparedStatement.setLong(5, info.getBcsid());
@@ -155,7 +161,7 @@ public class ContainerDatanodeDatabase {
         preparedStatement.executeBatch();
       }
     } catch (SQLException e) {
-      LOG.error("Failed to insert container log", e);
+      LOG.error("Failed to insert container log for container {} on datanode {}", containerId, datanodeId, e);
       throw e;
     } catch (Exception e) {
       LOG.error(e.getMessage());

@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.debug.container;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
@@ -32,6 +35,8 @@ import picocli.CommandLine;
     description = "parse the container logs"
 )
 public class ContainerLogParser implements Callable<Void> {
+  private static final int DEFAULT_THREAD_COUNT = 10;
+  
   @CommandLine.Option(names = {"--parse"},
       description = "path to the dir which contains log files")
   private String path;
@@ -46,7 +51,18 @@ public class ContainerLogParser implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
+    if (threadCount <= 0) {
+      System.out.println("Invalid threadCount value provided (" + threadCount + "). Using default value: "
+          + DEFAULT_THREAD_COUNT);
+      threadCount = DEFAULT_THREAD_COUNT;
+    }
+    
     if (path != null) {
+      Path logPath = Paths.get(path);
+      if (!Files.exists(logPath) || !Files.isDirectory(logPath)) {
+        System.err.println("Invalid path provided: " + path);
+        return null;
+      }
 
       ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
       ContainerLogFileParser parser = new ContainerLogFileParser();

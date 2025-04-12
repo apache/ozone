@@ -97,7 +97,6 @@ public class ContainerLogFileParser {
             System.err.println("Thread " + threadName + " is stopping to process the file: " + file.toString() +
                 " due to SQLException: " + e.getMessage());
             hasErrorOccurred.set(true);
-            executorService.shutdown();
           } finally {
             try {
               latch.countDown();
@@ -135,7 +134,7 @@ public class ContainerLogFileParser {
   
   private void processFile(String logFilePath, ContainerDatanodeDatabase dbstore, String datanodeId) 
       throws SQLException {
-    List<DatanodeContainerInfo> batchList = new ArrayList<>(5100);
+    List<DatanodeContainerInfo> batchList = new ArrayList<>(MAX_OBJ_IN_LIST + 100);
 
     try (BufferedReader reader = Files.newBufferedReader(Paths.get(logFilePath), StandardCharsets.UTF_8)) {
       String line;
@@ -144,6 +143,7 @@ public class ContainerLogFileParser {
         String timestamp = parts[0].trim();
         String logLevel = parts[1].trim();
         String id = null, index = null;
+        String errorMessage = "No error";
 
         DatanodeContainerInfo.Builder builder = new DatanodeContainerInfo.Builder()
             .setDatanodeId(datanodeId)
@@ -180,12 +180,11 @@ public class ContainerLogFileParser {
             }
           } else {
             if (!part.isEmpty()) {
-              builder.setErrorMessage(part.replace("|", "").trim());
-            } else {
-              builder.setErrorMessage("No error");
+              errorMessage = part.replace("|", "").trim();
             }
           }
         }
+        builder.setErrorMessage(errorMessage);
 
         if (index == null || !index.equals("0")) {
           continue; //Currently only ratis replicated containers are considered.
