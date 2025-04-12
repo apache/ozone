@@ -15,32 +15,5 @@
  * limitations under the License.
  */
 
+/** RocksDB related classes. */
 package org.apache.hadoop.hdds.utils.db;
-
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-
-/**
- * Interface for write data into a dump file.
- */
-public interface DumpFileWriter extends Closeable {
-  /**
-   * Open an external file for dump.
-   * @param externalFile
-   */
-  void open(File externalFile) throws IOException;
-
-  /**
-   * Put a key value pair into the file.
-   * @param key
-   * @param value
-   */
-  void put(byte[] key, byte[] value) throws IOException;
-
-  /**
-   * Finish dumping.
-   */
-  @Override
-  void close() throws IOException;
-}

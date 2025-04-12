@@ -17,23 +17,27 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.Closeable;
-import java.io.File;
 import java.io.IOException;
+import org.rocksdb.RocksDBException;
 
 /**
- * Interface for loading data from a dump file.
+ * Exceptions converted from {@link RocksDBException}.
  */
-public interface DumpFileLoader extends Closeable {
+public class RocksDatabaseException extends IOException {
+  private static String getStatus(RocksDBException e) {
+    return e.getStatus() == null ? "NULL_STATUS" : e.getStatus().getCodeString();
+  }
 
-  /**
-   * Load key value pairs from an external dump file.
-   */
-  void load(File externalFile) throws IOException;
+  /** Construct from the given {@link RocksDBException} cause. */
+  public RocksDatabaseException(String message, RocksDBException cause) {
+    super(getStatus(cause) + ": " + message, cause);
+  }
 
-  /**
-   * Close this file loader.
-   */
-  @Override
-  void close();
+  public RocksDatabaseException(String message) {
+    super(message);
+  }
+
+  public RocksDatabaseException() {
+    super();
+  }
 }
