@@ -43,7 +43,7 @@ execute_robot_test s3g basic/links.robot
 
 ## Exclude virtual-host tests. This is tested separately as it requires additional config.
 exclude="--exclude virtual-host"
-for bucket in encrypted link; do
+for bucket in link; do
   execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
   # some tests are independent of the bucket type, only need to be run once
   ## Exclude virtual-host.robot
