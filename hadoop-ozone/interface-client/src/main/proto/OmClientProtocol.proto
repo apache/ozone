@@ -2312,6 +2312,51 @@ message DeleteObjectTaggingResponse {
 }
 
 /**
+S3 lifecycles (filter, expiration, rule and configuration).
+ */
+message LifecycleFilterTag {
+  required string key = 1;
+  required string value = 2;
+}
+
+message LifecycleRuleAndOperator {
+  optional string prefix = 1;
+  repeated LifecycleFilterTag tags = 2;
+}
+
+message LifecycleFilter {
+  optional string prefix = 1;
+  optional LifecycleFilterTag tag = 2;
+  optional LifecycleRuleAndOperator andOperator = 3;
+}
+
+message LifecycleExpiration {
+  optional uint32 days = 1;
+  optional string date = 2;
+}
+
+message LifecycleRule {
+  required  string id = 1;
+  optional string prefix = 2;
+  required bool enabled = 3;
+  repeated LifecycleAction action = 4;
+  optional LifecycleFilter filter = 5;
+}
+
+message LifecycleAction {
+  optional LifecycleExpiration expiration = 1;
+}
+
+message LifecycleConfiguration {
+  required string volume = 1;
+  required string bucket = 2;
+  optional uint64 creationTime = 3;
+  repeated LifecycleRule rules = 4;
+  optional uint64 objectID = 5;
+  optional uint64 updateID = 6;
+}
+
+/**
  The OM service that takes care of Ozone namespace.
 */
 service OzoneManagerService {

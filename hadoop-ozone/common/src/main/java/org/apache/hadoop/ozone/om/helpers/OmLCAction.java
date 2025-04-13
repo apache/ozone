@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
 
 /**
  * Interface that encapsulates lifecycle rule actions.
@@ -25,6 +26,11 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
  * configuration, such as Expiration and (in the future) Transition.
  */
 public interface OmLCAction {
+
+  /**
+   * Creates LifecycleAction protobuf from OmLCAction.
+   */
+  LifecycleAction getProtobuf();
 
   /**
    * Validates the action configuration.

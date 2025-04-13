@@ -237,6 +237,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static final String DELETED_TABLE = "deletedTable";
   public static final String OPEN_KEY_TABLE = "openKeyTable";
   public static final String MULTIPARTINFO_TABLE = "multipartInfoTable";
+  public static final String LIFECYCLE_CONFIGURATION_TABLE =
+      "lifecycleConfigurationTable";
   public static final String S3_SECRET_TABLE = "s3SecretTable";
   public static final String DELEGATION_TOKEN_TABLE = "dTokenTable";
   public static final String PREFIX_TABLE = "prefixTable";

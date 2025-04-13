@@ -21,7 +21,11 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getFutureDateString;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -163,5 +167,29 @@ class TestOmLCExpiration {
     OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:00:00+01:00");
     assertOMException(exp5::build, INVALID_REQUEST, "'Date' must represent midnight UTC");
+  }
+
+  @Test
+  public void testProtobufConversion() throws OMException {
+    // Only Days
+    OmLCExpiration expDays = new OmLCExpiration.Builder()
+        .setDays(30)
+        .build();
+    LifecycleAction protoFromDays = expDays.getProtobuf();
+    OmLCExpiration expFromProto = OmLCExpiration.getFromProtobuf(
+        protoFromDays.getExpiration());
+    assertEquals(30, expFromProto.getDays());
+    assertNull(expFromProto.getDate());
+
+    // Only Date
+    String dateStr = "2099-10-10T00:00:00Z";
+    OmLCExpiration expDate = new OmLCExpiration.Builder()
+        .setDate(dateStr)
+        .build();
+    LifecycleAction protoFromDate = expDate.getProtobuf();
+    OmLCExpiration expFromProto2 = OmLCExpiration.getFromProtobuf(
+        protoFromDate.getExpiration());
+    assertNull(expFromProto2.getDays());
+    assertEquals(dateStr, expFromProto2.getDate());
   }
 }

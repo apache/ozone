@@ -22,9 +22,12 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperatorBuilder;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCFilterBuilder;
+import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCRuleBuilder;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
@@ -34,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -167,5 +171,52 @@ class TestOmLCRule {
         .setRules(rules);
 
     assertOMException(config::build, INVALID_REQUEST, "Duplicate rule IDs found");
+  }
+
+  @Test
+  public void testProtobufConversion() throws OMException {
+    // Only Filter
+    // Object to proto
+    OmLCFilter filter1 = getOmLCFilterBuilder("prefix", null, null).build();
+    OmLCRule rule1 = getOmLCRuleBuilder("test-rule", null, true, 1, filter1).build();
+    LifecycleRule proto = rule1.getProtobuf();
+
+    // Proto to Object
+    OmLCRule ruleFromProto1 = OmLCRule.getFromProtobuf(proto);
+    assertEquals("test-rule", ruleFromProto1.getId());
+    assertNull(ruleFromProto1.getPrefix());
+    assertTrue(ruleFromProto1.isEnabled());
+    assertNotNull(ruleFromProto1.getExpiration());
+    assertEquals(1, ruleFromProto1.getExpiration().getDays());
+    assertNotNull(ruleFromProto1.getFilter());
+    assertEquals("prefix", ruleFromProto1.getFilter().getPrefix());
+
+    // Only Prefix
+    // Object to proto
+    OmLCRule rule2 = getOmLCRuleBuilder("test-rule", "/logs/", false, 30, null).build();
+    LifecycleRule proto2 = rule2.getProtobuf();
+
+    // Proto to Object
+    OmLCRule ruleFromProto2 = OmLCRule.getFromProtobuf(proto2);
+    assertEquals("test-rule", ruleFromProto2.getId());
+    assertFalse(ruleFromProto2.isEnabled());
+    assertEquals("/logs/", ruleFromProto2.getPrefix());
+    assertNotNull(ruleFromProto2.getExpiration());
+    assertEquals(30, ruleFromProto2.getExpiration().getDays());
+    assertNull(ruleFromProto2.getFilter());
+
+    // Prefix is ""
+    // Object to proto
+    OmLCRule rule3 = getOmLCRuleBuilder("test-rule", "", true, 30, null).build();
+    LifecycleRule proto3 = rule3.getProtobuf();
+
+    // Proto to Object
+    OmLCRule ruleFromProto3 = OmLCRule.getFromProtobuf(proto3);
+    assertEquals("test-rule", ruleFromProto3.getId());
+    assertTrue(ruleFromProto3.isEnabled());
+    assertEquals("", ruleFromProto3.getPrefix());
+    assertNotNull(ruleFromProto3.getExpiration());
+    assertEquals(30, ruleFromProto3.getExpiration().getDays());
+    assertNull(ruleFromProto3.getFilter());
   }
 }
