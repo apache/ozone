@@ -319,7 +319,14 @@ public class OzoneContainer {
   public OzoneContainer(HddsDatanodeService hddsDatanodeService, DatanodeDetails datanodeDetails,
                         ConfigurationSource conf,
                         StateContext context) throws IOException {
-    this(hddsDatanodeService, datanodeDetails, conf, context, null, null);
+    this(hddsDatanodeService, datanodeDetails, conf, context, null, null, null);
+  }
+
+  @VisibleForTesting
+  public OzoneContainer(HddsDatanodeService hddsDatanodeService, DatanodeDetails datanodeDetails,
+                        ConfigurationSource conf,
+                        StateContext context, VolumeChoosingPolicy volumeChoosingPolicy) throws IOException {
+    this(hddsDatanodeService, datanodeDetails, conf, context, null, null, volumeChoosingPolicy);
   }
 
   public GrpcTlsConfig getTlsClientConfig() {

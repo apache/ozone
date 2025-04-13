@@ -1726,7 +1726,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public Map<String, String> getNodeContainersReplicationMetrics(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    return nodeStateManager.getNode(datanodeDetails.getUuid()).getContainersReplicationMetrics();
+    return nodeStateManager.getNode(datanodeDetails.getID()).getContainersReplicationMetrics();
   }
 
   /**

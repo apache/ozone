@@ -246,8 +246,10 @@ public class TestDecommissionStatusSubCommand {
 
     cmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("ContainersReplicationMetrics:\\ntransferredBytes:\\s1423644672\\n" +
-        "numSuccessReplications:\\s5\\nsuccessTime:\\s27855");
+    Pattern p = Pattern.compile("Containers Replication Metrics:\\n"
+        + "Bytes transferred for successful replication tasks:\\s1423644672\\n" +
+        "Successfully replicated containers:\\s5\\n"
+        + "Time spent on successful replication tasks \\(ms\\):\\s27855");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }

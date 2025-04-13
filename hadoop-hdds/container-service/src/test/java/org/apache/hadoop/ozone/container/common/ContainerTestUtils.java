@@ -137,14 +137,15 @@ public final class ContainerTestUtils {
       throws IOException {
     StateContext context = getMockContext(datanodeDetails, conf);
     VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
-    return new OzoneContainer(datanodeDetails, conf, context, volumeChoosingPolicy);
+    return new OzoneContainer(getMockHddsDatanodeService(mock(ReplicationSupervisor.class),
+        getMockMeasuredReplicator()), datanodeDetails, conf, context, volumeChoosingPolicy);
   }
 
   public static OzoneContainer getOzoneContainer(HddsDatanodeService hddsDatanodeService,
                                                  DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
     StateContext context = getMockContext(datanodeDetails, conf);
-    return new OzoneContainer(hddsDatanodeService, datanodeDetails, conf, context, null, null);
+    return new OzoneContainer(hddsDatanodeService, datanodeDetails, conf, context, null, null, null);
   }
 
   public static HddsDatanodeService getMockHddsDatanodeService(ReplicationSupervisor replicationSupervisor,
