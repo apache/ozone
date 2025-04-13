@@ -1922,9 +1922,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
                         int valueLength, Map<String, String> customMetadata,
                         Map<String, String> tags)
       throws IOException {
-    TestDataUtil.createKey(bucket, keyName,
-        ReplicationConfig.
-            fromTypeAndFactor(RATIS, replication), value.getBytes(UTF_8));
+    OzoneOutputStream out = bucket.createKey(keyName, valueLength,
+        ReplicationConfig.fromTypeAndFactor(RATIS, replication), customMetadata, tags);
+    out.write(value.getBytes(UTF_8));
+    out.close();
   }
 
   private void writeFile(OzoneBucket bucket, String keyName,
