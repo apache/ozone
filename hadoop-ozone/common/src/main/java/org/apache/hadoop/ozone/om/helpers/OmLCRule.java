@@ -22,6 +22,8 @@ import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
 
 /**
  * A class that encapsulates lifecycle rule.
@@ -177,6 +179,49 @@ public class OmLCRule {
     }
   }
 
+
+  public LifecycleRule getProtobuf() {
+    LifecycleRule.Builder builder = LifecycleRule.newBuilder()
+        .setId(id)
+        .setEnabled(enabled);
+
+    if (prefix != null) {
+      builder.setPrefix(prefix);
+    }
+    if (actions != null) {
+      for (OmLCAction action : actions) {
+        builder.addAction(action.getProtobuf());
+      }
+    }
+    if (filter != null) {
+      builder.setFilter(filter.getProtobuf());
+    }
+
+    return builder.build();
+  }
+
+  public static OmLCRule getFromProtobuf(LifecycleRule lifecycleRule) {
+    Builder builder = new Builder()
+        .setEnabled(lifecycleRule.getEnabled());
+
+    if (lifecycleRule.hasId()) {
+      builder.setId(lifecycleRule.getId());
+    }
+    if (lifecycleRule.hasPrefix()) {
+      builder.setPrefix(lifecycleRule.getPrefix());
+    }
+    for (LifecycleAction lifecycleAction : lifecycleRule.getActionList()) {
+      if (lifecycleAction.hasExpiration()) {
+        builder.addAction(OmLCExpiration.getFromProtobuf(lifecycleAction.getExpiration()));
+      }
+    }
+    if (lifecycleRule.hasFilter()) {
+      builder.setFilter(OmLCFilter.getFromProtobuf(lifecycleRule.getFilter()));
+    }
+
+    return builder.build();
+  }
+
   @Override
   public String toString() {
     return "OmLCRule{" +
@@ -219,6 +264,13 @@ public class OmLCRule {
       if (lcAction != null) {
         this.actions = new ArrayList<>();
         this.actions.add(lcAction);
+      }
+      return this;
+    }
+
+    public Builder addAction(OmLCAction action) {
+      if (action != null) {
+        this.actions.add(action);
       }
       return this;
     }

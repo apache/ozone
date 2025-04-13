@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCFilter;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
@@ -34,6 +35,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -193,5 +195,32 @@ class TestOmLCRule {
         .build();
 
     assertOMException(config::valid, INVALID_REQUEST, "Duplicate rule IDs found");
+  }
+
+  @Test
+  public void testProtobufConversion() {
+    // Object to proto
+    OmLCExpiration expiration = new OmLCExpiration.Builder()
+        .setDays(30)
+        .build();
+    OmLCFilter filter = getOmLCFilter("prefix", null, null);
+    OmLCRule rule = new OmLCRule.Builder()
+        .setId("test-rule")
+        .setEnabled(true)
+        .setPrefix("/logs/")
+        .setAction(expiration)
+        .setFilter(filter)
+        .build();
+    LifecycleRule proto = rule.getProtobuf();
+
+    // Proto to Object
+    OmLCRule ruleFromProto = OmLCRule.getFromProtobuf(proto);
+    assertEquals("test-rule", ruleFromProto.getId());
+    assertTrue(ruleFromProto.isEnabled());
+    assertEquals("/logs/", ruleFromProto.getPrefix());
+    assertNotNull(ruleFromProto.getExpiration());
+    assertEquals(30, ruleFromProto.getExpiration().getDays());
+    assertNotNull(ruleFromProto.getFilter());
+    assertEquals("prefix", ruleFromProto.getFilter().getPrefix());
   }
 }

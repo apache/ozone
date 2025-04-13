@@ -23,15 +23,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
 
 /**
  * A class that encapsulates lifecycle configuration.
  */
 public class OmLifecycleConfiguration extends WithObjectID
-    implements Auditable {
+    implements Auditable, CopyObject<OmLifecycleConfiguration> {
+
+  private static final Codec<OmLifecycleConfiguration> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(LifecycleConfiguration.getDefaultInstance()),
+      OmLifecycleConfiguration::getFromProtobuf,
+      OmLifecycleConfiguration::getProtobuf,
+      OmLifecycleConfiguration.class);
+
+  public static Codec<OmLifecycleConfiguration> getCodec() {
+    return CODEC;
+  }
 
   // Ref: https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html#intro-lifecycle-rule-id
   public static final int LC_MAX_RULES = 1000;
@@ -144,14 +160,12 @@ public class OmLifecycleConfiguration extends WithObjectID
   }
 
   public Builder toBuilder() {
-    return new Builder()
+    return new Builder(this)
         .setVolume(volume)
         .setBucket(this.bucket)
         .setOwner(this.owner)
         .setCreationTime(this.creationTime)
-        .setRules(this.rules)
-        .setUpdateID(super.getUpdateID())
-        .setObjectID(super.getObjectID());
+        .setRules(this.rules);
   }
 
   @Override
@@ -187,6 +201,54 @@ public class OmLifecycleConfiguration extends WithObjectID
     return auditMap;
   }
 
+  @Override
+  public OmLifecycleConfiguration copyObject() {
+    return toBuilder().build();
+  }
+
+  public LifecycleConfiguration getProtobuf() {
+    List<LifecycleRule> rulesProtoBuf = rules.stream()
+        .map(OmLCRule::getProtobuf)
+        .collect(Collectors.toList());
+
+    LifecycleConfiguration.Builder b = LifecycleConfiguration.newBuilder()
+        .setVolume(volume)
+        .setBucket(bucket)
+        .setOwner(owner)
+        .setCreationTime(creationTime)
+        .addAllRules(rulesProtoBuf)
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID());
+    return b.build();
+  }
+
+  public static OmLifecycleConfiguration getFromProtobuf(
+      LifecycleConfiguration lifecycleConfiguration) {
+    List<OmLCRule> rulesList = lifecycleConfiguration
+        .getRulesList()
+        .stream()
+        .map(OmLCRule::getFromProtobuf)
+        .collect(Collectors.toList());
+
+    Builder builder = new Builder()
+        .setVolume(lifecycleConfiguration.getVolume())
+        .setBucket(lifecycleConfiguration.getBucket())
+        .setOwner(lifecycleConfiguration.getOwner())
+        .setRules(rulesList);
+
+    if (lifecycleConfiguration.hasCreationTime()) {
+      builder.setCreationTime(lifecycleConfiguration.getCreationTime());
+    }
+    if (lifecycleConfiguration.hasObjectID()) {
+      builder.setObjectID(lifecycleConfiguration.getObjectID());
+    }
+    if (lifecycleConfiguration.hasUpdateID()) {
+      builder.setUpdateID(lifecycleConfiguration.getUpdateID());
+    }
+
+    return builder.build();
+  }
+
   /**
    * Builder of OmLifecycleConfiguration.
    */
@@ -196,6 +258,10 @@ public class OmLifecycleConfiguration extends WithObjectID
     private String owner = "";
     private long creationTime;
     private List<OmLCRule> rules = new ArrayList<>();
+
+    private Builder(OmLifecycleConfiguration obj) {
+      super(obj);
+    }
 
     public Builder() {
     }

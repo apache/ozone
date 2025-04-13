@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -219,6 +220,46 @@ public class TestOmLifeCycleConfiguration {
 
     assertFalse(rule.isEnabled());
     assertDoesNotThrow(rule::valid);
+  }
+
+  @Test
+  public void testProtobufConversion() {
+    // Object to proto
+    OmLCExpiration expiration = new OmLCExpiration.Builder()
+        .setDays(30)
+        .build();
+    OmLCRule rule = new OmLCRule.Builder()
+        .setId("test-rule")
+        .setEnabled(true)
+        .setPrefix("/logs/")
+        .setAction(expiration)
+        .build();
+    List<OmLCRule> rules = Collections.singletonList(rule);
+    OmLifecycleConfiguration config = new OmLifecycleConfiguration.Builder()
+        .setVolume("test-volume")
+        .setBucket("test-bucket")
+        .setOwner("test-owner")
+        .setCreationTime(System.currentTimeMillis())
+        .setRules(rules)
+        .setObjectID(123456L)
+        .setUpdateID(78910L)
+        .build();
+    LifecycleConfiguration proto = config.getProtobuf();
+
+    // Proto to Object
+    OmLifecycleConfiguration configFromProto =
+        OmLifecycleConfiguration.getFromProtobuf(proto);
+    assertEquals("test-volume", configFromProto.getVolume());
+    assertEquals("test-bucket", configFromProto.getBucket());
+    assertEquals("test-owner", configFromProto.getOwner());
+    assertEquals(config.getCreationTime(), configFromProto.getCreationTime());
+    assertEquals(123456L, configFromProto.getObjectID());
+    assertEquals(78910L, configFromProto.getUpdateID());
+    assertEquals(1, configFromProto.getRules().size());
+    OmLCRule ruleFromProto = configFromProto.getRules().get(0);
+    assertEquals("test-rule", ruleFromProto.getId());
+    assertEquals("/logs/", ruleFromProto.getPrefix());
+    assertEquals(30, ruleFromProto.getExpiration().getDays());
   }
 
 }

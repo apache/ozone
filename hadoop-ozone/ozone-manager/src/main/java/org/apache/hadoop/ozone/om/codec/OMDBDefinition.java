@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -203,6 +204,13 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           StringCodec.get(),
           CompactionLogEntry.getCodec());
 
+  public static final DBColumnFamilyDefinition<String, OmLifecycleConfiguration>
+      LIFECYCLE_CONFIGURATION_TABLE =
+      new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.LIFECYCLE_CONFIGURATION_TABLE,
+          StringCodec.get(),
+          OmLifecycleConfiguration.getCodec());
+
   /**
    * SnapshotRenamedTable that complements the keyTable (or fileTable)
    * and dirTable entries of the immediately previous snapshot in the
@@ -245,7 +253,8 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           TENANT_STATE_TABLE,
           TRANSACTION_INFO_TABLE,
           USER_TABLE,
-          VOLUME_TABLE);
+          VOLUME_TABLE,
+          LIFECYCLE_CONFIGURATION_TABLE);
 
   private static final OMDBDefinition INSTANCE = new OMDBDefinition();
 

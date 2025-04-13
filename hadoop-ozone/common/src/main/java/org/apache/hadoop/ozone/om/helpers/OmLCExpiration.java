@@ -22,6 +22,8 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleExpiration;
 
 /**
  * A class that encapsulates lifecycle rule expiration action.
@@ -106,6 +108,25 @@ public class OmLCExpiration extends OmLCAction {
             OMException.ResultCodes.INVALID_REQUEST);
       }
     }
+  }
+
+  @Override
+  public LifecycleAction getProtobuf() {
+    return LifecycleAction.newBuilder()
+        .setExpiration(
+            LifecycleExpiration.newBuilder()
+                .setDate(date)
+                .setDays(days)
+                .build())
+        .build();
+  }
+
+  public static OmLCExpiration getFromProtobuf(
+      LifecycleExpiration lifecycleExpiration) {
+    return new Builder()
+        .setDate(lifecycleExpiration.getDate())
+        .setDays(lifecycleExpiration.getDays())
+        .build();
   }
 
   @Override

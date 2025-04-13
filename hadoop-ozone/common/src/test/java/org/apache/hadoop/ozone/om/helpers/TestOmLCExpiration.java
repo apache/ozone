@@ -21,7 +21,9 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getFutureDateString;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -148,5 +150,29 @@ class TestOmLCExpiration {
         .setDate("2099-10-10T00:00:00")
         .build();
     assertOMException(exp8::valid, INVALID_REQUEST, "ISO 8601 format");
+  }
+
+  @Test
+  public void testProtobufConversion() {
+    // Only Days
+    OmLCExpiration expDays = new OmLCExpiration.Builder()
+        .setDays(30)
+        .build();
+    LifecycleAction protoFromDays = expDays.getProtobuf();
+    OmLCExpiration expFromProto = OmLCExpiration.getFromProtobuf(
+        protoFromDays.getExpiration());
+    assertEquals(30, expFromProto.getDays());
+    assertEquals("", expFromProto.getDate());
+
+    // Only Date
+    String dateStr = "2099-10-10T00:00:00Z";
+    OmLCExpiration expDate = new OmLCExpiration.Builder()
+        .setDate(dateStr)
+        .build();
+    LifecycleAction protoFromDate = expDate.getProtobuf();
+    OmLCExpiration expFromProto2 = OmLCExpiration.getFromProtobuf(
+        protoFromDate.getExpiration());
+    assertEquals(0, expFromProto2.getDays());
+    assertEquals(dateStr, expFromProto2.getDate());
   }
 }

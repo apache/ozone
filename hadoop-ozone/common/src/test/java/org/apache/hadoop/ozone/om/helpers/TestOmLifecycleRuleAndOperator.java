@@ -21,9 +21,14 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperator;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
+import java.util.Map;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRuleAndOperator;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -56,6 +61,30 @@ class TestOmLifecycleRuleAndOperator {
 
     OmLifecycleRuleAndOperator andOperator3 = getOmLCAndOperator(null, null);
     assertOMException(andOperator3::valid, INVALID_REQUEST, "Either 'Tags' or 'Prefix' must be specified.");
+  }
+
+  @Test
+  public void testProtobufConversion() {
+    // Prefix and tags
+    Map<String, String> tags = ImmutableMap.of("tag1", "value1", "tag2", "value2");
+    OmLifecycleRuleAndOperator andOp = getOmLCAndOperator("prefix", tags);
+    LifecycleRuleAndOperator proto = andOp.getProtobuf();
+    OmLifecycleRuleAndOperator andOpFromProto =
+        OmLifecycleRuleAndOperator.getFromProtobuf(proto);
+    assertEquals("prefix", andOpFromProto.getPrefix());
+    assertEquals(2, andOpFromProto.getTags().size());
+    assertTrue(andOpFromProto.getTags().containsKey("tag1"));
+    assertEquals("value1", andOpFromProto.getTags().get("tag1"));
+    assertTrue(andOpFromProto.getTags().containsKey("tag2"));
+    assertEquals("value2", andOpFromProto.getTags().get("tag2"));
+
+    // Multiple tags
+    OmLifecycleRuleAndOperator andOp2 = getOmLCAndOperator(null, tags);
+    LifecycleRuleAndOperator proto2 = andOp2.getProtobuf();
+    OmLifecycleRuleAndOperator andOpFromProto2 =
+        OmLifecycleRuleAndOperator.getFromProtobuf(proto2);
+    assertNull(andOpFromProto2.getPrefix());
+    assertEquals(2, andOpFromProto2.getTags().size());
   }
 
 }

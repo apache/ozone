@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.helpers;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilter;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilterTag;
 
 /**
  * A class that encapsulates lifecycle rule filter.
@@ -74,6 +76,41 @@ public final class OmLCFilter {
   @Nullable
   public Pair<String, String> getTag() {
     return tag;
+  }
+
+  public LifecycleFilter getProtobuf() {
+    LifecycleFilter.Builder filterBuilder = LifecycleFilter.newBuilder();
+    if (prefix != null) {
+      filterBuilder.setPrefix(prefix);
+    }
+    if (tag != null) {
+      filterBuilder.setTag(LifecycleFilterTag.newBuilder()
+          .setKey(tag.getKey())
+          .setValue(tag.getValue())
+          .build());
+    }
+    if (andOperator != null) {
+      filterBuilder.setAndOperator(andOperator.getProtobuf());
+    }
+
+    return filterBuilder.build();
+  }
+
+  public static OmLCFilter getFromProtobuf(LifecycleFilter lifecycleFilter) {
+    OmLCFilter.Builder builder = new Builder();
+
+    if (lifecycleFilter.hasPrefix()) {
+      builder.setPrefix(lifecycleFilter.getPrefix());
+    }
+    if (lifecycleFilter.hasTag()) {
+      builder.setTag(lifecycleFilter.getTag().getKey(), lifecycleFilter.getTag().getValue());
+    }
+    if (lifecycleFilter.hasAndOperator()) {
+      builder.setAndOperator(
+          OmLifecycleRuleAndOperator.getFromProtobuf(lifecycleFilter.getAndOperator()));
+    }
+
+    return builder.build();
   }
 
   @Override

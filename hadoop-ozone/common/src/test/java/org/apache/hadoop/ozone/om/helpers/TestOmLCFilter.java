@@ -21,11 +21,17 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.VALID_OM_LC_AND_OPERATOR;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.VALID_OM_LC_FILTER;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
+import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperator;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCFilter;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCRule;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.util.Collections;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilter;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -78,6 +84,36 @@ class TestOmLCFilter {
     assertOMException(lcFilter4::valid, INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
+  }
+
+  @Test
+  public void testProtobufConversion() {
+    // Only prefix
+    OmLCFilter filter1 = getOmLCFilter("prefix", null, null);
+    LifecycleFilter proto1 = filter1.getProtobuf();
+    OmLCFilter filterFromProto1 = OmLCFilter.getFromProtobuf(proto1);
+    assertEquals("prefix", filterFromProto1.getPrefix());
+    assertNull(filterFromProto1.getTag());
+    assertNull(filterFromProto1.getAndOperator());
+
+    // Only tag
+    OmLCFilter filter2 = getOmLCFilter(null, Pair.of("key", "value"), null);
+    LifecycleFilter proto2 = filter2.getProtobuf();
+    OmLCFilter filterFromProto2 = OmLCFilter.getFromProtobuf(proto2);
+    assertNull(filterFromProto2.getPrefix());
+    assertNotNull(filterFromProto2.getTag());
+    assertEquals("key", filterFromProto2.getTag().getKey());
+    assertEquals("value", filterFromProto2.getTag().getValue());
+
+    // Only andOperator
+    OmLifecycleRuleAndOperator andOp = getOmLCAndOperator(
+        "prefix", Collections.singletonMap("tag1", "value1"));
+    OmLCFilter filter3 = getOmLCFilter(null, null, andOp);
+    LifecycleFilter proto3 = filter3.getProtobuf();
+    OmLCFilter filterFromProto3 = OmLCFilter.getFromProtobuf(proto3);
+    assertNull(filterFromProto3.getPrefix());
+    assertNull(filterFromProto3.getTag());
+    assertNotNull(filterFromProto3.getAndOperator());
   }
 
 }
