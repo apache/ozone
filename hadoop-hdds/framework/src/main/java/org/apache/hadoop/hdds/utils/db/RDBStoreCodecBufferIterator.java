@@ -29,8 +29,6 @@ import org.apache.commons.lang3.exception.UncheckedInterruptedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.ReferenceCountedObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implement {@link RDBStoreAbstractIterator} using {@link CodecBuffer}.
@@ -38,7 +36,6 @@ import org.slf4j.LoggerFactory;
  */
 class RDBStoreCodecBufferIterator
     extends RDBStoreAbstractIterator<CodecBuffer> {
-  private static final Logger LOG = LoggerFactory.getLogger(RDBStoreCodecBufferIterator.class);
   static class Buffer {
     private final CodecBuffer.Capacity initialCapacity;
     private final PutToByteBuffer<RuntimeException> source;
