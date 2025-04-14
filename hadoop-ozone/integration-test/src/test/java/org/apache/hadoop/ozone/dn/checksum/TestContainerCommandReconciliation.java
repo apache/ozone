@@ -530,9 +530,6 @@ public class TestContainerCommandReconciliation {
     KeyValueHandler kvHandler = (KeyValueHandler) datanodeStateMachine.getContainer().getDispatcher()
         .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
 
-    BlockManager blockManager = kvHandler.getBlockManager();
-    List<BlockData> blockDataList = blockManager.listBlock(container, -1, 100);
-    String chunksPath = container.getContainerData().getChunksPath();
     long oldDataChecksum = oldContainerChecksumInfo.getContainerMerkleTree().getDataChecksum();
     // Check non-zero checksum after container close
     StorageContainerLocationProtocolClientSideTranslatorPB scmClient = cluster.getStorageContainerLocationClient();
@@ -544,6 +541,9 @@ public class TestContainerCommandReconciliation {
     }
 
     // 2. Delete some blocks to simulate missing blocks.
+    BlockManager blockManager = kvHandler.getBlockManager();
+    List<BlockData> blockDataList = blockManager.listBlock(container, -1, 100);
+    String chunksPath = container.getContainerData().getChunksPath();
     try (DBHandle db = BlockUtils.getDB(containerData, conf);
          BatchOperation op = db.getStore().getBatchHandler().initBatchOperation()) {
       for (int i = 0; i < blockDataList.size(); i += 2) {

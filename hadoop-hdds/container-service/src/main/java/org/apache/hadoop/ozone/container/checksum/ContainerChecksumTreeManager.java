@@ -373,6 +373,11 @@ public class ContainerChecksumTreeManager {
     }
   }
 
+  /**
+   * Reads the container checksum info file (containerID.tree) from the disk.
+   * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
+   * swapped into place.
+   */
   public static Optional<ContainerProtos.ContainerChecksumInfo> readChecksumInfo(ContainerData data)
       throws IOException {
     long containerID = data.getContainerID();
