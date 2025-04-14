@@ -71,6 +71,9 @@ public class CompactionService extends BackgroundService {
   }
 
   private List<String> validateTables(List<String> tables) {
+    if (tables == null || tables.isEmpty()) {
+      return Collections.emptyList();
+    }
     List<String> validTables = new ArrayList<>();
     Set<String> allTableNames = new HashSet<>(omMetadataManager.listTableNames());
     for (String table : tables) {

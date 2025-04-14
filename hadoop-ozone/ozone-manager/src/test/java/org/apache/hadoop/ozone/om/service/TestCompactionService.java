@@ -151,7 +151,7 @@ class TestCompactionService {
 
   @Timeout(300)
   @Test
-  public void testCompactFailure() throws Exception {
+  public void testCompactFailure() {
 
     List<String> compactTables = new ArrayList<>();
     compactTables.add("invalidTable2");
@@ -161,7 +161,6 @@ class TestCompactionService {
     assertThrows(IllegalArgumentException.class,
         () -> getCompactionService(compactTables));
   }
-
 
   private CompactionService getCompactionService(List<String> compactTables) {
     CompactionService compactionService = new CompactionService(ozoneManager, TimeUnit.MILLISECONDS,
