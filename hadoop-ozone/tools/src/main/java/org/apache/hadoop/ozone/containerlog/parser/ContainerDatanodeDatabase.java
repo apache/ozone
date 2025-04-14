@@ -17,8 +17,13 @@
 
 package org.apache.hadoop.ozone.containerlog.parser;
 
+import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -231,5 +236,56 @@ public class ContainerDatanodeDatabase {
     stmt.executeUpdate(dropTableSQL);
   }
 
+  private void createContainerLogIndex(Statement stmt) throws SQLException {
+    String createIndexSQL = queries.get("CREATE_INDEX_LATEST_STATE");
+    stmt.execute(createIndexSQL);
+  }
+
+  public void listContainersByState(String state) throws SQLException {
+    int count = 0;
+    String query = queries.get("SELECT_LATEST_CONTAINER_LOGS_BY_STATE");
+
+    Path outputPath = Paths.get(state + "_containers_by_state.txt");
+
+    try (Connection connection = getConnection();
+         Statement stmt = connection.createStatement();
+         BufferedWriter writer = Files.newBufferedWriter(outputPath, StandardCharsets.UTF_8)) {
+      
+      createContainerLogIndex(stmt);
+
+      try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        pstmt.setString(1, state);
+        try (ResultSet rs = pstmt.executeQuery()) {
+          writer.write(String.format("%-25s | %-35s | %-15s | %-15s | %-40s | %-12s%n",
+              "Timestamp", "Datanode ID", "Container ID", "BCSID", "Message", "Index Value"));
+          writer.write("-------------------------------------------------------------------------------------" +
+              "---------------------------------------------------------------------------------------\n");
+          
+          while (rs.next()) {
+            String timestamp = rs.getString("timestamp");
+            String datanodeId = rs.getString("datanode_id");
+            long containerId = rs.getLong("container_id");
+            String latestState = rs.getString("latest_state");
+            long latestBcsid = rs.getLong("latest_bcsid");
+            String errorMessage = rs.getString("error_message");
+            int indexValue = rs.getInt("index_value");
+            count++;
+
+            writer.write(String.format("%-25s | %-15s | %-15d | %-15d | %-40s | %-12d%n",
+                timestamp, datanodeId, containerId, latestBcsid, errorMessage, indexValue));
+          }
+
+          writer.write("total: " + count + "\n");
+          System.out.println("Results written to file: " + outputPath.toAbsolutePath());
+        }
+      }
+    } catch (SQLException e) {
+      LOG.error("Error while retrieving containers with state: {}", state, e);
+      throw e;
+    } catch (Exception e) {
+      LOG.error(e.getMessage());
+      throw new RuntimeException(e);
+    }
+  }
 }
 
