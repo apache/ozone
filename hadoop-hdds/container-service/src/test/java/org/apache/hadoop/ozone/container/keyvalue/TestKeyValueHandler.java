@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
@@ -26,7 +25,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
@@ -70,6 +68,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -111,7 +110,6 @@ public class TestKeyValueHandler {
         mock(ContainerMetrics.class),
         mock(TokenVerifier.class)
     );
-
   }
 
   /**
@@ -282,14 +280,6 @@ public class TestKeyValueHandler {
       DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
       StateContext context = ContainerTestUtils.getMockContext(
           datanodeDetails, conf);
-      KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
-          context.getParent().getDatanodeDetails().getUuidString(), cset,
-          volumeSet, metrics, c -> {
-      });
-      assertEquals("org.apache.hadoop.ozone.container.common" +
-          ".volume.CapacityVolumeChoosingPolicy",
-          keyValueHandler.getVolumeChoosingPolicyForTesting()
-              .getClass().getName());
 
       // Ensures that KeyValueHandler falls back to FILE_PER_BLOCK.
       conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, "FILE_PER_CHUNK");
@@ -297,17 +287,6 @@ public class TestKeyValueHandler {
           metrics, c -> { });
       assertEquals(ContainerLayoutVersion.FILE_PER_BLOCK,
           conf.getEnum(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_CHUNK));
-
-      //Set a class which is not of sub class of VolumeChoosingPolicy
-      conf.set(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
-          "org.apache.hadoop.ozone.container.common.impl.HddsDispatcher");
-      RuntimeException exception = assertThrows(RuntimeException.class,
-          () -> new KeyValueHandler(conf, context.getParent().getDatanodeDetails().getUuidString(), cset, volumeSet,
-              metrics, c -> { }));
-
-      assertThat(exception).hasMessageEndingWith(
-          "class org.apache.hadoop.ozone.container.common.impl.HddsDispatcher " +
-              "not org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy");
     } finally {
       volumeSet.shutdown();
       FileUtil.fullyDelete(datanodeDir);
@@ -464,7 +443,7 @@ public class TestKeyValueHandler {
     final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     final Clock clock = mock(Clock.class);
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
 
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     when(clock.millis())
@@ -492,7 +471,7 @@ public class TestKeyValueHandler {
     final AtomicInteger icrReceived = new AtomicInteger(0);
 
     final KeyValueHandler kvHandler = new KeyValueHandler(conf,
-        datanodeId, containerSet, volumeSet, metrics,
+        datanodeId, containerSet, volumeSet, null, metrics,
         c -> icrReceived.incrementAndGet(), clock);
     kvHandler.setClusterID(clusterId);
 

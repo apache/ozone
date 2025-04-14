@@ -93,6 +93,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
@@ -821,7 +822,7 @@ public class TestBlockDeletion {
 
     // Wait for block delete command sent from OM
     OzoneTestUtils.flushAndWaitForDeletedBlockLog(scm);
-    long start = System.currentTimeMillis();
+    long start = Time.monotonicNow();
     // Wait for all blocks been deleted.
     GenericTestUtils.waitFor(() -> {
       try {
@@ -833,7 +834,7 @@ public class TestBlockDeletion {
       }
       return false;
     }, 100, 30000);
-    long end = System.currentTimeMillis();
+    long end = Time.monotonicNow();
     System.out.println("Block deletion costs " + (end - start) + "ms");
   }
 }

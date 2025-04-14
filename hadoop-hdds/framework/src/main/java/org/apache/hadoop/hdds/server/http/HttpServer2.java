@@ -89,6 +89,7 @@ import org.apache.hadoop.util.StringUtils;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.CustomRequestLog;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
@@ -96,6 +97,7 @@ import org.eclipse.jetty.server.RequestLog;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.Slf4jRequestLogWriter;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.HandlerCollection;
@@ -618,14 +620,13 @@ public final class HttpServer2 implements FilterContainer {
     handler.getSessionCookieConfig().setSecure(true);
 
     ContextHandlerCollection contexts = new ContextHandlerCollection();
-    RequestLog requestLog = HttpRequestLog.getRequestLog(builder.name);
-
     handlers.addHandler(contexts);
-    if (requestLog != null) {
-      RequestLogHandler requestLogHandler = new RequestLogHandler();
-      requestLogHandler.setRequestLog(requestLog);
-      handlers.addHandler(requestLogHandler);
-    }
+
+    RequestLog requestLog = getRequestLog(builder.name);
+    RequestLogHandler requestLogHandler = new RequestLogHandler();
+    requestLogHandler.setRequestLog(requestLog);
+    handlers.addHandler(requestLogHandler);
+
     handlers.addHandler(webAppContext);
     final String appDir = getWebAppsPath(builder.name);
     if (!builder.skipDefaultApps) {
@@ -1793,5 +1794,12 @@ public final class HttpServer2 implements FilterContainer {
       ozoneConfiguration.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
               tmpMetaDir.getAbsolutePath());
     }
+  }
+
+  private static RequestLog getRequestLog(String name) {
+    String loggerName = "http.requests." + name;
+    Slf4jRequestLogWriter writer = new Slf4jRequestLogWriter();
+    writer.setLoggerName(loggerName);
+    return new CustomRequestLog(writer, CustomRequestLog.EXTENDED_NCSA_FORMAT);
   }
 }

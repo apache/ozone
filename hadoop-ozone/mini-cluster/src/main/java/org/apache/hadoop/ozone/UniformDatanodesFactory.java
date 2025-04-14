@@ -24,7 +24,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_REST_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.HddsDatanodeService.TESTING_DATANODE_VERSION_CURRENT;
 import static org.apache.hadoop.ozone.HddsDatanodeService.TESTING_DATANODE_VERSION_INITIAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT;
@@ -124,7 +123,6 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
   }
 
   private void configureDatanodePorts(ConfigurationTarget conf) {
-    conf.set(HDDS_REST_HTTP_ADDRESS_KEY, anyHostWithFreePort());
     conf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, anyHostWithFreePort());
     conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, anyHostWithFreePort());
     conf.setInt(HDDS_CONTAINER_IPC_PORT, getFreePort());

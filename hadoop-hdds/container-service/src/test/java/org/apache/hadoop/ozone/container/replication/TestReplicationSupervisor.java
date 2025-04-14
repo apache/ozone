@@ -87,12 +87,14 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCommandInfo;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
@@ -143,6 +145,8 @@ public class TestReplicationSupervisor {
   private TestClock clock;
   private DatanodeDetails datanode;
 
+  private VolumeChoosingPolicy volumeChoosingPolicy;
+
   @BeforeEach
   public void setUp() throws Exception {
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
@@ -155,6 +159,7 @@ public class TestReplicationSupervisor {
     context.setTermOfLeaderSCM(CURRENT_TERM);
     datanode = MockDatanodeDetails.randomDatanodeDetails();
     when(stateMachine.getDatanodeDetails()).thenReturn(datanode);
+    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(new OzoneConfiguration());
   }
 
   @AfterEach
@@ -332,7 +337,7 @@ public class TestReplicationSupervisor {
     ContainerController mockedCC =
         mock(ContainerController.class);
     ContainerImporter importer =
-        new ContainerImporter(conf, set, mockedCC, volumeSet);
+        new ContainerImporter(conf, set, mockedCC, volumeSet, volumeChoosingPolicy);
     ContainerReplicator replicator =
         new DownloadAndImportReplicator(conf, set, importer, moc);
 
@@ -391,7 +396,7 @@ public class TestReplicationSupervisor {
         .thenReturn(tarFile.toPath());
 
     ContainerImporter importer =
-        new ContainerImporter(conf, set, controllerMock, volumeSet);
+        new ContainerImporter(conf, set, controllerMock, volumeSet, volumeChoosingPolicy);
 
     HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
     // Initially volume has 0 commit space
@@ -569,7 +574,7 @@ public class TestReplicationSupervisor {
       when(volumeSet.getVolumesList()).thenReturn(singletonList(
           new HddsVolume.Builder(testDir).conf(conf).build()));
       ContainerController mockedCC = mock(ContainerController.class);
-      ContainerImporter importer = new ContainerImporter(conf, set, mockedCC, volumeSet);
+      ContainerImporter importer = new ContainerImporter(conf, set, mockedCC, volumeSet, volumeChoosingPolicy);
       ContainerReplicator replicator = new DownloadAndImportReplicator(
           conf, set, importer, moc);
       replicatorRef.set(replicator);

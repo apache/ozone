@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
@@ -74,6 +75,7 @@ import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -95,6 +97,7 @@ import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Timer;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
@@ -152,7 +155,8 @@ public class OzoneContainer {
   public OzoneContainer(HddsDatanodeService hddsDatanodeService,
       DatanodeDetails datanodeDetails, ConfigurationSource conf,
       StateContext context, CertificateClient certClient,
-      SecretKeyVerifierClient secretKeyClient) throws IOException {
+      SecretKeyVerifierClient secretKeyClient,
+      VolumeChoosingPolicy volumeChoosingPolicy) throws IOException {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
@@ -214,7 +218,7 @@ public class OzoneContainer {
           Handler.getHandlerForContainerType(
               containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics, icrSender));
+              containerSet, volumeSet, volumeChoosingPolicy, metrics, icrSender));
     }
 
     SecurityConfig secConf = new SecurityConfig(conf);
@@ -239,7 +243,7 @@ public class OzoneContainer {
         secConf,
         certClient,
         new ContainerImporter(conf, containerSet, controller,
-            volumeSet),
+            volumeSet, volumeChoosingPolicy),
         datanodeDetails.threadNamePrefix());
 
     readChannel = new XceiverServerGrpc(
@@ -299,8 +303,9 @@ public class OzoneContainer {
   @VisibleForTesting
   public OzoneContainer(
       DatanodeDetails datanodeDetails, ConfigurationSource conf,
-      StateContext context) throws IOException {
-    this(null, datanodeDetails, conf, context, null, null);
+      StateContext context, VolumeChoosingPolicy volumeChoosingPolicy)
+      throws IOException {
+    this(null, datanodeDetails, conf, context, null, null, volumeChoosingPolicy);
   }
 
   public GrpcTlsConfig getTlsClientConfig() {
@@ -315,7 +320,7 @@ public class OzoneContainer {
     Iterator<StorageVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<>();
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
 
     // Load container inspectors that may be triggered at startup based on
     // system properties set. These can inspect and possibly repair
@@ -339,13 +344,13 @@ public class OzoneContainer {
       for (Thread volumeThread : volumeThreads) {
         volumeThread.join();
       }
-      try (TableIterator<Long, ? extends Table.KeyValue<Long, String>> itr =
+      try (TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, String>> itr =
                containerSet.getContainerIdsTable().iterator()) {
-        Map<Long, Long> containerIds = new HashMap<>();
+        final Map<ContainerID, Long> containerIds = new HashMap<>();
         while (itr.hasNext()) {
           containerIds.put(itr.next().getKey(), 0L);
         }
-        containerSet.buildMissingContainerSetAndValidate(containerIds);
+        containerSet.buildMissingContainerSetAndValidate(containerIds, ContainerID::getId);
       }
     } catch (InterruptedException ex) {
       LOG.error("Volume Threads Interrupted exception", ex);
@@ -357,7 +362,7 @@ public class OzoneContainer {
     ContainerInspectorUtil.unload();
 
     LOG.info("Build ContainerSet costs {}s",
-        (System.currentTimeMillis() - startTime) / 1000);
+        (Time.monotonicNow() - startTime) / 1000);
   }
 
   /**

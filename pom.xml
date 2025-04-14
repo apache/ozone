@@ -109,8 +109,6 @@
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
     <io.grpc.version>1.58.0</io.grpc.version>
-    <jackson-jaxr.version>1.9.13</jackson-jaxr.version>
-    <jackson1.version>1.9.13</jackson1.version>
     <jackson2-bom.version>2.16.2</jackson2-bom.version>
     <jacoco.version>0.8.13</jacoco.version>
     <jaeger.version>1.8.1</jaeger.version>
@@ -202,7 +200,7 @@
     <proto3.hadooprpc.protobuf.version>3.23.4</proto3.hadooprpc.protobuf.version>
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
-    <ranger.version>2.3.0</ranger.version>
+    <ranger.version>2.6.0</ranger.version>
     <ratis.thirdparty.version>1.0.6</ratis.thirdparty.version>
     <ratis.version>3.1.2</ratis.version>
     <re2j.version>1.7</re2j.version>
@@ -988,26 +986,6 @@
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcutil-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-core-asl</artifactId>
-        <version>${jackson1.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-jaxrs</artifactId>
-        <version>${jackson-jaxr.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-mapper-asl</artifactId>
-        <version>${jackson1.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.woodstox</groupId>
-        <artifactId>stax2-api</artifactId>
-        <version>${stax2.version}</version>
       </dependency>
       <dependency>
         <groupId>org.eclipse.jetty</groupId>

@@ -15,26 +15,24 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.server.http;
+package org.apache.hadoop.ozone.debug.container;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import org.junit.jupiter.api.Test;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 
 /**
- * Test Http request log appender.
+ * A controller for managing container log operations like parsing and listing containers.
  */
-public class TestHttpRequestLogAppender {
 
-  @Test
-  public void testParameterPropagation() {
+@CommandLine.Command(
+    name = "container",
+    subcommands = {
+        ContainerLogParser.class
+    },
+    description = "Parse, Store, Retrieve"
+)
+@MetaInfServices(DebugSubcommand.class)
+public class ContainerLogController implements DebugSubcommand  {
 
-    HttpRequestLogAppender requestLogAppender = new HttpRequestLogAppender();
-    requestLogAppender.setFilename("jetty-namenode-yyyy_mm_dd.log");
-    requestLogAppender.setRetainDays(17);
-    assertEquals("jetty-namenode-yyyy_mm_dd.log",
-        requestLogAppender.getFilename(), "Filename mismatch");
-    assertEquals(17, requestLogAppender.getRetainDays(),
-        "Retain days mismatch");
-  }
 }
