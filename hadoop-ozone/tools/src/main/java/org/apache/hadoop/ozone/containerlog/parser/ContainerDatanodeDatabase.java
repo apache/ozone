@@ -38,13 +38,13 @@ import org.sqlite.SQLiteConfig;
 
 
 /**
- * Datanode container Database.
+ * Handles creation and interaction with the database.
+ * Provides methods for table creation, log data insertion, and index setup.
  */
 
 public class ContainerDatanodeDatabase {
 
   private static Map<String, String> queries;
-  public static final String CONTAINER_KEY_DELIMITER = "#";
 
   static {
     loadProperties();
@@ -120,25 +120,29 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  public void insertContainerDatanodeData(String key, List<DatanodeContainerInfo> transitionList) throws SQLException {
-    String[] parts = key.split(CONTAINER_KEY_DELIMITER);
-    if (parts.length != 2) {
-      System.err.println("Invalid key format: " + key);
-      return;
-    }
-
-    long containerId = Long.parseLong(parts[0]);
-    long datanodeId = Long.parseLong(parts[1]);
+  /**
+   * Inserts a list of container log entries into the DatanodeContainerLogTable.
+   *
+   * @param transitionList List of container log entries to insert into the table.
+   */
+  
+  public synchronized void insertContainerDatanodeData(List<DatanodeContainerInfo> transitionList) throws SQLException {
 
     String insertSQL = queries.get("INSERT_DATANODE_CONTAINER_LOG");
 
+    long containerId = 0;
+    String datanodeId = null;
+    
     try (Connection connection = getConnection();
          PreparedStatement preparedStatement = connection.prepareStatement(insertSQL)) {
 
       int count = 0;
 
       for (DatanodeContainerInfo info : transitionList) {
-        preparedStatement.setLong(1, datanodeId);
+        datanodeId = info.getDatanodeId();
+        containerId = info.getContainerId();
+
+        preparedStatement.setString(1, datanodeId);
         preparedStatement.setLong(2, containerId);
         preparedStatement.setString(3, info.getTimestamp());
         preparedStatement.setString(4, info.getState());
@@ -173,6 +177,11 @@ public class ContainerDatanodeDatabase {
     stmt.execute(createIndexSQL);
   }
 
+  /**
+   * Extracts the latest container log data from the DatanodeContainerLogTable
+   * and inserts it into ContainerLogTable.
+   */
+
   public void insertLatestContainerLogData() throws SQLException {
     createContainerLogTable();
     String selectSQL = queries.get("SELECT_LATEST_CONTAINER_LOG");
@@ -186,12 +195,12 @@ public class ContainerDatanodeDatabase {
       int count = 0;
       
       while (resultSet.next()) {
-        long datanodeId = resultSet.getLong("datanode_id");
+        String datanodeId = resultSet.getString("datanode_id");
         long containerId = resultSet.getLong("container_id");
         String containerState = resultSet.getString("container_state");
         long bcsid = resultSet.getLong("bcsid");
         try {
-          insertStmt.setLong(1, datanodeId);
+          insertStmt.setString(1, datanodeId);
           insertStmt.setLong(2, containerId);
           insertStmt.setString(3, containerState);
           insertStmt.setLong(4, bcsid);
@@ -250,7 +259,7 @@ public class ContainerDatanodeDatabase {
         Set<Long> bcsids = new HashSet<>();
         Set<Long> deletedReplicas = new HashSet<>();
 
-        System.out.printf("%-12s | %-10s | %-10s | %-25s | %-30s | %-20s | %-12s\n",
+        System.out.printf("%-12s | %-10s | %-10s | %-25s | %-30s | %-20s | %-12s%n",
             "Datanode ID", "State", "BCSID", "Timestamp", "Error Message", "Index Value", "Log Level");
         System.out.println("-------------------------------------------------------------------------" +
             "---------------------------------------------------------------------------------------------");
@@ -281,7 +290,7 @@ public class ContainerDatanodeDatabase {
             deletedReplicas.add(datanodeId);
             bcsids.add(latestBcsid);
           }
-          System.out.printf("%-12d | %-10s | %-10d | %-25s | %-30s | %-20s | %-12s\n",
+          System.out.printf("%-12d | %-10s | %-10d | %-25s | %-30s | %-20s | %-12s%n",
               datanodeId, latestState, latestBcsid, timestamp, errorMessage, indexValue, logLevel);
 
         }
@@ -305,7 +314,7 @@ public class ContainerDatanodeDatabase {
           System.out.println("Container " + containerID + " is both UNHEALTHY and UNDER-REPLICATED.");
         } else if (unhealthyCount == 1 && closedReplicas.size() == replicaCount - unhealthyCount) {
           System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
-        } else if ((openReplicas.size() > 0 && openReplicas.size() < 3) &&
+        } else if ((!openReplicas.isEmpty() && openReplicas.size() < 3) &&
             (closedReplicas.size() == replicaCount - openReplicas.size() ||
                 unhealthyCount == replicaCount - openReplicas.size())) {
           System.out.println("Container " + containerID + " is OPEN_UNHEALTHY.");
@@ -373,14 +382,14 @@ public class ContainerDatanodeDatabase {
 
         if (issueFound) {
           System.out.println("Issue found: Container " + containerID + " has duplicate OPEN state.");
-          System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s\n",
+          System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s%n",
               "Timestamp", "Container ID", "Datanode ID", "Container State", "BCSID", "Error Message", "Index Value",
               "Log Level");
           System.out.println("-------------------------------------------------------------------------" +
               "---------------------------------------------------------------------------------------------");
 
           for (String[] row : allRows) {
-            System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s\n",
+            System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s%n",
                 row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]);
           }
           return true;

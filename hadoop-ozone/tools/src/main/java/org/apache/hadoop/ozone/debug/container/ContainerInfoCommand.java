@@ -34,8 +34,10 @@ public class ContainerInfoCommand implements Callable<Void> {
   @CommandLine.Option(names = {"--containerId"},
       description = "container Id")
   private Long containerId;
-  
 
+  @CommandLine.ParentCommand
+  private ContainerLogController parent;
+  
   @Override
   public Void call() throws Exception {
     if (containerId != null) {

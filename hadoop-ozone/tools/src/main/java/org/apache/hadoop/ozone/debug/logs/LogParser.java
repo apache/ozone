@@ -15,25 +15,24 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.logs;
+package org.apache.hadoop.ozone.debug.container;
 
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
-import org.apache.hadoop.ozone.debug.logs.container.ContainerLogController;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 /**
- * Entry point for Ozone debug log parsing and analysis commands.
+ * A controller for managing container log operations like parsing and listing containers.
  */
 
 @CommandLine.Command(
-    name = "log",
+    name = "container",
     subcommands = {
-        ContainerLogController.class
+        ContainerLogParser.class
     },
-    description = "This serves as a common entry point for all commands that parse and analyze logs," +
-        "regardless of their source or type and require logs to be extracted first."
+    description = "Parse, Store, Retrieve"
 )
 @MetaInfServices(DebugSubcommand.class)
-public class LogParser implements DebugSubcommand {
+public class ContainerLogController implements DebugSubcommand  {
+
 }
