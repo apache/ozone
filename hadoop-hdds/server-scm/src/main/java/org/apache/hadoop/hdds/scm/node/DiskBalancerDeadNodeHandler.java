@@ -30,7 +30,6 @@ import org.slf4j.LoggerFactory;
  * does not retain outdated state for unreachable datanodes.
  */
 
-
 public class DiskBalancerDeadNodeHandler implements EventHandler<DatanodeDetails> {
 
   private static final Logger LOG = LoggerFactory.getLogger(DiskBalancerDeadNodeHandler.class);
