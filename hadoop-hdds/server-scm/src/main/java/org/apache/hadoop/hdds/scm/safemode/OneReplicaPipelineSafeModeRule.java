@@ -27,7 +27,10 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -55,15 +58,23 @@ public class OneReplicaPipelineSafeModeRule extends
   private Set<PipelineID> oldPipelineIDSet;
   private int currentReportedPipelineCount = 0;
   private PipelineManager pipelineManager;
-  private final double pipelinePercent;
+  private double pipelinePercent;
 
 
-  public OneReplicaPipelineSafeModeRule(EventQueue eventQueue, PipelineManager pipelineManager,
-      SCMSafeModeManager safeModeManager, ConfigurationSource configuration) {
-    super(safeModeManager, NAME, eventQueue);
+  public OneReplicaPipelineSafeModeRule() {
 
+  }
+
+  @Override
+  public void initialize(ConfigurationSource config, SCMContext scmContext, EventQueue eventQueue,
+      SCMSafeModeManager safeModeManager, PipelineManager pipelineManager, ContainerManager containerManager,
+      NodeManager nodeManager) {
+    if (pipelineManager == null) {
+      return;
+    }
+    setup(NAME, eventQueue, safeModeManager, getEventType());
     pipelinePercent =
-        configuration.getDouble(
+        config.getDouble(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT,
             HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT_DEFAULT);
@@ -76,7 +87,7 @@ public class OneReplicaPipelineSafeModeRule extends
 
     this.pipelineManager = pipelineManager;
     initializeRule(false);
-
+    markInitialized();
   }
 
   @Override

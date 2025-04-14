@@ -26,8 +26,10 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -53,27 +55,35 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   private int healthyPipelineThresholdCount;
   private int currentHealthyPipelineCount = 0;
-  private final double healthyPipelinesPercent;
+  private double healthyPipelinesPercent;
   private final Set<PipelineID> processedPipelineIDs = new HashSet<>();
-  private final PipelineManager pipelineManager;
-  private final int minHealthyPipelines;
-  private final SCMContext scmContext;
+  private PipelineManager pipelineManager;
+  private int minHealthyPipelines;
+  private SCMContext scmContext;
   private final Set<PipelineID> unProcessedPipelineSet = new HashSet<>();
 
-  HealthyPipelineSafeModeRule(EventQueue eventQueue,
-      PipelineManager pipelineManager, SCMSafeModeManager manager,
-      ConfigurationSource configuration, SCMContext scmContext) {
-    super(manager, NAME, eventQueue);
+  HealthyPipelineSafeModeRule() {
+
+  }
+
+  @Override
+  public void initialize(ConfigurationSource config, SCMContext scmContext, EventQueue eventQueue,
+      SCMSafeModeManager safeModeManager, PipelineManager pipelineManager, ContainerManager containerManager,
+      NodeManager nodeManager) {
+    if (pipelineManager == null) {
+      return;
+    }
+    setup(NAME, eventQueue, safeModeManager, getEventType());
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
     healthyPipelinesPercent =
-        configuration.getDouble(HddsConfigKeys.
+        config.getDouble(HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT,
             HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT_DEFAULT);
 
     // We only care about THREE replica pipeline
-    minHealthyPipelines = getMinHealthyPipelines(configuration);
+    minHealthyPipelines = getMinHealthyPipelines(config);
 
     Preconditions.checkArgument(
         (healthyPipelinesPercent >= 0.0 && healthyPipelinesPercent <= 1.0),
@@ -82,6 +92,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
             + " value should be >= 0.0 and <= 1.0");
 
     initializeRule(false);
+    markInitialized();
   }
 
   private int getMinHealthyPipelines(ConfigurationSource config) {
