@@ -28,7 +28,8 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "container",
     subcommands = {
-        ContainerLogParser.class
+        ContainerLogParser.class,
+        ContainerInfoCommand.class
     },
     description = "Parse, Store, Retrieve"
 )
