@@ -120,7 +120,8 @@ public class DiskBalancerManager {
           .map(dn -> getInfoProto(dn, clientVersion))
           .collect(Collectors.toList());
     } else {
-      return nodeManager.getAllNodes().stream()
+      return nodeManager.getNodes(IN_SERVICE,
+              HddsProtos.NodeState.HEALTHY).stream()
           .filter(dn -> shouldReturnDatanode(filterStatus, dn))
           .map(dn -> getInfoProto((DatanodeInfo)dn, clientVersion))
           .collect(Collectors.toList());
@@ -302,7 +303,7 @@ public class DiskBalancerManager {
     return volumeDensitySum;
   }
 
-  private DiskBalancerStatus getStatus(DatanodeDetails datanodeDetails) {
+  public DiskBalancerStatus getStatus(DatanodeDetails datanodeDetails) {
     return statusMap.computeIfAbsent(datanodeDetails,
         dn -> new DiskBalancerStatus(DiskBalancerRunningStatus.UNKNOWN, new DiskBalancerConfiguration(), 0, 0, 0, 0));
   }
@@ -330,6 +331,22 @@ public class DiskBalancerManager {
         diskBalancerConfiguration, successMoveCount, failureMoveCount, bytesToMove, balancedBytes));
     if (reportProto.hasBalancedBytes()) {
       balancedBytesMap.put(dn, reportProto.getBalancedBytes());
+    }
+  }
+
+  public void markStatusUnknown(DatanodeDetails dn) {
+    DiskBalancerStatus currentStatus = statusMap.get(dn);
+    if (currentStatus != null &&
+        currentStatus.getRunningStatus() != DiskBalancerRunningStatus.UNKNOWN) {
+      DiskBalancerStatus unknownStatus = new DiskBalancerStatus(
+          DiskBalancerRunningStatus.UNKNOWN,
+          currentStatus.getDiskBalancerConfiguration(),
+          currentStatus.getSuccessMoveCount(),
+          currentStatus.getFailureMoveCount(),
+          currentStatus.getBytesToMove(),
+          currentStatus.getBalancedBytes()
+      );
+      statusMap.put(dn, unknownStatus);
     }
   }
 
