@@ -33,7 +33,8 @@ import org.slf4j.LoggerFactory;
 public class ReconIncrementalContainerReportHandler
     extends IncrementalContainerReportHandler {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ReconIncrementalContainerReportHandler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(
+      ReconIncrementalContainerReportHandler.class);
 
   ReconIncrementalContainerReportHandler(NodeManager nodeManager,
              ContainerManager containerManager, SCMContext scmContext) {

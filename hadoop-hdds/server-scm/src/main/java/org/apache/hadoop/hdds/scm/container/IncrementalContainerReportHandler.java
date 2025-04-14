@@ -40,7 +40,8 @@ public class IncrementalContainerReportHandler
     extends AbstractContainerReportHandler
     implements EventHandler<IncrementalContainerReportFromDatanode> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(IncrementalContainerReportHandler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(
+      IncrementalContainerReportHandler.class);
 
   public IncrementalContainerReportHandler(
       final NodeManager nodeManager,
