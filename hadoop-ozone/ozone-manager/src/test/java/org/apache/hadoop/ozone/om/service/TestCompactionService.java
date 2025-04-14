@@ -18,6 +18,9 @@
 package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -25,8 +28,10 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,26 +44,24 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@TestMethodOrder(OrderAnnotation.class)
 class TestCompactionService {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestCompactionService.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestCompactionService.class);
 
   private static final int SERVICE_INTERVAL = 1;
   private static final int WAIT_TIME = (int) Duration.ofSeconds(10).toMillis();
+  private OzoneManager ozoneManager;
+  private OMMetadataManager metadataManager;
 
   @BeforeAll
-  void setup(@TempDir Path tempDir) throws Exception {
+  void setup(@TempDir Path tempDir) {
     ExitUtils.disableSystemExit();
 
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -67,19 +70,10 @@ class TestCompactionService {
     conf.setTimeDuration(OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL,
         SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
     conf.setQuietMode(false);
-  }
 
-  /**
-   * Add a compaction request and verify that it is processed.
-   *
-   * @throws IOException - on Failure.
-   */
-  @Timeout(300)
-  @Test
-  public void testCompact() throws Exception {
-    OzoneManager ozoneManager = mock(OzoneManager.class);
-    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
-
+    ozoneManager = mock(OzoneManager.class);
+    metadataManager = mock(OMMetadataManager.class);
+    when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
     TypedTable table = mock(TypedTable.class);
 
     Set<String> tables = new HashSet<>();
@@ -89,20 +83,21 @@ class TestCompactionService {
     tables.add("deletedTable");
     tables.add("deletedDirectoryTable");
     tables.add("multipartInfoTable");
-
-    when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
     when(metadataManager.getTable(anyString())).thenReturn(table);
     when(metadataManager.listTableNames()).thenReturn(tables);
+  }
 
-    CompactionService compactionService = new CompactionService(ozoneManager, TimeUnit.MILLISECONDS,
-        TimeUnit.SECONDS.toMillis(SERVICE_INTERVAL), TimeUnit.SECONDS.toMillis(60),
-        Arrays.asList(OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT.split(","))) {
+  /**
+   * Add a compaction request and verify that it is processed.
+   *
+   * @throws IOException - on Failure.
+   */
+  @Timeout(300)
+  @Test
+  public void testCompactSuccessfully() throws Exception {
 
-      @Override
-      public void compactFully(String tableName) throws IOException {
-        LOG.info("Compacting column family: {}", tableName);
-      }
-    };
+    CompactionService compactionService = getCompactionService(Arrays.asList(
+        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT.split(",")));
     compactionService.start();
 
     compactionService.suspend();
@@ -120,4 +115,63 @@ class TestCompactionService {
         SERVICE_INTERVAL, WAIT_TIME);
   }
 
+  @Timeout(300)
+  @Test
+  public void testCompactSkipInvalidTable() throws Exception {
+
+    List<String> compactTables = new ArrayList<>();
+    compactTables.add("fileTable");
+    compactTables.add("keyTable");
+    compactTables.add("invalidTable");
+
+
+    CompactionService compactionService = getCompactionService(compactTables);
+
+    // compaction should start, but with only the valid tables
+    compactionService.start();
+    compactionService.suspend();
+    // wait for submitted tasks to complete
+    Thread.sleep(SERVICE_INTERVAL);
+
+    assertTrue(compactionService.getCompactableTables().contains("fileTable"));
+    assertTrue(compactionService.getCompactableTables().contains("keyTable"));
+    assertFalse(compactionService.getCompactableTables().contains("invalidTable"));
+
+    final long oldkeyCount = compactionService.getNumCompactions();
+    LOG.info("oldkeyCount={}", oldkeyCount);
+
+    final int compactionTriggered = 1;
+
+    compactionService.resume();
+
+    GenericTestUtils.waitFor(
+        () -> compactionService.getNumCompactions() >= oldkeyCount + compactionTriggered,
+        SERVICE_INTERVAL, WAIT_TIME);
+  }
+
+  @Timeout(300)
+  @Test
+  public void testCompactFailure() throws Exception {
+
+    List<String> compactTables = new ArrayList<>();
+    compactTables.add("invalidTable2");
+    compactTables.add("invalidTable1");
+
+    // initialization should fail if all tables are invalid
+    assertThrows(IllegalArgumentException.class,
+        () -> getCompactionService(compactTables));
+  }
+
+
+  private CompactionService getCompactionService(List<String> compactTables) {
+    CompactionService compactionService = new CompactionService(ozoneManager, TimeUnit.MILLISECONDS,
+        TimeUnit.SECONDS.toMillis(SERVICE_INTERVAL), TimeUnit.SECONDS.toMillis(60), compactTables) {
+
+      @Override
+      public void compactFully(String tableName) throws IOException {
+        LOG.info("Compacting column family: {}", tableName);
+      }
+    };
+    return compactionService;
+  }
 }

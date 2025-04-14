@@ -1528,7 +1528,7 @@
   </property>
   <property>
     <name>ozone.om.compaction.service.run.interval</name>
-    <value>5m</value>
+    <value>6h</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
       A background job that periodically compacts rocksdb tables flagged for compaction.

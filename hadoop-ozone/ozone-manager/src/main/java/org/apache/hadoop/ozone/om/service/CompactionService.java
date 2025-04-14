@@ -19,7 +19,11 @@ package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -63,12 +67,24 @@ public class CompactionService extends BackgroundService {
 
     this.numCompactions = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
+    this.compactableTables = validateTables(tables);
+  }
+
+  private List<String> validateTables(List<String> tables) {
+    List<String> validTables = new ArrayList<>();
+    Set<String> allTableNames = new HashSet<>(omMetadataManager.listTableNames());
     for (String table : tables) {
-      if (!omMetadataManager.listTableNames().contains(table)) {
-        throw new IllegalArgumentException();
+      if (allTableNames.contains(table)) {
+        validTables.add(table);
+      } else {
+        LOG.warn("CompactionService: Table \"{}\" not found in OM metadata. Skipping this table.", table);
       }
     }
-    this.compactableTables = tables;
+    if (validTables.isEmpty()) {
+      LOG.error("CompactionService: No valid compaction tables found. Failing initialization.");
+      throw new IllegalArgumentException("CompactionService: None of the provided tables are valid.");
+    }
+    return Collections.unmodifiableList(validTables);
   }
 
   /**
@@ -85,6 +101,11 @@ public class CompactionService extends BackgroundService {
   @VisibleForTesting
   public void resume() {
     suspended.set(false);
+  }
+
+  @VisibleForTesting
+  public List<String> getCompactableTables() {
+    return compactableTables;
   }
 
   /**
@@ -115,6 +136,7 @@ public class CompactionService extends BackgroundService {
     LOG.info("Compacting column family: {}", tableName);
     try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
       options.setBottommostLevelCompaction(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+      options.setExclusiveManualCompaction(true);
       RocksDatabase rocksDatabase = ((RDBStore) omMetadataManager.getStore()).getDb();
 
       try {
