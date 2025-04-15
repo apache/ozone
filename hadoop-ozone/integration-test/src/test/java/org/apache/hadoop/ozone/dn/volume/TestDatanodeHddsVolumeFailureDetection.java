@@ -289,20 +289,17 @@ class TestDatanodeHddsVolumeFailureDetection {
           // refer to HddsVolume.check()
           DatanodeTestUtils.simulateBadVolume(vol0);
 
+          // one volume health check got automatically executed when the cluster started
+          // the second health should log the rocksdb failure but return a healthy-volume status
           assertEquals(VolumeCheckResult.HEALTHY, vol0.checkDbHealth(dbDir));
+          // the third health check should log the rocksdb failure and return a failed-volume status
           assertEquals(VolumeCheckResult.FAILED, vol0.checkDbHealth(dbDir));
-        } catch (Exception e) {
-          LOG.error("Exception occurred while running test", e);
         } finally {
           // restore all
           DatanodeTestUtils.restoreBadVolume(vol0);
           DatanodeTestUtils.restoreDataDirFromFailure(dbDir);
         }
-      } catch (Exception e) {
-        LOG.error("Exception occurred while running test", e);
       }
-    } catch (Exception e) {
-      LOG.error("Exception occurred while running test", e);
     }
   }
 

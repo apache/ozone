@@ -38,19 +38,17 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.Time;
+import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -318,12 +316,10 @@ public class HddsVolume extends StorageVolume {
     }
 
     Boolean isVolumeTestResultHealthy = Boolean.TRUE;
-    try (DatanodeStore readOnlyStore
-             = BlockUtils.getUncachedDatanodeStore(dbFile.toString(), OzoneConsts.SCHEMA_V3, getConf(), true)) {
-//             = new DatanodeStoreSchemaThreeImpl(getConf(), dbFile.toString(), true)) {
-
-        volumeTestResultQueue.add(isVolumeTestResultHealthy);
-    } catch (AssertionError | Exception e) {
+    try (Options options = new Options().setCreateIfMissing(true);
+         RocksDB readDB = RocksDB.openReadOnly(options, dbFile.toString())) {
+      volumeTestResultQueue.add(isVolumeTestResultHealthy);
+    } catch (Exception e) {
       LOG.warn("Could not open Volume DB located at {}", dbFile, e);
       volumeTestResultQueue.add(!isVolumeTestResultHealthy);
       volumeTestFailureCount.incrementAndGet();
