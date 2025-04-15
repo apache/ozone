@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto.DISK;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -483,14 +482,14 @@ public class TestSCMCommonPlacementPolicy {
 
     // capacity = 200000, used = 90000, remaining = 101000, committed = 500
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =
-        HddsTestUtils.createStorageReport(randomDatanodeDetails().getID(), "/data/hdds",
+        HddsTestUtils.createStorageReport(DatanodeID.randomID(), "/data/hdds",
                 200000, 90000, 101000, DISK).toBuilder()
             .setCommitted(500)
             .setFreeSpaceToSpare(10000)
             .build();
     // capacity = 200000, used = 90000, remaining = 101000, committed = 1000
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport2 =
-        HddsTestUtils.createStorageReport(randomDatanodeDetails().getID(), "/data/hdds",
+        HddsTestUtils.createStorageReport(DatanodeID.randomID(), "/data/hdds",
                 200000, 90000, 101000, DISK).toBuilder()
             .setCommitted(1000)
             .setFreeSpaceToSpare(100000)

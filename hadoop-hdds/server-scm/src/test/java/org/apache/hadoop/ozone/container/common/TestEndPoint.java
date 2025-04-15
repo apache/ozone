@@ -424,7 +424,7 @@ public class TestEndPoint {
   private RegisterEndpointTask getRegisterEndpointTask(boolean clearDatanodeDetails, OzoneConfiguration conf,
                                                        EndpointStateMachine rpcEndPoint) throws Exception {
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
-    DatanodeID datanodeID = randomDatanodeDetails().getID();
+    DatanodeID datanodeID = DatanodeID.randomID();
     when(ozoneContainer.getNodeReport()).thenReturn(HddsTestUtils
         .createNodeReport(Arrays.asList(getStorageReports(datanodeID)),
             Arrays.asList(getMetadataStorageReports(datanodeID))));

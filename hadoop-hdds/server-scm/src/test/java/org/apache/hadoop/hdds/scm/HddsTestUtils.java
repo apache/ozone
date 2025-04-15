@@ -161,8 +161,8 @@ public final class HddsTestUtils {
    */
   public static NodeReportProto getRandomNodeReport(int numberOfStorageReport,
       int numberOfMetadataStorageReport) {
-    DatanodeID nodeId = MockDatanodeDetails.randomDatanodeDetails().getID();
-    return getRandomNodeReport(nodeId, File.separator + nodeId,
+    DatanodeID nodeId = DatanodeID.randomID();
+    return getRandomNodeReport(nodeId, File.separator + nodeId.getID(),
         numberOfStorageReport, numberOfMetadataStorageReport);
   }
 
