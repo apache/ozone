@@ -267,6 +267,7 @@ Apache License 2.0
    ch.qos.reload4j:reload4j
    com.amazonaws:aws-java-sdk-core
    com.amazonaws:aws-java-sdk-kms
+   com.amazonaws:aws-java-sdk-logs
    com.amazonaws:aws-java-sdk-s3
    com.amazonaws:jmespath-java
    com.carrotsearch:hppc
@@ -276,6 +277,8 @@ Apache License 2.0
    com.fasterxml.jackson.dataformat:jackson-dataformat-cbor
    com.fasterxml.jackson.dataformat:jackson-dataformat-xml
    com.fasterxml.jackson.datatype:jackson-datatype-jsr310
+   com.fasterxml.jackson.jaxrs:jackson-jaxrs-base
+   com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider
    com.fasterxml.jackson.module:jackson-module-jaxb-annotations
    com.fasterxml.woodstox:woodstox-core
    com.github.jnr:jnr-a64asm
@@ -316,6 +319,7 @@ Apache License 2.0
    commons-fileupload:commons-fileupload
    info.picocli:picocli
    info.picocli:picocli-shell-jline3
+   io.airlift:aircompressor
    io.dropwizard.metrics:metrics-core
    io.grpc:grpc-api
    io.grpc:grpc-context
@@ -398,6 +402,7 @@ Apache License 2.0
    org.apache.logging.log4j:log4j-api
    org.apache.logging.log4j:log4j-core
    org.apache.orc:orc-core
+   org.apache.orc:orc-shims
    org.apache.ranger:ranger-intg
    org.apache.ranger:ranger-plugin-classloader
    org.apache.ranger:ranger-plugin-audit
@@ -417,10 +422,6 @@ Apache License 2.0
    org.apache.thrift:libthrift
    org.apache.zookeeper:zookeeper
    org.apache.zookeeper:zookeeper-jute
-   org.codehaus.jackson:jackson-core-asl
-   org.codehaus.jackson:jackson-jaxrs
-   org.codehaus.jackson:jackson-mapper-asl
-   org.codehaus.jackson:jackson-xc
    org.eclipse.jetty:jetty-client
    org.eclipse.jetty:jetty-http
    org.eclipse.jetty:jetty-io

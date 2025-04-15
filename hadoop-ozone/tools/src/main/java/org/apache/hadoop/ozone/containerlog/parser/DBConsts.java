@@ -15,48 +15,24 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.server.http;
-
-import org.apache.log4j.AppenderSkeleton;
-import org.apache.log4j.spi.LoggingEvent;
+package org.apache.hadoop.ozone.containerlog.parser;
 
 /**
- * Log4j Appender adapter for HttpRequestLog.
+ * Constants used for ContainerDatanodeDatabase.
  */
-public class HttpRequestLogAppender extends AppenderSkeleton {
+public final class DBConsts {
 
-  private String filename;
-  private int retainDays;
-
-  public HttpRequestLogAppender() {
+  private DBConsts() {
+    //Never constructed
   }
 
-  public void setRetainDays(int retainDays) {
-    this.retainDays = retainDays;
-  }
+  public static final String DRIVER = "org.sqlite.JDBC";
+  public static final String CONNECTION_PREFIX = "jdbc:sqlite:";
+  public static final String DATABASE_NAME = "container_datanode.db";
+  public static final String PROPS_FILE = "container-log-db-queries.properties";
+  public static final int CACHE_SIZE = 1000000;
+  public static final int BATCH_SIZE = 2500;
+  public static final String DATANODE_CONTAINER_LOG_TABLE_NAME = "DatanodeContainerLogTable";
+  public static final String CONTAINER_LOG_TABLE_NAME = "ContainerLogTable";
 
-  public int getRetainDays() {
-    return retainDays;
-  }
-
-  public void setFilename(String filename) {
-    this.filename = filename;
-  }
-
-  public String getFilename() {
-    return filename;
-  }
-
-  @Override
-  public void append(LoggingEvent event) {
-  }
-
-  @Override
-  public void close() {
-  }
-
-  @Override
-  public boolean requiresLayout() {
-    return false;
-  }
 }

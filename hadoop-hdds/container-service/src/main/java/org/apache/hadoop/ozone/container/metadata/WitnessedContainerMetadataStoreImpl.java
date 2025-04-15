@@ -22,6 +22,7 @@ import java.io.UncheckedIOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -33,7 +34,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<WitnessedContainerDBDefinition>
     implements WitnessedContainerMetadataStore {
 
-  private Table<Long, String> containerIdsTable;
+  private Table<ContainerID, String> containerIdsTable;
   private static final ConcurrentMap<String, WitnessedContainerMetadataStore> INSTANCES =
       new ConcurrentHashMap<>();
 
@@ -63,13 +64,13 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
   @Override
   protected DBStore initDBStore(DBStoreBuilder dbStoreBuilder, ManagedDBOptions options, ConfigurationSource config)
       throws IOException {
-    DBStore dbStore = dbStoreBuilder.build();
+    final DBStore dbStore = dbStoreBuilder.build();
     this.containerIdsTable = this.getDbDef().getContainerIdsTable().getTable(dbStore);
     return dbStore;
   }
 
   @Override
-  public Table<Long, String> getContainerIdsTable() {
+  public Table<ContainerID, String> getContainerIdsTable() {
     return containerIdsTable;
   }
 }
