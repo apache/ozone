@@ -21,6 +21,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.util.Time;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -48,7 +49,7 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    startTestTime = System.currentTimeMillis();
+    startTestTime = Time.monotonicNow();
 
     while (getRemainingTimeInSec() > 0) {
       try (ScmClient scmClient = scmOption.createScmClient()) {
@@ -85,6 +86,6 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
   }
 
   private long getRemainingTimeInSec() {
-    return timeoutSeconds - (System.currentTimeMillis() - startTestTime) / 1000;
+    return timeoutSeconds - (Time.monotonicNow() - startTestTime) / 1000;
   }
 }

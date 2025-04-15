@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinitio
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.repair.RepairTool;
+import org.apache.hadoop.util.Time;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -87,7 +88,7 @@ public class UpgradeContainerSchema extends RepairTool {
   List<VolumeUpgradeResult> run(OzoneConfiguration configuration, List<HddsVolume> volumes) {
     List<VolumeUpgradeResult> results = new ArrayList<>();
     Map<HddsVolume, CompletableFuture<VolumeUpgradeResult>> volumeFutures = new HashMap<>();
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
 
     info("Start to upgrade %s volume(s)", volumes.size());
     for (HddsVolume hddsVolume : volumes) {
@@ -114,7 +115,7 @@ public class UpgradeContainerSchema extends RepairTool {
     }
 
     info("It took %sms to finish all volume upgrade.",
-        (System.currentTimeMillis() - startTime));
+        (Time.monotonicNow() - startTime));
     return results;
   }
 

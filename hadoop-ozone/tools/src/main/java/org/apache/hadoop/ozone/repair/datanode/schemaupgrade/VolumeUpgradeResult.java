@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.util.Time;
 
 /**
  * This class contains v2 to v3 container upgrade result.
@@ -30,7 +31,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 class VolumeUpgradeResult {
   private Map<Long, ContainerUpgradeResult> resultMap;
   private final HddsVolume hddsVolume;
-  private final long startTimeMs = System.currentTimeMillis();
+  private final long startTimeMs = Time.monotonicNow();
   private long endTimeMs = 0L;
   private Exception e = null;
   private Status status = Status.FAIL;
@@ -72,12 +73,12 @@ class VolumeUpgradeResult {
   }
 
   public void success() {
-    this.endTimeMs = System.currentTimeMillis();
+    this.endTimeMs = Time.monotonicNow();
     this.status = Status.SUCCESS;
   }
 
   public void fail(Exception exception) {
-    this.endTimeMs = System.currentTimeMillis();
+    this.endTimeMs = Time.monotonicNow();
     this.status = Status.FAIL;
     this.e = exception;
   }

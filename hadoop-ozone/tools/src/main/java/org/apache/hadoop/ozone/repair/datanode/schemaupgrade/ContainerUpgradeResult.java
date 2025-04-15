@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.util.Time;
 
 /**
  * This class represents upgrade v2 to v3 container result.
@@ -27,7 +28,7 @@ class ContainerUpgradeResult {
   private final ContainerData originContainerData;
   private ContainerData newContainerData;
   private long totalRow = 0L;
-  private final long startTimeMs = System.currentTimeMillis();
+  private final long startTimeMs = Time.monotonicNow();
   private long endTimeMs = 0L;
   private Status status = Status.FAIL;
 
@@ -81,7 +82,7 @@ class ContainerUpgradeResult {
 
   public void success(long rowCount) {
     this.totalRow = rowCount;
-    this.endTimeMs = System.currentTimeMillis();
+    this.endTimeMs = Time.monotonicNow();
     this.status = Status.SUCCESS;
   }
 

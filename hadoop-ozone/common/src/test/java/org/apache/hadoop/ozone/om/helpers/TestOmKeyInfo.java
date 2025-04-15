@@ -123,6 +123,8 @@ public class TestOmKeyInfo {
         .setReplicationConfig(replicationConfig)
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
+        .addTag("tagKey1", "tagValue1")
+        .addTag("tagKey2", "tagValue2")
         .setExpectedDataGeneration(5678L)
         .build();
   }
@@ -149,6 +151,8 @@ public class TestOmKeyInfo {
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
+        .addTag("tagKey1", "tagValue1")
+        .addTag("tagKey2", "tagValue2")
         .setOmKeyLocationInfos(
             Collections.singletonList(createOmKeyLocationInfoGroup(isMPU)))
         .build();
@@ -194,6 +198,11 @@ public class TestOmKeyInfo {
     cloneKey = key.copyObject();
 
     assertEquals(key.getAcls(), cloneKey.getAcls());
+
+    // Change object tags and check
+    key.setTags(Collections.singletonMap("tagKey3", "tagValue3"));
+
+    assertNotEquals(key, cloneKey);
   }
 
 
