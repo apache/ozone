@@ -236,6 +236,15 @@ public class ContainerDatanodeDatabase {
     stmt.executeUpdate(dropTableSQL);
   }
 
+  /**
+   * Displays detailed information about a container based on its ID, including its state, BCSID, 
+   * timestamp, message, and index value. It also checks for issues such as UNHEALTHY 
+   * replicas, under-replication, over-replication, OPEN_UNHEALTHY, OUASI_CLOSED_STUCK, mismatched replication
+   * and duplicate open.
+   *
+   * @param containerID The ID of the container to display details for.
+   */
+  
   public void showContainerDetails(Long containerID) {
     String query = queries.get("CONTAINER_SELECT_QUERY");
 
@@ -338,6 +347,15 @@ public class ContainerDatanodeDatabase {
     }
   }
 
+  /**
+   * Checks whether the specified container has multiple "OPEN" states.
+   * If multiple "OPEN" states are found, it returns {@code true} and prints the details.
+   *
+   * @param containerID The container ID to check for multiple "OPEN" states.
+   * @param connection  The database connection to use for the check.
+   * @return {@code true} if multiple "OPEN" states are found, {@code false} otherwise.
+   */
+  
   private boolean checkForMultipleOpenStates(Long containerID, Connection connection) {
     String openCheckQuery = queries.get("OPEN_CHECK_QUERY");
     try (PreparedStatement openCheckStatement = connection.prepareStatement(openCheckQuery)) {
