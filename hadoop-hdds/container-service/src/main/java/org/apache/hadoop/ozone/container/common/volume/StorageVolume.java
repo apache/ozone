@@ -91,6 +91,8 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   private final StorageType storageType;
   private final String volumeRoot;
   private final File storageDir;
+  /** This is the raw storage dir location, saved for logging, to avoid repeated filesystem lookup. */
+  private final String storageDirStr;
   private String workingDirName;
   private File tmpDir;
   private File diskCheckDir;
@@ -171,6 +173,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.conf = null;
       this.dnConf = null;
     }
+    this.storageDirStr = storageDir.getAbsolutePath();
   }
 
   public void format(String cid) throws IOException {
@@ -457,7 +460,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     StorageLocationReport.Builder builder = StorageLocationReport.newBuilder()
         .setFailed(isFailed())
         .setId(getStorageID())
-        .setStorageLocation(volumeRoot)
+        .setStorageLocation(storageDirStr)
         .setStorageType(storageType);
 
     if (!builder.isFailed()) {

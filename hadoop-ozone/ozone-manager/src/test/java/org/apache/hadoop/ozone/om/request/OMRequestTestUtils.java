@@ -741,7 +741,7 @@ public final class OMRequestTestUtils {
     return BucketInfo.newBuilder()
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
-        .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.SSD)
+        .setStorageType(HddsProtos.StorageTypeProto.SSD)
         .setIsVersionEnabled(false)
         .addAllMetadata(getMetadataList());
   }

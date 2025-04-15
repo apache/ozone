@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory;
  */
 public class UpgradeManager {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(UpgradeManager.class);
 
   private final Map<String, DatanodeStoreSchemaThreeImpl>
@@ -48,7 +49,7 @@ public class UpgradeManager {
       List<HddsVolume> volumes) throws IOException {
     List<Result> results = new ArrayList<>();
     Map<HddsVolume, CompletableFuture<Result>> volumeFutures = new HashMap<>();
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
 
     LOG.info("Start to upgrade {} volume(s)", volumes.size());
     for (StorageVolume volume : volumes) {
@@ -76,7 +77,7 @@ public class UpgradeManager {
     }
 
     LOG.info("It took {}ms to finish all volume upgrade.",
-        (System.currentTimeMillis() - startTime));
+        (Time.monotonicNow() - startTime));
     return results;
   }
 
@@ -91,7 +92,7 @@ public class UpgradeManager {
   public static class Result {
     private Map<Long, UpgradeTask.UpgradeContainerResult> resultMap;
     private final HddsVolume hddsVolume;
-    private final long startTimeMs = System.currentTimeMillis();
+    private final long startTimeMs = Time.monotonicNow();
     private long endTimeMs = 0L;
     private Exception e = null;
     private Status status = Status.FAIL;
@@ -124,12 +125,12 @@ public class UpgradeManager {
     }
 
     public void success() {
-      this.endTimeMs = System.currentTimeMillis();
+      this.endTimeMs = Time.monotonicNow();
       this.status = Status.SUCCESS;
     }
 
     public void fail(Exception exception) {
-      this.endTimeMs = System.currentTimeMillis();
+      this.endTimeMs = Time.monotonicNow();
       this.status = Status.FAIL;
       this.e = exception;
     }

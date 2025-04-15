@@ -55,7 +55,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   // number of descendant leaves under this node
   private int numOfLeaves;
   // LOGGER
-  public static final Logger LOG = LoggerFactory.getLogger(InnerNodeImpl.class);
+  private static final Logger LOG = LoggerFactory.getLogger(InnerNodeImpl.class);
 
   /**
    * Construct an InnerNode from its name, network location, parent, level and

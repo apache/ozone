@@ -89,6 +89,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -101,6 +102,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -110,7 +112,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests for PipelineManagerImpl.
@@ -356,10 +357,9 @@ public class TestPipelineManagerImpl {
   @Test
   public void testPipelineReport() throws Exception {
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
-      SCMSafeModeManager scmSafeModeManager =
-          new SCMSafeModeManager(conf,
-              mock(ContainerManager.class), pipelineManager,
-              new EventQueue(), serviceManager, scmContext);
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(conf,
+          mock(ContainerManager.class), pipelineManager, mock(NodeManager.class),
+          new EventQueue(), serviceManager, scmContext);
       Pipeline pipeline = pipelineManager
           .createPipeline(RatisReplicationConfig
               .getInstance(ReplicationFactor.THREE));
@@ -467,10 +467,9 @@ public class TestPipelineManagerImpl {
     assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
-    SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(new OzoneConfiguration(),
-            mock(ContainerManager.class), pipelineManager, new EventQueue(),
-            serviceManager, scmContext);
+    SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(new OzoneConfiguration(),
+        mock(ContainerManager.class), pipelineManager, mock(NodeManager.class),
+        new EventQueue(), serviceManager, scmContext);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,
             SCMContext.emptyContext(), conf);
@@ -671,8 +670,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testAddContainerWithClosedPipelineScmStart() throws Exception {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.
-            captureLogs(LoggerFactory.getLogger(PipelineStateMap.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(PipelineStateMap.class);
     SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
             createPipelineManager(true, buffer);
@@ -717,8 +715,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testPipelineCloseFlow() throws IOException, TimeoutException {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-            .captureLogs(LoggerFactory.getLogger(PipelineManagerImpl.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(PipelineManagerImpl.class);
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(
             RatisReplicationConfig

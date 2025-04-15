@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Evolving
 public final class ReloadingX509TrustManager implements X509TrustManager, CertificateNotification {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ReloadingX509TrustManager.class);
 
   static final String RELOAD_ERROR_MESSAGE =

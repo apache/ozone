@@ -106,7 +106,7 @@ run_test() {
 
   local test_dir="$_upgrade_dir/upgrades/$upgrade_type"
   local callback_dir="$test_dir"/callbacks
-  local execution_dir="$test_dir"/execution/"${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}"
+  local execution_dir="$test_dir"/execution/"$compose_cluster-$upgrade_type-${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}"
   local compose_dir="$_upgrade_dir"/compose/"$compose_cluster"
   # Export variables needed by test, since it is run in a subshell.
   export OZONE_UPGRADE_CALLBACK="$callback_dir"/"$OZONE_UPGRADE_TO"/callback.sh
