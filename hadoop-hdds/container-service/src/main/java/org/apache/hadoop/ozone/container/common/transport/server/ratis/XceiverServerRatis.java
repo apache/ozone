@@ -126,7 +126,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static final Logger LOG = LoggerFactory.getLogger(XceiverServerRatis.class);
 
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
-
   private static final List<Integer> DEFAULT_PRIORITY_LIST =
       new ArrayList<>(Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
 

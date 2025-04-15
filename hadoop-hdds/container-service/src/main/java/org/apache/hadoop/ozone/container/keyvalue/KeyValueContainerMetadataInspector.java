@@ -75,7 +75,6 @@ import org.slf4j.LoggerFactory;
  */
 public class KeyValueContainerMetadataInspector implements ContainerInspector {
   private static final Logger LOG = LoggerFactory.getLogger(KeyValueContainerMetadataInspector.class);
-
   public static final Logger REPORT_LOG = LoggerFactory.getLogger("ContainerMetadataInspectorReport");
 
   public static final String SYSTEM_PROPERTY = "ozone.datanode.container" +

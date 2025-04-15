@@ -38,7 +38,6 @@ public final class CommandHandlerMetrics implements MetricsSource {
   public static final String SOURCE_NAME = CommandHandlerMetrics.class.getSimpleName();
 
   private final Map<Type, CommandHandler> handlerMap;
-
   private final Map<Type, AtomicInteger> commandCount;
 
   private CommandHandlerMetrics(Map<Type, CommandHandler> handlerMap) {
