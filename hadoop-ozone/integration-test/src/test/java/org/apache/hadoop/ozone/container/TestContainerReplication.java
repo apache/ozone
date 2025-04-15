@@ -192,7 +192,8 @@ class TestContainerReplication {
     OzoneBucket bucket = volume.getBucket(BUCKET);
 
     TestDataUtil.createKey(bucket, KEY,
-        RatisReplicationConfig.getInstance(THREE), "Hello".getBytes(UTF_8));
+        RatisReplicationConfig.getInstance(THREE),
+        "Hello".getBytes(UTF_8));
   }
 
   private byte[] createTestData(OzoneClient client, int size) throws IOException {
