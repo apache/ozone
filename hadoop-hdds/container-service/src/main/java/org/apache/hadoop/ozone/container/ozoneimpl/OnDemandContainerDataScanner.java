@@ -54,7 +54,7 @@ public final class OnDemandContainerDataScanner {
   private final OnDemandScannerMetrics metrics;
   private final long minScanGap;
 
-  private OnDemandContainerDataScanner(
+  public OnDemandContainerDataScanner(
       ContainerScannerConfiguration conf, ContainerController controller) {
     containerController = controller;
     throttler = new DataTransferThrottler(

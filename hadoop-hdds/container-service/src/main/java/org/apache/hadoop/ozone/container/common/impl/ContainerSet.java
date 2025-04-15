@@ -37,6 +37,8 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -66,6 +68,8 @@ public class ContainerSet implements Iterable<Container<?>> {
   private Clock clock;
   private long recoveringTimeout;
   private final Table<Long, String> containerIdsTable;
+  // Handler that will be invoked when a user of a container reports an error.
+  private Consumer<Container<?>> containerErrorHandler;
 
   @VisibleForTesting
   public ContainerSet(long recoveringTimeout) {
@@ -125,6 +129,19 @@ public class ContainerSet implements Iterable<Container<?>> {
       throw new StorageContainerException(String.format("Container with container Id %d with state : %s is missing in" +
           " the DN.", containerId, state),
           ContainerProtos.Result.CONTAINER_MISSING);
+    }
+  }
+
+  /**
+   * @param handler All callback that will be invoked when an error is reported with a member of this container set.
+   */
+  public void registerContainerErrorHandler(Consumer<Container<?>> handler) {
+    this.containerErrorHandler = handler;
+  }
+
+  public void reportError(long containerID) {
+    if (containerErrorHandler != null) {
+      containerErrorHandler.accept(getContainer(containerID));
     }
   }
 
