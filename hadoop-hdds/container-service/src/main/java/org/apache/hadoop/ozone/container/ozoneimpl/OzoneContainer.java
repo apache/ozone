@@ -453,7 +453,7 @@ public class OzoneContainer {
     for (BackgroundContainerDataScanner s : dataScanners) {
       s.shutdown();
     }
-    OnDemandContainerDataScanner.shutdown();
+    onDemandScanner.shutdown();
   }
 
   @VisibleForTesting
