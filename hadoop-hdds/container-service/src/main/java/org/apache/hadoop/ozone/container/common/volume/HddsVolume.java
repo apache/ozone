@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -47,8 +49,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.Time;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -315,9 +315,9 @@ public class HddsVolume extends StorageVolume {
       return VolumeCheckResult.HEALTHY;
     }
 
-    Boolean isVolumeTestResultHealthy = Boolean.TRUE;
-    try (Options options = new Options().setCreateIfMissing(true);
-         RocksDB readDB = RocksDB.openReadOnly(options, dbFile.toString())) {
+    boolean isVolumeTestResultHealthy = true;
+    try (ManagedOptions managedOptions = new ManagedOptions();
+         ManagedRocksDB readOnlyDb = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
       volumeTestResultQueue.add(isVolumeTestResultHealthy);
     } catch (Exception e) {
       LOG.warn("Could not open Volume DB located at {}", dbFile, e);

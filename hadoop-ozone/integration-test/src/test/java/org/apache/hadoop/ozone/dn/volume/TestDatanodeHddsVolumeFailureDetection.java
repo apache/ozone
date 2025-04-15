@@ -68,15 +68,12 @@ import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class tests datanode can detect failed volumes.
  */
 @Timeout(300)
 class TestDatanodeHddsVolumeFailureDetection {
-  private static final Logger LOG = LoggerFactory.getLogger(TestDatanodeHddsVolumeFailureDetection.class);
   private static final int KEY_SIZE = 128;
 
   @ParameterizedTest
