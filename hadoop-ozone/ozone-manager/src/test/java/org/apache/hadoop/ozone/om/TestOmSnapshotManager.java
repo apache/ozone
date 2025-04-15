@@ -275,6 +275,7 @@ class TestOmSnapshotManager {
 
     snapshotChainManager.addSnapshot(first);
     assertDoesNotThrow(() -> omSnapshotManager.snapshotLimitCheck());
+    omSnapshotManager.decrementInFlightSnapshotCount();
 
     snapshotChainManager.addSnapshot(second);
 

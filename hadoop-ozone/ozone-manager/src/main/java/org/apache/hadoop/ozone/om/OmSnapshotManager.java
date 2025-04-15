@@ -65,6 +65,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
@@ -175,6 +176,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final int softCacheSize;
 
   private int fsSnapshotMaxLimit;
+  private final AtomicInteger inFlightSnapshotCount = new AtomicInteger(0);
 
   public OmSnapshotManager(OzoneManager ozoneManager) {
 
@@ -856,23 +858,30 @@ public final class OmSnapshotManager implements AutoCloseable {
     checkSnapshotActive(toSnapInfo, false);
   }
 
-  public void snapshotLimitCheck() throws IOException {
-    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
-        ozoneManager.getMetadataManager();
-    SnapshotChainManager snapshotChainManager =
-        omMetadataManager.getSnapshotChainManager();
+  public void snapshotLimitCheck() throws IOException, OMException {
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager = omMetadataManager.getSnapshotChainManager();
     int currentSnapshotNum = snapshotChainManager.getGlobalSnapshotChain().size();
-    if (currentSnapshotNum >= fsSnapshotMaxLimit) {
+    int oldCount = inFlightSnapshotCount.get();
+    int newCount = inFlightSnapshotCount.updateAndGet(count -> {
+      if (currentSnapshotNum + count >= fsSnapshotMaxLimit) {
+        return count;
+      }
+      return count + 1;
+    });
+    if (newCount == oldCount) {
       throw new OMException(
-          String.format("Snapshot limit of %d reached. Cannot create more snapshots.",
-              fsSnapshotMaxLimit) + " If you already deleted some snapshots, " +
+          String.format("Snapshot limit of %d reached. Cannot create more snapshots. " +
+              "Current snapshots: %d, In-flight creations: %d",
+              fsSnapshotMaxLimit, currentSnapshotNum, newCount) +
+              " If you already deleted some snapshots, " +
               "please wait for the background service to complete the cleanup.",
           OMException.ResultCodes.TOO_MANY_SNAPSHOTS);
     }
   }
 
-  public void setFsSnapshotMaxLimit(int fsSnapshotMaxLimit) {
-    this.fsSnapshotMaxLimit = fsSnapshotMaxLimit;
+  public void decrementInFlightSnapshotCount() {
+    inFlightSnapshotCount.decrementAndGet();
   }
 
   private int getIndexFromToken(final String token) throws IOException {
