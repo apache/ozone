@@ -17,28 +17,27 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.File;
-import java.util.Collections;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedIngestExternalFileOptions;
+import java.io.IOException;
+import org.rocksdb.RocksDBException;
 
 /**
- * Load rocksdb sst files.
+ * Exceptions converted from {@link RocksDBException}.
  */
-final class RDBSstFileLoader {
-  private RDBSstFileLoader() { }
+public class RocksDatabaseException extends IOException {
+  private static String getStatus(RocksDBException e) {
+    return e.getStatus() == null ? "NULL_STATUS" : e.getStatus().getCodeString();
+  }
 
-  static void load(RocksDatabase db, ColumnFamily family, File externalFile) throws RocksDatabaseException {
-    // Ingest an empty sst file results in exception.
-    if (externalFile.length() == 0) {
-      return;
-    }
-    try (ManagedIngestExternalFileOptions ingestOptions =
-             new ManagedIngestExternalFileOptions()) {
-      ingestOptions.setIngestBehind(false);
-      db.ingestExternalFile(family,
-          Collections.singletonList(externalFile.getAbsolutePath()),
-          ingestOptions);
-    }
+  /** Construct from the given {@link RocksDBException} cause. */
+  public RocksDatabaseException(String message, RocksDBException cause) {
+    super(getStatus(cause) + ": " + message, cause);
+  }
+
+  public RocksDatabaseException(String message) {
+    super(message);
+  }
+
+  public RocksDatabaseException() {
+    super();
   }
 }
