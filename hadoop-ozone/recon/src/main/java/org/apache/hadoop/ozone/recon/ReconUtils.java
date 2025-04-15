@@ -403,7 +403,7 @@ public class ReconUtils {
    * <pre>
    * {@code
    * Examples:
-   * - Input: "volume/bucket/key" -> Output: "/volumeID/bucketID/parentDirID/key"
+   * - Input: "volume/bucket/key" -> Output: "/volumeID/bucketID/bucketID/key"
    * - Input: "volume/bucket/dir1" -> Output: "/volumeID/bucketID/dir1ID/"
    * - Input: "volume/bucket/dir1/key1" -> Output: "/volumeID/bucketID/dir1ID/key1"
    * - Input: "volume/bucket/dir1/dir2" -> Output: "/volumeID/bucketID/dir2ID/"

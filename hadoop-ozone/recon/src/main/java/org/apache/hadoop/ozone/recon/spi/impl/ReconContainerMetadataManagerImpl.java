@@ -32,9 +32,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -680,11 +682,13 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Get container key records from the containerKeyTable that exactly match the given
-   * startPrefix for the provided containerId.
+   * Get container key records from the containerKeyTable that match the given
+   * startPrefix or its subpaths for the provided containerId.
    *
    * @param containerId the container ID.
    * @param startPrefix the key prefix to search for.
+   * @param limit       max number of records to return.
+   * @param isFSO       flag to indicate if the bucket is FSO.
    * @return A List of ContainerKeyPrefix records if found; an empty list otherwise.
    * @throws IOException if a DB operation fails.
    */
@@ -701,29 +705,34 @@ public class ReconContainerMetadataManagerImpl
     if (isFSO) {
       String[] names = parseRequestPath(startPrefix);
       long parentId = Long.parseLong(names[names.length - 1]);
-      ReconUtils.gatherSubPaths(parentId, subPaths,
-          Long.parseLong(names[0]),
-          Long.parseLong(names[1]),
-          reconNamespaceSummaryManager);
+      long volumeId = Long.parseLong(names[0]);
+      long bucketId = Long.parseLong(names[1]);
+
+      ReconUtils.gatherSubPaths(parentId, subPaths, volumeId, bucketId, reconNamespaceSummaryManager);
     }
 
     try (TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix, Integer>> containerIterator =
              containerKeyTable.iterator()) {
-      // Seek to the first subPath (they are all prefixed similarly)
-      ContainerKeyPrefix seekKey = ContainerKeyPrefix.get(containerId, startPrefix);
-      KeyValue<ContainerKeyPrefix, Integer> seekKeyValue = containerIterator.seek(seekKey);
 
-      while (seekKeyValue != null && records.size() < limit) {
-        ContainerKeyPrefix currentKey = seekKeyValue.getKey();
-        if (!subPaths.stream().anyMatch(prefix -> currentKey.getKeyPrefix().startsWith(prefix))) {
-          break; // No more relevant records
+      for (String path : subPaths) {
+        // Seek to the first subPath (they are all prefixed similarly)
+        ContainerKeyPrefix seekKey = ContainerKeyPrefix.get(containerId, path);
+        KeyValue<ContainerKeyPrefix, Integer> seekKeyValue = containerIterator.seek(seekKey);
+
+        while (seekKeyValue != null &&
+            seekKeyValue.getKey().getKeyPrefix().startsWith(path) &&
+            records.size() < limit) {
+
+          ContainerKeyPrefix currentKey = seekKeyValue.getKey();
+          records.add(currentKey);
+
+          if (!containerIterator.hasNext()) {
+            break;
+          }
+          seekKeyValue = containerIterator.next();
         }
 
-        records.add(currentKey);
-
-        if (containerIterator.hasNext()) {
-          seekKeyValue = containerIterator.next();
-        } else {
+        if (records.size() >= limit) {
           break;
         }
       }

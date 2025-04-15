@@ -239,8 +239,8 @@ public class ContainerEndpoint {
         boolean isFSO = isFSOBucket(startPrefix);
         if (isFSO) {
           Table<String, OmKeyInfo> fileTable = omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-          startPrefix = ReconUtils.convertToObjectPathForSearch(startPrefix, omMetadataManager,
-              reconNamespaceSummaryManager, reconSCM, fileTable);
+          startPrefix = ReconUtils.convertToObjectPathForSearch(
+              startPrefix, omMetadataManager, reconNamespaceSummaryManager, reconSCM, fileTable);
         }
 
         // If a startPrefix is provided, fetch only the specific matching record(s).
