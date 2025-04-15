@@ -1216,8 +1216,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       String keyName = UUID.randomUUID().toString();
 
       TestDataUtil.createKey(bucket, keyName,
-          ReplicationConfig.
-              fromTypeAndFactor(RATIS, ONE), value.getBytes(UTF_8));
+          ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+          value.getBytes(UTF_8));
       OzoneKey key = bucket.getKey(keyName);
       assertEquals(keyName, key.getName());
       try (OzoneInputStream is = bucket.readKey(keyName)) {
@@ -2025,8 +2025,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
 
-      TestDataUtil.createKey(bucket, keyName, ReplicationConfig.
-          fromTypeAndFactor(RATIS, ONE), value.getBytes(UTF_8));
+      TestDataUtil.createKey(bucket, keyName,
+          ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+          value.getBytes(UTF_8));
       OzoneKey key = bucket.getKey(keyName);
       assertEquals(keyName, key.getName());
       try (OzoneInputStream is = bucket.readKey(keyName)) {
@@ -2057,7 +2058,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
 
-      TestDataUtil.createKey(bucket, keyName, value.getBytes(UTF_8));
+      TestDataUtil.createKey(bucket, keyName,
+          ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
+          value.getBytes(UTF_8));
       OzoneKey key = bucket.getKey(keyName);
       assertEquals(keyName, key.getName());
       try (OzoneInputStream is = bucket.readKey(keyName)) {
@@ -2095,7 +2098,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           String keyName = UUID.randomUUID().toString();
           String data = Arrays.toString(generateData(5 * 1024 * 1024,
               (byte) RandomUtils.nextLong()));
-          TestDataUtil.createKey(bucket, keyName, data.getBytes(UTF_8));
+          TestDataUtil.createKey(bucket, keyName,
+              ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
+              data.getBytes(UTF_8));
           OzoneKey key = bucket.getKey(keyName);
           assertEquals(keyName, key.getName());
           try (OzoneInputStream is = bucket.readKey(keyName)) {
@@ -2170,7 +2175,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     // Write data into a key
     TestDataUtil.createKey(bucket, keyName,
-        ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value.getBytes(UTF_8));
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        value.getBytes(UTF_8));
 
     // We need to find the location of the chunk file corresponding to the
     // data we just wrote.
@@ -2229,8 +2235,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     //String keyValue = "this is a test value.glx";
     // create the initial key with size 0, write will allocate the first block.
     TestDataUtil.createKey(bucket, keyName,
-        ReplicationConfig.
-            fromTypeAndFactor(RATIS, ONE), keyValue.getBytes(UTF_8));
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        keyValue.getBytes(UTF_8));
 
     // First, confirm the key info from the client matches the info in OM.
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
@@ -2370,14 +2376,16 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyName1 = UUID.randomUUID().toString();
 
     // Write first key
-    TestDataUtil.createKey(bucket, keyName1, ReplicationConfig.
-        fromTypeAndFactor(RATIS, THREE), value.getBytes(UTF_8));
+    TestDataUtil.createKey(bucket, keyName1,
+        ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
+        value.getBytes(UTF_8));
 
     // Write second key
     String keyName2 = UUID.randomUUID().toString();
     value = "unhealthy container replica";
-    TestDataUtil.createKey(bucket, keyName2, ReplicationConfig.
-        fromTypeAndFactor(RATIS, THREE), value.getBytes(UTF_8));
+    TestDataUtil.createKey(bucket, keyName2,
+        ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
+        value.getBytes(UTF_8));
 
     // Find container ID
     OzoneKey key = bucket.getKey(keyName2);
@@ -2463,7 +2471,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     // Write data into a key
     TestDataUtil.createKey(bucket, keyName,
-        ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value.getBytes(UTF_8));
+        ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
+        value.getBytes(UTF_8));
 
     // We need to find the location of the chunk file corresponding to the
     // data we just wrote.
@@ -2528,8 +2537,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    TestDataUtil.createKey(bucket, keyName, ReplicationConfig.
-        fromTypeAndFactor(RATIS, ONE), value.getBytes(UTF_8));
+    TestDataUtil.createKey(bucket, keyName,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        value.getBytes(UTF_8));
     OzoneKey key = bucket.getKey(keyName);
     assertEquals(keyName, key.getName());
     bucket.deleteKey(keyName);
@@ -2826,12 +2836,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
       TestDataUtil.createKey(volBbucketA,
           keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-          value);
+          ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
       TestDataUtil.createKey(volBbucketB,
           keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-          value);
+          ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
     }
     /*
     Create 10 keys in  vol-a-<random>/buc-a-<random>,
@@ -2843,20 +2851,16 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
       TestDataUtil.createKey(volAbucketA,
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-          value);
+          ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
       TestDataUtil.createKey(volAbucketB,
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-          value);
+          ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
       TestDataUtil.createKey(volBbucketA,
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-          value);
+          ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
       TestDataUtil.createKey(volBbucketB,
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-          value);
+          ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
     }
     Iterator<? extends OzoneKey> volABucketAIter =
         volAbucketA.listKeys("key-");
