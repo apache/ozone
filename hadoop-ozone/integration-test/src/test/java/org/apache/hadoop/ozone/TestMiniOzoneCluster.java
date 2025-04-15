@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.nio.file.Path;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -204,9 +204,11 @@ public class TestMiniOzoneCluster {
 
   /**
    * Test that a DN can register with SCM even if it was started before the SCM.
+   *
    * @throws Exception
    */
-  @Test @Timeout(100)
+  @Test
+  @Timeout(100)
   public void testDNstartAfterSCM() throws Exception {
     // Start a cluster with 3 DN
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -249,9 +251,11 @@ public class TestMiniOzoneCluster {
 
   /**
    * Test that multiple datanode directories are created in MiniOzoneCluster.
+   *
    * @throws Exception
    */
-  @Test @Timeout(60)
+  @Test
+  @Timeout(60)
   public void testMultipleDataDirs() throws Exception {
     // Start a cluster with 3 DN and configure reserved space in each DN
     String reservedSpace = "1B";
@@ -279,8 +283,8 @@ public class TestMiniOzoneCluster {
     assertEquals(3, volumeList.size());
 
     volumeList.forEach(storageVolume -> assertEquals(
-            (long) StorageSize.parse(reservedSpace).getValue(),
-            storageVolume.getVolumeUsage().get().getReservedInBytes()));
+        (long) StorageSize.parse(reservedSpace).getValue(),
+        storageVolume.getVolumeUsage().get().getReservedInBytes()));
   }
 
 }
