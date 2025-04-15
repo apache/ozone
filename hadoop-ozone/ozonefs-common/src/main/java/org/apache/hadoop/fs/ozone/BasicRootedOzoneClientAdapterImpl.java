@@ -379,8 +379,8 @@ public class BasicRootedOzoneClientAdapterImpl
         config);
     String key = ofsPath.getKeyName();
     try {
-      OzoneBucket bucket = getBucket(ofsPath, false);
-      return bucket.readFile(key).getInputStream();
+      ClientProtocol clientProtocol = ozoneClient.getProxy();
+      return clientProtocol.readFile(ofsPath.getVolumeName(), ofsPath.getBucketName(), key).getInputStream();
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
           || ex.getResult() == OMException.ResultCodes.KEY_NOT_FOUND
