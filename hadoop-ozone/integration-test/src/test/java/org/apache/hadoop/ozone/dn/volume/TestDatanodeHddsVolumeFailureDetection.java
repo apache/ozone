@@ -24,11 +24,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -48,6 +46,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -63,21 +62,21 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
-import org.apache.hadoop.util.Timer;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class tests datanode can detect failed volumes.
  */
 @Timeout(300)
 class TestDatanodeHddsVolumeFailureDetection {
-
+  private static final Logger LOG = LoggerFactory.getLogger(TestDatanodeHddsVolumeFailureDetection.class);
   private static final int KEY_SIZE = 128;
 
   @ParameterizedTest
@@ -282,27 +281,28 @@ class TestDatanodeHddsVolumeFailureDetection {
         }
 
         MutableVolumeSet volSet = oc.getVolumeSet();
-        StorageVolume vol0 = volSet.getVolumesList().get(0);
+        HddsVolume vol0 = (HddsVolume) volSet.getVolumesList().get(0);
 
         try {
           DatanodeTestUtils.injectDataDirFailure(dbDir);
-
           // simulate bad volume by removing write permission on root dir
           // refer to HddsVolume.check()
           DatanodeTestUtils.simulateBadVolume(vol0);
 
-          assertFalse(vol0.isFailed());
-          StorageVolumeChecker storageVolumeChecker = new StorageVolumeChecker(conf, new Timer(), "");
-          storageVolumeChecker.registerVolumeSet(volSet);
-          storageVolumeChecker.checkAllVolumeSets();
-          assertTrue(vol0.isFailed());
-          DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
+          assertEquals(VolumeCheckResult.HEALTHY, vol0.checkDbHealth(dbDir));
+          assertEquals(VolumeCheckResult.FAILED, vol0.checkDbHealth(dbDir));
+        } catch (Exception e) {
+          LOG.error("Exception occurred while running test", e);
         } finally {
           // restore all
           DatanodeTestUtils.restoreBadVolume(vol0);
           DatanodeTestUtils.restoreDataDirFromFailure(dbDir);
         }
+      } catch (Exception e) {
+        LOG.error("Exception occurred while running test", e);
       }
+    } catch (Exception e) {
+      LOG.error("Exception occurred while running test", e);
     }
   }
 

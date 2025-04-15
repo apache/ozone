@@ -22,26 +22,31 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.initPerDiskDBStore;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
@@ -99,6 +104,11 @@ public class HddsVolume extends StorageVolume {
   private AtomicBoolean dbLoaded = new AtomicBoolean(false);
   private final AtomicBoolean dbLoadFailure = new AtomicBoolean(false);
 
+  private final int volumeTestCount;
+  private final int volumeTestFailureTolerance;
+  private AtomicInteger volumeTestFailureCount;
+  private Queue<Boolean> volumeTestResultQueue;
+
   /**
    * Builder for HddsVolume.
    */
@@ -131,6 +141,11 @@ public class HddsVolume extends StorageVolume {
       this.volumeInfoMetrics =
           new VolumeInfoMetrics(b.getVolumeRootStr(), this);
 
+      this.volumeTestCount = getDatanodeConfig().getVolumeIOTestCount();
+      this.volumeTestFailureTolerance = getDatanodeConfig().getVolumeIOFailureTolerance();
+      this.volumeTestFailureCount = new AtomicInteger(0);
+      this.volumeTestResultQueue = new ConcurrentLinkedQueue<>();
+
       initialize();
     } else {
       // Builder is called with failedVolume set, so create a failed volume
@@ -138,6 +153,8 @@ public class HddsVolume extends StorageVolume {
       this.setState(VolumeState.FAILED);
       volumeIOStats = null;
       volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
+      this.volumeTestCount = 0;
+      this.volumeTestFailureTolerance = 0;
     }
 
     LOG.info("HddsVolume: {}", getReport());
@@ -291,17 +308,42 @@ public class HddsVolume extends StorageVolume {
       return VolumeCheckResult.FAILED;
     }
 
-    DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
-    Preconditions.checkNotNull(cache);
-    try {
-      RawDB db = cache.getDB(String.valueOf(dbFile), getConf());
-      RDBStore store = (RDBStore)db.getStore().getStore();
-      store.getDb().getManagedRocksDb().get().getLiveFiles();
-    } catch (IOException e) {
-      LOG.error("Could not open Volume DB located at {}", dbFile, e);
+    return checkDbHealth(dbFile);
+  }
+
+  @VisibleForTesting
+  public VolumeCheckResult checkDbHealth(File dbFile) {
+    if (volumeTestCount == 0) {
+      return VolumeCheckResult.HEALTHY;
+    }
+
+    Boolean isVolumeTestResultHealthy = Boolean.TRUE;
+    try (DatanodeStore readOnlyStore
+             = BlockUtils.getUncachedDatanodeStore(dbFile.toString(), OzoneConsts.SCHEMA_V3, getConf(), true)) {
+//             = new DatanodeStoreSchemaThreeImpl(getConf(), dbFile.toString(), true)) {
+
+        volumeTestResultQueue.add(isVolumeTestResultHealthy);
+    } catch (AssertionError | Exception e) {
+      LOG.warn("Could not open Volume DB located at {}", dbFile, e);
+      volumeTestResultQueue.add(!isVolumeTestResultHealthy);
+      volumeTestFailureCount.incrementAndGet();
+    }
+
+    if (volumeTestResultQueue.size() > volumeTestCount) {
+      if (!volumeTestResultQueue.isEmpty() &&
+          volumeTestResultQueue.poll() != isVolumeTestResultHealthy) {
+        volumeTestFailureCount.decrementAndGet();
+      }
+    }
+
+    if (volumeTestFailureCount.get() > volumeTestFailureTolerance) {
+      LOG.error("Failed volume test for volume {}: the last {} runs encountered {} out of {} tolerated failures.",
+          this, volumeTestResultQueue.size(), volumeTestFailureCount.get(), volumeTestFailureTolerance);
       return VolumeCheckResult.FAILED;
     }
 
+    LOG.info("IO test results for volume {}: the last {} runs encountered {} out of {} tolerated failures",
+        this, volumeTestResultQueue.size(), volumeTestFailureTolerance, volumeTestFailureTolerance);
     return VolumeCheckResult.HEALTHY;
   }
 
