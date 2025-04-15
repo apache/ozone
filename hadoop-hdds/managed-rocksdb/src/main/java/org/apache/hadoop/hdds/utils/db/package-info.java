@@ -15,26 +15,5 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.server.http;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import org.junit.jupiter.api.Test;
-
-/**
- * Test Http request log appender.
- */
-public class TestHttpRequestLogAppender {
-
-  @Test
-  public void testParameterPropagation() {
-
-    HttpRequestLogAppender requestLogAppender = new HttpRequestLogAppender();
-    requestLogAppender.setFilename("jetty-namenode-yyyy_mm_dd.log");
-    requestLogAppender.setRetainDays(17);
-    assertEquals("jetty-namenode-yyyy_mm_dd.log",
-        requestLogAppender.getFilename(), "Filename mismatch");
-    assertEquals(17, requestLogAppender.getRetainDays(),
-        "Retain days mismatch");
-  }
-}
+/** RocksDB related classes. */
+package org.apache.hadoop.hdds.utils.db;

@@ -15,48 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.server.http;
+package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.log4j.AppenderSkeleton;
-import org.apache.log4j.spi.LoggingEvent;
+import java.io.IOException;
+import org.rocksdb.RocksDBException;
 
 /**
- * Log4j Appender adapter for HttpRequestLog.
+ * Exceptions converted from {@link RocksDBException}.
  */
-public class HttpRequestLogAppender extends AppenderSkeleton {
-
-  private String filename;
-  private int retainDays;
-
-  public HttpRequestLogAppender() {
+public class RocksDatabaseException extends IOException {
+  private static String getStatus(RocksDBException e) {
+    return e.getStatus() == null ? "NULL_STATUS" : e.getStatus().getCodeString();
   }
 
-  public void setRetainDays(int retainDays) {
-    this.retainDays = retainDays;
+  /** Construct from the given {@link RocksDBException} cause. */
+  public RocksDatabaseException(String message, RocksDBException cause) {
+    super(getStatus(cause) + ": " + message, cause);
   }
 
-  public int getRetainDays() {
-    return retainDays;
+  public RocksDatabaseException(String message) {
+    super(message);
   }
 
-  public void setFilename(String filename) {
-    this.filename = filename;
-  }
-
-  public String getFilename() {
-    return filename;
-  }
-
-  @Override
-  public void append(LoggingEvent event) {
-  }
-
-  @Override
-  public void close() {
-  }
-
-  @Override
-  public boolean requiresLayout() {
-    return false;
+  public RocksDatabaseException() {
+    super();
   }
 }

@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -225,7 +224,7 @@ public class SstFilteringService extends BackgroundService
                 }
               }
             }
-          } catch (RocksDBException | IOException e) {
+          } catch (IOException e) {
             if (isSnapshotDeleted(snapshotInfoTable.get(snapShotTableKey))) {
               LOG.info("Exception encountered while filtering a snapshot: {} since it was deleted midway",
                   snapShotTableKey, e);

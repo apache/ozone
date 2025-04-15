@@ -15,25 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
-
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-
 /**
- * Interface for loading data from a dump file.
+ * Provides functionality for managing container log operations, including parsing, processing, and storing log data.
  */
-public interface DumpFileLoader extends Closeable {
 
-  /**
-   * Load key value pairs from an external dump file.
-   */
-  void load(File externalFile) throws IOException;
-
-  /**
-   * Close this file loader.
-   */
-  @Override
-  void close();
-}
+package org.apache.hadoop.ozone.debug.container;
