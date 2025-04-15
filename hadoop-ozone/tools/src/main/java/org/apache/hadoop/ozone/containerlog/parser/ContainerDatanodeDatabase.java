@@ -241,6 +241,15 @@ public class ContainerDatanodeDatabase {
     stmt.execute(createIndexSQL);
   }
 
+  /**
+   * Lists containers filtered by the specified state and writes their details to a file.
+   * <p>
+   * The output includes timestamp, datanode ID, container ID, BCSID, error message, and index value,
+   * written in a human-readable table format to a file named {@code <state>_containers_by_state.txt}.
+   *
+   * @param state the container state to filter by (e.g., "OPEN", "CLOSED")
+   */
+  
   public void listContainersByState(String state) throws SQLException {
     int count = 0;
     String query = queries.get("SELECT_LATEST_CONTAINER_LOGS_BY_STATE");
