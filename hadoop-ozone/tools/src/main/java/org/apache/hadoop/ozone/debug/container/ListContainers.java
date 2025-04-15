@@ -28,8 +28,8 @@ import picocli.CommandLine;
  */
 
 @CommandLine.Command(
-    name = "list_containers",
-    description = "list containers"
+    name = "list-containers",
+    description = "Finds containers from the database based on the option provided."
 )
 public class ListContainers implements Callable<Void> {
   
