@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.debug.container;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
@@ -32,12 +35,25 @@ import picocli.CommandLine;
     description = "Finds containers from the database based on the option provided."
 )
 public class ListContainers implements Callable<Void> {
+  /**
+   * Container states.
+   * Used to filter container records during database query.
+   */
+  public enum ContainerState {
+    OPEN, CLOSED, QUASI_CLOSED, CLOSING, DELETED, UNHEALTHY
+  }
   
-
   @CommandLine.Option(names = {"--state"},
       description = "state of the container")
-  private String state;
+  private ContainerState state;
   
+  @CommandLine.Option(names = {"--limit"},
+          description = "number of rows to display in the output , by default it would be 100 rows")
+  private Integer limit;
+
+  @CommandLine.Option(names = {"--file-path"},
+          description = "path to the output file")
+  private String path;
 
   @CommandLine.ParentCommand
   private ContainerLogController parent;
@@ -45,9 +61,17 @@ public class ListContainers implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     if (state != null) {
+      if (path != null) {
+        Path outputPath = Paths.get(path);
+        Path parentDir = outputPath.getParent();
+        if (parentDir != null && !Files.exists(parentDir)) {
+          System.out.println("The directory does not exist: " + parentDir.toAbsolutePath());
+          return null;
+        }
+      }
       ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
       try {
-        cdd.listContainersByState(state);
+        cdd.listContainersByState(state.name(), path, limit);
       } catch (SQLException e) {
         System.out.println("Error while retrieving containers with state: " + state + e.getMessage());
       } catch (Exception e) {
