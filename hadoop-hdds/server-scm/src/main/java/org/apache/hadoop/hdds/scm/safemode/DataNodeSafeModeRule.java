@@ -21,9 +21,12 @@ import java.util.HashSet;
 import java.util.UUID;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
@@ -44,16 +47,21 @@ public class DataNodeSafeModeRule extends
   private HashSet<UUID> registeredDnSet;
   private NodeManager nodeManager;
 
-  public DataNodeSafeModeRule(EventQueue eventQueue,
-      ConfigurationSource conf,
-      NodeManager nodeManager,
-      SCMSafeModeManager manager) {
-    super(manager, NAME, eventQueue);
-    requiredDns = conf.getInt(
+  public DataNodeSafeModeRule() {
+
+  }
+
+  @Override
+  public void initialize(ConfigurationSource config, SCMContext scmContext, EventQueue eventQueue,
+      SCMSafeModeManager safeModeManager, PipelineManager pipelineManager, ContainerManager containerManager,
+      NodeManager nodeManager) {
+    requiredDns = config.getInt(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);
     registeredDnSet = new HashSet<>(requiredDns * 2);
     this.nodeManager = nodeManager;
+    setup(NAME, eventQueue, safeModeManager, getEventType());
+    markInitialized();
   }
 
   @Override
@@ -101,5 +109,10 @@ public class DataNodeSafeModeRule extends
     // Do nothing.
     // As for this rule, there is nothing we read from SCM DB state and
     // validate it.
+  }
+
+  @Override
+  public boolean isPreCheckRule() {
+    return true;
   }
 }

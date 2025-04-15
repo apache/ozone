@@ -17,6 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -36,14 +41,19 @@ import org.apache.hadoop.hdds.server.events.TypedEvent;
  */
 public abstract class SafeModeExitRule<T> implements EventHandler<T> {
 
-  private final SCMSafeModeManager safeModeManager;
-  private final String ruleName;
+  private SCMSafeModeManager safeModeManager;
+  private String ruleName;
   protected static final int SAMPLE_CONTAINER_DISPLAY_LIMIT = 5;
   protected static final int SAMPLE_PIPELINE_DISPLAY_LIMIT = 5;
+  private boolean initialized = false;
 
   // TODO: Report processing logic will be removed in future. HDDS-11958.
   //   This flag is to add new code without breaking Safemode logic until we have HDDS-11958.
   private boolean validateBasedOnReportProcessing = true;
+
+  protected SafeModeExitRule() {
+    // No-arg constructor for ServiceLoader
+  }
 
   public SafeModeExitRule(SCMSafeModeManager safeModeManager,
       String ruleName, EventQueue eventQueue) {
@@ -139,4 +149,36 @@ public abstract class SafeModeExitRule<T> implements EventHandler<T> {
    *
    */
   protected abstract void refresh(boolean forceRefresh);
+
+  public void initialize(ConfigurationSource config,
+      SCMContext scmContext,
+      EventQueue eventQueue,
+      SCMSafeModeManager safeModeManager,
+      PipelineManager pipelineManager,
+      ContainerManager containerManager,
+      NodeManager nodeManager) {
+    throw new UnsupportedOperationException("initialize() not implemented.");
+  }
+
+  public void setup(String ruleName,
+      EventQueue eventQueue,
+      SCMSafeModeManager safeModeManager,
+      TypedEvent<T> eventType) {
+    this.ruleName = ruleName;
+    this.safeModeManager = safeModeManager;
+    // Register handler
+    eventQueue.addHandler(eventType, this);
+  }
+
+  protected void markInitialized() {
+    this.initialized = true;
+  }
+
+  public boolean isInitialized() {
+    return initialized;
+  }
+
+  public boolean isPreCheckRule() {
+    return false;
+  }
 }

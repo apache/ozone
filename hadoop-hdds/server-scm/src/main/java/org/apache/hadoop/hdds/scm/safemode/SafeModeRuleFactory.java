@@ -19,12 +19,15 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ServiceLoader;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Factory to create SafeMode rules.
@@ -47,6 +50,9 @@ public final class SafeModeRuleFactory {
 
   private static SafeModeRuleFactory instance;
 
+  private static final Logger LOG = LoggerFactory.getLogger(
+      SafeModeRuleFactory.class);
+
   private SafeModeRuleFactory(final ConfigurationSource config,
                               final SCMContext scmContext,
                               final EventQueue eventQueue,
@@ -67,24 +73,26 @@ public final class SafeModeRuleFactory {
   }
 
   private void loadRules() {
-    // TODO: Use annotation to load the rules. (HDDS-11730)
-    SafeModeExitRule<?> containerRule = new ContainerSafeModeRule(eventQueue, 
-        config, containerManager, safeModeManager);
-    SafeModeExitRule<?> datanodeRule = new DataNodeSafeModeRule(eventQueue, 
-        config, nodeManager, safeModeManager);
 
-    safeModeRules.add(containerRule);
-    safeModeRules.add(datanodeRule);
+    ServiceLoader<SafeModeExitRule> loader =
+        ServiceLoader.load(SafeModeExitRule.class);
 
-    preCheckRules.add(datanodeRule);
-
-    if (pipelineManager != null) {
-      safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue, pipelineManager,
-          safeModeManager, config, scmContext));
-      safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
-          safeModeManager, config));
+    for (SafeModeExitRule<?> rule : loader) {
+      try {
+        rule.initialize(config, scmContext, eventQueue, safeModeManager,
+            pipelineManager, containerManager, nodeManager);
+        // Skip uninitialized or skipped rules
+        if (!rule.isInitialized()) {
+          continue;
+        }
+        safeModeRules.add(rule);
+        if (rule.isPreCheckRule()) {
+          preCheckRules.add(rule);
+        }
+      } catch (Exception e) {
+        LOG.warn("Skipping rule {} due to initialization error: {}", rule.getClass().getName(), e.getMessage());
+      }
     }
-
   }
 
   public static synchronized SafeModeRuleFactory getInstance() {

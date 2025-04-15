@@ -43,6 +43,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
@@ -59,32 +62,36 @@ public class ContainerSafeModeRule extends
   
   private static final String NAME = "ContainerSafeModeRule";
 
-  private final ContainerManager containerManager;
+  private ContainerManager containerManager;
   // Required cutoff % for containers with at least 1 reported replica.
-  private final double safeModeCutoff;
+  private double safeModeCutoff;
   // Containers read from scm db (excluding containers in ALLOCATED state).
-  private final Set<Long> ratisContainers;
-  private final Set<Long> ecContainers;
-  private final Map<Long, Set<UUID>> ecContainerDNsMap;
+  private Set<Long> ratisContainers;
+  private Set<Long> ecContainers;
+  private Map<Long, Set<UUID>> ecContainerDNsMap;
   private final AtomicLong ratisContainerWithMinReplicas = new AtomicLong(0);
   private final AtomicLong ecContainerWithMinReplicas = new AtomicLong(0);
 
   private double ratisMaxContainer;
   private double ecMaxContainer;
 
-  public ContainerSafeModeRule(final EventQueue eventQueue,
-                               final ConfigurationSource conf,
-                               final ContainerManager containerManager,
-                               final SCMSafeModeManager manager) {
-    super(manager, NAME, eventQueue);
-    this.safeModeCutoff = getSafeModeCutoff(conf);
+  public ContainerSafeModeRule() {
+
+  }
+
+  @Override
+  public void initialize(ConfigurationSource config, SCMContext scmContext, EventQueue eventQueue,
+      SCMSafeModeManager safeModeManager, PipelineManager pipelineManager, ContainerManager containerManager,
+      NodeManager nodeManager) {
+    this.safeModeCutoff = getSafeModeCutoff(config);
     this.containerManager = containerManager;
     this.ratisContainers = new HashSet<>();
     this.ecContainers = new HashSet<>();
     this.ecContainerDNsMap = new ConcurrentHashMap<>();
     initializeRule();
+    setup(NAME, eventQueue, safeModeManager, getEventType());
+    markInitialized();
   }
-
 
   private static double getSafeModeCutoff(ConfigurationSource conf) {
     final double cutoff = conf.getDouble(HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
