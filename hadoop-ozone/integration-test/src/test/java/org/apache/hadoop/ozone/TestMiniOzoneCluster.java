@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -45,7 +46,6 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -60,6 +60,7 @@ public class TestMiniOzoneCluster {
 
   private MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
+  private static Path tempDir;
 
   @BeforeAll
   static void setup(@TempDir File testDir) {
@@ -267,7 +268,7 @@ public class TestMiniOzoneCluster {
         + "-" + cluster.getClusterId();
     assertEquals(name, cluster.getName());
 
-    final String baseDir = GenericTestUtils.getTempPath(name);
+    final String baseDir = tempDir.resolve(name).toString();
     assertEquals(baseDir, cluster.getBaseDir());
 
 
