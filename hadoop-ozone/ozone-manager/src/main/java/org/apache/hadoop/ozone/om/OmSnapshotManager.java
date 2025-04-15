@@ -884,6 +884,14 @@ public final class OmSnapshotManager implements AutoCloseable {
     inFlightSnapshotCount.decrementAndGet();
   }
 
+  public void resetInFlightSnapshotCount() {
+    inFlightSnapshotCount.set(0);
+  }
+
+  public int getInFlightSnapshotCount() {
+    return inFlightSnapshotCount.get();
+  }
+
   private int getIndexFromToken(final String token) throws IOException {
     if (isBlank(token)) {
       return 0;

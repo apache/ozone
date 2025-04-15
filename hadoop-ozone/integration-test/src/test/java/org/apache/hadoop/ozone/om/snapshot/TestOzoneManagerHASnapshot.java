@@ -345,6 +345,29 @@ public class TestOzoneManagerHASnapshot {
     checkSnapshotIsPurgedFromDB(omFollower, tableKey);
   }
 
+  @Test
+  public void testSnapshotInFlightCount() throws Exception {
+    // snapshot inflight count should be reset to 0 when leader changes
+
+    // first do some snapshot creations
+    String snapshotName1 = UUID.randomUUID().toString();
+    store.createSnapshot(volumeName, bucketName, snapshotName1);
+
+    // then shutdown the leader
+    OzoneManager omLeader = cluster.getOMLeader();
+    cluster.shutdownOzoneManager(omLeader);
+
+    // wait for the new leader to be elected
+    cluster.waitForLeaderOM();
+
+    // check the inflight count on the new leader is 0
+    OzoneManager newLeader = cluster.getOMLeader();
+    assertEquals(0, newLeader.getOmSnapshotManager().getInFlightSnapshotCount());
+
+    // restart the previous shutdowned node
+    cluster.restartOzoneManager(omLeader, true);
+  }
+
   private void createSnapshot(String volName, String buckName, String snapName) throws IOException {
     store.createSnapshot(volName, buckName, snapName);
 
