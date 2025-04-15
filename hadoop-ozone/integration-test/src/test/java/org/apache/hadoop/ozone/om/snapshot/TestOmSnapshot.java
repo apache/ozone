@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -2100,7 +2101,7 @@ public abstract class TestOmSnapshot {
     await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS,
         () -> cluster.getOzoneManager().isRunning());
 
-    while (diffReport.getToken() != null) {
+    while (isNotEmpty(diffReport.getToken())) {
       diffReport = fetchReportPage(volumeName, bucketName, snapshot1,
           snapshot2, diffReport.getToken(), pageSize);
       diffReportEntries.addAll(diffReport.getDiffList());
