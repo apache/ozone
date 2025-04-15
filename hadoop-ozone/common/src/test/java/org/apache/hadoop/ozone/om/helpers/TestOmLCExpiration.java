@@ -90,23 +90,36 @@ class TestOmLCExpiration {
         "Either 'days' or 'date' should be specified, but not both or neither.");
 
     OmLCExpiration exp6 = new OmLCExpiration.Builder()
-        .setDate("10-10-2025")
+        .setDate("10-10-2099")
         .build();
     assertOMException(exp6::valid, INVALID_REQUEST,
         "'Date' must be in ISO 8601 format");
 
-    // Testing for date in the past
     OmLCExpiration exp7 = new OmLCExpiration.Builder()
-        .setDate(getFutureDateString(-1))
+        .setDate("2099-12-31T00:00:00")
         .build();
     assertOMException(exp7::valid, INVALID_REQUEST,
-        "'Date' must be in the future");
+        "'Date' must be in ISO 8601 format");
 
+    // Testing for date in the past
     OmLCExpiration exp8 = new OmLCExpiration.Builder()
-        .setDays(0)
+        .setDate(getFutureDateString(-1))
         .build();
     assertOMException(exp8::valid, INVALID_REQUEST,
+        "'Date' must be in the future");
+
+    OmLCExpiration exp9 = new OmLCExpiration.Builder()
+        .setDays(0)
+        .build();
+    assertOMException(exp9::valid, INVALID_REQUEST,
         "Either 'days' or 'date' should be specified, but not both or neither.");
+
+    // 1 minute ago
+    OmLCExpiration exp10 = new OmLCExpiration.Builder()
+        .setDate(getFutureDateString(0, 0, -1))
+        .build();
+    assertOMException(exp10::valid, INVALID_REQUEST,
+        "'Date' must be in the future");
   }
 
   @Test

@@ -101,7 +101,6 @@ public class OmLCRule {
 
   /**
    * Get the expiration action if present.
-   * This method is for backward compatibility.
    *
    * @return the expiration action if present, null otherwise
    */

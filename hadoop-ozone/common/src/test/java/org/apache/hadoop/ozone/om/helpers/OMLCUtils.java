@@ -48,6 +48,16 @@ public final class OMLCUtils {
         "Expected: " + expectedMessageContent + "\n Actual: " + e.getMessage());
   }
 
+  public static String getFutureDateString(long daysInFuture, int hoursInFuture, int minuteInFuture) {
+    return ZonedDateTime.now(ZoneOffset.UTC)
+        .plusDays(daysInFuture)
+        .plusHours(hoursInFuture)
+        .plusMinutes(minuteInFuture)
+        .withSecond(0)
+        .withNano(0)
+        .format(DateTimeFormatter.ISO_DATE_TIME);
+  }
+
   public static String getFutureDateString(long daysInFuture) {
     return ZonedDateTime.now(ZoneOffset.UTC)
         .plusDays(daysInFuture)

@@ -161,7 +161,7 @@ public class OmLifecycleConfiguration extends WithObjectID
         ", bucket='" + bucket + '\'' +
         ", owner='" + owner + '\'' +
         ", creationTime=" + creationTime +
-        ", rulesCount=" + rules +
+        ", rulesCount=" + rules.size() +
         ", objectID=" + getObjectID() +
         ", updateID=" + getUpdateID() +
         '}';

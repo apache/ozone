@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
- * Abstract base class that encapsulates lifecycle rule actions.
+ * Interface that encapsulates lifecycle rule actions.
  * This class serves as a foundation for various action types in lifecycle
  * configuration, such as Expiration and (in the future) Transition.
  */
-public abstract class OmLCAction {
+public interface OmLCAction {
 
   /**
    * Validates the action configuration.
@@ -32,19 +32,19 @@ public abstract class OmLCAction {
    *
    * @throws OMException if the validation fails
    */
-  public abstract void valid() throws OMException;
+  void valid() throws OMException;
 
   /**
    * Returns the action type.
    *
    * @return the type of this action
    */
-  public abstract ActionType getActionType();
+  ActionType getActionType();
 
   /**
    * Enum defining supported action types.
    */
-  public enum ActionType {
+  enum ActionType {
     EXPIRATION,
     // Future action types can be added here (e.g., TRANSITION)
   }

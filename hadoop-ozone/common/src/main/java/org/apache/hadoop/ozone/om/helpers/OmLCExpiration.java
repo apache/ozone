@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
  * This class extends OmLCAction and represents the expiration
  * action type in lifecycle configuration.
  */
-public class OmLCExpiration extends OmLCAction {
+public class OmLCExpiration implements OmLCAction {
 
   private int days;
   private String date;
@@ -71,7 +71,7 @@ public class OmLCExpiration extends OmLCAction {
    */
   @Override
   public void valid() throws OMException {
-    if (days <= 0 && days != 0) {
+    if (days < 0) {
       throw new OMException("'Days' for Expiration action must be a positive integer.",
           OMException.ResultCodes.INVALID_REQUEST);
     }
