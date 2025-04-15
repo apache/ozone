@@ -156,7 +156,7 @@ public class SnapshotDiffHandler extends Handler {
         .forEach(diffReportEntry -> resArray.add(getJsonObject(diffReportEntry)));
     diffReportNode.set("diffList", resArray);
 
-    if (StringUtils.isNotEmpty(diffReportOzone.getToken())) {
+    if (diffReportOzone.getToken() != null) {
       diffReportNode.put("nextToken", diffReportOzone.getToken());
     }
     return diffReportNode;

@@ -703,7 +703,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       SnapshotDiffReportOzone report =
           getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot, "");
       aggregated = report;
-      while (!report.getToken().isEmpty()) {
+      while (report.getToken() != null) {
         LOG.info(
             "Total Snapshot Diff length between snapshot {} and {} exceeds"
                 + " max page size, Performing another " +
