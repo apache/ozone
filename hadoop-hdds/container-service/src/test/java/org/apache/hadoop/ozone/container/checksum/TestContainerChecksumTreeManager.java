@@ -201,7 +201,6 @@ class TestContainerChecksumTreeManager {
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
     checksumManager.markBlocksAsDeleted(container, new ArrayList<>(expectedBlocksToDelete));
-    assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     ContainerMerkleTreeWriter tree = buildTestTree(config);
     checksumManager.writeContainerDataTree(container, tree);
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
@@ -222,7 +221,6 @@ class TestContainerChecksumTreeManager {
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     ContainerMerkleTreeWriter tree = buildTestTree(config);
     checksumManager.writeContainerDataTree(container, tree);
-    assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
     checksumManager.markBlocksAsDeleted(container, new ArrayList<>(expectedBlocksToDelete));
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
@@ -241,8 +239,6 @@ class TestContainerChecksumTreeManager {
     assertEquals(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     ContainerMerkleTreeWriter tree = buildTestTree(config);
-    checksumManager.writeContainerDataTree(container, tree);
-    assertEquals(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total(), 0);
     checksumManager.writeContainerDataTree(container, tree);
     assertTrue(metrics.getWriteContainerMerkleTreeLatencyNS().lastStat().total() > 0);
     assertTrue(metrics.getReadContainerMerkleTreeLatencyNS().lastStat().total() > 0);

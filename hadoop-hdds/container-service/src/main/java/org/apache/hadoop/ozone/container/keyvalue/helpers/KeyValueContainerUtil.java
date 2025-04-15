@@ -26,12 +26,15 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerChecksumInfo;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
@@ -277,6 +280,23 @@ public final class KeyValueContainerUtil {
     }
   }
 
+  private static void populateContainerDataChecksum(KeyValueContainerData kvContainerData) {
+    if (kvContainerData.isOpen()) {
+      return;
+    }
+
+    try {
+      Optional<ContainerChecksumInfo> optionalContainerChecksumInfo = ContainerChecksumTreeManager
+          .readChecksumInfo(kvContainerData);
+      if (optionalContainerChecksumInfo.isPresent()) {
+        ContainerChecksumInfo containerChecksumInfo = optionalContainerChecksumInfo.get();
+        kvContainerData.setDataChecksum(containerChecksumInfo.getContainerMerkleTree().getDataChecksum());
+      }
+    } catch (IOException ex) {
+      LOG.warn("Failed to read checksum info for container {}", kvContainerData.getContainerID(), ex);
+    }
+  }
+
   private static void populateContainerMetadata(
       KeyValueContainerData kvContainerData, DatanodeStore store,
       boolean bCheckChunksFilePath)
@@ -356,6 +376,7 @@ public final class KeyValueContainerUtil {
 
     // Load finalizeBlockLocalIds for container in memory.
     populateContainerFinalizeBlock(kvContainerData, store);
+    populateContainerDataChecksum(kvContainerData);
   }
 
   /**

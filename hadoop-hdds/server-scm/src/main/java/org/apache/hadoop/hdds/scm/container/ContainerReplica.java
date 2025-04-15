@@ -188,6 +188,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         ",replicaIndex=" + replicaIndex :
         "") +
         ", isEmpty=" + isEmpty +
+        ", dataChecksum=" + dataChecksum +
         '}';
   }
 
