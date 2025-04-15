@@ -36,6 +36,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestNodeSchemaLoader {
 
   /**
+   * Test cases that do not use the parameters should be executed only once.
+   */
+  private static final String VALID_SCHEMA_FILE = "good.xml";
+
+  /**
    * Parameterized test cases for various error conditions.
    */
   public static Stream<Arguments> getSchemaFiles() {
@@ -70,12 +75,6 @@ public class TestNodeSchemaLoader {
         () -> NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath));
     assertMessageContains(e.getMessage(), errMsg, schemaFile);
   }
-
-  /**
-   * Test cases that do not use the parameters, should be executed only once.
-   */
-
-  private static final String VALID_SCHEMA_FILE = "good.xml";
 
   @Test
   public void testGood() throws Exception {
