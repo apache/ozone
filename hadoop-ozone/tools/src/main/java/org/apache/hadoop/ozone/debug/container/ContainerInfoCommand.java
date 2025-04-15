@@ -26,7 +26,7 @@ import picocli.CommandLine;
  */
 
 @CommandLine.Command(
-    name = "container_info",
+    name = "container-info",
     description = "provides details of a single container"
 )
 public class ContainerInfoCommand implements Callable<Void> {
