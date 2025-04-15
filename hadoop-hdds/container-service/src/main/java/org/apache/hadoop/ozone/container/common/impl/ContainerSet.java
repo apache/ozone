@@ -69,7 +69,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   private long recoveringTimeout;
   private final Table<Long, String> containerIdsTable;
   // Handler that will be invoked when a user of a container reports an error.
-  private Consumer<Container<?>> containerErrorHandler;
+  private Consumer<Container<?>> containerScanHandler;
 
   @VisibleForTesting
   public ContainerSet(long recoveringTimeout) {
@@ -133,15 +133,25 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
-   * @param handler All callback that will be invoked when an error is reported with a member of this container set.
+   * @param scanner A callback that will be invoked when a scan of a container in this set is requested.
    */
-  public void registerContainerErrorHandler(Consumer<Container<?>> handler) {
-    this.containerErrorHandler = handler;
+  public void registerContainerScanHandler(Consumer<Container<?>> scanner) {
+    this.containerScanHandler = scanner;
   }
 
-  public void reportError(long containerID) {
-    if (containerErrorHandler != null) {
-      containerErrorHandler.accept(getContainer(containerID));
+  /**
+   * Triggers a scan of a container in this set using the registered scan handler. This is a no-op if no scan handler
+   * is registered or the container does not exist in the set.
+   * @param containerID The container in this set to scan.
+   */
+  public void scanContainer(long containerID) {
+    if (containerScanHandler != null) {
+      Container<?> container = getContainer(containerID);
+      if (container != null) {
+        containerScanHandler.accept(container);
+      } else {
+        LOG.warn("Request to scan container {} which was not found in the container set", containerID);
+      }
     }
   }
 

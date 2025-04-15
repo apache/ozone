@@ -155,7 +155,6 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
@@ -1582,7 +1581,7 @@ public class KeyValueHandler extends Handler {
     }
 
     // Trigger manual on demand scanner
-    containerSet.reportError(containerID);
+    containerSet.scanContainer(containerID);
     sendICR(container);
   }
 
