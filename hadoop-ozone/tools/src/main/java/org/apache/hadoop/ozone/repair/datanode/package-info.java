@@ -15,19 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.cli;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
 /**
- * Interface to access the higher level parameters.
+ * Repair tools for Datanode.
  */
-public interface GenericParentCommand {
-
-  boolean isVerbose();
-
-  /** Returns a cached configuration, i.e. it is created only once, subsequent calls return the same instance. */
-  OzoneConfiguration getOzoneConf();
-
-  void printError(Throwable t);
-}
+package org.apache.hadoop.ozone.repair.datanode;
