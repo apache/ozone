@@ -104,7 +104,9 @@ public class OMRatisLogRepair extends RepairTool {
     }
     if (!backupDir.exists()) {
       info("BackupDir \"" + backupDir + "\" does not exist. Creating the directory path.");
-      Files.createDirectories(backupDir.toPath());
+      if (!isDryRun()) {
+        Files.createDirectories(backupDir.toPath());
+      }
     }
 
     File backupPath = new File(backupDir, exclusiveArguments.segmentFile.getName());
@@ -123,8 +125,8 @@ public class OMRatisLogRepair extends RepairTool {
     if (!isDryRun()) {
       outputFile = File.createTempFile("srt-output", null, backupDir);
       outputFile.deleteOnExit();
-      info("Created temporary output file: " + outputFile.toPath());
     }
+    info("Created temporary output file: " + (outputFile == null ? null : outputFile.toPath()));
 
     info("Processing Raft Log file: " + this.exclusiveArguments.segmentFile.getAbsolutePath() + " size:" +
         this.exclusiveArguments.segmentFile.length());
@@ -143,10 +145,12 @@ public class OMRatisLogRepair extends RepairTool {
               "gap between entry %s and entry %s", prev, next);
         }
 
-        if (next.getIndex() != index && !isDryRun()) {
+        if (next.getIndex() != index) {
           // all other logs will be written as it is
-          outputStream.write(next);
-          outputStream.flush();
+          if (!isDryRun()) {
+            outputStream.write(next);
+            outputStream.flush();
+          }
           info("Copied raft log for index (" + next.getIndex() + ").");
         } else {
           // replace the transaction with a dummy OmEcho operation
@@ -201,8 +205,8 @@ public class OMRatisLogRepair extends RepairTool {
         outputStream.close();
         Files.move(outputFile.toPath(), exclusiveArguments.segmentFile.toPath(),
             StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        info("Moved temporary output file to correct raft log location : " + exclusiveArguments.segmentFile.toPath());
       }
+      info("Moved temporary output file to correct raft log location : " + exclusiveArguments.segmentFile.toPath());
 
     } finally {
       if (outputStream != null) {
