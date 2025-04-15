@@ -114,7 +114,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   @Override
-  public final synchronized UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> next() {
+  public final UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> next() {
     if (hasNext()) {
       UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> entry = currentEntry.retainAndReleaseOnClose();
       rocksDBIterator.get().next();
@@ -125,7 +125,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   @Override
-  public final synchronized void seekToFirst() {
+  public final void seekToFirst() {
     if (prefix == null) {
       rocksDBIterator.get().seekToFirst();
     } else {
@@ -135,7 +135,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   @Override
-  public final synchronized void seekToLast() {
+  public final void seekToLast() {
     if (prefix == null) {
       rocksDBIterator.get().seekToLast();
     } else {
@@ -145,7 +145,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   @Override
-  public final synchronized UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> seek(RAW key) {
+  public final UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> seek(RAW key) {
     seek0(key);
     setCurrentEntry();
     // Current entry should be only closed when the next() and thus closing the returned entry should be a noop.
@@ -153,7 +153,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   @Override
-  public final synchronized void removeFromDB() throws IOException {
+  public final void removeFromDB() throws IOException {
     if (rocksDBTable == null) {
       throw new UnsupportedOperationException("remove");
     }
@@ -165,7 +165,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   @Override
-  public synchronized void close() {
+  public void close() {
     rocksDBIterator.close();
     closed = true;
     setCurrentEntry();
