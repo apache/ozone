@@ -1537,7 +1537,6 @@
                       <allowedImport>org.rocksdb.TransactionLogIterator.BatchResult</allowedImport>
                       <allowedImport>org.rocksdb.TickerType</allowedImport>
                       <allowedImport>org.rocksdb.LiveFileMetaData</allowedImport>
-                      <allowedImport>org.rocksdb.BlockBasedTableConfig</allowedImport>
                       <!-- Allow RocksObjects whose native pointer is managed by RocksDB. -->
                       <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>
                       <allowedImport>org.rocksdb.Env</allowedImport>
