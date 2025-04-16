@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.LongStream;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class used to test ContainerSet operations.
@@ -282,6 +284,21 @@ public class TestContainerSet {
     containerSet.listContainer(0, count, result);
 
     assertContainerIds(FIRST_ID, count, result);
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testContainerScanHandler(ContainerLayoutVersion layout) throws Exception {
+    setLayoutVersion(layout);
+    ContainerSet containerSet = createContainerSet();
+    // Atomic long required since lambda modification must be effectively final.
+    AtomicLong invocationCount = new AtomicLong();
+    containerSet.registerContainerScanHandler(c -> {
+      assertEquals(c.getContainerData().getContainerID(), FIRST_ID);
+      invocationCount.getAndIncrement();
+    });
+
+    containerSet.scanContainer(FIRST_ID);
+    assertEquals(1, invocationCount.get());
   }
 
   /**
