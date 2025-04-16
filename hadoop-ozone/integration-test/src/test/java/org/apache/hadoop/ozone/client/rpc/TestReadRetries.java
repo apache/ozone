@@ -25,8 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomUtils;
@@ -39,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -81,10 +80,8 @@ class TestReadRetries {
 
         String keyName = "a/b/c/" + UUID.randomUUID();
         byte[] content = RandomUtils.nextBytes(128);
-        try (OutputStream out = bucket.createKey(keyName, content.length,
-            RatisReplicationConfig.getInstance(THREE), new HashMap<>())) {
-          out.write(content);
-        }
+        TestDataUtil.createKey(bucket, keyName,
+            RatisReplicationConfig.getInstance(THREE), content);
 
         // First, confirm the key info from the client matches the info in OM.
         OmKeyArgs keyArgs = new OmKeyArgs.Builder()
