@@ -115,13 +115,13 @@ public class SnapshotDiffHandler extends Handler {
       cancelSnapshotDiff(client.getObjectStore(), volumeName, bucketName, omNodeId);
       if (isVerbose()) {
         System.out.printf("Cancel snapshot diff for o3://%s/ %s from OM %s",
-            volumeName, bucketName, (omNodeId != null) ? ("node" + omNodeId) : "leader");
+            volumeName, bucketName, (omNodeId != null) ? ("node " + omNodeId) : "leader");
       }
     } else {
       getSnapshotDiff(client.getObjectStore(), volumeName, bucketName, omNodeId);
       if (isVerbose()) {
         System.out.printf("Request snapshot diff for o3://%s/ %s from OM %s",
-            volumeName, bucketName, (omNodeId != null) ? ("node" + omNodeId) : "leader");
+            volumeName, bucketName, (omNodeId != null) ? ("node " + omNodeId) : "leader");
       }
     }
   }

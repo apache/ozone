@@ -80,7 +80,7 @@ public class ListSnapshotDiffHandler extends Handler {
     if (isVerbose()) {
       System.out.printf("Found : %d snapshot diff jobs for o3://%s/ %s from OM %s",
           counter, volumeName, bucketName,
-          (omNodeId != null) ? ("node" + omNodeId) : "leader");
+          (omNodeId != null) ? ("node " + omNodeId) : "leader");
     }
   }
 }

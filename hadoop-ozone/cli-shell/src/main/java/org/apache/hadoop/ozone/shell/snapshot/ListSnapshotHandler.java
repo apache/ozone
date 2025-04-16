@@ -74,7 +74,7 @@ public class ListSnapshotHandler extends Handler {
     if (isVerbose()) {
       err().printf("Found : %d snapshots for o3://%s/%s %n from OM %s", counter,
           volumeName, bucketName,
-          (omNodeId != null) ? ("node" + omNodeId) : "leader");
+          (omNodeId != null) ? ("node " + omNodeId) : "leader");
     }
   }
 }
