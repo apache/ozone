@@ -315,12 +315,15 @@ public class ContainerDatanodeDatabase {
             writer.write(String.format("%-25s | %-35s | %-15d | %-15d | %-40s | %-12d%n",
                 timestamp, datanodeId, containerId, latestBcsid, errorMessage, indexValue));
           }
-
-          writer.write("total: " + count + "\n");
-          writer.flush();
-
-          if (writeToFile) {
-            System.out.println("Results written to file: " + outputPath.toAbsolutePath());
+          
+          if (count == 0) {
+            writer.write("No containers found for state: " + state + "\n");
+          } else {
+            writer.write("total: " + count + "\n");
+            writer.flush();
+            if (writeToFile) {
+              System.out.println("Results written to file: " + outputPath.toAbsolutePath());
+            }
           }
         }
       }

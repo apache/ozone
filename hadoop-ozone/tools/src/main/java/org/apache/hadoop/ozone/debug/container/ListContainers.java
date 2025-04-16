@@ -43,15 +43,15 @@ public class ListContainers implements Callable<Void> {
     OPEN, CLOSED, QUASI_CLOSED, CLOSING, DELETED, UNHEALTHY
   }
   
-  @CommandLine.Option(names = {"--state"},
+  @CommandLine.Option(names = {"--state", "-s"},
       description = "state of the container")
   private ContainerState state;
   
-  @CommandLine.Option(names = {"--limit"},
+  @CommandLine.Option(names = {"--limit", "-l"},
           description = "number of rows to display in the output , by default it would be 100 rows")
   private Integer limit;
 
-  @CommandLine.Option(names = {"--file-path"},
+  @CommandLine.Option(names = {"--file-path", "-p"},
           description = "path to the output file")
   private String path;
 
