@@ -52,8 +52,8 @@ import picocli.CommandLine.Command;
  *      ozone admin datanode diskbalancer start -p 5 -d {@literal <hosts>}
  *        start balancer with 5 parallel thread on each datanode
  *      ozone admin datanode diskbalancer start -s=false -a}
- *        start balancer and will keep running until stopped by the
- *        stop command
+ *        start balancer on each datanode and will keep running even after
+ *        disks are balanced until stopped by the stop command.
  * To stop:
  *      ozone admin datanode diskbalancer stop -a
  *        stop diskblancer on all datanodes

@@ -50,8 +50,8 @@ Check if balancer stops automatically
     Run Keyword         Kinit test user                 testuser                testuser.keytab
     Execute             ozone admin datanode diskbalancer start -a
 
-    # Wait until the balancer status contains "RUNNING", retry every 5s for up to 1 min
-    Wait Until Keyword Succeeds   1 min   5 sec   Check Balancer Status   RUNNING
+    # Wait until the balancer status contains "RUNNING", retry every 5s for up to 20 sec
+    Wait Until Keyword Succeeds   20 sec   5 sec   Check Balancer Status   RUNNING
 
-    # Wait until the balancer status contains "STOPPED", retry every 5s for up to 2 min
-    Wait Until Keyword Succeeds   2 min   5 sec   Check Balancer Status   STOPPED
+    # Wait until the balancer status contains "STOPPED", retry every 5s for up to 40 sec
+    Wait Until Keyword Succeeds   40 sec   5 sec   Check Balancer Status   STOPPED
