@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.debug.container;
 
-import java.sql.SQLException;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
