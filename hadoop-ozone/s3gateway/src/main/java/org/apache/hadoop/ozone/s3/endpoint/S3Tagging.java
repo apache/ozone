@@ -34,7 +34,7 @@ import javax.xml.bind.annotation.XmlRootElement;
     namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
 public class S3Tagging {
 
-  @XmlElement(name = "TagSet")
+  @XmlElement(name = "TagSet", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
   private TagSet tagSet;
 
   public S3Tagging() {
@@ -59,7 +59,7 @@ public class S3Tagging {
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "TagSet")
   public static class TagSet {
-    @XmlElement(name = "Tag")
+    @XmlElement(name = "Tag", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
     private List<Tag> tags = new ArrayList<>();
 
     public TagSet() {
@@ -84,10 +84,10 @@ public class S3Tagging {
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "Tag")
   public static class Tag {
-    @XmlElement(name = "Key")
+    @XmlElement(name = "Key", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
     private String key;
 
-    @XmlElement(name = "Value")
+    @XmlElement(name = "Value", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
     private String value;
 
     public Tag() {
