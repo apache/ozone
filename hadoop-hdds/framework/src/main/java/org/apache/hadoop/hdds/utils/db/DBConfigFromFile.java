@@ -17,12 +17,10 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -57,7 +55,7 @@ public final class DBConfigFromFile {
   private DBConfigFromFile() {
   }
 
-  public static File getConfigLocation() throws IOException {
+  public static File getConfigLocation() {
     String path = System.getenv(CONFIG_DIR);
 
     // Make testing easy.
@@ -112,7 +110,6 @@ public final class DBConfigFromFile {
    *
    * @param dbPath - The DB File Name, for example, OzoneManager.db.
    * @return DBOptions, Options to be used for opening/creating the DB.
-   * @throws IOException
    */
   public static ManagedDBOptions readDBOptionsFromFile(Path dbPath) throws IOException {
     List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
@@ -143,7 +140,7 @@ public final class DBConfigFromFile {
   }
 
   private static ManagedDBOptions readFromFile(Path dbPath, List<ColumnFamilyDescriptor> descriptors)
-      throws IOException {
+      throws RocksDBException {
     Preconditions.checkNotNull(dbPath);
 
     //TODO: Add Documentation on how to support RocksDB Mem Env.
@@ -157,7 +154,7 @@ public final class DBConfigFromFile {
       OptionsUtil.loadOptionsFromFile(configOptions, generatedDBPath.toString(), options, descriptors);
     } catch (RocksDBException rdEx) {
       options.close();
-      throw toIOException("There was an error opening rocksDB Options file.", rdEx);
+      throw new RocksDBException("There was an error opening rocksDB Options file.", rdEx);
     }
     return options;
   }
@@ -173,9 +170,9 @@ public final class DBConfigFromFile {
    *
    * @param path
    * @return
-   * @throws IOException
+   * @throws RocksDBException
    */
-  private static Path generateDBPath(Path path) throws IOException {
+  private static Path generateDBPath(Path path) {
     if (path.toFile().exists()) {
       LOG.debug("RocksDB path found: {}, opening db from it.", path);
       return path;

@@ -15,25 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.hdds.scm.cli.container;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
+import java.util.List;
+import org.apache.hadoop.hdds.cli.ItemsFromStdin;
+import picocli.CommandLine;
 
-/**
- * Interface for loading data from a dump file.
- */
-public interface DumpFileLoader extends Closeable {
+/** Parameter for specifying list of container IDs. */
+@CommandLine.Command
+public class ContainerIDParameters extends ItemsFromStdin {
 
-  /**
-   * Load key value pairs from an external dump file.
-   */
-  void load(File externalFile) throws IOException;
-
-  /**
-   * Close this file loader.
-   */
-  @Override
-  void close();
+  @CommandLine.Parameters(description = "Container IDs" + FORMAT_DESCRIPTION,
+      arity = "1..*",
+      paramLabel = "<container ID>")
+  public void setContainerIDs(List<String> arguments) {
+    setItems(arguments);
+  }
 }

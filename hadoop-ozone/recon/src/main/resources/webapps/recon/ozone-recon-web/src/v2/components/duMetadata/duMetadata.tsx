@@ -201,7 +201,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
     if (objectInfo?.quotaInNamespace !== undefined && objectInfo?.quotaInNamespace !== -1) {
       data.push({
         key: 'Quota In Namespace',
-        value: byteToSize(objectInfo.quotaInNamespace, 3)
+        value: objectInfo.quotaInNamespace
       });
     }
 

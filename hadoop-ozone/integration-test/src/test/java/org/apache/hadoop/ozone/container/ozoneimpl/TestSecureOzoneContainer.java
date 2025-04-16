@@ -54,8 +54,10 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.util.ExitUtils;
@@ -83,6 +85,7 @@ class TestSecureOzoneContainer {
   private Path ozoneMetaPath;
 
   private OzoneConfiguration conf;
+  private VolumeChoosingPolicy volumeChoosingPolicy;
   private CertificateClientTestImpl caClient;
   private SecretKeyClient secretKeyClient;
   private ContainerTokenSecretManager secretManager;
@@ -111,6 +114,7 @@ class TestSecureOzoneContainer {
     secretKeyClient = new SecretKeyTestClient();
     secretManager = new ContainerTokenSecretManager(
         TimeUnit.DAYS.toMillis(1), secretKeyClient);
+    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
   }
 
   @ParameterizedTest
@@ -134,7 +138,7 @@ class TestSecureOzoneContainer {
 
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       container = new OzoneContainer(null, dn, conf, ContainerTestUtils
-          .getMockContext(dn, conf), caClient, secretKeyClient);
+          .getMockContext(dn, conf), caClient, secretKeyClient, volumeChoosingPolicy);
       MutableVolumeSet volumeSet = container.getVolumeSet();
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempFolder.toFile()));

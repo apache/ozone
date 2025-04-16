@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ContainerBalancerTask implements Runnable {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerTask.class);
   public static final long ABSENCE_OF_DURATION = -1L;
 

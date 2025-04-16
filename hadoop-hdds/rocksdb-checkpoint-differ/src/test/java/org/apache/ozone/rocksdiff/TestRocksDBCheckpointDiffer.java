@@ -89,6 +89,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdb.util.RdbUtil;
@@ -155,9 +156,9 @@ public class TestRocksDBCheckpointDiffer {
   @BeforeEach
   public void init() throws RocksDBException {
     // Checkpoint differ log level. Set to DEBUG for verbose output
-    GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.getLog(), Level.INFO);
+    GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.class, Level.INFO);
     // Test class log level. Set to DEBUG for verbose output
-    GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.LOG, Level.INFO);
+    GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.class, Level.INFO);
 
     activeDbDir = new File(ACTIVE_DB_DIR_NAME);
     createDir(activeDbDir, ACTIVE_DB_DIR_NAME);
@@ -758,7 +759,7 @@ public class TestRocksDBCheckpointDiffer {
   private void createCheckpoint(ManagedRocksDB rocksDB) throws RocksDBException {
 
     LOG.trace("Current time: " + System.currentTimeMillis());
-    long t1 = System.currentTimeMillis();
+    long t1 = Time.monotonicNow();
 
     final long snapshotGeneration = rocksDB.get().getLatestSequenceNumber();
     final String cpPath = CP_PATH_PREFIX + snapshotGeneration;
@@ -780,7 +781,7 @@ public class TestRocksDBCheckpointDiffer {
                 colHandle));
     this.snapshots.add(currentSnapshot);
 
-    long t2 = System.currentTimeMillis();
+    long t2 = Time.monotonicNow();
     LOG.trace("Current time: " + t2);
     LOG.debug("Time elapsed: " + (t2 - t1) + " ms");
   }

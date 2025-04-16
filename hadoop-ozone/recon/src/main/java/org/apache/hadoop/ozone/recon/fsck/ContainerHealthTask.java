@@ -732,16 +732,6 @@ public class ContainerHealthTask extends ReconScmTask {
   }
 
   /**
-   * Expose the logger for testing purposes.
-   *
-   * @return the logger instance
-   */
-  @VisibleForTesting
-  public Logger getLogger() {
-    return LOG;
-  }
-
-  /**
    * Expose the unhealthyContainerStateStatsMap for testing purposes.
    */
   @VisibleForTesting
