@@ -90,7 +90,7 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
   private static String ozoneAddress;
 
   @BeforeAll
-  public static void setup() throws IOException{
+  public static void setup() throws IOException {
     LOG.info("Saving data to: {}", tempDir.getAbsolutePath());
   }
 
@@ -109,8 +109,8 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
   void setupKeys() throws IOException {
     volume = generateVolume("vol-a-");
     ozoneAddress = "/" + volume;
-    generateKeys(volume, "level1/multilevel-",1);
-    generateKeys(volume, "key-",1);
+    generateKeys(volume, "level1/multilevel-", 1);
+    generateKeys(volume, "key-", 1);
   }
 
   @AfterEach
@@ -124,12 +124,12 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     }
 
     for (Iterator<? extends OzoneBucket> it = store.getVolume(volume).listBuckets(null); it.hasNext();) {
-      OzoneBucket bucket = it.next();
-      for (Iterator<? extends OzoneKey> keyIterator = bucket.listKeys(null); keyIterator.hasNext();) {
-        OzoneKey key = keyIterator.next();
-        bucket.deleteDirectory(key.getName(), true);
+      OzoneBucket ozoneBucket = it.next();
+      for (Iterator<? extends OzoneKey> keyIterator = ozoneBucket.listKeys(null); keyIterator.hasNext();) {
+        OzoneKey ozoneKey = keyIterator.next();
+        ozoneBucket.deleteDirectory(ozoneKey.getName(), true);
       }
-      store.getVolume(volume).deleteBucket(bucket.getName());
+      store.getVolume(volume).deleteBucket(ozoneBucket.getName());
     }
     store.deleteVolume(volume);
   }
@@ -139,8 +139,8 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
    * ozone debug command line, This is necessary for client to
    * connect to OM by setting the right om address.
    */
-  private String getSetConfStringFromConf(String key) {
-    return String.format("--set=%s=%s", key, cluster().getConf().get(key));
+  private String getSetConfStringFromConf(String configKey) {
+    return String.format("--set=%s=%s", configKey, cluster().getConf().get(configKey));
   }
 
 
@@ -210,7 +210,7 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
           .getContainer()
           .getContainerSet()
           .getContainer(containerID);
-      if(container != null) {
+      if (container != null) {
         return container;
       }
     }
@@ -223,10 +223,10 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     return store.getVolume(volumeA).getName();
   }
 
-  private static void generateKeys(String volume, String keyPrefix, int numberOfKeys) throws IOException {
+  private static void generateKeys(String volumeName, String keyPrefix, int numberOfKeys) throws IOException {
     ReplicationConfig repConfig = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE);
     bucket = "bucket-" + RandomStringUtils.randomNumeric(5);
-    OzoneVolume volA = store.getVolume(volume);
+    OzoneVolume volA = store.getVolume(volumeName);
     volA.createBucket(bucket);
 
     for (int i = 0; i < numberOfKeys; i++) {
