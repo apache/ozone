@@ -156,7 +156,6 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
@@ -1512,6 +1511,7 @@ public class KeyValueHandler extends Handler {
                                  Collection<DatanodeDetails> peers) throws IOException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+    long containerID = containerData.getContainerID();
     Optional<ContainerProtos.ContainerChecksumInfo> optionalChecksumInfo = checksumManager.read(containerData);
     ContainerProtos.ContainerChecksumInfo checksumInfo;
 
@@ -1526,10 +1526,10 @@ public class KeyValueHandler extends Handler {
     for (DatanodeDetails peer : peers) {
       long start = Instant.now().toEpochMilli();
       ContainerProtos.ContainerChecksumInfo peerChecksumInfo = dnClient.getContainerChecksumInfo(
-          containerData.getContainerID(), peer);
+          containerID, peer);
       if (peerChecksumInfo == null) {
         LOG.warn("Cannot reconcile container {} with peer {} which has not yet generated a checksum",
-            containerData.getContainerID(), peer);
+            containerID, peer);
         continue;
       }
 
@@ -1543,7 +1543,7 @@ public class KeyValueHandler extends Handler {
           handleMissingBlock(kvContainer, pipeline, dnClient, missingBlock, chunkByteBuffer);
         } catch (IOException e) {
           LOG.error("Error while reconciling missing block for block {} in container {}", missingBlock.getBlockID(),
-              containerData.getContainerID(), e);
+              containerID, e);
         }
       }
 
@@ -1553,7 +1553,7 @@ public class KeyValueHandler extends Handler {
           reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(), entry.getValue(), chunkByteBuffer);
         } catch (IOException e) {
           LOG.error("Error while reconciling missing chunk for block {} in container {}", entry.getKey(),
-              containerData.getContainerID(), e);
+              containerID, e);
         }
       }
 
@@ -1563,7 +1563,7 @@ public class KeyValueHandler extends Handler {
           reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(), entry.getValue(), chunkByteBuffer);
         } catch (IOException e) {
           LOG.error("Error while reconciling corrupt chunk for block {} in container {}", entry.getKey(),
-              containerData.getContainerID(), e);
+              containerID, e);
         }
       }
       // Update checksum based on RocksDB metadata. The read chunk validates the checksum of the data
@@ -1575,18 +1575,18 @@ public class KeyValueHandler extends Handler {
       if (dataChecksum == oldDataChecksum) {
         metrics.incContainerReconciledWithoutChanges();
         LOG.info("Container {} reconciled with peer {}. No change in checksum. Current checksum {}. Time taken {} ms",
-            containerData.getContainerID(), peer.toString(), checksumToString(dataChecksum), duration);
+            containerID, peer.toString(), checksumToString(dataChecksum), duration);
       } else {
         metrics.incContainerReconciledWithChanges();
         LOG.warn("Container {} reconciled with peer {}. Checksum updated from {} to {}. Time taken {} ms",
-            containerData.getContainerID(), peer.toString(), checksumToString(oldDataChecksum),
+            containerID, peer.toString(), checksumToString(oldDataChecksum),
             checksumToString(dataChecksum), duration);
       }
       ContainerLogger.logReconciled(container.getContainerData(), oldDataChecksum, peer);
     }
 
     // Trigger manual on demand scanner
-    OnDemandContainerDataScanner.scanContainer(container);
+    containerSet.scanContainer(containerID);
     sendICR(container);
   }
 

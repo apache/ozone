@@ -66,6 +66,8 @@ import static org.mockito.Mockito.times;
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class TestOnDemandContainerDataScanner extends
     TestContainerScannersAbstract {
+  
+  private OnDemandContainerDataScanner onDemandScanner;
 
   private ContainerChecksumTreeManager mockChecksumManager;
 
@@ -73,6 +75,7 @@ public class TestOnDemandContainerDataScanner extends
   public void setup() {
     super.setup();
     mockChecksumManager = mock(ContainerChecksumTreeManager .class);
+    onDemandScanner = new OnDemandContainerDataScanner(conf, controller, mockChecksumManager);
   }
 
   @Test
@@ -105,14 +108,13 @@ public class TestOnDemandContainerDataScanner extends
 
   @AfterEach
   public void tearDown() {
-    OnDemandContainerDataScanner.shutdown();
+    onDemandScanner.shutdown();
   }
 
   @Test
   public void testScanTimestampUpdated() throws Exception {
-    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     Optional<Future<?>> scanFuture =
-        OnDemandContainerDataScanner.scanContainer(healthy);
+        onDemandScanner.scanContainer(healthy);
     assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
     verify(controller, atLeastOnce())
@@ -121,7 +123,7 @@ public class TestOnDemandContainerDataScanner extends
 
     // Metrics for deleted container should not be updated.
     scanFuture =
-        OnDemandContainerDataScanner.scanContainer(healthy);
+        onDemandScanner.scanContainer(healthy);
     assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
     verify(controller, never())
@@ -130,35 +132,28 @@ public class TestOnDemandContainerDataScanner extends
   }
 
   @Test
-  public void testContainerScannerMultipleInitsAndShutdowns() throws Exception {
-    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
-    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
-    OnDemandContainerDataScanner.shutdown();
-    OnDemandContainerDataScanner.shutdown();
-    //There shouldn't be an interaction after shutdown:
-    OnDemandContainerDataScanner.scanContainer(corruptData);
-    verifyContainerMarkedUnhealthy(corruptData, never());
+  public void testContainerScannerMultipleShutdowns() {
+    // No runtime exceptions should be thrown.
+    onDemandScanner.shutdown();
+    onDemandScanner.shutdown();
   }
 
   @Test
   public void testSameContainerQueuedMultipleTimes() throws Exception {
-    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     //Given a container that has not finished scanning
     CountDownLatch latch = new CountDownLatch(1);
     when(corruptData.scanData(
-            OnDemandContainerDataScanner.getThrottler(),
-            OnDemandContainerDataScanner.getCanceler()))
+            any(),
+            any()))
         .thenAnswer((Answer<ScanResult>) invocation -> {
           latch.await();
           return getUnhealthyDataScanResult();
         });
-    Optional<Future<?>> onGoingScan = OnDemandContainerDataScanner
-        .scanContainer(corruptData);
+    Optional<Future<?>> onGoingScan = onDemandScanner.scanContainer(corruptData);
     assertTrue(onGoingScan.isPresent());
     assertFalse(onGoingScan.get().isDone());
     //When scheduling the same container again
-    Optional<Future<?>> secondScan = OnDemandContainerDataScanner
-        .scanContainer(corruptData);
+    Optional<Future<?>> secondScan = onDemandScanner.scanContainer(corruptData);
     //Then the second scan is not scheduled and the first scan can still finish
     assertFalse(secondScan.isPresent());
     latch.countDown();
@@ -170,19 +165,18 @@ public class TestOnDemandContainerDataScanner extends
   @Test
   @Override
   public void testScannerMetrics() throws Exception {
-    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
-    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(
+    resultFutureList.add(onDemandScanner.scanContainer(
         corruptData));
     resultFutureList.add(
-        OnDemandContainerDataScanner.scanContainer(openContainer));
+        onDemandScanner.scanContainer(openContainer));
     resultFutureList.add(
-        OnDemandContainerDataScanner.scanContainer(openCorruptMetadata));
-    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(healthy));
+        onDemandScanner.scanContainer(openCorruptMetadata));
+    resultFutureList.add(onDemandScanner.scanContainer(healthy));
     // Deleted containers will not count towards the scan count metric.
-    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(deletedContainer));
+    resultFutureList.add(onDemandScanner.scanContainer(deletedContainer));
     waitOnScannerToFinish(resultFutureList);
-    OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
+    OnDemandScannerMetrics metrics = onDemandScanner.getMetrics();
     //Containers with shouldScanData = false shouldn't increase
     // the number of scanned containers
     assertEquals(0, metrics.getNumUnHealthyContainers());
@@ -192,11 +186,9 @@ public class TestOnDemandContainerDataScanner extends
   @Test
   @Override
   public void testScannerMetricsUnregisters() {
-    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
-    String metricsName = OnDemandContainerDataScanner.getMetrics().getName();
+    String metricsName = onDemandScanner.getMetrics().getName();
     assertNotNull(DefaultMetricsSystem.instance().getSource(metricsName));
-    OnDemandContainerDataScanner.shutdown();
-    OnDemandContainerDataScanner.scanContainer(healthy);
+    onDemandScanner.shutdown();
     assertNull(DefaultMetricsSystem.instance().getSource(metricsName));
   }
 
@@ -205,7 +197,7 @@ public class TestOnDemandContainerDataScanner extends
   public void testUnhealthyContainersDetected() throws Exception {
     // Without initialization,
     // there shouldn't be interaction with containerController
-    OnDemandContainerDataScanner.scanContainer(corruptData);
+    onDemandScanner.scanContainer(corruptData);
     verifyNoInteractions(controller);
 
     scanContainer(healthy);
@@ -232,8 +224,7 @@ public class TestOnDemandContainerDataScanner extends
   public void testWithVolumeFailure() throws Exception {
     when(vol.isFailed()).thenReturn(true);
 
-    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
-    OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
+    OnDemandScannerMetrics metrics = onDemandScanner.getMetrics();
 
     scanContainer(healthy);
     verifyContainerMarkedUnhealthy(healthy, never());
@@ -257,11 +248,10 @@ public class TestOnDemandContainerDataScanner extends
     });
 
     // Start the blocking scan.
-    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
-    OnDemandContainerDataScanner.scanContainer(healthy);
+    onDemandScanner.scanContainer(healthy);
     // Shut down the on demand scanner. This will interrupt the blocked scan
     // on the healthy container.
-    OnDemandContainerDataScanner.shutdown();
+    onDemandScanner.shutdown();
     // Interrupting the healthy container's scan should not mark it unhealthy.
     verifyContainerMarkedUnhealthy(healthy, never());
   }
@@ -280,7 +270,7 @@ public class TestOnDemandContainerDataScanner extends
     // First iteration should find the unhealthy container.
     scanContainer(unhealthy);
     verifyContainerMarkedUnhealthy(unhealthy, atMostOnce());
-    OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
+    OnDemandScannerMetrics metrics = onDemandScanner.getMetrics();
     assertEquals(1, metrics.getNumContainersScanned());
     assertEquals(1, metrics.getNumUnHealthyContainers());
 
@@ -322,9 +312,8 @@ public class TestOnDemandContainerDataScanner extends
   }
 
   private void scanContainer(Container<?> container) throws Exception {
-    OnDemandContainerDataScanner.init(conf, controller, mockChecksumManager);
     Optional<Future<?>> scanFuture =
-        OnDemandContainerDataScanner.scanContainer(container);
+        onDemandScanner.scanContainer(container);
     if (scanFuture.isPresent()) {
       scanFuture.get().get();
     }
