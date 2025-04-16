@@ -128,36 +128,22 @@ public abstract class SingleOMFailoverProxyProviderBase<T> implements FailoverPr
   }
 
   protected synchronized boolean shouldRetryAgain(Exception ex) {
-    if (ex instanceof ServiceException) {
-      OMNotLeaderException notLeaderException =
-          getNotLeaderException(ex);
-      if (notLeaderException != null) {
-        // This means that the OM node is a follower and it does not allow this particular
-        // request to go through. We should fail this immediately since the OM does not
-        // allow the request to non-leader to go through.
-        return false;
-      }
-
-      OMLeaderNotReadyException leaderNotReadyException =
-          getLeaderNotReadyException(ex);
-      if (leaderNotReadyException != null) {
-        // Retry on same OM again as leader OM is not ready.
-        // Failing over to same OM so that wait time between retries is
-        // incremented
-        return true;
-      }
-
-      OMNodeIdMismatchException nodeIdMismatchException =
-          getOMNodeIdMismatchException(ex);
-      if (nodeIdMismatchException != null) {
-        // This means that the OM node ID specified by the client is wrong
-        // We need to fail immediately
-        return false;
-      }
-    }
-
     Throwable unwrappedException = HddsUtils.getUnwrappedException(ex);
-    if (unwrappedException instanceof AccessControlException ||
+    if (unwrappedException instanceof OMNotLeaderException) {
+      // This means that the OM node is a follower and it does not allow this particular
+      // request to go through. We should fail this immediately since the OM does not
+      // allow the request to non-leader to go through.
+      return false;
+    } else if (unwrappedException instanceof OMLeaderNotReadyException) {
+      // Retry on same OM again as leader OM is not ready.
+      // Failing over to same OM so that wait time between retries is
+      // incremented
+      return true;
+    } else if (unwrappedException instanceof OMNodeIdMismatchException) {
+      // This means that the OM node ID specified by the client is wrong
+      // We need to fail immediately
+      return false;
+    } else if (unwrappedException instanceof AccessControlException ||
         unwrappedException instanceof SecretManager.InvalidToken ||
         HddsUtils.shouldNotFailoverOnRpcException(unwrappedException)) {
       // Unlike OMFailoverProxyProviderBase which will retry all OMs first,
@@ -222,24 +208,6 @@ public abstract class SingleOMFailoverProxyProviderBase<T> implements FailoverPr
   @Override
   public final synchronized void performFailover(T currentProxy) {
     // Do nothing since this proxy provider does not failover to other OM
-  }
-
-  /**
-   * Check if exception is a OMNodeIdMismatchException.
-   *
-   * @return OMNodeIdMismatchException.
-   */
-  public static OMNodeIdMismatchException getOMNodeIdMismatchException(
-      Exception exception) {
-    Throwable cause = exception.getCause();
-    if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof OMNodeIdMismatchException) {
-        return (OMNodeIdMismatchException) ioException;
-      }
-    }
-    return null;
   }
 
   protected ConfigurationSource getConf() {
