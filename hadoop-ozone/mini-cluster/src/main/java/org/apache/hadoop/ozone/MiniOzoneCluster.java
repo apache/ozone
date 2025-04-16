@@ -52,7 +52,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * Returns the Builder to construct MiniOzoneCluster.
    *
    * @param conf OzoneConfiguration
-   *
    * @return MiniOzoneCluster builder
    */
   static Builder newBuilder(OzoneConfiguration conf) {
@@ -63,7 +62,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * Returns the Builder to construct MiniOzoneHACluster.
    *
    * @param conf OzoneConfiguration
-   *
    * @return MiniOzoneCluster builder
    */
   static MiniOzoneHAClusterImpl.Builder newHABuilder(OzoneConfiguration conf) {
@@ -82,7 +80,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * configured {@link HddsDatanodeService} registers with
    * {@link StorageContainerManager}.
    *
-   * @throws TimeoutException In case of timeout
+   * @throws TimeoutException     In case of timeout
    * @throws InterruptedException In case of interrupt while waiting
    */
   void waitForClusterToBeReady() throws TimeoutException, InterruptedException;
@@ -91,14 +89,14 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * Waits for at least one RATIS pipeline of given factor to be reported in open
    * state.
    *
-   * @param factor replication factor
+   * @param factor      replication factor
    * @param timeoutInMs timeout value in milliseconds
-   * @throws TimeoutException In case of timeout
+   * @throws TimeoutException     In case of timeout
    * @throws InterruptedException In case of interrupt while waiting
    */
   void waitForPipelineTobeReady(HddsProtos.ReplicationFactor factor,
                                 int timeoutInMs)
-          throws TimeoutException, InterruptedException;
+      throws TimeoutException, InterruptedException;
 
   /**
    * Sets the timeout value after which
@@ -111,7 +109,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
   /**
    * Waits/blocks till the cluster is out of safe mode.
    *
-   * @throws TimeoutException TimeoutException In case of timeout
+   * @throws TimeoutException     TimeoutException In case of timeout
    * @throws InterruptedException In case of interrupt while waiting
    */
   void waitTobeOutOfSafeMode() throws TimeoutException, InterruptedException;
@@ -162,7 +160,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * {@link StorageContainerManager} associated with the MiniOzoneCluster.
    */
   StorageContainerLocationProtocolClientSideTranslatorPB
-      getStorageContainerLocationClient() throws IOException;
+  getStorageContainerLocationClient() throws IOException;
 
   /**
    * Restarts StorageContainerManager instance.
@@ -198,6 +196,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
    */
   void restartHddsDatanode(DatanodeDetails dn, boolean waitForDatanode)
       throws InterruptedException, TimeoutException, IOException;
+
   /**
    * Shutdown a particular HddsDatanode.
    *
@@ -264,9 +263,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
    *
    * @param subpath sub path, with no leading "/" character
    * @return a string to use in paths
-   *
    */
-  static String getTempPath(String subpath){
+  static String getTempPath(String subpath) {
     String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
         : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
 
@@ -302,7 +300,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected boolean includeRecon = false;
 
     protected int numOfDatanodes = 3;
-    protected boolean  startDataNodes = true;
+    protected boolean startDataNodes = true;
     protected CertificateClient certClient;
     protected SecretKeyClient secretKeyClient;
     protected DatanodeFactory dnFactory = UniformDatanodesFactory.newBuilder().build();
@@ -316,8 +314,10 @@ public interface MiniOzoneCluster extends AutoCloseable {
       ExitUtils.disableSystemExit();
     }
 
-    /** Prepare the builder for another call to {@link #build()}, avoiding conflict
-     * between the clusters created. */
+    /**
+     * Prepare the builder for another call to {@link #build()}, avoiding conflict
+     * between the clusters created.
+     */
     protected void prepareForNextBuild() {
       conf = new OzoneConfiguration(conf);
       setClusterId();
@@ -364,7 +364,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
      * MiniOzoneCluster.
      *
      * @param val number of datanodes
-     *
      * @return MiniOzoneCluster.Builder
      */
     public Builder setNumDatanodes(int val) {
@@ -406,9 +405,12 @@ public interface MiniOzoneCluster extends AutoCloseable {
     // marker
   }
 
-  /** Service to manage as part of the mini cluster. */
+  /**
+   * Service to manage as part of the mini cluster.
+   */
   interface Service {
     void start(OzoneConfiguration conf) throws Exception;
+
     void stop() throws Exception;
   }
 }
