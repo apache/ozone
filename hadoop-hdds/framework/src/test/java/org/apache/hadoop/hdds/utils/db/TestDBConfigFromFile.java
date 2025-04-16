@@ -37,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.CompactionStyle;
 import org.rocksdb.DBOptions;
+import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
 /**
@@ -83,8 +84,8 @@ public class TestDBConfigFromFile {
   public void readFromEmptyFile() throws IOException {
     File emptyFile = new File(Paths.get(System.getProperty(DBConfigFromFile.CONFIG_DIR)).toString(), "empty.ini");
     assertTrue(emptyFile.createNewFile());
-    IOException thrownException =
-        assertThrows(IOException.class, () -> DBConfigFromFile.readDBOptionsFromFile(emptyFile.toPath()));
+    RocksDBException thrownException =
+        assertThrows(RocksDBException.class, () -> DBConfigFromFile.readDBOptionsFromFile(emptyFile.toPath()));
     assertThat(thrownException.getMessage()).contains("A RocksDB Option file must have a single DBOptions section");
   }
 
