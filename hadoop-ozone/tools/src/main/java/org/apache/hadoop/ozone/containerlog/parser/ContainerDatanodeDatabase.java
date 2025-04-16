@@ -260,29 +260,28 @@ public class ContainerDatanodeDatabase {
       try (ResultSet resultSet = statement.executeQuery()) {
 
         boolean foundit = false;
-        Set<Long> datanodeIds = new HashSet<>();
-        Set<Long> unhealthyReplicas = new HashSet<>();
-        Set<Long> closedReplicas = new HashSet<>();
-        Set<Long> openReplicas = new HashSet<>();
-        Set<Long> quasiclosedReplicas = new HashSet<>();
+        Set<String> datanodeIds = new HashSet<>();
+        Set<String> unhealthyReplicas = new HashSet<>();
+        Set<String> closedReplicas = new HashSet<>();
+        Set<String> openReplicas = new HashSet<>();
+        Set<String> quasiclosedReplicas = new HashSet<>();
         Set<Long> bcsids = new HashSet<>();
-        Set<Long> deletedReplicas = new HashSet<>();
+        Set<String> deletedReplicas = new HashSet<>();
 
-        System.out.printf("%-12s | %-10s | %-10s | %-25s | %-30s | %-20s | %-12s%n",
-            "Datanode ID", "State", "BCSID", "Timestamp", "Error Message", "Index Value", "Log Level");
+        System.out.printf("%-35s | %-13s | %-10s | %-25s | %-25s | %-12s%n",
+            "Datanode ID", "State", "BCSID", "Timestamp", "Message", "Index Value");
         System.out.println("-------------------------------------------------------------------------" +
-            "---------------------------------------------------------------------------------------------");
+            "-------------------------------------------------------------------------------");
 
         while (resultSet.next()) {
           foundit = true;
 
-          long datanodeId = resultSet.getLong("datanode_id");
+          String datanodeId = resultSet.getString("datanode_id");
           String latestState = resultSet.getString("latest_state");
           long latestBcsid = resultSet.getLong("latest_bcsid");
           String timestamp = resultSet.getString("timestamp");
           String errorMessage = resultSet.getString("error_message");
           int indexValue = resultSet.getInt("index_value");
-          String logLevel = resultSet.getString("log_level");
 
           datanodeIds.add(datanodeId);
 
@@ -299,8 +298,8 @@ public class ContainerDatanodeDatabase {
             deletedReplicas.add(datanodeId);
             bcsids.add(latestBcsid);
           }
-          System.out.printf("%-12d | %-10s | %-10d | %-25s | %-30s | %-20s | %-12s%n",
-              datanodeId, latestState, latestBcsid, timestamp, errorMessage, indexValue, logLevel);
+          System.out.printf("%-35s | %-13s | %-10d | %-25s | %-25s | %-12d%n",
+              datanodeId, latestState, latestBcsid, timestamp, errorMessage, indexValue);
 
         }
 
@@ -363,28 +362,26 @@ public class ContainerDatanodeDatabase {
 
       try (ResultSet openCheckResult = openCheckStatement.executeQuery()) {
         List<String> firstOpenTimestamps = new ArrayList<>();
-        Set<Long> firstOpenDatanodes = new HashSet<>();
+        Set<String> firstOpenDatanodes = new HashSet<>();
         List<String[]> allRows = new ArrayList<>();
         boolean issueFound = false;
 
         while (openCheckResult.next()) {
           String timestamp = openCheckResult.getString("timestamp");
-          long datanodeId = openCheckResult.getLong("datanode_id");
+          String datanodeId = openCheckResult.getString("datanode_id");
           String state = openCheckResult.getString("container_state");
           String errorMessage = openCheckResult.getString("error_message");
           long bcsid = openCheckResult.getLong("bcsid");
           int indexValue = openCheckResult.getInt("index_value");
-          String logLevel = openCheckResult.getString("log_level");
 
           String[] row = new String[]{
               timestamp,
               String.valueOf(containerID),
-              String.valueOf(datanodeId),
+              datanodeId,
               state,
               String.valueOf(bcsid),
               errorMessage,
-              String.valueOf(indexValue),
-              logLevel
+              String.valueOf(indexValue)
           };
           allRows.add(row);
 
@@ -400,15 +397,15 @@ public class ContainerDatanodeDatabase {
 
         if (issueFound) {
           System.out.println("Issue found: Container " + containerID + " has duplicate OPEN state.");
-          System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s%n",
-              "Timestamp", "Container ID", "Datanode ID", "Container State", "BCSID", "Error Message", "Index Value",
-              "Log Level");
-          System.out.println("-------------------------------------------------------------------------" +
-              "---------------------------------------------------------------------------------------------");
+          System.out.printf("%-25s | %-15s | %-35s | %-20s | %-10s | %-30s | %-12s%n",
+              "Timestamp", "Container ID", "Datanode ID", "Container State", "BCSID", "Message", "Index Value");
+          System.out.println("-----------------------------------------------------------------------------------" +
+              "-------------------------------------------------------------------------------------------------");
 
           for (String[] row : allRows) {
-            System.out.printf("%-25s | %-12s | %-12s | %-25s | %-12s | %-30s | %-12s | %-12s%n",
-                row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]);
+            System.out.printf("%-25s | %-15s | %-35s | %-20s | %-10s | %-30s | %-12s%n",
+                row[0], row[1], row[2], row[3], row[4], row[5], row[6]);
+
           }
           return true;
         } else {

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.debug.container;
 
+import java.sql.SQLException;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
 import picocli.CommandLine;
@@ -32,7 +33,8 @@ import picocli.CommandLine;
 public class ContainerInfoCommand implements Callable<Void> {
 
   @CommandLine.Option(names = {"--containerId"},
-      description = "container Id")
+      description = "container Id", 
+          required = true)
   private Long containerId;
 
   @CommandLine.ParentCommand
@@ -43,7 +45,13 @@ public class ContainerInfoCommand implements Callable<Void> {
     if (containerId != null) {
 
       ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
-      cdd.showContainerDetails(containerId);
+      try {
+        cdd.showContainerDetails(containerId);
+      } catch (SQLException e) {
+        System.err.println("SQL error while fetching container details: " + e.getMessage());
+      } catch (Exception e) {
+        System.err.println("Unexpected error: " + e.getMessage());
+      }
     } else {
       System.out.println("containerId not provided");
     }
