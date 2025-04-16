@@ -115,7 +115,8 @@ public class TestDeadNodeHandler {
         mockRatisProvider);
     containerManager = scm.getContainerManager();
     deletedBlockLog = mock(DeletedBlockLog.class);
-    diskBalancerManager = mock(DiskBalancerManager.class);
+    diskBalancerManager = new DiskBalancerManager(conf, new EventQueue(),
+        SCMContext.emptyContext(), null);;
     deadNodeHandler = new DeadNodeHandler(nodeManager,
         mock(PipelineManager.class), containerManager, diskBalancerManager, deletedBlockLog);
     healthyReadOnlyNodeHandler =
@@ -219,6 +220,11 @@ public class TestDeadNodeHandler {
     HddsTestUtils.quasiCloseContainer(containerManager,
         container3.containerID());
 
+    //starting diskBalancer on all Datanodes
+    diskBalancerManager.addRunningDatanode(datanode1);
+    diskBalancerManager.addRunningDatanode(datanode2);
+    diskBalancerManager.addRunningDatanode(datanode3);
+
     // First set the node to IN_MAINTENANCE and ensure the container replicas
     // are not removed on the dead event
     datanode1 = nodeManager.getNode(datanode1.getID());
@@ -234,6 +240,15 @@ public class TestDeadNodeHandler {
 
     verify(deletedBlockLog, times(0))
         .onDatanodeDead(datanode1.getUuid());
+
+    // Verify DiskBalancer status is marked UNKNOWN for the dead datanode
+    assertEquals(HddsProtos.DiskBalancerRunningStatus.UNKNOWN,
+        diskBalancerManager.getStatus(datanode1).getRunningStatus());
+    // Verify DiskBalancer status remains unchanged for other datanodes
+    assertEquals(HddsProtos.DiskBalancerRunningStatus.RUNNING,
+        diskBalancerManager.getStatus(datanode2).getRunningStatus());
+    assertEquals(HddsProtos.DiskBalancerRunningStatus.RUNNING,
+        diskBalancerManager.getStatus(datanode3).getRunningStatus());
 
     Set<ContainerReplica> container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));
@@ -284,41 +299,6 @@ public class TestDeadNodeHandler {
     assertTrue(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
-  }
-
-  @Test
-  public void testDiskBalancerStatusUnknownForDeadNode() throws Exception {
-    DatanodeDetails healthyDn = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails deadDn = MockDatanodeDetails.randomDatanodeDetails();
-
-    // Register healthy datanode
-    nodeManager.register(healthyDn,
-        HddsTestUtils.createNodeReport(Collections.emptyList(),
-            Collections.emptyList()), null);
-
-    // Register dead datanode
-    nodeManager.register(deadDn,
-        HddsTestUtils.createNodeReport(Collections.emptyList(),
-            Collections.emptyList()), null);
-
-    diskBalancerManager.addRunningDatanode(healthyDn);
-    diskBalancerManager.addRunningDatanode(deadDn);
-
-    // Verify initial status of both datanodes
-    assertEquals(HddsProtos.DiskBalancerRunningStatus.RUNNING,
-        diskBalancerManager.getStatus(healthyDn).getRunningStatus());
-    assertEquals(HddsProtos.DiskBalancerRunningStatus.RUNNING,
-        diskBalancerManager.getStatus(deadDn).getRunningStatus());
-
-    deadNodeHandler.onMessage(deadDn, publisher);
-
-    // Verify that the status of the dead datanode is updated to UNKNOWN
-    assertEquals(HddsProtos.DiskBalancerRunningStatus.UNKNOWN,
-        diskBalancerManager.getStatus(deadDn).getRunningStatus());
-
-    // Verify that the status of the healthy datanode remains unchanged
-    assertEquals(HddsProtos.DiskBalancerRunningStatus.RUNNING,
-        diskBalancerManager.getStatus(healthyDn).getRunningStatus());
   }
 
   private void registerReplicas(ContainerManager contManager,
