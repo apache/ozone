@@ -295,7 +295,7 @@ public class TestRDBStoreCodecBufferIterator {
       verifier.verify(rocksIteratorMock, times(1)).isValid();
       verifier.verify(rocksIteratorMock, never()).key(any());
       verifier.verify(rocksIteratorMock, never()).value(any());
-      assertNull(valSupplier.get());
+      assertNull(valSupplier);
     }
   }
 

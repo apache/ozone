@@ -181,7 +181,7 @@ public class TestRDBStoreByteArrayIterator {
       verifier.verify(rocksDBIteratorMock, times(1)).isValid();
       verifier.verify(rocksDBIteratorMock, never()).key();
       verifier.verify(rocksDBIteratorMock, never()).value();
-      assertNull(val.get());
+      assertNull(val);
     }
   }
 

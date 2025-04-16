@@ -222,8 +222,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix)
       throws IOException {
-    TableIterator<byte[], UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>>> itr  =
-        new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
+    RDBStoreByteArrayIterator itr  = new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
     return new TableIterator<byte[], KeyValue<byte[], byte[]>>() {
       @Override
       public void seekToFirst() {
@@ -238,7 +237,7 @@ class RDBTable implements Table<byte[], byte[]> {
       @Override
       public KeyValue<byte[], byte[]> seek(byte[] bytes) throws IOException {
         try (UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> kv = itr.seek(bytes)) {
-          return kv.get();
+          return kv == null ? null : kv.get();
         }
       }
 
