@@ -471,13 +471,13 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   public double getIdealUsage() {
-    long totalCapacity = 0L, totalUsed = 0L;
+    long totalCapacity = 0L, totalFree = 0L;
     for (StorageVolume volume: volumeMap.values()) {
       SpaceUsageSource usage = volume.getCurrentUsage();
       totalCapacity += usage.getCapacity();
-      totalUsed += usage.getUsedSpace();
+      totalFree += usage.getAvailable();
     }
     Preconditions.checkArgument(totalCapacity != 0);
-    return (double) totalUsed / totalCapacity;
+    return ((double) (totalCapacity - totalFree)) / totalCapacity;
   }
 }

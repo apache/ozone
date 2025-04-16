@@ -519,11 +519,11 @@ public class DiskBalancerService extends BackgroundService {
 
   public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {
     long bytesPendingToMove = 0;
-    long totalUsedSpace = 0;
+    long totalFreeSpace = 0;
     long totalCapacity = 0;
 
     for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(inputVolumeSet.getVolumesList())) {
-      totalUsedSpace += volume.getCurrentUsage().getUsedSpace();
+      totalFreeSpace += volume.getCurrentUsage().getAvailable();
       totalCapacity += volume.getCurrentUsage().getCapacity();
     }
 
@@ -531,20 +531,20 @@ public class DiskBalancerService extends BackgroundService {
       return 0;
     }
 
-    double datanodeUtilization = (double) totalUsedSpace / totalCapacity;
+    double datanodeUtilization = ((double) (totalCapacity - totalFreeSpace)) / totalCapacity;
 
     double thresholdFraction = threshold / 100.0;
     double upperLimit = datanodeUtilization + thresholdFraction;
 
     // Calculate excess data in overused volumes
     for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(inputVolumeSet.getVolumesList())) {
-      long usedSpace = volume.getCurrentUsage().getUsedSpace();
+      long freeSpace = volume.getCurrentUsage().getAvailable();
       long capacity = volume.getCurrentUsage().getCapacity();
-      double volumeUtilization = (double) usedSpace / capacity;
+      double volumeUtilization = ((double) (capacity - freeSpace)) / capacity;
 
       // Consider only volumes exceeding the upper threshold
       if (volumeUtilization > upperLimit) {
-        long excessData = usedSpace - (long) (upperLimit * capacity);
+        long excessData = (capacity - freeSpace) - (long) (upperLimit * capacity);
         bytesPendingToMove += excessData;
       }
     }
