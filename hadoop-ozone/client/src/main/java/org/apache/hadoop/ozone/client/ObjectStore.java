@@ -600,7 +600,7 @@ public class ObjectStore {
   public OzoneSnapshot getSnapshotInfo(String volumeName,
                                        String bucketName,
                                        String snapshotName) throws IOException {
-    return proxy.getSnapshotInfo(volumeName, bucketName, snapshotName);
+    return getSnapshotInfo(volumeName, bucketName, snapshotName, null);
   }
 
   /**
@@ -632,7 +632,7 @@ public class ObjectStore {
                                               String bucketName,
                                               String snapshotPrefix,
                                               String prevSnapshot) throws IOException {
-    return new SnapshotIterator(volumeName, bucketName, snapshotPrefix, prevSnapshot);
+    return listSnapshot(volumeName, bucketName, snapshotPrefix, prevSnapshot, null);
   }
 
   /**
@@ -669,18 +669,6 @@ public class ObjectStore {
     SnapshotIterator(String volumeName,
                      String bucketName,
                      String snapshotPrefix,
-                     String prevSnapshot) throws IOException {
-      this.volumeName = volumeName;
-      this.bucketName = bucketName;
-      this.snapshotPrefix = snapshotPrefix;
-      this.omNodeId = null;
-      // Initialized the currentIterator and continuationToken.
-      getNextListOfSnapshots(prevSnapshot);
-    }
-
-    SnapshotIterator(String volumeName,
-                     String bucketName,
-                     String snapshotPrefix,
                      String prevSnapshot,
                      String omNodeId) throws IOException {
       this.volumeName = volumeName;
@@ -696,11 +684,7 @@ public class ObjectStore {
       if (!currentIterator.hasNext() && StringUtils.isNotEmpty(lastSnapshot)) {
         try {
           // fetch the next page if lastSnapshot is not null.
-          if (!StringUtils.isBlank(omNodeId)) {
-            getNextListOfSnapshots(lastSnapshot, omNodeId);
-          } else {
-            getNextListOfSnapshots(lastSnapshot);
-          }
+          getNextListOfSnapshots(lastSnapshot, omNodeId);
         } catch (IOException e) {
           LOG.error("Error retrieving next batch of list results", e);
         }
@@ -714,13 +698,6 @@ public class ObjectStore {
         return currentIterator.next();
       }
       throw new NoSuchElementException();
-    }
-
-    private void getNextListOfSnapshots(String startSnapshot) throws IOException {
-      ListSnapshotResponse response =
-          proxy.listSnapshot(volumeName, bucketName, snapshotPrefix, startSnapshot, listCacheSize);
-      currentIterator = response.getSnapshotInfos().stream().map(OzoneSnapshot::fromSnapshotInfo).iterator();
-      lastSnapshot = response.getLastSnapshot();
     }
 
     private void getNextListOfSnapshots(String startSnapshot, String nodeId) throws IOException {
@@ -767,8 +744,8 @@ public class ObjectStore {
                                            boolean forceFullDiff,
                                            boolean disableNativeDiff)
       throws IOException {
-    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        token, pageSize, forceFullDiff, disableNativeDiff);
+    return snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+        token, pageSize, forceFullDiff, disableNativeDiff, null);
   }
 
   /**
@@ -815,8 +792,7 @@ public class ObjectStore {
                                                        String fromSnapshot,
                                                        String toSnapshot)
       throws IOException {
-    return proxy.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot,
-        toSnapshot);
+    return cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot, null);
   }
 
   /**
@@ -853,8 +829,7 @@ public class ObjectStore {
                                                     String jobStatus,
                                                     boolean listAll)
       throws IOException {
-    return proxy.listSnapshotDiffJobs(volumeName,
-        bucketName, jobStatus, listAll);
+    return listSnapshotDiffJobs(volumeName, bucketName, jobStatus, listAll, null);
   }
 
   /**
