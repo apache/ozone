@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import org.apache.hadoop.conf.StorageUnit;
@@ -27,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
 import org.rocksdb.CompactionStyle;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +54,7 @@ public enum DBProfile {
         if (dbPath != null) {
           option = DBConfigFromFile.readDBOptionsFromFile(dbPath);
         }
-      } catch (IOException ex) {
+      } catch (RocksDBException ex) {
         LOG.error("Unable to read RocksDB DBOptions from {}, exception {}", dbPath, ex);
       }
       if (option != null) {
@@ -87,7 +87,7 @@ public enum DBProfile {
       }
       try {
         option = DBConfigFromFile.readCFOptionsFromFile(dbPath, cfName);
-      } catch (IOException ex) {
+      } catch (RocksDBException ex) {
         LOG.error("Unable to read RocksDB CFOptions from {}, exception {}", dbPath, ex);
       }
 

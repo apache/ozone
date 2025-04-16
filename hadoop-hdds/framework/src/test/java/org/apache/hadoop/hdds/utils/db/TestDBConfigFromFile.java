@@ -37,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.CompactionStyle;
 import org.rocksdb.DBOptions;
+import org.rocksdb.RocksDBException;
 
 /**
  * DBConf tests.
@@ -60,7 +61,7 @@ public class TestDBConfigFromFile {
   }
 
   @Test
-  public void readFromFile() throws IOException {
+  public void readFromFile() throws RocksDBException {
     final DBOptions options = DBConfigFromFile.readDBOptionsFromFile(Paths.get(DB_FILE));
 
     // Some Random Values Defined in the test.db.ini, we verify that we are
@@ -72,7 +73,7 @@ public class TestDBConfigFromFile {
   }
 
   @Test
-  public void readFromNonExistentFile() throws IOException {
+  public void readFromNonExistentFile() throws RocksDBException {
     final DBOptions options = DBConfigFromFile.readDBOptionsFromFile(Paths.get("nonExistent.db.ini"));
     // This has to return a Null, since we have config defined for badfile.db
     assertNull(options);
@@ -88,7 +89,7 @@ public class TestDBConfigFromFile {
   }
 
   @Test
-  public void readColumnFamilyOptionsFromFile() throws IOException {
+  public void readColumnFamilyOptionsFromFile() throws RocksDBException {
     ManagedColumnFamilyOptions managedColumnFamily = DBConfigFromFile.readCFOptionsFromFile(
         Paths.get(DB_FILE), "default");
     assertNotNull(managedColumnFamily);

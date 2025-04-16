@@ -111,7 +111,7 @@ public final class DBConfigFromFile {
    * @param dbPath - The DB File Name, for example, OzoneManager.db.
    * @return DBOptions, Options to be used for opening/creating the DB.
    */
-  public static ManagedDBOptions readDBOptionsFromFile(Path dbPath) throws IOException {
+  public static ManagedDBOptions readDBOptionsFromFile(Path dbPath) throws RocksDBException {
     List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
     try {
       return readFromFile(dbPath, descriptors);
@@ -122,7 +122,7 @@ public final class DBConfigFromFile {
   }
 
 
-  public static ManagedColumnFamilyOptions readCFOptionsFromFile(Path dbPath, String cfName) throws IOException {
+  public static ManagedColumnFamilyOptions readCFOptionsFromFile(Path dbPath, String cfName) throws RocksDBException {
     List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
     String validatedCfName = StringUtil.isEmpty(cfName) ? StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY) : cfName;
     ManagedColumnFamilyOptions resultCfOptions = null;
@@ -154,7 +154,7 @@ public final class DBConfigFromFile {
       OptionsUtil.loadOptionsFromFile(configOptions, generatedDBPath.toString(), options, descriptors);
     } catch (RocksDBException rdEx) {
       options.close();
-      throw new RocksDBException("There was an error opening rocksDB Options file.", rdEx);
+      throw new RocksDBException("There was an error opening rocksDB Options file: " + rdEx.getMessage());
     }
     return options;
   }
