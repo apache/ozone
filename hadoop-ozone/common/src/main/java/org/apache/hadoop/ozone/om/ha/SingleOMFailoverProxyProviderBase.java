@@ -127,7 +127,7 @@ public abstract class SingleOMFailoverProxyProviderBase<T> implements FailoverPr
     return protocolClass;
   }
 
-  protected synchronized boolean shouldRetryAgain(Exception ex) {
+  protected boolean shouldRetryAgain(Exception ex) {
     Throwable unwrappedException = HddsUtils.getUnwrappedException(ex);
     if (unwrappedException instanceof OMNotLeaderException) {
       // This means that the OM node is a follower and it does not allow this particular
@@ -163,7 +163,7 @@ public abstract class SingleOMFailoverProxyProviderBase<T> implements FailoverPr
     return true;
   }
 
-  public synchronized long getWaitTime() {
+  public long getWaitTime() {
     return waitBetweenRetries;
   }
 
