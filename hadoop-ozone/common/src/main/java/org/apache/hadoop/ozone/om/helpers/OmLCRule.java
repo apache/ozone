@@ -49,6 +49,7 @@ public class OmLCRule {
     this.actions = actions;
     this.filter = filter;
 
+    // If no ID is specified in the lifecycle configure, a random ID will be generated
     if (StringUtils.isEmpty(this.id)) {
       this.id = RandomStringUtils.randomAlphanumeric(LC_ID_LENGTH);
     }

@@ -55,14 +55,21 @@ class TestOmLCRule {
         .build();
     assertDoesNotThrow(r1::valid);
 
-    // Empty id should generate a 48 (default) bit one.
     OmLCRule r2 = new OmLCRule.Builder()
+        .setEnabled(true)
+        .setPrefix("")
+        .setAction(exp)
+        .build();
+    assertDoesNotThrow(r2::valid);
+
+    // Empty id should generate a 48 (default) bit one.
+    OmLCRule r3 = new OmLCRule.Builder()
         .setEnabled(true)
         .setAction(exp)
         .build();
 
-    assertDoesNotThrow(r2::valid);
-    assertEquals(OmLCRule.LC_ID_LENGTH, r2.getId().length(),
+    assertDoesNotThrow(r3::valid);
+    assertEquals(OmLCRule.LC_ID_LENGTH, r3.getId().length(),
         "Expected a " + OmLCRule.LC_ID_LENGTH + " length generated ID");
   }
 

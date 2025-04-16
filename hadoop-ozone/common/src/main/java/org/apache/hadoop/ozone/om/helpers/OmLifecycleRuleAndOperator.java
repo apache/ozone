@@ -56,23 +56,22 @@ public final class OmLifecycleRuleAndOperator {
    * @throws OMException if the validation fails.
    */
   public void valid() throws OMException {
-    if ((tags == null || tags.isEmpty()) && (prefix == null || prefix.isEmpty())) {
+    boolean hasTags = tags != null && !tags.isEmpty();
+    boolean hasPrefix = prefix != null;
+
+    if (!hasTags && !hasPrefix) {
       throw new OMException("Invalid lifecycle rule andOperator configuration: " +
           "Either 'Tags' or 'Prefix' must be specified.",
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
-    if (tags != null && !tags.isEmpty()) {
-      if (prefix == null || prefix.isEmpty()) {
-        if (tags.size() == 1) {
-          throw new OMException("Invalid lifecycle rule andOperator configuration: " +
-              "If 'Tags' are specified without 'Prefix', there should be more than one tag.",
-              OMException.ResultCodes.INVALID_REQUEST);
-        }
-      }
+    if (hasTags && !hasPrefix && tags.size() == 1) {
+      throw new OMException("Invalid lifecycle rule andOperator configuration: " +
+          "If 'Tags' are specified without 'Prefix', there should be more than one tag.",
+          OMException.ResultCodes.INVALID_REQUEST);
     }
 
-    if (prefix != null && !prefix.isEmpty() && (tags == null || tags.isEmpty())) {
+    if (hasPrefix && !hasTags) {
       throw new OMException("Invalid lifecycle rule andOperator configuration: " +
           "'Prefix' alone is not allowed.",
           OMException.ResultCodes.INVALID_REQUEST);

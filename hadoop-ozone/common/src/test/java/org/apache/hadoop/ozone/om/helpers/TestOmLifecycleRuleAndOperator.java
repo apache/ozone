@@ -36,13 +36,18 @@ class TestOmLifecycleRuleAndOperator {
     OmLifecycleRuleAndOperator andOperator1 = getOmLCAndOperator("prefix", Collections.singletonMap("tag1", "value1"));
     assertDoesNotThrow(andOperator1::valid);
 
-    OmLifecycleRuleAndOperator andOperator2 =
-        getOmLCAndOperator("prefix", ImmutableMap.of("tag1", "value1", "tag2", "value2"));
+    OmLifecycleRuleAndOperator andOperator2 = getOmLCAndOperator("", Collections.singletonMap("tag1", "value1"));
     assertDoesNotThrow(andOperator2::valid);
 
-    OmLifecycleRuleAndOperator andOperator3 = getOmLCAndOperator(
-        null, ImmutableMap.of("tag1", "value1", "tag2", "value2"));
+    OmLifecycleRuleAndOperator andOperator3 =
+        getOmLCAndOperator("prefix", ImmutableMap.of("tag1", "value1", "tag2", "value2"));
     assertDoesNotThrow(andOperator3::valid);
+
+    OmLifecycleRuleAndOperator andOperator4 = getOmLCAndOperator(
+        null, ImmutableMap.of("tag1", "value1", "tag2", "value2"));
+    assertDoesNotThrow(andOperator4::valid);
+
+
   }
 
   @Test
