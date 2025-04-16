@@ -88,7 +88,7 @@ import picocli.CommandLine;
 )
 public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
-  public static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
   private static final String SCHEMA_V3 = "V3";
 
   @CommandLine.ParentCommand

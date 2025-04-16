@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.junit.jupiter.api.Test;
@@ -54,7 +55,7 @@ class TestSafeModeRuleFactory {
     // as the rules are hardcoded in SafeModeRuleFactory.
 
     // This will be fixed once we load rules using annotation.
-    assertEquals(4, factory.getSafeModeRules().size(),
+    assertEquals(5, factory.getSafeModeRules().size(),
         "The total safemode rules count doesn't match");
 
   }
@@ -78,7 +79,8 @@ class TestSafeModeRuleFactory {
     when(safeModeManager.getSafeModeMetrics()).thenReturn(mock(SafeModeMetrics.class));
     SafeModeRuleFactory.initialize(new OzoneConfiguration(),
         SCMContext.emptyContext(), new EventQueue(), safeModeManager, mock(
-            PipelineManager.class), mock(ContainerManager.class));
+            PipelineManager.class),
+        mock(ContainerManager.class), mock(NodeManager.class));
   }
 
 }

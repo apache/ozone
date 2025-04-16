@@ -301,15 +301,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.container.ratis.replication.level</name>
-    <value>MAJORITY</value>
-    <tag>OZONE, RATIS</tag>
-    <description>Replication level to be used by datanode for submitting a
-      container command to ratis. Available replication levels are ALL and
-      MAJORTIY, MAJORITY is used as the default replication level.
-    </description>
-  </property>
-  <property>
     <name>hdds.container.ratis.num.container.op.executors</name>
     <value>10</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
@@ -345,6 +336,14 @@
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for ratis leader election.
         Default is 5s.
+    </description>
+  </property>
+  <property>
+    <name>hdds.ratis.leader.first.election.minimum.timeout.duration</name>
+    <value/>
+    <tag>OZONE, RATIS, MANAGEMENT</tag>
+    <description>ratis Minimum timeout for the first election of a leader.
+      If not configured, fallback to hdds.ratis.leader.election.minimum.timeout.duration.
     </description>
   </property>
   <property>
@@ -1155,11 +1154,27 @@
     </description>
   </property>
   <property>
+    <name>hdds.initial.heartbeat.interval</name>
+    <value>2s</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Heartbeat interval used during Datanode initialization for SCM.
+    </description>
+  </property>
+  <property>
     <name>hdds.recon.heartbeat.interval</name>
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
       The heartbeat interval from a Datanode to Recon.
+    </description>
+  </property>
+  <property>
+    <name>hdds.recon.initial.heartbeat.interval</name>
+    <value>60s</value>
+    <tag>OZONE, MANAGEMENT, RECON</tag>
+    <description>
+      Heartbeat interval used during Datanode initialization for Recon.
     </description>
   </property>
   <property>
@@ -1504,12 +1519,6 @@
   </property>
 
   <property>
-    <name>hdds.rest.http-address</name>
-    <value>0.0.0.0:9880</value>
-    <description>The http address of Object Store REST server inside the
-      datanode.</description>
-  </property>
-  <property>
     <name>hdds.datanode.plugins</name>
     <value/>
     <description>
@@ -1632,15 +1641,6 @@
     <tag>HDDS,SCM,OPERATION</tag>
     <description>Minimum DataNodes which should be registered to get SCM out of
       safe mode.
-    </description>
-  </property>
-
-  <property>
-    <name>hdds.scm.safemode.pipeline-availability.check</name>
-    <value>true</value>
-    <tag>HDDS,SCM,OPERATION</tag>
-    <description>
-      Boolean value to enable pipeline availability check during SCM safe mode.
     </description>
   </property>
 
@@ -1838,10 +1838,11 @@
 
   <property>
     <name>ozone.s3g.https-address</name>
-    <value/>
+    <value>0.0.0.0:9879</value>
     <tag>OZONE, S3GATEWAY</tag>
-    <description>Ozone S3Gateway serverHTTPS server address and port
-      .</description>
+    <description>
+      Ozone S3Gateway HTTPS server address and port.
+    </description>
   </property>
 
   <property>
@@ -1863,7 +1864,7 @@
 
   <property>
     <name>ozone.s3g.webadmin.https-address</name>
-    <value/>
+    <value>0.0.0.0:19879</value>
     <tag>OZONE, S3GATEWAY</tag>
     <description>Ozone S3Gateway content server's HTTPS address and port.</description>
   </property>
@@ -3034,6 +3035,15 @@
       Property to determine the transport protocol for the client to Ozone Manager channel.
     </description>
   </property>
+
+  <property>
+    <name>ozone.recon.address</name>
+    <value/>
+    <tag>RECON, MANAGEMENT</tag>
+    <description>
+      RPC address of Recon Server. If not set, datanodes will not configure Recon Server.
+    </description>
+  </property>
   <property>
     <name>ozone.recon.http.enabled</name>
     <value>true</value>
@@ -3834,6 +3844,13 @@
       election. Default is 1s.</description>
   </property>
   <property>
+    <name>ozone.scm.ha.raft.server.rpc.first-election.timeout</name>
+    <value/>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>ratis timeout for the first election of a leader.
+      If not configured, fallback to ozone.scm.ha.ratis.leader.election.timeout.
+    </description>
+  </property><property>
     <name>ozone.scm.ha.ratis.server.leaderelection.pre-vote</name>
     <value>true</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
@@ -3937,6 +3954,16 @@
       OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.s3.grpc.server_enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM, S3GATEWAY</tag>
+    <description>
+      Property to enable or disable Ozone Manager gRPC endpoint for clients.  Right now, it is used by S3 Gateway only.
+    </description>
+  </property>
+
   <property>
     <name>ozone.om.grpc.maximum.response.length</name>
     <value>134217728</value>
