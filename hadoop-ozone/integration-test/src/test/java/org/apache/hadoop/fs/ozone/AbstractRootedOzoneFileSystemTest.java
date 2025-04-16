@@ -57,7 +57,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -215,7 +214,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
   private Path bucketPath;
   private String rootPath;
   private final BucketLayout bucketLayout;
-  private SecureRandom random;
 
   private static final String USER1 = "regularuser1";
   private static final UserGroupInformation UGI_USER1 = UserGroupInformation
@@ -274,7 +272,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     userOfs = UGI_USER1.doAs(
         (PrivilegedExceptionAction<RootedOzoneFileSystem>)()
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
-    random = new SecureRandom();
   }
 
   protected OMMetrics getOMMetrics() {
