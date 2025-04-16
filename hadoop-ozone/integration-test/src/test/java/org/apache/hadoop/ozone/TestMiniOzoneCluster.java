@@ -60,7 +60,8 @@ public class TestMiniOzoneCluster {
 
   private MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
-  private static Path tempDir;
+  @TempDir
+  private Path tempDir;
 
   @BeforeAll
   static void setup(@TempDir File testDir) {
