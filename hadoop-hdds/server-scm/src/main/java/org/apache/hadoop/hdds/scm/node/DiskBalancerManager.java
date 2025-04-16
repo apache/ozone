@@ -284,14 +284,14 @@ public class DiskBalancerManager {
 
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
 
-    double totalCapacity = 0d, totalUsed = 0d;
+    double totalCapacity = 0d, totalFree = 0d;
     for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
       totalCapacity += reportProto.getCapacity();
-      totalUsed += (reportProto.getCapacity() - reportProto.getRemaining());
+      totalFree += reportProto.getRemaining();
     }
 
     Preconditions.checkArgument(totalCapacity != 0);
-    double idealUsage = totalUsed / totalCapacity;
+    double idealUsage = (totalCapacity - totalFree) / totalCapacity;
 
     double volumeDensitySum = datanodeInfo.getStorageReports().stream()
         .map(report ->
