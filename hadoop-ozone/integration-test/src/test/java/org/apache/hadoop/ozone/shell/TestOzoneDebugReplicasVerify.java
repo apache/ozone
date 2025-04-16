@@ -153,6 +153,15 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     corruptFile(blockFile.get());
   }
 
+  public void truncateBlock(Container<?> container) {
+    File chunksDir = new File(container.getContainerData().getContainerPath(), "chunks");
+    Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
+            chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
+        .findFirst();
+    assertTrue(blockFile.isPresent());
+    truncateFile(blockFile.get());
+  }
+
   /**
    * Overwrite the file with random bytes.
    */
@@ -273,12 +282,14 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
             }
             return "";
           })
-          .forEach(manifestFile -> assertThat(manifestFile).doesNotContain("Checksum mismatch"));
+          .forEach(manifestFile -> assertThat(manifestFile)
+              .doesNotContain("Checksum mismatch")
+              .doesNotContain("Unexpected read size"));
     }
   }
 
   @Test
-  void testChecksumsWithDataCorruption() throws IOException {
+  void testChecksumsWithCorruptedBlockFile() throws IOException {
     Path checksumsOutputDir = tempDir.toPath().resolve(RandomStringUtils.insecure().nextAlphanumeric(10));
     Container<?> container = getFirstKeyContainer();
     LOG.info("Corrupting key: /" + volume + "/" + bucket + "/" + key);
@@ -310,7 +321,50 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
             if (manifestFile.contains(key)) {
               assertThat(manifestFile).contains("Checksum mismatch");
             } else {
-              assertThat(manifestFile).doesNotContain("Checksum mismatch");
+              assertThat(manifestFile)
+                  .doesNotContain("Checksum mismatch")
+                  .doesNotContain("Unexpected read size");
+            }
+          });
+    }
+  }
+
+  @Test
+  void testChecksumsWithEmptyBlockFile() throws IOException {
+    Path checksumsOutputDir = tempDir.toPath().resolve(RandomStringUtils.insecure().nextAlphanumeric(10));
+    Container<?> container = getFirstKeyContainer();
+    LOG.info("Corrupting key: /" + volume + "/" + bucket + "/" + key);
+    truncateBlock(container);
+
+    List<String> parameters = new ArrayList<>();
+    parameters.add(0, getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY));
+    parameters.add(0, getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY));
+    parameters.add("replicas");
+    parameters.add("verify");
+    parameters.add("--checksums");
+    parameters.add("--output-dir=" + checksumsOutputDir);
+    parameters.add(ozoneAddress);
+
+    int exitCode = ozoneDebugShell.execute(parameters.toArray(new String[0]));
+
+    assertEquals(0, exitCode, err.toString());
+    if (checksumsOutputDir.toFile().exists()) {
+      Files.walk(checksumsOutputDir)
+          .filter(Files::isRegularFile)
+          .map(e -> {
+            try {
+              return new String(Files.readAllBytes(e.toAbsolutePath()));
+            } catch (IOException ignored) {
+            }
+            return "";
+          })
+          .forEach(manifestFile -> {
+            if (manifestFile.contains(key)) {
+              assertThat(manifestFile).contains("Unexpected read size");
+            } else {
+              assertThat(manifestFile)
+                  .doesNotContain("Checksum mismatch")
+                  .doesNotContain("Unexpected read size");
             }
           });
     }
