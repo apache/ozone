@@ -66,8 +66,9 @@ public class InfoSnapshotHandler extends Handler {
     }
 
     if (isVerbose()) {
-      err().printf("Snapshot info for snapshot: %s under o3://%s/%s %n ",
-          snapshotName, volumeName, bucketName);
+      err().printf("Snapshot info for snapshot: %s under o3://%s/%s %n from OM %s",
+          snapshotName, volumeName, bucketName,
+          (omNodeId != null) ? ("node" + omNodeId) : "leader");
     }
     printObjectAsJson(ozoneSnapshot);
   }

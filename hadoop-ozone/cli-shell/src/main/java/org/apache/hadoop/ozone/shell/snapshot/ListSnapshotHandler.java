@@ -72,8 +72,9 @@ public class ListSnapshotHandler extends Handler {
 
     int counter = printAsJsonArray(snapshotInfos, listOptions.getLimit());
     if (isVerbose()) {
-      err().printf("Found : %d snapshots for o3://%s/%s %n", counter,
-          volumeName, bucketName);
+      err().printf("Found : %d snapshots for o3://%s/%s %n from OM %s", counter,
+          volumeName, bucketName,
+          (omNodeId != null) ? ("node" + omNodeId) : "leader");
     }
   }
 }

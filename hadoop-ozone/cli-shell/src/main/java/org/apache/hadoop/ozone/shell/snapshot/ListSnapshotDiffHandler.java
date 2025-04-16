@@ -78,8 +78,9 @@ public class ListSnapshotDiffHandler extends Handler {
     int counter = printAsJsonArray(jobList.iterator(),
         jobList.size());
     if (isVerbose()) {
-      System.out.printf("Found : %d snapshot diff jobs for o3://%s/ %s ",
-          counter, volumeName, bucketName);
+      System.out.printf("Found : %d snapshot diff jobs for o3://%s/ %s from OM %s",
+          counter, volumeName, bucketName,
+          (omNodeId != null) ? ("node" + omNodeId) : "leader");
     }
   }
 }
