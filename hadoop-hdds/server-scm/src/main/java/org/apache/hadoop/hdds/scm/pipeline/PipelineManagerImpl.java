@@ -547,7 +547,7 @@ public class PipelineManagerImpl implements PipelineManager {
             getStalePipelines(datanodeDetails);
     if (pipelinesWithStaleIpOrHostname.isEmpty()) {
       LOG.debug("No stale pipelines for datanode {}",
-              datanodeDetails.getUuidString());
+              datanodeDetails);
       return;
     }
     LOG.info("Found {} stale pipelines",

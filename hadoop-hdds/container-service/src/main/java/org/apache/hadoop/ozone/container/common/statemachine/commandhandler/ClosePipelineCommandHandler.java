@@ -140,10 +140,10 @@ public class ClosePipelineCommandHandler implements CommandHandler {
           // well. It is a no-op for XceiverServerSpi implementations (e.g. XceiverServerGrpc)
           server.removeGroup(pipelineIdProto);
           LOG.info("Close Pipeline {} command on datanode {}.", pipelineID,
-              dn.getUuidString());
+              dn);
         } else {
           LOG.debug("Ignoring close pipeline command for pipeline {} on datanode {} " +
-              "as it does not exist", pipelineID, dn.getUuidString());
+              "as it does not exist", pipelineID, dn);
         }
       } catch (IOException e) {
         Throwable gme = HddsClientUtils.containsException(e, GroupMismatchException.class);
@@ -151,7 +151,7 @@ public class ClosePipelineCommandHandler implements CommandHandler {
           // ignore silently since this means that the group has been closed by earlier close pipeline
           // command in another datanode
           LOG.debug("The group for pipeline {} on datanode {} has been removed by earlier close " +
-              "pipeline command handled in another datanode", pipelineID, dn.getUuidString());
+              "pipeline command handled in another datanode", pipelineID, dn);
         } else {
           LOG.error("Can't close pipeline {}", pipelineID, e);
         }
