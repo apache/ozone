@@ -131,7 +131,7 @@ class RDBStoreCodecBufferIterator
       } catch (InterruptedException e) {
         throw new UncheckedInterruptedException(e);
       }
-    } while(popped == null);
+    } while (popped == null);
     assertOpen();
     inUseSet.add(popped);
     return popped;
@@ -200,7 +200,6 @@ class RDBStoreCodecBufferIterator
       V popped = valueStack.pop();
       releaser.apply(popped);
     }
-
     for (V inUseValue : inUseSet) {
       releaser.apply(inUseValue);
     }
