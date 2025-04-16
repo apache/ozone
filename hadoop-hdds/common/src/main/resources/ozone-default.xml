@@ -1520,7 +1520,7 @@
 
   <property>
     <name>ozone.compaction.service.enabled</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
       Enable or disable a background job that periodically compacts rocksdb tables flagged for compaction.

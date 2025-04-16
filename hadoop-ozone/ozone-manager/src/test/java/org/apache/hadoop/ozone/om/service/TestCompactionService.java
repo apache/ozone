@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -67,6 +68,7 @@ class TestCompactionService {
     OzoneConfiguration conf = new OzoneConfiguration();
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(conf, tempDir.toString());
+    conf.setBoolean(OZONE_OM_COMPACTION_SERVICE_ENABLED, true);
     conf.setTimeDuration(OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL,
         SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
     conf.setQuietMode(false);
