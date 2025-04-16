@@ -36,7 +36,8 @@ import picocli.CommandLine;
 public class ListContainers implements Callable<Void> {
   
   @CommandLine.Option(names = {"--state"},
-      description = "state of the container")
+      description = "state of the container",
+      required = true)
   private HddsProtos.LifeCycleState state;
 
   @CommandLine.Mixin
@@ -47,21 +48,14 @@ public class ListContainers implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    if (state != null) {
-
-      ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
-      try {
-        cdd.listContainersByState(state.name(), listOptions.getLimit());
-      } catch (SQLException e) {
-        System.err.println("Error while retrieving containers with state: " + state + " " + e.getMessage());
-      } catch (Exception e) {
-        System.err.println("Error while retrieving containers with state: " + state + " " + e.getMessage());
-      }
-    } else {
-      System.out.println("state not provided");
+    
+    ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
+    try {
+      cdd.listContainersByState(state.name(), listOptions.getLimit());
+    } catch (Exception e) {
+      System.err.println("Error while retrieving containers with state: " + state + " " + e.getMessage());
     }
-
+    
     return null;
   }
-
 }
