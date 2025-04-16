@@ -2704,11 +2704,11 @@
     </description>
   </property>
   <property>
-    <name>rocks.db.config.path</name>
+    <name>datanode.db.config.path</name>
     <value/>
-    <tag>OZONE, OM</tag>
+    <tag>OZONE, CONTAINER, STORAGE</tag>
     <description>
-      Path to an ini configuration file for RocksDB.
+      Path to an ini configuration file for RocksDB on datanode compontent.
     </description>
   </property>
   <property>

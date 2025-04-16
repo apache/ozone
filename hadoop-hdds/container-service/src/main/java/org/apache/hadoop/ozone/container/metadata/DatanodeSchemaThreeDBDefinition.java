@@ -114,7 +114,7 @@ public class DatanodeSchemaThreeDBDefinition
         .getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
 
     Path pathToDb = Paths.get(
-        config.get(HddsConfigKeys.ROCKS_DB_CONFIG_PATH, HddsConfigKeys.ROCKS_DB_CONFIG_PATH_DEFAULT));
+        config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT));
 
     BLOCK_DATA.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "block_data"));
     METADATA.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "metadata"));
