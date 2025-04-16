@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -276,6 +277,25 @@ public class TestRDBStoreCodecBufferIterator {
     verify(rocksIteratorMock, times(1)).seekToLast();
 
     CodecTestUtil.gc();
+  }
+
+  @Test
+  public void testSeekWithInvalidValue() {
+    when(rocksIteratorMock.isValid()).thenReturn(false);
+
+    try (RDBStoreCodecBufferIterator i = newIterator();
+         CodecBuffer target = CodecBuffer.wrap(new byte[] {0x55});
+         UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>> valSupplier = i.seek(target)) {
+      InOrder verifier = inOrder(rocksIteratorMock);
+      verify(rocksIteratorMock, times(1)).seekToFirst(); //at construct time
+      verify(rocksIteratorMock, never()).seekToLast();
+      verifier.verify(rocksIteratorMock, times(1))
+          .seek(any(ByteBuffer.class));
+      verifier.verify(rocksIteratorMock, times(1)).isValid();
+      verifier.verify(rocksIteratorMock, never()).key(any());
+      verifier.verify(rocksIteratorMock, never()).value(any());
+      assertNull(valSupplier.get());
+    }
   }
 
   @Test

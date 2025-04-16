@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentCaptor.forClass;
@@ -164,6 +165,24 @@ public class TestRDBStoreByteArrayIterator {
     iter.seekToLast();
 
     verify(rocksDBIteratorMock, times(1)).seekToLast();
+  }
+
+  @Test
+  public void testSeekWithInvalidValue() {
+    when(rocksDBIteratorMock.isValid()).thenReturn(false);
+
+    try (RDBStoreByteArrayIterator iter = newIterator()) {
+      final UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> val = iter.seek(new byte[] {0x55});
+      InOrder verifier = inOrder(rocksDBIteratorMock);
+
+      verify(rocksDBIteratorMock, times(1)).seekToFirst(); //at construct time
+      verify(rocksDBIteratorMock, never()).seekToLast();
+      verifier.verify(rocksDBIteratorMock, times(1)).seek(any(byte[].class));
+      verifier.verify(rocksDBIteratorMock, times(1)).isValid();
+      verifier.verify(rocksDBIteratorMock, never()).key();
+      verifier.verify(rocksDBIteratorMock, never()).value();
+      assertNull(val.get());
+    }
   }
 
   @Test

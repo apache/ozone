@@ -37,6 +37,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStoreAbstractIterator.class);
 
+  private final UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> empty;
   private final ManagedRocksIterator rocksDBIterator;
   private final RDBTable rocksDBTable;
   private ReferenceCountedObject<RawKeyValue<RAW>> currentEntry;
@@ -54,6 +55,18 @@ abstract class RDBStoreAbstractIterator<RAW>
     this.currentEntry = null;
     this.hasNext = false;
     this.closed = false;
+    this.empty = new UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>() {
+
+          @Override
+          public void close() {
+
+          }
+
+          @Override
+          public RawKeyValue<RAW> get() {
+            return null;
+          }
+        };
   }
 
   /** @return the {@link Table.KeyValue} for the current entry. */
@@ -149,7 +162,10 @@ abstract class RDBStoreAbstractIterator<RAW>
     seek0(key);
     setCurrentEntry();
     // Current entry should be only closed when the next() and thus closing the returned entry should be a noop.
-    return currentEntry.retainAndReleaseOnClose();
+    if (hasNext()) {
+      return currentEntry.retainAndReleaseOnClose();
+    }
+    return empty;
   }
 
   @Override
