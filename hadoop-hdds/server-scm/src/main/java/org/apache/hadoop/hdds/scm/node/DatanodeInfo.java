@@ -56,6 +56,7 @@ public class DatanodeInfo extends DatanodeDetails {
   private final Map<SCMCommandProto.Type, Integer> commandCounts;
 
   private NodeStatus nodeStatus;
+  private Map<String, String> containersReplicationMetrics;
 
   /**
    * Constructs DatanodeInfo from DatanodeDetails.
@@ -348,6 +349,26 @@ public class DatanodeInfo extends DatanodeDetails {
     try {
       lock.readLock().lock();
       return commandCounts.getOrDefault(cmd, -1);
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  public void setContainersReplicationMetrics(
+      Map<String, String> containersReplicationMetrics) {
+    try {
+      lock.writeLock().lock();
+      this.containersReplicationMetrics =
+          containersReplicationMetrics;
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  public Map<String, String> getContainersReplicationMetrics() {
+    try {
+      lock.readLock().lock();
+      return containersReplicationMetrics;
     } finally {
       lock.readLock().unlock();
     }

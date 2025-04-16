@@ -236,6 +236,24 @@ public class TestDecommissionStatusSubCommand {
     assertFalse(m.find());
   }
 
+  @Test
+  public void testNodeContainersReplicationMetrics() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.queryNode(any(), any(), any(), any()))
+        .thenAnswer(invocation -> nodes.subList(0, 1)); // host0 decommissioning
+    when(scmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
+    when(scmClient.getMetrics(any())).thenReturn(metrics.get(1));
+
+    cmd.execute(scmClient);
+
+    Pattern p = Pattern.compile("Containers Replication Metrics:\\n"
+        + "Bytes transferred for successful replication tasks:\\s1423644672\\n" +
+        "Successfully replicated containers:\\s5\\n"
+        + "Time spent on successful replication tasks \\(ms\\):\\s27855");
+    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+  }
+
 
   private List<HddsProtos.Node> getNodeDetails(int n) {
     List<HddsProtos.Node> nodesList = new ArrayList<>();
@@ -256,6 +274,14 @@ public class TestDecommissionStatusSubCommand {
           HddsProtos.NodeOperationalState.DECOMMISSIONING);
       builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
       builder.setNodeID(dnd.build());
+
+      builder.addContainerReplicationMetrics(HddsProtos.KeyValue.newBuilder()
+          .setKey("transferredBytes").setValue("1423644672").build());
+      builder.addContainerReplicationMetrics(HddsProtos.KeyValue.newBuilder()
+          .setKey("numSuccessReplications").setValue("5").build());
+      builder.addContainerReplicationMetrics(HddsProtos.KeyValue.newBuilder()
+          .setKey("successTime").setValue("27855").build());
+
       nodesList.add(builder.build());
     }
     return nodesList;

@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +64,37 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
       description = "Show output in json format",
       defaultValue = "false")
   private boolean json;
+
+  /**
+   * Describes the containers replication metrics that will be printed in a plaintext format.
+   * A full list of metrics consist following keys:
+   * &lt;ul&gt;
+   *    &lt;li&gt;numTimeoutReplications&lt;/li&gt;
+   *    &lt;li&gt;numRequestedReplications&lt;/li&gt;
+   *    &lt;li&gt;numSuccessReplications&lt;/li&gt;
+   *    &lt;li&gt;transferredBytes&lt;/li&gt;
+   *    &lt;li&gt;numFailedReplications&lt;/li&gt;
+   *    &lt;li&gt;numQueuedReplications&lt;/li&gt;
+   *    &lt;li&gt;failureTime&lt;/li&gt;
+   *    &lt;li&gt;numInFlightReplications&lt;/li&gt;
+   *    &lt;li&gt;queueTime&lt;/li&gt;
+   *    &lt;li&gt;failureBytes&lt;/li&gt;
+   *    &lt;li&gt;maxReplicationStreams&lt;/li&gt;
+   *    &lt;li&gt;successTime&lt;/li&gt;
+   *    &lt;li&gt;numSkippedReplications&lt;/li&gt;
+   *    &lt;li&gt;closedContainersCount&lt;/li&gt;
+   * &lt;/ul&gt;
+   */
+  private Map<String, String> decommissionMetricsDescription =
+      new HashMap<String, String>() {{
+          put("numRequestedReplications", "Containers for replication");
+          put("numSuccessReplications", "Successfully replicated containers");
+          put("transferredBytes", "Bytes transferred for successful replication tasks");
+          put("numFailedReplications", "Failed replications");
+          put("successTime", "Time spent on successful replication tasks (ms)");
+          put("failureTime", "Time spent on failed replication attempts (ms)");
+          put("failureBytes", "Bytes transferred for failed replication attempts");
+        }};
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
@@ -106,6 +138,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
         datanodeMap.put("datanodeDetails", datanode);
         datanodeMap.put("metrics", getCounts(datanode, jsonNode, numDecomNodes));
         datanodeMap.put("containers", getContainers(scmClient, datanode));
+        datanodeMap.put("containersReplicationMetrics", node.getContainerReplicationMetricsList().stream()
+            .collect(Collectors.toMap(HddsProtos.KeyValue::getKey, HddsProtos.KeyValue::getValue)));
         decommissioningNodesDetails.add(datanodeMap);
       }
       System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(decommissioningNodesDetails));
@@ -119,6 +153,12 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
       printCounts(datanode, jsonNode, numDecomNodes);
       Map<String, List<ContainerID>> containers = scmClient.getContainersOnDecomNode(datanode);
       System.out.println(containers);
+      System.out.println("Containers Replication Metrics:");
+      for (HddsProtos.KeyValue keyValue: node.getContainerReplicationMetricsList()) {
+        if (decommissionMetricsDescription.containsKey(keyValue.getKey())) {
+          System.out.println(decommissionMetricsDescription.get(keyValue.getKey()) + ": " + keyValue.getValue());
+        }
+      }
     }
   }
 
@@ -164,10 +204,10 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   private Map<String, Object> getContainers(ScmClient scmClient, DatanodeDetails datanode) throws IOException {
     Map<String, List<ContainerID>> containers = scmClient.getContainersOnDecomNode(datanode);
     return containers.entrySet().stream()
-      .collect(Collectors.toMap(
-        Map.Entry::getKey,
-        entry -> entry.getValue().stream().
-                 map(ContainerID::toString).
-                 collect(Collectors.toList())));
+        .collect(Collectors.toMap(
+            Map.Entry::getKey,
+            entry -> entry.getValue().stream().
+                map(ContainerID::toString).
+                collect(Collectors.toList())));
   }
 }
