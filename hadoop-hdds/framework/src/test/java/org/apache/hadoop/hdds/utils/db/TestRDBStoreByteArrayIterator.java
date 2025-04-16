@@ -173,8 +173,8 @@ public class TestRDBStoreByteArrayIterator {
 
     try (RDBStoreByteArrayIterator iter = newIterator()) {
       final UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> val = iter.seek(new byte[] {0x55});
+      assertFalse(iter.hasNext());
       InOrder verifier = inOrder(rocksDBIteratorMock);
-
       verify(rocksDBIteratorMock, times(1)).seekToFirst(); //at construct time
       verify(rocksDBIteratorMock, never()).seekToLast();
       verifier.verify(rocksDBIteratorMock, times(1)).seek(any(byte[].class));
@@ -193,7 +193,7 @@ public class TestRDBStoreByteArrayIterator {
 
     RDBStoreByteArrayIterator iter = newIterator();
     final UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> val = iter.seek(new byte[]{0x55});
-
+    assertTrue(iter.hasNext());
     InOrder verifier = inOrder(rocksDBIteratorMock);
 
     verify(rocksDBIteratorMock, times(1)).seekToFirst(); //at construct time

@@ -286,6 +286,7 @@ public class TestRDBStoreCodecBufferIterator {
     try (RDBStoreCodecBufferIterator i = newIterator();
          CodecBuffer target = CodecBuffer.wrap(new byte[] {0x55});
          UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>> valSupplier = i.seek(target)) {
+      assertFalse(i.hasNext());
       InOrder verifier = inOrder(rocksIteratorMock);
       verify(rocksIteratorMock, times(1)).seekToFirst(); //at construct time
       verify(rocksIteratorMock, never()).seekToLast();
@@ -309,8 +310,8 @@ public class TestRDBStoreCodecBufferIterator {
     try (RDBStoreCodecBufferIterator i = newIterator();
          CodecBuffer target = CodecBuffer.wrap(new byte[] {0x55});
          UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>> valSupplier = i.seek(target)) {
+      assertTrue(i.hasNext());
       InOrder verifier = inOrder(rocksIteratorMock);
-
       verify(rocksIteratorMock, times(1)).seekToFirst(); //at construct time
       verify(rocksIteratorMock, never()).seekToLast();
       verifier.verify(rocksIteratorMock, times(1))
