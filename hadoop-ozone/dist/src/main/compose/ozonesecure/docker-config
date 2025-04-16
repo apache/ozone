@@ -54,6 +54,7 @@ OZONE-SITE.XML_ozone.recon.administrators="testuser2"
 OZONE-SITE.XML_ozone.s3.administrators="testuser,s3g"
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
+OZONE-SITE.XML_hdds.datanode.disk.balancer.service.interval=20s
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
 HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019
 HDFS-SITE.XML_dfs.datanode.http.address=0.0.0.0:1012

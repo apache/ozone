@@ -79,7 +79,7 @@ public class TestHeartbeatEndpointTask {
   public void setup() {
     datanodeStateMachine = mock(DatanodeStateMachine.class);
     container = mock(OzoneContainer.class);
-    when(container.getDiskBalancerInfo()).thenReturn(new DiskBalancerInfo(true, 10, 20, 30));
+    when(container.getDiskBalancerInfo()).thenReturn(new DiskBalancerInfo(true, 10, 20, 30, true));
     when(datanodeStateMachine.getContainer()).thenReturn(container);
     PipelineReportsProto pipelineReportsProto = mock(PipelineReportsProto.class);
     when(pipelineReportsProto.getPipelineReportList()).thenReturn(Collections.emptyList());

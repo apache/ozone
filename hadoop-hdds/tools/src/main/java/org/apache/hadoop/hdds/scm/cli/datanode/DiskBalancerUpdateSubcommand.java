@@ -53,6 +53,10 @@ public class DiskBalancerUpdateSubcommand extends ScmSubcommand {
       description = "Max parallelThread for DiskBalancer.")
   private Optional<Integer> parallelThread;
 
+  @Option(names = {"-s", "--stop-after-disk-even"},
+      description = "Stop DiskBalancer automatically after disk utilization is even.")
+  private Optional<Boolean> stopAfterDiskEven;
+
   @CommandLine.Mixin
   private DiskBalancerCommonOptions commonOptions =
       new DiskBalancerCommonOptions();
@@ -64,7 +68,7 @@ public class DiskBalancerUpdateSubcommand extends ScmSubcommand {
     }
     List<DatanodeAdminError> errors =
         scmClient.updateDiskBalancerConfiguration(threshold, bandwidthInMB,
-            parallelThread, commonOptions.getSpecifiedDatanodes());
+            parallelThread, stopAfterDiskEven, commonOptions.getSpecifiedDatanodes());
 
     System.out.println("Update DiskBalancer Configuration on datanode(s):\n" +
         commonOptions.getHostString());
