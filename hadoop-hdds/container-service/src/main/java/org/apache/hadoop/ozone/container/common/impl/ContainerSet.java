@@ -67,7 +67,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   private Clock clock;
   private long recoveringTimeout;
   private final Table<Long, String> containerIdsTable;
-  // Handler that will be invoked when a user of a container reports an error.
+  // Handler that will be invoked when a scan of a container in this set is requested.
   private Consumer<Container<?>> containerScanHandler;
 
   @VisibleForTesting
