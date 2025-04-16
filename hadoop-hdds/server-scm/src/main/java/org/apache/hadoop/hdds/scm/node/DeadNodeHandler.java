@@ -51,6 +51,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
   private final ContainerManager containerManager;
   @Nullable
   private final DeletedBlockLog deletedBlockLog;
+  private final DiskBalancerManager diskBalancerManager;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DeadNodeHandler.class);
@@ -58,16 +59,25 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
   public DeadNodeHandler(final NodeManager nodeManager,
                          final PipelineManager pipelineManager,
                          final ContainerManager containerManager) {
-    this(nodeManager, pipelineManager, containerManager, null);
+    this(nodeManager, pipelineManager, containerManager, null, null);
   }
 
   public DeadNodeHandler(final NodeManager nodeManager,
                          final PipelineManager pipelineManager,
                          final ContainerManager containerManager,
+                         final DiskBalancerManager diskBalancerManager) {
+    this(nodeManager, pipelineManager, containerManager, diskBalancerManager, null);
+  }
+
+  public DeadNodeHandler(final NodeManager nodeManager,
+                         final PipelineManager pipelineManager,
+                         final ContainerManager containerManager,
+                         final DiskBalancerManager diskBalancerManager,
                          @Nullable final DeletedBlockLog deletedBlockLog) {
     this.nodeManager = nodeManager;
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
+    this.diskBalancerManager = diskBalancerManager;
     this.deletedBlockLog = deletedBlockLog;
   }
 
@@ -120,6 +130,10 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
             nodeManager.getNode(datanodeDetails.getID())
                 .getParent() == null);
       }
+
+      // Mark DiskBalancer status as UNKNOWN for the dead datanode
+      LOG.info("Marking DiskBalancer status UNKNOWN for dead DN {}", datanodeDetails.getUuidString());
+      diskBalancerManager.markStatusUnknown(datanodeDetails);
     } catch (NodeNotFoundException ex) {
       // This should not happen, we cannot get a dead node event for an
       // unregistered datanode!

@@ -120,7 +120,6 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
-import org.apache.hadoop.hdds.scm.node.DiskBalancerDeadNodeHandler;
 import org.apache.hadoop.hdds.scm.node.DiskBalancerManager;
 import org.apache.hadoop.hdds.scm.node.DiskBalancerReportHandler;
 import org.apache.hadoop.hdds.scm.node.HealthyReadOnlyNodeHandler;
@@ -478,7 +477,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     StaleNodeHandler staleNodeHandler =
         new StaleNodeHandler(scmNodeManager, pipelineManager);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
-        pipelineManager, containerManager);
+        pipelineManager, containerManager, diskBalancerManager);
     StartDatanodeAdminHandler datanodeStartAdminHandler =
         new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
     ReadOnlyHealthyToHealthyNodeHandler readOnlyHealthyToHealthyNodeHandler =
@@ -500,8 +499,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new PipelineActionHandler(pipelineManager, scmContext);
     DiskBalancerReportHandler diskBalancerReportHandler =
         new DiskBalancerReportHandler(diskBalancerManager);
-    DiskBalancerDeadNodeHandler diskBalancerDeadNodeHandler =
-        new DiskBalancerDeadNodeHandler(diskBalancerManager);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
@@ -580,7 +577,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         scmBlockManager.getDeletedBlockLog()::onSent);
     eventQueue.addHandler(SCMEvents.DISK_BALANCER_REPORT,
         diskBalancerReportHandler);
-    eventQueue.addHandler(SCMEvents.DEAD_NODE, diskBalancerDeadNodeHandler);
   }
 
   private void initializeCertificateClient() throws IOException {

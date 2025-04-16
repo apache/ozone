@@ -338,14 +338,8 @@ public class DiskBalancerManager {
     DiskBalancerStatus currentStatus = statusMap.get(dn);
     if (currentStatus != null &&
         currentStatus.getRunningStatus() != DiskBalancerRunningStatus.UNKNOWN) {
-      DiskBalancerStatus unknownStatus = new DiskBalancerStatus(
-          DiskBalancerRunningStatus.UNKNOWN,
-          currentStatus.getDiskBalancerConfiguration(),
-          currentStatus.getSuccessMoveCount(),
-          currentStatus.getFailureMoveCount(),
-          currentStatus.getBytesToMove(),
-          currentStatus.getBalancedBytes()
-      );
+      DiskBalancerStatus unknownStatus = new DiskBalancerStatus(DiskBalancerRunningStatus.UNKNOWN,
+          new DiskBalancerConfiguration(), 0, 0, 0, 0);
       statusMap.put(dn, unknownStatus);
     }
   }
