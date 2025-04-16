@@ -17,14 +17,11 @@
 
 package org.apache.hadoop.ozone.containerlog.parser;
 
-import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -46,7 +43,6 @@ import org.sqlite.SQLiteConfig;
 public class ContainerDatanodeDatabase {
 
   private static Map<String, String> queries;
-  private static final int DEFAULT_LIMIT = 100;
 
   static {
     loadProperties();
@@ -244,43 +240,26 @@ public class ContainerDatanodeDatabase {
   }
 
   /**
-   * Lists containers filtered by the specified state and writes their details to a file or console.
-   * <p>
+   * Lists containers filtered by the specified state and writes their details to stdout 
+   * unless redirected to a file explicitly.
    * The output includes timestamp, datanode ID, container ID, BCSID, error message, and index value,
    * written in a human-readable table format to a file or console.
-   * - If no file path is provided and no limit is specified, results are printed
-   *   to the console with a default limit of 100 rows.
-   * - If no file path is provided but a limit is specified, results are printed
-   *   to the console with the specified limit.
-   * - If a file path is provided but no limit is specified, all matching rows are written
-   *   to the specified file.
-   * - If both a file path and a limit are provided, only the specified number of rows are written
-   *   to the file.
+   * Behavior based on the {@code limit} parameter:
+   * If {@code limit} is provided, only up to the specified number of rows are printed.
+   * If the number of matching containers exceeds the {@code limit},
+   * a note is printed indicating more containers exist.
    *
    * @param state the container state to filter by (e.g., "OPEN", "CLOSED", "QUASI_CLOSED")
-   * @param path the file path to write the output to. if {@code null}, output is printed to the console.
-   * @param limit the maximum number of rows to return.
-   *
+   * @param limit the maximum number of rows to display; use {@link Integer#MAX_VALUE} to fetch all rows
    */
 
-  public void listContainersByState(String state, String path, Integer limit) throws SQLException {
+  public void listContainersByState(String state, Integer limit) throws SQLException {
     int count = 0;
 
-    boolean writeToFile = path != null;
-    boolean limitProvided = limit != null;
+    boolean limitProvided = limit != Integer.MAX_VALUE;
 
     String baseQuery = queries.get("SELECT_LATEST_CONTAINER_LOGS_BY_STATE");
-    String finalQuery = (!writeToFile && !limitProvided) ? baseQuery + " LIMIT " + DEFAULT_LIMIT
-        : (limitProvided ? baseQuery + " LIMIT ?" : baseQuery);
-
-    Path outputPath = null;
-    if (writeToFile) {
-      outputPath = Paths.get(path);
-      if (Files.exists(outputPath)) {
-        System.out.println("Warning: Output file already exists and will be overwritten: "
-            + outputPath.toAbsolutePath());
-      }
-    }
+    String finalQuery = limitProvided ? baseQuery + " LIMIT ?" : baseQuery;
 
     try (Connection connection = getConnection();
          Statement stmt = connection.createStatement()) {
@@ -290,20 +269,23 @@ public class ContainerDatanodeDatabase {
       try (PreparedStatement pstmt = connection.prepareStatement(finalQuery)) {
         pstmt.setString(1, state);
         if (limitProvided) {
-          pstmt.setInt(2, limit);
+          pstmt.setInt(2, limit + 1);
         }
 
         try (ResultSet rs = pstmt.executeQuery();
-             BufferedWriter writer = writeToFile
-                 ? Files.newBufferedWriter(outputPath, StandardCharsets.UTF_8)
-                 : new BufferedWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8))) {
+             PrintWriter writer = new PrintWriter(new OutputStreamWriter(System.out,
+                 StandardCharsets.UTF_8), true)) {
 
-          writer.write(String.format("%-25s | %-35s | %-15s | %-15s | %-40s | %-12s%n",
-              "Timestamp", "Datanode ID", "Container ID", "BCSID", "Message", "Index Value"));
-          writer.write("-------------------------------------------------------------------------------------" +
-              "---------------------------------------------------------------------------------------\n");
+          writer.printf("%-25s | %-35s | %-15s | %-15s | %-40s | %-12s%n",
+              "Timestamp", "Datanode ID", "Container ID", "BCSID", "Message", "Index Value");
+          writer.println("-------------------------------------------------------------------------------------" +
+              "---------------------------------------------------------------------------------------");
 
           while (rs.next()) {
+            if (limitProvided && count >= limit) {
+              writer.println("Note: There might be more containers. Use -all option to list all entries");
+              break;
+            }
             String timestamp = rs.getString("timestamp");
             String datanodeId = rs.getString("datanode_id");
             long containerId = rs.getLong("container_id");
@@ -312,26 +294,20 @@ public class ContainerDatanodeDatabase {
             int indexValue = rs.getInt("index_value");
             count++;
 
-            writer.write(String.format("%-25s | %-35s | %-15d | %-15d | %-40s | %-12d%n",
-                timestamp, datanodeId, containerId, latestBcsid, errorMessage, indexValue));
+            writer.printf("%-25s | %-35s | %-15d | %-15d | %-40s | %-12d%n",
+                timestamp, datanodeId, containerId, latestBcsid, errorMessage, indexValue);
           }
           
           if (count == 0) {
-            writer.write("No containers found for state: " + state + "\n");
+            writer.printf("No containers found for state: %s%n", state);
           } else {
-            writer.write("total: " + count + "\n");
-            writer.flush();
-            if (writeToFile) {
-              System.out.println("Results written to file: " + outputPath.toAbsolutePath());
-            }
+            writer.printf("Number of containers listed: %d%n", count);
           }
         }
       }
     } catch (SQLException e) {
-      LOG.error("Error while retrieving containers with state: {}", state, e);
       throw e;
     } catch (Exception e) {
-      LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
