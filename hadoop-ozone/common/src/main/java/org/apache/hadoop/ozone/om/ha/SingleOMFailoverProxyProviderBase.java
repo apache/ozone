@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -127,6 +128,34 @@ public abstract class SingleOMFailoverProxyProviderBase<T> implements FailoverPr
   }
 
   protected synchronized boolean shouldRetryAgain(Exception ex) {
+    if (ex instanceof ServiceException) {
+      OMNotLeaderException notLeaderException =
+          getNotLeaderException(ex);
+      if (notLeaderException != null) {
+        // This means that the OM node is a follower and it does not allow this particular
+        // request to go through. We should fail this immediately since the OM does not
+        // allow the request to non-leader to go through.
+        return false;
+      }
+
+      OMLeaderNotReadyException leaderNotReadyException =
+          getLeaderNotReadyException(ex);
+      if (leaderNotReadyException != null) {
+        // Retry on same OM again as leader OM is not ready.
+        // Failing over to same OM so that wait time between retries is
+        // incremented
+        return true;
+      }
+
+      OMNodeIdMismatchException nodeIdMismatchException =
+          getOMNodeIdMismatchException(ex);
+      if (nodeIdMismatchException != null) {
+        // This means that the OM node ID specified by the client is wrong
+        // We need to fail immediately
+        return false;
+      }
+    }
+
     Throwable unwrappedException = HddsUtils.getUnwrappedException(ex);
     if (unwrappedException instanceof AccessControlException ||
         unwrappedException instanceof SecretManager.InvalidToken ||
@@ -167,34 +196,6 @@ public abstract class SingleOMFailoverProxyProviderBase<T> implements FailoverPr
           } else {
             LOG.debug("RetryProxy: OM {}: {}", omNodeId,
                 exception.getMessage());
-          }
-        }
-
-        if (exception instanceof ServiceException) {
-          OMNotLeaderException notLeaderException =
-              getNotLeaderException(exception);
-          if (notLeaderException != null) {
-            // This means that the OM node is a follower and it does not allow this particular
-            // request to go through. We should fail this immediately since the OM does not
-            // allow the request to non-leader to go through.
-            return RetryAction.FAIL;
-          }
-
-          OMLeaderNotReadyException leaderNotReadyException =
-              getLeaderNotReadyException(exception);
-          if (leaderNotReadyException != null) {
-            // Retry on same OM again as leader OM is not ready.
-            // Failing over to same OM so that wait time between retries is
-            // incremented
-            return getRetryAction(RetryDecision.RETRY, retries);
-          }
-
-          OMNodeIdMismatchException nodeIdMismatchException =
-              getOMNodeIdMismatchException(exception);
-          if (nodeIdMismatchException != null) {
-            // This means that the OM node ID specified by the client is wrong
-            // We need to fail immediately
-            return RetryAction.FAIL;
           }
         }
 
