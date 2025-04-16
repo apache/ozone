@@ -60,8 +60,6 @@ public class TestMiniOzoneCluster {
 
   private MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
-  @TempDir
-  private Path pathTempDir;
 
   @BeforeAll
   static void setup(@TempDir File testDir) {
@@ -273,7 +271,7 @@ public class TestMiniOzoneCluster {
         + "-" + cluster.getClusterId();
     assertEquals(name, cluster.getName());
 
-    final String baseDir = pathTempDir.resolve(name).toString();
+    final String baseDir = MiniOzoneCluster.getTempPath(name);
     assertEquals(baseDir, cluster.getBaseDir());
 
 
