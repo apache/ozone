@@ -669,7 +669,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     public KeyValue<KEY, VALUE> seek(KEY key) throws IOException {
       try (AutoCloseSupplier<RAW> rawKey = convert(key);
            UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> result = rawIterator.seek(rawKey.get())) {
-        return result.get() == null ? null : convert(result.get());
+        return result == null ? null : convert(result.get());
       }
     }
 
