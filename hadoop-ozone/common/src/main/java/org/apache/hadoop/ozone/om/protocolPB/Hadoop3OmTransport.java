@@ -27,6 +27,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
@@ -127,7 +129,7 @@ public class Hadoop3OmTransport implements OmTransport {
         throw new IOException(String.format("Could not find any configured client for OM node %s in service %s. " +
             "Please configure the system with %s", omNodeId, omServiceId, OZONE_OM_ADDRESS_KEY));
       }
-      if (!payload.hasOmNodeId()) {
+      if (!payload.hasOmNodeId() && StringUtils.isNotBlank(omNodeId)) {
         payload = payload.toBuilder().setOmNodeId(omNodeId).build();
       }
       return singleRpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
