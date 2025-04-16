@@ -221,12 +221,6 @@
 
     <!-- Test dependencies -->
     <dependency>
-      <!-- Needed for mocking RaftServerImpl -->
-      <groupId>com.codahale.metrics</groupId>
-      <artifactId>metrics-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
       <type>test-jar</type>

@@ -49,10 +49,6 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class)
 public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
 
-  @CommandLine.Option(names = {"-v", "--verbose"},
-          description = "Verbose output. Show current iteration info.")
-  private boolean verbose;
-
   @CommandLine.Option(names = {"-H", "--history"},
       description = "Verbose output with history. Show current iteration info and history of iterations. " +
           "Works only with -v.")
@@ -69,7 +65,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
           LocalDateTime.ofInstant(startedAtInstant, ZoneId.systemDefault());
       System.out.println("ContainerBalancer is Running.");
 
-      if (verbose) {
+      if (isVerbose()) {
         System.out.printf("Started at: %s %s%n",
             dateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
             dateTime.toLocalTime().format(DateTimeFormatter.ISO_LOCAL_TIME));

@@ -30,10 +30,10 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -67,7 +67,7 @@ public class TestSCMContainerPlacementCapacity {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getUuidString(),
           100L, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
@@ -82,19 +82,19 @@ public class TestSCMContainerPlacementCapacity {
     }
 
     StorageReportProto storage2 = HddsTestUtils.createStorageReport(
-        datanodes.get(2).getUuid(),
+        datanodes.get(2).getID(),
         "/data1-" + datanodes.get(2).getUuidString(),
         100L, 90L, 10L, null);
     datanodes.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
     StorageReportProto storage3 = HddsTestUtils.createStorageReport(
-        datanodes.get(3).getUuid(),
+        datanodes.get(3).getID(),
         "/data1-" + datanodes.get(3).getUuidString(),
         100L, 80L, 20L, null);
     datanodes.get(3).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage3)));
     StorageReportProto storage4 = HddsTestUtils.createStorageReport(
-        datanodes.get(4).getUuid(),
+        datanodes.get(4).getID(),
         "/data1-" + datanodes.get(4).getUuidString(),
         100L, 70L, 30L, null);
     datanodes.get(4).updateStorageReports(
@@ -112,9 +112,9 @@ public class TestSCMContainerPlacementCapacity {
         .thenReturn(new SCMNodeMetric(100L, 80L, 20L, 0, 19));
     when(mockNodeManager.getNodeStat(datanodes.get(4)))
         .thenReturn(new SCMNodeMetric(100L, 70L, 30L, 0, 20));
-    when(mockNodeManager.getNodeByUuid(any(UUID.class))).thenAnswer(
+    when(mockNodeManager.getNode(any(DatanodeID.class))).thenAnswer(
             invocation -> datanodes.stream()
-                .filter(dn -> dn.getUuid().equals(invocation.getArgument(0)))
+                .filter(dn -> dn.getID().equals(invocation.getArgument(0)))
                 .findFirst()
                 .orElse(null));
 

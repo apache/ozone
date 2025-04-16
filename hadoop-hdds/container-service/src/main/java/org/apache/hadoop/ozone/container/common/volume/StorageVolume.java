@@ -44,6 +44,7 @@ import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -122,6 +123,8 @@ public abstract class StorageVolume
   private final StorageType storageType;
   private final String volumeRoot;
   private final File storageDir;
+  /** This is the raw storage dir location, saved for logging, to avoid repeated filesystem lookup. */
+  private final String storageDirStr;
   private String workingDirName;
   private File tmpDir;
   private File diskCheckDir;
@@ -172,6 +175,7 @@ public abstract class StorageVolume
       this.conf = null;
       this.dnConf = null;
     }
+    this.storageDirStr = storageDir.getAbsolutePath();
   }
 
   public void format(String cid) throws IOException {
@@ -452,6 +456,27 @@ public abstract class StorageVolume
   public SpaceUsageSource getCurrentUsage() {
     return volumeUsage.map(VolumeUsage::getCurrentUsage)
         .orElse(SpaceUsageSource.UNKNOWN);
+  }
+
+  protected StorageLocationReport.Builder reportBuilder() {
+    StorageLocationReport.Builder builder = StorageLocationReport.newBuilder()
+        .setFailed(isFailed())
+        .setId(getStorageID())
+        .setStorageLocation(storageDirStr)
+        .setStorageType(storageType);
+
+    if (!builder.isFailed()) {
+      SpaceUsageSource usage = getCurrentUsage();
+      builder.setCapacity(usage.getCapacity())
+          .setRemaining(usage.getAvailable())
+          .setScmUsed(usage.getUsedSpace());
+    }
+
+    return builder;
+  }
+
+  public StorageLocationReport getReport() {
+    return reportBuilder().build();
   }
 
   public File getStorageDir() {

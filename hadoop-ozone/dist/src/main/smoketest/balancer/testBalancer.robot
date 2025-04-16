@@ -98,13 +98,13 @@ Run Balancer Status
                      Should Contain                  ${result}             ContainerBalancer is Running.
 
 Run Balancer Verbose Status
-    ${result} =      Execute                         ozone admin containerbalancer status -v
+    ${result} =      Execute                         ozone admin containerbalancer status --verbose
                      Verify Balancer Iteration       ${result}             1
                      Should Contain                  ${result}             Iteration result -    collapse_spaces=True
 
 
 Run Balancer Verbose History Status
-    ${result} =    Execute                         ozone admin containerbalancer status -v --history
+    ${result} =    Execute                         ozone admin containerbalancer status --verbose --history
                    Verify Balancer Iteration            ${result}             1
                    Verify Balancer Iteration History    ${result}
 

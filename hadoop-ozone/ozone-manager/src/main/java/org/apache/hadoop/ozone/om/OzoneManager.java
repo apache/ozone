@@ -3170,7 +3170,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (null == omRatisServer) {
       return getRatisRolesException("Server is shutting down");
     }
-    String leaderReadiness = omRatisServer.checkLeaderStatus().name();
+    String leaderReadiness = omRatisServer.getLeaderStatus().name();
     final RaftPeerId leaderId = omRatisServer.getLeaderId();
     if (leaderId == null) {
       LOG.error(NO_LEADER_ERROR_MESSAGE);
@@ -4333,7 +4333,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isLeaderReady() {
     final OzoneManagerRatisServer ratisServer = omRatisServer;
-    return ratisServer != null && ratisServer.checkLeaderStatus() == LEADER_AND_READY;
+    return ratisServer != null && ratisServer.getLeaderStatus() == LEADER_AND_READY;
   }
 
   /**
@@ -4344,7 +4344,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void checkLeaderStatus() throws OMNotLeaderException,
       OMLeaderNotReadyException {
     OzoneManagerRatisServer.RaftServerStatus raftServerStatus =
-        omRatisServer.checkLeaderStatus();
+        omRatisServer.getLeaderStatus();
     RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
 
     switch (raftServerStatus) {

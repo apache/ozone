@@ -60,7 +60,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class OMFailoverProxyProviderBase<T> implements FailoverProxyProvider<T> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMFailoverProxyProviderBase.class);
 
   private final ConfigurationSource conf;

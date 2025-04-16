@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
@@ -128,11 +129,6 @@ public class HddsVolume extends StorageVolume {
       this.volumeInfoMetrics =
           new VolumeInfoMetrics(b.getVolumeRootStr(), this);
 
-      LOG.info("Creating HddsVolume: {} of storage type: {}, {}",
-          getStorageDir(),
-          b.getStorageType(),
-          getCurrentUsage());
-
       initialize();
     } else {
       // Builder is called with failedVolume set, so create a failed volume
@@ -141,6 +137,8 @@ public class HddsVolume extends StorageVolume {
       volumeIOStats = null;
       volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
     }
+
+    LOG.info("HddsVolume: {}", getReport());
   }
 
   @Override
@@ -177,6 +175,16 @@ public class HddsVolume extends StorageVolume {
 
   public VolumeInfoMetrics getVolumeInfoStats() {
     return volumeInfoMetrics;
+  }
+
+  @Override
+  protected StorageLocationReport.Builder reportBuilder() {
+    StorageLocationReport.Builder builder = super.reportBuilder();
+    if (!builder.isFailed()) {
+      builder.setCommitted(getCommittedBytes())
+          .setFreeSpaceToSpare(getFreeSpaceToSpare(builder.getCapacity()));
+    }
+    return builder;
   }
 
   @Override

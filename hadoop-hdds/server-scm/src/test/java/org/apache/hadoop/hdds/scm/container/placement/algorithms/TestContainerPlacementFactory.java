@@ -105,7 +105,7 @@ public class TestContainerPlacementFactory {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
@@ -122,19 +122,19 @@ public class TestContainerPlacementFactory {
     }
 
     StorageReportProto storage2 = HddsTestUtils.createStorageReport(
-        dnInfos.get(2).getUuid(),
+        dnInfos.get(2).getID(),
         "/data1-" + dnInfos.get(2).getUuidString(),
         STORAGE_CAPACITY, 90L, 10L, null);
     dnInfos.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
     StorageReportProto storage3 = HddsTestUtils.createStorageReport(
-        dnInfos.get(3).getUuid(),
+        dnInfos.get(3).getID(),
         "/data1-" + dnInfos.get(3).getUuidString(),
         STORAGE_CAPACITY, 80L, 20L, null);
     dnInfos.get(3).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage3)));
     StorageReportProto storage4 = HddsTestUtils.createStorageReport(
-        dnInfos.get(4).getUuid(),
+        dnInfos.get(4).getID(),
         "/data1-" + dnInfos.get(4).getUuidString(),
         STORAGE_CAPACITY, 70L, 30L, null);
     dnInfos.get(4).updateStorageReports(
@@ -145,7 +145,7 @@ public class TestContainerPlacementFactory {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuid()))
+      when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
 

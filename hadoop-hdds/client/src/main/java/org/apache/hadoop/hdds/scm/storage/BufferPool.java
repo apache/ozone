@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * wait until a allocated buffer is released.
  */
 public class BufferPool {
-  public static final Logger LOG = LoggerFactory.getLogger(BufferPool.class);
+  private static final Logger LOG = LoggerFactory.getLogger(BufferPool.class);
 
   private static final BufferPool EMPTY = new BufferPool(0, 0);
   private final int bufferSize;

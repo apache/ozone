@@ -158,7 +158,6 @@ Incomplete command
                         Should contain   ${output}   create
                         Should contain   ${output}   close
                         Should contain   ${output}   report
-                        Should contain   ${output}   upgrade
 
 #List containers on unknown host
 #    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host
