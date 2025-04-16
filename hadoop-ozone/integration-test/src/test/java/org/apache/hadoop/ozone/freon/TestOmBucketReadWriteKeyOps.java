@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.freon.OmBucketTestUtils.ParameterBuilder;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
