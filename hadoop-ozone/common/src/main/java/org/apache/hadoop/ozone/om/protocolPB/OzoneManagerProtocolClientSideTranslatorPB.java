@@ -239,6 +239,7 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTok
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -1473,11 +1474,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
-                                                    String bucketName,
-                                                    String jobStatus,
-                                                    boolean listAll)
-      throws IOException {
+  public ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAllStatus,
+      String prevSnapshotDiffJob,
+      int maxListResult) throws IOException {
     final OzoneManagerProtocolProtos
         .ListSnapshotDiffJobRequest.Builder requestBuilder =
         OzoneManagerProtocolProtos
@@ -1485,17 +1488,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setJobStatus(jobStatus)
-            .setListAll(listAll);
+            .setListAll(listAllStatus)
+            .setMaxListResult(maxListResult);
+
+    if (prevSnapshotDiffJob != null) {
+      requestBuilder.setPrevSnapshotDiffJob(prevSnapshotDiffJob);
+    }
 
     final OMRequest omRequest = createOMRequest(Type.ListSnapshotDiffJobs)
         .setListSnapshotDiffJobRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
-    return omResponse.getListSnapshotDiffJobResponse()
-        .getSnapshotDiffJobList().stream()
+    OzoneManagerProtocolProtos.ListSnapshotDiffJobResponse response = omResponse.getListSnapshotDiffJobResponse();
+    List<SnapshotDiffJob> ozoneSnapshotDiffs = response.getSnapshotDiffJobList().stream()
         .map(SnapshotDiffJob::getFromProtoBuf)
         .collect(Collectors.toList());
+    return new ListSnapshotDiffJobResponse(ozoneSnapshotDiffs,
+        response.hasLastSnapshotDiffJob() ? response.getLastSnapshotDiffJob() : null);
   }
 
   /**
