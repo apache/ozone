@@ -164,8 +164,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
     boolean isPolicySatisfied = placementStatus.isPolicySatisfied();
     if (!isPolicySatisfied) {
       logger.debug("Moving container {} from source {} to target {} will not " +
-              "satisfy placement policy.", containerID, source,
-          target);
+              "satisfy placement policy.", containerID, source, target);
     }
     return isPolicySatisfied;
   }
@@ -206,8 +205,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
       return true;
     }
 
-    logger.warn("No record of how much size has entered datanode {}",
-        target);
+    logger.warn("No record of how much size has entered datanode {}", target);
     return false;
   }
 

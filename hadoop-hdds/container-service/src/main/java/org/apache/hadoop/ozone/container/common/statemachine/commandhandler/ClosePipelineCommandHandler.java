@@ -139,8 +139,7 @@ public class ClosePipelineCommandHandler implements CommandHandler {
           // Remove the Ratis group from the current datanode pipeline, might throw GroupMismatchException as
           // well. It is a no-op for XceiverServerSpi implementations (e.g. XceiverServerGrpc)
           server.removeGroup(pipelineIdProto);
-          LOG.info("Close Pipeline {} command on datanode {}.", pipelineID,
-              dn);
+          LOG.info("Close Pipeline {} command on datanode {}.", pipelineID, dn);
         } else {
           LOG.debug("Ignoring close pipeline command for pipeline {} on datanode {} " +
               "as it does not exist", pipelineID, dn);

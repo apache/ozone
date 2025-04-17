@@ -178,8 +178,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
       if (Double.compare(nodeManager.getUsageInfo(source)
           .calculateUtilization(-sizeLeavingAfterMove), lowerLimit) < 0) {
         LOG.debug("{} bytes cannot leave datanode {} because its utilization " +
-                "will drop below the lower limit of {}.", size,
-            source, lowerLimit);
+                "will drop below the lower limit of {}.", size, source, lowerLimit);
         return false;
       }
       return true;

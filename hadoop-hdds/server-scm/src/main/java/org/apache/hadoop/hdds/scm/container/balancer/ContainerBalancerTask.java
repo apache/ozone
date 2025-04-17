@@ -945,7 +945,7 @@ public class ContainerBalancerTask implements Runnable {
         if (ex != null) {
           LOG.info("Container move for container {} from source {} to " +
                   "target {} failed with exceptions.",
-              containerID.toString(), source,
+              containerID, source,
               moveSelection.getTargetNode(), ex);
           metrics.incrementNumContainerMovesFailedInLatestIteration(1);
         } else {
