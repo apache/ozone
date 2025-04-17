@@ -589,7 +589,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
                   scm.getClientRpcAddress());
             } else {
               inactiveSCMs.add(scm);
-              LOG.info("Intialized SCM at {}. This SCM is currently "
+              LOG.info("Initialized SCM at {}. This SCM is currently "
                   + "inactive (not running).", scm.getClientRpcAddress());
             }
           }
