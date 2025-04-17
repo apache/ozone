@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * target with the lowest space usage.
  */
 public class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(FindTargetGreedyByUsageInfo.class);
 
   public FindTargetGreedyByUsageInfo(
@@ -51,6 +51,7 @@ public class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
   /**
    * do nothing , since TreeSet is ordered itself.
    */
+  @Override
   @VisibleForTesting
   public void sortTargetForSource(DatanodeDetails source) {
     //noop, Treeset is naturally sorted.

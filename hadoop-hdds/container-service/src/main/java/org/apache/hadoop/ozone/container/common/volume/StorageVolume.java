@@ -37,12 +37,14 @@ import java.util.stream.Stream;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -115,14 +117,19 @@ public abstract class StorageVolume
   private long cTime;             // creation time of the file system state
   private int layoutVersion;      // layout version of the storage data
 
-  private ConfigurationSource conf;
+  private final ConfigurationSource conf;
+  private final DatanodeConfiguration dnConf;
 
+  private final StorageType storageType;
+  private final String volumeRoot;
   private final File storageDir;
+  /** This is the raw storage dir location, saved for logging, to avoid repeated filesystem lookup. */
+  private final String storageDirStr;
   private String workingDirName;
   private File tmpDir;
   private File diskCheckDir;
 
-  private final Optional<VolumeInfo> volumeInfo;
+  private final Optional<VolumeUsage> volumeUsage;
 
   private final VolumeSet volumeSet;
 
@@ -138,22 +145,20 @@ public abstract class StorageVolume
   private int healthCheckFileSize;
 
   protected StorageVolume(Builder<?> b) throws IOException {
+    storageType = b.storageType;
+    volumeRoot = b.volumeRootStr;
     if (!b.failedVolume) {
-      StorageLocation location = StorageLocation.parse(b.volumeRootStr);
+      StorageLocation location = StorageLocation.parse(volumeRoot);
       storageDir = new File(location.getUri().getPath(), b.storageDirStr);
-      this.volumeInfo = Optional.of(
-              new VolumeInfo.Builder(b.volumeRootStr, b.conf)
-          .storageType(b.storageType)
-          .usageCheckFactory(b.usageCheckFactory)
-          .build());
+      SpaceUsageCheckParams checkParams = getSpaceUsageCheckParams(b);
+      volumeUsage = Optional.of(new VolumeUsage(checkParams, b.conf));
       this.volumeSet = b.volumeSet;
       this.state = VolumeState.NOT_INITIALIZED;
       this.clusterID = b.clusterID;
       this.datanodeUuid = b.datanodeUuid;
-      this.conf = b.conf;
 
-      DatanodeConfiguration dnConf =
-          conf.getObject(DatanodeConfiguration.class);
+      this.conf = b.conf;
+      this.dnConf = conf.getObject(DatanodeConfiguration.class);
       this.ioTestCount = dnConf.getVolumeIOTestCount();
       this.ioFailureTolerance = dnConf.getVolumeIOFailureTolerance();
       this.ioTestSlidingWindow = new LinkedList<>();
@@ -161,13 +166,16 @@ public abstract class StorageVolume
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);
-      this.volumeInfo = Optional.empty();
+      volumeUsage = Optional.empty();
       this.volumeSet = null;
       this.storageID = UUID.randomUUID().toString();
       this.state = VolumeState.FAILED;
       this.ioTestCount = 0;
       this.ioFailureTolerance = 0;
+      this.conf = null;
+      this.dnConf = null;
     }
+    this.storageDirStr = storageDir.getAbsolutePath();
   }
 
   public void format(String cid) throws IOException {
@@ -373,7 +381,7 @@ public abstract class StorageVolume
     private final String volumeRootStr;
     private String storageDirStr;
     private ConfigurationSource conf;
-    private StorageType storageType;
+    private StorageType storageType = StorageType.DEFAULT;
     private SpaceUsageCheckFactory usageCheckFactory;
     private VolumeSet volumeSet;
     private boolean failedVolume = false;
@@ -393,7 +401,7 @@ public abstract class StorageVolume
     }
 
     public T storageType(StorageType st) {
-      this.storageType = st;
+      this.storageType = Objects.requireNonNull(st, "storageType == null");
       return this.getThis();
     }
 
@@ -441,12 +449,34 @@ public abstract class StorageVolume
   }
 
   public String getVolumeRootDir() {
-    return volumeInfo.map(VolumeInfo::getRootDir).orElse(null);
+    return volumeRoot;
   }
 
+  /** Get current usage of the volume. */
   public SpaceUsageSource getCurrentUsage() {
-    return volumeInfo.map(VolumeInfo::getCurrentUsage)
+    return volumeUsage.map(VolumeUsage::getCurrentUsage)
         .orElse(SpaceUsageSource.UNKNOWN);
+  }
+
+  protected StorageLocationReport.Builder reportBuilder() {
+    StorageLocationReport.Builder builder = StorageLocationReport.newBuilder()
+        .setFailed(isFailed())
+        .setId(getStorageID())
+        .setStorageLocation(storageDirStr)
+        .setStorageType(storageType);
+
+    if (!builder.isFailed()) {
+      SpaceUsageSource usage = getCurrentUsage();
+      builder.setCapacity(usage.getCapacity())
+          .setRemaining(usage.getAvailable())
+          .setScmUsed(usage.getUsedSpace());
+    }
+
+    return builder;
+  }
+
+  public StorageLocationReport getReport() {
+    return reportBuilder().build();
   }
 
   public File getStorageDir() {
@@ -466,21 +496,22 @@ public abstract class StorageVolume
     return this.diskCheckDir;
   }
 
-  public void refreshVolumeInfo() {
-    volumeInfo.ifPresent(VolumeInfo::refreshNow);
+  public void refreshVolumeUsage() {
+    volumeUsage.ifPresent(VolumeUsage::refreshNow);
   }
 
-  public Optional<VolumeInfo> getVolumeInfo() {
-    return this.volumeInfo;
+  /** @see #getCurrentUsage() */
+  public Optional<VolumeUsage> getVolumeUsage() {
+    return volumeUsage;
   }
 
   public void incrementUsedSpace(long usedSpace) {
-    volumeInfo.ifPresent(volInfo -> volInfo
+    volumeUsage.ifPresent(usage -> usage
             .incrementUsedSpace(usedSpace));
   }
 
   public void decrementUsedSpace(long reclaimedSpace) {
-    volumeInfo.ifPresent(volInfo -> volInfo
+    volumeUsage.ifPresent(usage -> usage
             .decrementUsedSpace(reclaimedSpace));
   }
 
@@ -489,8 +520,7 @@ public abstract class StorageVolume
   }
 
   public StorageType getStorageType() {
-    return volumeInfo.map(VolumeInfo::getStorageType)
-            .orElse(StorageType.DEFAULT);
+    return storageType;
   }
 
   public String getStorageID() {
@@ -529,14 +559,18 @@ public abstract class StorageVolume
     return conf;
   }
 
+  public DatanodeConfiguration getDatanodeConfig() {
+    return dnConf;
+  }
+
   public void failVolume() {
     setState(VolumeState.FAILED);
-    volumeInfo.ifPresent(VolumeInfo::shutdownUsageThread);
+    volumeUsage.ifPresent(VolumeUsage::shutdown);
   }
 
   public void shutdown() {
     setState(VolumeState.NON_EXISTENT);
-    volumeInfo.ifPresent(VolumeInfo::shutdownUsageThread);
+    volumeUsage.ifPresent(VolumeUsage::shutdown);
     cleanTmpDiskCheckDir();
   }
 
@@ -614,6 +648,15 @@ public abstract class StorageVolume
       return VolumeCheckResult.HEALTHY;
     }
 
+    // At least some space required to check disk read/write
+    // If there are not enough space remaining,
+    // to avoid volume failure we can ignore checking disk read/write
+    int minimumDiskSpace = healthCheckFileSize * 2;
+    if (getCurrentUsage().getAvailable() < minimumDiskSpace) {
+      ioTestSlidingWindow.add(true);
+      return VolumeCheckResult.HEALTHY;
+    }
+
     // Since IO errors may be intermittent, volume remains healthy until the
     // threshold of failures is crossed.
     boolean diskChecksPassed = DiskCheckUtil.checkReadWrite(storageDir,
@@ -623,6 +666,14 @@ public abstract class StorageVolume
       // consider this a failure.
       throw new InterruptedException("IO check of volume " + this +
           " interrupted.");
+    }
+
+    // As WRITE keeps happening there is probability, disk has become full during above check.
+    // We can check again if disk is full. If it is full,
+    // in this case keep volume as healthy so that READ can still be served
+    if (!diskChecksPassed && getCurrentUsage().getAvailable() < minimumDiskSpace) {
+      ioTestSlidingWindow.add(true);
+      return VolumeCheckResult.HEALTHY;
     }
 
     // Move the sliding window of IO test results forward 1 by adding the
@@ -672,5 +723,23 @@ public abstract class StorageVolume
   @Override
   public String toString() {
     return getStorageDir().toString();
+  }
+
+  private static SpaceUsageCheckParams getSpaceUsageCheckParams(Builder b) throws IOException {
+    File root = new File(b.volumeRootStr);
+
+    boolean succeeded = root.isDirectory() || root.mkdirs();
+
+    if (!succeeded) {
+      LOG.error("Unable to create the volume root dir at : {}", root);
+      throw new IOException("Unable to create the volume root dir at " + root);
+    }
+
+    SpaceUsageCheckFactory usageCheckFactory = b.usageCheckFactory;
+    if (usageCheckFactory == null) {
+      usageCheckFactory = SpaceUsageCheckFactory.create(b.conf);
+    }
+
+    return usageCheckFactory.paramsFor(root);
   }
 }

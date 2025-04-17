@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.snapshot;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse.JobStatusProto;
 
 /**
@@ -44,11 +45,31 @@ public class SnapshotDiffResponse {
       return JobStatus.valueOf(jobStatusProto.name());
     }
   }
+  /**
+   * Snapshot diff job sub-status enum.
+   */
+  public enum SubStatus {
+    SST_FILE_DELTA_DAG_WALK,
+    SST_FILE_DELTA_FULL_DIFF,
+    OBJECT_ID_MAP_GEN_OBS,
+    OBJECT_ID_MAP_GEN_FSO,
+    DIFF_REPORT_GEN;
+
+    public static SubStatus fromProtoBuf(OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus subStatusProto) {
+      return SubStatus.valueOf(subStatusProto.name());
+    }
+
+    public OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus toProtoBuf() {
+      return OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus.valueOf(this.name());
+    }
+  }
 
   private final SnapshotDiffReportOzone snapshotDiffReport;
   private final JobStatus jobStatus;
   private final long waitTimeInMs;
   private final String reason;
+  private SubStatus subStatus;
+  private double progressPercent = 0.0;
 
   public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
                               final JobStatus jobStatus,
@@ -85,6 +106,14 @@ public class SnapshotDiffResponse {
     return reason;
   }
 
+  public void setSubStatus(SubStatus subStatus) {
+    this.subStatus = subStatus;
+  }
+
+  public void setProgressPercent(double progressPercent) {
+    this.progressPercent = progressPercent;
+  }
+
   @Override
   public String toString() {
     StringBuilder str = new StringBuilder();
@@ -112,6 +141,15 @@ public class SnapshotDiffResponse {
           .append(". Please retry after ")
           .append(waitTimeInMs)
           .append(" ms.\n");
+      if (subStatus != null) {
+        str.append("SubStatus : ")
+            .append(subStatus);
+        if (subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_OBS) ||
+            subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_FSO)) {
+          str.append("Keys Processed Estimated Percentage : ")
+              .append(progressPercent);
+        }
+      }
     }
     return str.toString();
   }

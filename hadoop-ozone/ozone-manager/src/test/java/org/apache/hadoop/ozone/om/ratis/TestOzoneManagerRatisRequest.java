@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -109,6 +110,8 @@ public class TestOzoneManagerRatisRequest {
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    OMExecutionFlow omExecutionFlow = new OMExecutionFlow(ozoneManager);
+    when(ozoneManager.getOmExecutionFlow()).thenReturn(omExecutionFlow);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     final OmConfig omConfig = ozoneConfiguration.getObject(OmConfig.class);
     when(ozoneManager.getConfig()).thenReturn(omConfig);

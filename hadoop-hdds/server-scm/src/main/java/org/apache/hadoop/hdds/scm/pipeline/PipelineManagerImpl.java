@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -416,6 +417,7 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void openPipeline(PipelineID pipelineId)
       throws IOException {
+    long startNanos = Time.monotonicNowNanos();
     HddsProtos.PipelineID pipelineIdProtobuf = pipelineId.getProtobuf();
     acquireWriteLock();
     final Pipeline pipeline;
@@ -431,6 +433,7 @@ public class PipelineManagerImpl implements PipelineManager {
     } finally {
       releaseWriteLock();
     }
+    metrics.updatePipelineCreationLatencyNs(startNanos);
     metrics.incNumPipelineCreated();
     metrics.createPerPipelineMetrics(pipeline);
   }
@@ -443,7 +446,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   protected void removePipeline(Pipeline pipeline)
       throws IOException {
-    pipelineFactory.close(pipeline.getType(), pipeline);
+    // Removing the pipeline from SCM.
     HddsProtos.PipelineID pipelineID = pipeline.getId().getProtobuf();
     acquireWriteLock();
     try {
@@ -454,6 +457,8 @@ public class PipelineManagerImpl implements PipelineManager {
     } finally {
       releaseWriteLock();
     }
+    // Firing pipeline close command to datanode.
+    pipelineFactory.close(pipeline.getType(), pipeline);
     LOG.info("Pipeline {} removed.", pipeline);
     metrics.incNumPipelineDestroyed();
   }
@@ -490,6 +495,7 @@ public class PipelineManagerImpl implements PipelineManager {
    * @throws IOException throws exception in case of failure
    * @deprecated Do not use this method, onTimeout is not honored.
    */
+  @Override
   @Deprecated
   public void closePipeline(Pipeline pipeline, boolean onTimeout)
           throws IOException {
@@ -501,6 +507,7 @@ public class PipelineManagerImpl implements PipelineManager {
    * @param pipelineID ID of the Pipeline to be closed
    * @throws IOException In case of exception while closing the Pipeline
    */
+  @Override
   public void closePipeline(PipelineID pipelineID) throws IOException {
     HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
     // close containers.
@@ -525,6 +532,7 @@ public class PipelineManagerImpl implements PipelineManager {
    * @param pipelineID ID of the Pipeline to be deleted
    * @throws IOException In case of exception while deleting the Pipeline
    */
+  @Override
   public void deletePipeline(PipelineID pipelineID) throws IOException {
     removePipeline(getPipeline(pipelineID));
   }
@@ -634,7 +642,7 @@ public class PipelineManagerImpl implements PipelineManager {
       return false;
     }
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (nodeManager.getNodeByUuid(dn.getUuid()) == null) {
+      if (nodeManager.getNode(dn.getID()) == null) {
         return true;
       }
     }

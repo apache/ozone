@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory;
 public class DeletedBlockLogImpl
     implements DeletedBlockLog, EventHandler<DeleteBlockStatus> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeletedBlockLogImpl.class);
 
   private final int maxRetry;
@@ -115,7 +115,7 @@ public class DeletedBlockLogImpl
     this.metrics = metrics;
     this.transactionStatusManager =
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
-            containerManager, this.scmContext, metrics, scmCommandTimeoutMs);
+            containerManager, metrics, scmCommandTimeoutMs);
   }
 
   @Override

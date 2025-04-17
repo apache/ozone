@@ -397,6 +397,25 @@ public final class OMRequestTestUtils {
     return ozoneDBKey;
   }
 
+  /**
+   * Add multipart info entry to the multipartInfoTable.
+   * 
+   * @throws Exception
+   */
+  public static String addMultipartInfoToTableCache(
+      OmKeyInfo omKeyInfo, OmMultipartKeyInfo omMultipartKeyInfo,
+      long trxnLogIndex, OMMetadataManager omMetadataManager) throws IOException {
+    String ozoneDBKey = omMetadataManager.getMultipartKey(
+        omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
+        omKeyInfo.getKeyName(), omMultipartKeyInfo.getUploadID());
+
+    omMetadataManager.getMultipartInfoTable()
+        .addCacheEntry(new CacheKey<>(ozoneDBKey),
+            CacheValue.get(trxnLogIndex, omMultipartKeyInfo));
+
+    return ozoneDBKey;
+  }
+
   public static PartKeyInfo createPartKeyInfo(String volumeName,
       String bucketName, String keyName, String uploadId, int partNumber) {
     return PartKeyInfo.newBuilder()
@@ -722,7 +741,7 @@ public final class OMRequestTestUtils {
     return BucketInfo.newBuilder()
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
-        .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.SSD)
+        .setStorageType(HddsProtos.StorageTypeProto.SSD)
         .setIsVersionEnabled(false)
         .addAllMetadata(getMetadataList());
   }

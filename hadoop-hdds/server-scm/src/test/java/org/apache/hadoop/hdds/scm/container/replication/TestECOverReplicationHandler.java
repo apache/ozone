@@ -92,11 +92,9 @@ public class TestECOverReplicationHandler {
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
           if (staleNode != null && staleNode.equals(dd)) {
-            return new NodeStatus(dd.getPersistedOpState(),
-                HddsProtos.NodeState.STALE, 0);
+            return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.STALE);
           }
-          return new NodeStatus(dd.getPersistedOpState(),
-              HddsProtos.NodeState.HEALTHY, 0);
+          return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
         });
 
     commandsSent = new HashSet<>();

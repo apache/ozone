@@ -18,21 +18,16 @@
 package org.apache.hadoop.ozone.util;
 
 import com.google.protobuf.Proto2Utils;
-import java.util.Random;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.ratis.util.Preconditions;
-
 /**
  * Utility class for payload operations.
  */
 public final class PayloadUtils {
   private static final int MAX_SIZE = 2097151 * 1024;
-  private static final byte[] SEED = new byte[1024];
-
-  static {
-    new Random().nextBytes(SEED);
-  }
+  private static final byte[] SEED = RandomUtils.secure().randomBytes(1024);
 
   private PayloadUtils() {
   }

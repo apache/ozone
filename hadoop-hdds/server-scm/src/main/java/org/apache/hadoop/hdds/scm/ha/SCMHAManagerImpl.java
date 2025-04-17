@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -68,7 +67,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   private final ConfigurationSource conf;
   private final OzoneConfiguration ozoneConf;
   private final SecurityConfig securityConfig;
-  private final DBTransactionBuffer transactionBuffer;
+  private final SCMHADBTransactionBufferImpl transactionBuffer;
   private final SCMSnapshotProvider scmSnapshotProvider;
   private final StorageContainerManager scm;
   private ExitManager exitManager;
@@ -88,18 +87,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
     this.securityConfig = securityConfig;
     this.scm = scm;
     this.exitManager = new ExitManager();
-    if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
-      this.ratisServer = new SCMRatisServerImpl(conf, scm,
-          (SCMHADBTransactionBuffer) transactionBuffer);
-      this.scmSnapshotProvider = newScmSnapshotProvider(scm);
-      grpcServer = new InterSCMGrpcProtocolService(conf, scm);
-    } else {
-      this.transactionBuffer = new SCMDBTransactionBufferImpl();
-      this.scmSnapshotProvider = null;
-      this.grpcServer = null;
-      this.ratisServer = null;
-    }
+    this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
+    this.ratisServer = new SCMRatisServerImpl(conf, scm, transactionBuffer);
+    this.scmSnapshotProvider = newScmSnapshotProvider(scm);
+    this.grpcServer = new InterSCMGrpcProtocolService(conf, scm);
 
   }
 
@@ -152,7 +143,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
         TimeUnit.MILLISECONDS);
     SCMHATransactionBufferMonitorTask monitorTask
         = new SCMHATransactionBufferMonitorTask(
-        (SCMHADBTransactionBuffer) transactionBuffer, ratisServer, interval);
+        transactionBuffer, ratisServer, interval);
     trxBufferMonitorService =
         new BackgroundSCMService.Builder().setClock(scm.getSystemClock())
             .setScmContext(scm.getScmContext())
@@ -164,6 +155,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
     trxBufferMonitorService.start();
   }
 
+  @Override
   public SCMRatisServer getRatisServer() {
     return ratisServer;
   }
@@ -180,9 +172,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   @Override
   public SCMHADBTransactionBuffer asSCMHADBTransactionBuffer() {
-    Preconditions
-        .checkArgument(transactionBuffer instanceof SCMHADBTransactionBuffer);
-    return (SCMHADBTransactionBuffer)transactionBuffer;
+    return transactionBuffer;
 
   }
 
@@ -480,8 +470,4 @@ public class SCMHAManagerImpl implements SCMHAManager {
     grpcServer.stop();
   }
 
-  @VisibleForTesting
-  public static Logger getLogger() {
-    return LOG;
-  }
 }

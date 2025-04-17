@@ -64,7 +64,7 @@ public class TestSCMContainerPlacementRandom {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getUuidString(),
           100L, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
@@ -79,7 +79,7 @@ public class TestSCMContainerPlacementRandom {
     }
 
     StorageReportProto storage2 = HddsTestUtils.createStorageReport(
-        datanodes.get(2).getUuid(),
+        datanodes.get(2).getID(),
         "/data1-" + datanodes.get(2).getUuidString(),
         100L, 90L, 10L, null);
     datanodes.get(2).updateStorageReports(
@@ -170,7 +170,7 @@ public class TestSCMContainerPlacementRandom {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getUuidString(),
           100L, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
@@ -185,7 +185,7 @@ public class TestSCMContainerPlacementRandom {
     }
 
     StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-        datanodes.get(1).getUuid(),
+        datanodes.get(1).getID(),
         "/data1-" + datanodes.get(1).getUuidString(),
         100L, 90L, 10L, null);
     datanodes.get(1).updateStorageReports(
@@ -201,11 +201,11 @@ public class TestSCMContainerPlacementRandom {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
-    when(mockNodeManager.getNodeByUuid(datanodes.get(0).getUuid()))
+    when(mockNodeManager.getNode(datanodes.get(0).getID()))
         .thenReturn(datanodes.get(0));
-    when(mockNodeManager.getNodeByUuid(datanodes.get(1).getUuid()))
+    when(mockNodeManager.getNode(datanodes.get(1).getID()))
         .thenReturn(datanodes.get(1));
-    when(mockNodeManager.getNodeByUuid(datanodes.get(2).getUuid()))
+    when(mockNodeManager.getNode(datanodes.get(2).getID()))
         .thenReturn(datanodes.get(2));
 
     SCMContainerPlacementRandom scmContainerPlacementRandom =

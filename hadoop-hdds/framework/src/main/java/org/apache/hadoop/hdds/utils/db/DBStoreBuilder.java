@@ -98,15 +98,14 @@ public final class DBStoreBuilder {
   private RocksDBConfiguration rocksDBConfiguration;
   // Flag to indicate if the RocksDB should be opened readonly.
   private boolean openReadOnly = false;
-  private int maxFSSnapshots = 0;
   private final DBProfile defaultCfProfile;
   private boolean enableCompactionDag;
   private boolean createCheckpointDirs = true;
+  private boolean enableRocksDbMetrics = true;
   // this is to track the total size of dbUpdates data since sequence
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
   private Integer maxNumberOfOpenFiles = null;
-  private String threadNamePrefix = "";
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -230,18 +229,14 @@ public final class DBStoreBuilder {
       }
 
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
-          registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
-          enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
-          configuration, threadNamePrefix);
+          registry.build(), openReadOnly, dbJmxBeanNameName, enableCompactionDag,
+          maxDbUpdatesSizeThreshold, createCheckpointDirs, configuration,
+          enableRocksDbMetrics);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
   }
 
-  public DBStoreBuilder setMaxFSSnapshots(int maxFSSnapshots) {
-    this.maxFSSnapshots = maxFSSnapshots;
-    return this;
-  }
   public DBStoreBuilder setName(String name) {
     dbname = name;
     return this;
@@ -302,6 +297,11 @@ public final class DBStoreBuilder {
     this.createCheckpointDirs = createCheckpointDirs;
     return this;
   }
+
+  public DBStoreBuilder setEnableRocksDbMetrics(boolean enableRocksDbMetrics) {
+    this.enableRocksDbMetrics = enableRocksDbMetrics;
+    return this;
+  }
   /**
    * Set the {@link ManagedDBOptions} and default
    * {@link ManagedColumnFamilyOptions} based on {@code prof}.
@@ -314,11 +314,6 @@ public final class DBStoreBuilder {
 
   public DBStoreBuilder setMaxNumberOfOpenFiles(Integer maxNumberOfOpenFiles) {
     this.maxNumberOfOpenFiles = maxNumberOfOpenFiles;
-    return this;
-  }
-
-  public DBStoreBuilder setThreadNamePrefix(String prefix) {
-    this.threadNamePrefix = prefix;
     return this;
   }
 
@@ -444,7 +439,7 @@ public final class DBStoreBuilder {
         columnFamilyDescriptors.add(tc.getDescriptor());
       }
 
-      if (columnFamilyDescriptors.size() > 0) {
+      if (!columnFamilyDescriptors.isEmpty()) {
         try {
           option = DBConfigFromFile.readFromFile(dbname,
               columnFamilyDescriptors);

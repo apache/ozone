@@ -720,8 +720,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // dir should inherit parent DEFAULT acls and self has DEFAULT scope
     // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
-    for (int indx = 0; indx < dirs.size(); indx++) {
-      String dirName = dirs.get(indx);
+    for (String dirName : dirs) {
       String dbKey;
       // for index=0, parentID is bucketID
       dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
@@ -759,14 +758,11 @@ public class TestOMDirectoryCreateRequestWithFSO {
           throws IOException {
     // bucketID is the parent
     long parentID = bucketId;
-    for (int indx = 0; indx < dirs.size(); indx++) {
-      String dirName = dirs.get(indx);
+    for (String dirName : dirs) {
       String dbKey;
       // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-              parentID, dirName);
-      OmDirectoryInfo omDirInfo =
-              omMetadataManager.getDirectoryTable().get(dbKey);
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, parentID, dirName);
+      OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().get(dbKey);
       assertNotNull(omDirInfo, "Invalid directory!");
       assertEquals(dirName, omDirInfo.getName(),
           "Invalid directory!");
@@ -781,15 +777,12 @@ public class TestOMDirectoryCreateRequestWithFSO {
           throws IOException {
     // bucketID is the parent
     long parentID = bucketId;
-    for (int indx = 0; indx < dirs.size(); indx++) {
-      String dirName = dirs.get(indx);
+    for (String dirName : dirs) {
       String dbKey;
       // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-              parentID, dirName);
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, parentID, dirName);
       CacheValue<OmDirectoryInfo> omDirInfoCacheValue =
-              omMetadataManager.getDirectoryTable()
-                      .getCacheValue(new CacheKey<>(dbKey));
+              omMetadataManager.getDirectoryTable().getCacheValue(new CacheKey<>(dbKey));
       assertNull(omDirInfoCacheValue, "Unexpected directory!");
     }
   }

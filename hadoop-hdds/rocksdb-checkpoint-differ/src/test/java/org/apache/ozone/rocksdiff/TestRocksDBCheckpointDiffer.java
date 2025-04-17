@@ -47,9 +47,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -89,6 +89,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdb.util.RdbUtil;
@@ -155,9 +156,9 @@ public class TestRocksDBCheckpointDiffer {
   @BeforeEach
   public void init() throws RocksDBException {
     // Checkpoint differ log level. Set to DEBUG for verbose output
-    GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.getLog(), Level.INFO);
+    GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.class, Level.INFO);
     // Test class log level. Set to DEBUG for verbose output
-    GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.LOG, Level.INFO);
+    GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.class, Level.INFO);
 
     activeDbDir = new File(ACTIVE_DB_DIR_NAME);
     createDir(activeDbDir, ACTIVE_DB_DIR_NAME);
@@ -758,7 +759,7 @@ public class TestRocksDBCheckpointDiffer {
   private void createCheckpoint(ManagedRocksDB rocksDB) throws RocksDBException {
 
     LOG.trace("Current time: " + System.currentTimeMillis());
-    long t1 = System.currentTimeMillis();
+    long t1 = Time.monotonicNow();
 
     final long snapshotGeneration = rocksDB.get().getLatestSequenceNumber();
     final String cpPath = CP_PATH_PREFIX + snapshotGeneration;
@@ -780,7 +781,7 @@ public class TestRocksDBCheckpointDiffer {
                 colHandle));
     this.snapshots.add(currentSnapshot);
 
-    long t2 = System.currentTimeMillis();
+    long t2 = Time.monotonicNow();
     LOG.trace("Current time: " + t2);
     LOG.debug("Time elapsed: " + (t2 - t1) + " ms");
   }
@@ -925,7 +926,7 @@ public class TestRocksDBCheckpointDiffer {
       // fist go through fwdGraph to find nodes that don't have successors.
       // These nodes will be the top level nodes in reverse graph
       Set<CompactionNode> successors = fwdMutableGraph.successors(infileNode);
-      if (successors.size() == 0) {
+      if (successors.isEmpty()) {
         LOG.debug("No successors. Cumulative keys: {}, total keys: {}",
             infileNode.getCumulativeKeysReverseTraversal(),
             infileNode.getTotalNumberOfKeys());
@@ -1050,9 +1051,9 @@ public class TestRocksDBCheckpointDiffer {
       List<CompactionNode> currentLevel = COMPACTION_NODES_BY_LEVEL.get(level);
       List<CompactionNode> nextLevel = COMPACTION_NODES_BY_LEVEL.get(level + 1);
 
-      for (int i = 0; i < currentLevel.size(); i++) {
+      for (CompactionNode compactionNode : currentLevel) {
         for (int j = 0; j < nextLevel.size(); j++) {
-          dag.addNode(currentLevel.get(i));
+          dag.addNode(compactionNode);
           dag.addNode(nextLevel.get(j));
 
           int child = nextLevel.size();
@@ -1061,7 +1062,7 @@ public class TestRocksDBCheckpointDiffer {
           }
 
           if (j < child) {
-            dag.putEdge(currentLevel.get(i), nextLevel.get(j));
+            dag.putEdge(compactionNode, nextLevel.get(j));
           }
         }
       }
@@ -1094,9 +1095,9 @@ public class TestRocksDBCheckpointDiffer {
       List<CompactionNode> nextLevel = COMPACTION_NODES_BY_LEVEL.get(level - 1);
 
       for (int i = 0; i < currentLevel.size(); i++) {
-        for (int j = 0; j < nextLevel.size(); j++) {
+        for (CompactionNode compactionNode : nextLevel) {
           dag.addNode(currentLevel.get(i));
-          dag.addNode(nextLevel.get(j));
+          dag.addNode(compactionNode);
 
           int parent = currentLevel.size();
           if (level < COMPACTION_NODES_BY_LEVEL.size() - 1) {
@@ -1104,7 +1105,7 @@ public class TestRocksDBCheckpointDiffer {
           }
 
           if (i < parent) {
-            dag.putEdge(currentLevel.get(i), nextLevel.get(j));
+            dag.putEdge(currentLevel.get(i), compactionNode);
           }
         }
       }
@@ -1698,7 +1699,7 @@ public class TestRocksDBCheckpointDiffer {
 
   private void createFileWithContext(String fileName, String context)
       throws IOException {
-    try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
+    try (OutputStream fileOutputStream = Files.newOutputStream(Paths.get(fileName))) {
       fileOutputStream.write(context.getBytes(UTF_8));
     }
   }

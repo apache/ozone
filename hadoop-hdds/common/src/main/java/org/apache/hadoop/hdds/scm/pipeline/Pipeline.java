@@ -68,10 +68,6 @@ public final class Pipeline {
       Pipeline.class,
       DelegatedCodec.CopyType.UNSUPPORTED);
 
-  public static Codec<Pipeline> getCodec() {
-    return CODEC;
-  }
-
   private static final Logger LOG = LoggerFactory.getLogger(Pipeline.class);
   private final PipelineID id;
   private final ReplicationConfig replicationConfig;
@@ -115,6 +111,10 @@ public final class Pipeline {
     replicaIndexes = b.replicaIndexes;
     creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
     stateEnterTime = Instant.now();
+  }
+
+  public static Codec<Pipeline> getCodec() {
+    return CODEC;
   }
 
   /**
@@ -411,10 +411,10 @@ public final class Pipeline {
     // To save the message size on wire, only transfer the node order based on
     // network topology
     if (!nodesInOrder.isEmpty()) {
-      for (int i = 0; i < nodesInOrder.size(); i++) {
+      for (DatanodeDetails datanodeDetails : nodesInOrder) {
         Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
-        for (int j = 0; j < nodeStatus.keySet().size(); j++) {
-          if (it.next().equals(nodesInOrder.get(i))) {
+        for (int j = 0; j < nodeStatus.size(); j++) {
+          if (it.next().equals(datanodeDetails)) {
             builder.addMemberOrders(j);
             break;
           }
@@ -522,19 +522,20 @@ public final class Pipeline {
   @Override
   public String toString() {
     final StringBuilder b =
-        new StringBuilder(getClass().getSimpleName()).append("[");
+        new StringBuilder(getClass().getSimpleName()).append("{");
     b.append(" Id: ").append(id.getId());
-    b.append(", Nodes: ");
+    b.append(", Nodes: [");
     for (DatanodeDetails datanodeDetails : nodeStatus.keySet()) {
-      b.append(datanodeDetails);
-      b.append(" ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails));
+      b.append(" {").append(datanodeDetails);
+      b.append(", ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails)).append("},");
     }
+    b.append("]");
     b.append(", ReplicationConfig: ").append(replicationConfig);
     b.append(", State:").append(getPipelineState());
     b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");
     b.append(", CreationTimestamp").append(getCreationTimestamp()
         .atZone(ZoneId.systemDefault()));
-    b.append("]");
+    b.append("}");
     return b.toString();
   }
 
@@ -655,8 +656,7 @@ public final class Pipeline {
 
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         List<DatanodeDetails> nodesWithOrder = new ArrayList<>();
-        for (int i = 0; i < nodeOrder.size(); i++) {
-          int nodeIndex = nodeOrder.get(i);
+        for (int nodeIndex : nodeOrder) {
           Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
           while (it.hasNext() && nodeIndex >= 0) {
             DatanodeDetails node = it.next();

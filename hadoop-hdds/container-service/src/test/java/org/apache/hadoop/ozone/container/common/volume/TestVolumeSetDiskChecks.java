@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -41,7 +42,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -78,7 +78,7 @@ public class TestVolumeSetDiskChecks {
   @TempDir
   private Path tempDir;
 
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestVolumeSetDiskChecks.class);
   @TempDir
   private File dir;
@@ -91,7 +91,7 @@ public class TestVolumeSetDiskChecks {
   @AfterEach
   public void cleanup() {
     final Collection<String> dirs = conf.getTrimmedStringCollection(
-        DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY);
+        ScmConfigKeys.HDDS_DATANODE_DIR_KEY);
 
     for (String d: dirs) {
       FileUtils.deleteQuietly(new File(d));
@@ -116,7 +116,7 @@ public class TestVolumeSetDiskChecks {
 
     // Verify that the Ozone dirs were created during initialization.
     Collection<String> dirs = conf.getTrimmedStringCollection(
-        DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY);
+        ScmConfigKeys.HDDS_DATANODE_DIR_KEY);
     for (String d : dirs) {
       assertTrue(new File(d).isDirectory());
     }
@@ -223,7 +223,7 @@ public class TestVolumeSetDiskChecks {
     for (int i = 0; i < numDirs; ++i) {
       dirs.add(new File(dir, randomAlphanumeric(10)).toString());
     }
-    ozoneConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
+    ozoneConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         String.join(",", dirs));
 
     final List<String> metaDirs = new ArrayList<>();
@@ -265,7 +265,7 @@ public class TestVolumeSetDiskChecks {
         new DummyChecker(conf, new Timer(), 0);
 
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
-    ContainerSet conSet = new ContainerSet(20);
+    ContainerSet conSet = newContainerSet(20);
     when(ozoneContainer.getContainerSet()).thenReturn(conSet);
 
     String path = dir.getPath();

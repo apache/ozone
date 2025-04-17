@@ -246,13 +246,13 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     OmKeyLocationInfoGroup openKeyLatestVersionLocations = openKeyInfo.getLatestVersionLocations();
     List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.getLocationList();
 
-    if (keyLocationInfoList.size() > 0) {
+    if (!keyLocationInfoList.isEmpty()) {
       updateBlockInfo(ozoneManager, keyLocationInfoList.get(keyLocationInfoList.size() - 1));
     }
     if (openKeyLocationInfoList.size() > 1) {
       updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 1));
       updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 2));
-    } else if (openKeyLocationInfoList.size() > 0) {
+    } else if (!openKeyLocationInfoList.isEmpty()) {
       updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(0));
     }
 

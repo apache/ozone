@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -67,11 +68,11 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test ContainerReader class which loads containers from disks.
@@ -102,7 +103,7 @@ public class TestContainerReader {
         Files.createDirectory(tempDir.resolve("volumeDir")).toFile();
     this.conf = new OzoneConfiguration();
     volumeSet = mock(MutableVolumeSet.class);
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
 
     datanodeId = UUID.randomUUID();
     hddsVolume = new HddsVolume.Builder(volumeDir
@@ -236,10 +237,16 @@ public class TestContainerReader {
     thread.start();
     thread.join();
 
-    //recovering container should be marked unhealthy, so the count should be 3
-    assertEquals(UNHEALTHY, containerSet.getContainer(
-        recoveringContainerData.getContainerID()).getContainerState());
-    assertEquals(3, containerSet.containerCount());
+    // Ratis replicated recovering containers are deleted upon datanode startup
+    if (recoveringKeyValueContainer.getContainerData().getReplicaIndex() == 0) {
+      assertNull(containerSet.getContainer(recoveringContainerData.getContainerID()));
+      assertEquals(2, containerSet.containerCount());
+    } else {
+      //recovering container should be marked unhealthy, so the count should be 3
+      assertEquals(UNHEALTHY, containerSet.getContainer(
+          recoveringContainerData.getContainerID()).getContainerState());
+      assertEquals(3, containerSet.containerCount());
+    }
 
     for (int i = 0; i < 2; i++) {
       Container keyValueContainer = containerSet.getContainer(i);
@@ -266,7 +273,7 @@ public class TestContainerReader {
     setup(versionInfo);
     MutableVolumeSet volumeSet1;
     HddsVolume hddsVolume1;
-    ContainerSet containerSet1 = new ContainerSet(1000);
+    ContainerSet containerSet1 = newContainerSet();
     File volumeDir1 =
         Files.createDirectory(tempDir.resolve("volumeDir" + 1)).toFile();
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
@@ -316,7 +323,7 @@ public class TestContainerReader {
     setup(versionInfo);
     MutableVolumeSet volumeSet1;
     HddsVolume hddsVolume1;
-    ContainerSet containerSet1 = new ContainerSet(1000);
+    ContainerSet containerSet1 = newContainerSet();
     File volumeDir1 =
         Files.createDirectory(tempDir.resolve("volumeDirDbDelete")).toFile();
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
@@ -349,8 +356,7 @@ public class TestContainerReader {
       FileUtils.deleteFully(dbPath.toPath());
     }
 
-    GenericTestUtils.LogCapturer dnLogs = GenericTestUtils.LogCapturer.captureLogs(
-        LoggerFactory.getLogger(ContainerReader.class));
+    LogCapturer dnLogs = LogCapturer.captureLogs(ContainerReader.class);
     dnLogs.clearOutput();
     ContainerReader containerReader = new ContainerReader(volumeSet1,
         hddsVolume1, containerSet1, conf, true);
@@ -445,7 +451,7 @@ public class TestContainerReader {
           (HddsVolume) volumes.get(i), containerSet, conf, true);
       threads[i] = new Thread(containerReaders[i]);
     }
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     for (int i = 0; i < volumeNum; i++) {
       threads[i].start();
     }
@@ -453,7 +459,7 @@ public class TestContainerReader {
       threads[i].join();
     }
     System.out.println("Open " + volumeNum + " Volume with " + containerCount +
-        " costs " + (System.currentTimeMillis() - startTime) / 1000 + "s");
+        " costs " + (Time.monotonicNow() - startTime) / 1000 + "s");
     assertEquals(containerCount,
         containerSet.getContainerMap().entrySet().size());
     assertEquals(volumeSet.getFailedVolumesList().size(), 0);

@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.http.HttpConfig;
-import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.TimeDuration;
 
 /**
@@ -339,11 +338,6 @@ public final class OzoneConfigKeys {
       HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
       = ScmConfigKeys.
       HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT;
-  public static final String HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
-      = ScmConfigKeys.HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY;
-  public static final ReplicationLevel
-      HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT
-      = ScmConfigKeys.HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT;
   public static final String HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
       = ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY;
   public static final int HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT
@@ -415,6 +409,8 @@ public final class OzoneConfigKeys {
       ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY;
   public static final long HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
       ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT;
+  public static final String HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
+      "hdds.ratis.leader.first.election.minimum.timeout.duration";
 
   public static final String HDDS_DATANODE_PLUGINS_KEY =
       "hdds.datanode.plugins";
@@ -594,7 +590,6 @@ public final class OzoneConfigKeys {
   public static final long
       OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
       300 * 1000;
-
 
   // Values for bucket layout configurations.
   public static final String OZONE_BUCKET_LAYOUT_LEGACY =

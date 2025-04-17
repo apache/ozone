@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -83,7 +84,7 @@ import org.slf4j.LoggerFactory;
  * through to the container.
  */
 public class BlockOutputStream extends OutputStream {
-  public static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStream.class);
   public static final String EXCEPTION_MSG =
       "Unexpected Storage Container Exception: ";
@@ -228,7 +229,7 @@ public class BlockOutputStream extends OutputStream {
     totalWriteChunkLength = 0;
     totalPutBlockLength = 0;
     writtenDataLength = 0;
-    failedServers = new ArrayList<>(0);
+    failedServers = new CopyOnWriteArrayList<>();
     ioException = new AtomicReference<>(null);
     this.checksum = new Checksum(config.getChecksumType(), config.getBytesPerChecksum(), true);
     this.clientMetrics = clientMetrics;
@@ -627,7 +628,7 @@ public class BlockOutputStream extends OutputStream {
       // never reach, just to make compiler happy.
       return null;
     }
-    return flushFuture.thenApply(r -> new PutBlockResult(flushPos, asyncReply.getLogIndex(), r));
+    return flushFuture.thenApply(r -> new PutBlockResult(asyncReply.getLogIndex(), r));
   }
 
   @Override
@@ -996,7 +997,7 @@ public class BlockOutputStream extends OutputStream {
       // never reach.
       return null;
     }
-    return validateFuture.thenApply(x -> new PutBlockResult(flushPos, asyncReply.getLogIndex(), x));
+    return validateFuture.thenApply(x -> new PutBlockResult(asyncReply.getLogIndex(), x));
   }
 
   private void handleSuccessfulPutBlock(
@@ -1226,12 +1227,10 @@ public class BlockOutputStream extends OutputStream {
   }
 
   static class PutBlockResult {
-    private final long flushPosition;
     private final long commitIndex;
     private final ContainerCommandResponseProto response;
 
-    PutBlockResult(long flushPosition, long commitIndex, ContainerCommandResponseProto response) {
-      this.flushPosition = flushPosition;
+    PutBlockResult(long commitIndex, ContainerCommandResponseProto response) {
       this.commitIndex = commitIndex;
       this.response = response;
     }

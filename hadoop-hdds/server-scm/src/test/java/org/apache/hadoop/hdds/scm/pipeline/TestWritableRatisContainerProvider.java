@@ -157,7 +157,7 @@ class TestWritableRatisContainerProvider {
   }
 
   private WritableRatisContainerProvider createSubject() {
-    return new WritableRatisContainerProvider(conf,
+    return new WritableRatisContainerProvider(
         pipelineManager, containerManager, policy);
   }
 

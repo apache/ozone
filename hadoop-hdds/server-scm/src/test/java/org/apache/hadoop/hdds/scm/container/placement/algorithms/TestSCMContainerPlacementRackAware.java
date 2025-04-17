@@ -117,7 +117,7 @@ public class TestSCMContainerPlacementRackAware {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
@@ -132,39 +132,39 @@ public class TestSCMContainerPlacementRackAware {
 
     if (datanodeCount > 4) {
       StorageReportProto storage2 = HddsTestUtils.createStorageReport(
-          dnInfos.get(2).getUuid(),
+          dnInfos.get(2).getID(),
           "/data1-" + datanodes.get(2).getUuidString(),
           STORAGE_CAPACITY, 90L, 10L, null);
       dnInfos.get(2).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage2)));
       StorageReportProto storage3 = HddsTestUtils.createStorageReport(
-          dnInfos.get(3).getUuid(),
+          dnInfos.get(3).getID(),
           "/data1-" + dnInfos.get(3).getUuidString(),
           STORAGE_CAPACITY, 80L, 20L, null);
       dnInfos.get(3).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage3)));
       StorageReportProto storage4 = HddsTestUtils.createStorageReport(
-          dnInfos.get(4).getUuid(),
+          dnInfos.get(4).getID(),
           "/data1-" + dnInfos.get(4).getUuidString(),
           STORAGE_CAPACITY, 70L, 30L, null);
       dnInfos.get(4).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage4)));
     } else if (datanodeCount > 3) {
       StorageReportProto storage2 = HddsTestUtils.createStorageReport(
-          dnInfos.get(2).getUuid(),
+          dnInfos.get(2).getID(),
           "/data1-" + dnInfos.get(2).getUuidString(),
           STORAGE_CAPACITY, 90L, 10L, null);
       dnInfos.get(2).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage2)));
       StorageReportProto storage3 = HddsTestUtils.createStorageReport(
-          dnInfos.get(3).getUuid(),
+          dnInfos.get(3).getID(),
           "/data1-" + dnInfos.get(3).getUuidString(),
           STORAGE_CAPACITY, 80L, 20L, null);
       dnInfos.get(3).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage3)));
     } else if (datanodeCount > 2) {
       StorageReportProto storage2 = HddsTestUtils.createStorageReport(
-          dnInfos.get(2).getUuid(),
+          dnInfos.get(2).getID(),
           "/data1-" + dnInfos.get(2).getUuidString(),
           STORAGE_CAPACITY, 84L, 16L, null);
       dnInfos.get(2).updateStorageReports(
@@ -176,7 +176,7 @@ public class TestSCMContainerPlacementRackAware {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuid()))
+      when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
     when(nodeManager.getClusterNetworkTopologyMap())
@@ -460,7 +460,7 @@ public class TestSCMContainerPlacementRackAware {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          dnInfo.getUuid(), "/data1-" + dnInfo.getUuidString(),
+          dnInfo.getID(), "/data1-" + dnInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
@@ -478,7 +478,7 @@ public class TestSCMContainerPlacementRackAware {
     assertEquals(dataList.size(), StringUtils.countMatches(
         clusterMap.toString(), NetConstants.DEFAULT_RACK));
     for (DatanodeInfo dn: dnInfoList) {
-      when(nodeManager.getNodeByUuid(dn.getUuid()))
+      when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
 
@@ -616,7 +616,7 @@ public class TestSCMContainerPlacementRackAware {
     setup(datanodeCount);
     // Set all the nodes to out of service
     for (DatanodeInfo dn : dnInfos) {
-      dn.setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
+      dn.setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
     }
 
     for (int i = 0; i < 10; i++) {
@@ -632,7 +632,7 @@ public class TestSCMContainerPlacementRackAware {
         // ok, as there is only 1 IN_SERVICE node and with the retry logic we
         // may never find it.
       }
-      dnInfos.get(index).setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
+      dnInfos.get(index).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
     }
   }
 

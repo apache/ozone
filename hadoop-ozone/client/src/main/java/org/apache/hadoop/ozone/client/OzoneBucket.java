@@ -1029,9 +1029,10 @@ public class OzoneBucket extends WithMetadata {
    *
    * @param prefix Optional string to filter for the selected keys.
    */
-  public OzoneMultipartUploadList listMultipartUploads(String prefix)
+  public OzoneMultipartUploadList listMultipartUploads(String prefix, 
+      String keyMarker, String uploadIdMarker, int maxUploads) 
       throws IOException {
-    return proxy.listMultipartUploads(volumeName, getName(), prefix);
+    return proxy.listMultipartUploads(volumeName, getName(), prefix, keyMarker, uploadIdMarker, maxUploads);
   }
 
   /**
@@ -1406,7 +1407,7 @@ public class OzoneBucket extends WithMetadata {
           proxy.listStatusLight(volumeName, name, delimiterKeyPrefix, false,
               startKey, listCacheSize, false);
 
-      if (addedKeyPrefix && statuses.size() > 0) {
+      if (addedKeyPrefix && !statuses.isEmpty()) {
         // previous round already include the startKey, so remove it
         statuses.remove(0);
       } else {

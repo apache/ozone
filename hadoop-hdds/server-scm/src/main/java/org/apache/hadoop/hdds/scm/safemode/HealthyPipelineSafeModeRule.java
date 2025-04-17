@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  */
 public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(HealthyPipelineSafeModeRule.class);
 
   private static final String NAME = "HealthyPipelineSafeModeRule";
@@ -147,6 +147,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   }
 
 
+  @Override
   public synchronized void refresh(boolean forceRefresh) {
     if (forceRefresh) {
       initializeRule(true);

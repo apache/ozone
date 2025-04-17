@@ -18,7 +18,11 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static org.apache.hadoop.hdds.conf.ConfigTag.CONTAINER;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.MANAGEMENT;
+import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.STORAGE;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
 
 import java.time.Duration;
@@ -28,6 +32,7 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,6 +73,20 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       "hdds.datanode.disk.check.min.gap";
   public static final String DISK_CHECK_TIMEOUT_KEY =
       "hdds.datanode.disk.check.timeout";
+
+  // Minimum space should be left on volume.
+  // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
+  // In this case when availableSpace is 10GB or below, volume is assumed as full
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
+      "hdds.datanode.volume.min.free.space";
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT =
+      "5GB";
+  // Minimum percent of space should be left on volume.
+  // Ex: If volume has 1000GB and minFreeSpacePercent is configured as 2%,
+  // In this case when availableSpace is 20GB(2% of 1000) or below, volume is assumed as full
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
+      "hdds.datanode.volume.min.free.space.percent";
+  static final byte MIN_FREE_SPACE_UNSET = -1;
 
   public static final String WAIT_ON_ALL_FOLLOWERS =
       "hdds.datanode.wait.on.all.followers";
@@ -318,6 +337,32 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public void setBlockDeletionLimit(int limit) {
     this.blockLimitPerInterval = limit;
   }
+
+  @Config(key = "hdds.datanode.volume.min.free.space",
+      defaultValue = "-1",
+      type = ConfigType.SIZE,
+      tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
+      description = "This determines the free space to be used for closing containers" +
+          " When the difference between volume capacity and used reaches this number," +
+          " containers that reside on this volume will be closed and no new containers" +
+          " would be allocated on this volume." +
+          " Either of min.free.space or min.free.space.percent should be configured, when both are set then" +
+          " min.free.space will be used."
+  )
+  private long minFreeSpace = MIN_FREE_SPACE_UNSET;
+
+  @Config(key = "hdds.datanode.volume.min.free.space.percent",
+      defaultValue = "-1",
+      type = ConfigType.FLOAT,
+      tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
+      description = "This determines the free space percent to be used for closing containers" +
+          " When the difference between volume capacity and used reaches (free.space.percent of volume capacity)," +
+          " containers that reside on this volume will be closed and no new containers" +
+          " would be allocated on this volume." +
+          " Either of min.free.space or min.free.space.percent should be configured, when both are set then" +
+          " min.free.space will be used."
+  )
+  private float minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
 
   @Config(key = "periodic.disk.check.interval.minutes",
       defaultValue = "60",
@@ -719,6 +764,43 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       rocksdbDeleteObsoleteFilesPeriod =
           ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
     }
+
+    validateMinFreeSpace();
+  }
+
+  /**
+   * If 'hdds.datanode.volume.min.free.space' is defined,
+   * it will be honored first. If it is not defined and
+   * 'hdds.datanode.volume.min.free.space.percent' is defined, it will honor this
+   * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
+   */
+  private void validateMinFreeSpace() {
+    if (minFreeSpaceRatio > 1) {
+      LOG.warn("{} = {} is invalid, should be between 0 and 1",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, minFreeSpaceRatio);
+      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+    }
+
+    final boolean minFreeSpaceConfigured = minFreeSpace >= 0;
+    final boolean minFreeSpaceRatioConfigured = minFreeSpaceRatio >= 0;
+
+    if (minFreeSpaceConfigured && minFreeSpaceRatioConfigured) {
+      // Only one property should be configured.
+      // Since both properties are configured, HDDS_DATANODE_VOLUME_MIN_FREE_SPACE is used to determine minFreeSpace
+      LOG.warn("Only one of {}={} and {}={} should be set. With both set, {} value will be used.",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+          minFreeSpace,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+          minFreeSpaceRatio,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
+      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+    }
+
+    if (!minFreeSpaceConfigured && !minFreeSpaceRatioConfigured) {
+      // If both are not configured use defaultFreeSpace
+      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+      minFreeSpace = getDefaultFreeSpace();
+    }
   }
 
   public void setContainerDeleteThreads(int containerDeleteThreads) {
@@ -735,6 +817,20 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public int getContainerCloseThreads() {
     return containerCloseThreads;
+  }
+
+  public long getMinFreeSpace(long capacity) {
+    return minFreeSpaceRatio >= 0
+        ? ((long) (capacity * minFreeSpaceRatio))
+        : minFreeSpace;
+  }
+
+  public long getMinFreeSpace() {
+    return minFreeSpace;
+  }
+
+  public float getMinFreeSpaceRatio() {
+    return minFreeSpaceRatio;
   }
 
   public long getPeriodicDiskCheckIntervalMinutes() {
@@ -966,4 +1062,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     this.autoCompactionSmallSstFileThreads =
         autoCompactionSmallSstFileThreads;
   }
+
+  static long getDefaultFreeSpace() {
+    final StorageSize measure = StorageSize.parse(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
+    return Math.round(measure.getUnit().toBytes(measure.getValue()));
+  }
+
 }

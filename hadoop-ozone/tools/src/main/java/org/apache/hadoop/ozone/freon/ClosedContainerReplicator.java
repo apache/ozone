@@ -1,22 +1,36 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -31,11 +45,13 @@ import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -48,25 +64,11 @@ import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Utility to replicated closed container with datanode code.
@@ -194,12 +196,13 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     WitnessedContainerMetadataStore referenceCountedDS =
         WitnessedContainerMetadataStoreImpl.get(conf);
     this.witnessedContainerMetadataStore = referenceCountedDS;
-    ContainerSet containerSet = new ContainerSet(referenceCountedDS.getContainerIdsTable(), 1000);
+    ContainerSet containerSet = ContainerSet.newRwContainerSet(referenceCountedDS.getContainerIdsTable(), 1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
     MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
 
     if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
       MutableVolumeSet dbVolumeSet =
@@ -225,6 +228,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               fakeDatanodeUuid,
               containerSet,
               volumeSet,
+              volumeChoosingPolicy,
               metrics,
               containerReplicaProto -> {
               });
@@ -236,7 +240,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         new ContainerController(containerSet, handlers);
 
     ContainerImporter importer = new ContainerImporter(conf, containerSet,
-        controller, volumeSet);
+        controller, volumeSet, volumeChoosingPolicy);
     replicator = new DownloadAndImportReplicator(conf, containerSet, importer,
         new SimpleContainerDownloader(conf, null));
 

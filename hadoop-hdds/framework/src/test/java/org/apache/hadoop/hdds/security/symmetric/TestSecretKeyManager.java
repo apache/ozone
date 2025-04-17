@@ -52,7 +52,7 @@ public class TestSecretKeyManager {
   private SecretKeyStore mockedKeyStore;
 
   @BeforeEach
-  private void setup() {
+  void setup() {
     mockedKeyStore = mock(SecretKeyStore.class);
   }
 

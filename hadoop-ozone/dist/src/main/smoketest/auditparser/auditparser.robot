@@ -42,15 +42,15 @@ Testing audit parser
 
     ${logdir} =        Get Environment Variable      OZONE_LOG_DIR     /var/log/ozone
     ${logfile} =       Execute              ls -t "${logdir}" | grep om-audit | head -1
-                       Execute              ozone auditparser "${auditworkdir}/audit.db" load "${logdir}/${logfile}"
-    ${result} =        Execute              ozone auditparser "${auditworkdir}/audit.db" template top5cmds
+                       Execute              ozone debug auditparser "${auditworkdir}/audit.db" load "${logdir}/${logfile}"
+    ${result} =        Execute              ozone debug auditparser "${auditworkdir}/audit.db" template top5cmds
                        Should Contain       ${result}  ALLOCATE_KEY
-    ${result} =        Execute              ozone auditparser "${auditworkdir}/audit.db" template top5users
+    ${result} =        Execute              ozone debug auditparser "${auditworkdir}/audit.db" template top5users
     Run Keyword If     '${SECURITY_ENABLED}' == 'true'      Set username
                        Should Contain       ${result}  ${user}
-    ${result} =        Execute              ozone auditparser "${auditworkdir}/audit.db" query "select count(*) from audit where op='CREATE_VOLUME' and RESULT='SUCCESS'"
+    ${result} =        Execute              ozone debug auditparser "${auditworkdir}/audit.db" query "select count(*) from audit where op='CREATE_VOLUME' and RESULT='SUCCESS'"
     ${result} =        Convert To Number     ${result}
                        Should be true       ${result}>=1
-    ${result} =        Execute              ozone auditparser "${auditworkdir}/audit.db" query "select count(*) from audit where op='CREATE_BUCKET' and RESULT='SUCCESS'"
+    ${result} =        Execute              ozone debug auditparser "${auditworkdir}/audit.db" query "select count(*) from audit where op='CREATE_BUCKET' and RESULT='SUCCESS'"
     ${result} =        Convert To Number     ${result}
                        Should be true       ${result}>=${buckets}

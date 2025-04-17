@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
 public class OzoneDelegationTokenSecretManager
     extends OzoneSecretManager<OzoneTokenIdentifier> {
 
-  public static final Logger LOG = LoggerFactory
+  private static final Logger LOG = LoggerFactory
       .getLogger(OzoneDelegationTokenSecretManager.class);
   private final Map<OzoneTokenIdentifier, TokenInfo> currentTokens;
   private final OzoneSecretStore store;
@@ -232,18 +232,6 @@ public class OzoneDelegationTokenSecretManager
         ozoneTokenIdentifier.getTrackingId());
     currentTokens.put(ozoneTokenIdentifier, tokenInfo);
     return renewTime;
-  }
-
-  /**
-   * Stores given identifier in token store.
-   */
-  private void addToTokenStore(OzoneTokenIdentifier identifier,
-      byte[] password, long renewTime)
-      throws IOException {
-    TokenInfo tokenInfo = new TokenInfo(renewTime, password,
-        identifier.getTrackingId());
-    currentTokens.put(identifier, tokenInfo);
-    store.storeToken(identifier, tokenInfo.getRenewDate());
   }
 
   /**

@@ -156,8 +156,7 @@ public abstract class SCMCommonPlacementPolicy implements
     }
     for (int i = 0; i < dns.size(); i++) {
       DatanodeDetails node = dns.get(i);
-      DatanodeDetails datanodeDetails =
-          nodeManager.getNodeByUuid(node.getUuid());
+      final DatanodeDetails datanodeDetails = nodeManager.getNode(node.getID());
       if (datanodeDetails != null) {
         dns.set(i, datanodeDetails);
       }
@@ -235,7 +234,7 @@ public abstract class SCMCommonPlacementPolicy implements
       healthyNodes.removeAll(usedNodes);
     }
     String msg;
-    if (healthyNodes.size() == 0) {
+    if (healthyNodes.isEmpty()) {
       msg = "No healthy node found to allocate container.";
       LOG.error(msg);
       throw new SCMException(msg, SCMException.ResultCodes
@@ -309,9 +308,7 @@ public abstract class SCMCommonPlacementPolicy implements
 
     if (dataSizeRequired > 0) {
       for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        if (VolumeUsage.hasVolumeEnoughSpace(reportProto.getRemaining(),
-              reportProto.getCommitted(), dataSizeRequired,
-              reportProto.getFreeSpaceToSpare())) {
+        if (VolumeUsage.getUsableSpace(reportProto) > dataSizeRequired) {
           enoughForData = true;
           break;
         }
@@ -440,7 +437,7 @@ public abstract class SCMCommonPlacementPolicy implements
     // We have a network topology so calculate if it is satisfied or not.
     int requiredRacks = getRequiredRackCount(replicas, 0);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
-      if (dns.size() > 0) {
+      if (!dns.isEmpty()) {
         // placement is always satisfied if there is at least one DN.
         return validPlacement;
       } else {
@@ -498,7 +495,7 @@ public abstract class SCMCommonPlacementPolicy implements
   public boolean isValidNode(DatanodeDetails datanodeDetails,
       long metadataSizeRequired, long dataSizeRequired) {
     DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
-        .getNodeByUuid(datanodeDetails.getUuid());
+        .getNode(datanodeDetails.getID());
     if (datanodeInfo == null) {
       LOG.error("Failed to find the DatanodeInfo for datanode {}",
           datanodeDetails);
@@ -556,7 +553,7 @@ public abstract class SCMCommonPlacementPolicy implements
                 .limit(numberOfReplicasToBeCopied)
                 .collect(Collectors.toList());
         if (numberOfReplicasToBeCopied > replicasToBeCopied.size()) {
-          Node rack = replicaList.size() > 0 ? this.getPlacementGroup(
+          Node rack = !replicaList.isEmpty() ? this.getPlacementGroup(
                   replicaList.get(0).getDatanodeDetails()) : null;
           LOG.warn("Not enough copyable replicas available in rack {}. " +
                   "Required number of Replicas to be copied: {}." +
@@ -641,14 +638,14 @@ public abstract class SCMCommonPlacementPolicy implements
         Node rack = pq.poll();
         Set<ContainerReplica> replicaSet =
                 placementGroupReplicaIdMap.get(rack).get(rid);
-        if (replicaSet.size() > 0) {
+        if (!replicaSet.isEmpty()) {
           ContainerReplica r = replicaSet.stream().findFirst().get();
           replicasToRemove.add(r);
           replicaSet.remove(r);
           replicaIdMap.get(rid).remove(r);
           placementGroupCntMap.compute(rack,
                   (group, cnt) -> (cnt == null ? 0 : cnt) - 1);
-          if (replicaSet.size() == 0) {
+          if (replicaSet.isEmpty()) {
             placementGroupReplicaIdMap.get(rack).remove(rid);
           } else {
             pq.add(rack);

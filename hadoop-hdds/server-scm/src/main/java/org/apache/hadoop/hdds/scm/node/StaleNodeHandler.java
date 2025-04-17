@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.scm.node;
 
 import java.io.IOException;
 import java.util.Set;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -38,13 +36,11 @@ public class StaleNodeHandler implements EventHandler<DatanodeDetails> {
 
   private final NodeManager nodeManager;
   private final PipelineManager pipelineManager;
-  private final ConfigurationSource conf;
 
   public StaleNodeHandler(NodeManager nodeManager,
-      PipelineManager pipelineManager, OzoneConfiguration conf) {
+      PipelineManager pipelineManager) {
     this.nodeManager = nodeManager;
     this.pipelineManager = pipelineManager;
-    this.conf = conf;
   }
 
   @Override

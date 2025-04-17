@@ -48,7 +48,7 @@ public final class TestUtils {
   public static List<Optional<String>> getTestingBounds(
       SortedMap<String, Integer> keys) {
     Set<String> boundary = new HashSet<>();
-    if (keys.size() > 0) {
+    if (!keys.isEmpty()) {
       List<String> sortedKeys = new ArrayList<>(keys.keySet());
       boundary.add(getLexicographicallyLowerString(keys.firstKey()));
       boundary.add(keys.firstKey());

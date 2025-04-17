@@ -1024,6 +1024,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   static class NodeComparator
       implements Comparator<CompactionNode>, Serializable {
+    @Override
     public int compare(CompactionNode a, CompactionNode b) {
       return a.getFileName().compareToIgnoreCase(b.getFileName());
     }
@@ -1388,11 +1389,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @VisibleForTesting
   public boolean debugEnabled(Integer level) {
     return DEBUG_LEVEL.contains(level);
-  }
-
-  @VisibleForTesting
-  public static Logger getLog() {
-    return LOG;
   }
 
   @VisibleForTesting

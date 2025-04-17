@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  */
 public class FindTargetGreedyByNetworkTopology
     extends AbstractFindTargetGreedy {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(FindTargetGreedyByNetworkTopology.class);
 
   private NetworkTopology networkTopology;
@@ -63,6 +63,7 @@ public class FindTargetGreedyByNetworkTopology
    * network topology.
    * @param source the specified source datanode
    */
+  @Override
   @VisibleForTesting
   public void sortTargetForSource(DatanodeDetails source) {
     Collections.sort(potentialTargets,

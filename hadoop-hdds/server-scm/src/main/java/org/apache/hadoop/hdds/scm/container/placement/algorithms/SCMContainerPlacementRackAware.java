@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 public final class SCMContainerPlacementRackAware
     extends SCMCommonPlacementPolicy {
   @VisibleForTesting
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRackAware.class);
   private final NetworkTopology networkTopology;
   private boolean fallback;
@@ -146,7 +146,7 @@ public final class SCMContainerPlacementRackAware
     }
     DatanodeDetails favoredNode;
     int favorIndex = 0;
-    if (mutableUsedNodes.size() == 0) {
+    if (mutableUsedNodes.isEmpty()) {
       // choose all nodes for a new pipeline case
       // choose first datanode from scope ROOT or from favoredNodes if not null
       favoredNode = favoredNodeNum > favorIndex ?

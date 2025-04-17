@@ -1,21 +1,31 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.TestDataUtil.createKey;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -23,7 +33,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -35,15 +44,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
-
-import java.io.IOException;
-import java.util.UUID;
-
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for Ozone Bucket Owner.
@@ -92,8 +92,8 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
           .getVolume(VOLUME_NAME);
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       //Key Create
-      createKey(ozoneBucket, "key1", 10, new byte[10]);
-      createKey(ozoneBucket, "key2", 10, new byte[10]);
+      createKey(ozoneBucket, "key1", new byte[10]);
+      createKey(ozoneBucket, "key2", new byte[10]);
       //Key Delete
       ozoneBucket.deleteKey("key1");
       //Bucket Delete
@@ -103,7 +103,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       //Get Acls
       ozoneBucket.getAcls();
       //Add Acls
-      OzoneAcl acl = new OzoneAcl(USER, "testuser",
+      OzoneAcl acl = OzoneAcl.of(USER, "testuser",
           DEFAULT, IAccessAuthorizer.ACLType.ALL);
       ozoneBucket.addAcl(acl);
     }
@@ -118,7 +118,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       assertThrows(Exception.class, () -> {
         OzoneVolume volume = client.getObjectStore().getVolume(VOLUME_NAME);
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
-        createKey(ozoneBucket, "key3", 10, new byte[10]);
+        createKey(ozoneBucket, "key3", new byte[10]);
       }, "Create key as non-volume and non-bucket owner should fail");
     }
     //Key Delete - should fail
@@ -159,7 +159,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       assertThrows(Exception.class, () -> {
         OzoneVolume volume = client.getObjectStore().getVolume(VOLUME_NAME);
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
-        OzoneAcl acl = new OzoneAcl(USER, "testuser1",
+        OzoneAcl acl = OzoneAcl.of(USER, "testuser1",
             DEFAULT, IAccessAuthorizer.ACLType.ALL);
         ozoneBucket.addAcl(acl);
       }, "Add Acls as non-volume and non-bucket owner should fail");
@@ -173,8 +173,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
     try (OzoneClient client = cluster().newClient()) {
       OzoneVolume volume = client.getObjectStore().getVolume(VOLUME_NAME);
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
-      //Key Create
-      createKey(ozoneBucket, "key2", 10, new byte[10]);
+      createKey(ozoneBucket, "key2", new byte[10]);
       //Key Delete
       ozoneBucket.deleteKey("key2");
       //List Keys
@@ -182,7 +181,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       //Get Acls
       ozoneBucket.getAcls();
       //Add Acls
-      OzoneAcl acl = new OzoneAcl(USER, "testuser2",
+      OzoneAcl acl = OzoneAcl.of(USER, "testuser2",
           DEFAULT, IAccessAuthorizer.ACLType.ALL);
       ozoneBucket.addAcl(acl);
       //Bucket Delete
@@ -207,13 +206,5 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
     assertTrue(store.setAcl(obj, OzoneAcl.parseAcls(aclString)));
-  }
-
-  private void createKey(OzoneBucket ozoneBucket, String key, int length,
-       byte[] input) throws Exception {
-    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key, length);
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
   }
 }
