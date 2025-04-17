@@ -159,7 +159,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * {@link StorageContainerManager} associated with the MiniOzoneCluster.
    */
   StorageContainerLocationProtocolClientSideTranslatorPB
-  getStorageContainerLocationClient() throws IOException;
+      getStorageContainerLocationClient() throws IOException;
 
   /**
    * Restarts StorageContainerManager instance.
