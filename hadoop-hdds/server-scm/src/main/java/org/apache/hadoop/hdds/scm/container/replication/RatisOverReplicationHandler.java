@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RatisOverReplicationHandler
     extends AbstractOverReplicationHandler {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(RatisOverReplicationHandler.class);
 
   private final ReplicationManager replicationManager;

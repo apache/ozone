@@ -1588,7 +1588,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new IOException(
           "Path of " + OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR + " and "
               + ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR
-              + " should not be co located. Please change atleast one path.");
+              + " should not be co located. Please change at least one path.");
     }
 
     // Create Ratis snapshot dir

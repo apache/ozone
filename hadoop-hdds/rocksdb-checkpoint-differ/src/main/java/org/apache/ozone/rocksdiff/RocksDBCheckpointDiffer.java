@@ -1206,13 +1206,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
-  public static Logger getLog() {
-    return LOG;
+  public boolean debugEnabled(Integer level) {
+    return DEBUG_LEVEL.contains(level);
   }
 
   @VisibleForTesting
-  public ConcurrentMap<String, CompactionNode> getCompactionNodeMap() {
-    return compactionDag.getCompactionMap();
+  public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
+    return compactionDag.compactionNodeMap;
   }
 
   @VisibleForTesting

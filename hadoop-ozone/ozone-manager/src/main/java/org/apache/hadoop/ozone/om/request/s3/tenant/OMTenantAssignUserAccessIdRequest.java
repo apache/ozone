@@ -94,7 +94,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMTenantAssignUserAccessIdRequest.class);
 
   public OMTenantAssignUserAccessIdRequest(OMRequest omRequest) {

@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
     type = ReconUpgradeAction.UpgradeActionType.FINALIZE)
 public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
 
-  public static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
 
   /**
    * Utility function to add provided column to RECON_TASK_STATUS table as INTEGER type.

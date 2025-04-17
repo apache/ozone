@@ -74,7 +74,7 @@ import org.slf4j.LoggerFactory;
  * log4j.appender.inspectorAppender.layout=org.apache.log4j.PatternLayout
  */
 public class KeyValueContainerMetadataInspector implements ContainerInspector {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(KeyValueContainerMetadataInspector.class);
   public static final Logger REPORT_LOG = LoggerFactory.getLogger(
       "ContainerMetadataInspectorReport");

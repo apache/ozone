@@ -44,13 +44,13 @@ public final class ContainerID implements Comparable<ContainerID> {
 
   public static final ContainerID MIN = ContainerID.valueOf(0);
 
-  public static Codec<ContainerID> getCodec() {
-    return CODEC;
-  }
-
   private final long id;
   private final Supplier<HddsProtos.ContainerID> proto;
   private final Supplier<Integer> hash;
+
+  public static Codec<ContainerID> getCodec() {
+    return CODEC;
+  }
 
   /**
    * Constructs ContainerID.

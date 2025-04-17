@@ -74,7 +74,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
   @BeforeAll
   public static void setup() {
-    GenericTestUtils.setLogLevel(ContainerBalancerTask.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ContainerBalancerTask.class, Level.DEBUG);
   }
 
   private static Stream<Arguments> createMockedSCMs() {

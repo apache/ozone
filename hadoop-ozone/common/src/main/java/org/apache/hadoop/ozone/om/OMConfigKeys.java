@@ -627,4 +627,22 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_KEY =
       "ozone.om.edekcacheloader.max-retries";
   public static final int OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT = 10;
+
+  /**
+   * Configuration properties for Compaction Service.
+   */
+  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.compaction.service.enabled";
+  public static final boolean OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT = false;
+  public static final String OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL =
+      "ozone.om.compaction.service.run.interval";
+  public static final long OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT
+      = TimeUnit.HOURS.toMillis(6);
+
+  public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT
+      = "ozone.om.compaction.service.timeout";
+  public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT_DEFAULT = "10m";
+  public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES
+      = "ozone.om.compaction.service.columnfamilies";
+  public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
+      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable";
 }

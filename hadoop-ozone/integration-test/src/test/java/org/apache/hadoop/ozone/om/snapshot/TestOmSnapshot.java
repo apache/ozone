@@ -94,6 +94,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
@@ -192,6 +193,10 @@ public abstract class TestOmSnapshot {
     this.counter = new AtomicInteger();
     this.createLinkedBucket = createLinkedBucket;
     init();
+
+    if (!disableNativeDiff) {
+      assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary());
+    }
   }
 
   /**

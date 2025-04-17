@@ -66,7 +66,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneHAClusterImpl.class);
 
   private final OMHAService omhaService;
@@ -589,7 +589,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
                   scm.getClientRpcAddress());
             } else {
               inactiveSCMs.add(scm);
-              LOG.info("Intialized SCM at {}. This SCM is currently "
+              LOG.info("Initialized SCM at {}. This SCM is currently "
                   + "inactive (not running).", scm.getClientRpcAddress());
             }
           }
