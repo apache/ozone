@@ -162,11 +162,11 @@ public class OmLCRule {
       if (action.getActionType() == OmLCAction.ActionType.EXPIRATION) {
         expirationActionCount++;
       }
+      if (expirationActionCount > 1) {
+        throw new OMException("A rule can have at most one Expiration action.",
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
       action.valid();
-    }
-    if (expirationActionCount > 1) {
-      throw new OMException("A rule can have at most one Expiration action.",
-          OMException.ResultCodes.INVALID_REQUEST);
     }
 
     if (prefix != null && filter != null) {
