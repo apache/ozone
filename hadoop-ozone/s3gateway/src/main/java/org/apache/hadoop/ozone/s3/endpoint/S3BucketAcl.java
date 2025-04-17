@@ -25,19 +25,20 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Bucket ACL.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "AccessControlPolicy",
-    namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    namespace = OzoneConsts.S3_NAMESPACE_URL)
 public class S3BucketAcl {
 
-  @XmlElement(name = "Owner", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+  @XmlElement(name = "Owner", namespace = OzoneConsts.S3_NAMESPACE_URL)
   private S3Owner owner;
 
-  @XmlElement(name = "AccessControlList", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+  @XmlElement(name = "AccessControlList", namespace = OzoneConsts.S3_NAMESPACE_URL)
   private AccessControlList aclList;
 
   public S3Owner getOwner() {
@@ -71,7 +72,7 @@ public class S3BucketAcl {
   @XmlRootElement(name = "AccessControlList")
   public static class AccessControlList {
 
-    @XmlElement(name = "Grant", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "Grant", namespace = OzoneConsts.S3_NAMESPACE_URL)
     private List<Grant> grantList = new ArrayList<>();
 
     public void addGrant(Grant grant) {
@@ -105,10 +106,10 @@ public class S3BucketAcl {
   @XmlRootElement(name = "Grant")
   public static class Grant {
 
-    @XmlElement(name = "Grantee", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "Grantee", namespace = OzoneConsts.S3_NAMESPACE_URL)
     private Grantee grantee;
 
-    @XmlElement(name = "Permission", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "Permission", namespace = OzoneConsts.S3_NAMESPACE_URL)
     private String permission;
 
     public String getPermission() {
@@ -162,10 +163,10 @@ public class S3BucketAcl {
   @XmlRootElement(name = "Grantee")
   public static class Grantee {
 
-    @XmlElement(name = "DisplayName", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "DisplayName", namespace = OzoneConsts.S3_NAMESPACE_URL)
     private String displayName;
 
-    @XmlElement(name = "ID", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "ID", namespace = OzoneConsts.S3_NAMESPACE_URL)
     private String id;
 
     @XmlAttribute(name = "xsi:type")

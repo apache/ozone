@@ -30,10 +30,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "CompleteMultipartUpload", namespace =
-    "http://s3.amazonaws.com/doc/2006-03-01/")
+    OzoneConsts.S3_NAMESPACE_URL)
 public class CompleteMultipartUploadRequest {
 
-  @XmlElement(name = "Part", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+  @XmlElement(name = "Part", namespace = OzoneConsts.S3_NAMESPACE_URL)
   private List<Part> partList = new ArrayList<>();
 
   public List<Part> getPartList() {
@@ -51,10 +51,10 @@ public class CompleteMultipartUploadRequest {
   @XmlRootElement(name = "Part")
   public static class Part {
 
-    @XmlElement(name = "PartNumber", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "PartNumber", namespace = OzoneConsts.S3_NAMESPACE_URL)
     private int partNumber;
 
-    @XmlElement(name = OzoneConsts.ETAG, namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = OzoneConsts.ETAG, namespace = OzoneConsts.S3_NAMESPACE_URL)
     private String eTag;
 
     public int getPartNumber() {

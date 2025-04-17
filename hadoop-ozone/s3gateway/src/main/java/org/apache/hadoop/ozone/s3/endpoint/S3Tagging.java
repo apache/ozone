@@ -25,16 +25,17 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * S3 tagging.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "Tagging",
-    namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    namespace = OzoneConsts.S3_NAMESPACE_URL)
 public class S3Tagging {
 
-  @XmlElement(name = "TagSet", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+  @XmlElement(name = "TagSet", namespace = OzoneConsts.S3_NAMESPACE_URL)
   private TagSet tagSet;
 
   public S3Tagging() {
@@ -59,7 +60,7 @@ public class S3Tagging {
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "TagSet")
   public static class TagSet {
-    @XmlElement(name = "Tag", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "Tag", namespace = OzoneConsts.S3_NAMESPACE_URL)
     private List<Tag> tags = new ArrayList<>();
 
     public TagSet() {
@@ -84,10 +85,10 @@ public class S3Tagging {
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "Tag")
   public static class Tag {
-    @XmlElement(name = "Key", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "Key", namespace = OzoneConsts.S3_NAMESPACE_URL)
     private String key;
 
-    @XmlElement(name = "Value", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "Value", namespace = OzoneConsts.S3_NAMESPACE_URL)
     private String value;
 
     public Tag() {

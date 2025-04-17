@@ -23,20 +23,20 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Request for multi object delete request.
  */
 
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "Delete", namespace = "http://s3.amazonaws"
-    + ".com/doc/2006-03-01/")
+@XmlRootElement(name = "Delete", namespace = OzoneConsts.S3_NAMESPACE_URL)
 public class MultiDeleteRequest {
 
-  @XmlElement(name = "Quiet", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+  @XmlElement(name = "Quiet", namespace = OzoneConsts.S3_NAMESPACE_URL)
   private Boolean quiet = Boolean.FALSE;
 
-  @XmlElement(name = "Object", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+  @XmlElement(name = "Object", namespace = OzoneConsts.S3_NAMESPACE_URL)
   private List<DeleteObject> objects = new ArrayList<>();
 
   public boolean isQuiet() {
@@ -64,10 +64,10 @@ public class MultiDeleteRequest {
       + ".com/doc/2006-03-01/")
   public static class DeleteObject {
 
-    @XmlElement(name = "Key", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "Key", namespace = OzoneConsts.S3_NAMESPACE_URL)
     private String key;
 
-    @XmlElement(name = "VersionId", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "VersionId", namespace = OzoneConsts.S3_NAMESPACE_URL)
     private String versionId;
 
     public DeleteObject() {
