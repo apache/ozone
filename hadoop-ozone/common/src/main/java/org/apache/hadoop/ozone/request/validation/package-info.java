@@ -28,13 +28,14 @@
  * - processingPhase: Returns {@link org.apache.hadoop.ozone.request.validation.RequestProcessingPhase}
  *
  * The system uses a reflection based discovery to find methods that are
- * annotated with the
+ * annotated with an annotation annotated with the
  * {@link org.apache.hadoop.ozone.request.validation.RegisterValidator}
  * annotation.
- * This annotation is used to register a particular annotation which inturn would be used to specify conditions in
- * which a certain validator has to be used, the request type to which the validation should be applied,
- * and the request processing phase in which we apply the validation and the maxVersion corresponding to which this
- * is supposed to run.
+ * The RegisterValidator annotation is used to register a particular annotation which in turn would be used
+ * to specify conditions in which a certain validator has to be used:
+ * - the request type onto which the validation should be applied,
+ * - the request processing phase in which the validation should be applied
+ * - and the layout version before which the validation should be applied.
  */
 
 package org.apache.hadoop.ozone.request.validation;
