@@ -51,6 +51,7 @@ import static org.apache.ozone.test.LambdaTestUtils.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -108,6 +109,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
+import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -1723,10 +1725,8 @@ public abstract class TestOmSnapshot {
     String volErrorMessage = "Volume not found: " + volume;
 
     Exception volBucketEx = assertThrows(OMException.class,
-        () -> store.listSnapshotDiffJobs(volume, bucket,
-            "", true));
-    assertEquals(volErrorMessage,
-        volBucketEx.getMessage());
+        () -> store.listSnapshotDiffJobs(volume, bucket, "", true, null));
+    assertEquals(volErrorMessage, volBucketEx.getMessage());
 
     // Create the volume and the bucket.
     store.createVolume(volume);
@@ -1734,12 +1734,11 @@ public abstract class TestOmSnapshot {
     createBucket(ozVolume, bucket);
 
     assertDoesNotThrow(() ->
-        store.listSnapshotDiffJobs(volume, bucket, "", true));
+        store.listSnapshotDiffJobs(volume, bucket, "", true, null));
 
     // There are no snapshots, response should be empty.
-    assertTrue(store
-        .listSnapshotDiffJobs(volume, bucket,
-            "", true).isEmpty());
+    Iterator<OzoneSnapshotDiff> iterator = store.listSnapshotDiffJobs(volume, bucket, "", true, null);
+    assertFalse(iterator.hasNext());
 
     OzoneBucket ozBucket = ozVolume.getBucket(bucket);
     // Create keys and take snapshots.
@@ -1760,8 +1759,7 @@ public abstract class TestOmSnapshot {
     String statusErrorMessage = "Invalid job status: " + invalidStatus;
 
     OMException statusEx = assertThrows(OMException.class,
-        () -> store.listSnapshotDiffJobs(volume, bucket,
-            invalidStatus, false));
+        () -> store.listSnapshotDiffJobs(volume, bucket, invalidStatus, false, null));
     assertEquals(statusErrorMessage, statusEx.getMessage());
   }
 
