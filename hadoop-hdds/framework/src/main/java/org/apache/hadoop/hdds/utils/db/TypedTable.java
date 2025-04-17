@@ -463,6 +463,14 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public long getExactKeyCount() throws IOException {
+    if (cache.getCacheType() == CacheType.FULL_CACHE) {
+      return cache.size();
+    }
+    return rawTable.getExactKeyCount();
+  }
+
+  @Override
   public void close() throws Exception {
     rawTable.close();
 
