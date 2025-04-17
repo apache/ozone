@@ -503,7 +503,8 @@ public class TestOzoneManagerHASnapshot {
     // Ensure that the snapdiff is actually sent to the follower by comparing list of snapdiff jobs
     // with the OM follower metadata directly
     List<SnapshotDiffJob> snapshotDiffJobs =
-        finalNonLeaderOM.getOmSnapshotManager().getSnapshotDiffManager().getSnapshotDiffJobList(volumeName, bucketName, "", true);
+        finalNonLeaderOM.getOmSnapshotManager().getSnapshotDiffManager().getSnapshotDiffJobList(
+            volumeName, bucketName, "", true);
     assertEquals(snapshotDiffJobs.size(), originalFollowerSnapshotDiffJobs.size());
     for (int i = 0; i < snapshotDiffJobs.size(); i++) {
       OzoneSnapshotDiff clientSideDiff = originalFollowerSnapshotDiffJobs.get(i);
@@ -549,7 +550,8 @@ public class TestOzoneManagerHASnapshot {
     // Ensure that the snapdiff is actually sent to the follower by comparing list of snapdiff jobs
     // with the OM follower metadata directly
     snapshotDiffJobs =
-        finalNonLeaderOM.getOmSnapshotManager().getSnapshotDiffManager().getSnapshotDiffJobList(volumeName, bucketName, "", true);
+        finalNonLeaderOM.getOmSnapshotManager().getSnapshotDiffManager().getSnapshotDiffJobList(
+            volumeName, bucketName, "", true);
     assertEquals(snapshotDiffJobs.size(), followerSnapshotDiffJobs.size());
     for (int i = 0; i < snapshotDiffJobs.size(); i++) {
       OzoneSnapshotDiff clientSideDiff = followerSnapshotDiffJobs.get(i);
