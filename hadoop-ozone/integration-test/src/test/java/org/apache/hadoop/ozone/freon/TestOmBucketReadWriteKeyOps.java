@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.freon.TestOmBucketReadWriteFileOps.ParameterBuilder;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,7 +116,7 @@ public abstract class TestOmBucketReadWriteKeyOps implements NonHATests.TestCase
         parameterBuilder.getBucketArgs().setBucketLayout(BucketLayout.OBJECT_STORE).build()
     );
 
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     String om = cluster().getConf().get(OZONE_OM_ADDRESS_KEY);
     new Freon().getCmd().execute(
         "-D", OZONE_OM_ADDRESS_KEY + "=" + om,
@@ -132,7 +133,7 @@ public abstract class TestOmBucketReadWriteKeyOps implements NonHATests.TestCase
         "-R", String.valueOf(parameterBuilder.getNumOfReadOperations()),
         "-W", String.valueOf(parameterBuilder.getNumOfWriteOperations()),
         "-n", String.valueOf(1));
-    long totalTime = System.currentTimeMillis() - startTime;
+    long totalTime = Time.monotonicNow() - startTime;
     LOG.info("Total Execution Time: " + totalTime);
 
     LOG.info("Started verifying OM bucket read/write ops key generation...");

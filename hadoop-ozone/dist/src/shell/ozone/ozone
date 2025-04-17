@@ -37,6 +37,7 @@ function ozone_usage
   ozone_add_option "--validate (continue)" "validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present, command execution shall continue post validation failure if 'continue' is passed"
 
   ozone_add_subcommand "classpath" client "prints the class path needed for running ozone commands"
+  ozone_add_subcommand "completion" client "generate autocompletion script for bash/zsh"
   ozone_add_subcommand "datanode" daemon "run a HDDS datanode"
   ozone_add_subcommand "envvars" client "display computed Hadoop environment variables"
   ozone_add_subcommand "daemonlog" admin "get/set the log level for each daemon"
@@ -96,6 +97,10 @@ function ozonecmd_case
         ls -1 ${OZONE_HOME}/share/ozone/classpath/ | sed 's/.classpath//'
         exit -1
       fi
+    ;;
+    completion)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.utils.AutoCompletion;
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     datanode)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"

@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class OmKeyHSyncUtil {
 
-  public static final Logger LOG = LoggerFactory.getLogger(OmKeyHSyncUtil.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OmKeyHSyncUtil.class);
 
   private OmKeyHSyncUtil() {
   }

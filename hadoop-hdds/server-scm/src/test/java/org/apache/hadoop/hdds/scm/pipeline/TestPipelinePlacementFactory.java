@@ -111,7 +111,7 @@ public class TestPipelinePlacementFactory {
 
       StorageContainerDatanodeProtocolProtos.StorageReportProto storage1 =
           HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
       StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
           metaStorage1 =
@@ -128,7 +128,7 @@ public class TestPipelinePlacementFactory {
         false, 10);
     nodeManager = spy(nodeManagerBase);
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+      when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
 

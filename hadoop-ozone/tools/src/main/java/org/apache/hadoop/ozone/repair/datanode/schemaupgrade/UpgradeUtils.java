@@ -15,9 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.cli.container.upgrade;
-
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
+package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -26,19 +24,36 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
+import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
 
 /**
  * Utils functions to help upgrade v2 to v3 container functions.
  */
-public final class UpgradeUtils {
+final class UpgradeUtils {
+
+  public static final Set<String> COLUMN_FAMILY_NAMES = Collections.unmodifiableSet(
+      new DatanodeSchemaTwoDBDefinition("", new OzoneConfiguration())
+          .getMap().keySet());
+
+  public static final String BACKUP_CONTAINER_DATA_FILE_SUFFIX = ".backup";
+  public static final String UPGRADE_COMPLETE_FILE_NAME = "upgrade.complete";
+  public static final String UPGRADE_LOCK_FILE_NAME = "upgrade.lock";
 
   /** Never constructed. **/
   private UpgradeUtils() {
@@ -60,18 +75,12 @@ public final class UpgradeUtils {
     return ContainerUtils.readDatanodeDetailsFrom(idFile);
   }
 
-  public static File getContainerDBPath(HddsVolume volume) {
-    return new File(volume.getDbParentDir(), CONTAINER_DB_NAME);
-  }
-
   public static File getVolumeUpgradeCompleteFile(HddsVolume volume) {
-    return new File(volume.getHddsRootDir(),
-        UpgradeTask.UPGRADE_COMPLETE_FILE_NAME);
+    return new File(volume.getHddsRootDir(), UPGRADE_COMPLETE_FILE_NAME);
   }
 
   public static File getVolumeUpgradeLockFile(HddsVolume volume) {
-    return new File(volume.getHddsRootDir(),
-        UpgradeTask.UPGRADE_LOCK_FILE_NAME);
+    return new File(volume.getHddsRootDir(), UPGRADE_LOCK_FILE_NAME);
   }
 
   public static boolean createFile(File file) throws IOException {
@@ -83,4 +92,38 @@ public final class UpgradeUtils {
     return file.exists();
   }
 
+  public static Pair<HDDSLayoutFeature, HDDSLayoutFeature> getLayoutFeature(
+      DatanodeDetails dnDetail, OzoneConfiguration conf) throws IOException {
+    DatanodeLayoutStorage layoutStorage =
+        new DatanodeLayoutStorage(conf, dnDetail.getUuidString());
+    HDDSLayoutVersionManager layoutVersionManager =
+        new HDDSLayoutVersionManager(layoutStorage.getLayoutVersion());
+
+    final int metadataLayoutVersion =
+        layoutVersionManager.getMetadataLayoutVersion();
+    final HDDSLayoutFeature metadataLayoutFeature =
+        (HDDSLayoutFeature) layoutVersionManager.getFeature(
+            metadataLayoutVersion);
+
+    final int softwareLayoutVersion =
+        layoutVersionManager.getSoftwareLayoutVersion();
+    final HDDSLayoutFeature softwareLayoutFeature =
+        (HDDSLayoutFeature) layoutVersionManager.getFeature(
+            softwareLayoutVersion);
+
+    return Pair.of(softwareLayoutFeature, metadataLayoutFeature);
+  }
+
+  public static List<HddsVolume> getAllVolume(DatanodeDetails detail,
+      OzoneConfiguration configuration) throws IOException {
+    final MutableVolumeSet dataVolumeSet = getHddsVolumes(configuration, StorageVolume.VolumeType.DATA_VOLUME,
+            detail.getUuidString());
+    return StorageVolumeUtil.getHddsVolumesList(dataVolumeSet.getVolumesList());
+  }
+
+  public static boolean isAlreadyUpgraded(HddsVolume hddsVolume) {
+    final File migrateFile =
+        getVolumeUpgradeCompleteFile(hddsVolume);
+    return migrateFile.exists();
+  }
 }

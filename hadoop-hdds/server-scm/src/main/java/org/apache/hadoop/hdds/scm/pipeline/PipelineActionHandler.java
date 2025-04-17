@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 public class PipelineActionHandler
     implements EventHandler<PipelineActionsFromDatanode> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(PipelineActionHandler.class);
 
   private final PipelineManager pipelineManager;

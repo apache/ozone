@@ -31,7 +31,6 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -113,8 +112,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   // bits are set aside for this in ObjectID.
   private static final long MAX_NUM_OF_RECURSIVE_DIRS = 255;
 
-  @VisibleForTesting
-  public static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
+  protected static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 

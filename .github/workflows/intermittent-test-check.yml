@@ -28,6 +28,10 @@ on:
         description: Test Name
         default:  ALL
         required: false
+      submodule:
+        description: Submodule
+        default: 'AUTO'
+        required: true
       iterations:
         description: Number of Iterations per split
         default: 10
@@ -91,7 +95,7 @@ jobs:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
       ref: ${{ github.event.inputs.ratis-ref }}
   find-tests:
-    if: ${{ always() }}
+    if: ${{ always() && github.event.inputs.submodule == 'AUTO' }}
     needs:
       - prepare-job
     runs-on: ubuntu-24.04
@@ -143,6 +147,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
@@ -175,7 +181,9 @@ jobs:
             args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
 
-          if [[ -n "${{ needs.find-tests.outputs.modules }}" ]]; then
+          if [[ "${{ github.event.inputs.submodule }}" != "AUTO" ]]; then
+            args="$args -am -pl :${{ github.event.inputs.submodule }}"
+          elif [[ -n "${{ needs.find-tests.outputs.modules }}" ]]; then
             args="$args -am -pl ${{ needs.find-tests.outputs.modules }}"
           fi
 
@@ -248,7 +256,9 @@ jobs:
             args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
 
-          if [[ -n "${{ needs.find-tests.outputs.modules }}" ]]; then
+          if [[ "${{ github.event.inputs.submodule }}" != "AUTO" ]]; then
+            args="$args -pl :${{ github.event.inputs.submodule }}"
+          elif [[ -n "${{ needs.find-tests.outputs.modules }}" ]]; then
             args="$args -pl ${{ needs.find-tests.outputs.modules }}"
           fi
 

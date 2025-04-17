@@ -15,5 +15,5 @@
  * limitations under the License.
  */
 
-/** Helper classes for ozone and container tests. */
-package org.apache.hadoop.ozone.container.testutils;
+/** RocksDB related classes. */
+package org.apache.hadoop.hdds.utils.db;

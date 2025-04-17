@@ -56,12 +56,28 @@ import org.rocksdb.StatsLevel;
  * RDBStore Tests.
  */
 public class TestRDBStore {
+  static ManagedDBOptions newManagedDBOptions() {
+    final ManagedDBOptions options = new ManagedDBOptions();
+    options.setCreateIfMissing(true);
+    options.setCreateMissingColumnFamilies(true);
+
+    Statistics statistics = new Statistics();
+    statistics.setStatsLevel(StatsLevel.ALL);
+    options.setStatistics(statistics);
+    return options;
+  }
+
+  static RDBStore newRDBStore(File dbFile, ManagedDBOptions options, Set<TableConfig> families)
+      throws IOException {
+    return newRDBStore(dbFile, options, families, MAX_DB_UPDATES_SIZE_THRESHOLD);
+  }
+
   public static RDBStore newRDBStore(File dbFile, ManagedDBOptions options,
       Set<TableConfig> families,
       long maxDbUpdatesSizeThreshold)
       throws IOException {
     return new RDBStore(dbFile, options, null, new ManagedWriteOptions(), families,
-        CodecRegistry.newBuilder().build(), false, 1000, null, false,
+        CodecRegistry.newBuilder().build(), false, null, false,
         maxDbUpdatesSizeThreshold, true, null, true);
   }
 
@@ -72,20 +88,14 @@ public class TestRDBStore {
           "Fourth", "Fifth",
           "Sixth");
   private RDBStore rdbStore = null;
-  private ManagedDBOptions options = null;
+  private ManagedDBOptions options;
   private Set<TableConfig> configSet;
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
     CodecBuffer.enableLeakDetection();
 
-    options = new ManagedDBOptions();
-    options.setCreateIfMissing(true);
-    options.setCreateMissingColumnFamilies(true);
-
-    Statistics statistics = new Statistics();
-    statistics.setStatsLevel(StatsLevel.ALL);
-    options.setStatistics(statistics);
+    options = newManagedDBOptions();
     configSet = new HashSet<>();
     for (String name : families) {
       TableConfig newConfig = new TableConfig(name,

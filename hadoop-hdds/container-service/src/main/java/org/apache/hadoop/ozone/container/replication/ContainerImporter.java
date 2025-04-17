@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -71,15 +70,12 @@ public class ContainerImporter {
   public ContainerImporter(@Nonnull ConfigurationSource conf,
                            @Nonnull ContainerSet containerSet,
                            @Nonnull ContainerController controller,
-                           @Nonnull MutableVolumeSet volumeSet) {
+                           @Nonnull MutableVolumeSet volumeSet,
+                           @Nonnull VolumeChoosingPolicy volumeChoosingPolicy) {
     this.containerSet = containerSet;
     this.controller = controller;
     this.volumeSet = volumeSet;
-    try {
-      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    this.volumeChoosingPolicy = volumeChoosingPolicy;
     containerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);

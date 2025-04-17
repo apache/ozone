@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -50,7 +51,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -271,7 +271,7 @@ public class MockNodeManager implements NodeManager {
         long used = nodeMetricMap.get(dd).getScmUsed().get();
         long remaining = nodeMetricMap.get(dd).getRemaining().get();
         StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-            di.getUuid(), "/data1-" + di.getUuidString(),
+            di.getID(), "/data1-" + di.getUuidString(),
             capacity, used, remaining, null);
         MetadataStorageReportProto metaStorage1 =
             HddsTestUtils.createMetadataStorageReport(
@@ -617,15 +617,10 @@ public class MockNodeManager implements NodeManager {
 
   /**
    * Update set of containers available on a datanode.
-   * @param uuid - DatanodeID
-   * @param containerIds - Set of containerIDs
-   * @throws SCMException - if datanode is not known. For new datanode use
-   *                        addDatanodeInContainerMap call.
    */
-  @Override
   public void setContainers(DatanodeDetails uuid, Set<ContainerID> containerIds)
       throws NodeNotFoundException {
-    node2ContainerMap.setContainers(uuid.getID(), containerIds);
+    node2ContainerMap.setContainersForTesting(uuid.getID(), containerIds);
   }
 
   /**
@@ -704,10 +699,9 @@ public class MockNodeManager implements NodeManager {
                                     NodeReportProto nodeReport,
                                     PipelineReportsProto pipelineReportsProto,
                                     LayoutVersionProto layoutInfo) {
+    final DatanodeInfo info = new DatanodeInfo(datanodeDetails, NodeStatus.inServiceHealthy(), layoutInfo);
     try {
-      node2ContainerMap.addNode(datanodeDetails,
-          NodeStatus.inServiceHealthy(),
-          layoutInfo);
+      node2ContainerMap.addNode(info);
       addEntryTodnsToUuidMap(datanodeDetails.getIpAddress(),
           datanodeDetails.getUuidString());
       if (clusterMap != null) {
@@ -837,8 +831,8 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public DatanodeDetails getNodeByUuid(String uuid) {
-    Node node = clusterMap.getNode(NetConstants.DEFAULT_RACK + "/" + uuid);
+  public DatanodeDetails getNode(DatanodeID id) {
+    Node node = clusterMap.getNode(NetConstants.DEFAULT_RACK + "/" + id);
     return node == null ? null : (DatanodeDetails)node;
   }
 
@@ -850,7 +844,7 @@ public class MockNodeManager implements NodeManager {
       return results;
     }
     for (String uuid : uuids) {
-      DatanodeDetails dn = getNodeByUuid(uuid);
+      DatanodeDetails dn = getNode(DatanodeID.fromUuidString(uuid));
       if (dn != null) {
         results.add(dn);
       }

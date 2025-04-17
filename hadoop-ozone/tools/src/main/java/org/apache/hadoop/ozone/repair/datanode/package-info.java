@@ -16,6 +16,6 @@
  */
 
 /**
- * Contains all of the container related scm commands.
+ * Repair tools for Datanode.
  */
-package org.apache.hadoop.hdds.scm.cli.container.upgrade;
+package org.apache.hadoop.ozone.repair.datanode;
