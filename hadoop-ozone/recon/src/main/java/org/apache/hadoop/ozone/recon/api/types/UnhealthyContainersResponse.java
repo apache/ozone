@@ -50,6 +50,21 @@ public class UnhealthyContainersResponse {
   private long misReplicatedCount = 0;
 
   /**
+   * .
+   */
+  @JsonProperty("firstKey")
+  private long firstKey = 0;
+
+
+  /**
+   * Total count of mis-replicated containers.
+   */
+  @JsonProperty("lastKey")
+  private long lastKey = 0;
+
+
+
+  /**
    * A collection of unhealthy containers.
    */
   @JsonProperty("containers")
@@ -97,5 +112,13 @@ public class UnhealthyContainersResponse {
 
   public Collection<UnhealthyContainerMetadata> getContainers() {
     return containers;
+  }
+
+  public void setFirstKey(long firstKey) {
+    this.firstKey = firstKey;
+  }
+
+  public void setLastKey(long lastKey) {
+    this.lastKey = lastKey;
   }
 }
