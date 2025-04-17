@@ -101,6 +101,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final Map<ContainerType, Handler> handlers;
   private final ConfigurationSource conf;
   private final ContainerSet containerSet;
+  private final VolumeSet volumeSet;
   private final StateContext context;
   private final float containerCloseThreshold;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
@@ -124,6 +125,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     this.context = context;
     this.handlers = handlers;
     this.metrics = metrics;
+    this.volumeSet = volumes;
     this.containerCloseThreshold = conf.getFloat(
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD,
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD_DEFAULT);
@@ -419,7 +421,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // Create a specific exception that signals for on demand scanning
         // and move this general scan to where it is more appropriate.
         // Add integration tests to test the full functionality.
-        OnDemandContainerDataScanner.scanContainer(container);
+        OnDemandContainerDataScanner.scanContainer(container, volumeSet);
         audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
