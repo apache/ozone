@@ -55,7 +55,7 @@ import org.rocksdb.RocksDBException;
  * Test class for ReclaimableFilter testing general initializing of snapshot chain.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
+public class TestReclaimableFilter extends AbstractReclaimableFilterTest {
 
   @Override
   protected ReclaimableFilter initializeFilter(
