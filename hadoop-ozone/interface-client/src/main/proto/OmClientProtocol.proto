@@ -184,7 +184,7 @@ message OMRequest {
   // OM needs to rejects the request if it does not support it.
   // If isDirect flag is not specified (or set to false),
   // this means that this client request is expected to be sent to the leader.
-  optional string isDirect = 3000;
+  optional bool isDirect = 3000;
 
   optional CreateVolumeRequest              createVolumeRequest            = 11;
   optional SetVolumePropertyRequest         setVolumePropertyRequest       = 12;
