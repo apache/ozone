@@ -504,7 +504,7 @@ public class TestOMValidatorProcessor {
       Class<?> annotationClass,
       V applyBeforeVersion) {
     StringBuilder annotation = new StringBuilder();
-    annotation.append("@" + annotationClass.getName() + "(");
+    annotation.append("@").append(annotationClass.getName()).append("(");
     annotation.append("processingPhase = ").append(phase);
     annotation.append(", requestType = ").append(reqType.name());
     if (applyBeforeVersion != null) {
