@@ -33,13 +33,13 @@ import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
  * The methods annotated with this annotation are collected by the
  * {@link ValidatorRegistry} class during the initialization of the server.
  *
- * The conditions specify the specific use case in which the validator should be
- * applied to the request. See {@link VersionExtractor} for getting all the supported different
- * {@link org.apache.hadoop.ozone.Versioned}.
- * The validator method should be applied to just one specific request type
- * to help keep these methods simple and straightforward. If you want to use
- * the same validation for different request types, use inheritance, and
- * annotate the override method that just calls super.
+ * The conditions describe the specific use case in which the validator should be
+ * applied to the request.
+ * See {@link VersionExtractor} for getting all the supported different {@link org.apache.hadoop.ozone.Versioned} component's actual version.
+ * The validator method will be applied to the specified request type(s).
+ * To help keep these methods simple and straightforward use inheritance and annotate
+ * the override method that just calls the method defined in the parent instead of specifying
+ * multiple request types.
  * Note that the aim is to have these validators together with the request
  * processing code, so the handling of these specific situations are easy to
  * find.
@@ -50,10 +50,10 @@ import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
  * Its signature has to be the following:
  * - it has to be static and idempotent
  * - it has to have two parameters
- * - the first parameter it is an
+ * - the first parameter is an
  * {@link
  * org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest}
- * - the second parameter of type {@link ValidationContext}
+ * - the second parameter is a {@link ValidationContext}
  * - the method has to return the modified request, or throw a ServiceException
  *   in case the request is considered to be invalid
  * - the method does not need to care about preserving the request it gets,
@@ -90,15 +90,17 @@ public @interface OMLayoutVersionValidator {
   RequestProcessingPhase processingPhase();
 
   /**
-   * The type of the request handled by this validator method.
-   * @return the requestType to whihc the validator should be applied
+   * The type(s) of the request(s) handled by this validator method.
+   * In case you are considering to specify multiple request types, please read the note above on
+   * using multiple request types with this kind of validator method.
+   * @return the requestType(s) onto which the validator should be applied
    */
   Type[] requestType();
 
   /**
-   * The max version for which the validator would run. The validator would run for the request
-   * where the version is older than the excluding of the specified version.
-   * @returns the max layout version until which the validator runs excluding the specified version itself.
+   * The version before which the validator needs to run. The validator will run only for requests
+   * having a version which precedes the specified version.
+   * @returns the exclusive upper bound of the request's version under which the validator is applicable.
    */
   OMLayoutFeature applyBefore();
 
