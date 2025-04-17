@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.apache.ratis.server.metrics.SegmentedRaftLogMetrics;
 import org.apache.ratis.server.raftlog.segmented.LogSegment;
 import org.apache.ratis.server.raftlog.segmented.LogSegmentPath;
 import org.apache.ratis.server.raftlog.segmented.SegmentedRaftLogOutputStream;
@@ -144,6 +143,7 @@ public class OMRatisLogRepair extends RepairTool {
       Files.move(outputFile.toPath(), exclusiveArguments.segmentFile.toPath(),
           StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
+    info("Finished processing all the entries (" + entryCount + " logs) from the segment file.");
     info("Moved temporary output file to correct raft log location : " + exclusiveArguments.segmentFile.toPath());
 
     if (outputStream != null) {
