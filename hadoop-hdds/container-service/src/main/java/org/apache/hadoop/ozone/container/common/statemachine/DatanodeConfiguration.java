@@ -43,44 +43,30 @@ import org.slf4j.LoggerFactory;
 public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String CONFIG_PREFIX = "hdds.datanode";
 
-  private static final String BLOCK_DELETE_THREAD_MAX
-      = "block.delete.threads.max";
+  private static final String BLOCK_DELETE_THREAD_MAX = "block.delete.threads.max";
+
   public static final String HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX =
       CONFIG_PREFIX + "." + BLOCK_DELETE_THREAD_MAX;
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeConfiguration.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DatanodeConfiguration.class);
 
-  static final String CONTAINER_DELETE_THREADS_MAX_KEY =
-      "hdds.datanode.container.delete.threads.max";
-  static final String CONTAINER_CLOSE_THREADS_MAX_KEY =
-      "hdds.datanode.container.close.threads.max";
-  static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
-      "hdds.datanode.periodic.disk.check.interval.minutes";
-  public static final String DISK_CHECK_FILE_SIZE_KEY =
-      "hdds.datanode.disk.check.io.file.size";
-  public static final String DISK_CHECK_IO_TEST_COUNT_KEY =
-      "hdds.datanode.disk.check.io.test.count";
-  public static final String DISK_CHECK_IO_FAILURES_TOLERATED_KEY =
-      "hdds.datanode.disk.check.io.failures.tolerated";
-  public static final String FAILED_DATA_VOLUMES_TOLERATED_KEY =
-      "hdds.datanode.failed.data.volumes.tolerated";
-  public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY =
-      "hdds.datanode.failed.metadata.volumes.tolerated";
-  public static final String FAILED_DB_VOLUMES_TOLERATED_KEY =
-      "hdds.datanode.failed.db.volumes.tolerated";
-  public static final String DISK_CHECK_MIN_GAP_KEY =
-      "hdds.datanode.disk.check.min.gap";
-  public static final String DISK_CHECK_TIMEOUT_KEY =
-      "hdds.datanode.disk.check.timeout";
+  static final String CONTAINER_DELETE_THREADS_MAX_KEY = "hdds.datanode.container.delete.threads.max";
+  static final String CONTAINER_CLOSE_THREADS_MAX_KEY = "hdds.datanode.container.close.threads.max";
+  static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY = "hdds.datanode.periodic.disk.check.interval.minutes";
+  public static final String DISK_CHECK_FILE_SIZE_KEY = "hdds.datanode.disk.check.io.file.size";
+  public static final String DISK_CHECK_IO_TEST_COUNT_KEY = "hdds.datanode.disk.check.io.test.count";
+  public static final String DISK_CHECK_IO_FAILURES_TOLERATED_KEY = "hdds.datanode.disk.check.io.failures.tolerated";
+  public static final String FAILED_DATA_VOLUMES_TOLERATED_KEY = "hdds.datanode.failed.data.volumes.tolerated";
+  public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY = "hdds.datanode.failed.metadata.volumes.tolerated";
+  public static final String FAILED_DB_VOLUMES_TOLERATED_KEY = "hdds.datanode.failed.db.volumes.tolerated";
+  public static final String DISK_CHECK_MIN_GAP_KEY = "hdds.datanode.disk.check.min.gap";
+  public static final String DISK_CHECK_TIMEOUT_KEY = "hdds.datanode.disk.check.timeout";
 
   // Minimum space should be left on volume.
   // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
   // In this case when availableSpace is 10GB or below, volume is assumed as full
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
-      "hdds.datanode.volume.min.free.space";
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT =
-      "5GB";
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE = "hdds.datanode.volume.min.free.space";
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT = "5GB";
   // Minimum percent of space should be left on volume.
   // Ex: If volume has 1000GB and minFreeSpacePercent is configured as 2%,
   // In this case when availableSpace is 20GB(2% of 1000) or below, volume is assumed as full
@@ -88,10 +74,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       "hdds.datanode.volume.min.free.space.percent";
   static final byte MIN_FREE_SPACE_UNSET = -1;
 
-  public static final String WAIT_ON_ALL_FOLLOWERS =
-      "hdds.datanode.wait.on.all.followers";
-  public static final String CONTAINER_SCHEMA_V3_ENABLED =
-      "hdds.datanode.container.schema.v3.enabled";
+  public static final String WAIT_ON_ALL_FOLLOWERS = "hdds.datanode.wait.on.all.followers";
+  public static final String CONTAINER_SCHEMA_V3_ENABLED = "hdds.datanode.container.schema.v3.enabled";
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
@@ -115,23 +99,24 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
   static final int ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT = 64;
   // one hour
-  static final long ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT =
-      1L * 60 * 60 * 1000 * 1000;
+  static final long ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT = 1L * 60 * 60 * 1000 * 1000;
   static final int ROCKSDB_MAX_OPEN_FILES_DEFAULT = 1024;
-  public static final String ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY =
-      "hdds.datanode.rocksdb.log.max-file-size";
-  public static final String ROCKSDB_LOG_MAX_FILE_NUM_KEY =
-      "hdds.datanode.rocksdb.log.max-file-num";
-  public static final String
-      ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
+  public static final String ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY = "hdds.datanode.rocksdb.log.max-file-size";
+  public static final String ROCKSDB_LOG_MAX_FILE_NUM_KEY = "hdds.datanode.rocksdb.log.max-file-num";
+  public static final String ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
       "hdds.datanode.rocksdb.delete_obsolete_files_period";
-  public static final Boolean
-      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
+  public static final Boolean OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
 
-  private static final long
-      AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT = 120;
-  private static final int
-      AUTO_COMPACTION_SMALL_SST_FILE_THREADS_DEFAULT = 1;
+  private static final long AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT = 120;
+  private static final int AUTO_COMPACTION_SMALL_SST_FILE_THREADS_DEFAULT = 1;
+
+  static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
+  static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
+  static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
+
+  public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
+      "hdds.datanode.block.delete.command.worker.interval";
+  public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT = Duration.ofSeconds(2);
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -140,19 +125,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.INT,
       defaultValue = "10",
       tags = {DATANODE},
-      description = "Number of threads per volume that Datanode will use for " +
-          "reading replicated chunks."
+      description = "Number of threads per volume that Datanode will use for reading replicated chunks."
   )
   private int numReadThreadPerVolume = 10;
-
-  static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
-  static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
-  static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
-
-  public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
-      "hdds.datanode.block.delete.command.worker.interval";
-  public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT =
-      Duration.ofSeconds(2);
 
   /**
    * The maximum number of threads used to delete containers on a datanode
@@ -162,8 +137,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.INT,
       defaultValue = "2",
       tags = {DATANODE},
-      description = "The maximum number of threads used to delete containers " +
-          "on a datanode"
+      description = "The maximum number of threads used to delete containers on a datanode"
   )
   private int containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
 
@@ -175,8 +149,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.INT,
       defaultValue = "3",
       tags = {DATANODE},
-      description = "The maximum number of threads used to close containers " +
-          "on a datanode"
+      description = "The maximum number of threads used to close containers on a datanode"
   )
   private int containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
 
@@ -191,8 +164,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.INT,
       defaultValue = "5",
       tags = {DATANODE},
-      description = "The maximum number of threads used to handle delete " +
-          " blocks on a datanode"
+      description = "The maximum number of threads used to handle delete blocks on a datanode"
   )
   private int blockDeleteThreads = BLOCK_DELETE_THREADS_DEFAULT;
 
@@ -219,8 +191,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.TIME,
       defaultValue = "2s",
       tags = {DATANODE},
-      description = "The interval between DeleteCmdWorker execution of " +
-          "delete commands."
+      description = "The interval between DeleteCmdWorker execution of delete commands."
   )
   private Duration blockDeleteCommandWorkerInterval =
       BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
@@ -233,8 +204,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.INT,
       defaultValue = "5000",
       tags = {DATANODE},
-      description = "The default maximum number of commands in the queue " +
-          "and command type's sub-queue on a datanode"
+      description = "The default maximum number of commands in the queue and command type's sub-queue on a datanode"
   )
   private int cmdQueueLimit = 5000;
 
@@ -274,8 +244,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "100ms",
       type = ConfigType.TIME,
       tags = { DATANODE, ConfigTag.DELETION},
-      description = "Timeout for the thread used to process the delete" +
-          " block command to wait for the container lock."
+      description = "Timeout for the thread used to process the delete block command to wait for the container lock."
   )
   private long blockDeleteMaxLockWaitTimeoutMs = Duration.ofMillis(100).toMillis();
 
@@ -284,8 +253,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       reconfigurable = true,
       type = ConfigType.INT,
       tags = { ConfigTag.SCM, ConfigTag.DELETION },
-      description =
-          "Number of blocks to be deleted in an interval."
+      description = "Number of blocks to be deleted in an interval."
   )
   private int blockLimitPerInterval = 5000;
 
@@ -433,8 +401,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
-      description = "Enable safety checks such as checksum validation"
-          + " for Ratis calls."
+      description = "Enable safety checks such as checksum validation for Ratis calls."
   )
   private boolean isChunkDataValidationCheck =
       CHUNK_DATA_VALIDATION_CHECK_DEFAULT;
@@ -463,8 +430,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "|",
       type = ConfigType.STRING,
       tags = { DATANODE },
-      description = "The default separator between Container ID and container" +
-           " meta key name."
+      description = "The default separator between Container ID and container meta key name."
   )
   private String containerSchemaV3KeySeparator = "|";
 
@@ -472,8 +438,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "INFO",
       type = ConfigType.STRING,
       tags = { DATANODE },
-      description =
-          "The user log level of RocksDB(DEBUG/INFO/WARN/ERROR/FATAL))"
+      description = "The user log level of RocksDB(DEBUG/INFO/WARN/ERROR/FATAL))"
   )
   private String rocksdbLogLevel = "INFO";
 
@@ -481,8 +446,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "32MB",
       type = ConfigType.SIZE,
       tags = { DATANODE },
-      description = "The max size of each user log file of RocksDB. " +
-          "O means no size limit."
+      description = "The max size of each user log file of RocksDB. O means no size limit."
   )
   private long rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
 
@@ -501,8 +465,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "1h", timeUnit = MICROSECONDS,
       type = ConfigType.TIME,
       tags = { DATANODE },
-      description = "Periodicity when obsolete files get deleted. " +
-          "Default is 1h."
+      description = "Periodicity when obsolete files get deleted. Default is 1h."
   )
   private long rocksdbDeleteObsoleteFilesPeriod =
       ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
@@ -529,8 +492,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "1MB",
       type = ConfigType.SIZE,
       tags = { DATANODE },
-      description = "SST files smaller than this configuration will be " +
-          "auto compacted."
+      description = "SST files smaller than this configuration will be auto compacted."
   )
   private long autoCompactionSmallSstFileSize = 1024 * 1024;
 
@@ -538,8 +500,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "512",
       type = ConfigType.INT,
       tags = { DATANODE },
-      description = "Auto compaction will happen if the number of small SST " +
-          " files exceeds this threshold."
+      description = "Auto compaction will happen if the number of small SST files exceeds this threshold."
   )
   private int autoCompactionSmallSstFileNum = 512;
 
@@ -569,8 +530,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
       tags = { DATANODE },
-      description = "Boolean Flag to decide whether to check container " +
-          "directory or not to determine container is empty"
+      description = "Boolean Flag to decide whether to check container directory or not to determine container is empty"
   )
   private boolean bCheckEmptyContainerDir =
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT;
@@ -585,24 +545,227 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private long deleteContainerTimeoutMs = Duration.ofSeconds(60).toMillis();
 
+  @PostConstruct
+  public void validate() {
+    if (containerDeleteThreads < 1) {
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          CONTAINER_DELETE_THREADS_MAX_KEY,
+          containerDeleteThreads,
+          CONTAINER_DELETE_THREADS_DEFAULT);
+
+      containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
+    }
+
+    if (containerCloseThreads < 1) {
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          CONTAINER_CLOSE_THREADS_MAX_KEY,
+          containerCloseThreads,
+          CONTAINER_CLOSE_THREADS_DEFAULT);
+
+      containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
+    }
+
+    if (periodicDiskCheckIntervalMinutes < 1) {
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
+          periodicDiskCheckIntervalMinutes,
+          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT);
+
+      periodicDiskCheckIntervalMinutes = PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
+    }
+
+    if (failedDataVolumesTolerated < -1) {
+      LOG.warn("{} must be greater than -1 and was set to {}. Defaulting to {}",
+          FAILED_DATA_VOLUMES_TOLERATED_KEY,
+          failedDataVolumesTolerated,
+          FAILED_VOLUMES_TOLERATED_DEFAULT);
+
+      failedDataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+    }
+
+    if (failedMetadataVolumesTolerated < -1) {
+      LOG.warn("{} must be greater than -1 and was set to {}. Defaulting to {}",
+          FAILED_METADATA_VOLUMES_TOLERATED_KEY,
+          failedMetadataVolumesTolerated,
+          FAILED_VOLUMES_TOLERATED_DEFAULT);
+
+      failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+    }
+
+    if (failedDbVolumesTolerated < -1) {
+      LOG.warn("{} must be greater than -1 and was set to {}. Defaulting to {}",
+          FAILED_DB_VOLUMES_TOLERATED_KEY,
+          failedDbVolumesTolerated,
+          FAILED_VOLUMES_TOLERATED_DEFAULT);
+
+      failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+    }
+
+    if (volumeIOTestCount == 0) {
+      LOG.info("{} set to {}. Disk IO health tests have been disabled.",
+          DISK_CHECK_IO_TEST_COUNT_KEY,
+          volumeIOTestCount);
+    } else {
+      if (volumeIOTestCount < 0) {
+        LOG.warn("{} must be greater than 0 but was set to {}. Defaulting to {}",
+            DISK_CHECK_IO_TEST_COUNT_KEY,
+            volumeIOTestCount,
+            DISK_CHECK_IO_TEST_COUNT_DEFAULT);
+
+        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
+      }
+
+      if (volumeIOFailureTolerance < 0) {
+        LOG.warn("{} must be greater than or equal to 0 but was set to {}. Defaulting to {}",
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
+            volumeIOFailureTolerance,
+            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
+
+        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
+      }
+
+      if (volumeIOFailureTolerance >= volumeIOTestCount) {
+        LOG.warn("{} was set to {} but cannot be greater or equals to {} set to {}. Defaulting {} to {} and {} to {}",
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
+            volumeIOFailureTolerance,
+            DISK_CHECK_IO_TEST_COUNT_KEY,
+            volumeIOTestCount,
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
+            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
+            DISK_CHECK_IO_TEST_COUNT_KEY,
+            DISK_CHECK_IO_TEST_COUNT_DEFAULT);
+
+        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
+        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
+      }
+
+      if (volumeHealthCheckFileSize < 1) {
+        LOG.warn("{} must be at least 1 byte and was set to {}. Defaulting to {}",
+            DISK_CHECK_FILE_SIZE_KEY,
+            volumeHealthCheckFileSize,
+            DISK_CHECK_FILE_SIZE_DEFAULT);
+
+        volumeHealthCheckFileSize = DISK_CHECK_FILE_SIZE_DEFAULT;
+      }
+    }
+
+    if (diskCheckMinGap.isNegative()) {
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          DISK_CHECK_MIN_GAP_KEY,
+          diskCheckMinGap,
+          DISK_CHECK_MIN_GAP_DEFAULT);
+
+      diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
+    }
+
+    if (diskCheckTimeout.isNegative()) {
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          DISK_CHECK_TIMEOUT_KEY,
+          diskCheckTimeout,
+          DISK_CHECK_TIMEOUT_DEFAULT);
+
+      diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
+    }
+
+    if (blockDeleteCommandWorkerInterval.isNegative()) {
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
+          blockDeleteCommandWorkerInterval,
+          BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT);
+
+      blockDeleteCommandWorkerInterval = BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
+    }
+
+    if (rocksdbLogMaxFileSize < 0) {
+      LOG.warn("{} must be no less than zero and was set to {}. Defaulting to {}",
+          ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY,
+          rocksdbLogMaxFileSize,
+          ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT);
+
+      rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
+    }
+
+    if (rocksdbLogMaxFileNum <= 0) {
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          ROCKSDB_LOG_MAX_FILE_NUM_KEY,
+          rocksdbLogMaxFileNum,
+          ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT);
+
+      rocksdbLogMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
+    }
+
+    if (rocksdbDeleteObsoleteFilesPeriod <= 0) {
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY,
+          rocksdbDeleteObsoleteFilesPeriod,
+          ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT);
+
+      rocksdbDeleteObsoleteFilesPeriod = ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
+    }
+
+    validateMinFreeSpace();
+  }
+
+  /**
+   * If 'hdds.datanode.volume.min.free.space' is defined,
+   * it will be honored first. If it is not defined and
+   * 'hdds.datanode.volume.min.free.space.percent' is defined, it will honor this
+   * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
+   */
+  private void validateMinFreeSpace() {
+    if (minFreeSpaceRatio > 1) {
+      LOG.warn("{} = {} is invalid, should be between 0 and 1",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+          minFreeSpaceRatio);
+
+      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+    }
+
+    final boolean minFreeSpaceConfigured = minFreeSpace >= 0;
+    final boolean minFreeSpaceRatioConfigured = minFreeSpaceRatio >= 0;
+
+    if (minFreeSpaceConfigured && minFreeSpaceRatioConfigured) {
+      // Only one property should be configured.
+      // Since both properties are configured, HDDS_DATANODE_VOLUME_MIN_FREE_SPACE is used to determine minFreeSpace
+      LOG.warn("Only one of {}={} and {}={} should be set. With both set, {} value will be used.",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+          minFreeSpace,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+          minFreeSpaceRatio,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
+
+      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+    }
+
+    if (!minFreeSpaceConfigured && !minFreeSpaceRatioConfigured) {
+      // If both are not configured use defaultFreeSpace
+      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+      minFreeSpace = getDefaultFreeSpace();
+    }
+  }
+
   public Duration getBlockDeletionInterval() {
     return blockDeletionInterval;
-  }
-
-  public void setRecoveringContainerScrubInterval(Duration duration) {
-    recoveringContainerScrubInterval = duration;
-  }
-
-  public Duration getRecoveringContainerScrubInterval() {
-    return recoveringContainerScrubInterval;
   }
 
   public void setBlockDeletionInterval(Duration duration) {
     blockDeletionInterval = duration;
   }
 
+  public Duration getRecoveringContainerScrubInterval() {
+    return recoveringContainerScrubInterval;
+  }
+
+  public void setRecoveringContainerScrubInterval(Duration duration) {
+    recoveringContainerScrubInterval = duration;
+  }
+
   public int getBlockDeletionLimit() {
     return blockLimitPerInterval;
+  }
+
+  public void setBlockDeletionLimit(int limit) {
+    this.blockLimitPerInterval = limit;
   }
 
   public long getDeleteContainerTimeoutMs() {
@@ -625,196 +788,20 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     this.waitOnAllFollowers = val;
   }
 
-  public void setBlockDeletionLimit(int limit) {
-    this.blockLimitPerInterval = limit;
-  }
-
-  @PostConstruct
-  public void validate() {
-    if (containerDeleteThreads < 1) {
-      LOG.warn(CONTAINER_DELETE_THREADS_MAX_KEY + " must be greater than zero" +
-              " and was set to {}. Defaulting to {}",
-          containerDeleteThreads, CONTAINER_DELETE_THREADS_DEFAULT);
-      containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
-    }
-
-    if (containerCloseThreads < 1) {
-      LOG.warn(CONTAINER_CLOSE_THREADS_MAX_KEY + " must be greater than zero" +
-              " and was set to {}. Defaulting to {}",
-          containerCloseThreads, CONTAINER_CLOSE_THREADS_DEFAULT);
-      containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
-    }
-
-    if (periodicDiskCheckIntervalMinutes < 1) {
-      LOG.warn(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY +
-              " must be greater than zero and was set to {}. Defaulting to {}",
-          periodicDiskCheckIntervalMinutes,
-          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT);
-      periodicDiskCheckIntervalMinutes =
-          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
-    }
-
-    if (failedDataVolumesTolerated < -1) {
-      LOG.warn(FAILED_DATA_VOLUMES_TOLERATED_KEY +
-          "must be greater than -1 and was set to {}. Defaulting to {}",
-          failedDataVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
-      failedDataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
-    }
-
-    if (failedMetadataVolumesTolerated < -1) {
-      LOG.warn(FAILED_METADATA_VOLUMES_TOLERATED_KEY +
-              "must be greater than -1 and was set to {}. Defaulting to {}",
-          failedMetadataVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
-      failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
-    }
-
-    if (failedDbVolumesTolerated < -1) {
-      LOG.warn(FAILED_DB_VOLUMES_TOLERATED_KEY +
-              "must be greater than -1 and was set to {}. Defaulting to {}",
-          failedDbVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
-      failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
-    }
-
-    if (volumeIOTestCount == 0) {
-      LOG.info("{} set to {}. Disk IO health tests have been disabled.",
-          DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount);
-    } else {
-      if (volumeIOTestCount < 0) {
-        LOG.warn("{} must be greater than 0 but was set to {}." +
-                "Defaulting to {}",
-            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
-            DISK_CHECK_IO_TEST_COUNT_DEFAULT);
-        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
-      }
-
-      if (volumeIOFailureTolerance < 0) {
-        LOG.warn("{} must be greater than or equal to 0 but was set to {}. " +
-                "Defaulting to {}",
-            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
-            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
-        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
-      }
-
-      if (volumeIOFailureTolerance >= volumeIOTestCount) {
-        LOG.warn("{} was set to {} but cannot be greater or equals to {} " +
-                "set to {}. Defaulting {} to {} and {} to {}",
-            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
-            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
-            DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
-            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
-            DISK_CHECK_IO_TEST_COUNT_KEY, DISK_CHECK_IO_TEST_COUNT_DEFAULT);
-        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
-        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
-      }
-
-      if (volumeHealthCheckFileSize < 1) {
-        LOG.warn(DISK_CHECK_FILE_SIZE_KEY +
-                "must be at least 1 byte and was set to {}. Defaulting to {}",
-            volumeHealthCheckFileSize,
-            DISK_CHECK_FILE_SIZE_DEFAULT);
-        volumeHealthCheckFileSize =
-            DISK_CHECK_FILE_SIZE_DEFAULT;
-      }
-    }
-
-    if (diskCheckMinGap.isNegative()) {
-      LOG.warn(DISK_CHECK_MIN_GAP_KEY +
-              " must be greater than zero and was set to {}. Defaulting to {}",
-          diskCheckMinGap, DISK_CHECK_MIN_GAP_DEFAULT);
-      diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
-    }
-
-    if (diskCheckTimeout.isNegative()) {
-      LOG.warn(DISK_CHECK_TIMEOUT_KEY +
-              " must be greater than zero and was set to {}. Defaulting to {}",
-          diskCheckTimeout, DISK_CHECK_TIMEOUT_DEFAULT);
-      diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
-    }
-
-    if (blockDeleteCommandWorkerInterval.isNegative()) {
-      LOG.warn(BLOCK_DELETE_COMMAND_WORKER_INTERVAL +
-          " must be greater than zero and was set to {}. Defaulting to {}",
-          blockDeleteCommandWorkerInterval,
-          BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT);
-      blockDeleteCommandWorkerInterval =
-          BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
-    }
-
-    if (rocksdbLogMaxFileSize < 0) {
-      LOG.warn(ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY +
-              " must be no less than zero and was set to {}. Defaulting to {}",
-          rocksdbLogMaxFileSize, ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT);
-      rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
-    }
-
-    if (rocksdbLogMaxFileNum <= 0) {
-      LOG.warn(ROCKSDB_LOG_MAX_FILE_NUM_KEY +
-              " must be greater than zero and was set to {}. Defaulting to {}",
-          rocksdbLogMaxFileNum, ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT);
-      rocksdbLogMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
-    }
-
-    if (rocksdbDeleteObsoleteFilesPeriod <= 0) {
-      LOG.warn(ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY +
-              " must be greater than zero and was set to {}. Defaulting to {}",
-          rocksdbDeleteObsoleteFilesPeriod,
-          ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT);
-      rocksdbDeleteObsoleteFilesPeriod =
-          ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
-    }
-
-    validateMinFreeSpace();
-  }
-
-  /**
-   * If 'hdds.datanode.volume.min.free.space' is defined,
-   * it will be honored first. If it is not defined and
-   * 'hdds.datanode.volume.min.free.space.percent' is defined, it will honor this
-   * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
-   */
-  private void validateMinFreeSpace() {
-    if (minFreeSpaceRatio > 1) {
-      LOG.warn("{} = {} is invalid, should be between 0 and 1",
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, minFreeSpaceRatio);
-      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
-    }
-
-    final boolean minFreeSpaceConfigured = minFreeSpace >= 0;
-    final boolean minFreeSpaceRatioConfigured = minFreeSpaceRatio >= 0;
-
-    if (minFreeSpaceConfigured && minFreeSpaceRatioConfigured) {
-      // Only one property should be configured.
-      // Since both properties are configured, HDDS_DATANODE_VOLUME_MIN_FREE_SPACE is used to determine minFreeSpace
-      LOG.warn("Only one of {}={} and {}={} should be set. With both set, {} value will be used.",
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
-          minFreeSpace,
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
-          minFreeSpaceRatio,
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
-      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
-    }
-
-    if (!minFreeSpaceConfigured && !minFreeSpaceRatioConfigured) {
-      // If both are not configured use defaultFreeSpace
-      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
-      minFreeSpace = getDefaultFreeSpace();
-    }
+  public int getContainerDeleteThreads() {
+    return containerDeleteThreads;
   }
 
   public void setContainerDeleteThreads(int containerDeleteThreads) {
     this.containerDeleteThreads = containerDeleteThreads;
   }
 
-  public int getContainerDeleteThreads() {
-    return containerDeleteThreads;
+  public int getContainerCloseThreads() {
+    return containerCloseThreads;
   }
 
   public void setContainerCloseThreads(int containerCloseThreads) {
     this.containerCloseThreads = containerCloseThreads;
-  }
-
-  public int getContainerCloseThreads() {
-    return containerCloseThreads;
   }
 
   public long getMinFreeSpace(long capacity) {
@@ -835,8 +822,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     return periodicDiskCheckIntervalMinutes;
   }
 
-  public void setPeriodicDiskCheckIntervalMinutes(
-      long periodicDiskCheckIntervalMinutes) {
+  public void setPeriodicDiskCheckIntervalMinutes(long periodicDiskCheckIntervalMinutes) {
     this.periodicDiskCheckIntervalMinutes = periodicDiskCheckIntervalMinutes;
   }
 
@@ -920,12 +906,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     return blockDeleteQueueLimit;
   }
 
-  public long getBlockDeleteMaxLockWaitTimeoutMs() {
-    return blockDeleteMaxLockWaitTimeoutMs;
-  }
-
   public void setBlockDeleteQueueLimit(int queueLimit) {
     this.blockDeleteQueueLimit = queueLimit;
+  }
+
+  public long getBlockDeleteMaxLockWaitTimeoutMs() {
+    return blockDeleteMaxLockWaitTimeoutMs;
   }
 
   public Duration getBlockDeleteCommandWorkerInterval() {
@@ -953,12 +939,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     isChunkDataValidationCheck = writeChunkValidationCheck;
   }
 
-  public void setNumReadThreadPerVolume(int threads) {
-    this.numReadThreadPerVolume = threads;
-  }
-
   public int getNumReadThreadPerVolume() {
     return numReadThreadPerVolume;
+  }
+
+  public void setNumReadThreadPerVolume(int threads) {
+    this.numReadThreadPerVolume = threads;
   }
 
   public boolean getContainerSchemaV3Enabled() {
@@ -1045,8 +1031,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     return autoCompactionSmallSstFileIntervalMinutes;
   }
 
-  public void setAutoCompactionSmallSstFileIntervalMinutes(
-      long autoCompactionSmallSstFileIntervalMinutes) {
+  public void setAutoCompactionSmallSstFileIntervalMinutes(long autoCompactionSmallSstFileIntervalMinutes) {
     this.autoCompactionSmallSstFileIntervalMinutes =
         autoCompactionSmallSstFileIntervalMinutes;
   }
@@ -1055,8 +1040,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     return autoCompactionSmallSstFileThreads;
   }
 
-  public void setAutoCompactionSmallSstFileThreads(
-      int autoCompactionSmallSstFileThreads) {
+  public void setAutoCompactionSmallSstFileThreads(int autoCompactionSmallSstFileThreads) {
     this.autoCompactionSmallSstFileThreads =
         autoCompactionSmallSstFileThreads;
   }
@@ -1065,5 +1049,4 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     final StorageSize measure = StorageSize.parse(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
     return Math.round(measure.getUnit().toBytes(measure.getValue()));
   }
-
 }

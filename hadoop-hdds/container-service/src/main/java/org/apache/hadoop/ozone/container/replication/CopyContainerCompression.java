@@ -53,9 +53,9 @@ public enum CopyContainerCompression {
 
   private static final Logger LOG = LoggerFactory.getLogger(CopyContainerCompression.class);
 
-  private final String compressorFactoryName;
-
   private static final CopyContainerCompression DEFAULT_COMPRESSION = CopyContainerCompression.NO_COMPRESSION;
+
+  private final String compressorFactoryName;
 
   CopyContainerCompression(String compressorFactoryName) {
     this.compressorFactoryName = compressorFactoryName;

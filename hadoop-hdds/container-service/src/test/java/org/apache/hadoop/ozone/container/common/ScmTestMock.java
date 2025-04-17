@@ -58,9 +58,7 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   private String scmId;
 
   // Map of datanode to containers
-  private Map<DatanodeDetails,
-      Map<String, ContainerReplicaProto>> nodeContainers =
-      new HashMap<>();
+  private Map<DatanodeDetails, Map<String, ContainerReplicaProto>> nodeContainers = new HashMap<>();
   private Map<DatanodeDetails, NodeReportProto> nodeReports = new HashMap<>();
   private AtomicInteger commandStatusReport = new AtomicInteger(0);
   private List<CommandStatus> cmdStatusList = new ArrayList<>();
@@ -325,7 +323,6 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
     rpcCount.set(0);
     containerReportsCount.set(0);
     nodeContainers.clear();
-
   }
 
   public int getCommandStatusReportCount() {
