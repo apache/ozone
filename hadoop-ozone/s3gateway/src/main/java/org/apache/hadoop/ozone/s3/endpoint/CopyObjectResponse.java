@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.s3.commontypes.IsoDateAdapter;
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "CopyObjectResult",
-    namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    namespace = OzoneConsts.S3_NAMESPACE_URL)
 public class CopyObjectResponse {
 
   @XmlJavaTypeAdapter(IsoDateAdapter.class)

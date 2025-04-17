@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "CompleteMultipartUploadResult", namespace =
-    "http://s3.amazonaws.com/doc/2006-03-01/")
+    OzoneConsts.S3_NAMESPACE_URL)
 public class CompleteMultipartUploadResponse {
 
   @XmlElement(name = "Location")
