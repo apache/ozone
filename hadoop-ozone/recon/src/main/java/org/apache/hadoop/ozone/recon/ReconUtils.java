@@ -300,7 +300,7 @@ public class ReconUtils {
    * <pre>
    * {@code
    * Examples:
-   * - Input: "volume/bucket/key" -> Output: "/volumeID/bucketID/parentDirID/key"
+   * - Input: "volume/bucket/key" -> Output: "/volumeID/bucketID/bucketID/key"
    * - Input: "volume/bucket/dir1" -> Output: "/volumeID/bucketID/dir1ID/"
    * - Input: "volume/bucket/dir1/key1" -> Output: "/volumeID/bucketID/dir1ID/key1"
    * - Input: "volume/bucket/dir1/dir2" -> Output: "/volumeID/bucketID/dir2ID/"
@@ -311,16 +311,15 @@ public class ReconUtils {
    * @throws IOException If database access fails.
    * @throws IllegalArgumentException If the provided path is invalid or cannot be converted.
    */
-  public static String convertToObjectPathForOpenKeySearch(String prevKeyPrefix,
-                                                           ReconOMMetadataManager omMetadataManager,
-                                                           ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                                           OzoneStorageContainerManager reconSCM)
+  public static String convertToObjectPathForSearch(String prevKeyPrefix,
+                                                    ReconOMMetadataManager omMetadataManager,
+                                                    ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                                    OzoneStorageContainerManager reconSCM,
+                                                    Table<String, OmKeyInfo> table)
       throws IOException {
     try {
       String[] names = EntityHandler.parseRequestPath(EntityHandler.normalizePath(
           prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
-      Table<String, OmKeyInfo> openFileTable = omMetadataManager.getOpenKeyTable(
-          BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
       // Root-Level: Return the original path
       if (names.length == 0 || names[0].isEmpty()) {
@@ -363,7 +362,7 @@ public class ReconUtils {
         long dirID = handler.getDirObjectId(names, names.length);
         String keyKey = constructObjectPathWithPrefix(volumeId, bucketId, dirID) +
             OM_KEY_PREFIX + lastEntiry;
-        OmKeyInfo keyInfo = openFileTable.getSkipCache(keyKey);
+        OmKeyInfo keyInfo = table.getSkipCache(keyKey);
         if (keyInfo != null && keyInfo.getFileName().equals(lastEntiry)) {
           return constructObjectPathWithPrefix(volumeId, bucketId,
               keyInfo.getParentObjectID()) + OM_KEY_PREFIX + lastEntiry;
