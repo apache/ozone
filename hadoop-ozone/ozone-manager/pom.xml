@@ -208,6 +208,11 @@
           <artifactId>jersey-bundle</artifactId>
         </exclusion>
         <exclusion>
+          <!-- depend on jcl-over-slf4j instead -->
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
