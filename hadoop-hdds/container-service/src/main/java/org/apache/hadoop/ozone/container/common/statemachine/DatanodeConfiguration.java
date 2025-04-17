@@ -548,159 +548,135 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {
-      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
-          CONTAINER_DELETE_THREADS_MAX_KEY,
-          containerDeleteThreads,
-          CONTAINER_DELETE_THREADS_DEFAULT);
-
+      LOG.warn(CONTAINER_DELETE_THREADS_MAX_KEY + " must be greater than zero" +
+              " and was set to {}. Defaulting to {}",
+          containerDeleteThreads, CONTAINER_DELETE_THREADS_DEFAULT);
       containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
     }
 
     if (containerCloseThreads < 1) {
-      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
-          CONTAINER_CLOSE_THREADS_MAX_KEY,
-          containerCloseThreads,
-          CONTAINER_CLOSE_THREADS_DEFAULT);
-
+      LOG.warn(CONTAINER_CLOSE_THREADS_MAX_KEY + " must be greater than zero" +
+              " and was set to {}. Defaulting to {}",
+          containerCloseThreads, CONTAINER_CLOSE_THREADS_DEFAULT);
       containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
     }
 
     if (periodicDiskCheckIntervalMinutes < 1) {
-      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
-          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
+      LOG.warn(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY +
+              " must be greater than zero and was set to {}. Defaulting to {}",
           periodicDiskCheckIntervalMinutes,
           PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT);
-
-      periodicDiskCheckIntervalMinutes = PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
+      periodicDiskCheckIntervalMinutes =
+          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
     }
 
     if (failedDataVolumesTolerated < -1) {
-      LOG.warn("{} must be greater than -1 and was set to {}. Defaulting to {}",
-          FAILED_DATA_VOLUMES_TOLERATED_KEY,
-          failedDataVolumesTolerated,
-          FAILED_VOLUMES_TOLERATED_DEFAULT);
-
+      LOG.warn(FAILED_DATA_VOLUMES_TOLERATED_KEY +
+          "must be greater than -1 and was set to {}. Defaulting to {}",
+          failedDataVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
       failedDataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
     if (failedMetadataVolumesTolerated < -1) {
-      LOG.warn("{} must be greater than -1 and was set to {}. Defaulting to {}",
-          FAILED_METADATA_VOLUMES_TOLERATED_KEY,
-          failedMetadataVolumesTolerated,
-          FAILED_VOLUMES_TOLERATED_DEFAULT);
-
+      LOG.warn(FAILED_METADATA_VOLUMES_TOLERATED_KEY +
+              "must be greater than -1 and was set to {}. Defaulting to {}",
+          failedMetadataVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
       failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
     if (failedDbVolumesTolerated < -1) {
-      LOG.warn("{} must be greater than -1 and was set to {}. Defaulting to {}",
-          FAILED_DB_VOLUMES_TOLERATED_KEY,
-          failedDbVolumesTolerated,
-          FAILED_VOLUMES_TOLERATED_DEFAULT);
-
+      LOG.warn(FAILED_DB_VOLUMES_TOLERATED_KEY +
+              "must be greater than -1 and was set to {}. Defaulting to {}",
+          failedDbVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
       failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
     if (volumeIOTestCount == 0) {
       LOG.info("{} set to {}. Disk IO health tests have been disabled.",
-          DISK_CHECK_IO_TEST_COUNT_KEY,
-          volumeIOTestCount);
+          DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount);
     } else {
       if (volumeIOTestCount < 0) {
-        LOG.warn("{} must be greater than 0 but was set to {}. Defaulting to {}",
-            DISK_CHECK_IO_TEST_COUNT_KEY,
-            volumeIOTestCount,
+        LOG.warn("{} must be greater than 0 but was set to {}." +
+                "Defaulting to {}",
+            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
             DISK_CHECK_IO_TEST_COUNT_DEFAULT);
-
         volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
       }
 
       if (volumeIOFailureTolerance < 0) {
-        LOG.warn("{} must be greater than or equal to 0 but was set to {}. Defaulting to {}",
-            DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
-            volumeIOFailureTolerance,
+        LOG.warn("{} must be greater than or equal to 0 but was set to {}. " +
+                "Defaulting to {}",
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
             DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
-
         volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
       }
 
       if (volumeIOFailureTolerance >= volumeIOTestCount) {
-        LOG.warn("{} was set to {} but cannot be greater or equals to {} set to {}. Defaulting {} to {} and {} to {}",
-            DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
-            volumeIOFailureTolerance,
-            DISK_CHECK_IO_TEST_COUNT_KEY,
-            volumeIOTestCount,
+        LOG.warn("{} was set to {} but cannot be greater or equals to {} " +
+                "set to {}. Defaulting {} to {} and {} to {}",
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
+            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
             DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
             DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
-            DISK_CHECK_IO_TEST_COUNT_KEY,
-            DISK_CHECK_IO_TEST_COUNT_DEFAULT);
-
+            DISK_CHECK_IO_TEST_COUNT_KEY, DISK_CHECK_IO_TEST_COUNT_DEFAULT);
         volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
         volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
       }
 
       if (volumeHealthCheckFileSize < 1) {
-        LOG.warn("{} must be at least 1 byte and was set to {}. Defaulting to {}",
-            DISK_CHECK_FILE_SIZE_KEY,
+        LOG.warn(DISK_CHECK_FILE_SIZE_KEY +
+                "must be at least 1 byte and was set to {}. Defaulting to {}",
             volumeHealthCheckFileSize,
             DISK_CHECK_FILE_SIZE_DEFAULT);
-
-        volumeHealthCheckFileSize = DISK_CHECK_FILE_SIZE_DEFAULT;
+        volumeHealthCheckFileSize =
+            DISK_CHECK_FILE_SIZE_DEFAULT;
       }
     }
 
     if (diskCheckMinGap.isNegative()) {
-      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
-          DISK_CHECK_MIN_GAP_KEY,
-          diskCheckMinGap,
-          DISK_CHECK_MIN_GAP_DEFAULT);
-
+      LOG.warn(DISK_CHECK_MIN_GAP_KEY +
+              " must be greater than zero and was set to {}. Defaulting to {}",
+          diskCheckMinGap, DISK_CHECK_MIN_GAP_DEFAULT);
       diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
     }
 
     if (diskCheckTimeout.isNegative()) {
-      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
-          DISK_CHECK_TIMEOUT_KEY,
-          diskCheckTimeout,
-          DISK_CHECK_TIMEOUT_DEFAULT);
-
+      LOG.warn(DISK_CHECK_TIMEOUT_KEY +
+              " must be greater than zero and was set to {}. Defaulting to {}",
+          diskCheckTimeout, DISK_CHECK_TIMEOUT_DEFAULT);
       diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
     }
 
     if (blockDeleteCommandWorkerInterval.isNegative()) {
-      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
-          BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
+      LOG.warn(BLOCK_DELETE_COMMAND_WORKER_INTERVAL +
+          " must be greater than zero and was set to {}. Defaulting to {}",
           blockDeleteCommandWorkerInterval,
           BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT);
-
-      blockDeleteCommandWorkerInterval = BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
+      blockDeleteCommandWorkerInterval =
+          BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
     }
 
     if (rocksdbLogMaxFileSize < 0) {
-      LOG.warn("{} must be no less than zero and was set to {}. Defaulting to {}",
-          ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY,
-          rocksdbLogMaxFileSize,
-          ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT);
-
+      LOG.warn(ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY +
+              " must be no less than zero and was set to {}. Defaulting to {}",
+          rocksdbLogMaxFileSize, ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT);
       rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
     }
 
     if (rocksdbLogMaxFileNum <= 0) {
-      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
-          ROCKSDB_LOG_MAX_FILE_NUM_KEY,
-          rocksdbLogMaxFileNum,
-          ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT);
-
+      LOG.warn(ROCKSDB_LOG_MAX_FILE_NUM_KEY +
+              " must be greater than zero and was set to {}. Defaulting to {}",
+          rocksdbLogMaxFileNum, ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT);
       rocksdbLogMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
     }
 
     if (rocksdbDeleteObsoleteFilesPeriod <= 0) {
-      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
-          ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY,
+      LOG.warn(ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY +
+              " must be greater than zero and was set to {}. Defaulting to {}",
           rocksdbDeleteObsoleteFilesPeriod,
           ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT);
-
-      rocksdbDeleteObsoleteFilesPeriod = ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
+      rocksdbDeleteObsoleteFilesPeriod =
+          ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
     }
 
     validateMinFreeSpace();
