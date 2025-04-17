@@ -1438,13 +1438,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private ListSnapshotDiffJobResponse listSnapshotDiffJobs(
       ListSnapshotDiffJobRequest listSnapshotDiffJobRequest
   ) throws IOException {
+    String prevSnapshotDiffJob = listSnapshotDiffJobRequest.hasPrevSnapshotDiffJob() ?
+        listSnapshotDiffJobRequest.getPrevSnapshotDiffJob() : null;
+    int maxListResult = listSnapshotDiffJobRequest.hasMaxListResult() ?
+        listSnapshotDiffJobRequest.getMaxListResult() : impl.getOmSnapshotManager().getMaxPageSize();
+
     org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse response = impl.listSnapshotDiffJobs(
         listSnapshotDiffJobRequest.getVolumeName(),
         listSnapshotDiffJobRequest.getBucketName(),
         listSnapshotDiffJobRequest.getJobStatus(),
         listSnapshotDiffJobRequest.getListAll(),
-        listSnapshotDiffJobRequest.getPrevSnapshotDiffJob(),
-        listSnapshotDiffJobRequest.getMaxListResult());
+        prevSnapshotDiffJob,
+        maxListResult);
 
     ListSnapshotDiffJobResponse.Builder builder = ListSnapshotDiffJobResponse.newBuilder();
 

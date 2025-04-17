@@ -413,6 +413,10 @@ public final class OmSnapshotManager implements AutoCloseable {
     return registry.build();
   }
 
+  public int getMaxPageSize() {
+    return maxPageSize;
+  }
+
   /**
    * Get snapshot instance LRU cache size.
    * @return cache size.
