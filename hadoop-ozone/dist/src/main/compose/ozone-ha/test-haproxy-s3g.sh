@@ -35,6 +35,6 @@ exclude="--exclude virtual-host"
 for bucket in generated; do
   execute_robot_test ${SCM} -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
   # some tests are independent of the bucket type, only need to be run once
-  ## Exclude virtual-host.robot
+  ## Exclude awss3virtualhost.robot
   exclude="--exclude virtual-host --exclude no-bucket-type"
 done
