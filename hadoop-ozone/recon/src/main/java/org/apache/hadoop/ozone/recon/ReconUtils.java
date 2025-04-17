@@ -434,6 +434,7 @@ public class ReconUtils {
    */
   public File getLastKnownDB(File reconDbDir, String fileNamePrefix) {
     String lastKnownSnapshotFileName = null;
+    File lastKnownSnapshotFile = null;
     long lastKnonwnSnapshotTs = Long.MIN_VALUE;
     if (reconDbDir != null) {
       File[] snapshotFiles = reconDbDir.listFiles((dir, name) ->
@@ -448,8 +449,17 @@ public class ReconUtils {
             }
             long snapshotTimestamp = Long.parseLong(fileNameSplits[1]);
             if (lastKnonwnSnapshotTs < snapshotTimestamp) {
+              if (lastKnownSnapshotFile != null) {
+                try {
+                  FileUtils.deleteDirectory(lastKnownSnapshotFile);
+                } catch (IOException e) {
+                  log.warn("Error deleting existing om db snapshot directory: {}",
+                      lastKnownSnapshotFile.getAbsolutePath());
+                }
+              }
               lastKnonwnSnapshotTs = snapshotTimestamp;
               lastKnownSnapshotFileName = fileName;
+              lastKnownSnapshotFile = snapshotFile;
             }
           } catch (NumberFormatException nfEx) {
             log.warn("Unknown file found in Recon DB dir : {}", fileName);
