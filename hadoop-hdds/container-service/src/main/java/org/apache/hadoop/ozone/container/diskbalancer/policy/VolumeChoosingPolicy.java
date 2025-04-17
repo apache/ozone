@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
-import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -31,9 +30,8 @@ public interface VolumeChoosingPolicy {
    *
    * @param volumeSet - volumes to choose from.
    * @param threshold - the threshold to choose source and dest volumes.
-   * @param deltaSizes - the sizes changes of inProgress balancing jobs.
    * @return Source volume and Dest volume.
    */
   Pair<HddsVolume, HddsVolume> chooseVolume(MutableVolumeSet volumeSet,
-      double threshold, Map<HddsVolume, Long> deltaSizes);
+      double threshold);
 }
