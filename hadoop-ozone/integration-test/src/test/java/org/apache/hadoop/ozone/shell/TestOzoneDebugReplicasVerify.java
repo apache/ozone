@@ -48,19 +48,16 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -75,42 +72,34 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCase {
   private static final Logger LOG = LoggerFactory.getLogger(TestOzoneDebugReplicasVerify.class);
+  private static final String CHUNKS_DIR_NAME = "chunks";
+  private static final String BLOCK_FILE_EXTENSION = ".block";
 
   @TempDir
-  private static File tempDir;
-  private static StringWriter out;
-  private static StringWriter err;
-
-  private static OzoneDebug ozoneDebugShell;
-  private static OzoneClient client;
-  private static ObjectStore store = null;
-  private static String volume;
-  private static String bucket;
-  private static String key;
-  private static String ozoneAddress;
-
-  @BeforeAll
-  public static void setup() throws IOException {
-    LOG.info("Saving data to: {}", tempDir.getAbsolutePath());
-  }
+  private File tempDir;
+  private OzoneDebug ozoneDebugShell;
+  private String volume;
+  private String bucket;
+  private String key;
+  private String ozoneAddress;
+  private StringWriter err;
+  private StringWriter out;
 
   @BeforeEach
-  void init() throws Exception {
+  void init() {
     out = new StringWriter();
     err = new StringWriter();
     ozoneDebugShell = new OzoneDebug();
     ozoneDebugShell.getCmd().setOut(new PrintWriter(out));
     ozoneDebugShell.getCmd().setErr(new PrintWriter(err));
-    client = cluster().newClient();
-    store = client.getObjectStore();
   }
 
   @BeforeEach
   void setupKeys() throws IOException {
     volume = generateVolume("vol-a-");
     ozoneAddress = "/" + volume;
-    generateKeys(volume, "level1/multilevel-", 1);
-    generateKeys(volume, "key-", 1);
+    generateKeys(volume, "level1/multiLevelKey-", 10);
+    generateKeys(volume, "key-", 10);
   }
 
   @AfterEach
@@ -123,6 +112,7 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
       LOG.error(err.toString());
     }
 
+    ObjectStore store = cluster().newClient().getObjectStore();
     for (Iterator<? extends OzoneBucket> it = store.getVolume(volume).listBuckets(null); it.hasNext();) {
       OzoneBucket ozoneBucket = it.next();
       for (Iterator<? extends OzoneKey> keyIterator = ozoneBucket.listKeys(null); keyIterator.hasNext();) {
@@ -143,22 +133,24 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     return String.format("--set=%s=%s", configKey, cluster().getConf().get(configKey));
   }
 
-
-  public void corruptBlock(Container<?> container) {
-    File chunksDir = new File(container.getContainerData().getContainerPath(), "chunks");
-    Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
-        chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
+  private Optional<File> findFirstBlockFile(Container<?> container, String fileName) {
+    Objects.requireNonNull(container, "Container cannot be null");
+    File chunksDir = new File(container.getContainerData().getContainerPath(), CHUNKS_DIR_NAME);
+    return Arrays.stream(Objects.requireNonNull(
+        chunksDir.listFiles((dir, name) -> name.contains(fileName)
+            && name.endsWith(BLOCK_FILE_EXTENSION))))
         .findFirst();
-    assertTrue(blockFile.isPresent());
+  }
+
+  public void corruptBlock(Container<?> container, String fileName) {
+    Optional<File> blockFile = findFirstBlockFile(container, fileName);
+    assertTrue(blockFile.isPresent(), "No block file found in the container.");
     corruptFile(blockFile.get());
   }
 
-  public void truncateBlock(Container<?> container) {
-    File chunksDir = new File(container.getContainerData().getContainerPath(), "chunks");
-    Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
-            chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
-        .findFirst();
-    assertTrue(blockFile.isPresent());
+  public void truncateBlock(Container<?> container, String fileName) {
+    Optional<File> blockFile = findFirstBlockFile(container, fileName);
+    assertTrue(blockFile.isPresent(), "No block file found in the container.");
     truncateFile(blockFile.get());
   }
 
@@ -192,6 +184,7 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
    * Truncate the file to 0 bytes in length.
    */
   private static void truncateFile(File file) {
+    LOG.info("Truncating file: {}", file.getAbsolutePath());
     try {
       Files.write(file.toPath(), new byte[0],
           StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
@@ -203,17 +196,7 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     }
   }
 
-  private Container<?> getFirstKeyContainer() throws IOException {
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volume)
-        .setBucketName(bucket)
-        .setKeyName(key)
-        .build();
-    OmKeyInfo keyInfo = cluster().getOzoneManager().lookupKey(keyArgs);
-    OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
-    Assertions.assertNotNull(locations);
-    long containerID = locations.getLocationList().get(0).getContainerID();
-
+  private Container<?> getFirstContainer(long containerID) {
     for (HddsDatanodeService dn : cluster().getHddsDatanodes()) {
       Container<?> container = dn.getDatanodeStateMachine()
           .getContainer()
@@ -226,23 +209,35 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     return null;
   }
 
-  private static String generateVolume(String volumePrefix) throws IOException {
-    String volumeA = volumePrefix + RandomStringUtils.randomNumeric(5);
-    store.createVolume(volumeA);
-    return store.getVolume(volumeA).getName();
+  private OmKeyLocationInfoGroup getOmKeyLocations() throws IOException {
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setKeyName(key)
+        .build();
+    return cluster().getOzoneManager().lookupKey(keyArgs).getLatestVersionLocations();
   }
 
-  private static void generateKeys(String volumeName, String keyPrefix, int numberOfKeys) throws IOException {
-    ReplicationConfig repConfig = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE);
-    bucket = "bucket-" + RandomStringUtils.randomNumeric(5);
+  private String generateVolume(String volumePrefix) throws IOException {
+    ObjectStore store = cluster().newClient().getObjectStore();
+    String volumeName = volumePrefix + RandomStringUtils.insecure().nextNumeric(5);
+    store.createVolume(volumeName);
+    return store.getVolume(volumeName).getName();
+  }
+
+  private void generateKeys(String volumeName, String keyPrefix, int numberOfKeys) throws IOException {
+    ObjectStore store = cluster().newClient().getObjectStore();
+    ReplicationConfig repConfig = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE);
+    String bucketName = "bucket-" + RandomStringUtils.insecure().nextNumeric(5);
     OzoneVolume volA = store.getVolume(volumeName);
-    volA.createBucket(bucket);
+    volA.createBucket(bucketName);
 
     for (int i = 0; i < numberOfKeys; i++) {
-      byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
-      String k = keyPrefix + i + "-" + RandomStringUtils.randomNumeric(5);
+      byte[] value = RandomStringUtils.insecure().nextAlphanumeric(10240).getBytes(UTF_8);
+      String k = keyPrefix + i + "-" + RandomStringUtils.insecure().nextNumeric(5);
+      bucket = bucketName;
       key = k;
-      TestDataUtil.createKey(volA.getBucket(bucket), k, repConfig, value);
+      TestDataUtil.createKey(volA.getBucket(bucketName), k, repConfig, value);
     }
   }
 
@@ -277,8 +272,9 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
           .filter(Files::isRegularFile)
           .map(e -> {
             try {
-              return new String(Files.readAllBytes(e.toAbsolutePath()));
+              return new String(Files.readAllBytes(e.toAbsolutePath()), UTF_8);
             } catch (IOException ignored) {
+              //ignored
             }
             return "";
           })
@@ -291,9 +287,11 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
   @Test
   void testChecksumsWithCorruptedBlockFile() throws IOException {
     Path checksumsOutputDir = tempDir.toPath().resolve(RandomStringUtils.insecure().nextAlphanumeric(10));
-    Container<?> container = getFirstKeyContainer();
-    LOG.info("Corrupting key: /" + volume + "/" + bucket + "/" + key);
-    corruptBlock(container);
+    OmKeyLocationInfo location = getOmKeyLocations().getLocationList().get(0);
+    Container<?> container = getFirstContainer(location.getContainerID());
+    long localID = location.getLocalID();
+    LOG.info("Corrupting key: /{}/{}/{}", volume, bucket, key);
+    corruptBlock(container, Long.toString(localID));
 
     List<String> parameters = new ArrayList<>();
     parameters.add(0, getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY));
@@ -307,34 +305,35 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     int exitCode = ozoneDebugShell.execute(parameters.toArray(new String[0]));
 
     assertEquals(0, exitCode, err.toString());
-    if (checksumsOutputDir.toFile().exists()) {
-      Files.walk(checksumsOutputDir)
-          .filter(Files::isRegularFile)
-          .map(e -> {
-            try {
-              return new String(Files.readAllBytes(e.toAbsolutePath()));
-            } catch (IOException ignored) {
-            }
-            return "";
-          })
-          .forEach(manifestFile -> {
-            if (manifestFile.contains(key)) {
-              assertThat(manifestFile).contains("Checksum mismatch");
-            } else {
-              assertThat(manifestFile)
-                  .doesNotContain("Checksum mismatch")
-                  .doesNotContain("Unexpected read size");
-            }
-          });
-    }
+    Files.walk(checksumsOutputDir)
+        .filter(Files::isRegularFile)
+        .map(e -> {
+          try {
+            return new String(Files.readAllBytes(e.toAbsolutePath()), UTF_8);
+          } catch (IOException ignored) {
+            //ignored
+          }
+          return "";
+        })
+        .forEach(manifestFile -> {
+          if (manifestFile.contains(Long.toString(localID))) {
+            assertThat(manifestFile).contains("Checksum mismatch");
+          } else {
+            assertThat(manifestFile)
+                .doesNotContain("Checksum mismatch")
+                .doesNotContain("Unexpected read size");
+          }
+        });
   }
 
   @Test
   void testChecksumsWithEmptyBlockFile() throws IOException {
     Path checksumsOutputDir = tempDir.toPath().resolve(RandomStringUtils.insecure().nextAlphanumeric(10));
-    Container<?> container = getFirstKeyContainer();
-    LOG.info("Corrupting key: /" + volume + "/" + bucket + "/" + key);
-    truncateBlock(container);
+    OmKeyLocationInfo location = getOmKeyLocations().getLocationList().get(0);
+    Container<?> container = getFirstContainer(location.getContainerID());
+    long localID = location.getLocalID();
+    LOG.info("Truncating key: /{}/{}/{}", volume, bucket, key);
+    truncateBlock(container, Long.toString(localID));
 
     List<String> parameters = new ArrayList<>();
     parameters.add(0, getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY));
@@ -348,25 +347,24 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     int exitCode = ozoneDebugShell.execute(parameters.toArray(new String[0]));
 
     assertEquals(0, exitCode, err.toString());
-    if (checksumsOutputDir.toFile().exists()) {
-      Files.walk(checksumsOutputDir)
-          .filter(Files::isRegularFile)
-          .map(e -> {
-            try {
-              return new String(Files.readAllBytes(e.toAbsolutePath()));
-            } catch (IOException ignored) {
-            }
-            return "";
-          })
-          .forEach(manifestFile -> {
-            if (manifestFile.contains(key)) {
-              assertThat(manifestFile).contains("Unexpected read size");
-            } else {
-              assertThat(manifestFile)
-                  .doesNotContain("Checksum mismatch")
-                  .doesNotContain("Unexpected read size");
-            }
-          });
-    }
+    Files.walk(checksumsOutputDir)
+        .filter(Files::isRegularFile)
+        .map(e -> {
+          try {
+            return new String(Files.readAllBytes(e.toAbsolutePath()), UTF_8);
+          } catch (IOException ignored) {
+            //ignored
+          }
+          return "";
+        })
+        .forEach(manifestFile -> {
+          if (manifestFile.contains(Long.toString(localID))) {
+            assertThat(manifestFile).contains("Unexpected read size");
+          } else {
+            assertThat(manifestFile)
+                .doesNotContain("Checksum mismatch")
+                .doesNotContain("Unexpected read size");
+          }
+        });
   }
 }
