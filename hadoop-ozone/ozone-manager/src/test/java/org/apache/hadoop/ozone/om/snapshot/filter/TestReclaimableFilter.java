@@ -81,6 +81,12 @@ public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
     };
   }
 
+  /**
+   * Method for creating arguments for paramatrized tests requiring arguments in the following order:
+   *  numberOfPreviousSnapshotsFromChain: Number of previous snapshots in the chain.
+   *  actualNumberOfSnapshots: Total number of snapshots in the chain.
+   *  index: Index of snapshot in the chain for testing. If index > actualNumberOfSnapshots test case will run for AOS.
+   */
   List<Arguments> testReclaimableFilterArguments() {
     List<Arguments> arguments = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
@@ -112,9 +118,9 @@ public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
 
   @ParameterizedTest
   @MethodSource("testReclaimableFilterArguments")
-  public void testReclaimableFilterSnapshotChainInitilization(int numberOfPreviousSnapshotsFromChain,
-                                                              int actualNumberOfSnapshots,
-                                                              int index) throws IOException, RocksDBException {
+  public void testReclaimableFilterSnapshotChainInitialization(int numberOfPreviousSnapshotsFromChain,
+                                                               int actualNumberOfSnapshots,
+                                                               int index) throws IOException, RocksDBException {
     SnapshotInfo currentSnapshotInfo =
         setup(numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots, index, 4, 2);
     String volume = getVolumes().get(3);
