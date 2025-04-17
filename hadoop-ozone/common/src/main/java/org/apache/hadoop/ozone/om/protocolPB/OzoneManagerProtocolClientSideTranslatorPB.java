@@ -303,12 +303,25 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Submits client request to OM server.
+   * Submits client request to current OM leader .
    * @param omRequest client request
    * @return response from OM
    * @throws IOException thrown if any Protobuf service exception occurs
    */
   private OMResponse submitRequest(OMRequest omRequest)
+      throws IOException {
+    return submitRequest(omRequest, null);
+  }
+
+  /**
+   * Submits client request to OM server.
+   * @param omRequest client request
+   * @param omNodeId OM Node ID of the node to send the request to.
+   *                 If it is empty or null, it will be directed to the current OM leader.
+   * @return response from OM
+   * @throws IOException thrown if any Protobuf service exception occurs
+   */
+  private OMResponse submitRequest(OMRequest omRequest, String omNodeId)
       throws IOException {
     OMRequest.Builder builder = OMRequest.newBuilder(omRequest);
     // Insert S3 Authentication information for each request.
@@ -338,10 +351,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
 
     OMResponse response;
-    if (omRequest.hasOmNodeId()) {
+    if (StringUtils.isNotBlank(omNodeId)) {
       // The request is sent to the particular OM node without failover
       response = transport.submitRequest(
-          omRequest.getOmNodeId(),
+          omNodeId,
           builder.setTraceID(TracingUtil.exportCurrentSpan()).build());
     } else {
       // The request is eventually sent to the OM leader through failover mechanisms
@@ -1338,10 +1351,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     final OMRequest.Builder omRequest = createOMRequest(Type.GetSnapshotInfo)
         .setSnapshotInfoRequest(requestBuilder);
-    if (!StringUtils.isBlank(omNodeId)) {
-      omRequest.setOmNodeId(omNodeId);
-    }
-    final OMResponse omResponse = submitRequest(omRequest.build());
+    final OMResponse omResponse = submitRequest(omRequest.build(), omNodeId);
     handleError(omResponse);
     return SnapshotInfo.getFromProtobuf(omResponse.getSnapshotInfoResponse()
         .getSnapshotInfo());
@@ -1406,11 +1416,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final OMRequest.Builder omRequest = createOMRequest(Type.ListSnapshot)
         .setListSnapshotRequest(requestBuilder);
 
-    if (StringUtils.isNotBlank(omNodeId)) {
-      omRequest.setOmNodeId(omNodeId);
-    }
-
-    final OMResponse omResponse = submitRequest(omRequest.build());
+    final OMResponse omResponse = submitRequest(omRequest.build(), omNodeId);
     handleError(omResponse);
     OzoneManagerProtocolProtos.ListSnapshotResponse response = omResponse.getListSnapshotResponse();
     List<SnapshotInfo> snapshotInfos = response
@@ -1481,11 +1487,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final OMRequest.Builder omRequest = createOMRequest(Type.SnapshotDiff)
         .setSnapshotDiffRequest(requestBuilder);
 
-    if (!StringUtils.isBlank(omNodeId)) {
-      omRequest.setOmNodeId(omNodeId);
-    }
-
-    final OMResponse omResponse = submitRequest(omRequest.build());
+    final OMResponse omResponse = submitRequest(omRequest.build(), omNodeId);
     handleError(omResponse);
     OzoneManagerProtocolProtos.SnapshotDiffResponse diffResponse =
         omResponse.getSnapshotDiffResponse();
@@ -1526,11 +1528,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final OMRequest.Builder omRequest = createOMRequest(Type.CancelSnapshotDiff)
         .setCancelSnapshotDiffRequest(requestBuilder);
 
-    if (!StringUtils.isBlank(omNodeId)) {
-      omRequest.setOmNodeId(omNodeId);
-    }
-
-    final OMResponse omResponse = submitRequest(omRequest.build());
+    final OMResponse omResponse = submitRequest(omRequest.build(), omNodeId);
     handleError(omResponse);
     OzoneManagerProtocolProtos.CancelSnapshotDiffResponse diffResponse =
         omResponse.getCancelSnapshotDiffResponse();
@@ -1567,10 +1565,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     final OMRequest.Builder omRequest = createOMRequest(Type.ListSnapshotDiffJobs)
         .setListSnapshotDiffJobRequest(requestBuilder);
-    if (!StringUtils.isBlank(omNodeId)) {
-      omRequest.setOmNodeId(omNodeId);
-    }
-    final OMResponse omResponse = submitRequest(omRequest.build());
+    final OMResponse omResponse = submitRequest(omRequest.build(), omNodeId);
     handleError(omResponse);
     return omResponse.getListSnapshotDiffJobResponse()
         .getSnapshotDiffJobList().stream()

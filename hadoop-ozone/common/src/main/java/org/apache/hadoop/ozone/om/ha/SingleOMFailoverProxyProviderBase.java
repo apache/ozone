@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
-import org.apache.hadoop.ozone.om.exceptions.OMNodeIdMismatchException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -133,10 +132,6 @@ public abstract class SingleOMFailoverProxyProviderBase<T> implements FailoverPr
       // Failing over to same OM so that wait time between retries is
       // incremented
       return true;
-    } else if (unwrappedException instanceof OMNodeIdMismatchException) {
-      // This means that the OM node ID specified by the client is wrong
-      // We need to fail immediately
-      return false;
     } else if (unwrappedException instanceof AccessControlException ||
         unwrappedException instanceof SecretManager.InvalidToken ||
         HddsUtils.shouldNotFailoverOnRpcException(unwrappedException)) {

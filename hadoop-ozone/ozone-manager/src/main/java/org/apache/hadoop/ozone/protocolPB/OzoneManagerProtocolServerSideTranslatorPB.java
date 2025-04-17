@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
-import org.apache.hadoop.ozone.om.exceptions.OMNodeIdMismatchException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
@@ -188,35 +187,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       throws ServiceException {
     // Check if this OM is the leader.
     RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
-    boolean isNodeIdSpecified = validateNodeId(request);
+    boolean isDirectRequest = request.hasIsDirect() && request.getIsDirect();
     if (raftServerStatus == LEADER_AND_READY || request.getCmdType().equals(PrepareStatus)) {
       return handler.handleReadRequest(request);
-    } else if (raftServerStatus == NOT_LEADER && isNodeIdSpecified && allowSnapshotReadFromFollower(request)) {
+    } else if (raftServerStatus == NOT_LEADER && isDirectRequest && allowSnapshotReadFromFollower(request)) {
       return handler.handleReadRequest(request);
     } else {
       throw createLeaderErrorException(raftServerStatus);
     }
-  }
-
-
-  /**
-   * Check whether the OM request specified an OM node ID.
-   * @param omRequest OM request.
-   * @return true if the request specified an OM node ID and it is the same as the current OM, false otherwise.
-   * @throws ServiceException exception if there is a mismatch between the OM request's node ID and the
-   *         current OM Node ID.
-   */
-  private boolean validateNodeId(OMRequest omRequest) throws ServiceException {
-    if (!omRequest.hasOmNodeId()) {
-      return false;
-    }
-
-    if (!omRequest.getOmNodeId().equals(ozoneManager.getOMNodeId())) {
-      throw new ServiceException(new OMNodeIdMismatchException("OM request node ID is " + omRequest.getOmNodeId() +
-          ", but the current OM node ID is " + ozoneManager.getOMNodeId()));
-    }
-
-    return true;
   }
 
   private boolean allowSnapshotReadFromFollower(OMRequest omRequest) {
