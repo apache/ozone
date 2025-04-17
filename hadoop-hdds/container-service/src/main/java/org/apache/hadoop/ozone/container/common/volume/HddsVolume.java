@@ -310,36 +310,39 @@ public class HddsVolume extends StorageVolume {
   }
 
   @VisibleForTesting
-  public VolumeCheckResult checkDbHealth(File dbFile) {
+  public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
     if (volumeTestCount == 0) {
       return VolumeCheckResult.HEALTHY;
     }
 
-    boolean isVolumeTestResultHealthy = true;
+    final boolean isVolumeTestResultHealthy = true;
     try (ManagedOptions managedOptions = new ManagedOptions();
          ManagedRocksDB readOnlyDb = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
       volumeTestResultQueue.add(isVolumeTestResultHealthy);
     } catch (Exception e) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Check of database for volume " + this + " interrupted.");
+      }
       LOG.warn("Could not open Volume DB located at {}", dbFile, e);
       volumeTestResultQueue.add(!isVolumeTestResultHealthy);
       volumeTestFailureCount.incrementAndGet();
     }
 
-    if (volumeTestResultQueue.size() > volumeTestCount) {
-      if (!volumeTestResultQueue.isEmpty() &&
-          volumeTestResultQueue.poll() != isVolumeTestResultHealthy) {
+    if (volumeTestResultQueue.size() > volumeTestCount
+        && volumeTestResultQueue.poll() != isVolumeTestResultHealthy) {
         volumeTestFailureCount.decrementAndGet();
-      }
     }
 
     if (volumeTestFailureCount.get() > volumeTestFailureTolerance) {
-      LOG.error("Failed volume test for volume {}: the last {} runs encountered {} out of {} tolerated failures.",
-          this, volumeTestResultQueue.size(), volumeTestFailureCount.get(), volumeTestFailureTolerance);
+      LOG.error("Failed to open the database at \"{}\" for HDDS volume {}: " +
+              "the last {} runs encountered {} out of {} tolerated failures.",
+          dbFile, this, volumeTestResultQueue.size(), volumeTestFailureCount.get(), volumeTestFailureTolerance);
       return VolumeCheckResult.FAILED;
     }
 
-    LOG.info("IO test results for volume {}: the last {} runs encountered {} out of {} tolerated failures",
-        this, volumeTestResultQueue.size(), volumeTestFailureTolerance, volumeTestFailureTolerance);
+    LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}: " +
+            "the last {} runs encountered {} out of {} tolerated failures",
+        dbFile, this, volumeTestResultQueue.size(), volumeTestFailureTolerance, volumeTestFailureTolerance);
     return VolumeCheckResult.HEALTHY;
   }
 

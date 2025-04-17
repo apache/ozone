@@ -241,6 +241,15 @@ class TestDatanodeHddsVolumeFailureDetection {
     }
   }
 
+  /**
+   * {@link HddsVolume#check(Boolean)} will capture the failures injected by this test and not allow the
+   * test to reach the helper method {@link HddsVolume#checkDbHealth}.
+   * As a workaround, we test the helper method directly.
+   * As we test the helper method directly, we cannot test for schemas older than V3.
+   *
+   * @param schemaV3
+   * @throws Exception
+   */
   @ParameterizedTest
   @ValueSource(booleans = {true})
   void corruptDbFileWithoutDbHandleCacheInvalidation(boolean schemaV3) throws Exception {
