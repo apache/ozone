@@ -440,7 +440,7 @@ public class SCMNodeManager implements NodeManager {
         if (updateDnsToDnIdMap(oldNode.getHostName(), oldNode.getIpAddress(),
             hostName, ipAddress, dnId)) {
           LOG.info("Updating datanode {} from {} to {}",
-                  datanodeDetails.getUuidString(),
+                  datanodeDetails,
                   oldNode,
                   datanodeDetails);
           clusterMap.update(oldNode, datanodeDetails);
@@ -1070,7 +1070,7 @@ public class SCMNodeManager implements NodeManager {
           freeSpaceToSpare);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-          datanodeDetails.getUuidString());
+          datanodeDetails);
       return null;
     }
   }
