@@ -83,7 +83,7 @@ import org.rocksdb.RocksIterator;
  * Test class for ReclaimableFilter.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestAbstractReclaimableFilter {
+public abstract class AbstractReclaimableFilterTest {
 
   private ReclaimableFilter reclaimableFilter;
   private OzoneManager ozoneManager;
