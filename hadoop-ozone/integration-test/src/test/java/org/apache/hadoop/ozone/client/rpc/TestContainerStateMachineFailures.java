@@ -725,7 +725,7 @@ public class TestContainerStateMachineFailures {
       Thread closeContainerThread = new Thread(r1);
       closeContainerThread.start();
       threadList.add(closeContainerThread);
-      latch.await(600, TimeUnit.SECONDS);
+      assertTrue(latch.await(600, TimeUnit.SECONDS));
       for (int i = 0; i < 101; i++) {
         threadList.get(i).join();
       }
