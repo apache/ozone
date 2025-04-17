@@ -63,6 +63,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -928,7 +929,7 @@ public class TestRocksDBCheckpointDiffer {
    * @param fwdMutableGraph
    */
   private void traverseGraph(
-      ConcurrentHashMap<String, CompactionNode> compactionNodeMap,
+      ConcurrentMap<String, CompactionNode> compactionNodeMap,
       MutableGraph<CompactionNode> reverseMutableGraph,
       MutableGraph<CompactionNode> fwdMutableGraph) {
 
@@ -988,7 +989,7 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   private void printMutableGraphFromAGivenNode(
-      ConcurrentHashMap<String, CompactionNode> compactionNodeMap,
+      ConcurrentMap<String, CompactionNode> compactionNodeMap,
       String fileName,
       int sstLevel,
       MutableGraph<CompactionNode> mutableGraph) {
@@ -1035,7 +1036,6 @@ public class TestRocksDBCheckpointDiffer {
               sstFiles.stream()
                   .map(
                       sstFile -> new CompactionNode(sstFile,
-                          1000L,
                           Long.parseLong(sstFile.substring(0, 6)),
                           null, null, null
                       ))
@@ -1983,14 +1983,10 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   private static Stream<Arguments> shouldSkipNodeEdgeCases() {
-    CompactionNode node = new CompactionNode("fileName",
-        100, 100, "startKey", "endKey", "columnFamily");
-    CompactionNode nullColumnFamilyNode = new CompactionNode("fileName",
-        100, 100, "startKey", "endKey", null);
-    CompactionNode nullStartKeyNode = new CompactionNode("fileName",
-        100, 100, null, "endKey", "columnFamily");
-    CompactionNode nullEndKeyNode = new CompactionNode("fileName",
-        100, 100, "startKey", null, "columnFamily");
+    CompactionNode node = new CompactionNode("fileName", 100, "startKey", "endKey", "columnFamily");
+    CompactionNode nullColumnFamilyNode = new CompactionNode("fileName", 100, "startKey", "endKey", null);
+    CompactionNode nullStartKeyNode = new CompactionNode("fileName", 100, null, "endKey", "columnFamily");
+    CompactionNode nullEndKeyNode = new CompactionNode("fileName", 100, "startKey", null, "columnFamily");
 
     return Stream.of(
         Arguments.of(node, Collections.emptyMap(), false),
