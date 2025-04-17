@@ -40,6 +40,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   private final ManagedRocksIterator rocksDBIterator;
   private final RDBTable rocksDBTable;
   private ReferenceCountedObject<RawKeyValue<RAW>> currentEntry;
+  private RawKeyValue<RAW> previousKeyValue;
   // This is for schemas that use a fixed-length
   // prefix for each key.
   private final RAW prefix;
@@ -54,6 +55,7 @@ abstract class RDBStoreAbstractIterator<RAW>
     this.currentEntry = null;
     this.hasNext = false;
     this.closed = false;
+    this.previousKeyValue = null;
   }
 
   /** @return the {@link Table.KeyValue} for the current entry. */
@@ -117,6 +119,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   public final UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> next() {
     if (hasNext()) {
       UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> entry = currentEntry.retainAndReleaseOnClose();
+      this.previousKeyValue = entry.get();
       rocksDBIterator.get().next();
       setCurrentEntry();
       return entry;
@@ -160,8 +163,8 @@ abstract class RDBStoreAbstractIterator<RAW>
     if (rocksDBTable == null) {
       throw new UnsupportedOperationException("remove");
     }
-    if (currentEntry.get() != null) {
-      delete(currentEntry.get().getKey());
+    if (previousKeyValue != null) {
+      delete(previousKeyValue.getKey());
     } else {
       LOG.info("Failed to removeFromDB: currentEntry == null");
     }

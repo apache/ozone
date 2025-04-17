@@ -257,6 +257,7 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.key()).thenReturn(testKey);
 
     RDBStoreByteArrayIterator iter = newIterator(null);
+    iter.next();
     iter.removeFromDB();
 
     InOrder verifier = inOrder(rocksDBIteratorMock, rocksTableMock);

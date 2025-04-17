@@ -235,19 +235,19 @@ class RDBTable implements Table<byte[], byte[]> {
       }
 
       @Override
-      public KeyValue<byte[], byte[]> seek(byte[] bytes) throws IOException {
+      public KeyValue<byte[], byte[]> seek(byte[] bytes) {
         try (UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> kv = itr.seek(bytes)) {
           return kv == null ? null : kv.get();
         }
       }
 
       @Override
-      public void removeFromDB() {
-        itr.remove();
+      public void removeFromDB() throws IOException {
+        itr.removeFromDB();
       }
 
       @Override
-      public void close() throws IOException {
+      public void close() {
         itr.close();
       }
 

@@ -388,6 +388,7 @@ public class TestRDBStoreCodecBufferIterator {
         .then(newAnswer("key1", testKey));
 
     try (RDBStoreCodecBufferIterator i = newIterator(null)) {
+      i.next();
       i.removeFromDB();
     }
 
