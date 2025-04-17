@@ -96,8 +96,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private final String metadataDir;
   private final String sstBackupDir;
-  private final String activeDBLocationStr;
-
   private final String compactionLogDir;
 
   public static final String COMPACTION_LOG_FILE_NAME_SUFFIX = ".log";
@@ -205,8 +203,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     this.sstBackupDir = Paths.get(metadataDirName, sstBackupDirName) + "/";
     createSstBackUpDir();
 
-    // Active DB location is used in getSSTFileNumKeys
-    this.activeDBLocationStr = activeDBLocationName + "/";
     this.maxAllowedTimeInDag = configuration.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,

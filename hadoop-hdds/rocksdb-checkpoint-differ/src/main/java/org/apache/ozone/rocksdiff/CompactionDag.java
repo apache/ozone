@@ -17,7 +17,6 @@
 
 package org.apache.ozone.rocksdiff;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import java.util.HashSet;
@@ -66,7 +65,6 @@ public class CompactionDag {
       final CompactionNode outfileNode = compactionNodeMap.computeIfAbsent(outfile.getFileName(),
           file -> addNodeToDAG(file, seqNum, outfile.getStartKey(), outfile.getEndKey(), outfile.getColumnFamily()));
 
-
       for (CompactionFileInfo infile : inputFiles) {
         final CompactionNode infileNode = compactionNodeMap.computeIfAbsent(infile.getFileName(),
             file -> addNodeToDAG(file, seqNum, infile.getStartKey(), infile.getEndKey(), infile.getColumnFamily()));
@@ -92,7 +90,6 @@ public class CompactionDag {
   /**
    * Prunes backward DAG's upstream from the level, that needs to be removed.
    */
-  @VisibleForTesting
   Set<String> pruneBackwardDag(MutableGraph<CompactionNode> backwardDag,
                                Set<CompactionNode> startNodes) {
     Set<String> removedFiles = new HashSet<>();
@@ -120,7 +117,6 @@ public class CompactionDag {
   /**
    * Prunes forward DAG's downstream from the level that needs to be removed.
    */
-  @VisibleForTesting
   Set<String> pruneForwardDag(MutableGraph<CompactionNode> forwardDag,
                               Set<CompactionNode> startNodes) {
     Set<String> removedFiles = new HashSet<>();
