@@ -1074,13 +1074,10 @@ public class TestContainerPersistence {
     // Test force update flag.
     // Close the container and then try to update without force update flag.
     container.close();
-    try {
-      container.update(newMetadata, false);
-    } catch (StorageContainerException ex) {
-      assertEquals("Updating a closed container without " +
-          "force option is not allowed. ContainerID: " +
-          testContainerID, ex.getMessage());
-    }
+    StorageContainerException exception = assertThrows(StorageContainerException.class,
+        () -> container.update(newMetadata, false));
+    assertThat(exception).hasMessageContaining(container.getContainerData().toString());
+
 
     // Update with force flag, it should be success.
     newMetadata.put("VOLUME", "shire_new_1");
