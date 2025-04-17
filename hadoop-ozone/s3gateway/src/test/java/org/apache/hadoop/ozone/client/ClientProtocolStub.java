@@ -724,6 +724,7 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @Deprecated
   public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType) throws IOException {
     return null;
