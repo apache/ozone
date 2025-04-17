@@ -92,11 +92,6 @@ public class DiskBalancerService extends BackgroundService {
   private Map<DiskBalancerTask, Integer> inProgressTasks;
   private Set<Long> inProgressContainers;
 
-  // Every time a container is decided to be moved from Vol A to Vol B,
-  // the size will be deducted from Vol A and added to Vol B.
-  // This map is used to help calculate the expected storage size after
-  // the container balancing finished.
-  private Map<HddsVolume, Long> deltaSizes;
   private MutableVolumeSet volumeSet;
 
   private VolumeChoosingPolicy volumeChoosingPolicy;
@@ -120,7 +115,6 @@ public class DiskBalancerService extends BackgroundService {
 
     inProgressTasks = new ConcurrentHashMap<>();
     inProgressContainers = ConcurrentHashMap.newKeySet();
-    deltaSizes = new ConcurrentHashMap<>();
     volumeSet = ozoneContainer.getVolumeSet();
 
     try {
@@ -333,7 +327,7 @@ public class DiskBalancerService extends BackgroundService {
 
     for (int i = 0; i < availableTaskCount; i++) {
       Pair<HddsVolume, HddsVolume> pair = volumeChoosingPolicy
-          .chooseVolume(volumeSet, threshold, deltaSizes);
+          .chooseVolume(volumeSet, threshold);
       if (pair == null) {
         continue;
       }
@@ -344,10 +338,8 @@ public class DiskBalancerService extends BackgroundService {
         queue.add(new DiskBalancerTask(toBalanceContainer, sourceVolume,
             destVolume));
         inProgressContainers.add(toBalanceContainer.getContainerID());
-        deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
-            - toBalanceContainer.getBytesUsed());
-        deltaSizes.put(destVolume, deltaSizes.getOrDefault(destVolume, 0L)
-            + toBalanceContainer.getBytesUsed());
+        sourceVolume.incCommittedBytes(-toBalanceContainer.getBytesUsed());
+        destVolume.incCommittedBytes(toBalanceContainer.getBytesUsed());
       }
     }
 
@@ -504,10 +496,8 @@ public class DiskBalancerService extends BackgroundService {
 
     private void postCall() {
       inProgressContainers.remove(containerData.getContainerID());
-      deltaSizes.put(sourceVolume, deltaSizes.get(sourceVolume) +
-          containerData.getBytesUsed());
-      deltaSizes.put(destVolume, deltaSizes.get(destVolume)
-          - containerData.getBytesUsed());
+      sourceVolume.incCommittedBytes(containerData.getBytesUsed());
+      destVolume.incCommittedBytes(-containerData.getBytesUsed());
     }
   }
 
