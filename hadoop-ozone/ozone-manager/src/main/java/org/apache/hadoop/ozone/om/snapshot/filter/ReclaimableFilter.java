@@ -38,7 +38,7 @@ import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
-import org.apache.hadoop.ozone.util.CheckedFunction;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,11 +79,10 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
    * @param lock : Lock for Active OM.
    * @param numberOfPreviousSnapshotsFromChain : number of previous snapshots to be initialized.
    */
-  public ReclaimableFilter(OzoneManager ozoneManager, OmSnapshotManager omSnapshotManager,
-                           SnapshotChainManager snapshotChainManager,
-                           SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
-                           IOzoneManagerLock lock,
-                           int numberOfPreviousSnapshotsFromChain) {
+  public ReclaimableFilter(
+      OzoneManager ozoneManager, OmSnapshotManager omSnapshotManager, SnapshotChainManager snapshotChainManager,
+      SnapshotInfo currentSnapshotInfo, KeyManager keyManager, IOzoneManagerLock lock,
+      int numberOfPreviousSnapshotsFromChain) {
     this.ozoneManager = ozoneManager;
     this.omSnapshotManager = omSnapshotManager;
     this.currentSnapshotInfo = currentSnapshotInfo;
