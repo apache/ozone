@@ -824,7 +824,7 @@ public class SCMClientProtocolServer implements
   public Pipeline getPipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
     final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("pipelineID", String.valueOf(pipelineID));
+    auditMap.put("pipelineID", pipelineID.getId());
     try {
       Pipeline pipeline = scm.getPipelineManager().getPipeline(PipelineID.getFromProtobuf(pipelineID));
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
