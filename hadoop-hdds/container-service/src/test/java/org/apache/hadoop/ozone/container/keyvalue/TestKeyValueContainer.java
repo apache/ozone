@@ -667,8 +667,7 @@ public class TestKeyValueContainer {
     });
 
     assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, exception.getResult());
-    assertThat(exception)
-        .hasMessageStartingWith("Updating a closed container without force option is not allowed. ContainerID: ");
+    assertThat(exception).hasMessageContaining(keyValueContainerData.toString());
   }
 
 
