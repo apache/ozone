@@ -84,7 +84,7 @@ import org.slf4j.LoggerFactory;
  * through to the container.
  */
 public class BlockOutputStream extends OutputStream {
-  public static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStream.class);
   public static final String EXCEPTION_MSG =
       "Unexpected Storage Container Exception: ";

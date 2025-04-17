@@ -41,10 +41,6 @@ public class BlockData {
       BlockData::getProtoBufMessage,
       BlockData.class);
 
-  public static Codec<BlockData> getCodec() {
-    return CODEC;
-  }
-
   private final BlockID blockID;
   private final Map<String, String> metadata;
 
@@ -77,6 +73,10 @@ public class BlockData {
     this.blockID = blockID;
     this.metadata = new TreeMap<>();
     this.size = 0;
+  }
+
+  public static Codec<BlockData> getCodec() {
+    return CODEC;
   }
 
   public long getBlockCommitSequenceId() {

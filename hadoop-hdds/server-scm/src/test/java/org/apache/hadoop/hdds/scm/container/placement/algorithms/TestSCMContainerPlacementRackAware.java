@@ -117,7 +117,7 @@ public class TestSCMContainerPlacementRackAware {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
@@ -132,39 +132,39 @@ public class TestSCMContainerPlacementRackAware {
 
     if (datanodeCount > 4) {
       StorageReportProto storage2 = HddsTestUtils.createStorageReport(
-          dnInfos.get(2).getUuid(),
+          dnInfos.get(2).getID(),
           "/data1-" + datanodes.get(2).getUuidString(),
           STORAGE_CAPACITY, 90L, 10L, null);
       dnInfos.get(2).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage2)));
       StorageReportProto storage3 = HddsTestUtils.createStorageReport(
-          dnInfos.get(3).getUuid(),
+          dnInfos.get(3).getID(),
           "/data1-" + dnInfos.get(3).getUuidString(),
           STORAGE_CAPACITY, 80L, 20L, null);
       dnInfos.get(3).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage3)));
       StorageReportProto storage4 = HddsTestUtils.createStorageReport(
-          dnInfos.get(4).getUuid(),
+          dnInfos.get(4).getID(),
           "/data1-" + dnInfos.get(4).getUuidString(),
           STORAGE_CAPACITY, 70L, 30L, null);
       dnInfos.get(4).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage4)));
     } else if (datanodeCount > 3) {
       StorageReportProto storage2 = HddsTestUtils.createStorageReport(
-          dnInfos.get(2).getUuid(),
+          dnInfos.get(2).getID(),
           "/data1-" + dnInfos.get(2).getUuidString(),
           STORAGE_CAPACITY, 90L, 10L, null);
       dnInfos.get(2).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage2)));
       StorageReportProto storage3 = HddsTestUtils.createStorageReport(
-          dnInfos.get(3).getUuid(),
+          dnInfos.get(3).getID(),
           "/data1-" + dnInfos.get(3).getUuidString(),
           STORAGE_CAPACITY, 80L, 20L, null);
       dnInfos.get(3).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage3)));
     } else if (datanodeCount > 2) {
       StorageReportProto storage2 = HddsTestUtils.createStorageReport(
-          dnInfos.get(2).getUuid(),
+          dnInfos.get(2).getID(),
           "/data1-" + dnInfos.get(2).getUuidString(),
           STORAGE_CAPACITY, 84L, 16L, null);
       dnInfos.get(2).updateStorageReports(
@@ -460,7 +460,7 @@ public class TestSCMContainerPlacementRackAware {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          dnInfo.getUuid(), "/data1-" + dnInfo.getUuidString(),
+          dnInfo.getID(), "/data1-" + dnInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(

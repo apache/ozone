@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * commands.
  */
 public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ECOverReplicationHandler.class);
 
   private final ReplicationManager replicationManager;

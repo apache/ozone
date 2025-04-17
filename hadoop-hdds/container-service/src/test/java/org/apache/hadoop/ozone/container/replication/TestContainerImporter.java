@@ -51,8 +51,10 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
@@ -72,11 +74,13 @@ class TestContainerImporter {
   private File tempDir;
 
   private OzoneConfiguration conf;
+  private VolumeChoosingPolicy volumeChoosingPolicy;
 
   @BeforeEach
   void setup() {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.getAbsolutePath());
+    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
   }
 
   @Test
@@ -93,7 +97,7 @@ class TestContainerImporter {
     MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     ContainerImporter containerImporter = new ContainerImporter(conf,
-        containerSet, controllerMock, volumeSet);
+        containerSet, controllerMock, volumeSet, volumeChoosingPolicy);
     File tarFile = new File("dummy.tar");
     // second import should fail immediately
     StorageContainerException ex = assertThrows(StorageContainerException.class,
@@ -123,7 +127,7 @@ class TestContainerImporter {
     MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     ContainerImporter containerImporter = new ContainerImporter(conf,
-        containerSet, controllerMock, volumeSet);
+        containerSet, controllerMock, volumeSet, volumeChoosingPolicy);
     // run import async first time having delay
     File tarFile = containerTarFile(containerId, containerData);
     CompletableFuture.runAsync(() -> {
@@ -162,7 +166,7 @@ class TestContainerImporter {
     MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     ContainerImporter containerImporter = spy(new ContainerImporter(conf,
-        containerSet, controllerMock, volumeSet));
+        containerSet, controllerMock, volumeSet, volumeChoosingPolicy));
 
     TarContainerPacker packer = mock(TarContainerPacker.class);
     when(packer.unpackContainerDescriptor(any())).thenReturn("test".getBytes(

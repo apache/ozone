@@ -68,8 +68,7 @@ import org.slf4j.LoggerFactory;
  */
 public class HeartbeatEndpointTask
     implements Callable<EndpointStateMachine.EndPointStates> {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(HeartbeatEndpointTask.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HeartbeatEndpointTask.class);
   private final EndpointStateMachine rpcEndpoint;
   private DatanodeDetailsProto datanodeDetailsProto;
   private StateContext context;
