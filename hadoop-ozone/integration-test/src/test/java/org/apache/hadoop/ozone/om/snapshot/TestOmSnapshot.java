@@ -79,6 +79,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -90,7 +91,6 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -2307,7 +2307,7 @@ public abstract class TestOmSnapshot {
       try (OzoneInputStream ozoneInputStream =
                ozoneBucketClient.readKey(keyName)) {
         byte[] fileContent = new byte[keyName.length()];
-        ozoneInputStream.read(fileContent);
+        IOUtils.readFully(ozoneInputStream, fileContent);
         assertEquals(keyName, new String(fileContent, UTF_8));
       }
     }
@@ -2346,7 +2346,7 @@ public abstract class TestOmSnapshot {
           if (snapKeyNameMatcher.matches()) {
             String truncatedSnapshotKeyName = snapKeyNameMatcher.group(3);
             byte[] fileContent = new byte[truncatedSnapshotKeyName.length()];
-            ozoneInputStream.read(fileContent);
+            IOUtils.readFully(ozoneInputStream, fileContent);
             assertEquals(truncatedSnapshotKeyName,
                 new String(fileContent, UTF_8));
           }
