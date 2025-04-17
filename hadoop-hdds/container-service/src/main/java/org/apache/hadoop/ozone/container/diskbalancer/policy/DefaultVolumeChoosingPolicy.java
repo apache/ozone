@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -37,7 +36,7 @@ public class DefaultVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
   @Override
   public Pair<HddsVolume, HddsVolume> chooseVolume(MutableVolumeSet volumeSet,
-      double threshold, Map<HddsVolume, Long> deltaMap) {
+      double threshold) {
     double idealUsage = volumeSet.getIdealUsage();
 
     List<HddsVolume> volumes = StorageVolumeUtil
@@ -45,13 +44,13 @@ public class DefaultVolumeChoosingPolicy implements VolumeChoosingPolicy {
         .stream()
         .filter(volume ->
             Math.abs(
-                (double) (volume.getCurrentUsage().getUsedSpace() + deltaMap.getOrDefault(volume, 0L))
+                (double) (volume.getCurrentUsage().getUsedSpace() + volume.getCommittedBytes())
                     / volume.getCurrentUsage().getCapacity() - idealUsage) >= threshold)
         .sorted((v1, v2) ->
             Double.compare(
-                (double) (v2.getCurrentUsage().getUsedSpace() + deltaMap.getOrDefault(v2, 0L)) /
+                (double) (v2.getCurrentUsage().getUsedSpace() + v2.getCommittedBytes()) /
                     v2.getCurrentUsage().getCapacity(),
-                (double) (v1.getCurrentUsage().getUsedSpace() + deltaMap.getOrDefault(v1, 0L)) /
+                (double) (v1.getCurrentUsage().getUsedSpace() + v1.getCommittedBytes()) /
                     v1.getCurrentUsage().getCapacity()))
         .collect(Collectors.toList());
 
