@@ -126,9 +126,13 @@ public class Hadoop27RpcTransport implements OmTransport {
         throw new IOException(String.format("Could not find any configured client for OM node %s in service %s. " +
             "Please configure the system with %s", omNodeId, omServiceId, OZONE_OM_ADDRESS_KEY));
       }
+      // A guard rail to ensure that isDirect flag is always set
+      if (!payload.hasIsDirect()) {
+        payload = payload.toBuilder().setIsDirect(true).build();
+      }
       return singleRpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
     } catch (ServiceException e) {
-      throw new IOException("Could not connect to OM node " + omNodeId);
+      throw new IOException("Could not connect to OM node " + omNodeId + ": " + e);
     }
   }
 

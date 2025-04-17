@@ -355,7 +355,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       // The request is sent to the particular OM node without failover
       response = transport.submitRequest(
           omNodeId,
-          builder.setTraceID(TracingUtil.exportCurrentSpan()).build());
+          builder.setIsDirect(true).setTraceID(TracingUtil.exportCurrentSpan()).build());
     } else {
       // The request is eventually sent to the OM leader through failover mechanisms
       response = transport.submitRequest(
