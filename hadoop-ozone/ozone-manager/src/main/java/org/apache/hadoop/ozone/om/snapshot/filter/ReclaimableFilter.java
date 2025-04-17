@@ -46,8 +46,8 @@ import org.slf4j.LoggerFactory;
  * This class is responsible for opening last N snapshot given a snapshot metadata manager or AOS metadata manager by
  * acquiring a lock.
  */
-public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyValue<String, V>,
-    Boolean, IOException>, Closeable {
+public abstract class ReclaimableFilter<V>
+    implements CheckedFunction<Table.KeyValue<String, V>, Boolean, IOException>, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReclaimableFilter.class);
 
