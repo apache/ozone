@@ -50,7 +50,7 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
       if (!((ManagedBlockBasedTableConfig) previous).isClosed()) {
         throw new IllegalStateException("Overriding an unclosed value.");
       }
-    } else if (!(previous instanceof BlockBasedTableConfig) && previous != null) {
+    } else if (previous != null && !(previous instanceof BlockBasedTableConfig)) {
       //Note that the type of tableFormatConfig read directly from
       //the ini file is org.rocksdb.BlockBasedTableConfig
       throw new UnsupportedOperationException("Overwrite is not supported for "

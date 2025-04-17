@@ -54,41 +54,46 @@ import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
  * The keys would be encoded in a fix-length encoding style in order to
  * utilize the "Prefix Seek" feature from Rocksdb to optimize seek.
  */
-public class DatanodeSchemaThreeDBDefinition
-    extends AbstractDatanodeDBDefinition
+public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinition
     implements DBDefinition.WithMapInterface {
+  public static final String BLOCK_DATA_TABLE = "block_data";
+  public static final String METADATA_TABLE = "metadata";
+  public static final String DELETE_TXNS_TABLE = "delete_txns";
+  public static final String FINALIZE_BLOCKS_TABLE = "finalize_blocks";
+  public static final String LAST_CHUNK_INFO_TABLE = "last_chunk_info";
+
   public static final DBColumnFamilyDefinition<String, BlockData>
       BLOCK_DATA =
       new DBColumnFamilyDefinition<>(
-          "block_data",
+          BLOCK_DATA_TABLE,
           FixedLengthStringCodec.get(),
           BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
       METADATA =
       new DBColumnFamilyDefinition<>(
-          "metadata",
+          METADATA_TABLE,
           FixedLengthStringCodec.get(),
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, DeletedBlocksTransaction>
       DELETE_TRANSACTION =
       new DBColumnFamilyDefinition<>(
-          "delete_txns",
+          DELETE_TXNS_TABLE,
           FixedLengthStringCodec.get(),
           Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()));
 
   public static final DBColumnFamilyDefinition<String, Long>
       FINALIZE_BLOCKS =
       new DBColumnFamilyDefinition<>(
-          "finalize_blocks",
+          FINALIZE_BLOCKS_TABLE,
           FixedLengthStringCodec.get(),
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, BlockData>
       LAST_CHUNK_INFO =
       new DBColumnFamilyDefinition<>(
-          "last_chunk_info",
+          LAST_CHUNK_INFO_TABLE,
           FixedLengthStringCodec.get(),
           BlockData.getCodec());
 
