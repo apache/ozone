@@ -338,6 +338,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
             .setKeyName("key-one")
             .setOwnerName(
                 UserGroupInformation.getCurrentUser().getShortUserName())
+            .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(
@@ -353,6 +354,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
             .setKeyName("key-two")
             .setOwnerName(
                 UserGroupInformation.getCurrentUser().getShortUserName())
+            .setGroupName(UserGroupInformation.getCurrentUser().getPrimaryGroupName())
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(

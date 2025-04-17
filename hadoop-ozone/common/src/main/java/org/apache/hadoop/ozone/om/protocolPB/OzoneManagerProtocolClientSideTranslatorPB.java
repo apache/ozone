@@ -699,6 +699,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       keyArgs.setOwnerName(args.getOwner());
     }
 
+    if (args.getGroup() != null) {
+      keyArgs.setGroupName(args.getGroup());
+    }
+
     if (args.getAcls() != null) {
       keyArgs.addAllAcls(args.getAcls().stream().distinct().map(a ->
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
@@ -1660,6 +1664,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setKeyName(omKeyArgs.getKeyName())
         .addAllMetadata(KeyValueUtil.toProtobuf(omKeyArgs.getMetadata()))
         .setOwnerName(omKeyArgs.getOwner())
+        .setGroupName(omKeyArgs.getGroup())
         .addAllTags(KeyValueUtil.toProtobuf(omKeyArgs.getTags()));
 
     if (omKeyArgs.getAcls() != null) {
@@ -1738,6 +1743,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(omKeyArgs.getBucketName())
         .setKeyName(omKeyArgs.getKeyName())
         .setOwnerName(omKeyArgs.getOwner())
+        .setGroupName(omKeyArgs.getGroup())
         .setMultipartUploadID(omKeyArgs.getMultipartUploadID());
     if (omKeyArgs.getAcls() != null) {
       keyArgs.addAllAcls(omKeyArgs.getAcls().stream().map(a ->
@@ -2152,7 +2158,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
-        .setOwnerName(args.getOwner());
+        .setOwnerName(args.getOwner())
+        .setGroupName(args.getGroup());
     if (args.getAcls() != null) {
       keyArgsBuilder.addAllAcls(args.getAcls().stream().map(a ->
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
@@ -2320,7 +2327,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize())
-        .setOwnerName(args.getOwner());
+        .setOwnerName(args.getOwner())
+        .setGroupName(args.getGroup());
     if (args.getAcls() != null) {
       keyArgsBuilder.addAllAcls(args.getAcls().stream().map(a ->
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));

@@ -62,8 +62,10 @@ Create Bucket 1 Success via S3 API
     ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-buckets
                         Should contain   ${output}         bucket-test1
 
-Verify Bucket 1 Owner
+Verify Bucket 1 Owner and Group
     ${result} =         Execute          ozone sh bucket info /tenantone/bucket-test1 | jq -r '.owner'
+                        Should Be Equal  ${result}       testuser
+    ${result} =         Execute          ozone sh bucket info /tenantone/bucket-test1 | jq -r '.group'
                         Should Be Equal  ${result}       testuser
 
 Put a key in the tenant bucket

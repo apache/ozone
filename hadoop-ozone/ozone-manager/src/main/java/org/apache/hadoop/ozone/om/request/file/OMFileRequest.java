@@ -750,6 +750,7 @@ public final class OMFileRequest {
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setOwnerName(dirInfo.getOwner())
+        .setGroupName(dirInfo.getGroup())
         .build();
   }
 

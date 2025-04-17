@@ -1044,7 +1044,7 @@ public class BasicRootedOzoneClientAdapterImpl
         keyInfo.getModificationTime(),
         status.isDirectory() ? (short) 00777 : (short) 00666,
         StringUtils.defaultIfEmpty(keyInfo.getOwnerName(), owner),
-        owner,
+        StringUtils.defaultIfEmpty(keyInfo.getGroupName(), owner),
         null,
         getBlockLocations(status),
         OzoneClientUtils.isKeyEncrypted(keyInfo),
