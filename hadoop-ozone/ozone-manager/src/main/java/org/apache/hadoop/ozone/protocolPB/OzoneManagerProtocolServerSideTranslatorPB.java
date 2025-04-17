@@ -187,11 +187,26 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       throws ServiceException {
     // Check if this OM is the leader.
     RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
-    if (raftServerStatus == LEADER_AND_READY ||
-        request.getCmdType().equals(PrepareStatus)) {
+    boolean isDirectRequest = request.hasIsDirect() && request.getIsDirect();
+    if (raftServerStatus == LEADER_AND_READY || request.getCmdType().equals(PrepareStatus)) {
+      return handler.handleReadRequest(request);
+    } else if (raftServerStatus == NOT_LEADER && isDirectRequest && allowSnapshotReadFromFollower(request)) {
       return handler.handleReadRequest(request);
     } else {
       throw createLeaderErrorException(raftServerStatus);
+    }
+  }
+
+  private boolean allowSnapshotReadFromFollower(OMRequest omRequest) {
+    switch (omRequest.getCmdType()) {
+    case SnapshotDiff:
+    case ListSnapshot:
+    case GetSnapshotInfo:
+    case ListSnapshotDiffJobs:
+    case CancelSnapshotDiff:
+      return true;
+    default:
+      return false;
     }
   }
 
