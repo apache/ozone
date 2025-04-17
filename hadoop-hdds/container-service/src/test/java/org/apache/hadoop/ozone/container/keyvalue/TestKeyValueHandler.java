@@ -633,7 +633,7 @@ public class TestKeyValueHandler {
       // After reconciliation, checksums should be the same for all containers.
       ContainerProtos.ContainerChecksumInfo prevContainerChecksumInfo = null;
       for (KeyValueContainer kvContainer : containers) {
-        kvHandler.createContainerMerkleTree(kvContainer);
+        kvHandler.createContainerMerkleTreeFromMetadata(kvContainer);
         Optional<ContainerProtos.ContainerChecksumInfo> containerChecksumInfo =
             checksumManager.read(kvContainer.getContainerData());
         assertTrue(containerChecksumInfo.isPresent());
@@ -921,7 +921,7 @@ public class TestKeyValueHandler {
       handle.getStore().getBatchHandler().commitBatchOperation(batch);
     }
     Files.deleteIfExists(getContainerChecksumFile(keyValueContainer.getContainerData()).toPath());
-    kvHandler.createContainerMerkleTree(keyValueContainer);
+    kvHandler.createContainerMerkleTreeFromMetadata(keyValueContainer);
 
     // Corrupt chunks at an offset.
     List<BlockData> blockDataList = kvHandler.getBlockManager().listBlock(keyValueContainer, -1, 100);

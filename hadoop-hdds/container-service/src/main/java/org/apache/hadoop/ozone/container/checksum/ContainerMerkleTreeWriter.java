@@ -60,10 +60,28 @@ public class ContainerMerkleTreeWriter {
    * If the block entry already exists, the chunks will be added to the existing chunks for that block.
    *
    * @param blockID The ID of the block that these chunks belong to.
+   * @param healthy True if there were no errors detected with these chunks. False indicates that all the chunks
+   *                being added had errors.
    * @param chunks A list of chunks to add to this block. The chunks will be sorted internally by their offset.
    */
-  public void addChunks(long blockID, Collection<ContainerProtos.ChunkInfo> chunks) {
-    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new).addChunks(chunks);
+  public void addChunks(long blockID, boolean healthy, ContainerProtos.ChunkInfo... chunks) {
+    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new).addChunks(healthy, chunks);
+  }
+
+  public void addChunks(long blockID, boolean healthy, Collection<ContainerProtos.ChunkInfo> chunks) {
+    for (ContainerProtos.ChunkInfo chunk: chunks) {
+      addChunks(blockID, healthy, chunk);
+    }
+  }
+
+  /**
+   * Adds an empty block to the tree. This method is not a pre-requisite to {@code addChunks}.
+   * If the block entry already exists, it will not be modified.
+   *
+   * @param blockID The ID of the empty block to add to the tree
+   */
+  public void addBlock(long blockID) {
+    addChunks(blockID, true);
   }
 
   /**
@@ -110,11 +128,13 @@ public class ContainerMerkleTreeWriter {
      * Adds the specified chunks to this block. The offset value of the chunk must be unique within the block,
      * otherwise it will overwrite the previous value at that offset.
      *
+     * @param healthy True if there were no errors detected with these chunks. False indicates that all the chunks
+     *                being added had errors.
      * @param chunks A list of chunks to add to this block.
      */
-    public void addChunks(Collection<ContainerProtos.ChunkInfo> chunks) {
+    public void addChunks(boolean healthy, ContainerProtos.ChunkInfo... chunks) {
       for (ContainerProtos.ChunkInfo chunk: chunks) {
-        offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTreeWriter(chunk));
+        offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTreeWriter(chunk, healthy));
       }
     }
 
@@ -160,10 +180,10 @@ public class ContainerMerkleTreeWriter {
     private final boolean isHealthy;
     private final long dataChecksum;
 
-    ChunkMerkleTreeWriter(ContainerProtos.ChunkInfo chunk) {
+    ChunkMerkleTreeWriter(ContainerProtos.ChunkInfo chunk, boolean healthy) {
       length = chunk.getLen();
       offset = chunk.getOffset();
-      isHealthy = true;
+      isHealthy = healthy;
       ChecksumByteBuffer checksumImpl = CHECKSUM_BUFFER_SUPPLIER.get();
       for (ByteString checksum: chunk.getChecksumData().getChecksumsList()) {
         checksumImpl.update(checksum.asReadOnlyByteBuffer());

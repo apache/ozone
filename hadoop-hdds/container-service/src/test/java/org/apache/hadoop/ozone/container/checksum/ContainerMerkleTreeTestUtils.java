@@ -17,6 +17,17 @@
 
 package org.apache.hadoop.ozone.container.checksum;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.getContainerChecksumFile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,7 +38,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -148,11 +158,10 @@ public final class ContainerMerkleTreeTestUtils {
     ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
     byte byteValue = 1;
     for (int blockIndex = 1; blockIndex <= numBlocks; blockIndex++) {
-      List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>();
       for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
-        chunks.add(buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+        tree.addChunks(blockIndex, true,
+            buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
       }
-      tree.addChunks(blockIndex, chunks);
     }
     return tree;
   }
@@ -333,10 +342,9 @@ public final class ContainerMerkleTreeTestUtils {
   /**
    * This function checks whether the container checksum file exists.
    */
-  public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode,
-                                                    ContainerInfo containerInfo) {
+  public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode, long containerID) {
     OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
-    Container container = ozoneContainer.getController().getContainer(containerInfo.getContainerID());
+    Container<?> container = ozoneContainer.getController().getContainer(containerID);
     return ContainerChecksumTreeManager.checksumFileExist(container);
   }
 

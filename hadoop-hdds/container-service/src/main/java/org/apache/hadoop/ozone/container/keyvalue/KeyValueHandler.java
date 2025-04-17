@@ -626,13 +626,18 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-
   /**
-   * Create a Merkle tree for the container if it does not exist.
+   * Write the merkle tree for this container using the existing checksum metadata only. The data is not read or
+   * validated by this method, so it is expected to run quickly.
+   *
+   * If a checksum file already exists on the disk, this method will do nothing. The existing file would have either
+   * been made from the metadata or data itself so there is no need to recreate it from the metadata.
+   *
    * TODO: This method should be changed to private after HDDS-10374 is merged.
+   *
+   * @param container The container which will have a tree generated.
    */
-  @VisibleForTesting
-  public void createContainerMerkleTree(Container container) {
+  public void createContainerMerkleTreeFromMetadata(Container container) {
     if (ContainerChecksumTreeManager.checksumFileExist(container)) {
       return;
     }
@@ -1393,7 +1398,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTree(container);
+    createContainerMerkleTreeFromMetadata(container);
     ContainerLogger.logClosing(container.getContainerData());
     sendICR(container);
   }
@@ -1426,7 +1431,6 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTree(container);
     // Even if the container file is corrupted/missing and the unhealthy
     // update fails, the unhealthy state is kept in memory and sent to
     // SCM. Write a corresponding entry to the container log as well.
@@ -1457,7 +1461,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTree(container);
+    createContainerMerkleTreeFromMetadata(container);
     ContainerLogger.logQuasiClosed(container.getContainerData(), reason);
     sendICR(container);
   }
@@ -1491,7 +1495,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTree(container);
+    createContainerMerkleTreeFromMetadata(container);
     ContainerLogger.logClosed(container.getContainerData());
     sendICR(container);
   }
@@ -1599,12 +1603,12 @@ public class KeyValueHandler extends Handler {
         BlockData blockData = blockIterator.nextBlock();
         List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
         // TODO: Add empty blocks to the merkle tree. Done in HDDS-10374, needs to be backported.
-        merkleTree.addChunks(blockData.getLocalID(), chunkInfos);
+        // Assume all chunks are healthy when building the tree from metadata. Scanner will identify corruption when
+        // it runs after.
+        merkleTree.addChunks(blockData.getLocalID(), true, chunkInfos);
       }
     }
-    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager
-        .writeContainerDataTree(containerData, merkleTree);
-    return checksumInfo;
+    return checksumManager.writeContainerDataTree(containerData, merkleTree);
   }
 
   /**

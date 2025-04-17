@@ -17,6 +17,41 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdfs.util.Canceler;
+import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerDiffReport;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
+import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.RandomAccessFile;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.CORRUPT_BLOCK;
 import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.CORRUPT_CONTAINER_FILE;
 import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_BLOCK;
@@ -31,36 +66,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
-
-import java.io.File;
-import java.io.RandomAccessFile;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdfs.util.Canceler;
-import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test the KeyValueContainerCheck class's ability to detect container errors.
@@ -154,13 +159,22 @@ public class TestKeyValueContainerCheck
 
     DataScanResult result = kvCheck.fullCheck(throttler, null);
     assertTrue(result.isHealthy());
+    // The scanner would write the checksum file to disk. `KeyValueContainerCheck` does not, so we will create the
+    // result here.
+    ContainerProtos.ContainerChecksumInfo healthyChecksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerID(containerID)
+        .setContainerMerkleTree(result.getDataTree().toProto())
+        .build();
 
     // Put different types of block failures in the middle of the container.
-    CORRUPT_BLOCK.applyTo(container, 1);
-    MISSING_BLOCK.applyTo(container, 2);
-    TRUNCATED_BLOCK.applyTo(container, 4);
+    long corruptBlockID = 1;
+    long missingBlockID = 2;
+    long truncatedBlockID = 4;
+    CORRUPT_BLOCK.applyTo(container, corruptBlockID);
+    MISSING_BLOCK.applyTo(container, missingBlockID);
+    TRUNCATED_BLOCK.applyTo(container, truncatedBlockID);
     List<FailureType> expectedErrors = new ArrayList<>();
-    // Corruption is applied to two different chunks within the block.
+    // Corruption is applied to two different chunks within the block, so the error will be raised twice.
     expectedErrors.add(CORRUPT_BLOCK.getExpectedResult());
     expectedErrors.add(CORRUPT_BLOCK.getExpectedResult());
     expectedErrors.add(MISSING_BLOCK.getExpectedResult());
@@ -175,12 +189,42 @@ public class TestKeyValueContainerCheck
 
     assertFalse(result.isHealthy());
     // Check that all data errors were detected in order.
-    // TODO HDDS-10374 Use merkle tree to check the actual content affected by the errors.
     assertEquals(expectedErrors.size(), result.getErrors().size());
     List<FailureType> actualErrors = result.getErrors().stream()
         .map(ContainerScanError::getFailureType)
         .collect(Collectors.toList());
     assertEquals(expectedErrors, actualErrors);
+
+    // Write the new tree into the container, as the scanner would do.
+    ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
+    KeyValueContainerData containerData = container.getContainerData();
+    checksumManager.writeContainerDataTree(containerData, result.getDataTree());
+    // This will read the corrupted tree from the disk, which represents the current state of the container, and
+    // compare it against the original healthy tree. The diff we get back should match the failures we injected.
+    Optional<ContainerProtos.ContainerChecksumInfo> generatedChecksumInfo = checksumManager.read(containerData);
+    assertTrue(generatedChecksumInfo.isPresent());
+    ContainerDiffReport diffReport = checksumManager.diff(generatedChecksumInfo.get(), healthyChecksumInfo);
+
+    LOG.info("Diff of healthy container with actual container {}", diffReport);
+
+    // Check that the new tree identified all the expected errors by checking the diff.
+    Map<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks = diffReport.getCorruptChunks();
+    // One block had corrupted chunks.
+    assertEquals(1, corruptChunks.size());
+    List<ContainerProtos.ChunkMerkleTree> corruptChunksInBlock = corruptChunks.get(corruptBlockID);
+    assertEquals(2, corruptChunksInBlock.size());
+
+    // One block was truncated which resulted in all of its chunks being reported as missing.
+    Map<Long, List<ContainerProtos.ChunkMerkleTree>> missingChunks = diffReport.getMissingChunks();
+    assertEquals(1, missingChunks.size());
+    List<ContainerProtos.ChunkMerkleTree> missingChunksInBlock = missingChunks.get(truncatedBlockID);
+    assertEquals(CHUNKS_PER_BLOCK, missingChunksInBlock.size());
+
+    // Check missing block was correctly identified in the tree diff.
+    List<ContainerProtos.BlockMerkleTree> missingBlocks = diffReport.getMissingBlocks();
+    assertEquals(1, missingBlocks.size());
+    assertEquals(missingBlockID, missingBlocks.get(0).getBlockID());
+
   }
 
   /**

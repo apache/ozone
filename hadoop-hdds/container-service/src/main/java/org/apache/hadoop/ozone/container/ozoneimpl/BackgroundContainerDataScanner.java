@@ -92,6 +92,13 @@ public class BackgroundContainerDataScanner extends
     if (result.isDeleted()) {
       LOG.debug("Container [{}] has been deleted during the data scan.", containerId);
     } else {
+      // Merkle tree write failure should not abort the scanning process. Continue marking the scan as completed.
+      try {
+        checksumManager.writeContainerDataTree(containerData, result.getDataTree());
+      } catch (IOException ex) {
+        LOG.error("Failed to write container merkle tree for container {}", containerId, ex);
+      }
+
       if (!result.isHealthy()) {
         logUnhealthyScanResult(containerId, result, LOG);
 
@@ -103,17 +110,15 @@ public class BackgroundContainerDataScanner extends
           metrics.incNumUnHealthyContainers();
         }
       }
-      checksumManager.writeContainerDataTree(containerData, result.getDataTree());
       metrics.incNumContainersScanned();
     }
 
-    // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
     Instant now = Instant.now();
-    logScanCompleted(containerData, now);
-
     if (!result.isDeleted()) {
       controller.updateDataScanTimestamp(containerId, now);
     }
+    // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
+    logScanCompleted(containerData, now);
   }
 
   @Override
