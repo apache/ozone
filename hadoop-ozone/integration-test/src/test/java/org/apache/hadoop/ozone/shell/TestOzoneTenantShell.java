@@ -132,8 +132,7 @@ public class TestOzoneTenantShell {
     }
 
     testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
-    testFile.getParentFile().mkdirs();
-    testFile.createNewFile();
+    FileUtils.touch(testFile);
 
     ozoneSh = new OzoneShell();
     tenantShell = new TenantShell();
