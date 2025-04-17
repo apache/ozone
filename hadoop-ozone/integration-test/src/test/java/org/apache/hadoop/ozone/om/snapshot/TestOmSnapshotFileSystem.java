@@ -89,7 +89,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
@@ -163,7 +163,7 @@ public abstract class TestOmSnapshotFileSystem {
     keyManager.stop();
   }
 
-  @BeforeEach
+  @BeforeAll
   public void setupFsClient() throws IOException {
     String rootPath = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucketName, VOLUME_NAME);
@@ -178,6 +178,7 @@ public abstract class TestOmSnapshotFileSystem {
   @AfterAll
   void tearDown() {
     IOUtils.closeQuietly(client);
+    IOUtils.closeQuietly(fs);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -210,9 +211,6 @@ public abstract class TestOmSnapshotFileSystem {
         return false;
       }
     }, 1000, 120000);
-
-    IOUtils.closeQuietly(fs);
-    IOUtils.closeQuietly(o3fs);
   }
 
   @Test

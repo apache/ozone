@@ -49,6 +49,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRI
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -199,6 +200,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -2204,20 +2206,21 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       configuration.setFromObject(clientConfig);
 
       RpcClient client = new RpcClient(configuration, null);
-      try (InputStream is = client.getKey(volumeName, bucketName, keyName)) {
-        IOUtils.readFully(is, new byte[100]);
+      try {
+        int len = Math.toIntExact(client.getKeyDetails(volumeName, bucketName, keyName).getDataSize());
+        try (InputStream is = client.getKey(volumeName, bucketName, keyName)) {
+          Executable read = () -> IOUtils.readFully(is, len);
+          if (verifyChecksum) {
+            assertThrows(IOException.class, read);
+          } else {
+            assertDoesNotThrow(read);
+          }
+        }
       } finally {
         client.close();
       }
-      if (verifyChecksum) {
-        fail("Reading corrupted data should fail, as verify checksum is " +
-            "enabled");
-      }
-    } catch (IOException e) {
-      if (!verifyChecksum) {
-        fail("Reading corrupted data should not fail, as verify checksum is " +
-            "disabled");
-      }
+    } catch (IOException ignored) {
+      // ignore
     }
   }
 
@@ -2445,8 +2448,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // Try reading keyName2
     GenericTestUtils.setLogLevel(XceiverClientGrpc.class, DEBUG);
     try (OzoneInputStream is = bucket.readKey(keyName2)) {
-      byte[] content = new byte[100];
-      IOUtils.readFully(is, content);
+      byte[] content = IOUtils.readFully(is, Math.toIntExact(bucket.getKey(keyName2).getDataSize()));
       String retValue = new String(content, UTF_8);
       assertEquals(value, retValue.trim());
     }
