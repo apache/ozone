@@ -136,10 +136,10 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
   private Optional<File> findFirstBlockFile(Container<?> container, String fileName) {
     Objects.requireNonNull(container, "Container cannot be null");
     File chunksDir = new File(container.getContainerData().getContainerPath(), CHUNKS_DIR_NAME);
-    return Arrays.stream(Objects.requireNonNull(
-        chunksDir.listFiles((dir, name) -> name.contains(fileName)
-            && name.endsWith(BLOCK_FILE_EXTENSION))))
-        .findFirst();
+    Optional<File[]> files = Optional.ofNullable(chunksDir.listFiles((dir, name)
+        -> name.contains(fileName) && name.endsWith(BLOCK_FILE_EXTENSION)));
+    assertTrue(files.isPresent(), "No block files found in the container.");
+    return Arrays.stream(files.get()).findFirst();
   }
 
   public void corruptBlock(Container<?> container, String fileName) {
