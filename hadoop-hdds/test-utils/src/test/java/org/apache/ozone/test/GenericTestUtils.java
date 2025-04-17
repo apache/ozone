@@ -56,9 +56,8 @@ import org.slf4j.LoggerFactory;
  * Provides some very generic helpers which might be used across the tests.
  */
 public abstract class GenericTestUtils {
-  public static final String SYSPROP_TEST_DATA_DIR = "test.build.data";
   public static final String DEFAULT_TEST_DATA_DIR;
-  public static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
+
   /**
    * Error string used in
    * {@link GenericTestUtils#waitFor(BooleanSupplier, int, int)}.
@@ -91,31 +90,6 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * Get a temp path. This may or may not be relative; it depends on what the
-   * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
-   * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
-   *
-   * @param subpath sub path, with no leading "/" character
-   * @return a string to use in paths
-   *
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   */
-  @Deprecated
-  public static String getTempPath(String subpath) {
-    String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
-        : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
-
-    if (prop.isEmpty()) {
-      // corner case: property is there but empty
-      prop = DEFAULT_TEST_DATA_PATH;
-    }
-    if (!prop.endsWith("/")) {
-      prop = prop + "/";
-    }
-    return prop + subpath;
-  }
-
-  /**
    * Wait for the specified test to return true. The test will be performed
    * initially and then every {@code checkEveryMillis} until at least
    * {@code waitForMillis} time has expired. If {@code check} is null or
@@ -133,7 +107,7 @@ public abstract class GenericTestUtils {
    * @throws InterruptedException if the method is interrupted while waiting
    */
   public static void waitFor(BooleanSupplier check, int checkEveryMillis,
-      int waitForMillis) throws TimeoutException, InterruptedException {
+                             int waitForMillis) throws TimeoutException, InterruptedException {
     Preconditions.checkNotNull(check, ERROR_MISSING_ARGUMENT);
     Preconditions.checkArgument(waitForMillis >= checkEveryMillis,
         ERROR_INVALID_ARGUMENT);
@@ -176,7 +150,7 @@ public abstract class GenericTestUtils {
   }
 
   public static void setLogLevel(org.slf4j.Logger logger,
-      org.slf4j.event.Level level) {
+                                 org.slf4j.event.Level level) {
     setLogLevel(toLog4j(logger), Level.toLevel(level.toString()));
   }
 
@@ -197,7 +171,7 @@ public abstract class GenericTestUtils {
   }
 
   public static <T> T mockFieldReflection(Object object, String fieldName)
-          throws NoSuchFieldException, IllegalAccessException {
+      throws NoSuchFieldException, IllegalAccessException {
     Field field = object.getClass().getDeclaredField(fieldName);
     boolean isAccessible = field.isAccessible();
 
@@ -217,7 +191,7 @@ public abstract class GenericTestUtils {
   }
 
   public static <T> T getFieldReflection(Object object, String fieldName)
-          throws NoSuchFieldException, IllegalAccessException {
+      throws NoSuchFieldException, IllegalAccessException {
     Field field = object.getClass().getDeclaredField(fieldName);
     boolean isAccessible = field.isAccessible();
 
@@ -237,7 +211,7 @@ public abstract class GenericTestUtils {
   public static <K, V> Map<V, K> getReverseMap(Map<K, List<V>> map) {
     return map.entrySet().stream().flatMap(entry -> entry.getValue().stream()
             .map(v -> Pair.of(v, entry.getKey())))
-            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+        .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
   }
 
   /**
@@ -281,6 +255,7 @@ public abstract class GenericTestUtils {
       writer().getBuffer().setLength(0);
     }
   }
+
   @Deprecated
   public static Logger toLog4j(org.slf4j.Logger logger) {
     return LogManager.getLogger(logger.getName());
@@ -298,7 +273,9 @@ public abstract class GenericTestUtils {
     return new SystemErrCapturer();
   }
 
-  /** Capture contents of a {@code PrintStream}, until {@code close()}d. */
+  /**
+   * Capture contents of a {@code PrintStream}, until {@code close()}d.
+   */
   public abstract static class PrintStreamCapturer implements AutoCloseable, Supplier<String> {
     private final ByteArrayOutputStream bytes;
     private final PrintStream bytesPrintStream;
@@ -377,6 +354,7 @@ public abstract class GenericTestUtils {
 
   /**
    * Replaces {@link System#in} with a stream that provides {@code lines} as input.
+   *
    * @return an {@code AutoCloseable} to restore the original {@link System#in} stream
    */
   public static AutoCloseable supplyOnSystemIn(String... lines) {
@@ -456,9 +434,10 @@ public abstract class GenericTestUtils {
     /**
      * This method provides the modifiers field using reflection approach which is compatible
      * for both pre Java 9 and post java 9 versions.
+     *
      * @return modifiers field
      * @throws IllegalAccessException illegalAccessException,
-     * @throws NoSuchFieldException noSuchFieldException.
+     * @throws NoSuchFieldException   noSuchFieldException.
      */
     public static Field getModifiersField() throws IllegalAccessException, NoSuchFieldException {
       Field modifiersField = null;
