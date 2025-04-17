@@ -260,7 +260,9 @@ public abstract class AbstractContractCopyFromLocalTest extends
     Files.createTempFile(srcDir, "test1", ".txt");
 
     Path src = new Path(srcDir.toUri());
-    Path dst = path(srcDir.getFileName().toString());
+    java.nio.file.Path fileName = srcDir.getFileName();
+    Assertions.assertThat(fileName).isNotNull();
+    Path dst = path(fileName.toString());
     getFileSystem().copyFromLocalFile(true, true, src, dst);
 
     Assertions.assertThat(srcDir)

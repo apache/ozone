@@ -41,7 +41,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -353,7 +352,9 @@ public class TestOMRatisSnapshots {
     int hardLinkCount = 0;
     try (Stream<Path> list = Files.list(leaderSnapshotDir)) {
       for (Path leaderSnapshotSST: list.collect(Collectors.toList())) {
-        String fileName = leaderSnapshotSST.getFileName().toString();
+        Path path = leaderSnapshotSST.getFileName();
+        assertNotNull(path);
+        String fileName = path.toString();
         if (fileName.toLowerCase().endsWith(".sst")) {
 
           Path leaderActiveSST =
@@ -1009,8 +1010,9 @@ public class TestOMRatisSnapshots {
     // Corrupt the leader checkpoint and install that on the OM. The
     // operation should fail and OM should shutdown.
     boolean delete = true;
-    for (File file : leaderCheckpointLocation.toFile()
-        .listFiles()) {
+    File[] files = leaderCheckpointLocation.toFile().listFiles();
+    assertNotNull(files);
+    for (File file : files) {
       if (file.getName().contains(".sst")) {
         if (delete) {
           FileUtils.deleteQuietly(file);
@@ -1111,7 +1113,9 @@ public class TestOMRatisSnapshots {
       throws IOException {
     File snapshotDir = followerOm.getOmSnapshotProvider().getSnapshotDir();
     // Find the latest tarball.
-    String tarBall = Arrays.stream(Objects.requireNonNull(snapshotDir.list())).
+    String[] list = snapshotDir.list();
+    assertNotNull(list);
+    String tarBall = Arrays.stream(list).
         filter(s -> s.toLowerCase().endsWith(".tar")).
         reduce("", (s1, s2) -> s1.compareToIgnoreCase(s2) > 0 ? s1 : s2);
     FileUtil.unTar(new File(snapshotDir, tarBall), tempDir.toFile());
