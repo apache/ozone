@@ -356,16 +356,16 @@ public class SCMClientProtocolServer implements
                 .setReplicaIndex(r.getReplicaIndex()).build()
         );
       }
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
+          auditMap));
+      return results;
     } catch (Exception ex) {
       AUDIT.logReadFailure(buildAuditMessageForFailure(
           SCMAction.GET_CONTAINER_REPLICAS,
           auditMap, ex));
       throw ex;
     }
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-        SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
-        auditMap));
-    return results;
   }
 
   @Override
@@ -632,25 +632,24 @@ public class SCMClientProtocolServer implements
           SCMAction.QUERY_NODE, auditMap, ex));
       throw ex;
     }
-
-    List<HddsProtos.Node> result = new ArrayList<>();
-    for (DatanodeDetails node : queryNode(opState, state)) {
-      try {
+    try {
+      List<HddsProtos.Node> result = new ArrayList<>();
+      for (DatanodeDetails node : queryNode(opState, state)) {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
         result.add(HddsProtos.Node.newBuilder()
             .setNodeID(node.toProto(clientVersion))
             .addNodeStates(ns.getHealth())
             .addNodeOperationalStates(ns.getOperationalState())
             .build());
-      } catch (NodeNotFoundException e) {
-        AUDIT.logReadFailure(buildAuditMessageForFailure(
-            SCMAction.QUERY_NODE, auditMap, e));
-        throw new IOException("An unexpected error occurred querying the NodeStatus", e);
       }
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.QUERY_NODE, auditMap));
+      return result;
+    } catch (NodeNotFoundException e) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.QUERY_NODE, auditMap, e));
+      throw new IOException("An unexpected error occurred querying the NodeStatus", e);
     }
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-        SCMAction.QUERY_NODE, auditMap));
-    return result;
   }
 
   @Override
@@ -894,8 +893,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public ScmInfo getScmInfo() {
-    boolean auditSuccess = true;
+  public ScmInfo getScmInfo() throws IOException {
     try {
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
@@ -918,7 +916,6 @@ public class SCMClientProtocolServer implements
   public void transferLeadership(String newLeaderId)
       throws IOException {
 
-    boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("newLeaderId", newLeaderId);
     try {
