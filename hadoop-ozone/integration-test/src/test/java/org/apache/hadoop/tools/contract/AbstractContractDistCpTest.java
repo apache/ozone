@@ -435,7 +435,7 @@ public abstract class AbstractContractDistCpTest
             .withDirectWrite(shouldUseDirectWrite())
             .withOverwrite(false)));
 
-    lsR("tracked udpate", remoteFS, destDir);
+    lsR("tracked update", remoteFS, destDir);
     // new file went over
     Path outputFileNew1 = new Path(outputSubDir2, "newfile1");
     ContractTestUtils.assertIsFile(remoteFS, outputFileNew1);

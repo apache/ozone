@@ -99,7 +99,7 @@ public final class ReplicationManagerUtil {
       }
     }
     throw new SCMException(String.format("Placement Policy: %s did not return"
-            + " any nodes. Number of required Nodes %d, Datasize Required: %d",
+            + " any nodes. Number of required Nodes %d, Data size Required: %d",
         policy.getClass(), requiredNodes, dataSizeRequired),
         SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
   }
