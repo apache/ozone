@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
@@ -32,12 +31,11 @@ import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.metrics.SegmentedRaftLogMetrics;
+import org.apache.ratis.server.raftlog.segmented.LogSegment;
 import org.apache.ratis.server.raftlog.segmented.LogSegmentPath;
-import org.apache.ratis.server.raftlog.segmented.LogSegmentStartEnd;
-import org.apache.ratis.server.raftlog.segmented.SegmentedRaftLogInputStream;
 import org.apache.ratis.server.raftlog.segmented.SegmentedRaftLogOutputStream;
-import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.SizeInBytes;
 import picocli.CommandLine;
 
@@ -82,6 +80,8 @@ public class OMRatisLogRepair extends RepairTool {
       required = true,
       description = "Index of the failing transaction that should be removed")
   private long index;
+
+  private SegmentedRaftLogOutputStream outputStream = null;
 
   @Override
   public void execute() throws Exception {
@@ -130,105 +130,75 @@ public class OMRatisLogRepair extends RepairTool {
 
     info("Processing Raft Log file: " + this.exclusiveArguments.segmentFile.getAbsolutePath() + " size:" +
         this.exclusiveArguments.segmentFile.length());
-    SegmentedRaftLogOutputStream outputStream = null;
 
-    try (SegmentedRaftLogInputStream logInputStream = getInputStream(pi)) {
-      if (!isDryRun()) {
-        outputStream = new SegmentedRaftLogOutputStream(outputFile, false,
-            1024, 1024, ByteBuffer.allocateDirect(SizeInBytes.valueOf("8MB").getSizeInt()));
-      }
+    if (!isDryRun()) {
+      outputStream = new SegmentedRaftLogOutputStream(outputFile, false,
+          1024, 1024, ByteBuffer.allocateDirect(SizeInBytes.valueOf("8MB").getSizeInt()));
+    }
 
-      RaftProtos.LogEntryProto next;
-      for (RaftProtos.LogEntryProto prev = null; (next = logInputStream.nextEntry()) != null; prev = next) {
-        if (prev != null) {
-          Preconditions.assertTrue(next.getIndex() == prev.getIndex() + 1L,
-              "gap between entry %s and entry %s", prev, next);
-        }
+    int entryCount = LogSegment.readSegmentFile(exclusiveArguments.segmentFile, pi.getStartEnd(),
+        SizeInBytes.valueOf("32MB"), RaftServerConfigKeys.Log.CorruptionPolicy.EXCEPTION, null, this::processLogEntry);
+    if (!isDryRun()) {
+      outputStream.flush();
+      outputStream.close();
+      Files.move(outputFile.toPath(), exclusiveArguments.segmentFile.toPath(),
+          StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+    }
+    info("Moved temporary output file to correct raft log location : " + exclusiveArguments.segmentFile.toPath());
 
-        if (next.getIndex() != index) {
-          // all other logs will be written as it is
-          if (!isDryRun()) {
-            outputStream.write(next);
-            outputStream.flush();
-          }
-          info("Copied raft log for index (" + next.getIndex() + ").");
-        } else {
-          // replace the transaction with a dummy OmEcho operation
-          OzoneManagerProtocolProtos.OMRequest oldRequest = OMRatisHelper
-              .convertByteStringToOMRequest(next.getStateMachineLogEntry().getLogData());
-          OzoneManagerProtocolProtos.OMRequest.Builder newRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setCmdType(EchoRPC)
-              .setClientId(oldRequest.getClientId())
-              .setEchoRPCRequest(OzoneManagerProtocolProtos.EchoRPCRequest.newBuilder().build());
-
-          if (oldRequest.hasUserInfo()) {
-            newRequest.setUserInfo(oldRequest.getUserInfo());
-          }
-          if (oldRequest.hasTraceID()) {
-            newRequest.setTraceID(oldRequest.getTraceID());
-          }
-          if (oldRequest.hasLayoutVersion()) {
-            newRequest.setLayoutVersion(oldRequest.getLayoutVersion());
-          }
-          if (oldRequest.hasVersion()) {
-            newRequest.setVersion(oldRequest.getVersion());
-          }
-
-          RaftProtos.StateMachineLogEntryProto oldEntry = next.getStateMachineLogEntry();
-          RaftProtos.StateMachineLogEntryProto.Builder newEntry =
-              RaftProtos.StateMachineLogEntryProto.newBuilder()
-                  .setCallId(oldEntry.getCallId())
-                  .setClientId(oldEntry.getClientId())
-                  .setType(oldEntry.getType())
-                  .setLogData(OMRatisHelper.convertRequestToByteString(newRequest.build()));
-          if (oldEntry.hasStateMachineEntry()) {
-            newEntry.setStateMachineEntry(oldEntry.getStateMachineEntry());
-          }
-
-          RaftProtos.LogEntryProto newLogEntry = RaftProtos.LogEntryProto.newBuilder()
-              .setTerm(next.getTerm())
-              .setIndex(next.getIndex())
-              .setStateMachineLogEntry(newEntry)
-              .build();
-
-          if (!isDryRun()) {
-            outputStream.write(newLogEntry);
-            outputStream.flush();
-          }
-          info("Replaced {" + oldRequest + "} with EchoRPC command at index "
-              + next.getIndex());
-        }
-      }
-
-      if (!isDryRun()) {
-        outputStream.flush();
-        outputStream.close();
-        Files.move(outputFile.toPath(), exclusiveArguments.segmentFile.toPath(),
-            StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-      }
-      info("Moved temporary output file to correct raft log location : " + exclusiveArguments.segmentFile.toPath());
-
-    } finally {
-      if (outputStream != null) {
-        outputStream.flush();
-        outputStream.close();
-      }
+    if (outputStream != null) {
+      outputStream.flush();
+      outputStream.close();
     }
   }
 
-  private SegmentedRaftLogInputStream getInputStream(LogSegmentPath pi) throws Exception {
-    Class<?> logInputStreamClass =
-        Class.forName("org.apache.ratis.server.raftlog.segmented.SegmentedRaftLogInputStream");
-    Constructor<?> constructor = logInputStreamClass.getDeclaredConstructor(File.class, LogSegmentStartEnd.class,
-        SizeInBytes.class, SegmentedRaftLogMetrics.class);
-    constructor.setAccessible(true);
-    SegmentedRaftLogInputStream inputStream =
-        (SegmentedRaftLogInputStream) constructor.newInstance(exclusiveArguments.segmentFile, pi.getStartEnd(),
-            SizeInBytes.valueOf("32MB"), null);
-    if (inputStream == null) {
-      throw new RuntimeException("logInputStream is null. Constructor might have failed.");
+  public void processLogEntry(RaftProtos.LogEntryProto proto) {
+    try {
+      if (proto.getIndex() != index) {
+        // all other logs will be written as it is
+        if (!isDryRun()) {
+          outputStream.write(proto);
+          outputStream.flush();
+        }
+        info("Copied raft log for index (" + proto.getIndex() + ").");
+      } else {
+        // replace the transaction with a dummy OmEcho operation
+        RaftProtos.StateMachineLogEntryProto oldEntry = proto.getStateMachineLogEntry();
+        OzoneManagerProtocolProtos.OMRequest.Builder newRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(EchoRPC)
+            .setClientId("skip-ratis-transaction-repair-tool")
+            .setEchoRPCRequest(OzoneManagerProtocolProtos.EchoRPCRequest.newBuilder().build());
+
+        info("Retaining the same { callid: " + oldEntry.getCallId() + ", clientID: " +
+            oldEntry.getClientId().toString() + ", type: " + oldEntry.getType() +
+            " } for EchoRPC as the old request");
+
+        RaftProtos.StateMachineLogEntryProto.Builder newEntry =
+            RaftProtos.StateMachineLogEntryProto.newBuilder()
+              .setCallId(oldEntry.getCallId())
+              .setClientId(oldEntry.getClientId())
+              .setType(oldEntry.getType())
+                .setLogData(OMRatisHelper.convertRequestToByteString(newRequest.build()));
+
+        RaftProtos.LogEntryProto newLogEntry = RaftProtos.LogEntryProto.newBuilder()
+            .setTerm(proto.getTerm())
+            .setIndex(proto.getIndex())
+            .setStateMachineLogEntry(newEntry)
+            .build();
+
+        if (!isDryRun()) {
+          outputStream.write(newLogEntry);
+          outputStream.flush();
+        }
+
+        OzoneManagerProtocolProtos.OMRequest oldRequest = OMRatisHelper
+            .convertByteStringToOMRequest(oldEntry.getLogData());
+        info("Replaced {" + oldRequest.toString().replace("\n", "  ")
+            + "} with EchoRPC command at index " + proto.getIndex());
+      }
+    } catch (IOException ex) {
+      throw new RuntimeException("Error while processing logEntry: (" + proto.getIndex() + "). Exception: " + ex);
     }
-    return inputStream;
   }
 
   private File findSegmentFileContainingIndex() {
