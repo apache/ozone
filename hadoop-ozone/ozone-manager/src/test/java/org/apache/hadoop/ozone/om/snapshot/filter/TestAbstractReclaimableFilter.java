@@ -98,30 +98,28 @@ public abstract class TestAbstractReclaimableFilter {
   private SnapshotChainManager snapshotChainManager;
   private KeyManager keyManager;
 
-  protected abstract ReclaimableFilter initializeFilter(OzoneManager om, OmSnapshotManager snapshotManager,
-                                                        SnapshotChainManager chainManager,
-                                                        SnapshotInfo currentSnapshotInfo, KeyManager km,
-                                                        IOzoneManagerLock lock, int numberOfPreviousSnapshotsFromChain);
+  protected abstract ReclaimableFilter initializeFilter(
+      OzoneManager om, OmSnapshotManager snapshotManager, SnapshotChainManager chainManager,
+      SnapshotInfo currentSnapshotInfo, KeyManager km, IOzoneManagerLock lock, int numberOfPreviousSnapshotsFromChain);
 
-  protected SnapshotInfo setup(int numberOfPreviousSnapshotsFromChain,
-                               int actualTotalNumberOfSnapshotsInChain, int index, int numberOfVolumes,
-                               int numberOfBucketsPerVolume) throws RocksDBException, IOException {
+  protected SnapshotInfo setup(
+      int numberOfPreviousSnapshotsFromChain, int actualTotalNumberOfSnapshotsInChain, int index, int numberOfVolumes,
+      int numberOfBucketsPerVolume) throws RocksDBException, IOException {
     return setup(numberOfPreviousSnapshotsFromChain, actualTotalNumberOfSnapshotsInChain, index, numberOfVolumes,
         numberOfBucketsPerVolume, (info) -> info, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
-  protected SnapshotInfo setup(int numberOfPreviousSnapshotsFromChain,
-                               int actualTotalNumberOfSnapshotsInChain, int index, int numberOfVolumes,
-                               int numberOfBucketsPerVolume, BucketLayout bucketLayout)
-      throws RocksDBException, IOException {
+  protected SnapshotInfo setup(
+      int numberOfPreviousSnapshotsFromChain, int actualTotalNumberOfSnapshotsInChain, int index, int numberOfVolumes,
+      int numberOfBucketsPerVolume, BucketLayout bucketLayout) throws RocksDBException, IOException {
     return setup(numberOfPreviousSnapshotsFromChain, actualTotalNumberOfSnapshotsInChain, index, numberOfVolumes,
         numberOfBucketsPerVolume, (info) -> info, bucketLayout);
   }
 
-  protected SnapshotInfo setup(int numberOfPreviousSnapshotsFromChain,
-                               int actualTotalNumberOfSnapshotsInChain, int index, int numberOfVolumes,
-                               int numberOfBucketsPerVolume, Function<SnapshotInfo, SnapshotInfo> snapshotProps,
-                               BucketLayout bucketLayout) throws IOException, RocksDBException {
+  protected SnapshotInfo setup(
+      int numberOfPreviousSnapshotsFromChain, int actualTotalNumberOfSnapshotsInChain, int index, int numberOfVolumes,
+      int numberOfBucketsPerVolume, Function<SnapshotInfo, SnapshotInfo> snapshotProps,
+      BucketLayout bucketLayout) throws IOException, RocksDBException {
     this.ozoneManager = mock(OzoneManager.class);
     this.snapshotChainManager = mock(SnapshotChainManager.class);
     this.keyManager = mock(KeyManager.class);
@@ -231,8 +229,8 @@ public abstract class TestAbstractReclaimableFilter {
     }
   }
 
-  protected List<SnapshotInfo> getLastSnapshotInfos(String volume, String bucket, int numberOfSnapshotsInChain,
-                                                    int index) {
+  protected List<SnapshotInfo> getLastSnapshotInfos(
+      String volume, String bucket, int numberOfSnapshotsInChain, int index) {
     List<SnapshotInfo> infos = getSnapshotInfos().get(getKey(volume, bucket));
     int endIndex = Math.min(index - 1, infos.size() - 1);
     return IntStream.range(endIndex - numberOfSnapshotsInChain + 1, endIndex + 1).mapToObj(i -> i >= 0 ?

@@ -58,10 +58,9 @@ import org.rocksdb.RocksDBException;
 public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
 
   @Override
-  protected ReclaimableFilter initializeFilter(OzoneManager om, OmSnapshotManager snapshotManager,
-                                               SnapshotChainManager chainManager,
-                                               SnapshotInfo currentSnapshotInfo, KeyManager km,
-                                               IOzoneManagerLock lock, int numberOfPreviousSnapshotsFromChain) {
+  protected ReclaimableFilter initializeFilter(
+      OzoneManager om, OmSnapshotManager snapshotManager, SnapshotChainManager chainManager,
+      SnapshotInfo currentSnapshotInfo, KeyManager km, IOzoneManagerLock lock, int numberOfPreviousSnapshotsFromChain) {
     return new ReclaimableFilter<Boolean>(om, snapshotManager, chainManager, currentSnapshotInfo,
         km, lock, numberOfPreviousSnapshotsFromChain) {
       @Override
@@ -99,9 +98,9 @@ public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
     return arguments;
   }
 
-  private void testSnapshotInitAndLocking(String volume, String bucket, int numberOfPreviousSnapshotsFromChain,
-                                          int index, SnapshotInfo currentSnapshotInfo, Boolean reclaimable,
-                                          Boolean expectedReturnValue) throws IOException {
+  private void testSnapshotInitAndLocking(
+      String volume, String bucket, int numberOfPreviousSnapshotsFromChain, int index, SnapshotInfo currentSnapshotInfo,
+      Boolean reclaimable, Boolean expectedReturnValue) throws IOException {
     List<SnapshotInfo> infos = getLastSnapshotInfos(volume, bucket, numberOfPreviousSnapshotsFromChain, index);
     assertEquals(expectedReturnValue,
         getReclaimableFilter().apply(Table.newKeyValue(getKey(volume, bucket), reclaimable)));
@@ -118,9 +117,9 @@ public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
 
   @ParameterizedTest
   @MethodSource("testReclaimableFilterArguments")
-  public void testReclaimableFilterSnapshotChainInitialization(int numberOfPreviousSnapshotsFromChain,
-                                                               int actualNumberOfSnapshots,
-                                                               int index) throws IOException, RocksDBException {
+  public void testReclaimableFilterSnapshotChainInitialization(
+      int numberOfPreviousSnapshotsFromChain, int actualNumberOfSnapshots, int index)
+      throws IOException, RocksDBException {
     SnapshotInfo currentSnapshotInfo =
         setup(numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots, index, 4, 2);
     String volume = getVolumes().get(3);
@@ -133,9 +132,9 @@ public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
 
   @ParameterizedTest
   @MethodSource("testReclaimableFilterArguments")
-  public void testReclaimableFilterWithBucketVolumeMismatch(int numberOfPreviousSnapshotsFromChain,
-                                                            int actualNumberOfSnapshots,
-                                                            int index) throws IOException, RocksDBException {
+  public void testReclaimableFilterWithBucketVolumeMismatch(
+      int numberOfPreviousSnapshotsFromChain, int actualNumberOfSnapshots, int index)
+      throws IOException, RocksDBException {
     SnapshotInfo currentSnapshotInfo =
         setup(numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots, index, 4, 4);
     AtomicReference<String> volume = new AtomicReference<>(getVolumes().get(2));
@@ -172,9 +171,9 @@ public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
 
   @ParameterizedTest
   @MethodSource("testReclaimableFilterArguments")
-  public void testReclaimabilityOnSnapshotAddition(int numberOfPreviousSnapshotsFromChain,
-                                                   int actualNumberOfSnapshots,
-                                                   int index) throws IOException, RocksDBException {
+  public void testReclaimabilityOnSnapshotAddition(
+      int numberOfPreviousSnapshotsFromChain, int actualNumberOfSnapshots, int index)
+      throws IOException, RocksDBException {
 
     SnapshotInfo currentSnapshotInfo =
         setup(numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots, index, 4, 4);
@@ -221,10 +220,9 @@ public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
 
   @ParameterizedTest
   @MethodSource("testInvalidSnapshotArgs")
-  public void testInitWithInactiveSnapshots(int numberOfPreviousSnapshotsFromChain,
-                                            int actualNumberOfSnapshots,
-                                            int index,
-                                            int snapIndex) throws IOException, RocksDBException {
+  public void testInitWithInactiveSnapshots(
+      int numberOfPreviousSnapshotsFromChain, int actualNumberOfSnapshots, int index, int snapIndex)
+      throws IOException, RocksDBException {
     SnapshotInfo currentSnapshotInfo = setup(numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots, index,
         1, 1, (snapshotInfo) -> {
           if (snapshotInfo.getVolumeName().equals(getVolumes().get(0)) &&
@@ -256,10 +254,9 @@ public class TestReclaimableFilter extends TestAbstractReclaimableFilter {
 
   @ParameterizedTest
   @MethodSource("testInvalidSnapshotArgs")
-  public void testInitWithUnflushedSnapshots(int numberOfPreviousSnapshotsFromChain,
-                                             int actualNumberOfSnapshots,
-                                             int index,
-                                             int snapIndex) throws IOException, RocksDBException {
+  public void testInitWithUnflushedSnapshots(
+      int numberOfPreviousSnapshotsFromChain, int actualNumberOfSnapshots, int index,
+      int snapIndex) throws IOException, RocksDBException {
     SnapshotInfo currentSnapshotInfo = setup(numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots, index,
         4, 4, (snapshotInfo) -> {
           if (snapshotInfo.getVolumeName().equals(getVolumes().get(3)) &&
