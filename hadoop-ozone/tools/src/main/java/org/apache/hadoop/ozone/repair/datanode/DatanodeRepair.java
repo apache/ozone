@@ -15,25 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.ozone.repair.datanode;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
+import org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeContainerSchema;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 
 /**
- * Interface for loading data from a dump file.
+ * Ozone Repair CLI for Datanode.
  */
-public interface DumpFileLoader extends Closeable {
+@CommandLine.Command(name = "datanode",
+    subcommands = {
+        UpgradeContainerSchema.class,
+    },
+    description = "Tools to repair Datanode")
+@MetaInfServices(RepairSubcommand.class)
+public class DatanodeRepair implements RepairSubcommand {
 
-  /**
-   * Load key value pairs from an external dump file.
-   */
-  void load(File externalFile) throws IOException;
-
-  /**
-   * Close this file loader.
-   */
-  @Override
-  void close();
 }

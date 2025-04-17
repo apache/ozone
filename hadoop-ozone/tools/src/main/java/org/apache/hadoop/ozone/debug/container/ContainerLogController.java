@@ -15,32 +15,24 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.ozone.debug.container;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 
 /**
- * Interface for write data into a dump file.
+ * A controller for managing container log operations like parsing and listing containers.
  */
-public interface DumpFileWriter extends Closeable {
-  /**
-   * Open an external file for dump.
-   * @param externalFile
-   */
-  void open(File externalFile) throws IOException;
 
-  /**
-   * Put a key value pair into the file.
-   * @param key
-   * @param value
-   */
-  void put(byte[] key, byte[] value) throws IOException;
+@CommandLine.Command(
+    name = "container",
+    subcommands = {
+        ContainerLogParser.class
+    },
+    description = "Parse, Store, Retrieve"
+)
+@MetaInfServices(DebugSubcommand.class)
+public class ContainerLogController implements DebugSubcommand  {
 
-  /**
-   * Finish dumping.
-   */
-  @Override
-  void close() throws IOException;
 }

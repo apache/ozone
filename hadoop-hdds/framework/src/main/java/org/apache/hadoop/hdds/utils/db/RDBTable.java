@@ -321,10 +321,8 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
       throws IOException {
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter
-             = iterator(prefix);
-         DumpFileWriter fileWriter = new RDBSstFileWriter()) {
-      fileWriter.open(externalFile);
+    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter = iterator(prefix);
+         RDBSstFileWriter fileWriter = new RDBSstFileWriter(externalFile)) {
       while (iter.hasNext()) {
         final KeyValue<byte[], byte[]> entry = iter.next();
         fileWriter.put(entry.getKey(), entry.getValue());
@@ -333,10 +331,8 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void loadFromFile(File externalFile) throws IOException {
-    try (DumpFileLoader fileLoader = new RDBSstFileLoader(db, family)) {
-      fileLoader.load(externalFile);
-    }
+  public void loadFromFile(File externalFile) throws RocksDatabaseException {
+    RDBSstFileLoader.load(db, family, externalFile);
   }
 
   private List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey,

@@ -145,7 +145,7 @@ public class TestDeadNodeHandler {
         .concat("/metadata-" + datanode1.getUuidString());
 
     StorageReportProto storageOne = HddsTestUtils.createStorageReport(
-        datanode1.getUuid(), storagePath, 100 * OzoneConsts.TB,
+        datanode1.getID(), storagePath, 100 * OzoneConsts.TB,
         10 * OzoneConsts.TB, 90 * OzoneConsts.TB, null);
     MetadataStorageReportProto metaStorageOne =
         HddsTestUtils.createMetadataStorageReport(metaStoragePath,

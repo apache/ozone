@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.Collections.emptyMap;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
@@ -38,7 +37,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -419,10 +417,7 @@ class TestReconAndAdminContainerCLI {
       ReplicationConfig replicationConfig)
       throws IOException {
     byte[] textBytes = "Testing".getBytes(UTF_8);
-    try (OutputStream out = ozoneBucket.createKey(keyName,
-        textBytes.length, replicationConfig, emptyMap())) {
-      out.write(textBytes);
-    }
+    TestDataUtil.createKey(ozoneBucket, keyName, replicationConfig, textBytes);
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
                             .setVolumeName(ozoneBucket.getVolumeName())

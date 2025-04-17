@@ -55,7 +55,7 @@ class TestSafeModeRuleFactory {
     // as the rules are hardcoded in SafeModeRuleFactory.
 
     // This will be fixed once we load rules using annotation.
-    assertEquals(4, factory.getSafeModeRules().size(),
+    assertEquals(5, factory.getSafeModeRules().size(),
         "The total safemode rules count doesn't match");
 
   }
