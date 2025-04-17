@@ -52,6 +52,7 @@ import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
@@ -1012,7 +1013,7 @@ public class TestOMRatisSnapshots {
         .listFiles()) {
       if (file.getName().contains(".sst")) {
         if (delete) {
-          file.delete();
+          FileUtils.deleteQuietly(file);
           delete = false;
         } else {
           delete = true;

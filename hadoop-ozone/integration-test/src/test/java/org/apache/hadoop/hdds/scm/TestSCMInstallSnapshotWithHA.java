@@ -244,7 +244,7 @@ public class TestSCMInstallSnapshotWithHA {
         .listFiles()) {
       if (file.getName().contains(".sst")) {
         if (delete) {
-          file.delete();
+          FileUtils.deleteQuietly(file);
           delete = false;
         } else {
           delete = true;
