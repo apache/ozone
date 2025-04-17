@@ -42,7 +42,7 @@ import javax.tools.Diagnostic;
 
 /**
  * This class is an annotation processor that is hooked into the java compiler
- * and is used to validate the RequestFeatureValidator annotations in the
+ * and is used to validate the OMRequest with the validator annotation in the
  * codebase, to ensure that the annotated methods have the proper signature and
  * return type.
  *

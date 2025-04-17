@@ -35,8 +35,13 @@ import javax.tools.Diagnostic;
 
 /**
  * This class is an annotation processor that is hooked into the java compiler
- * and is used to validate the RegisterValidator annotations in the
- * codebase, to ensure that the annotated classes have the proper methods returning appropriate object types.
+ * and is used to validate the Registered Validators annotations in the
+ * codebase, to ensure that the annotated annotation classes have the proper required annotation methods and
+ * appropriate return type for these methods.
+ *
+ * applyBefore : Returns an enum which implement
+ * requestType: Returns an Enum value.
+ * processingPhase: Returns an Enum of type RequestProcessingPhase.
  *
  * The module is compiled in a different execution via Maven before anything
  * else is compiled, and then javac picks this class up as an annotation
