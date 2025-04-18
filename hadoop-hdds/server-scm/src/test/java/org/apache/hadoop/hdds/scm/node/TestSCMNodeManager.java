@@ -436,7 +436,7 @@ public class TestSCMNodeManager {
       // creation, they will fail with not enough healthy nodes for ratis 3
       // pipeline. Therefore we do not have to worry about this create call
       // failing due to datanodes reaching their maximum pipeline limit.
-      assertPipelineCreationFailsWithNotEnoughNodes(1);
+      assertPipelineCreationFailsWithExceedingLimit(2);
 
       // Heartbeat bad MLV nodes back to healthy.
       nodeManager.processLayoutVersionReport(badMlvNode1, CORRECT_LAYOUT_PROTO);
@@ -466,6 +466,18 @@ public class TestSCMNodeManager {
     }, "3 nodes should not have been found for a pipeline.");
     assertThat(ex.getMessage()).contains("Required 3. Found " +
         actualNodeCount);
+  }
+
+  private void assertPipelineCreationFailsWithExceedingLimit(int limit) {
+    SCMException ex = assertThrows(SCMException.class, () -> {
+      ReplicationConfig ratisThree =
+          ReplicationConfig.fromProtoTypeAndFactor(
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE);
+      scm.getPipelineManager().createPipeline(ratisThree);
+    }, "3 nodes should not have been found for a pipeline.");
+    assertThat(ex.getMessage()).contains("Ratis pipeline number meets the limit per datanode: " +
+        limit);
   }
 
   private void assertPipelines(HddsProtos.ReplicationFactor factor,
