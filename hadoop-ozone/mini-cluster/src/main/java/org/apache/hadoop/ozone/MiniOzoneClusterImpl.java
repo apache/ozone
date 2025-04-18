@@ -774,7 +774,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           "3s");
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, getFreePort());
       conf.setInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, getFreePort());
-      conf.setIfUnset(ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT, "1s");
+      conf.setIfUnset(ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_FIRST_ELECTION_TIMEOUT, "1s");
     }
 
     private void configureOM() {
