@@ -41,6 +41,21 @@ public final class DispatcherContext {
   private static final DispatcherContext HANDLE_PUT_SMALL_FILE
       = newBuilder(Op.HANDLE_PUT_SMALL_FILE).build();
 
+  private final Op op;
+  // whether the chunk data needs to be written or committed or both
+  private final WriteChunkStage stage;
+  // which term the request is being served in Ratis
+  private final long term;
+  // the log index in Ratis log to which the request belongs to
+  private final long logIndex;
+
+  private final Map<Long, Long> container2BCSIDMap;
+
+  private final boolean releaseSupported;
+  private volatile Runnable releaseMethod;
+
+  private final long startTime = Time.monotonicNowNanos();
+
   public static DispatcherContext getHandleReadChunk() {
     return HANDLE_READ_CHUNK;
   }
@@ -108,21 +123,6 @@ public final class DispatcherContext {
   public static Op op(DispatcherContext context) {
     return context == null ? Op.NULL : context.getOp();
   }
-
-  private final Op op;
-  // whether the chunk data needs to be written or committed or both
-  private final WriteChunkStage stage;
-  // which term the request is being served in Ratis
-  private final long term;
-  // the log index in Ratis log to which the request belongs to
-  private final long logIndex;
-
-  private final Map<Long, Long> container2BCSIDMap;
-
-  private final boolean releaseSupported;
-  private volatile Runnable releaseMethod;
-
-  private final long startTime = Time.monotonicNowNanos();
 
   private DispatcherContext(Builder b) {
     this.op = Objects.requireNonNull(b.op, "op == null");
