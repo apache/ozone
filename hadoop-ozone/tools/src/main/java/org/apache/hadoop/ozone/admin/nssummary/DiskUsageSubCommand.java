@@ -79,14 +79,13 @@ public class DiskUsageSubCommand implements Callable {
   private static final int DU_INDENT = 12;
   private static final int PATH_INDENT = 27;
 
-  private StringBuffer url = new StringBuffer();
-
   @Override
   public Void call() throws Exception {
     if (path == null || path.isEmpty()) {
       printEmptyPathRequest();
       return null;
     }
+    StringBuffer url = new StringBuffer();
     url.append(parent.getReconWebAddress()).append(ENDPOINT);
 
     String response = makeHttpCall(url, parseInputPath(path), listFiles,

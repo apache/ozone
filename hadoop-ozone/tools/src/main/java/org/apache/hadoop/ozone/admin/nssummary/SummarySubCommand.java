@@ -52,14 +52,13 @@ public class SummarySubCommand implements Callable<Void> {
 
   private static final String ENDPOINT = "/api/v1/namespace/summary";
 
-  private StringBuffer url = new StringBuffer();
-
   @Override
   public Void call() throws Exception {
     if (path == null || path.isEmpty()) {
       printEmptyPathRequest();
       return null;
     }
+    StringBuffer url = new StringBuffer();
     url.append(parent.getReconWebAddress()).append(ENDPOINT);
 
     printNewLines(1);

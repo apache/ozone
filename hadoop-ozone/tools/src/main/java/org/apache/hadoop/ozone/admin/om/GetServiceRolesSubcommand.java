@@ -87,7 +87,8 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
                 omRoleInfo.getNodeId(), omRoleInfo.getServerRole()});
           }
         }
-        System.out.println(formattingCLIUtils.render());
+        StringBuilder join = new StringBuilder();
+        System.out.println(formattingCLIUtils.render(join));
       } else {
         printOmServerRoles(ozoneManagerClient.getServiceList());
       }
