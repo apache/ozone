@@ -375,7 +375,7 @@ public class TestReplicationSupervisor {
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
     HddsVolume vol = mock(HddsVolume.class);
     containerData.setVolume(vol);
-    containerData.incrBytesUsed(100);
+    containerData.getStatistics().updateWrite(100, false);
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     ContainerController controllerMock = mock(ContainerController.class);
     Semaphore semaphore = new Semaphore(1);

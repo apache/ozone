@@ -222,7 +222,7 @@ public class TestDeleteContainerHandler {
 
     // Set container blockCount to 0 to mock that it is empty as per RocksDB
     getContainerfromDN(hddsDatanodeService, containerId.getId())
-        .getContainerData().setBlockCount(0);
+        .getContainerData().getStatistics().setBlockCountForTesting(0);
 
     // send delete container to the datanode
     SCMCommand<?> command = new DeleteContainerCommand(containerId.getId(),
@@ -432,8 +432,7 @@ public class TestDeleteContainerHandler {
     // Check the log for the error message when deleting non-empty containers
     LogCapturer logCapturer = LogCapturer.captureLogs(KeyValueHandler.class);
     GenericTestUtils.waitFor(() ->
-            logCapturer.getOutput().
-                contains("the container is not empty with blockCount"),
+            logCapturer.getOutput().contains("Received container deletion command for non-empty"),
         500,
         5 * 2000);
 

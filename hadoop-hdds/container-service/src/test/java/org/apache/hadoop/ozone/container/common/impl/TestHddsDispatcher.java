@@ -168,7 +168,7 @@ public class TestHddsDispatcher {
           responseOne.getResult());
       verify(context, times(0))
           .addContainerActionIfAbsent(any(ContainerAction.class));
-      containerData.setBytesUsed(Double.valueOf(
+      containerData.getStatistics().setBlockBytesForTesting(Double.valueOf(
           StorageUnit.MB.toBytes(950)).longValue());
       ContainerCommandResponseProto responseTwo = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L), null);

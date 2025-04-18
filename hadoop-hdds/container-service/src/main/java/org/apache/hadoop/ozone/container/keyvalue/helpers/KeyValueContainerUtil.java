@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -279,27 +280,25 @@ public final class KeyValueContainerUtil {
       KeyValueContainerData kvContainerData, DatanodeStore store,
       boolean bCheckChunksFilePath)
       throws IOException {
-    boolean isBlockMetadataSet = false;
     Table<String, Long> metadataTable = store.getMetadataTable();
 
     // Set pending deleted block count.
+    final long blockPendingDeletion;
     Long pendingDeleteBlockCount =
         metadataTable.get(kvContainerData
             .getPendingDeleteBlockCountKey());
     if (pendingDeleteBlockCount != null) {
-      kvContainerData.incrPendingDeletionBlocks(
-          pendingDeleteBlockCount);
+      blockPendingDeletion = pendingDeleteBlockCount;
     } else {
       // Set pending deleted block count.
+      LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
       MetadataKeyFilters.KeyPrefixFilter filter =
           kvContainerData.getDeletingBlockKeyFilter();
-      int numPendingDeletionBlocks = store.getBlockDataTable()
+      blockPendingDeletion = store.getBlockDataTable()
               .getSequentialRangeKVs(kvContainerData.startKeyEmpty(),
                   Integer.MAX_VALUE, kvContainerData.containerPrefix(),
                   filter).size();
-      kvContainerData.incrPendingDeletionBlocks(numPendingDeletionBlocks);
     }
-
     // Set delete transaction id.
     Long delTxnId =
         metadataTable.get(kvContainerData.getLatestDeleteTxnKey());
@@ -318,23 +317,23 @@ public final class KeyValueContainerUtil {
 
     // Set bytes used.
     // commitSpace for Open Containers relies on usedBytes
-    Long bytesUsed =
-        metadataTable.get(kvContainerData.getBytesUsedKey());
-    if (bytesUsed != null) {
-      isBlockMetadataSet = true;
-      kvContainerData.setBytesUsed(bytesUsed);
+    final long blockBytes;
+    final long blockCount;
+    final Long metadataTableBytesUsed = metadataTable.get(kvContainerData.getBytesUsedKey());
+    // Set block count.
+    final Long metadataTableBlockCount = metadataTable.get(kvContainerData.getBlockCountKey());
+    if (metadataTableBytesUsed != null && metadataTableBlockCount != null) {
+      blockBytes = metadataTableBytesUsed;
+      blockCount = metadataTableBlockCount;
+    } else {
+      LOG.warn("Missing bytesUsed={} or blockCount={} from {}: recalculate them from block table",
+          metadataTableBytesUsed, metadataTableBlockCount, metadataTable.getName());
+      final ContainerData.BlockByteAndCounts b = getUsedBytesAndBlockCount(store, kvContainerData);
+      blockBytes = b.getBytes();
+      blockCount = b.getCount();
     }
 
-    // Set block count.
-    Long blockCount = metadataTable.get(
-        kvContainerData.getBlockCountKey());
-    if (blockCount != null) {
-      isBlockMetadataSet = true;
-      kvContainerData.setBlockCount(blockCount);
-    }
-    if (!isBlockMetadataSet) {
-      initializeUsedBytesAndBlockCount(store, kvContainerData);
-    }
+    kvContainerData.getStatistics().updateBlocks(blockBytes, blockCount, blockPendingDeletion);
 
     // If the container is missing a chunks directory, possibly due to the
     // bug fixed by HDDS-6235, create it here.
@@ -376,15 +375,8 @@ public final class KeyValueContainerUtil {
     }
   }
 
-  /**
-   * Initialize bytes used and block count.
-   * @param kvData
-   * @throws IOException
-   */
-  private static void initializeUsedBytesAndBlockCount(DatanodeStore store,
+  private static ContainerData.BlockByteAndCounts getUsedBytesAndBlockCount(DatanodeStore store,
       KeyValueContainerData kvData) throws IOException {
-    final String errorMessage = "Failed to parse block data for" +
-        " Container " + kvData.getContainerID();
     long blockCount = 0;
     long usedBytes = 0;
 
@@ -394,11 +386,7 @@ public final class KeyValueContainerUtil {
 
       while (blockIter.hasNext()) {
         blockCount++;
-        try {
-          usedBytes += getBlockLength(blockIter.nextBlock());
-        } catch (Exception ex) {
-          LOG.error(errorMessage, ex);
-        }
+        usedBytes += getBlockLengthTryCatch(blockIter.nextBlock());
       }
     }
 
@@ -409,18 +397,24 @@ public final class KeyValueContainerUtil {
 
       while (blockIter.hasNext()) {
         blockCount++;
-        try {
-          usedBytes += getBlockLength(blockIter.nextBlock());
-        } catch (IOException ex) {
-          LOG.error(errorMessage);
-        }
+        usedBytes += getBlockLengthTryCatch(blockIter.nextBlock());
       }
     }
-    kvData.setBytesUsed(usedBytes);
-    kvData.setBlockCount(blockCount);
+    return new ContainerData.BlockByteAndCounts(usedBytes, blockCount, 0);
   }
 
-  public static long getBlockLength(BlockData block) throws IOException {
+  public static long getBlockLengthTryCatch(BlockData block) {
+    try {
+      return block.getChunks().stream()
+          .mapToLong(ContainerProtos.ChunkInfo::getLen)
+          .sum();
+    } catch (Exception e) {
+      LOG.error("Failed to getBlockLength for block {}", block.getBlockID(), e);
+      return 0;
+    }
+  }
+
+  public static long getBlockLength(BlockData block) {
     return block.getChunks().stream()
         .mapToLong(ContainerProtos.ChunkInfo::getLen)
         .sum();
