@@ -56,7 +56,6 @@ import org.slf4j.LoggerFactory;
  * Provides some very generic helpers which might be used across the tests.
  */
 public abstract class GenericTestUtils {
-  public static final String DEFAULT_TEST_DATA_DIR;
 
   /**
    * Error string used in
@@ -67,15 +66,7 @@ public abstract class GenericTestUtils {
   public static final String ERROR_INVALID_ARGUMENT =
       "Total wait time should be greater than check interval time";
 
-  public static final boolean WINDOWS =
-      System.getProperty("os.name").startsWith("Windows");
-
   private static final long NANOSECONDS_PER_MILLISECOND = 1_000_000;
-
-  static {
-    DEFAULT_TEST_DATA_DIR =
-        "target" + File.separator + "test" + File.separator + "data";
-  }
 
   /**
    * Return current time in millis as an {@code Instant}.  This may be
