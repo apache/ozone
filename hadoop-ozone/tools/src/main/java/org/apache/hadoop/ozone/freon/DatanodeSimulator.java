@@ -337,7 +337,7 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
       throws IOException {
     if (!registerDataNode(dn)) {
       LOGGER.info("Failed to register datanode to SCM: {}",
-          dn.getDatanodeDetails().getUuidString());
+          dn.getDatanodeDetails());
       return false;
     }
 
@@ -359,7 +359,7 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
         reconHeartbeatInterval, TimeUnit.MILLISECONDS);
 
     LOGGER.info("Successfully registered datanode to SCM: {}",
-        dn.getDatanodeDetails().getUuidString());
+        dn.getDatanodeDetails());
     return true;
   }
 
@@ -418,7 +418,7 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
       }
     } catch (Exception e) {
       LOGGER.info("Error sending heartbeat for {}: {}",
-          dn.getDatanodeDetails().getUuidString(), e.getMessage(), e);
+          dn.getDatanodeDetails(), e.getMessage(), e);
     }
   }
 
