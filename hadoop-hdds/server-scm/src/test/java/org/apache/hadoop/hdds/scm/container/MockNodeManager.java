@@ -188,8 +188,7 @@ public class MockNodeManager implements NodeManager {
           setContainers(usageInfo.getDatanodeDetails(), entry.getValue());
         } catch (NodeNotFoundException e) {
           LOG.warn("Could not find Datanode {} for adding containers to it. " +
-                  "Skipping this node.", usageInfo
-              .getDatanodeDetails().getUuidString());
+                  "Skipping this node.", usageInfo.getDatanodeDetails());
           continue;
         }
 

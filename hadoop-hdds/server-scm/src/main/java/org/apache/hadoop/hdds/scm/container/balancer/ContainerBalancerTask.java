@@ -506,7 +506,7 @@ public class ContainerBalancerTask implements Runnable {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Utilization for node {} with capacity {}B, used {}B, and " +
                 "remaining {}B is {}",
-            datanodeUsageInfo.getDatanodeDetails().getUuidString(),
+            datanodeUsageInfo.getDatanodeDetails(),
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             datanodeUsageInfo.getScmNodeStat().getScmUsed().get(),
             datanodeUsageInfo.getScmNodeStat().getRemaining().get(),
@@ -683,8 +683,8 @@ public class ContainerBalancerTask implements Runnable {
             "{}B from source datanode {} to target datanode {}",
         containerID.toString(),
         containerInfo.getUsedBytes(),
-        source.getUuidString(),
-        moveSelection.getTargetNode().getUuidString());
+        source,
+        moveSelection.getTargetNode());
 
     if (moveContainer(source, moveSelection)) {
       // consider move successful for now, and update selection criteria
@@ -792,9 +792,8 @@ public class ContainerBalancerTask implements Runnable {
       if (!entry.getValue().isDone()) {
         LOG.warn("Container move timed out for container {} from source {}" +
                 " to target {}.", entry.getKey().getContainerID(),
-            containerToSourceMap.get(entry.getKey().getContainerID())
-                                .getUuidString(),
-            entry.getKey().getTargetNode().getUuidString());
+            containerToSourceMap.get(entry.getKey().getContainerID()),
+            entry.getKey().getTargetNode());
 
         entry.getValue().cancel(true);
         numCancelled += 1;
@@ -817,14 +816,14 @@ public class ContainerBalancerTask implements Runnable {
     if (sourceContainerIDSet.isEmpty()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("ContainerBalancer could not find any candidate containers " +
-            "for datanode {}", source.getUuidString());
+            "for datanode {}", source);
       }
       return null;
     }
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("ContainerBalancer is finding suitable target for source " +
-          "datanode {}", source.getUuidString());
+          "datanode {}", source);
     }
 
     ContainerMoveSelection moveSelection = null;
@@ -846,12 +845,11 @@ public class ContainerBalancerTask implements Runnable {
 
     if (moveSelection == null) {
       LOG.info("ContainerBalancer could not find a suitable target for " +
-          "source node {}.", source.getUuidString());
+          "source node {}.", source);
       return null;
     }
     LOG.info("ContainerBalancer matched source datanode {} with target " +
-            "datanode {} for container move.", source.getUuidString(),
-        moveSelection.getTargetNode().getUuidString());
+            "datanode {} for container move.", source, moveSelection.getTargetNode());
 
     return moveSelection;
   }
@@ -947,24 +945,22 @@ public class ContainerBalancerTask implements Runnable {
         if (ex != null) {
           LOG.info("Container move for container {} from source {} to " +
                   "target {} failed with exceptions.",
-              containerID.toString(),
-              source.getUuidString(),
-              moveSelection.getTargetNode().getUuidString(), ex);
+              containerID, source,
+              moveSelection.getTargetNode(), ex);
           metrics.incrementNumContainerMovesFailedInLatestIteration(1);
         } else {
           if (result == MoveManager.MoveResult.COMPLETED) {
             sizeActuallyMovedInLatestIteration +=
                 containerInfo.getUsedBytes();
             LOG.debug("Container move completed for container {} from " +
-                    "source {} to target {}", containerID,
-                source.getUuidString(),
-                moveSelection.getTargetNode().getUuidString());
+                    "source {} to target {}", containerID, source,
+                moveSelection.getTargetNode());
           } else {
             LOG.warn(
                 "Container move for container {} from source {} to target" +
                     " {} failed: {}",
-                moveSelection.getContainerID(), source.getUuidString(),
-                moveSelection.getTargetNode().getUuidString(), result);
+                moveSelection.getContainerID(), source,
+                moveSelection.getTargetNode(), result);
           }
         }
       });
