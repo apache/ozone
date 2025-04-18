@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.MiniOzoneCluster.getTempPath;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -267,7 +266,7 @@ public class TestMiniOzoneCluster {
         + "-" + cluster.getClusterId();
     assertEquals(name, cluster.getName());
 
-    final String baseDir = getTempPath(name);
+    final String baseDir = MiniOzoneCluster.Builder.getTempPath(name);
     assertEquals(baseDir, cluster.getBaseDir());
 
 

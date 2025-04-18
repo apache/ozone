@@ -42,9 +42,6 @@ import org.apache.ratis.util.function.CheckedFunction;
  * Interface used for MiniOzoneClusters.
  */
 public interface MiniOzoneCluster extends AutoCloseable {
-  String SYSPROP_TEST_DATA_DIR = "test.build.data";
-  String DEFAULT_TEST_DATA_PATH = "target/test/data/";
-  boolean WINDOWS = System.getProperty("os.name").startsWith("Windows");
 
   /**
    * Returns the Builder to construct MiniOzoneCluster.
@@ -252,29 +249,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
   }
 
   default String getBaseDir() {
-    return getTempPath(getName());
-  }
-
-  /**
-   * Get a temp path. This may or may not be relative; it depends on what the
-   * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
-   * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
-   *
-   * @param subpath sub path, with no leading "/" character
-   * @return a string to use in paths
-   */
-  static String getTempPath(String subpath) {
-    String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
-        : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
-
-    if (prop.isEmpty()) {
-      // corner case: property is there but empty
-      prop = DEFAULT_TEST_DATA_PATH;
-    }
-    if (!prop.endsWith("/")) {
-      prop = prop + "/";
-    }
-    return prop + subpath;
+    return Builder.getTempPath(getName());
   }
 
   /**
@@ -286,6 +261,10 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected static final int ACTIVE_OMS_NOT_SET = -1;
     protected static final int ACTIVE_SCMS_NOT_SET = -1;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
+
+    private static final String SYSPROP_TEST_DATA_DIR = "test.build.data";
+    private static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
+    private static final boolean WINDOWS = System.getProperty("os.name").startsWith("Windows");
 
     protected OzoneConfiguration conf;
     protected String path;
@@ -318,6 +297,28 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected void prepareForNextBuild() {
       conf = new OzoneConfiguration(conf);
       setClusterId();
+    }
+
+    /**
+     * Get a temp path. This may or may not be relative; it depends on what the
+     * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
+     * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
+     *
+     * @param subpath sub path, with no leading "/" character
+     * @return a string to use in paths
+     */
+    protected static String getTempPath(String subpath) {
+      String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
+          : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
+
+      if (prop.isEmpty()) {
+        // corner case: property is there but empty
+        prop = DEFAULT_TEST_DATA_PATH;
+      }
+      if (!prop.endsWith("/")) {
+        prop = prop + "/";
+      }
+      return prop + subpath;
     }
 
     public Builder setSCMConfigurator(SCMConfigurator configurator) {
