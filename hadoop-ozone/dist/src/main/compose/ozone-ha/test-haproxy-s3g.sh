@@ -15,39 +15,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:HA-secure
-
-set -u -o pipefail
+#suite:HA-unsecure
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-export SECURITY_ENABLED=true
-export OM_SERVICE_ID="omservice"
-export SCM=scm1.org
-
-: ${OZONE_BUCKET_KEY_NAME:=key1}
+export SECURITY_ENABLED=false
+export COMPOSE_FILE=docker-compose.yaml:../common/s3-haproxy.yaml
+export OZONE_REPLICATION_FACTOR=3
+export SCM=scm1
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
-
-execute_robot_test s3g kinit.robot
-
-execute_robot_test s3g freon
-
-execute_robot_test s3g -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link ozonefs/ozonefs.robot
-
-execute_robot_test s3g basic/links.robot
-
 ## Exclude virtual-host tests. This is tested separately as it requires additional config.
 exclude="--exclude virtual-host"
-for bucket in link; do
-  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
+for bucket in generated; do
+  execute_robot_test ${SCM} -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
   # some tests are independent of the bucket type, only need to be run once
-  ## Exclude virtual-host.robot
+  ## Exclude awss3virtualhost.robot
   exclude="--exclude virtual-host --exclude no-bucket-type"
 done
