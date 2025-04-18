@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
+import org.apache.hadoop.ozone.lock.StripedLockProvider;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
 import org.rocksdb.RocksDBException;
@@ -83,7 +84,8 @@ public class RDBStore implements DBStore {
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
                   ConfigurationSource configuration,
-                  boolean enableRocksDBMetrics)
+                  boolean enableRocksDBMetrics,
+                  StripedLockProvider lock)
 
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
@@ -103,7 +105,8 @@ public class RDBStore implements DBStore {
             DB_COMPACTION_SST_BACKUP_DIR,
             DB_COMPACTION_LOG_DIR,
             dbLocation.toString(),
-            configuration);
+            configuration,
+            lock);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;

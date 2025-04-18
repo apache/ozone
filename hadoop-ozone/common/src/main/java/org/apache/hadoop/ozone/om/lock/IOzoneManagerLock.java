@@ -19,11 +19,12 @@ package org.apache.hadoop.ozone.om.lock;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
+import org.apache.hadoop.ozone.lock.StripedLockProvider;
 
 /**
  * Interface for OM Metadata locks.
  */
-public interface IOzoneManagerLock {
+public interface IOzoneManagerLock extends StripedLockProvider {
 
   OMLockDetails acquireReadLock(OzoneManagerLock.Resource resource,
                                 String... resources);

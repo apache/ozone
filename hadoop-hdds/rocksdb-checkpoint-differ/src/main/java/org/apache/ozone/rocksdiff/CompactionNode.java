@@ -31,6 +31,7 @@ public class CompactionNode {
   private final String startKey;
   private final String endKey;
   private final String columnFamily;
+  private boolean pruned;
 
   /**
    * CompactionNode constructor.
@@ -41,6 +42,12 @@ public class CompactionNode {
 
   public CompactionNode(String file, long numKeys, long seqNum,
                         String startKey, String endKey, String columnFamily) {
+    this(file, numKeys, seqNum, startKey, endKey, columnFamily, false);
+  }
+
+  public CompactionNode(String file, long numKeys, long seqNum,
+                        String startKey, String endKey, String columnFamily,
+                        boolean pruned) {
     fileName = file;
     totalNumberOfKeys = numKeys;
     snapshotGeneration = seqNum;
@@ -48,11 +55,12 @@ public class CompactionNode {
     this.startKey = startKey;
     this.endKey = endKey;
     this.columnFamily = columnFamily;
+    this.pruned = pruned;
   }
 
   public CompactionNode(CompactionFileInfo compactionFileInfo) {
     this(compactionFileInfo.getFileName(), -1, -1, compactionFileInfo.getStartKey(),
-        compactionFileInfo.getEndKey(), compactionFileInfo.getColumnFamily());
+        compactionFileInfo.getEndKey(), compactionFileInfo.getColumnFamily(), compactionFileInfo.isPruned());
   }
 
   @Override
@@ -88,6 +96,10 @@ public class CompactionNode {
     return columnFamily;
   }
 
+  public boolean isPruned() {
+    return pruned;
+  }
+
   public void setCumulativeKeysReverseTraversal(
       long cumulativeKeysReverseTraversal) {
     this.cumulativeKeysReverseTraversal = cumulativeKeysReverseTraversal;
@@ -95,5 +107,9 @@ public class CompactionNode {
 
   public void addCumulativeKeysReverseTraversal(long diff) {
     this.cumulativeKeysReverseTraversal += diff;
+  }
+
+  public void setPruned() {
+    this.pruned = true;
   }
 }

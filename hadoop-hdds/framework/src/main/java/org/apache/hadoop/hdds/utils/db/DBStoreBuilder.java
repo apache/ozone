@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedLogger;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
+import org.apache.hadoop.ozone.lock.StripedLockProvider;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.InfoLogLevel;
@@ -106,6 +107,7 @@ public final class DBStoreBuilder {
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
   private Integer maxNumberOfOpenFiles = null;
+  private StripedLockProvider lock = null;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -231,7 +233,7 @@ public final class DBStoreBuilder {
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
           registry.build(), openReadOnly, dbJmxBeanNameName, enableCompactionDag,
           maxDbUpdatesSizeThreshold, createCheckpointDirs, configuration,
-          enableRocksDbMetrics);
+          enableRocksDbMetrics, lock);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
@@ -300,6 +302,10 @@ public final class DBStoreBuilder {
 
   public DBStoreBuilder setEnableRocksDbMetrics(boolean enableRocksDbMetrics) {
     this.enableRocksDbMetrics = enableRocksDbMetrics;
+    return this;
+  }
+  public DBStoreBuilder setLock(StripedLockProvider lock) {
+    this.lock = lock;
     return this;
   }
   /**
