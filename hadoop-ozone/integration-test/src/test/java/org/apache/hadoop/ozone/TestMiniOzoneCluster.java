@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.ozone.MiniOzoneCluster.getTempPath;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -202,11 +203,9 @@ public class TestMiniOzoneCluster {
 
   /**
    * Test that a DN can register with SCM even if it was started before the SCM.
-   *
    * @throws Exception
    */
-  @Test
-  @Timeout(100)
+  @Test @Timeout(100)
   public void testDNstartAfterSCM() throws Exception {
     // Start a cluster with 3 DN
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -249,11 +248,9 @@ public class TestMiniOzoneCluster {
 
   /**
    * Test that multiple datanode directories are created in MiniOzoneCluster.
-   *
    * @throws Exception
    */
-  @Test
-  @Timeout(60)
+  @Test @Timeout(60)
   public void testMultipleDataDirs() throws Exception {
     // Start a cluster with 3 DN and configure reserved space in each DN
     String reservedSpace = "1B";
@@ -270,7 +267,7 @@ public class TestMiniOzoneCluster {
         + "-" + cluster.getClusterId();
     assertEquals(name, cluster.getName());
 
-    final String baseDir = MiniOzoneCluster.getTempPath(name);
+    final String baseDir = getTempPath(name);
     assertEquals(baseDir, cluster.getBaseDir());
 
 
@@ -281,8 +278,8 @@ public class TestMiniOzoneCluster {
     assertEquals(3, volumeList.size());
 
     volumeList.forEach(storageVolume -> assertEquals(
-        (long) StorageSize.parse(reservedSpace).getValue(),
-        storageVolume.getVolumeUsage().get().getReservedInBytes()));
+            (long) StorageSize.parse(reservedSpace).getValue(),
+            storageVolume.getVolumeUsage().get().getReservedInBytes()));
   }
 
 }

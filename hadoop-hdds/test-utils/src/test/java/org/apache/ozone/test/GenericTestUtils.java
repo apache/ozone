@@ -107,7 +107,7 @@ public abstract class GenericTestUtils {
    * @throws InterruptedException if the method is interrupted while waiting
    */
   public static void waitFor(BooleanSupplier check, int checkEveryMillis,
-                             int waitForMillis) throws TimeoutException, InterruptedException {
+      int waitForMillis) throws TimeoutException, InterruptedException {
     Preconditions.checkNotNull(check, ERROR_MISSING_ARGUMENT);
     Preconditions.checkArgument(waitForMillis >= checkEveryMillis,
         ERROR_INVALID_ARGUMENT);
@@ -150,7 +150,7 @@ public abstract class GenericTestUtils {
   }
 
   public static void setLogLevel(org.slf4j.Logger logger,
-                                 org.slf4j.event.Level level) {
+      org.slf4j.event.Level level) {
     setLogLevel(toLog4j(logger), Level.toLevel(level.toString()));
   }
 
@@ -171,7 +171,7 @@ public abstract class GenericTestUtils {
   }
 
   public static <T> T mockFieldReflection(Object object, String fieldName)
-      throws NoSuchFieldException, IllegalAccessException {
+          throws NoSuchFieldException, IllegalAccessException {
     Field field = object.getClass().getDeclaredField(fieldName);
     boolean isAccessible = field.isAccessible();
 
@@ -191,7 +191,7 @@ public abstract class GenericTestUtils {
   }
 
   public static <T> T getFieldReflection(Object object, String fieldName)
-      throws NoSuchFieldException, IllegalAccessException {
+          throws NoSuchFieldException, IllegalAccessException {
     Field field = object.getClass().getDeclaredField(fieldName);
     boolean isAccessible = field.isAccessible();
 
@@ -211,7 +211,7 @@ public abstract class GenericTestUtils {
   public static <K, V> Map<V, K> getReverseMap(Map<K, List<V>> map) {
     return map.entrySet().stream().flatMap(entry -> entry.getValue().stream()
             .map(v -> Pair.of(v, entry.getKey())))
-        .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
   }
 
   /**
@@ -255,7 +255,6 @@ public abstract class GenericTestUtils {
       writer().getBuffer().setLength(0);
     }
   }
-
   @Deprecated
   public static Logger toLog4j(org.slf4j.Logger logger) {
     return LogManager.getLogger(logger.getName());
@@ -273,9 +272,7 @@ public abstract class GenericTestUtils {
     return new SystemErrCapturer();
   }
 
-  /**
-   * Capture contents of a {@code PrintStream}, until {@code close()}d.
-   */
+  /** Capture contents of a {@code PrintStream}, until {@code close()}d. */
   public abstract static class PrintStreamCapturer implements AutoCloseable, Supplier<String> {
     private final ByteArrayOutputStream bytes;
     private final PrintStream bytesPrintStream;
@@ -354,7 +351,6 @@ public abstract class GenericTestUtils {
 
   /**
    * Replaces {@link System#in} with a stream that provides {@code lines} as input.
-   *
    * @return an {@code AutoCloseable} to restore the original {@link System#in} stream
    */
   public static AutoCloseable supplyOnSystemIn(String... lines) {
@@ -434,10 +430,9 @@ public abstract class GenericTestUtils {
     /**
      * This method provides the modifiers field using reflection approach which is compatible
      * for both pre Java 9 and post java 9 versions.
-     *
      * @return modifiers field
      * @throws IllegalAccessException illegalAccessException,
-     * @throws NoSuchFieldException   noSuchFieldException.
+     * @throws NoSuchFieldException noSuchFieldException.
      */
     public static Field getModifiersField() throws IllegalAccessException, NoSuchFieldException {
       Field modifiersField = null;
