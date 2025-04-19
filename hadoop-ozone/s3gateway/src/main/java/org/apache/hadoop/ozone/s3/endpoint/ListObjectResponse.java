@@ -28,13 +28,13 @@ import org.apache.hadoop.ozone.s3.commontypes.CommonPrefix;
 import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.commontypes.KeyMetadata;
 import org.apache.hadoop.ozone.s3.commontypes.ObjectKeyNameAdapter;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
  * Response from the ListObject RPC Call.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "ListBucketResult", namespace = "http://s3.amazonaws"
-    + ".com/doc/2006-03-01/")
+@XmlRootElement(name = "ListBucketResult", namespace = S3Consts.S3_XML_NAMESPACE)
 public class ListObjectResponse {
 
   @XmlElement(name = "Name")
