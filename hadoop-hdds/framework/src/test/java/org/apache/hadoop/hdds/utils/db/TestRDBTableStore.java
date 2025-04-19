@@ -495,6 +495,7 @@ public class TestRDBTableStore {
       writeToTable(testTable, 3);
       try (TableIterator<?, ? extends Table.KeyValue<?, ?>> iterator =
           testTable.iterator()) {
+        iterator.next();
         iterator.removeFromDB();
       }
       assertNull(testTable.get(bytesOf[1]));
@@ -508,6 +509,7 @@ public class TestRDBTableStore {
       try (TableIterator<?, ? extends Table.KeyValue<?, ?>> iterator =
                testTable.iterator()) {
         iterator.seekToLast();
+        iterator.next();
         iterator.removeFromDB();
       }
       assertNotNull(testTable.get(bytesOf[1]));
@@ -521,6 +523,7 @@ public class TestRDBTableStore {
       try (TableIterator<byte[], ? extends Table.KeyValue<?, ?>> iterator =
                testTable.iterator()) {
         iterator.seek(bytesOf[3]);
+        iterator.next();
         iterator.removeFromDB();
       }
       assertNotNull(testTable.get(bytesOf[1]));
