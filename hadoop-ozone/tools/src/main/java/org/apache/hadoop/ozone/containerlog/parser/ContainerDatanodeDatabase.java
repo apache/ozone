@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.containerlog.parser;
 
 import java.io.FileNotFoundException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -233,5 +236,82 @@ public class ContainerDatanodeDatabase {
     stmt.executeUpdate(dropTableSQL);
   }
 
+  private void createContainerLogIndex(Statement stmt) throws SQLException {
+    String createIndexSQL = queries.get("CREATE_INDEX_LATEST_STATE");
+    stmt.execute(createIndexSQL);
+  }
+
+  /**
+   * Lists containers filtered by the specified state and writes their details to stdout 
+   * unless redirected to a file explicitly.
+   * The output includes timestamp, datanode ID, container ID, BCSID, error message, and index value,
+   * written in a human-readable table format to a file or console.
+   * Behavior based on the {@code limit} parameter:
+   * If {@code limit} is provided, only up to the specified number of rows are printed.
+   * If the number of matching containers exceeds the {@code limit},
+   * a note is printed indicating more containers exist.
+   *
+   * @param state the container state to filter by (e.g., "OPEN", "CLOSED", "QUASI_CLOSED")
+   * @param limit the maximum number of rows to display; use {@link Integer#MAX_VALUE} to fetch all rows
+   */
+
+  public void listContainersByState(String state, Integer limit) throws SQLException {
+    int count = 0;
+
+    boolean limitProvided = limit != Integer.MAX_VALUE;
+
+    String baseQuery = queries.get("SELECT_LATEST_CONTAINER_LOGS_BY_STATE");
+    String finalQuery = limitProvided ? baseQuery + " LIMIT ?" : baseQuery;
+
+    try (Connection connection = getConnection();
+         Statement stmt = connection.createStatement()) {
+
+      createContainerLogIndex(stmt);
+
+      try (PreparedStatement pstmt = connection.prepareStatement(finalQuery)) {
+        pstmt.setString(1, state);
+        if (limitProvided) {
+          pstmt.setInt(2, limit + 1);
+        }
+
+        try (ResultSet rs = pstmt.executeQuery();
+             PrintWriter writer = new PrintWriter(new OutputStreamWriter(System.out,
+                 StandardCharsets.UTF_8), true)) {
+
+          writer.printf("%-25s | %-35s | %-15s | %-15s | %-40s | %-12s%n",
+              "Timestamp", "Datanode ID", "Container ID", "BCSID", "Message", "Index Value");
+          writer.println("-------------------------------------------------------------------------------------" +
+              "---------------------------------------------------------------------------------------");
+
+          while (rs.next()) {
+            if (limitProvided && count >= limit) {
+              writer.println("Note: There might be more containers. Use -all option to list all entries");
+              break;
+            }
+            String timestamp = rs.getString("timestamp");
+            String datanodeId = rs.getString("datanode_id");
+            long containerId = rs.getLong("container_id");
+            long latestBcsid = rs.getLong("latest_bcsid");
+            String errorMessage = rs.getString("error_message");
+            int indexValue = rs.getInt("index_value");
+            count++;
+
+            writer.printf("%-25s | %-35s | %-15d | %-15d | %-40s | %-12d%n",
+                timestamp, datanodeId, containerId, latestBcsid, errorMessage, indexValue);
+          }
+          
+          if (count == 0) {
+            writer.printf("No containers found for state: %s%n", state);
+          } else {
+            writer.printf("Number of containers listed: %d%n", count);
+          }
+        }
+      }
+    } catch (SQLException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
 }
 
