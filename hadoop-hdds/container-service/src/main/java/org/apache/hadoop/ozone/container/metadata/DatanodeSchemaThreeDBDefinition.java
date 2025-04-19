@@ -21,7 +21,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 
 import com.google.common.primitives.Longs;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -51,41 +54,46 @@ import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
  * The keys would be encoded in a fix-length encoding style in order to
  * utilize the "Prefix Seek" feature from Rocksdb to optimize seek.
  */
-public class DatanodeSchemaThreeDBDefinition
-    extends AbstractDatanodeDBDefinition
+public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinition
     implements DBDefinition.WithMapInterface {
+  public static final String BLOCK_DATA_TABLE = "block_data";
+  public static final String METADATA_TABLE = "metadata";
+  public static final String DELETE_TXNS_TABLE = "delete_txns";
+  public static final String FINALIZE_BLOCKS_TABLE = "finalize_blocks";
+  public static final String LAST_CHUNK_INFO_TABLE = "last_chunk_info";
+
   public static final DBColumnFamilyDefinition<String, BlockData>
       BLOCK_DATA =
       new DBColumnFamilyDefinition<>(
-          "block_data",
+          BLOCK_DATA_TABLE,
           FixedLengthStringCodec.get(),
           BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
       METADATA =
       new DBColumnFamilyDefinition<>(
-          "metadata",
+          METADATA_TABLE,
           FixedLengthStringCodec.get(),
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, DeletedBlocksTransaction>
       DELETE_TRANSACTION =
       new DBColumnFamilyDefinition<>(
-          "delete_txns",
+          DELETE_TXNS_TABLE,
           FixedLengthStringCodec.get(),
           Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()));
 
   public static final DBColumnFamilyDefinition<String, Long>
       FINALIZE_BLOCKS =
       new DBColumnFamilyDefinition<>(
-          "finalize_blocks",
+          FINALIZE_BLOCKS_TABLE,
           FixedLengthStringCodec.get(),
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, BlockData>
       LAST_CHUNK_INFO =
       new DBColumnFamilyDefinition<>(
-          "last_chunk_info",
+          LAST_CHUNK_INFO_TABLE,
           FixedLengthStringCodec.get(),
           BlockData.getCodec());
 
@@ -110,17 +118,14 @@ public class DatanodeSchemaThreeDBDefinition
     DatanodeDBProfile dbProfile = DatanodeDBProfile
         .getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
 
-    ManagedColumnFamilyOptions cfOptions =
-        dbProfile.getColumnFamilyOptions(config);
-    // Use prefix seek to mitigating seek overhead.
-    // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
-    cfOptions.useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
+    Path pathToDb = Paths.get(
+        config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT));
 
-    BLOCK_DATA.setCfOptions(cfOptions);
-    METADATA.setCfOptions(cfOptions);
-    DELETE_TRANSACTION.setCfOptions(cfOptions);
-    FINALIZE_BLOCKS.setCfOptions(cfOptions);
-    LAST_CHUNK_INFO.setCfOptions(cfOptions);
+    BLOCK_DATA.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "block_data"));
+    METADATA.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "metadata"));
+    DELETE_TRANSACTION.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "delete_txns"));
+    FINALIZE_BLOCKS.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "finalize_blocks"));
+    LAST_CHUNK_INFO.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "last_chunk_info"));
   }
 
   @Override
@@ -189,5 +194,14 @@ public class DatanodeSchemaThreeDBDefinition
 
   private void setSeparator(String keySeparator) {
     separator = keySeparator;
+  }
+
+  private ManagedColumnFamilyOptions getCFOptions(
+      ConfigurationSource config, DatanodeDBProfile dbProfile, Path pathToDb, String cfName) {
+    // Use prefix seek to mitigating seek overhead.
+    // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
+    return (ManagedColumnFamilyOptions) dbProfile
+        .getColumnFamilyOptions(config, pathToDb, cfName)
+        .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
   }
 }
