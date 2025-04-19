@@ -80,7 +80,7 @@ public class TestSCMContainerPlacementRandom {
 
     StorageReportProto storage2 = HddsTestUtils.createStorageReport(
         datanodes.get(2).getID(),
-        "/data1-" + datanodes.get(2).getUuidString(),
+        "/data1-" + datanodes.get(2).getID(),
         100L, 90L, 10L, null);
     datanodes.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
@@ -186,14 +186,14 @@ public class TestSCMContainerPlacementRandom {
 
     StorageReportProto storage1 = HddsTestUtils.createStorageReport(
         datanodes.get(1).getID(),
-        "/data1-" + datanodes.get(1).getUuidString(),
+        "/data1-" + datanodes.get(1).getID(),
         100L, 90L, 10L, null);
     datanodes.get(1).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage1)));
 
     MetadataStorageReportProto metaStorage2 =
         HddsTestUtils.createMetadataStorageReport(
-            "/metadata1-" + datanodes.get(2).getUuidString(),
+            "/metadata1-" + datanodes.get(2).getID(),
             100L, 90, 10L, null);
     datanodes.get(2).updateMetaDataStorageReports(
         new ArrayList<>(Arrays.asList(metaStorage2)));

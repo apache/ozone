@@ -123,19 +123,19 @@ public class TestContainerPlacementFactory {
 
     StorageReportProto storage2 = HddsTestUtils.createStorageReport(
         dnInfos.get(2).getID(),
-        "/data1-" + dnInfos.get(2).getUuidString(),
+        "/data1-" + dnInfos.get(2).getID(),
         STORAGE_CAPACITY, 90L, 10L, null);
     dnInfos.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
     StorageReportProto storage3 = HddsTestUtils.createStorageReport(
         dnInfos.get(3).getID(),
-        "/data1-" + dnInfos.get(3).getUuidString(),
+        "/data1-" + dnInfos.get(3).getID(),
         STORAGE_CAPACITY, 80L, 20L, null);
     dnInfos.get(3).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage3)));
     StorageReportProto storage4 = HddsTestUtils.createStorageReport(
         dnInfos.get(4).getID(),
-        "/data1-" + dnInfos.get(4).getUuidString(),
+        "/data1-" + dnInfos.get(4).getID(),
         STORAGE_CAPACITY, 70L, 30L, null);
     dnInfos.get(4).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage4)));
