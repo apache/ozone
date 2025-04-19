@@ -639,7 +639,7 @@ public class TestStorageContainerManager {
       DatanodeInfo datanodeInfo = assertInstanceOf(DatanodeInfo.class, nodeManager.getNode(node.getID()));
       assertNotNull(datanodeInfo);
       assertThat(datanodeInfo.getLastHeartbeatTime()).isPositive();
-      assertEquals(datanodeInfo.getUuidString(), datanodeInfo.getNetworkName());
+      assertEquals(datanodeInfo.getID().toString(), datanodeInfo.getNetworkName());
       assertEquals("/rack1", datanodeInfo.getNetworkLocation());
     }
   }
