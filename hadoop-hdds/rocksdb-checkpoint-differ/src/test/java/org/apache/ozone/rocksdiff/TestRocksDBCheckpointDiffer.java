@@ -188,7 +188,7 @@ public class TestRocksDBCheckpointDiffer {
         SST_BACK_UP_DIR_NAME,
         COMPACTION_LOG_DIR_NAME,
         ACTIVE_DB_DIR_NAME,
-        config);
+        config, null);
 
     ManagedColumnFamilyOptions cfOpts = new ManagedColumnFamilyOptions();
     cfOpts.optimizeUniversalStyleCompaction();

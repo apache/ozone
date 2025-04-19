@@ -393,7 +393,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     int maxOpenFiles = conf.getInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
     setStore(loadDB(conf, dir, name, true, Optional.of(Boolean.TRUE),
-        maxOpenFiles, false, false, true));
+        maxOpenFiles, false, false, true, null));
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
   }
@@ -428,7 +428,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       setStore(loadDB(conf, metaDir, dbName, false,
           java.util.Optional.of(Boolean.TRUE), maxOpenFiles, false, false,
           conf.getBoolean(OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED,
-              OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT)));
+              OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT), null));
       initializeOmTables(CacheType.PARTIAL_CACHE, false);
     } catch (IOException e) {
       stop();
@@ -562,7 +562,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       int maxOpenFiles = configuration.getInt(OZONE_OM_DB_MAX_OPEN_FILES,
           OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT);
 
-      this.store = loadDB(configuration, metaDir, maxOpenFiles);
+      this.store = loadDB(configuration, metaDir, maxOpenFiles, getLock());
 
       initializeOmTables(CacheType.FULL_CACHE, true);
     }
@@ -570,9 +570,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     snapshotChainManager = new SnapshotChainManager(this);
   }
 
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles) throws IOException {
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles,
+                               IOzoneManagerLock lock) throws IOException {
     return loadDB(configuration, metaDir, OM_DB_NAME, false,
-        java.util.Optional.empty(), maxOpenFiles, true, true, true);
+        java.util.Optional.empty(), maxOpenFiles, true, true, true, lock);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
@@ -582,7 +583,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       int maxOpenFiles,
       boolean enableCompactionDag,
       boolean createCheckpointDirs,
-      boolean enableRocksDBMetrics)
+      boolean enableRocksDBMetrics,
+      IOzoneManagerLock lock)
       throws IOException {
     RocksDBConfiguration rocksDBConfiguration =
         configuration.getObject(RocksDBConfiguration.class);
@@ -594,6 +596,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setCreateCheckpointDirs(createCheckpointDirs)
         .setMaxNumberOfOpenFiles(maxOpenFiles)
         .setEnableRocksDbMetrics(enableRocksDBMetrics);
+    if (lock != null) {
+      dbStoreBuilder = dbStoreBuilder.setLock(lock);
+    }
     disableAutoCompaction.ifPresent(
             dbStoreBuilder::disableDefaultCFAutoCompaction);
     return addOMTablesAndCodecs(dbStoreBuilder).build();
