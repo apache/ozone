@@ -362,7 +362,7 @@ public final class ContainerCommandResponseBuilders {
     ContainerProtos.EchoResponseProto.Builder echo =
         ContainerProtos.EchoResponseProto
             .newBuilder()
-            .setPayload(UnsafeByteOperations.unsafeWrap(RandomUtils.nextBytes(responsePayload)));
+            .setPayload(UnsafeByteOperations.unsafeWrap(RandomUtils.secure().randomBytes(responsePayload)));
 
     return getSuccessResponseBuilder(msg)
         .setEcho(echo)

@@ -250,7 +250,7 @@ public final class TestBlockTokens {
     for (OmKeyLocationInfoGroup v : keyInfo.getKeyLocationVersions()) {
       for (OmKeyLocationInfo l : v.getLocationList()) {
         Token<OzoneBlockTokenIdentifier> token = l.getToken();
-        byte[] randomPassword = RandomUtils.nextBytes(100);
+        byte[] randomPassword = RandomUtils.secure().randomBytes(100);
         Token<OzoneBlockTokenIdentifier> override = new Token<>(
             token.getIdentifier(), randomPassword,
             token.getKind(), token.getService());

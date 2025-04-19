@@ -79,7 +79,7 @@ class TestReadRetries {
         OzoneBucket bucket = volume.getBucket(bucketName);
 
         String keyName = "a/b/c/" + UUID.randomUUID();
-        byte[] content = RandomUtils.nextBytes(128);
+        byte[] content = RandomUtils.secure().randomBytes(128);
         TestDataUtil.createKey(bucket, keyName,
             RatisReplicationConfig.getInstance(THREE), content);
 

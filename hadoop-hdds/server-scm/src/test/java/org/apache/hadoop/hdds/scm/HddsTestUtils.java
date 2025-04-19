@@ -623,7 +623,7 @@ public final class HddsTestUtils {
   private static ContainerInfo.Builder getDefaultContainerInfoBuilder(
       final HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
-        .setContainerID(RandomUtils.nextLong())
+        .setContainerID(RandomUtils.secure().randomLong())
         .setReplicationConfig(
             RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE))
@@ -816,7 +816,7 @@ public final class HddsTestUtils {
     for (int i = 0; i < numContainers; i++) {
       ContainerInfo.Builder builder = new ContainerInfo.Builder();
       containerInfoList.add(builder
-          .setContainerID(RandomUtils.nextLong())
+          .setContainerID(RandomUtils.secure().randomLong())
           .setReplicationConfig(ratisReplicationConfig)
           .build());
     }
@@ -837,7 +837,7 @@ public final class HddsTestUtils {
     for (int i = 0; i < numContainers; i++) {
       ContainerInfo.Builder builder = new ContainerInfo.Builder();
       containerInfoList.add(builder
-          .setContainerID(RandomUtils.nextLong())
+          .setContainerID(RandomUtils.secure().randomLong())
           .setOwner("test-owner")
           .setPipelineID(PipelineID.randomId())
           .setReplicationConfig(eCReplicationConfig)

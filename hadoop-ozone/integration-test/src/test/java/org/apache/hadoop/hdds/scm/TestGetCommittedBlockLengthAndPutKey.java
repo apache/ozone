@@ -90,7 +90,7 @@ public abstract class TestGetCommittedBlockLengthAndPutKey implements NonHATests
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.random(RandomUtils.nextInt(1, 1024)).getBytes(UTF_8);
+        RandomStringUtils.random(RandomUtils.secure().randomInt(1, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,
@@ -154,7 +154,7 @@ public abstract class TestGetCommittedBlockLengthAndPutKey implements NonHATests
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.random(RandomUtils.nextInt(1, 1024)).getBytes(UTF_8);
+        RandomStringUtils.random(RandomUtils.secure().randomInt(1, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,

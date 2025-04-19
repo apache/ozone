@@ -326,7 +326,7 @@ public class TestContainerStateManagerIntegration {
         .setUuid(UUID.randomUUID()).build();
 
     // Test 1: no replica's exist
-    ContainerID containerID = ContainerID.valueOf(RandomUtils.nextLong());
+    ContainerID containerID = ContainerID.valueOf(RandomUtils.secure().randomLong());
     Set<ContainerReplica> replicaSet =
         containerStateManager.getContainerReplicas(containerID);
     assertNull(replicaSet);

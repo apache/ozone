@@ -469,16 +469,16 @@ class TestOpenKeyCleanupService {
     String volume = UUID.randomUUID().toString();
     String bucket = UUID.randomUUID().toString();
     for (int x = 0; x < keyCount; x++) {
-      if (RandomUtils.nextBoolean()) {
+      if (RandomUtils.secure().randomBoolean()) {
         bucket = UUID.randomUUID().toString();
-        if (RandomUtils.nextBoolean()) {
+        if (RandomUtils.secure().randomBoolean()) {
           volume = UUID.randomUUID().toString();
         }
       }
       String key = withDir ? "dir1/dir2/" + UUID.randomUUID() : UUID.randomUUID().toString();
       createVolumeAndBucket(volume, bucket, bucketLayout);
 
-      final int numBlocks = RandomUtils.nextInt(1, 3);
+      final int numBlocks = RandomUtils.secure().randomInt(1, 3);
       // Create the key
       createOpenKey(volume, bucket, key, numBlocks, hsync, recovery);
     }
@@ -538,9 +538,9 @@ class TestOpenKeyCleanupService {
     String volume = UUID.randomUUID().toString();
     String bucket = UUID.randomUUID().toString();
     for (int x = 0; x < mpuKeyCount; x++) {
-      if (RandomUtils.nextBoolean()) {
+      if (RandomUtils.secure().randomBoolean()) {
         bucket = UUID.randomUUID().toString();
-        if (RandomUtils.nextBoolean()) {
+        if (RandomUtils.secure().randomBoolean()) {
           volume = UUID.randomUUID().toString();
         }
       }
