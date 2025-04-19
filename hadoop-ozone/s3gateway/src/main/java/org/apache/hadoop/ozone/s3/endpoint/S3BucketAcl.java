@@ -34,10 +34,10 @@ import javax.xml.bind.annotation.XmlRootElement;
     namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
 public class S3BucketAcl {
 
-  @XmlElement(name = "Owner", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+  @XmlElement(name = "Owner")
   private S3Owner owner;
 
-  @XmlElement(name = "AccessControlList", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+  @XmlElement(name = "AccessControlList")
   private AccessControlList aclList;
 
   public S3Owner getOwner() {
@@ -71,7 +71,7 @@ public class S3BucketAcl {
   @XmlRootElement(name = "AccessControlList")
   public static class AccessControlList {
 
-    @XmlElement(name = "Grant", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "Grant")
     private List<Grant> grantList = new ArrayList<>();
 
     public void addGrant(Grant grant) {
@@ -105,10 +105,10 @@ public class S3BucketAcl {
   @XmlRootElement(name = "Grant")
   public static class Grant {
 
-    @XmlElement(name = "Grantee", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "Grantee")
     private Grantee grantee;
 
-    @XmlElement(name = "Permission", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "Permission")
     private String permission;
 
     public String getPermission() {
@@ -162,10 +162,10 @@ public class S3BucketAcl {
   @XmlRootElement(name = "Grantee")
   public static class Grantee {
 
-    @XmlElement(name = "DisplayName", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "DisplayName")
     private String displayName;
 
-    @XmlElement(name = "ID", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "ID")
     private String id;
 
     @XmlAttribute(name = "xsi:type")

@@ -33,10 +33,10 @@ import javax.xml.bind.annotation.XmlRootElement;
     + ".com/doc/2006-03-01/")
 public class MultiDeleteRequest {
 
-  @XmlElement(name = "Quiet", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+  @XmlElement(name = "Quiet")
   private Boolean quiet = Boolean.FALSE;
 
-  @XmlElement(name = "Object", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+  @XmlElement(name = "Object")
   private List<DeleteObject> objects = new ArrayList<>();
 
   public boolean isQuiet() {
@@ -64,10 +64,10 @@ public class MultiDeleteRequest {
       + ".com/doc/2006-03-01/")
   public static class DeleteObject {
 
-    @XmlElement(name = "Key", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "Key")
     private String key;
 
-    @XmlElement(name = "VersionId", namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    @XmlElement(name = "VersionId")
     private String versionId;
 
     public DeleteObject() {
