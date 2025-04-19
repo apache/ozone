@@ -621,7 +621,7 @@ public class TestSCMContainerPlacementRackAware {
 
     for (int i = 0; i < 10; i++) {
       // Set a random DN to in_service and ensure it is always picked
-      int index = RandomUtils.nextInt(0, dnInfos.size());
+      int index = RandomUtils.secure().randomInt(0, dnInfos.size());
       dnInfos.get(index).setNodeStatus(NodeStatus.inServiceHealthy());
       try {
         List<DatanodeDetails> datanodeDetails =

@@ -263,7 +263,7 @@ public class TestSecureContainerServer {
 
       Token<OzoneBlockTokenIdentifier> token =
           blockTokenSecretManager.generateToken(blockID,
-              EnumSet.allOf(AccessModeProto.class), RandomUtils.nextLong());
+              EnumSet.allOf(AccessModeProto.class), RandomUtils.secure().randomLong());
       String encodedToken = token.encodeToUrlString();
 
       ContainerCommandRequestProto.Builder writeChunk =

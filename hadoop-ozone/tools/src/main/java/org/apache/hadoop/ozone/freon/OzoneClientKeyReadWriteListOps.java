@@ -169,7 +169,7 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
 
       timer = getMetrics().timer("key-read-write-list");
       if (objectSizeInBytes >= 0) {
-        keyContent = RandomUtils.nextBytes(objectSizeInBytes);
+        keyContent = RandomUtils.secure().randomBytes(objectSizeInBytes);
       }
       if (kg == null) {
         kg = new KeyGeneratorUtil();

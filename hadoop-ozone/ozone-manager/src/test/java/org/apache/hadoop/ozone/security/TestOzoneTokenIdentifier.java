@@ -105,7 +105,7 @@ public class TestOzoneTokenIdentifier {
         new Text("rm"), new Text("client"));
     tokenId.setOmCertSerialId("123");
     LOG.info("Unsigned token {} is {}", tokenId,
-        verifyTokenAsymmetric(tokenId, RandomUtils.nextBytes(128), cert));
+        verifyTokenAsymmetric(tokenId, RandomUtils.secure().randomBytes(128), cert));
 
   }
 

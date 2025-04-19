@@ -282,7 +282,8 @@ public class TestWatchForCommit {
         // as well as there is no logIndex generate in Ratis.
         // The basic idea here is just to test if its throws an exception.
         ExecutionException e = assertThrows(ExecutionException.class,
-            () -> xceiverClient.watchForCommit(index + RandomUtils.nextInt(0, 100) + 10).get());
+            () -> xceiverClient.watchForCommit(index + RandomUtils.secure().
+                randomInt(0, 100) + 10).get());
         // since the timeout value is quite long, the watch request will either
         // fail with NotReplicated exceptio, RetryFailureException or
         // RuntimeException
@@ -382,7 +383,8 @@ public class TestWatchForCommit {
         // as well as there is no logIndex generate in Ratis.
         // The basic idea here is just to test if its throws an exception.
         final Exception e = assertThrows(Exception.class,
-            () -> xceiverClient.watchForCommit(reply.getLogIndex() + RandomUtils.nextInt(0, 100) + 10).get());
+            () -> xceiverClient.watchForCommit(reply.getLogIndex() + RandomUtils.secure().
+                randomInt(0, 100) + 10).get());
         assertInstanceOf(GroupMismatchException.class, HddsClientUtils.checkForException(e));
       } finally {
         clientManager.releaseClient(xceiverClient, false);

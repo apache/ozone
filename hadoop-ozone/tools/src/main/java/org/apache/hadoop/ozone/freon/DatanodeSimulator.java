@@ -345,7 +345,7 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
     long scmHeartbeatInterval = HddsServerUtil.getScmHeartbeatInterval(conf);
     scmClients.forEach((endpoint, client) -> {
       // Use random initial delay as a jitter to avoid peaks.
-      long initialDelay = RandomUtils.nextLong(0, scmHeartbeatInterval);
+      long initialDelay = RandomUtils.secure().randomLong(0, scmHeartbeatInterval);
       Runnable runnable = () -> heartbeat(endpoint, client, dn);
       heartbeatScheduler.scheduleAtFixedRate(runnable, initialDelay,
           scmHeartbeatInterval, TimeUnit.MILLISECONDS);
@@ -353,7 +353,7 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
 
     long reconHeartbeatInterval =
         HddsServerUtil.getReconHeartbeatInterval(conf);
-    long initialDelay = RandomUtils.nextLong(0, reconHeartbeatInterval);
+    long initialDelay = RandomUtils.secure().randomLong(0, reconHeartbeatInterval);
     Runnable runnable = () -> heartbeat(reconAddress, reconClient, dn);
     heartbeatScheduler.scheduleAtFixedRate(runnable, initialDelay,
         reconHeartbeatInterval, TimeUnit.MILLISECONDS);

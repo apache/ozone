@@ -288,8 +288,8 @@ public class TestStorageContainerManager {
       // Add 2 TXs per container.
       Map<Long, List<Long>> deletedBlocks = new HashMap<>();
       List<Long> blocks = new ArrayList<>();
-      blocks.add(RandomUtils.nextLong());
-      blocks.add(RandomUtils.nextLong());
+      blocks.add(RandomUtils.secure().randomLong());
+      blocks.add(RandomUtils.secure().randomLong());
       deletedBlocks.put(containerID, blocks);
       addTransactions(cluster.getStorageContainerManager(), delLog,
           deletedBlocks);

@@ -277,7 +277,7 @@ class TestDatanodeHddsVolumeFailureDetection {
 
   private static long createKey(OzoneBucket bucket, String key)
       throws IOException {
-    byte[] bytes = RandomUtils.nextBytes(KEY_SIZE);
+    byte[] bytes = RandomUtils.secure().randomBytes(KEY_SIZE);
     RatisReplicationConfig replication =
         RatisReplicationConfig.getInstance(ReplicationFactor.ONE);
     TestDataUtil.createKey(bucket, key, replication, bytes);
