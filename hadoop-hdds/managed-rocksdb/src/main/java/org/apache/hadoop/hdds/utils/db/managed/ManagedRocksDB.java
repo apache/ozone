@@ -47,6 +47,13 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
   }
 
   public static ManagedRocksDB openReadOnly(
+      final ManagedOptions options,
+      final String path)
+      throws RocksDBException {
+    return new ManagedRocksDB(RocksDB.openReadOnly(options, path));
+  }
+
+  public static ManagedRocksDB openReadOnly(
       final ManagedDBOptions options, final String path,
       final List<ColumnFamilyDescriptor> columnFamilyDescriptors,
       final List<ColumnFamilyHandle> columnFamilyHandles)
