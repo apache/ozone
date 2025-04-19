@@ -27,14 +27,13 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import org.apache.hadoop.ozone.s3.commontypes.IsoDateAdapter;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
-import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * AWS compatible REST response for list multipart upload.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "ListMultipartUploadsResult", namespace =
-    OzoneConsts.S3_NAMESPACE_URL)
+    "http://s3.amazonaws.com/doc/2006-03-01/")
 public class ListMultipartUploadsResult {
 
   @XmlElement(name = "Bucket")

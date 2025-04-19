@@ -25,7 +25,6 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.commontypes.BucketMetadata;
 
 /**
@@ -33,7 +32,7 @@ import org.apache.hadoop.ozone.s3.commontypes.BucketMetadata;
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "ListAllMyBucketsResult",
-    namespace = OzoneConsts.S3_NAMESPACE_URL)
+    namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
 public class ListBucketResponse {
   @XmlElementWrapper(name = "Buckets")
   @XmlElement(name = "Bucket")
