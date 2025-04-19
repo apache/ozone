@@ -275,8 +275,7 @@ public class MockNodeManager implements NodeManager {
             capacity, used, remaining, null);
         MetadataStorageReportProto metaStorage1 =
             HddsTestUtils.createMetadataStorageReport(
-                "/metadata1-" + di.getUuidString(), capacity, used,
-                remaining, null);
+                "/metadata1-" + di, capacity, used, remaining, null);
         di.updateStorageReports(Collections.singletonList(storage1));
         di.updateMetaDataStorageReports(Collections.singletonList(metaStorage1));
 
