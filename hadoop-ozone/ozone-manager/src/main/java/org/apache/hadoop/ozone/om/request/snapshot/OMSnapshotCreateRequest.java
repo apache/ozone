@@ -104,6 +104,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   @RequireSnapshotFeatureState(true)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final OMRequest omRequest = super.preExecute(ozoneManager);
+    // verify snapshot limit
+    ozoneManager.getOmSnapshotManager().snapshotLimitCheck();
     // Verify name
     OmUtils.validateSnapshotName(snapshotName);
     // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
@@ -188,7 +190,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       //  pre-replicated key size counter in OmBucketInfo.
       snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo));
 
-      addSnapshotInfoToSnapshotChainAndCache(omMetadataManager, context.getIndex());
+      addSnapshotInfoToSnapshotChainAndCache(ozoneManager, omMetadataManager, context.getIndex());
 
       omResponse.setCreateSnapshotResponse(
           CreateSnapshotResponse.newBuilder()
@@ -250,6 +252,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
    * it was removed at T-5.
    */
   private void addSnapshotInfoToSnapshotChainAndCache(
+      OzoneManager ozoneManager,
       OmMetadataManagerImpl omMetadataManager,
       long transactionLogIndex
   ) throws IOException {
@@ -288,6 +291,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         removeSnapshotInfoFromSnapshotChainManager(snapshotChainManager,
             snapshotInfo);
         throw new IOException(exception.getMessage(), exception);
+      } finally {
+        ozoneManager.getOmSnapshotManager().decrementInFlightSnapshotCount();
       }
     }
   }
