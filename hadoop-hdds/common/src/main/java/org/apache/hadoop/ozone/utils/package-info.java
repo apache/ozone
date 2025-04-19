@@ -16,6 +16,6 @@
  */
 
 /**
- * Command-line tools for HDDS.
+ * Utility classes for Ozone.
  */
-package org.apache.hadoop.hdds.cli;
+package org.apache.hadoop.ozone.utils;

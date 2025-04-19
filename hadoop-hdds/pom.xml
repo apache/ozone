@@ -47,7 +47,6 @@
     <module>rocksdb-checkpoint-differ</module>
     <module>server-scm</module>
     <module>test-utils</module>
-    <module>tools</module>
   </modules>
 
   <dependencyManagement>
@@ -167,11 +166,6 @@
         <artifactId>hdds-test-utils</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-tools</artifactId>
-        <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
