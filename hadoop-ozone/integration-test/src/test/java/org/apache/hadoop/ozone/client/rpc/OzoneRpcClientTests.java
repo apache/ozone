@@ -1946,7 +1946,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
         OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     String sampleData = Arrays.toString(generateData(blockSize + 100,
-        (byte) RandomUtils.nextLong()));
+        (byte) RandomUtils.secure().randomLong()));
     int valueLength = sampleData.getBytes(UTF_8).length;
 
     store.createVolume(volumeName);
@@ -1983,7 +1983,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(RandomUtils.nextInt(1, 1024));
+    String value = RandomStringUtils.random(RandomUtils.secure().randomInt(1, 1024));
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -2097,7 +2097,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         for (int i = 0; i < 5; i++) {
           String keyName = UUID.randomUUID().toString();
           String data = Arrays.toString(generateData(5 * 1024 * 1024,
-              (byte) RandomUtils.nextLong()));
+              (byte) RandomUtils.secure().randomLong()));
           TestDataUtil.createKey(bucket, keyName,
               ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
               data.getBytes(UTF_8));
@@ -3645,7 +3645,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     // upload part 1.
     byte[] data = generateData(5 * 1024 * 1024,
-        (byte) RandomUtils.nextLong());
+        (byte) RandomUtils.secure().randomLong());
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);

@@ -119,7 +119,7 @@ public class TestParentAcl {
   public void testKeyAcl()
       throws IOException {
     OzoneObj keyObj;
-    int randomInt = RandomUtils.nextInt();
+    int randomInt = RandomUtils.secure().randomInt();
     String vol = "vol" + randomInt;
     String buck = "bucket" + randomInt;
     String key = "key" + randomInt;
@@ -165,7 +165,7 @@ public class TestParentAcl {
   public void testBucketAcl()
       throws IOException {
     OzoneObj bucketObj;
-    int randomInt = RandomUtils.nextInt();
+    int randomInt = RandomUtils.secure().randomInt();
     String vol = "vol" + randomInt;
     String buck = "bucket" + randomInt;
 

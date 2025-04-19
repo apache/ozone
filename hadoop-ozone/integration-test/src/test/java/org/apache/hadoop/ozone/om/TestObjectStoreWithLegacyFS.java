@@ -215,7 +215,7 @@ public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase
     String uploadID = omMultipartInfo.getUploadID();
 
     // upload part 1.
-    byte[] data = generateData(128, (byte) RandomUtils.nextLong());
+    byte[] data = generateData(128, (byte) RandomUtils.secure().randomLong());
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);

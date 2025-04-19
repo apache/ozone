@@ -255,7 +255,7 @@ public class TestContainerCommandsEC {
     String keyName = UUID.randomUUID().toString();
     try (OutputStream out = classBucket
         .createKey(keyName, keyLen, repConfig, new HashMap<>())) {
-      out.write(RandomUtils.nextBytes(keyLen));
+      out.write(RandomUtils.secure().randomBytes(keyLen));
     }
     long orphanContainerID = classBucket.getKey(keyName)
         .getOzoneKeyLocations().get(0).getContainerID();
@@ -1023,8 +1023,8 @@ public class TestContainerCommandsEC {
         new ECReplicationConfig(EC_DATA, EC_PARITY, EC_CODEC, EC_CHUNK_SIZE);
     values = new byte[ranges.length][];
     for (int i = 0; i < ranges.length; i++) {
-      int keySize = RandomUtils.nextInt(ranges[i][0], ranges[i][1]);
-      values[i] = RandomUtils.nextBytes(keySize);
+      int keySize = RandomUtils.secure().randomInt(ranges[i][0], ranges[i][1]);
+      values[i] = RandomUtils.secure().randomBytes(keySize);
       final String keyName = UUID.randomUUID().toString();
       try (OutputStream out = classBucket
           .createKey(keyName, values[i].length, repConfig, new HashMap<>())) {
