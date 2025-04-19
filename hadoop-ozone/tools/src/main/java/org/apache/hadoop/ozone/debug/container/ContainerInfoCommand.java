@@ -17,23 +17,39 @@
 
 package org.apache.hadoop.ozone.debug.container;
 
-import org.apache.hadoop.hdds.cli.DebugSubcommand;
-import org.kohsuke.MetaInfServices;
+import java.util.concurrent.Callable;
+import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
 import picocli.CommandLine;
 
 /**
- * A controller for managing container log operations like parsing and listing containers.
+ * Command to display detailed information of a single container by ID.
  */
 
 @CommandLine.Command(
-    name = "container",
-    subcommands = {
-        ContainerLogParser.class,
-        ContainerInfoCommand.class
-    },
-    description = "Parse, Store, Retrieve"
+    name = "info",
+    description = "provides details of a single container"
 )
-@MetaInfServices(DebugSubcommand.class)
-public class ContainerLogController implements DebugSubcommand  {
+public class ContainerInfoCommand implements Callable<Void> {
+
+  @CommandLine.Parameters(index = "0", description = "Container ID")
+  private Long containerId;
+
+  @CommandLine.ParentCommand
+  private ContainerLogController parent;
+  
+  @Override
+  public Void call() throws Exception {
+
+
+    ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
+    try {
+      cdd.showContainerDetails(containerId);
+    } catch (Exception e) {
+      System.err.println("Error while retrieving container with id: " + containerId + " " + e.getMessage());
+    }
+
+    return null;
+  }
 
 }
+
