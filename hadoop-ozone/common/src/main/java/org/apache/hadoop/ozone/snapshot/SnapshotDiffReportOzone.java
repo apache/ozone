@@ -149,7 +149,7 @@ public class SnapshotDiffReportOzone
         report.getDiffListList().stream()
             .map(SnapshotDiffReportOzone::fromProtobufDiffReportEntry)
             .collect(Collectors.toList()),
-        report.getToken());
+        report.hasToken() ? report.getToken() : null);
   }
 
   public static DiffType fromProtobufDiffType(

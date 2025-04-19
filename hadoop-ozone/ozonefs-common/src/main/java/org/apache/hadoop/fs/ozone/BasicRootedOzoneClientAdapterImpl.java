@@ -1367,7 +1367,7 @@ public class BasicRootedOzoneClientAdapterImpl
           getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot, volume,
               bucket, "");
       aggregated = report;
-      while (!report.getToken().isEmpty()) {
+      while (StringUtils.isNotEmpty(report.getToken())) {
         LOG.info(
             "Total Snapshot Diff length between snapshot {} and {} exceeds"
                 + " max page size, Performing another" +

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -2095,7 +2096,6 @@ public abstract class TestOmSnapshot {
         bucketName, snapshot1, snapshot2, null, pageSize);
 
     List<DiffReportEntry> diffReportEntries = diffReport.getDiffList();
-    String nextToken = diffReport.getToken();
 
     // Restart the OM and no need to wait because snapDiff job finished before
     // the restart.
@@ -2104,11 +2104,10 @@ public abstract class TestOmSnapshot {
     await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS,
         () -> cluster.getOzoneManager().isRunning());
 
-    while (nextToken == null || !nextToken.isEmpty()) {
+    while (isNotEmpty(diffReport.getToken())) {
       diffReport = fetchReportPage(volumeName, bucketName, snapshot1,
-          snapshot2, nextToken, pageSize);
+          snapshot2, diffReport.getToken(), pageSize);
       diffReportEntries.addAll(diffReport.getDiffList());
-      nextToken = diffReport.getToken();
     }
     assertEquals(100, diffReportEntries.size());
   }
