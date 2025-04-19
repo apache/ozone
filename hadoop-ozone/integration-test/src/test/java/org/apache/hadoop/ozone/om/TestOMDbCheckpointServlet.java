@@ -694,7 +694,7 @@ public class TestOMDbCheckpointServlet {
     Path fabricatedSnapshot  = Paths.get(
         new File(snapshotDirName).getParent(),
         "fabricatedSnapshot");
-    fabricatedSnapshot.toFile().mkdirs();
+    assertTrue(fabricatedSnapshot.toFile().mkdirs());
     assertTrue(Paths.get(fabricatedSnapshot.toString(),
         FABRICATED_FILE_NAME).toFile().createNewFile());
 

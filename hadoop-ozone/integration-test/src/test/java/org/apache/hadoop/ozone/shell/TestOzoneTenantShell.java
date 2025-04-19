@@ -115,9 +115,7 @@ public class TestOzoneTenantShell {
   @BeforeAll
   public static void init() throws Exception {
     // Remove audit log output if it exists
-    if (AUDIT_LOG_FILE.exists()) {
-      AUDIT_LOG_FILE.delete();
-    }
+    FileUtils.deleteQuietly(AUDIT_LOG_FILE);
 
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
@@ -134,8 +132,7 @@ public class TestOzoneTenantShell {
     }
 
     testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
-    testFile.getParentFile().mkdirs();
-    testFile.createNewFile();
+    FileUtils.touch(testFile);
 
     ozoneSh = new OzoneShell();
     tenantShell = new TenantShell();
@@ -160,9 +157,7 @@ public class TestOzoneTenantShell {
       cluster.shutdown();
     }
 
-    if (AUDIT_LOG_FILE.exists()) {
-      AUDIT_LOG_FILE.delete();
-    }
+    FileUtils.deleteQuietly(AUDIT_LOG_FILE);
   }
 
   @BeforeEach

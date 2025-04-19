@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -30,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -131,6 +133,13 @@ public final class TestDataUtil {
     try (OutputStream stream = createOutputStream(bucket, keyName,
         repConfig, content)) {
       stream.write(content);
+    }
+  }
+
+  public static void readFully(OzoneBucket bucket, String keyName) throws IOException {
+    int len = Math.toIntExact(bucket.getKey(keyName).getDataSize());
+    try (InputStream inputStream = bucket.readKey(keyName)) {
+      assertDoesNotThrow(() -> IOUtils.readFully(inputStream, len));
     }
   }
 

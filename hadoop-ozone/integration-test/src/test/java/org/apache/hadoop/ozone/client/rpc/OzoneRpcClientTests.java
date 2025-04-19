@@ -49,6 +49,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRI
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -199,6 +200,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -1190,7 +1192,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       assertEquals(keyName, key.getName());
       try (OzoneInputStream is = bucket.readKey(keyName)) {
         byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-        is.read(fileContent);
+        IOUtils.readFully(is, fileContent);
         assertEquals(value, new String(fileContent, UTF_8));
       }
     } else {
@@ -1222,7 +1224,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       assertEquals(keyName, key.getName());
       try (OzoneInputStream is = bucket.readKey(keyName)) {
         byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-        is.read(fileContent);
+        IOUtils.readFully(is, fileContent);
         verifyReplication(volumeName, bucketName, keyName,
             RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE));
@@ -2032,7 +2034,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       assertEquals(keyName, key.getName());
       try (OzoneInputStream is = bucket.readKey(keyName)) {
         byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-        is.read(fileContent);
+        IOUtils.readFully(is, fileContent);
         verifyReplication(volumeName, bucketName, keyName,
             RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE));
@@ -2065,7 +2067,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       assertEquals(keyName, key.getName());
       try (OzoneInputStream is = bucket.readKey(keyName)) {
         byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-        is.read(fileContent);
+        IOUtils.readFully(is, fileContent);
         verifyReplication(volumeName, bucketName, keyName,
             RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.THREE));
@@ -2105,7 +2107,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           assertEquals(keyName, key.getName());
           try (OzoneInputStream is = bucket.readKey(keyName)) {
             byte[] fileContent = new byte[data.getBytes(UTF_8).length];
-            is.read(fileContent);
+            IOUtils.readFully(is, fileContent);
             verifyReplication(volumeName, bucketName, keyName,
                 RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.THREE));
@@ -2204,20 +2206,21 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       configuration.setFromObject(clientConfig);
 
       RpcClient client = new RpcClient(configuration, null);
-      try (InputStream is = client.getKey(volumeName, bucketName, keyName)) {
-        is.read(new byte[100]);
+      try {
+        int len = Math.toIntExact(client.getKeyDetails(volumeName, bucketName, keyName).getDataSize());
+        try (InputStream is = client.getKey(volumeName, bucketName, keyName)) {
+          Executable read = () -> IOUtils.readFully(is, len);
+          if (verifyChecksum) {
+            assertThrows(IOException.class, read);
+          } else {
+            assertDoesNotThrow(read);
+          }
+        }
       } finally {
         client.close();
       }
-      if (verifyChecksum) {
-        fail("Reading corrupted data should fail, as verify checksum is " +
-            "enabled");
-      }
-    } catch (IOException e) {
-      if (!verifyChecksum) {
-        fail("Reading corrupted data should not fail, as verify checksum is " +
-            "disabled");
-      }
+    } catch (IOException ignored) {
+      // ignore
     }
   }
 
@@ -2306,7 +2309,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private void assertInputStreamContent(String expected, InputStream is)
       throws IOException {
     byte[] fileContent = new byte[expected.getBytes(UTF_8).length];
-    is.read(fileContent);
+    IOUtils.readFully(is, fileContent);
     assertEquals(expected, new String(fileContent, UTF_8));
   }
 
@@ -2354,7 +2357,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // throw a checksum mismatch exception.
     IOException ioException = assertThrows(IOException.class, () -> {
       try (OzoneInputStream is = bucket.readKey(keyName)) {
-        is.read(new byte[100]);
+        IOUtils.readFully(is, new byte[100]);
       }
     });
 
@@ -2445,8 +2448,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // Try reading keyName2
     GenericTestUtils.setLogLevel(XceiverClientGrpc.class, DEBUG);
     try (OzoneInputStream is = bucket.readKey(keyName2)) {
-      byte[] content = new byte[100];
-      is.read(content);
+      byte[] content = IOUtils.readFully(is, Math.toIntExact(bucket.getKey(keyName2).getDataSize()));
       String retValue = new String(content, UTF_8);
       assertEquals(value, retValue.trim());
     }
@@ -2502,7 +2504,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // failover to next replica
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[data.length];
-      is.read(b);
+      IOUtils.readFully(is, b);
       assertArrayEquals(b, data);
     }
     corruptData(cluster, containerList.get(1), key);
@@ -2510,7 +2512,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // failover to next replica
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[data.length];
-      is.read(b);
+      IOUtils.readFully(is, b);
       assertArrayEquals(b, data);
     }
     corruptData(cluster, containerList.get(2), key);
@@ -2519,7 +2521,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     IOException ioException = assertThrows(IOException.class, () -> {
       try (OzoneInputStream is = bucket.readKey(keyName)) {
         byte[] b = new byte[data.length];
-        is.read(b);
+        IOUtils.readFully(is, b);
       }
     });
     assertThat(ioException).hasMessageContaining("Checksum mismatch");
@@ -3671,7 +3673,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     byte[] fileContent = new byte[data.length];
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
-      inputStream.read(fileContent);
+      IOUtils.readFully(inputStream, fileContent);
     }
     StringBuilder sb = new StringBuilder(data.length);
 
@@ -4247,7 +4249,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     byte[] fileContent = new byte[data.length + data.length + part3.getBytes(
         UTF_8).length];
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
-      inputStream.read(fileContent);
+      IOUtils.readFully(inputStream, fileContent);
     }
 
     verifyReplication(bucket.getVolumeName(), bucket.getName(), keyName,
@@ -4454,7 +4456,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[text.getBytes(UTF_8).length];
-      is.read(fileContent);
+      IOUtils.readFully(is, fileContent);
 
       //Step 6
       assertNotEquals(text, new String(fileContent, UTF_8));
@@ -4852,14 +4854,14 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // read key with topology aware read enabled
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[value.getBytes(UTF_8).length];
-      is.read(b);
+      IOUtils.readFully(is, b);
       assertArrayEquals(b, value.getBytes(UTF_8));
     }
 
     // read file with topology aware read enabled
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[value.getBytes(UTF_8).length];
-      is.read(b);
+      IOUtils.readFully(is, b);
       assertArrayEquals(b, value.getBytes(UTF_8));
     }
 
@@ -4873,14 +4875,14 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           newStore.getVolume(volumeName).getBucket(bucketName);
       try (OzoneInputStream is = newBucket.readKey(keyName)) {
         byte[] b = new byte[value.getBytes(UTF_8).length];
-        is.read(b);
+        IOUtils.readFully(is, b);
         assertArrayEquals(b, value.getBytes(UTF_8));
       }
 
       // read file with topology aware read disabled
       try (OzoneInputStream is = newBucket.readFile(keyName)) {
         byte[] b = new byte[value.getBytes(UTF_8).length];
-        is.read(b);
+        IOUtils.readFully(is, b);
         assertArrayEquals(b, value.getBytes(UTF_8));
       }
     }
