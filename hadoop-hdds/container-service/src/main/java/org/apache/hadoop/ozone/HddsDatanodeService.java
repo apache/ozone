@@ -234,7 +234,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       LOG.info("HddsDatanodeService {}", datanodeDetails);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        component = "dn-" + datanodeDetails;
+        component = "dn-" + datanodeDetails.getID();
         secConf = new SecurityConfig(conf);
 
         if (SecurityUtil.getAuthenticationMethod(conf).equals(
