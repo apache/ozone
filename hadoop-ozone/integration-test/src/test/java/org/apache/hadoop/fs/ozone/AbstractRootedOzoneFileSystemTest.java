@@ -604,7 +604,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     long retriesLeft = Math.round(Math.pow(10, 5));
     String name = null;
     while (name == null && retriesLeft-- > 0) {
-      name = "volume-" + RandomStringUtils.randomNumeric(numDigit);
+      name = "volume-" + RandomStringUtils.secure().nextNumeric(numDigit);
       // Check volume existence.
       Iterator<? extends OzoneVolume> iter =
           objectStore.listVolumesByUser(null, name, null);
@@ -632,7 +632,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
             "tuned for FS Path yet");
 
     String volumeNameLocal = getRandomNonExistVolumeName();
-    String bucketNameLocal = "bucket-" + RandomStringUtils.randomNumeric(5);
+    String bucketNameLocal = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
     Path root = new Path("/" + volumeNameLocal + "/" + bucketNameLocal);
     Path dir1 = new Path(root, "dir1");
     Path dir12 = new Path(dir1, "dir12");
@@ -673,7 +673,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
   @Test
   void testMkdirNonExistentVolumeBucket() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
-    String bucketNameLocal = "bucket-" + RandomStringUtils.randomNumeric(5);
+    String bucketNameLocal = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
     Path newVolBucket = new Path(
         "/" + volumeNameLocal + "/" + bucketNameLocal);
     fs.mkdirs(newVolBucket);
@@ -917,7 +917,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
    */
   private Path createRandomVolumeBucketWithDirs() throws IOException {
     String volume1 = getRandomNonExistVolumeName();
-    String bucket1 = "bucket-" + RandomStringUtils.randomNumeric(5);
+    String bucket1 = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
     Path bucketPath1 = new Path(OZONE_URI_DELIMITER + volume1 +
         OZONE_URI_DELIMITER + bucket1);
 
@@ -956,9 +956,9 @@ abstract class AbstractRootedOzoneFileSystemTest {
     objectStore.createVolume(volName);
     OzoneVolume ozoneVolume = objectStore.getVolume(volName);
 
-    String buckName = "bucket-" + RandomStringUtils.randomNumeric(5);
+    String buckName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
     UserGroupInformation currUgi = UserGroupInformation.getCurrentUser();
-    String bucketOwner = currUgi.getUserName() + RandomStringUtils.randomNumeric(5);
+    String bucketOwner = currUgi.getUserName() + RandomStringUtils.secure().nextNumeric(5);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setOwner(bucketOwner)
         .build();
@@ -2188,7 +2188,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
   @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
-    String bucketNameLocal = RandomStringUtils.randomNumeric(5);
+    String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);
     Path volume = new Path("/" + volumeNameLocal);
     ofs.mkdirs(volume);
     assertThrows(OMException.class,
@@ -2401,7 +2401,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // page size is 4.
     for (int fileCount = 0; fileCount < 10; fileCount++) {
       Path file =
-          new Path(bucketPath1, "key" + RandomStringUtils.randomAlphabetic(5));
+          new Path(bucketPath1, "key" + RandomStringUtils.secure().nextAlphabetic(5));
       ContractTestUtils.touch(fs, file);
     }
     Path snap3 = fs.createSnapshot(bucketPath1);
@@ -2413,7 +2413,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     assertEquals(10, diff.getDiffList().size());
 
     Path file =
-        new Path(bucketPath1, "key" + RandomStringUtils.randomAlphabetic(5));
+        new Path(bucketPath1, "key" + RandomStringUtils.secure().nextAlphabetic(5));
     ContractTestUtils.touch(fs, file);
     diff = ofs.getSnapshotDiffReport(bucketPath1, toSnap, "");
     assertEquals(1, diff.getDiffList().size());
@@ -2555,7 +2555,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
   private List<String> createFiles(Path srcBucketPath, int fileCount, short factor) throws IOException {
     List<String> createdFiles = new ArrayList<>();
     for (int i = 1; i <= fileCount; i++) {
-      String keyName = "key" + RandomStringUtils.randomNumeric(5);
+      String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
       Path file = new Path(srcBucketPath, keyName);
       try (FSDataOutputStream fsDataOutputStream = fs.create(file, factor)) {
         fsDataOutputStream.writeBytes("Hello");

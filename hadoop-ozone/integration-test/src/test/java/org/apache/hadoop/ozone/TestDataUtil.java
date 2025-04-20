@@ -91,8 +91,8 @@ public final class TestDataUtil {
 
   public static OzoneVolume createVolume(OzoneClient client,
                                          String volumeName) throws IOException {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin(adminName)
         .setOwner(userName)
@@ -166,7 +166,7 @@ public final class TestDataUtil {
     OzoneVolume volume = objectStore.getVolume(vol);
     String sourceBucket = bukName;
     if (createLinkedBucket) {
-      sourceBucket = bukName + RandomStringUtils.randomNumeric(5);
+      sourceBucket = bukName + RandomStringUtils.secure().nextNumeric(5);
     }
     volume.createBucket(sourceBucket, bucketArgs);
     OzoneBucket ozoneBucket = volume.getBucket(sourceBucket);
@@ -197,12 +197,12 @@ public final class TestDataUtil {
     final int attempts = 5;
     for (int i = 0; i < attempts; i++) {
       try {
-        String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-        String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+        String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+        String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
         OzoneBucket ozoneBucket = createVolumeAndBucket(client, volumeName, bucketName,
             bucketLayout);
         if (createLinkedBucket) {
-          String targetBucketName = ozoneBucket.getName() + RandomStringUtils.randomNumeric(5);
+          String targetBucketName = ozoneBucket.getName() + RandomStringUtils.secure().nextNumeric(5);
           ozoneBucket = createLinkedBucket(client, volumeName, bucketName, targetBucketName);
         }
         return ozoneBucket;
@@ -225,10 +225,10 @@ public final class TestDataUtil {
     try (OzoneClient client = cluster.newClient()) {
       OzoneBucket bucket = createVolumeAndBucket(client);
       for (int i = 0; i < numOfKeys; i++) {
-        String keyName = RandomStringUtils.randomAlphabetic(5) + i;
+        String keyName = RandomStringUtils.secure().nextAlphabetic(5) + i;
         createKey(bucket, keyName, ReplicationConfig
             .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
-            RandomStringUtils.randomAlphabetic(5).getBytes(UTF_8));
+            RandomStringUtils.secure().nextAlphabetic(5).getBytes(UTF_8));
         keyLocationMap.put(keyName, lookupOmKeyInfo(cluster, bucket, keyName));
       }
     }

@@ -60,8 +60,8 @@ public class TestOzoneFileSystemPrefixParser {
 
   @BeforeAll
   public static void init() throws Exception {
-    volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    volumeName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
+    bucketName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
 
     configuration = new OzoneConfiguration();
 
@@ -125,7 +125,7 @@ public class TestOzoneFileSystemPrefixParser {
   private void testPrefixParseWithInvalidPaths() throws Exception {
     PrefixParser invalidVolumeParser = new PrefixParser();
     String invalidVolumeName =
-        RandomStringUtils.randomAlphabetic(10).toLowerCase();
+        RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
     invalidVolumeParser.parse(invalidVolumeName, bucketName,
         OMStorage.getOmDbDir(configuration).getPath(),
         file.toString());
@@ -133,7 +133,7 @@ public class TestOzoneFileSystemPrefixParser {
 
     PrefixParser invalidBucketParser = new PrefixParser();
     String invalidBucketName =
-        RandomStringUtils.randomAlphabetic(10).toLowerCase();
+        RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
     invalidBucketParser.parse(volumeName, invalidBucketName,
         OMStorage.getOmDbDir(configuration).getPath(),
         file.toString());

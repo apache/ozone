@@ -209,8 +209,8 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   private OzoneVolume createAndCheckVolume(String volumeName)
       throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
         .setAdmin(adminName)
@@ -230,7 +230,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   @Test
   public void testAllVolumeOperations() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     createAndCheckVolume(volumeName);
 
@@ -247,8 +247,8 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   @Test
   public void testAllBucketOperations() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     OzoneVolume retVolume = createAndCheckVolume(volumeName);
 
@@ -399,7 +399,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   @Test
   public void testReadRequest() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
     ObjectStore objectStore = getObjectStore();
     objectStore.createVolume(volumeName);
 
@@ -661,7 +661,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
   void testAddPrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
-    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
+    String prefixName = RandomStringUtils.secure().nextAlphabetic(5) + "/";
     OzoneAcl defaultUserAcl = OzoneAcl.of(USER, remoteUserName,
         DEFAULT, READ);
 
@@ -674,7 +674,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
   void testRemovePrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
-    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
+    String prefixName = RandomStringUtils.secure().nextAlphabetic(5) + "/";
     OzoneAcl userAcl = OzoneAcl.of(USER, remoteUserName,
         ACCESS, READ);
     OzoneAcl userAcl1 = OzoneAcl.of(USER, "remote",
@@ -706,7 +706,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
   void testSetPrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
-    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
+    String prefixName = RandomStringUtils.secure().nextAlphabetic(5) + "/";
     OzoneAcl defaultUserAcl = OzoneAcl.of(USER, remoteUserName,
         DEFAULT, READ);
 
@@ -1079,10 +1079,10 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   @Test
   void testOMRatisSnapshot() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)

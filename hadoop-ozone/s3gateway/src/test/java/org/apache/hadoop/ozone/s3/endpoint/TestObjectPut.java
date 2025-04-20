@@ -151,7 +151,7 @@ class TestObjectPut {
   @MethodSource("argumentsForPutObject")
   void testPutObject(int length, ReplicationConfig replication) throws IOException, OS3Exception {
     //GIVEN
-    final String content = RandomStringUtils.randomAlphanumeric(length);
+    final String content = RandomStringUtils.secure().nextAlphanumeric(length);
     ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8));
     bucket.setReplicationConfig(replication);
 

@@ -140,7 +140,7 @@ public final class TestBlockTokens {
   private static void createTestData() throws IOException {
     client.getProxy().createVolume(TEST_VOLUME);
     client.getProxy().createBucket(TEST_VOLUME, TEST_BUCKET);
-    byte[] data = string2Bytes(RandomStringUtils.randomAlphanumeric(1024));
+    byte[] data = string2Bytes(RandomStringUtils.secure().nextAlphanumeric(1024));
     OzoneBucket bucket = client.getObjectStore().getVolume(TEST_VOLUME)
         .getBucket(TEST_BUCKET);
     try (OzoneOutputStream out = bucket.createKey(TEST_FILE, data.length)) {
