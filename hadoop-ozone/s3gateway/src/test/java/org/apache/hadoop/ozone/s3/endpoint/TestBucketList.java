@@ -18,12 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -519,6 +514,28 @@ public class TestBucketList {
         "b1", null, "unSupportType", null, 1000, null,
         null, null, null, null, null, null, 0, null).getEntity());
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e.getCode());
+  }
+
+  @Test
+  public void testListObjectsWithInvalidMaxKeys() throws Exception {
+    OzoneClient client = createClientWithKeys("file1");
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    // maxKeys < 0
+    OS3Exception e1 = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.get("bucket", null, null, null, -1, null,
+            null, null, null, null, null, null, 1000, null)
+    );
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e1.getCode());
+
+    // maxKeys == 0
+    OS3Exception e2 = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.get("bucket", null, null, null, 0, null,
+            null, null, null, null, null, null, 1000, null)
+    );
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e2.getCode());
   }
 
   private void assertEncodingTypeObject(
