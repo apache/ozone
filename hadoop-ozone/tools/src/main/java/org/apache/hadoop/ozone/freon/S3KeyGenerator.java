@@ -97,7 +97,7 @@ public class S3KeyGenerator extends S3EntityGenerator
 
     s3ClientInit();
 
-    content = RandomStringUtils.randomAscii(fileSize);
+    content = RandomStringUtils.secure().nextAscii(fileSize);
 
     timer = getMetrics().timer("key-create");
 

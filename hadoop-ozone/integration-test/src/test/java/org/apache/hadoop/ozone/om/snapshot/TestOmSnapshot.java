@@ -612,7 +612,7 @@ public abstract class TestOmSnapshot {
    */
   @Test
   public void testSnapDiffHandlingReclaimWithLatestUse() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.randomNumeric(5);
+    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -650,7 +650,7 @@ public abstract class TestOmSnapshot {
    */
   @Test
   public void testSnapDiffHandlingReclaimWithPreviousUse() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.randomNumeric(5);
+    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -697,7 +697,7 @@ public abstract class TestOmSnapshot {
    */
   @Test
   public void testSnapDiffReclaimWithKeyRecreation() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.randomNumeric(5);
+    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -751,7 +751,7 @@ public abstract class TestOmSnapshot {
    */
   @Test
   public void testSnapDiffReclaimWithKeyRename() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.randomNumeric(5);
+    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -1630,7 +1630,7 @@ public abstract class TestOmSnapshot {
    */
   @Test
   public void testSnapDiffWithKeyOverwrite() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.randomNumeric(5);
+    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -1719,8 +1719,8 @@ public abstract class TestOmSnapshot {
   @Test
   public void testListSnapshotDiffWithInvalidParameters()
       throws Exception {
-    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    String volume = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.secure().nextNumeric(5);
 
     String volErrorMessage = "Volume not found: " + volume;
 
@@ -1742,14 +1742,14 @@ public abstract class TestOmSnapshot {
 
     OzoneBucket ozBucket = ozVolume.getBucket(bucket);
     // Create keys and take snapshots.
-    String key1 = "key-1-" + RandomStringUtils.randomNumeric(5);
+    String key1 = "key-1-" + RandomStringUtils.secure().nextNumeric(5);
     createFileKey(ozBucket, key1);
-    String snap1 = "snap-1-" + RandomStringUtils.randomNumeric(5);
+    String snap1 = "snap-1-" + RandomStringUtils.secure().nextNumeric(5);
     createSnapshot(volume, bucket, snap1);
 
-    String key2 = "key-2-" + RandomStringUtils.randomNumeric(5);
+    String key2 = "key-2-" + RandomStringUtils.secure().nextNumeric(5);
     createFileKey(ozBucket, key2);
-    String snap2 = "snap-2-" + RandomStringUtils.randomNumeric(5);
+    String snap2 = "snap-2-" + RandomStringUtils.secure().nextNumeric(5);
     createSnapshot(volume, bucket, snap2);
 
     store.snapshotDiff(volume, bucket, snap1, snap2, null, 0,
@@ -1990,7 +1990,7 @@ public abstract class TestOmSnapshot {
 
   private String createFileKey(OzoneBucket bucket, String key)
           throws Exception {
-    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
     OzoneOutputStream fileKey = bucket.createKey(key, value.length);
     fileKey.write(value);
     fileKey.close();
@@ -2008,7 +2008,7 @@ public abstract class TestOmSnapshot {
   private void createFileKey(FileSystem fs,
                              String path)
       throws IOException, InterruptedException, TimeoutException {
-    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
     Path pathVal = new Path(path);
     FSDataOutputStream fileKey = fs.create(pathVal);
     fileKey.write(value);
@@ -2042,8 +2042,8 @@ public abstract class TestOmSnapshot {
   // in_progress when it restarts.
   @Test
   public void testSnapshotDiffWhenOmRestart() throws Exception {
-    String snapshot1 = "snap-" + RandomStringUtils.randomNumeric(5);
-    String snapshot2 = "snap-" + RandomStringUtils.randomNumeric(5);
+    String snapshot1 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String snapshot2 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
     createSnapshots(snapshot1, snapshot2);
 
     SnapshotDiffResponse response = store.snapshotDiff(volumeName, bucketName,
@@ -2087,8 +2087,8 @@ public abstract class TestOmSnapshot {
   public void testSnapshotDiffWhenOmRestartAndReportIsPartiallyFetched()
       throws Exception {
     int pageSize = 10;
-    String snapshot1 = "snap-" + RandomStringUtils.randomNumeric(5);
-    String snapshot2 = "snap-" + RandomStringUtils.randomNumeric(5);
+    String snapshot1 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String snapshot2 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
     createSnapshots(snapshot1, snapshot2);
 
     SnapshotDiffReportOzone diffReport = fetchReportPage(volumeName,
@@ -2170,8 +2170,8 @@ public abstract class TestOmSnapshot {
   @Test
   @Slow("HDDS-9299")
   public void testDayWeekMonthSnapshotCreationAndExpiration() throws Exception {
-    String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
-    String bucketA = "buc-a-" + RandomStringUtils.randomNumeric(5);
+    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketA = "buc-a-" + RandomStringUtils.secure().nextNumeric(5);
     store.createVolume(volumeA);
     OzoneVolume volA = store.getVolume(volumeA);
     createBucket(volA, bucketA);
@@ -2376,10 +2376,10 @@ public abstract class TestOmSnapshot {
   // column families are used in SST diff calculation.
   @Test
   public void testSnapshotCompactionDag() throws Exception {
-    String volume1 = "volume-1-" + RandomStringUtils.randomNumeric(5);
-    String bucket1 = "bucket-1-" + RandomStringUtils.randomNumeric(5);
-    String bucket2 = "bucket-2-" + RandomStringUtils.randomNumeric(5);
-    String bucket3 = "bucket-3-" + RandomStringUtils.randomNumeric(5);
+    String volume1 = "volume-1-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucket1 = "bucket-1-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucket2 = "bucket-2-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucket3 = "bucket-3-" + RandomStringUtils.secure().nextNumeric(5);
 
     store.createVolume(volume1);
     OzoneVolume ozoneVolume = store.getVolume(volume1);

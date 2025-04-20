@@ -150,7 +150,7 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
     inFlightMessages = new LinkedBlockingQueue<>(inflightLimit);
 
     timer = getMetrics().timer("append-entry");
-    byte[] data = RandomStringUtils.randomAscii(chunkSize)
+    byte[] data = RandomStringUtils.secure().nextAscii(chunkSize)
         .getBytes(StandardCharsets.UTF_8);
 
     dataToWrite = ByteString.copyFrom(data);

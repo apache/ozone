@@ -206,7 +206,7 @@ public class TestAuditParser {
 
   private static File getRandomTempDir() throws IOException {
     File tempDir = new File(outputBaseDir,
-        RandomStringUtils.randomAlphanumeric(5));
+        RandomStringUtils.secure().nextAlphanumeric(5));
     FileUtils.forceMkdir(tempDir);
     return tempDir;
   }

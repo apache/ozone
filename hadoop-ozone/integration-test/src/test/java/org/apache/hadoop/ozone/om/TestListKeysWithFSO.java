@@ -95,15 +95,15 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     omBucketArgs = builder.build();
 
-    String fsoBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String fsoBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
     fsoOzoneBucket = ozoneVolume.getBucket(fsoBucketName);
 
-    fsoBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    fsoBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
     fsoOzoneBucket2 = ozoneVolume.getBucket(fsoBucketName);
 
-    fsoBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    fsoBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
     emptyFsoOzoneBucket = ozoneVolume.getBucket(fsoBucketName);
 
@@ -111,11 +111,11 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
     omBucketArgs = builder.build();
-    String legacyBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String legacyBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(legacyBucketName, omBucketArgs);
     legacyOzoneBucket2 = ozoneVolume.getBucket(legacyBucketName);
 
-    legacyBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    legacyBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(legacyBucketName, omBucketArgs);
     emptyLegacyOzoneBucket = ozoneVolume.getBucket(legacyBucketName);
 

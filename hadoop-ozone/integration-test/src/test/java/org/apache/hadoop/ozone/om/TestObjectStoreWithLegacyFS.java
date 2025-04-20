@@ -99,8 +99,8 @@ public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase
 
   @BeforeEach
   public void init() throws Exception {
-    volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    volumeName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
+    bucketName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,

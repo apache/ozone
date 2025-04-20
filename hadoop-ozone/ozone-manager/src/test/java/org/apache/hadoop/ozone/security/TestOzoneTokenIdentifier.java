@@ -142,9 +142,9 @@ public class TestOzoneTokenIdentifier {
 
   OzoneTokenIdentifier generateTestToken() {
     OzoneTokenIdentifier tokenIdentifier = new OzoneTokenIdentifier(
-        new Text(RandomStringUtils.randomAlphabetic(6)),
-        new Text(RandomStringUtils.randomAlphabetic(5)),
-        new Text(RandomStringUtils.randomAlphabetic(4)));
+        new Text(RandomStringUtils.secure().nextAlphabetic(6)),
+        new Text(RandomStringUtils.secure().nextAlphabetic(5)),
+        new Text(RandomStringUtils.secure().nextAlphabetic(4)));
     tokenIdentifier.setOmCertSerialId("123");
     return tokenIdentifier;
   }

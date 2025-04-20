@@ -151,7 +151,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   @Test
   public void testCreateKey() throws Exception {
     String parent = "a/b/c/";
-    String file = "key" + RandomStringUtils.randomNumeric(5);
+    String file = "key" + RandomStringUtils.secure().nextNumeric(5);
     String key = parent + file;
 
     ObjectStore objectStore = client.getObjectStore();
@@ -219,7 +219,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     String testBucketName = testBucket.getName();
 
     String parent = "a/b/c/";
-    String file = "key" + RandomStringUtils.randomNumeric(5);
+    String file = "key" + RandomStringUtils.secure().nextNumeric(5);
     String key = parent + file;
 
     ObjectStore objectStore = client.getObjectStore();
@@ -271,7 +271,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   @Test
   public void testLookupKey() throws Exception {
     String parent = "a/b/c/";
-    String fileName = "key" + RandomStringUtils.randomNumeric(5);
+    String fileName = "key" + RandomStringUtils.secure().nextNumeric(5);
     String key = parent + fileName;
 
     ObjectStore objectStore = client.getObjectStore();

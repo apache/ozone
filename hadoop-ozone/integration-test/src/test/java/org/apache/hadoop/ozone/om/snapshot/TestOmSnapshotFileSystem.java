@@ -103,11 +103,11 @@ import org.slf4j.LoggerFactory;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class TestOmSnapshotFileSystem {
   protected static final String VOLUME_NAME =
-      "volume" + RandomStringUtils.randomNumeric(5);
+      "volume" + RandomStringUtils.secure().nextNumeric(5);
   protected static final String BUCKET_NAME_FSO =
-      "bucket-fso-" + RandomStringUtils.randomNumeric(5);
+      "bucket-fso-" + RandomStringUtils.secure().nextNumeric(5);
   protected static final String BUCKET_NAME_LEGACY =
-      "bucket-legacy-" + RandomStringUtils.randomNumeric(5);
+      "bucket-legacy-" + RandomStringUtils.secure().nextNumeric(5);
 
   private MiniOzoneCluster cluster = null;
   private OzoneClient client;
