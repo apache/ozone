@@ -93,8 +93,8 @@ public class TestDefaultCAServer {
   @Test
   public void testInit() throws Exception {
     CertificateServer testCA = new DefaultCAServer("testCA",
-        RandomStringUtils.secure().nextAlphanumeric(4),
-        RandomStringUtils.secure().nextAlphanumeric(4), caStore,
+        RandomStringUtils.secure().nextAlphabetic(4),
+        RandomStringUtils.secure().nextAlphabetic(4), caStore,
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(securityConfig, CAType.ROOT);
@@ -109,8 +109,8 @@ public class TestDefaultCAServer {
   @Test
   public void testMissingCertificate() throws Exception {
     CertificateServer testCA = new DefaultCAServer("testCA",
-        RandomStringUtils.secure().nextAlphanumeric(4),
-        RandomStringUtils.secure().nextAlphanumeric(4), caStore,
+        RandomStringUtils.secure().nextAlphabetic(4),
+        RandomStringUtils.secure().nextAlphabetic(4), caStore,
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(securityConfig, CAType.ROOT);
@@ -128,8 +128,8 @@ public class TestDefaultCAServer {
   @Test
   public void testMissingKey() {
     DefaultCAServer testCA = new DefaultCAServer("testCA",
-        RandomStringUtils.secure().nextAlphanumeric(4),
-        RandomStringUtils.secure().nextAlphanumeric(4), caStore,
+        RandomStringUtils.secure().nextAlphabetic(4),
+        RandomStringUtils.secure().nextAlphabetic(4), caStore,
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     Consumer<SecurityConfig> caInitializer =
@@ -152,8 +152,8 @@ public class TestDefaultCAServer {
    */
   @Test
   public void testRequestCertificate() throws Exception {
-    String scmId = RandomStringUtils.secure().nextAlphanumeric(4);
-    String clusterId = RandomStringUtils.secure().nextAlphanumeric(4);
+    String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+    String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
     KeyPair keyPair =
         new HDDSKeyGenerator(securityConfig).generateKey();
     //TODO: generateCSR!
