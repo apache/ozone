@@ -46,20 +46,19 @@ import org.apache.hadoop.util.StopWatch;
  */
 public final class RawErasureCoderBenchmark {
 
-  private RawErasureCoderBenchmark() {
-    // prevent instantiation
-  }
-
   // target size of input data buffer
   private static final int TARGET_BUFFER_SIZE_MB = 126;
 
-  private static final int MAX_CHUNK_SIZE =
-      TARGET_BUFFER_SIZE_MB / BenchData.NUM_DATA_UNITS * 1024;
+  private static final int MAX_CHUNK_SIZE = TARGET_BUFFER_SIZE_MB / BenchData.NUM_DATA_UNITS * 1024;
 
   private static final List<RawErasureCoderFactory> CODER_MAKERS =
       Collections.unmodifiableList(
           Arrays.asList(new DummyRawErasureCoderFactory(),
               new RSRawErasureCoderFactory()));
+
+  private RawErasureCoderBenchmark() {
+    // prevent instantiation
+  }
 
   enum CODER {
     DUMMY_CODER("Dummy coder"),

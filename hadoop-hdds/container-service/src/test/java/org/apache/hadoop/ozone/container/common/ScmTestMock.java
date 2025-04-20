@@ -73,6 +73,7 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
     this.clusterId = clusterId;
     this.scmId = UUID.randomUUID().toString();
   }
+
   /**
    * Returns the number of heartbeats made to this class.
    *

@@ -65,6 +65,8 @@ public class TestOMUpgradeFinalizer {
   @Mock
   private OMLayoutVersionManager versionManager;
 
+  private int storedLayoutVersion = 0;
+
   @Test
   public void testEmitsFinalizedStatusIfAlreadyFinalized() throws Exception {
 
@@ -253,8 +255,6 @@ public class TestOMUpgradeFinalizer {
     }
     return ret;
   }
-
-  private int storedLayoutVersion = 0;
 
   private OzoneManager mockOzoneManager(int initialLayoutVersion) {
     OzoneManager mock = mock(OzoneManager.class);

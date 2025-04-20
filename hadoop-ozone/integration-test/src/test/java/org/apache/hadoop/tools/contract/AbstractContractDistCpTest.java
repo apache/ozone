@@ -102,16 +102,6 @@ public abstract class AbstractContractDistCpTest
    */
   protected static final int DEFAULT_WIDTH = 2;
 
-  /**
-   * The timeout value is extended over the default so that large updates
-   * are allowed to take time, especially to remote stores.
-   * @return the current test timeout
-   */
-  @Override
-  protected int getTestTimeoutMillis() {
-    return 15  * 60 * 1000;
-  }
-
   private Configuration conf;
   private FileSystem localFS, remoteFS;
   private Path localDir, remoteDir;
@@ -151,6 +141,16 @@ public abstract class AbstractContractDistCpTest
   private Path outputFile4;
 
   private Path inputDirUnderOutputDir;
+
+  /**
+   * The timeout value is extended over the default so that large updates
+   * are allowed to take time, especially to remote stores.
+   * @return the current test timeout
+   */
+  @Override
+  protected int getTestTimeoutMillis() {
+    return 15  * 60 * 1000;
+  }
 
   @Override
   protected Configuration createConfiguration() {
