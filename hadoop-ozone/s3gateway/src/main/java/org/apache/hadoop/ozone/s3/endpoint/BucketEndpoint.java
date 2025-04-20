@@ -142,6 +142,8 @@ public class BucketEndpoint extends EndpointBase {
         return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
 
+      maxKeys = validateMaxKeys(maxKeys);
+
       if (prefix == null) {
         prefix = "";
       }
@@ -290,6 +292,14 @@ public class BucketEndpoint extends EndpointBase {
         getAuditParameters(), perf));
     response.setKeyCount(keyCount);
     return Response.ok(response).build();
+  }
+
+  private int validateMaxKeys(int maxKeys) throws OS3Exception {
+    if (maxKeys <= 0) {
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, "maxKeys must be > 0");
+    }
+
+    return Math.min(maxKeys, 1000);
   }
 
   @PUT
