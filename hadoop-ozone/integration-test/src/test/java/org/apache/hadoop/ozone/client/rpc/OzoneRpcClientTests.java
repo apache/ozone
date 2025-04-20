@@ -1983,7 +1983,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(RandomUtils.secure().randomInt(1, 1024));
+    String value = RandomStringUtils.secure().next(RandomUtils.secure().randomInt(1, 1024));
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -2231,7 +2231,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     String keyName = UUID.randomUUID().toString();
-    String keyValue = RandomStringUtils.random(128);
+    String keyValue = RandomStringUtils.secure().next(128);
     //String keyValue = "this is a test value.glx";
     // create the initial key with size 0, write will allocate the first block.
     TestDataUtil.createKey(bucket, keyName,
@@ -2668,13 +2668,13 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String volBaseNameA = volBase + "a-";
     for (int i = 0; i < 10; i++) {
       store.createVolume(
-          volBaseNameA + i + "-" + RandomStringUtils.randomNumeric(5));
+          volBaseNameA + i + "-" + RandomStringUtils.secure().nextNumeric(5));
     }
     //Create 10 volume vol-list-b-0-<random> to vol-list-b-9-<random>
     String volBaseNameB = volBase + "b-";
     for (int i = 0; i < 10; i++) {
       store.createVolume(
-          volBaseNameB + i + "-" + RandomStringUtils.randomNumeric(5));
+          volBaseNameB + i + "-" + RandomStringUtils.secure().nextNumeric(5));
     }
     Iterator<? extends OzoneVolume> volIterator = store.listVolumes(volBase);
     int totalVolumeCount = 0;
@@ -2706,8 +2706,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testListBucket()
       throws IOException {
-    String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
-    String volumeB = "vol-b-" + RandomStringUtils.randomNumeric(5);
+    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeB = "vol-b-" + RandomStringUtils.secure().nextNumeric(5);
     store.createVolume(volumeA);
     store.createVolume(volumeB);
     OzoneVolume volA = store.getVolume(volumeA);
@@ -2718,11 +2718,11 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String bucketBaseNameA = "bucket-a-";
     for (int i = 0; i < 10; i++) {
       String bucketName = bucketBaseNameA +
-          i + "-" + RandomStringUtils.randomNumeric(5);
+          i + "-" + RandomStringUtils.secure().nextNumeric(5);
       volA.createBucket(bucketName);
       store.createSnapshot(volumeA, bucketName, null);
       bucketName = bucketBaseNameA +
-          i + "-" + RandomStringUtils.randomNumeric(5);
+          i + "-" + RandomStringUtils.secure().nextNumeric(5);
       volB.createBucket(bucketName);
       store.createSnapshot(volumeB, bucketName, null);
     }
@@ -2730,11 +2730,11 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String bucketBaseNameB = "bucket-b-";
     for (int i = 0; i < 10; i++) {
       String bucketName = bucketBaseNameB +
-          i + "-" + RandomStringUtils.randomNumeric(5);
+          i + "-" + RandomStringUtils.secure().nextNumeric(5);
       volA.createBucket(bucketName);
       store.createSnapshot(volumeA, bucketName, null);
       volB.createBucket(
-          bucketBaseNameB + i + "-" + RandomStringUtils.randomNumeric(5));
+          bucketBaseNameB + i + "-" + RandomStringUtils.secure().nextNumeric(5));
     }
     assertBucketCount(volA, "bucket-", null, false, 20);
     assertBucketCount(volA, "bucket-", null, true, 20);
@@ -2803,10 +2803,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testListKey()
       throws IOException {
-    String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
-    String volumeB = "vol-b-" + RandomStringUtils.randomNumeric(5);
-    String bucketA = "buc-a-" + RandomStringUtils.randomNumeric(5);
-    String bucketB = "buc-b-" + RandomStringUtils.randomNumeric(5);
+    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeB = "vol-b-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketA = "buc-a-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketB = "buc-b-" + RandomStringUtils.secure().nextNumeric(5);
     store.createVolume(volumeA);
     store.createVolume(volumeB);
     OzoneVolume volA = store.getVolume(volumeA);
@@ -2827,18 +2827,18 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
      */
     String keyBaseA = "key-a-";
     for (int i = 0; i < 10; i++) {
-      byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+      byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
       TestDataUtil.createKey(volAbucketA,
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
+          keyBaseA + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
       TestDataUtil.createKey(volAbucketB,
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
+          keyBaseA + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
       TestDataUtil.createKey(volBbucketA,
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
+          keyBaseA + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
       TestDataUtil.createKey(volBbucketB,
-          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
+          keyBaseA + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
     }
     /*
@@ -2848,18 +2848,18 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
      */
     String keyBaseB = "key-b-";
     for (int i = 0; i < 10; i++) {
-      byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+      byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
       TestDataUtil.createKey(volAbucketA,
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
+          keyBaseB + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
       TestDataUtil.createKey(volAbucketB,
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
+          keyBaseB + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
       TestDataUtil.createKey(volBbucketA,
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
+          keyBaseB + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
       TestDataUtil.createKey(volBbucketB,
-          keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
+          keyBaseB + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
     }
     Iterator<? extends OzoneKey> volABucketAIter =
@@ -2914,8 +2914,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testListKeyOnEmptyBucket()
       throws IOException {
-    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
+    String volume = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucket = "buc-" + RandomStringUtils.secure().nextNumeric(5);
     store.createVolume(volume);
     OzoneVolume vol = store.getVolume(volume);
     vol.createBucket(bucket);
@@ -4196,7 +4196,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private void writeKey(String key1, OzoneBucket bucket) throws IOException {
     TestDataUtil.createKey(bucket, key1,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-        RandomStringUtils.random(1024).getBytes(UTF_8));
+        RandomStringUtils.secure().next(1024).getBytes(UTF_8));
   }
 
   private byte[] generateData(int size, byte val) {
@@ -4358,7 +4358,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       OzoneBucket bucket, String keyName, byte[] bytes
   ) throws IOException {
     RatisReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
-    Map<String, String> metadata = singletonMap("key", RandomStringUtils.randomAscii(10));
+    Map<String, String> metadata = singletonMap("key", RandomStringUtils.secure().nextAscii(10));
     try (OzoneOutputStream out = bucket.createKey(keyName, bytes.length, replication, metadata)) {
       out.write(bytes);
     }
@@ -4744,10 +4744,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testListSnapshot() throws IOException {
-    String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
-    String volumeB = "vol-b-" + RandomStringUtils.randomNumeric(5);
-    String bucketA = "buc-a-" + RandomStringUtils.randomNumeric(5);
-    String bucketB = "buc-b-" + RandomStringUtils.randomNumeric(5);
+    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeB = "vol-b-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketA = "buc-a-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketB = "buc-b-" + RandomStringUtils.secure().nextNumeric(5);
     store.createVolume(volumeA);
     store.createVolume(volumeB);
     OzoneVolume volA = store.getVolume(volumeA);
@@ -4760,23 +4760,23 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String snapshotPrefixB = "snapshot-b-";
     for (int i = 0; i < 10; i++) {
       store.createSnapshot(volumeA, bucketA,
-          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+          snapshotPrefixA + i + "-" + RandomStringUtils.secure().nextNumeric(5));
       store.createSnapshot(volumeA, bucketB,
-          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+          snapshotPrefixA + i + "-" + RandomStringUtils.secure().nextNumeric(5));
       store.createSnapshot(volumeB, bucketA,
-          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+          snapshotPrefixA + i + "-" + RandomStringUtils.secure().nextNumeric(5));
       store.createSnapshot(volumeB, bucketB,
-          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+          snapshotPrefixA + i + "-" + RandomStringUtils.secure().nextNumeric(5));
     }
     for (int i = 0; i < 10; i++) {
       store.createSnapshot(volumeA, bucketA,
-          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+          snapshotPrefixB + i + "-" + RandomStringUtils.secure().nextNumeric(5));
       store.createSnapshot(volumeA, bucketB,
-          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+          snapshotPrefixB + i + "-" + RandomStringUtils.secure().nextNumeric(5));
       store.createSnapshot(volumeB, bucketA,
-          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+          snapshotPrefixB + i + "-" + RandomStringUtils.secure().nextNumeric(5));
       store.createSnapshot(volumeB, bucketB,
-          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+          snapshotPrefixB + i + "-" + RandomStringUtils.secure().nextNumeric(5));
     }
 
     Iterator<OzoneSnapshot> snapshotIter = store.listSnapshot(volumeA, bucketA, null, null);

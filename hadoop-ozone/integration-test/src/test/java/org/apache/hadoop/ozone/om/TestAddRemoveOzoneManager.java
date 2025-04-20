@@ -84,8 +84,8 @@ public class TestAddRemoveOzoneManager {
   private static final String BUCKET_NAME;
 
   static {
-    VOLUME_NAME = "volume" + RandomStringUtils.randomNumeric(5);
-    BUCKET_NAME = "bucket" + RandomStringUtils.randomNumeric(5);
+    VOLUME_NAME = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    BUCKET_NAME = "bucket" + RandomStringUtils.secure().nextNumeric(5);
   }
 
   private OzoneClient client;

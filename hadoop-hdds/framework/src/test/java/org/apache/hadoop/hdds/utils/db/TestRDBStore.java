@@ -121,9 +121,9 @@ public class TestRDBStore {
       assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         byte[] value =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
       }
     } catch (Exception e) {
@@ -169,9 +169,9 @@ public class TestRDBStore {
   @Test
   public void moveKey() throws Exception {
     byte[] key =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
     byte[] value =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
 
     try (Table firstTable = rdbStore.getTable(families.get(1))) {
       firstTable.put(key, value);
@@ -192,12 +192,12 @@ public class TestRDBStore {
   @Test
   public void moveWithValue() throws Exception {
     byte[] key =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
     byte[] value =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
 
     byte[] nextValue =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
     try (Table firstTable = rdbStore.getTable(families.get(1))) {
       firstTable.put(key, value);
       try (Table<byte[], byte[]> secondTable = rdbStore
@@ -355,7 +355,7 @@ public class TestRDBStore {
       try (Table table = rdbStore.getTable(family)) {
         byte[] key = family.getBytes(StandardCharsets.UTF_8);
         byte[] value =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         table.put(key, value);
       }
     }
