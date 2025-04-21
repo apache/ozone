@@ -128,7 +128,7 @@ public class ChunkKeyHandler extends KeyHandler {
             GetBlockResponseProto blockResponse = entry.getValue();
 
             if (blockResponse == null || !blockResponse.hasBlockData()) {
-              System.err.printf("GetBlock call failed on %s datanode and %s block.\n",
+              System.err.printf("GetBlock call failed on %s datanode and %s block.%n",
                   datanodeDetails.getHostName(), keyLocation.getBlockID());
               continue;
             }
