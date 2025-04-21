@@ -79,8 +79,7 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
         }
         formattingCLIUtils.addLine(roleItems);
       }
-      StringBuilder join = new StringBuilder();
-      System.out.println(formattingCLIUtils.render(join));
+      System.out.println(formattingCLIUtils.render());
     } else {
       for (String role: peerRoles) {
         System.out.println(role);

@@ -39,11 +39,14 @@ import java.util.Map;
  * | bigdata-ozone-online31          |  om31   |  LEADER  |
  * +---------------------------------+---------+----------+
  */
+@SuppressWarnings(value = "PMD.AvoidStringBufferField")
 public final class FormattingCLIUtils {
   /** Table title. */
   private String title;
   /** Last processed row type. */
   private TableRowType lastTableRowType;
+  /** StringBuilder object used to concatenate strings. */
+  private StringBuilder join;
   /** An ordered Map that holds each row of data. */
   private List<TableRow> tableRows;
   /** Maps the maximum length of each column. */
@@ -62,6 +65,7 @@ public final class FormattingCLIUtils {
    * Initialize the data.
    */
   private void init() {
+    this.join = new StringBuilder();
     this.tableRows = new ArrayList<>();
     this.maxColMap = new HashMap<>();
   }
@@ -119,7 +123,7 @@ public final class FormattingCLIUtils {
   /**
    * Builds the string for the row of the table title.
    */
-  private void buildTitle(StringBuilder join) {
+  private void buildTitle() {
     if (this.title != null) {
       int maxTitleSize = 0;
       for (Integer maxColSize : this.maxColMap.values()) {
@@ -129,11 +133,11 @@ public final class FormattingCLIUtils {
       if (this.title.length() > maxTitleSize) {
         this.title = this.title.substring(0, maxTitleSize);
       }
-      join.append("+");
+      this.join.append("+");
       for (int i = 0; i < maxTitleSize + 2; i++) {
-        join.append("-");
+        this.join.append("-");
       }
-      join.append("+\n")
+      this.join.append("+\n")
           .append("|")
           .append(StrUtils.center(this.title, maxTitleSize + 2, ' '))
           .append("|\n");
@@ -144,8 +148,8 @@ public final class FormattingCLIUtils {
   /**
    * Build the table, first build the title, and then walk through each row of data to build.
    */
-  private void buildTable(StringBuilder join) {
-    this.buildTitle(join);
+  private void buildTable() {
+    this.buildTitle();
     for (int i = 0, len = this.tableRows.size(); i < len; i++) {
       List<String> data = this.tableRows.get(i).data;
       switch (this.tableRows.get(i).tableRowType) {
@@ -172,37 +176,37 @@ public final class FormattingCLIUtils {
    * Method to build a border row.
    * @param data dataLine
    */
-  private void buildRowBorder(List<String> data, StringBuilder join) {
-    join.append("+");
+  private void buildRowBorder(List<String> data) {
+    this.join.append("+");
     for (int i = 0, len = data.size(); i < len; i++) {
       for (int j = 0; j < this.maxColMap.get(i) + 2; j++) {
-        join.append("-");
+        this.join.append("-");
       }
-      join.append("+");
+      this.join.append("+");
     }
-    join.append("\n");
+    this.join.append("\n");
   }
 
   /**
    * A way to build rows of data.
    * @param data dataLine
    */
-  private void buildRowLine(List<String> data, StringBuilder join) {
-    join.append("|");
+  private void buildRowLine(List<String> data) {
+    this.join.append("|");
     for (int i = 0, len = data.size(); i < len; i++) {
-      join.append(StrUtils.center(data.get(i), this.maxColMap.get(i) + 2, ' '))
+      this.join.append(StrUtils.center(data.get(i), this.maxColMap.get(i) + 2, ' '))
           .append("|");
     }
-    join.append("\n");
+    this.join.append("\n");
   }
 
   /**
    * Rendering is born as a result.
    * @return ASCII string of Table
    */
-  public String render(StringBuilder join) {
-    this.buildTable(join);
-    return join.toString();
+  public String render() {
+    this.buildTable();
+    return this.join.toString();
   }
 
   /**

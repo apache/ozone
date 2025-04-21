@@ -42,6 +42,7 @@ import java.nio.file.Path;
  * ... (binary content)
  * END 0
  */
+@SuppressWarnings(value = "PMD.AvoidStringBufferField")
 public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
 
   private final StreamingDestination destination;
