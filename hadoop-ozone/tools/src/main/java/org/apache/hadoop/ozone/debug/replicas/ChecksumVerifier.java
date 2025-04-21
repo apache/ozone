@@ -42,8 +42,6 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
  * with a given key.
  */
 public class ChecksumVerifier implements ReplicaVerifier {
-  private final OzoneClient client;
-  private final OzoneAddress address;
   private final OzoneConfiguration conf;
   private final ContainerOperationClient containerClient;
   private final XceiverClientManager xceiverClientManager;
@@ -54,9 +52,7 @@ public class ChecksumVerifier implements ReplicaVerifier {
     return CHECK_TYPE;
   }
 
-  public ChecksumVerifier(OzoneClient client, OzoneAddress address, OzoneConfiguration conf) throws IOException {
-    this.client = client;
-    this.address = address;
+  public ChecksumVerifier(OzoneConfiguration conf) throws IOException {
     this.conf = conf;
     this.containerClient = new ContainerOperationClient(conf);
     this.xceiverClientManager = containerClient.getXceiverClientManager();

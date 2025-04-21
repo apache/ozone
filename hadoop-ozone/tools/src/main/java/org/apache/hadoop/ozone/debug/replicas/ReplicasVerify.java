@@ -89,7 +89,7 @@ public class ReplicasVerify extends Handler {
     replicaVerifiers = new ArrayList<>();
 
     if (verification.doExecuteChecksums) {
-      replicaVerifiers.add(new ChecksumVerifier(client, address, getConf()));
+      replicaVerifiers.add(new ChecksumVerifier(getConf()));
     }
 
     if (verification.doExecuteBlockExistence) {

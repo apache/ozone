@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
  * Verifies block existence by making getBlock calls to the datanode.
  */
 public class BlockExistenceVerifier implements ReplicaVerifier {
-  private final OzoneConfiguration conf;
   private final ContainerOperationClient containerClient;
   private final XceiverClientManager xceiverClientManager;
   private static final String CHECK_TYPE = "blockExistence";
@@ -47,7 +46,6 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
   }
 
   public BlockExistenceVerifier(OzoneConfiguration conf) throws IOException {
-    this.conf = conf;
     this.containerClient = new ContainerOperationClient(conf);
     this.xceiverClientManager = containerClient.getXceiverClientManager();
   }
