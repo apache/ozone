@@ -25,16 +25,49 @@ author: Sumit Agrawal
 OBS case just involves volume, bucket and key. So this is more simplified in terms of locking.
 
 There will be:
-1. Volume Strip Lock: locking for volume
-2. Bucket Strip Lock: locking for bucket
-3. Key Strip Lock: Locking for key
+1. Volume Lock: locking for volume
+2. Bucket Lock: locking for bucket
+3. Key Lock: Locking for key
 
-**Note**: Multiple keys locking (like delete multiple keys or rename operation), lock needs to be taken in order, i.e. using StrippedLocking order to avoid deadlock.
+**Note**: Multiple keys locking (like delete multiple keys or rename operation), lock needs to be taken in order to avoid deadlock.
 
-Stripped locking ordering:
-- Strip lock is obtained over a hash bucket.
-- All keys needs to be ordered with hash bucket
-- And then need take lock in sequence order
+### Striped locking (java builtin class)
+Locking class: com.google.common.util.concurrent.Striped
+
+This reduces needs of maintaining list of lock object for all keys, and make use of set of locks pre-allocated.
+Lock object is obtained from these lock set based on hash index of key.
+
+Striped locking ordering: Striped class have method to provide locks in order, `bulkGet()`. This internally,
+- Index is obtained from hash of key and lock object is ordered based on index and returned the ordered lock object.
+- locks to be taken in same order as returned by `bulkGet()`
+
+## Bucket and volume locking as required for concurrency for obs key handling
+
+### Volume Operation
+All operation over volume has taken write lock to avoid,
+- delete volume which may add entry if parallel operation add entry with updated volume info to rocksdb.
+- bucket creation which takes read lock to retrieve latest information from volume as present like acls
+- bucket deletion which takes read lock
+
+| API Name     | Locking Key       | Notes                                                                                          |
+|--------------|-------------------|------------------------------------------------------------------------------------------------|
+| CreateVolume | Volume Write lock | volume level write lock to avoid parallel volume creation and deletion                         |
+| DeleteVolume | Volume Write lock | volume level write lock to avoid parallel volume creation and deletion                         |
+| SetProperty  | Volume Write lock | volume property update like owner and quota, avoid parallel operation like delete volume       |
+| SetAcl       | Volume Write lock | volume acl updated, avoid parallel operation like delete volume and bucket creation / deletion |
+| AddAcl       | Volume Write lock | volume acl updated, avoid parallel operation like delete volume and bucket creation / deletion |
+| RemoveAcl    | Volume Write lock | volume acl updated, avoid parallel operation like delete volume and bucket creation / deletion |
+
+### Bucket Operation
+
+| API Name     | Locking Key                    | Notes                                                                                                                           |
+|--------------|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| CreateBucket | Volume Read, Bucket Write lock | creates bucket, volume level read lock to avoid parallel volume deletion                                                        |
+| DeleteBucket | Volume Read, Bucket Write lock | creates bucket, volume level read lock to avoid parallel volume deletion                                                        |
+| SetProperty  | Bucket Write lock              | bucket property update like owner, replication, quota and so on, lock to avoid key operation which depends on bucket properties |
+| SetAcl       | Bucket Write lock              | bucket acl updated, block key operation                                                                                         |
+| AddAcl       | Bucket Write lock              | bucket acl updated, block key operation                                                                                         |
+| RemoveAcl    | Bucket Write lock              | bucket acl updated, block key operation                                                                                         |
 
 ## OBS operation
 Bucket read lock will be there default. This is to ensure:
@@ -66,32 +99,15 @@ Batch Operation:
 1. deleteKeys: batch will be divided to multiple threads in Execution Pool to run parallel calling DeleteKey
 2. RenameKeys: This is `depreciated`, but for compatibility, will be divided to multiple threads in Execution Pool to run parallel calling RenameKey
 
-For batch operation, atomicity is not guranteed for above api, and same is behavior for s3 perspective.
+For batch operation, atomicity is not guaranteed for above api, and same is behavior for s3 perspective.
 
-## Bucket and volume locking as required for concurrency for obs key handling
+## Lock operation timeout
+Currently, lock is taken within a scope of a method, i.e.` validateAndUpdateCache()` of implementation method for handling request.
 
-### Volume Operation
-All operation over volume has taken write lock to avoid,
-- delete volume which may add entry if parallel operation add entry with updated volume info to rocksdb.
-- bucket creation which takes read lock to retrieve latest information from volume as present like acls
-- bucket deletion which takes read lock
+But as per new change, lock is taken involving remote call,
+- take the lock for the key involved in request
+- prepare db changes for the request
+- send to all nodes to update db (ie involve remote handling by follower nodes)
+- on response, release the lock
 
-| API Name     | Locking Key       | Notes                                                                                          |
-|--------------|-------------------|------------------------------------------------------------------------------------------------|
-| CreateVolume | Volume Write lock | volume level write lock to avoid parallel volume creation and deletion                         |
-| DeleteVolume | Volume Write lock | volume level write lock to avoid parallel volume creation and deletion                         |
-| SetProperty  | Volume Write lock | volume property update like owner and quota, avoid parallel operation like delete volume       |
-| SetAcl       | Volume Write lock | volume acl updated, avoid parallel operation like delete volume and bucket creation / deletion |
-| AddAcl       | Volume Write lock | volume acl updated, avoid parallel operation like delete volume and bucket creation / deletion |
-| RemoveAcl    | Volume Write lock | volume acl updated, avoid parallel operation like delete volume and bucket creation / deletion |
-
-### Bucket Operation
-
-| API Name     | Locking Key                    | Notes                                                                                                                           |
-|--------------|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
-| CreateBucket | Volume Read, Bucket Write lock | creates bucket, volume level read lock to avoid parallel volume deletion                                                        |
-| DeleteBucket | Volume Read, Bucket Write lock | creates bucket, volume level read lock to avoid parallel volume deletion                                                        |
-| SetProperty  | Bucket Write lock              | bucket property update like owner, replication, quota and so on, lock to avoid key operation which depends on bucket properties |
-| SetAcl       | Bucket Write lock              | bucket acl updated, block key operation                                                                                         |
-| AddAcl       | Bucket Write lock              | bucket acl updated, block key operation                                                                                         |
-| RemoveAcl    | Bucket Write lock              | bucket acl updated, block key operation                                                                                         |
+This adds risk for infinite locking if there is some error in network or request handling. So a timeout is required for lock over a key.
