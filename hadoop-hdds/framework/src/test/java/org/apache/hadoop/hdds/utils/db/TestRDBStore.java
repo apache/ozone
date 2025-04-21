@@ -56,6 +56,22 @@ import org.rocksdb.StatsLevel;
  * RDBStore Tests.
  */
 public class TestRDBStore {
+  static ManagedDBOptions newManagedDBOptions() {
+    final ManagedDBOptions options = new ManagedDBOptions();
+    options.setCreateIfMissing(true);
+    options.setCreateMissingColumnFamilies(true);
+
+    Statistics statistics = new Statistics();
+    statistics.setStatsLevel(StatsLevel.ALL);
+    options.setStatistics(statistics);
+    return options;
+  }
+
+  static RDBStore newRDBStore(File dbFile, ManagedDBOptions options, Set<TableConfig> families)
+      throws IOException {
+    return newRDBStore(dbFile, options, families, MAX_DB_UPDATES_SIZE_THRESHOLD);
+  }
+
   public static RDBStore newRDBStore(File dbFile, ManagedDBOptions options,
       Set<TableConfig> families,
       long maxDbUpdatesSizeThreshold)
@@ -72,20 +88,14 @@ public class TestRDBStore {
           "Fourth", "Fifth",
           "Sixth");
   private RDBStore rdbStore = null;
-  private ManagedDBOptions options = null;
+  private ManagedDBOptions options;
   private Set<TableConfig> configSet;
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
     CodecBuffer.enableLeakDetection();
 
-    options = new ManagedDBOptions();
-    options.setCreateIfMissing(true);
-    options.setCreateMissingColumnFamilies(true);
-
-    Statistics statistics = new Statistics();
-    statistics.setStatsLevel(StatsLevel.ALL);
-    options.setStatistics(statistics);
+    options = newManagedDBOptions();
     configSet = new HashSet<>();
     for (String name : families) {
       TableConfig newConfig = new TableConfig(name,
@@ -111,9 +121,9 @@ public class TestRDBStore {
       assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         byte[] value =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
       }
     } catch (Exception e) {
@@ -159,9 +169,9 @@ public class TestRDBStore {
   @Test
   public void moveKey() throws Exception {
     byte[] key =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
     byte[] value =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
 
     try (Table firstTable = rdbStore.getTable(families.get(1))) {
       firstTable.put(key, value);
@@ -182,12 +192,12 @@ public class TestRDBStore {
   @Test
   public void moveWithValue() throws Exception {
     byte[] key =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
     byte[] value =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
 
     byte[] nextValue =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
     try (Table firstTable = rdbStore.getTable(families.get(1))) {
       firstTable.put(key, value);
       try (Table<byte[], byte[]> secondTable = rdbStore
@@ -345,7 +355,7 @@ public class TestRDBStore {
       try (Table table = rdbStore.getTable(family)) {
         byte[] key = family.getBytes(StandardCharsets.UTF_8);
         byte[] value =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         table.put(key, value);
       }
     }

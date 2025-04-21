@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -33,10 +33,10 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.DiskBalancerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit tests for the DiskBalancer manager.
@@ -47,16 +47,15 @@ public class TestDiskBalancerManager {
   private DiskBalancerManager diskBalancerManager;
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
-  private String storageDir;
   private DiskBalancerReportHandler diskBalancerReportHandler;
   private Random random;
+  @TempDir
+  private File testDir;
 
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
-    storageDir = GenericTestUtils.getTempPath(
-        TestDiskBalancerManager.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     nodeManager = new MockNodeManager(true, 3);
     diskBalancerManager = new DiskBalancerManager(conf, new EventQueue(),
         SCMContext.emptyContext(), nodeManager);

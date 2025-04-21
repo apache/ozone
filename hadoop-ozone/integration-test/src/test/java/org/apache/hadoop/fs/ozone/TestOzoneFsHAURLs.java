@@ -63,7 +63,7 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
   /**
     * Set a timeout for each test.
     */
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneFsHAURLs.class);
 
   private OzoneConfiguration conf;
@@ -105,12 +105,12 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
 
     assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
-    volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
 
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
-    bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     retVolumeinfo.createBucket(bucketName);
 
     rootPath = String.format("%s://%s.%s.%s/", OzoneConsts.OZONE_URI_SCHEME,

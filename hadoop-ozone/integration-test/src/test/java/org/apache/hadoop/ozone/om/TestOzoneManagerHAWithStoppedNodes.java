@@ -279,10 +279,10 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
         leaderOM.getPeerNodes().get(1).getNodeId());
 
     // Do some transactions so that the log index increases
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -584,7 +584,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
     ObjectStore objectStore = getObjectStore();
 
-    String prefix = "vol-" + RandomStringUtils.randomNumeric(10) + "-";
+    String prefix = "vol-" + RandomStringUtils.secure().nextNumeric(10) + "-";
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
         .setAdmin(userName)
@@ -611,9 +611,9 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   @Test
   void testRetryCacheWithDownedOM() throws Exception {
     // Create a volume, a bucket and a key
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
     String bucketName = UUID.randomUUID().toString();
     String keyTo = UUID.randomUUID().toString();
 

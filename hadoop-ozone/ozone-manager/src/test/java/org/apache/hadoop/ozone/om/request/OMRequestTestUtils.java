@@ -1064,7 +1064,7 @@ public final class OMRequestTestUtils {
             .setValue(DatatypeConverter.printHexBinary(
                 new DigestInputStream(
                     new ByteArrayInputStream(
-                        RandomStringUtils.randomAlphanumeric((int) size)
+                        RandomStringUtils.secure().nextAlphanumeric((int) size)
                             .getBytes(StandardCharsets.UTF_8)),
                     eTagProvider)
                     .getMessageDigest().digest()))

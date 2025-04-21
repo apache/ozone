@@ -70,8 +70,7 @@ import org.slf4j.LoggerFactory;
  */
 public class HeartbeatEndpointTask
     implements Callable<EndpointStateMachine.EndPointStates> {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(HeartbeatEndpointTask.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HeartbeatEndpointTask.class);
   private final EndpointStateMachine rpcEndpoint;
   private DatanodeDetailsProto datanodeDetailsProto;
   private StateContext context;
@@ -519,7 +518,7 @@ public class HeartbeatEndpointTask
 
       if (conf == null) {
         LOG.error("No config specified.");
-        throw new IllegalArgumentException("A valid configration is needed to" +
+        throw new IllegalArgumentException("A valid configuration is needed to" +
             " construct HeartbeatEndpointTask task");
       }
 

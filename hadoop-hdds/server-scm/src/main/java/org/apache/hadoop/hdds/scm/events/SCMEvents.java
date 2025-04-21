@@ -221,6 +221,10 @@ public final class SCMEvents {
       DISK_BALANCER_REPORT = new TypedEvent<>(
           DiskBalancerReportFromDatanode.class, "DiskBalancer_Report");
 
+  public static final TypedEvent<DatanodeDetails>
+      REPLICATION_MANAGER_NOTIFY =
+      new TypedEvent<>(DatanodeDetails.class, "Replication_Manager_Notify");
+
   /**
    * Private Ctor. Never Constructed.
    */

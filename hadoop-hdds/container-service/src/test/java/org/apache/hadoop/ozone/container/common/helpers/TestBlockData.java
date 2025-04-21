@@ -37,6 +37,8 @@ import org.slf4j.LoggerFactory;
 public class TestBlockData {
   static final Logger LOG = LoggerFactory.getLogger(TestBlockData.class);
 
+  private static int chunkCount = 0;
+
   static ContainerProtos.ChunkInfo buildChunkInfo(String name, long offset,
       long len) {
     return ContainerProtos.ChunkInfo.newBuilder()
@@ -64,7 +66,6 @@ public class TestBlockData {
     }
   }
 
-  private static int chunkCount = 0;
   static ContainerProtos.ChunkInfo addChunk(
       List<ContainerProtos.ChunkInfo> expected, long offset) {
     final long length = ThreadLocalRandom.current().nextLong(1000);

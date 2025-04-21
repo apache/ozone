@@ -48,9 +48,9 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class tests HealthyPipelineSafeMode rule.
@@ -75,8 +75,6 @@ public class TestHealthyPipelineSafeModeRule {
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
     config.setBoolean(
-            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
-    config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
 
@@ -97,7 +95,7 @@ public class TestHealthyPipelineSafeModeRule {
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
           mockRatisProvider);
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, eventQueue,
+          config, containerManager, pipelineManager, nodeManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
@@ -128,8 +126,6 @@ public class TestHealthyPipelineSafeModeRule {
     when(containerManager.getContainers()).thenReturn(containers);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
-    config.setBoolean(
-            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
     config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
@@ -177,7 +173,7 @@ public class TestHealthyPipelineSafeModeRule {
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, eventQueue,
+          config, containerManager, pipelineManager, nodeManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
@@ -225,8 +221,6 @@ public class TestHealthyPipelineSafeModeRule {
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
     config.setBoolean(
-            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
-    config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
@@ -273,7 +267,7 @@ public class TestHealthyPipelineSafeModeRule {
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, eventQueue,
+          config, containerManager, pipelineManager, nodeManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
@@ -283,10 +277,7 @@ public class TestHealthyPipelineSafeModeRule {
       // No pipeline event have sent to SCMSafemodeManager
       assertFalse(healthyPipelineSafeModeRule.validate());
 
-
-      GenericTestUtils.LogCapturer logCapturer =
-          GenericTestUtils.LogCapturer.captureLogs(LoggerFactory.getLogger(
-              SCMSafeModeManager.class));
+      LogCapturer logCapturer = LogCapturer.captureLogs(SCMSafeModeManager.class);
 
       // fire event with pipeline create status with ratis type and factor 1
       // pipeline, validate() should return false
