@@ -46,6 +46,7 @@ import org.sqlite.SQLiteConfig;
 public class ContainerDatanodeDatabase {
 
   private static Map<String, String> queries;
+  private static final int DEFAULT_REPLICATION_FACTOR = 3;
 
   static {
     loadProperties();
@@ -286,61 +287,67 @@ public class ContainerDatanodeDatabase {
         }
       }
 
-      Set<String> unhealthyReplicas = new HashSet<>();
-      Set<String> closedReplicas = new HashSet<>();
-      Set<String> openReplicas = new HashSet<>();
-      Set<String> quasiclosedReplicas = new HashSet<>();
-      Set<String> deletedReplicas = new HashSet<>();
-      Set<Long> bcsids = new HashSet<>();
-      Set<String> datanodeIds = new HashSet<>();
-
-      for (DatanodeContainerInfo entry : latestPerDatanode.values()) {
-        String datanodeId = entry.getDatanodeId();
-        String state = entry.getState();
-        long bcsid = entry.getBcsid();
-
-        datanodeIds.add(datanodeId);
-
-        switch (state.toUpperCase()) {
-        case "UNHEALTHY": unhealthyReplicas.add(datanodeId); break;
-        case "CLOSED": closedReplicas.add(datanodeId); bcsids.add(bcsid); break;
-        case "OPEN": openReplicas.add(datanodeId); break;
-        case "QUASI_CLOSED": quasiclosedReplicas.add(datanodeId); break;
-        case "DELETED": deletedReplicas.add(datanodeId); bcsids.add(bcsid); break;
-        default:
-          break;
-        }
-      }
+      analyzeContainerHealth(containerID, latestPerDatanode);
       
-      int unhealthyCount = unhealthyReplicas.size();
-      int replicaCount = datanodeIds.size();
-      int expectedReplicationFactor = 3;
-
-      if (!deletedReplicas.isEmpty() && !closedReplicas.isEmpty() && bcsids.size() > 1) {
-        System.out.println("Container " + containerID + " has MISMATCHED REPLICATION.");
-      } else if (unhealthyCount == replicaCount) {
-        System.out.println("Container " + containerID + " is UNHEALTHY across all datanodes.");
-      } else if (unhealthyCount >= 2 && closedReplicas.size() == replicaCount - unhealthyCount) {
-        System.out.println("Container " + containerID + " is both UNHEALTHY and UNDER-REPLICATED.");
-      } else if (unhealthyCount == 1 && closedReplicas.size() == replicaCount - unhealthyCount) {
-        System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
-      } else if ((!openReplicas.isEmpty() && openReplicas.size() < 3) &&
-          (closedReplicas.size() == replicaCount - openReplicas.size() ||
-              unhealthyCount == replicaCount - openReplicas.size())) {
-        System.out.println("Container " + containerID + " is OPEN_UNHEALTHY.");
-      } else if (quasiclosedReplicas.size() >= 3) {
-        System.out.println("Container " + containerID + " is QUASI_CLOSED_STUCK.");
-      } else if (replicaCount - deletedReplicas.size() < expectedReplicationFactor) {
-        System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
-      } else if (replicaCount - deletedReplicas.size() > expectedReplicationFactor) {
-        System.out.println("Container " + containerID + " is OVER-REPLICATED.");
-      } else {
-        System.out.println("Container " + containerID + " has enough replicas.");
-      }
     } catch (SQLException e) {
       throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  private void analyzeContainerHealth(Long containerID,
+                                      Map<String, DatanodeContainerInfo> latestPerDatanode) {
+
+    Set<String> unhealthyReplicas = new HashSet<>();
+    Set<String> closedReplicas = new HashSet<>();
+    Set<String> openReplicas = new HashSet<>();
+    Set<String> quasiclosedReplicas = new HashSet<>();
+    Set<String> deletedReplicas = new HashSet<>();
+    Set<Long> bcsids = new HashSet<>();
+    Set<String> datanodeIds = new HashSet<>();
+
+    for (DatanodeContainerInfo entry : latestPerDatanode.values()) {
+      String datanodeId = entry.getDatanodeId();
+      String state = entry.getState();
+      long bcsid = entry.getBcsid();
+
+      datanodeIds.add(datanodeId);
+
+      switch (state.toUpperCase()) {
+      case "UNHEALTHY": unhealthyReplicas.add(datanodeId); break;
+      case "CLOSED": closedReplicas.add(datanodeId); bcsids.add(bcsid); break;
+      case "OPEN": openReplicas.add(datanodeId); break;
+      case "QUASI_CLOSED": quasiclosedReplicas.add(datanodeId); break;
+      case "DELETED": deletedReplicas.add(datanodeId); bcsids.add(bcsid); break;
+      default:
+        break;
+      }
+    }
+
+    int unhealthyCount = unhealthyReplicas.size();
+    int replicaCount = datanodeIds.size();
+    
+    if (bcsids.size() > 1) {
+      System.out.println("Container " + containerID + " has MISMATCHED REPLICATION.");
+    } else if (unhealthyCount == replicaCount && replicaCount >= DEFAULT_REPLICATION_FACTOR) {
+      System.out.println("Container " + containerID + " is UNHEALTHY across all datanodes.");
+    } else if (unhealthyCount >= 2 && closedReplicas.size() == replicaCount - unhealthyCount) {
+      System.out.println("Container " + containerID + " is both UNHEALTHY and UNDER-REPLICATED.");
+    } else if (unhealthyCount == 1 && closedReplicas.size() == replicaCount - unhealthyCount) {
+      System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
+    } else if (openReplicas.size() > 0 &&
+        (closedReplicas.size() > 0 || unhealthyCount > 0) &&
+        (replicaCount - deletedReplicas.size()) >= DEFAULT_REPLICATION_FACTOR) {
+      System.out.println("Container " + containerID + " is OPEN_UNHEALTHY.");
+    } else if (quasiclosedReplicas.size() >= DEFAULT_REPLICATION_FACTOR) {
+      System.out.println("Container " + containerID + " is QUASI_CLOSED_STUCK.");
+    } else if (replicaCount - deletedReplicas.size() < DEFAULT_REPLICATION_FACTOR) {
+      System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
+    } else if (replicaCount - deletedReplicas.size() > DEFAULT_REPLICATION_FACTOR) {
+      System.out.println("Container " + containerID + " is OVER-REPLICATED.");
+    } else {
+      System.out.println("Container " + containerID + " has enough replicas.");
     }
   }
 
@@ -359,7 +366,8 @@ public class ContainerDatanodeDatabase {
 
     for (DatanodeContainerInfo entry : entries) {
       if ("OPEN".equalsIgnoreCase(entry.getState())) {
-        if (firstOpenTimestamps.size() < 3 && !firstOpenDatanodes.contains(entry.getDatanodeId())) {
+        if (firstOpenTimestamps.size() < DEFAULT_REPLICATION_FACTOR && 
+            !firstOpenDatanodes.contains(entry.getDatanodeId())) {
           firstOpenTimestamps.add(entry.getTimestamp());
           firstOpenDatanodes.add(entry.getDatanodeId());
         } else if (isTimestampAfterFirstOpens(entry.getTimestamp(), firstOpenTimestamps)) {
