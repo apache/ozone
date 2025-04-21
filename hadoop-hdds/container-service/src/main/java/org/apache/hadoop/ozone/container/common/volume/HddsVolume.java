@@ -25,9 +25,9 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -142,7 +142,7 @@ public class HddsVolume extends StorageVolume {
       this.volumeTestCount = getDatanodeConfig().getVolumeIOTestCount();
       this.volumeTestFailureTolerance = getDatanodeConfig().getVolumeIOFailureTolerance();
       this.volumeTestFailureCount = new AtomicInteger(0);
-      this.volumeTestResultQueue = new ConcurrentLinkedQueue<>();
+      this.volumeTestResultQueue = new LinkedList<>();
 
       initialize();
     } else {
@@ -329,8 +329,8 @@ public class HddsVolume extends StorageVolume {
     }
 
     if (volumeTestResultQueue.size() > volumeTestCount
-        && volumeTestResultQueue.poll() != isVolumeTestResultHealthy) {
-        volumeTestFailureCount.decrementAndGet();
+        && (Boolean.TRUE.equals(volumeTestResultQueue.poll()) != isVolumeTestResultHealthy)) {
+      volumeTestFailureCount.decrementAndGet();
     }
 
     if (volumeTestFailureCount.get() > volumeTestFailureTolerance) {
