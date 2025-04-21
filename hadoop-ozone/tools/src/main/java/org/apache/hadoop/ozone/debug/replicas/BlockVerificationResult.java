@@ -17,75 +17,67 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Json structure for replicas to pass through each check and give output.
  */
 public class BlockVerificationResult {
 
-  private final String type;
   private final boolean pass;
   private final List<FailureDetail> failures;
 
-  public BlockVerificationResult(String type, boolean pass, List<FailureDetail> failures) {
-    this.type = type;
+  public BlockVerificationResult(boolean pass, List<FailureDetail> failures) {
     this.pass = pass;
     this.failures = failures;
   }
 
-  public String getType() {
-    return type;
+  public static BlockVerificationResult pass() {
+    return new BlockVerificationResult(true, null);
   }
 
-  public boolean isPass() {
+  public static BlockVerificationResult failCheck(String message) {
+    return new BlockVerificationResult(false,
+        Collections.singletonList(new FailureDetail(true, message)));
+  }
+
+  public static BlockVerificationResult failIncomplete(String message) {
+    return new BlockVerificationResult(false,
+        Collections.singletonList(new FailureDetail(false, message)));
+  }
+
+  public boolean passed() {
     return pass;
   }
 
-  public List<FailureDetail> getFailures() {
-    return failures;
+  public Optional<List<FailureDetail>> getFailures() {
+    return Optional.ofNullable(failures);
   }
 
   /**
    * Details about the check failure.
    */
   public static class FailureDetail {
-    private final boolean present;
+    // indicates whether the check finished and failed,
+    // or it was unable to finish due to connection or other issues
+    private final boolean completed;
     private final String message;
 
-    public FailureDetail(boolean present, String message) {
-      this.present = present;
+    public FailureDetail(boolean completed, String message) {
+      this.completed = completed;
       this.message = message;
     }
 
-    public boolean isPresent() {
-      return present;
+    public boolean isCompleted() {
+      return completed;
     }
 
     public String getFailureMessage() {
       return message;
     }
 
-  }
-
-  public ObjectNode toJson(ObjectMapper mapper) {
-    ObjectNode resultNode = mapper.createObjectNode();
-    resultNode.put("type", type);
-    resultNode.put("pass", pass);
-
-    ArrayNode failuresArray = mapper.createArrayNode();
-    for (FailureDetail failure : failures) {
-      ObjectNode failureNode = mapper.createObjectNode();
-      failureNode.put("present", failure.isPresent());
-      failureNode.put("message", failure.getFailureMessage());
-      failuresArray.add(failureNode);
-    }
-
-    resultNode.set("failures", failuresArray);
-    return resultNode;
   }
 
 }

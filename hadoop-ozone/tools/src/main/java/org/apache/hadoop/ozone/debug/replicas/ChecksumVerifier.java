@@ -20,33 +20,43 @@ package org.apache.hadoop.ozone.debug.replicas;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collections;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.output.NullOutputStream;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 /**
- * Verifies block existence by making getBlock calls to the datanode.
+ * Verifies the checksum of blocks by checking each replica associated
+ * with a given key.
  */
-public class BlockExistenceVerifier implements ReplicaVerifier {
+public class ChecksumVerifier implements ReplicaVerifier {
+  private final OzoneClient client;
+  private final OzoneAddress address;
   private final OzoneConfiguration conf;
   private final ContainerOperationClient containerClient;
   private final XceiverClientManager xceiverClientManager;
-  private static final String CHECK_TYPE = "blockExistence";
+  private static final String CHECK_TYPE = "checksum";
 
   @Override
   public String getType() {
     return CHECK_TYPE;
   }
 
-  public BlockExistenceVerifier(OzoneConfiguration conf) throws IOException {
+  public ChecksumVerifier(OzoneClient client, OzoneAddress address, OzoneConfiguration conf) throws IOException {
+    this.client = client;
+    this.address = address;
     this.conf = conf;
     this.containerClient = new ContainerOperationClient(conf);
     this.xceiverClientManager = containerClient.getXceiverClientManager();
@@ -54,29 +64,28 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
 
   @Override
   public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation) {
-    try {
-      Pipeline pipeline = Pipeline.newBuilder(keyLocation.getPipeline())
-          .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
-          .setNodes(Collections.singletonList(datanode))
-          .build();
+    Pipeline pipeline = Pipeline.newBuilder(keyLocation.getPipeline())
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setNodes(Collections.singletonList(datanode))
+        .build();
 
-      XceiverClientSpi client = xceiverClientManager.acquireClientForReadData(pipeline);
-      ContainerProtos.GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
-          client,
-          keyLocation.getBlockID(),
-          keyLocation.getToken(),
-          Collections.singletonMap(datanode, 1)
-      );
-
-      boolean hasBlock = response != null && response.hasBlockData();
-
-      if (hasBlock) {
-        return BlockVerificationResult.pass();
-      } else {
-        return BlockVerificationResult.failCheck("Block does not exist on this replica");
-      }
+    try (InputStream is = new BlockInputStreamFactoryImpl().create(
+        keyLocation.getPipeline().getReplicationConfig(),
+        keyLocation,
+        pipeline,
+        keyLocation.getToken(),
+        xceiverClientManager,
+        null,
+        conf.getObject(OzoneClientConfig.class))) {
+      IOUtils.copyLarge(is, NullOutputStream.INSTANCE);
+      return BlockVerificationResult.pass();
     } catch (IOException e) {
-      return BlockVerificationResult.failIncomplete(e.getMessage());
+      Throwable cause = e.getCause() != null ? e.getCause() : e;
+      if (cause instanceof OzoneChecksumException) {
+        return BlockVerificationResult.failCheck(cause.getMessage());
+      } else {
+        return BlockVerificationResult.failIncomplete(cause.getMessage());
+      }
     }
   }
 }

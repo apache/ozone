@@ -17,14 +17,13 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -33,11 +32,11 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.Shell;
@@ -63,9 +62,9 @@ public class ReplicasVerify extends Handler {
       required = true)
   private String outputDir;
 
-  @CommandLine.Option(names = {"--all"},
+  @CommandLine.Option(names = {"--all-results"},
       description = "Print results for all passing and failing keys")
-  private boolean allKeys;
+  private boolean allResults;
 
   @CommandLine.ArgGroup(exclusive = false, multiplicity = "1")
   private Verification verification;
@@ -90,7 +89,7 @@ public class ReplicasVerify extends Handler {
     replicaVerifiers = new ArrayList<>();
 
     if (verification.doExecuteChecksums) {
-      replicaVerifiers.add(new Checksums());
+      replicaVerifiers.add(new ChecksumVerifier(client, address, getConf()));
     }
 
     if (verification.doExecuteBlockExistence) {
@@ -111,13 +110,12 @@ public class ReplicasVerify extends Handler {
     String bucketName = address.getBucketName();
     String keyName = address.getKeyName();
 
-    ObjectMapper mapper = new ObjectMapper();
-    ObjectNode root = mapper.createObjectNode();
-    ArrayNode keysArray = mapper.createArrayNode();
+    ObjectNode root = JsonUtils.createObjectNode(null);
+    ArrayNode keysArray = root.putArray("keys");
 
     if (!keyName.isEmpty()) {
-      OzoneKeyDetails keyDetails = ozoneClient.getProxy().getKeyDetails(volumeName, bucketName, keyName);
-      processKey(ozoneClient, keyDetails, keysArray);
+      OmKeyInfo keyInfo = ((RpcClient) ozoneClient.getProxy()).getKeyInfo(volumeName, bucketName, keyName, false);
+      processKey(ozoneClient, keyInfo, keysArray);
     } else if (!bucketName.isEmpty()) {
       OzoneVolume volume = objectStore.getVolume(volumeName);
       OzoneBucket bucket = volume.getBucket(bucketName);
@@ -131,8 +129,7 @@ public class ReplicasVerify extends Handler {
       }
     }
 
-    root.set("keys", keysArray);
-    System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root));
+    System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(root));
   }
 
   void checkVolume(OzoneClient ozoneClient, OzoneVolume volume, ArrayNode keysArray) throws IOException {
@@ -147,33 +144,28 @@ public class ReplicasVerify extends Handler {
       OzoneKey key = it.next();
       // TODO: Remove this check once HDDS-12094 is fixed
       if (!key.getName().endsWith("/")) {
-        processKey(ozoneClient, bucket.getKey(key.getName()), keysArray);
+        OmKeyInfo keyInfo = ((RpcClient) ozoneClient.getProxy()).getKeyInfo(
+            bucket.getVolumeName(), bucket.getName(), key.getName(), false);
+        processKey(ozoneClient, keyInfo, keysArray);
       }
     }
   }
 
-  void processKey(OzoneClient ozoneClient, OzoneKeyDetails keyDetails, ArrayNode keysArray) {
-    ObjectMapper mapper = new ObjectMapper();
-
-    String volumeName = keyDetails.getVolumeName();
-    String bucketName = keyDetails.getBucketName();
-    String keyName = keyDetails.getName();
+  void processKey(OzoneClient ozoneClient, OmKeyInfo keyInfo, ArrayNode keysArray) {
+    String volumeName = keyInfo.getVolumeName();
+    String bucketName = keyInfo.getBucketName();
+    String keyName = keyInfo.getKeyName();
 
     ObjectNode keyNode = JsonUtils.createObjectNode(null);
     keyNode.put("volumeName", volumeName);
     keyNode.put("bucketName", bucketName);
     keyNode.put("name", keyName);
 
-    ArrayNode blocksArray = mapper.createArrayNode();
-    boolean keyPass = true; //to check if all checks are passed
+    ArrayNode blocksArray = keyNode.putArray("blocks");
+    boolean keyPass = true;
 
-    try {
-      ClientProtocol clientProtocol = ozoneClient.getObjectStore().getClientProxy();
-      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas =
-          clientProtocol.getKeysEveryReplicas(volumeName, bucketName, keyName);
-
-      for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> block : replicas.entrySet()) {
-        OmKeyLocationInfo keyLocation = block.getKey();
+    for (OmKeyLocationInfoGroup keyLocationInfoGroup : keyInfo.getKeyLocationVersions()) {
+      for (OmKeyLocationInfo keyLocation : keyLocationInfoGroup.getLocationList()) {
         long containerID = keyLocation.getContainerID();
         long localID = keyLocation.getLocalID();
 
@@ -181,56 +173,55 @@ public class ReplicasVerify extends Handler {
         blockNode.put("containerID", containerID);
         blockNode.put("localID", localID);
 
-        ArrayNode replicasArray = mapper.createArrayNode();
-        boolean blockPass = !block.getValue().isEmpty(); // If no replicas, the block automatically fails
+        ArrayNode replicasArray = blockNode.putArray("replicas");
+        boolean blockPass = true;
 
-        for (Map.Entry<DatanodeDetails, OzoneInputStream> replica : block.getValue().entrySet()) {
-          DatanodeDetails datanode = replica.getKey();
-
+        for (DatanodeDetails datanode : keyLocation.getPipeline().getNodes()) {
           ObjectNode datanodeNode = JsonUtils.createObjectNode(null);
           datanodeNode.put("uuid", datanode.getUuidString());
           datanodeNode.put("hostname", datanode.getHostName());
 
-
-          ArrayNode checksArray = mapper.createArrayNode();
+          ArrayNode checksArray = JsonUtils.createArrayNode();
           boolean replicaPass = true;
 
-          ObjectMapper replicaVerifierNode = new ObjectMapper();
           for (ReplicaVerifier verifier : replicaVerifiers) {
-            BlockVerificationResult result = verifier.verifyBlock(replica.getKey(), replica.getValue(), keyLocation);
-            ObjectNode checksNode = result.toJson(replicaVerifierNode);
-            checksArray.add(checksNode);
+            BlockVerificationResult result = verifier.verifyBlock(datanode, keyLocation);
+            ObjectNode checkNode = JsonUtils.createObjectNode(null);
+            checkNode.put("type", verifier.getType());
+            checkNode.put("pass", result.passed());
 
-            if (!result.isPass()) {
+            ArrayNode failuresArray = checkNode.putArray("failures");
+            for (BlockVerificationResult.FailureDetail failure : result.getFailures().orElse(Collections.emptyList())) {
+              ObjectNode failureNode = JsonUtils.createObjectNode(null);
+              failureNode.put("completed", failure.isCompleted());
+              failureNode.put("message", failure.getFailureMessage());
+              failuresArray.add(failureNode);
+            }
+            checksArray.add(checkNode);
+
+            if (!result.passed()) {
               replicaPass = false;
             }
           }
 
-          ObjectNode replicaNode = mapper.createObjectNode();
+          ObjectNode replicaNode = JsonUtils.createObjectNode(null);
           replicaNode.set("datanode", datanodeNode);
           replicaNode.set("checks", checksArray);
-          //replicaNode.put("pass", replicaPass);  // ← include pass flag for replica if needed
-
           replicasArray.add(replicaNode);
 
           if (!replicaPass) {
             blockPass = false;
           }
         }
-        blockNode.set("replicas", replicasArray);
-       // blockNode.put("pass", blockPass);  // ← pass flag per block
-
         blocksArray.add(blockNode);
 
         if (!blockPass) {
           keyPass = false;
         }
       }
-    } catch (IOException e) {
-      throw new RuntimeException("Error retrieving replicas for key: " + keyName);
     }
 
-    if (!keyPass || allKeys) {
+    if (!keyPass || allResults) {
       keyNode.set("blocks", blocksArray);
       keyNode.put("pass", keyPass);
       keysArray.add(keyNode);

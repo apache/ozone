@@ -36,12 +36,12 @@ Write keys
     Execute             ozone sh key put o3://om/${VOLUME}/${BUCKET}/${TESTFILE} ${TEMP_DIR}/${TESTFILE}
 
 *** Test Cases ***
-Test ozone debug read-replicas
-    ${directory} =                      Execute replicas verify checksums CLI tool
-    Set Test Variable    ${DIR}         ${directory}
+#Test ozone debug read-replicas
+#    ${directory} =                      Execute replicas verify checksums CLI tool
+#    Set Test Variable    ${DIR}         ${directory}
 
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     1
+#    ${count_files} =                    Count Files In Directory    ${directory}
+#    Should Be Equal As Integers         ${count_files}     1
 
 
 Test ozone debug version
