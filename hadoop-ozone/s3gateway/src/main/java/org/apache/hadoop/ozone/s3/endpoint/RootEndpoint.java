@@ -24,6 +24,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.s3.commontypes.BucketMetadata;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.util.Time;
@@ -60,6 +61,9 @@ public class RootEndpoint extends EndpointBase {
         getMetrics().updateListS3BucketsFailureStats(startNanos);
         throw e;
       }
+
+      OzoneVolume volume = getVolume();
+      response.setOwner(new S3Owner(volume.getName(), volume.getName()));
 
       while (bucketIterator.hasNext()) {
         OzoneBucket next = bucketIterator.next();
