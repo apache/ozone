@@ -469,15 +469,16 @@ public class TestSCMNodeManager {
   }
 
   private void assertPipelineCreationFailsWithExceedingLimit(int limit) {
-    SCMException ex = assertThrows(SCMException.class, () -> {
-      ReplicationConfig ratisThree =
-          ReplicationConfig.fromProtoTypeAndFactor(
-              HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
-      scm.getPipelineManager().createPipeline(ratisThree);
-    }, "3 nodes should not have been found for a pipeline.");
-    assertThat(ex.getMessage()).contains("Ratis pipeline number meets the limit per datanode: " +
-        limit);
+    // Build once, outside the assertion
+    ReplicationConfig config = ReplicationConfig.fromProtoTypeAndFactor(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.THREE);
+    SCMException ex = assertThrows(
+        SCMException.class,
+        () -> scm.getPipelineManager().createPipeline(config),
+        "3 nodes should not have been found for a pipeline.");
+    assertThat(ex.getMessage())
+        .contains("Cannot create pipeline as it would exceed the limit per datanode: " + limit);
   }
 
   private void assertPipelines(HddsProtos.ReplicationFactor factor,

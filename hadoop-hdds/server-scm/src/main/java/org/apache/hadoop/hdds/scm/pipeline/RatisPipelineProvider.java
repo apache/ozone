@@ -108,31 +108,22 @@ public class RatisPipelineProvider
     }
 
     PipelineStateManager pipelineStateManager = getPipelineStateManager();
-
     int totalActivePipelines = pipelineStateManager.getPipelines(replicationConfig).size();
-
     int closedPipelines = pipelineStateManager.getPipelines(replicationConfig, PipelineState.CLOSED).size();
-
     int openPipelines = totalActivePipelines - closedPipelines;
-
     // Check per-datanode pipeline limit
     if (maxPipelinePerDatanode > 0) {
       int healthyNodeCount = getNodeManager()
           .getNodeCount(NodeStatus.inServiceHealthy());
-
       int allowedOpenPipelines = (maxPipelinePerDatanode * healthyNodeCount)
           / replicationConfig.getRequiredNodes();
-
       return openPipelines >= allowedOpenPipelines;
     }
-
     // Check global pipeline limit
     if (pipelineNumberLimit > 0) {
       int factorOnePipelineCount = pipelineStateManager
           .getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.ONE)).size();
-
       int allowedOpenPipelines = pipelineNumberLimit - factorOnePipelineCount;
-
       return openPipelines >= allowedOpenPipelines;
     }
     // No limits are set
@@ -161,7 +152,7 @@ public class RatisPipelineProvider
           : String.format(": %d", pipelineNumberLimit);
 
       throw new SCMException(
-          String.format("Ratis pipeline number meets the limit %s replicationConfig: %s",
+          String.format("Cannot create pipeline as it would exceed the limit %s replicationConfig: %s",
               limitInfo, replicationConfig),
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE
       );
