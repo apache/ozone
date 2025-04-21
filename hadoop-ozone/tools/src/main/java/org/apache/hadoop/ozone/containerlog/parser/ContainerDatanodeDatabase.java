@@ -26,6 +26,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -246,10 +247,14 @@ public class ContainerDatanodeDatabase {
    */
   
   public void showContainerDetails(Long containerID) throws SQLException {
-    String query = queries.get("CONTAINER_SELECT_QUERY");
 
     try (Connection connection = getConnection()) {
       List<DatanodeContainerInfo> logEntries = getContainerLogData(containerID, connection);
+
+      if (logEntries.isEmpty()) {
+        System.out.println("Missing container with ID: " + containerID);
+        return;
+      }
       
       System.out.printf("%-25s | %-15s | %-35s | %-20s | %-10s | %-30s | %-12s%n",
           "Timestamp", "Container ID", "Datanode ID", "Container State", "BCSID", "Message", "Index Value");
@@ -272,89 +277,69 @@ public class ContainerDatanodeDatabase {
         return;
       }
 
-      try (PreparedStatement statement = connection.prepareStatement(query)) {
-        statement.setLong(1, containerID);
-
-        try (ResultSet resultSet = statement.executeQuery()) {
-
-          boolean foundit = false;
-          Set<String> datanodeIds = new HashSet<>();
-          Set<String> unhealthyReplicas = new HashSet<>();
-          Set<String> closedReplicas = new HashSet<>();
-          Set<String> openReplicas = new HashSet<>();
-          Set<String> quasiclosedReplicas = new HashSet<>();
-          Set<Long> bcsids = new HashSet<>();
-          Set<String> deletedReplicas = new HashSet<>();
-
-          while (resultSet.next()) {
-            foundit = true;
-
-            String datanodeId = resultSet.getString("datanode_id");
-            String latestState = resultSet.getString("latest_state");
-            long latestBcsid = resultSet.getLong("latest_bcsid");
-            String timestamp = resultSet.getString("timestamp");
-            String errorMessage = resultSet.getString("error_message");
-            int indexValue = resultSet.getInt("index_value");
-
-            datanodeIds.add(datanodeId);
-
-            if ("UNHEALTHY".equalsIgnoreCase(latestState)) {
-              unhealthyReplicas.add(datanodeId);
-            } else if ("CLOSED".equalsIgnoreCase(latestState)) {
-              closedReplicas.add(datanodeId);
-              bcsids.add(latestBcsid);
-            } else if ("OPEN".equalsIgnoreCase(latestState)) {
-              openReplicas.add(datanodeId);
-            } else if ("QUASI_CLOSED".equalsIgnoreCase(latestState)) {
-              quasiclosedReplicas.add(datanodeId);
-            } else if ("DELETED".equalsIgnoreCase(latestState)) {
-              deletedReplicas.add(datanodeId);
-              bcsids.add(latestBcsid);
-            }
-          }
-
-          if (!foundit) {
-            System.out.println("Missing container with ID: " + containerID);
-            return;
-          }
-
-          if (!deletedReplicas.isEmpty() && !closedReplicas.isEmpty() && bcsids.size() > 1) {
-            System.out.println("Container " + containerID + " has MISMATCHED REPLICATION.");
-            return;
-          }
-
-          int unhealthyCount = unhealthyReplicas.size();
-          int replicaCount = datanodeIds.size();
-
-          if (unhealthyCount == replicaCount) {
-            System.out.println("Container " + containerID + " is UNHEALTHY across all datanodes.");
-          } else if (unhealthyCount >= 2 && closedReplicas.size() == replicaCount - unhealthyCount) {
-            System.out.println("Container " + containerID + " is both UNHEALTHY and UNDER-REPLICATED.");
-          } else if (unhealthyCount == 1 && closedReplicas.size() == replicaCount - unhealthyCount) {
-            System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
-          } else if ((!openReplicas.isEmpty() && openReplicas.size() < 3) &&
-              (closedReplicas.size() == replicaCount - openReplicas.size() ||
-                  unhealthyCount == replicaCount - openReplicas.size())) {
-            System.out.println("Container " + containerID + " is OPEN_UNHEALTHY.");
-          } else if (quasiclosedReplicas.size() >= 3) {
-            System.out.println("Container " + containerID + " is OUASI_CLOSED_STUCK.");
-          } else {
-            int expectedReplicationFactor = 3;
-            if (replicaCount - deletedReplicas.size() < expectedReplicationFactor) {
-              System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
-            } else if (replicaCount - deletedReplicas.size() > expectedReplicationFactor) {
-              System.out.println("Container " + containerID + " is OVER-REPLICATED.");
-            } else {
-              System.out.println("Container " + containerID + " has enough replicas.");
-            }
-          }
+      Map<String, DatanodeContainerInfo> latestPerDatanode = new HashMap<>();
+      for (DatanodeContainerInfo entry : logEntries) {
+        String datanodeId = entry.getDatanodeId();
+        DatanodeContainerInfo existing = latestPerDatanode.get(datanodeId);
+        if (existing == null || entry.getTimestamp().compareTo(existing.getTimestamp()) > 0) {
+          latestPerDatanode.put(datanodeId, entry);
         }
       }
+
+      Set<String> unhealthyReplicas = new HashSet<>();
+      Set<String> closedReplicas = new HashSet<>();
+      Set<String> openReplicas = new HashSet<>();
+      Set<String> quasiclosedReplicas = new HashSet<>();
+      Set<String> deletedReplicas = new HashSet<>();
+      Set<Long> bcsids = new HashSet<>();
+      Set<String> datanodeIds = new HashSet<>();
+
+      for (DatanodeContainerInfo entry : latestPerDatanode.values()) {
+        String datanodeId = entry.getDatanodeId();
+        String state = entry.getState();
+        long bcsid = entry.getBcsid();
+
+        datanodeIds.add(datanodeId);
+
+        switch (state.toUpperCase()) {
+        case "UNHEALTHY": unhealthyReplicas.add(datanodeId); break;
+        case "CLOSED": closedReplicas.add(datanodeId); bcsids.add(bcsid); break;
+        case "OPEN": openReplicas.add(datanodeId); break;
+        case "QUASI_CLOSED": quasiclosedReplicas.add(datanodeId); break;
+        case "DELETED": deletedReplicas.add(datanodeId); bcsids.add(bcsid); break;
+        default:
+          break;
+        }
+      }
+      
+      int unhealthyCount = unhealthyReplicas.size();
+      int replicaCount = datanodeIds.size();
+      int expectedReplicationFactor = 3;
+
+      if (!deletedReplicas.isEmpty() && !closedReplicas.isEmpty() && bcsids.size() > 1) {
+        System.out.println("Container " + containerID + " has MISMATCHED REPLICATION.");
+      } else if (unhealthyCount == replicaCount) {
+        System.out.println("Container " + containerID + " is UNHEALTHY across all datanodes.");
+      } else if (unhealthyCount >= 2 && closedReplicas.size() == replicaCount - unhealthyCount) {
+        System.out.println("Container " + containerID + " is both UNHEALTHY and UNDER-REPLICATED.");
+      } else if (unhealthyCount == 1 && closedReplicas.size() == replicaCount - unhealthyCount) {
+        System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
+      } else if ((!openReplicas.isEmpty() && openReplicas.size() < 3) &&
+          (closedReplicas.size() == replicaCount - openReplicas.size() ||
+              unhealthyCount == replicaCount - openReplicas.size())) {
+        System.out.println("Container " + containerID + " is OPEN_UNHEALTHY.");
+      } else if (quasiclosedReplicas.size() >= 3) {
+        System.out.println("Container " + containerID + " is QUASI_CLOSED_STUCK.");
+      } else if (replicaCount - deletedReplicas.size() < expectedReplicationFactor) {
+        System.out.println("Container " + containerID + " is UNDER-REPLICATED.");
+      } else if (replicaCount - deletedReplicas.size() > expectedReplicationFactor) {
+        System.out.println("Container " + containerID + " is OVER-REPLICATED.");
+      } else {
+        System.out.println("Container " + containerID + " has enough replicas.");
+      }
     } catch (SQLException e) {
-      LOG.error("Failed to get details of container: {}", containerID, e);
       throw e;
     } catch (Exception e) {
-      LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
