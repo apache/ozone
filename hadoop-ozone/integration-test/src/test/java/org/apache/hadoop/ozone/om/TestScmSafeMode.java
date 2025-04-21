@@ -373,4 +373,38 @@ public class TestScmSafeMode {
 
     assertFalse(cluster.getStorageContainerManager().isInSafeMode());
   }
+
+  /**
+   * Verify that an administrator can put SCM into Safe Mode manually
+   * and that restricted operations are blocked until a subsequent
+   * {@code forceExitSafeMode()} call succeeds.
+   */
+  @Test
+  void testManualEnterSafeModeAndForceExit() throws Exception {
+    // ‑‑ restart cluster fully healthy so SCM starts OUT of safe mode
+    cluster.stop();
+    cluster = builder.build();
+    cluster.startHddsDatanodes();
+    cluster.waitForClusterToBeReady();
+    cluster.waitTobeOutOfSafeMode();
+
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    assertFalse(scm.isInSafeMode(), "SCM should begin out of safe mode");
+
+    // ‑‑ Manually enter safe mode via new API
+    boolean entered = scm.getClientProtocolServer().enterSafeMode();
+    assertTrue(entered, "enterSafeMode() should return true");
+    assertTrue(scm.isInSafeMode(), "SCM must now report safe mode");
+
+    // ‑‑ Any write‑type operation must fail
+    SCMException ex = assertThrows(SCMException.class,
+        () -> scm.getClientProtocolServer()
+            .allocateContainer(ReplicationType.STAND_ALONE,
+                ReplicationFactor.ONE, ""));
+    assertThat(ex.getMessage()).contains("SafeModePrecheck");
+
+    // ‑‑ Force exit and wait until SCM leaves safe mode
+    scm.getClientProtocolServer().forceExitSafeMode();
+    assertFalse(scm.isInSafeMode(), "SCM should have exited safe mode");
+  }
 }
