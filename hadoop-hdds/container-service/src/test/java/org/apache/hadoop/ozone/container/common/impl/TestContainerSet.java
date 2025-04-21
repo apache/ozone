@@ -292,18 +292,19 @@ public class TestContainerSet {
     // Scan when no handler is registered should not throw an exception.
     containerSet.scanContainer(FIRST_ID);
 
-    // Scan of non-existent container should not throw exception or trigger the handler.
-    containerSet.scanContainer(FIRST_ID - 1);
     AtomicLong invocationCount = new AtomicLong();
     containerSet.registerContainerScanHandler(c -> {
       // If the handler was incorrectly triggered for a non-existent container, this assert would fail.
-      assertEquals(c.getContainerData().getContainerID(), FIRST_ID);
+      assertEquals(FIRST_ID, c.getContainerData().getContainerID());
       invocationCount.getAndIncrement();
     });
-    assertEquals(0, invocationCount.get());
 
-    // Only scan of an existing container when a handler is registered should trigger a scan.
+    // Scan of an existing container when a handler is registered should trigger a scan.
     containerSet.scanContainer(FIRST_ID);
+    assertEquals(1, invocationCount.get());
+
+    // Scan of non-existent container should not throw exception or trigger an additional invocation.
+    containerSet.scanContainer(FIRST_ID - 1);
     assertEquals(1, invocationCount.get());
   }
 

@@ -171,16 +171,6 @@ public final class OnDemandContainerDataScanner {
     return metrics;
   }
 
-  @VisibleForTesting
-  public DataTransferThrottler getThrottler() {
-    return throttler;
-  }
-
-  @VisibleForTesting
-  public Canceler getCanceler() {
-    return canceler;
-  }
-
   public synchronized void shutdown() {
     metrics.unregister();
     String shutdownMessage = "On-demand container scanner is shutting down.";
