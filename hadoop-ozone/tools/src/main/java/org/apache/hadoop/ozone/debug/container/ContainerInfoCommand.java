@@ -39,8 +39,12 @@ public class ContainerInfoCommand implements Callable<Void> {
   
   @Override
   public Void call() throws Exception {
-
-
+    
+    if (containerId < 0) {
+      System.err.println("Invalid container ID: " + containerId);
+      return null;
+    }
+    
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
     try {
       cdd.showContainerDetails(containerId);

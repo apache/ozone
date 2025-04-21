@@ -26,6 +26,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -273,6 +274,8 @@ public class ContainerDatanodeDatabase {
             entry.getIndexValue());
       }
 
+      logEntries.sort(Comparator.comparing(DatanodeContainerInfo::getTimestamp));
+      
       if (checkForMultipleOpenStates(logEntries)) {
         System.out.println("Container " + containerID + " might have duplicate OPEN state.");
         return;
