@@ -215,7 +215,7 @@ public class RatisPipelineProvider
 
     dns.forEach(node -> {
       LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",
-          pipeline.getId(), node.getUuidString());
+          pipeline.getId(), node);
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
           new CommandForDatanode<>(node.getUuid(), createCommand));
     });

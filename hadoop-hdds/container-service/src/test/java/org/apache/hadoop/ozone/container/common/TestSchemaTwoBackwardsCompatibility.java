@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.common;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
+import static org.apache.commons.lang3.RandomStringUtils.secure;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
@@ -112,7 +112,7 @@ public class TestSchemaTwoBackwardsCompatibility {
   private static final int BLOCKS_PER_TXN = 2;
   private static final int CHUNK_LENGTH = 1024;
   private static final byte[] SAMPLE_DATA =
-      randomAlphanumeric(1024).getBytes(UTF_8);
+      secure().nextAlphanumeric(1024).getBytes(UTF_8);
 
   @BeforeEach
   public void setup() throws Exception {

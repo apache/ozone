@@ -113,7 +113,7 @@ import picocli.CommandLine;
 @SuppressWarnings("java:S2245") // no need for secure random
 public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcommand {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMThroughputBenchmark.class);
 
   /**

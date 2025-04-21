@@ -100,7 +100,7 @@ public class TestOzoneSnapshotRestore {
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
-    String serviceID = OM_SERVICE_ID + RandomStringUtils.randomNumeric(5);
+    String serviceID = OM_SERVICE_ID + RandomStringUtils.secure().nextNumeric(5);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
             .setOMServiceId(serviceID)
@@ -136,7 +136,7 @@ public class TestOzoneSnapshotRestore {
 
   private void createFileKey(OzoneBucket bucket, String key)
           throws IOException {
-    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
     OzoneOutputStream fileKey = bucket.createKey(key, value.length);
     fileKey.write(value);
     fileKey.close();

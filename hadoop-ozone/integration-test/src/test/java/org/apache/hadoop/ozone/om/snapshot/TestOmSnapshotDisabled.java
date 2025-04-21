@@ -78,9 +78,9 @@ public class TestOmSnapshotDisabled {
 
   @Test
   public void testExceptionThrown() throws Exception {
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "buck-" + RandomStringUtils.randomNumeric(5);
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "buck-" + RandomStringUtils.secure().nextNumeric(5);
+    String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);

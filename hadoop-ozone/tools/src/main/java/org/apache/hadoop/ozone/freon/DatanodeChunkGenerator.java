@@ -187,7 +187,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
 
     timer = getMetrics().timer("chunk-write");
 
-    byte[] data = RandomStringUtils.randomAscii(chunkSize)
+    byte[] data = RandomStringUtils.secure().nextAscii(chunkSize)
         .getBytes(StandardCharsets.UTF_8);
 
     dataToWrite = ByteString.copyFrom(data);

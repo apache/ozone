@@ -200,13 +200,13 @@ public abstract class TestOzoneManagerHA {
    * @return the key name.
    */
   public static String createKey(OzoneBucket ozoneBucket) throws IOException {
-    String keyName = "key" + RandomStringUtils.randomNumeric(5);
+    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
     createKey(ozoneBucket, keyName);
     return keyName;
   }
 
   public static void createKey(OzoneBucket ozoneBucket, String keyName) throws IOException {
-    String data = "data" + RandomStringUtils.randomNumeric(5);
+    String data = "data" + RandomStringUtils.secure().nextNumeric(5);
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName, data.length(), ReplicationType.RATIS,
         ReplicationFactor.ONE, new HashMap<>());
     ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
@@ -214,7 +214,7 @@ public abstract class TestOzoneManagerHA {
   }
 
   public static String createPrefixName() {
-    return "prefix" + RandomStringUtils.randomNumeric(5) + OZONE_URI_DELIMITER;
+    return "prefix" + RandomStringUtils.secure().nextNumeric(5) + OZONE_URI_DELIMITER;
   }
 
   public static void createPrefix(OzoneObj prefixObj) throws IOException {
@@ -222,8 +222,8 @@ public abstract class TestOzoneManagerHA {
   }
 
   protected OzoneBucket setupBucket() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
     String volumeName = "volume" + UUID.randomUUID();
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
@@ -250,9 +250,9 @@ public abstract class TestOzoneManagerHA {
   }
 
   protected OzoneBucket linkBucket(OzoneBucket srcBuk) throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String linkedVolName = "volume-link-" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String linkedVolName = "volume-link-" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -304,9 +304,9 @@ public abstract class TestOzoneManagerHA {
    * Create a volume and test its attribute.
    */
   protected void createVolumeTest(boolean checkSuccess) throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -394,9 +394,9 @@ public abstract class TestOzoneManagerHA {
   }
 
   protected void createKeyTest(boolean checkSuccess) throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.dn.volume;
 
-import static java.util.Collections.emptyMap;
 import static org.apache.commons.io.IOUtils.readFully;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
@@ -31,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -279,13 +277,10 @@ class TestDatanodeHddsVolumeFailureDetection {
 
   private static long createKey(OzoneBucket bucket, String key)
       throws IOException {
-    byte[] bytes = RandomUtils.nextBytes(KEY_SIZE);
+    byte[] bytes = RandomUtils.secure().randomBytes(KEY_SIZE);
     RatisReplicationConfig replication =
         RatisReplicationConfig.getInstance(ReplicationFactor.ONE);
-    try (OutputStream out = bucket.createKey(key, bytes.length, replication,
-        emptyMap())) {
-      out.write(bytes);
-    }
+    TestDataUtil.createKey(bucket, key, replication, bytes);
     OzoneKeyDetails keyDetails = bucket.getKey(key);
     assertEquals(key, keyDetails.getName());
     return keyDetails.getOzoneKeyLocations().get(0).getContainerID();

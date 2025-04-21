@@ -80,7 +80,7 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
         * MSECS_PER_MINUTE);
     if (deletionInterval < 0) {
       LOG.warn("Invalid value {} for deletion interval,"
-          + " deletion interaval can not be negative."
+          + " deletion interval can not be negative."
           + "Changing to default value 0", deletionInterval);
       this.deletionInterval = 0;
     }
