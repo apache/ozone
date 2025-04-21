@@ -332,6 +332,14 @@ public interface ScmClient extends Closeable {
   boolean forceExitSafeMode() throws IOException;
 
   /**
+   * Allow SCM to enter safe mode.
+   *
+   * @return returns true if operation is successful.
+   * @throws IOException
+   */
+  boolean enterSafeMode() throws IOException;
+
+  /**
    * Start ReplicationManager.
    */
   void startReplicationManager() throws IOException;

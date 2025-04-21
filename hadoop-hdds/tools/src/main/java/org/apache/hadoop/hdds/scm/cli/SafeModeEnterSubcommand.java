@@ -17,26 +17,26 @@
 
 package org.apache.hadoop.hdds.scm.cli;
 
-import org.apache.hadoop.hdds.cli.AdminSubcommand;
+import java.io.IOException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.kohsuke.MetaInfServices;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine.Command;
 
 /**
- * Subcommand to group safe mode related operations.
+ * This is the handler that process safe mode exit command.
  */
 @Command(
-    name = "safemode",
-    description = "Safe mode specific operations",
+    name = "enter",
+    description = "Allow SCM to enter safe mode",
     mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class,
-    subcommands = {
-        SafeModeCheckSubcommand.class,
-        SafeModeExitSubcommand.class,
-        SafeModeWaitSubcommand.class,
-        SafeModeEnterSubcommand.class
-    })
-@MetaInfServices(AdminSubcommand.class)
-public class SafeModeCommands implements AdminSubcommand {
+    versionProvider = HddsVersionProvider.class)
+public class SafeModeEnterSubcommand extends ScmSubcommand {
 
+  @Override
+  public void execute(ScmClient scmClient) throws IOException {
+    boolean execReturn = scmClient.enterSafeMode();
+    if (execReturn) {
+      System.out.println("SCM entered to safe mode successfully.");
+    }
+  }
 }

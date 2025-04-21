@@ -63,6 +63,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.EnterSafeModeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.EnterSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
@@ -862,6 +864,23 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     return resp.getExitedSafeMode();
 
+  }
+
+  /**
+   * Allow SCM to enter Safe mode.
+   *
+   * @return returns true if operation is successful.
+   */
+  @Override
+  public boolean enterSafeMode() throws IOException {
+    EnterSafeModeRequestProto request =
+        EnterSafeModeRequestProto.getDefaultInstance();
+
+    EnterSafeModeResponseProto resp =
+        submitRequest(Type.InManualSafeMode,
+            builder -> builder.setEnterSafeModeRequest(request))
+            .getEnterSafeModeResponse();
+    return resp.getEnteredSafeMode();
   }
 
   @Override

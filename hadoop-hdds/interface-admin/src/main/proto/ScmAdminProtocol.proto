@@ -85,6 +85,7 @@ message ScmContainerLocationRequest {
   optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
   optional GetMetricsRequestProto getMetricsRequest = 47;
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
+  optional EnterSafeModeRequestProto enterSafeModeRequest = 49;
 }
 
 message ScmContainerLocationResponse {
@@ -141,6 +142,7 @@ message ScmContainerLocationResponse {
   optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
   optional GetMetricsResponseProto getMetricsResponse = 47;
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
+  optional EnterSafeModeResponseProto enterSafeModeResponse = 49;
 
   enum Status {
     OK = 1;
@@ -196,6 +198,7 @@ enum Type {
   GetContainersOnDecomNode = 42;
   GetMetrics = 43;
   GetContainerBalancerStatusInfo = 44;
+  InManualSafeMode = 45;
 }
 
 /**
@@ -490,6 +493,14 @@ message ForceExitSafeModeRequestProto {
 
 message ForceExitSafeModeResponseProto {
   required bool exitedSafeMode = 1;
+}
+
+message EnterSafeModeRequestProto {
+  optional string traceID = 1;
+}
+
+message EnterSafeModeResponseProto {
+  required bool enteredSafeMode = 1;
 }
 
 message StartReplicationManagerRequestProto {

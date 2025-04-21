@@ -85,6 +85,7 @@ public class SCMSafeModeManager implements SafeModeManager {
       LoggerFactory.getLogger(SCMSafeModeManager.class);
   private final boolean isSafeModeEnabled;
   private AtomicBoolean inSafeMode = new AtomicBoolean(true);
+  private AtomicBoolean inManualSafeMode = new AtomicBoolean(false);
   private AtomicBoolean preCheckComplete = new AtomicBoolean(false);
   private AtomicBoolean forceExitSafeMode = new AtomicBoolean(false);
 
@@ -233,11 +234,33 @@ public class SCMSafeModeManager implements SafeModeManager {
     // set it to true.
     setPreCheckComplete(true);
     setInSafeMode(false);
+
+    // Manual flag will reset only if we exit from commandline.
+    if (force) {
+      setInManualSafeMode(false);
+    }
+
+    //TODO Do we need to reset manual flag here.b
     setForceExitSafeMode(force);
 
     // TODO: Remove handler registration as there is no need to listen to
     // register events anymore.
 
+    if (inManualSafeMode.get()) {
+      LOG.info("SCM remains in safe mode as it was manually triggered.");
+    }
+
+    emitSafeModeStatus();
+  }
+
+  /**
+   * Enter safe mode. It does following actions:
+   * 1. Set safe mode status to true.
+   * 2. Emit safe mode status.
+   * @param eventQueue
+   */
+  public void enterManualSafeMode(EventPublisher eventQueue) {
+    setInManualSafeMode(true);
     emitSafeModeStatus();
   }
 
@@ -275,7 +298,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     if (!isSafeModeEnabled) {
       return false;
     }
-    return inSafeMode.get();
+    return inSafeMode.get() || inManualSafeMode.get();
   }
   /**
    * Get the safe mode status of all rules.
@@ -300,6 +323,13 @@ public class SCMSafeModeManager implements SafeModeManager {
    */
   public void setInSafeMode(boolean inSafeMode) {
     this.inSafeMode.set(inSafeMode);
+  }
+
+  /**
+   * Set Manual safe mode status.
+   */
+  public void setInManualSafeMode(boolean inManualSafeMode) {
+    this.inManualSafeMode.set(inManualSafeMode);
   }
 
   public void setPreCheckComplete(boolean newState) {

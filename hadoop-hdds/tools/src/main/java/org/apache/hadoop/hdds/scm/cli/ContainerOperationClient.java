@@ -473,6 +473,11 @@ public class ContainerOperationClient implements ScmClient {
   public boolean forceExitSafeMode() throws IOException {
     return storageContainerLocationClient.forceExitSafeMode();
   }
+  
+  @Override
+  public boolean enterSafeMode() throws IOException {
+    return storageContainerLocationClient.enterSafeMode();
+  }
 
   @Override
   public void startReplicationManager() throws IOException {
