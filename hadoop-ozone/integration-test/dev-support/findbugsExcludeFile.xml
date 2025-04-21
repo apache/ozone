@@ -53,7 +53,7 @@
     <Bug pattern="RV_RETURN_VALUE_IGNORED" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.ozone.client.rpc.read.TestKeyInputStream"/>
+    <Class name="org.apache.hadoop.ozone.client.rpc.TestKeyInputStream"/>
     <Bug pattern="SR_NOT_CHECKED" />
   </Match>
   <Match>
