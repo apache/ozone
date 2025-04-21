@@ -155,15 +155,15 @@ public final class FormattingCLIUtils {
       switch (this.tableRows.get(i).tableRowType) {
       case HEADER:
         if (this.lastTableRowType != TableRowType.HEADER) {
-          this.buildRowBorder(data, join);
+          this.buildRowBorder(data);
         }
-        this.buildRowLine(data, join);
-        this.buildRowBorder(data, join);
+        this.buildRowLine(data);
+        this.buildRowBorder(data);
         break;
       case LINE:
-        this.buildRowLine(data, join);
+        this.buildRowLine(data);
         if (i == len - 1) {
-          this.buildRowBorder(data, join);
+          this.buildRowBorder(data);
         }
         break;
       default:
