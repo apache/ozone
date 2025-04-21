@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 /**
  * Abstract Class created to handle common objects and methods.
  */
-public class TestNSSummaryTaskBase {
+public abstract class TestNSSummaryTaskBase {
   // User and Volume Constants
   protected static final String TEST_USER = "TestUser";
   protected static final String VOL = "vol";
