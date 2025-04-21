@@ -29,13 +29,13 @@ This document provides a comprehensive overview of the network ports utilized by
 
 # **Ozone Manager (OM)**
 
-| Default Port Number | Configuration Key | Endpoint Protocol | Purpose |
-| :---- | :---- | :---- | :---- |
-| 9862 | ozone.om.address | Hadooop RPC | Primary RPC endpoint for Ozone clients. |
-| 9874 | ozone.om.http-address | HTTP | Web UI for monitoring OM status and metadata. |
-| 9875 | ozone.om.https-address | HTTPS | Secure Web UI for monitoring OM status and metadata. |
-| 9872 | ozone.om.ratis.port  | HTTP/2 | RPC endpoint for OM HA instances to form a RAFT consensus ring |
-| N/A | ozone.om.grpc.port | HTTP/2 | gRPC endpoint for Ozone Manager clients |
+| Default Port Number | Configuration Key                           | Endpoint Protocol | Purpose |
+|:--------------------|:--------------------------------------------| :---- | :---- |
+| 9862                | ozone.om.address.\<service_id\>.\<node_id\> | Hadooop RPC | Primary RPC endpoint for Ozone clients. |
+| 9874                | ozone.om.http-address.\<service_id\>.\<node_id\>                       | HTTP | Web UI for monitoring OM status and metadata. |
+| 9875                | ozone.om.https-address.\<service_id\>.\<node_id\>                      | HTTPS | Secure Web UI for monitoring OM status and metadata. |
+| 9872                | ozone.om.ratis.port.\<service_id\>.\<node_id\>                         | HTTP/2 | RPC endpoint for OM HA instances to form a RAFT consensus ring |
+| 8981                | ozone.om.grpc.port                          | HTTP/2 | gRPC endpoint for Ozone Manager clients |
 
 # **Storage Container Manager (SCM)**
 
