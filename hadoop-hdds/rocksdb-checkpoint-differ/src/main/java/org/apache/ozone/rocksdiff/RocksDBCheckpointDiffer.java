@@ -1206,13 +1206,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
-  public boolean debugEnabled(Integer level) {
-    return DEBUG_LEVEL.contains(level);
-  }
-
-  @VisibleForTesting
   public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
-    return compactionDag.compactionNodeMap;
+    return (ConcurrentHashMap<String, CompactionNode>) compactionDag.getCompactionMap();
   }
 
   @VisibleForTesting
