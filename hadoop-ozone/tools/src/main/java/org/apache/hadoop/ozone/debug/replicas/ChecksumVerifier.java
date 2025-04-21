@@ -31,11 +31,9 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 /**
  * Verifies the checksum of blocks by checking each replica associated
