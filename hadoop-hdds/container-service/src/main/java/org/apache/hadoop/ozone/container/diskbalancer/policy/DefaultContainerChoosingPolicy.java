@@ -43,9 +43,9 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
       ContainerData containerData = itr.next().getContainerData();
       long containerID = containerData.getContainerID();
 
-      if (!replicationContainerIDs.contains(containerID) &&
-          !inProgressContainerIDs.contains(containerID) &&
-          containerData.isClosed() && !containerData.isEmpty()) {
+      if (containerData.isClosed() && !containerData.isEmpty()
+          && !replicationContainerIDs.contains(containerID)
+          && !inProgressContainerIDs.contains(containerID)) {
         return containerData;
       }
     }
