@@ -32,6 +32,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
@@ -46,7 +47,9 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -533,4 +536,56 @@ class TestContainerChecksumTreeManager {
     assertEquals(checksumFile.getAbsolutePath(),
         ContainerChecksumTreeManager.getContainerChecksumFile(container).getAbsolutePath());
   }
+  @Test
+  void testGetContainerChecksumInfoSuccess() throws IOException {
+    String content = "mock-checksum";
+    Files.write(checksumFile.toPath(), content.getBytes());
+
+    ByteString result = checksumManager.getContainerChecksumInfo(container);
+
+    assertEquals(content, result.toStringUtf8(), "Checksum content mismatch");
+  }
+  @Test
+  void testGetContainerChecksumInfoFileNotFound() {
+
+    assertThrows(FileNotFoundException.class, () -> {
+      checksumManager.getContainerChecksumInfo(container);
+    });
+  }
+  @Test
+  void testGetContainerChecksumInfoIOException() throws IOException {
+    Files.write(checksumFile.toPath(), "test".getBytes());
+
+    // Make file unreadable
+    boolean changed = checksumFile.setReadable(false);
+
+    if (!changed && checksumFile.canRead()) {
+      System.out.println("Warning: Could not make file unreadable for test.");
+    }
+
+    assertThrows(IOException.class, () -> {
+      checksumManager.getContainerChecksumInfo(container);
+    });
+  }
+  @Test
+  void testChecksumFileExistTrue() throws IOException {
+    Files.write(checksumFile.toPath(), "dummy content".getBytes());
+
+    Container mockContainer = mock(Container.class);
+    when(mockContainer.getContainerData()).thenReturn(container);
+
+    assertTrue(ContainerChecksumTreeManager.checksumFileExist(mockContainer),
+            "Expected true since checksum file exists");
+  }
+  @Test
+  void testChecksumFileExistFalse() {
+
+    Container mockContainer = mock(Container.class);
+    when(mockContainer.getContainerData()).thenReturn(container);
+
+    assertFalse(ContainerChecksumTreeManager.checksumFileExist(mockContainer),
+            "Expected false since checksum file does not exist");
+  }
+
 }
+

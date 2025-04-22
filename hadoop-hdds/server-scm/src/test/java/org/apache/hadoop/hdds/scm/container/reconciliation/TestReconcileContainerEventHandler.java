@@ -278,6 +278,59 @@ public class TestReconcileContainerEventHandler {
       break;
     }
   }
+  @Test
+  public void testReconcileFailsWithNotEligibleReplicas() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+
+    addReplicasToContainer(State.CLOSED, State.DELETED, State.DELETED);
+
+    EligibilityResult result =
+            ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+
+    assertFalse(result.isOk());
+    assertEquals(Result.INELIGIBLE_REPLICA_STATES, result.getResult());
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+    verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
+  }
+
+  @Test
+  public void testReconcileFailsDueToInvalidContainerState() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.DELETING);
+    addReplicasToContainer(3);
+
+    EligibilityResult result =
+            ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+    assertFalse(result.isOk());
+    assertEquals(Result.INELIGIBLE_CONTAINER_STATE, result.getResult());
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+    verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
+  }
+  @Test
+  public void testReconcileWithUnsupportedReplicationType() throws Exception {
+
+    ReplicationConfig unsupportedRep = mock(ReplicationConfig.class);
+    addContainer(unsupportedRep, LifeCycleState.CLOSED);
+
+    addReplicasToContainer(3);
+
+    EligibilityResult result = ReconciliationEligibilityHandler
+            .isEligibleForReconciliation(CONTAINER_ID, containerManager);
+
+    assertFalse(result.isOk());
+    assertEquals(Result.INELIGIBLE_REPLICATION_TYPE, result.getResult());
+    verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
+  }
+  @Test
+  public void testScmNotLeader() {
+
+    when(scmContext.isLeader()).thenReturn(false);
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+    verify(eventPublisher, never()).fireEvent(any(), commandCaptor.capture());
+  }
+
 
   private ContainerInfo addContainer(ReplicationConfig repConfig, LifeCycleState state) throws Exception {
     ContainerInfo container = new ContainerInfo.Builder()
