@@ -50,8 +50,9 @@ This document provides a comprehensive overview of the network ports utilized by
 | 9894 | ozone.scm.ratis.port  | HTTP/2 | SCM Ratis HA |
 | 9895 | ozone.scm.grpc.port  | HTTP/2 | SCM GRPC server port |
 
-Note : all the above SCM properties are suffixed with \<service_id\>.\<node_id\> in case of HA.
+Note : all the above SCM properties are suffixed with \<scm service_id\>.\<node_id\> in case of HA.
 For example: ozone.scm.client.port.<scm service_id>.<scm_node_id>.
+
 # **Recon**
 
 | Default Port Number | Configuration Key | Endpoint Protocol | Purpose |
