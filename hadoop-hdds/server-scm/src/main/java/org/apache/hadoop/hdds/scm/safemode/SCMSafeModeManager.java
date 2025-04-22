@@ -237,7 +237,7 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     // Manual flag will reset only if we exit from commandline.
     if (force) {
-      setInManualSafeMode(false);
+      inManualSafeMode.set(false);
     }
     setForceExitSafeMode(force);
 
@@ -259,7 +259,7 @@ public class SCMSafeModeManager implements SafeModeManager {
    * </ol>
    */
   public void enterManualSafeMode(EventPublisher eventQueue) {
-    setInManualSafeMode(true);
+    inManualSafeMode.set(true);
     emitSafeModeStatus();
   }
 
@@ -322,13 +322,6 @@ public class SCMSafeModeManager implements SafeModeManager {
    */
   public void setInSafeMode(boolean inSafeMode) {
     this.inSafeMode.set(inSafeMode);
-  }
-
-  /**
-   * Set Manual safe mode status.
-   */
-  public void setInManualSafeMode(boolean inManualSafeMode) {
-    this.inManualSafeMode.set(inManualSafeMode);
   }
 
   public void setPreCheckComplete(boolean newState) {
