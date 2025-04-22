@@ -877,7 +877,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         EnterSafeModeRequestProto.getDefaultInstance();
 
     EnterSafeModeResponseProto resp =
-        submitRequest(Type.InManualSafeMode,
+        submitRequest(Type.EnterSafeMode,
             builder -> builder.setEnterSafeModeRequest(request))
             .getEnterSafeModeResponse();
     return resp.getEnteredSafeMode();

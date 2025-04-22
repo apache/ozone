@@ -70,7 +70,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
       Type.StartReplicationManager,
       Type.StopReplicationManager,
       Type.ForceExitSafeMode,
-      Type.InManualSafeMode));
+      Type.EnterSafeMode));
 
   /**
    * Asks SCM where a container should be allocated. SCM responds with the

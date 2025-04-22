@@ -1059,10 +1059,10 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
       boolean result = scm.enterSafeMode();
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.IN_SAFE_MODE, null));
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.ENTER_SAFE_MODE, null));
       return result;
     } catch (Exception ex) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.IN_SAFE_MODE, null, ex));
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.ENTER_SAFE_MODE, null, ex));
       throw ex;
     }
   }

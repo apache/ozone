@@ -198,7 +198,7 @@ enum Type {
   GetContainersOnDecomNode = 42;
   GetMetrics = 43;
   GetContainerBalancerStatusInfo = 44;
-  InManualSafeMode = 45;
+  EnterSafeMode = 45;
 }
 
 /**

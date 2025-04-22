@@ -555,7 +555,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setForceExitSafeModeResponse(forceExitSafeMode(
                 request.getForceExitSafeModeRequest()))
             .build();
-      case InManualSafeMode:
+      case EnterSafeMode:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
