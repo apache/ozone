@@ -239,8 +239,6 @@ public class SCMSafeModeManager implements SafeModeManager {
     if (force) {
       setInManualSafeMode(false);
     }
-
-    //TODO Do we need to reset manual flag here.b
     setForceExitSafeMode(force);
 
     // TODO: Remove handler registration as there is no need to listen to

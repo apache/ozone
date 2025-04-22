@@ -381,7 +381,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * Allow SCM to enter Safe mode.
    *
    * @return returns true if operation is successful.
-   * @throws IOException
+   * @throws IOException In case of exception while checking admin access
    */
   boolean enterSafeMode() throws IOException;
 

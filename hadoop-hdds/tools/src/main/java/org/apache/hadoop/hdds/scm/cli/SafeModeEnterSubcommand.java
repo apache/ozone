@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine.Command;
 
 /**
- * This is the handler that process safe mode exit command.
+ * This is the handler that process safe mode enter command.
  */
 @Command(
     name = "enter",
