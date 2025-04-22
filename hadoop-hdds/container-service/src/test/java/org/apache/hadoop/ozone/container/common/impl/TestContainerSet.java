@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.LongStream;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -282,6 +283,29 @@ public class TestContainerSet {
     containerSet.listContainer(0, count, result);
 
     assertContainerIds(FIRST_ID, count, result);
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testContainerScanHandler(ContainerLayoutVersion layout) throws Exception {
+    setLayoutVersion(layout);
+    ContainerSet containerSet = createContainerSet();
+    // Scan when no handler is registered should not throw an exception.
+    containerSet.scanContainer(FIRST_ID);
+
+    AtomicLong invocationCount = new AtomicLong();
+    containerSet.registerContainerScanHandler(c -> {
+      // If the handler was incorrectly triggered for a non-existent container, this assert would fail.
+      assertEquals(FIRST_ID, c.getContainerData().getContainerID());
+      invocationCount.getAndIncrement();
+    });
+
+    // Scan of an existing container when a handler is registered should trigger a scan.
+    containerSet.scanContainer(FIRST_ID);
+    assertEquals(1, invocationCount.get());
+
+    // Scan of non-existent container should not throw exception or trigger an additional invocation.
+    containerSet.scanContainer(FIRST_ID - 1);
+    assertEquals(1, invocationCount.get());
   }
 
   /**

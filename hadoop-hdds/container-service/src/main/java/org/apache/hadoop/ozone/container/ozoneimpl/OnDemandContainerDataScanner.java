@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.ozone.container.ozoneimpl.AbstractBackgroundContainerScanner.logUnhealthyScanResult;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
@@ -45,8 +44,6 @@ public final class OnDemandContainerDataScanner {
   public static final Logger LOG =
       LoggerFactory.getLogger(OnDemandContainerDataScanner.class);
 
-  private static volatile OnDemandContainerDataScanner instance;
-
   private final ExecutorService scanExecutor;
   private final ContainerController containerController;
   private final DataTransferThrottler throttler;
@@ -56,7 +53,7 @@ public final class OnDemandContainerDataScanner {
   private final OnDemandScannerMetrics metrics;
   private final long minScanGap;
 
-  private OnDemandContainerDataScanner(
+  public OnDemandContainerDataScanner(
       ContainerScannerConfiguration conf, ContainerController controller) {
     containerController = controller;
     throttler = new DataTransferThrottler(
@@ -68,26 +65,11 @@ public final class OnDemandContainerDataScanner {
     minScanGap = conf.getContainerScanMinGap();
   }
 
-  public static synchronized void init(
-      ContainerScannerConfiguration conf, ContainerController controller) {
-    if (instance != null) {
-      LOG.warn("Trying to initialize on demand scanner" +
-          " a second time on a datanode.");
-      return;
-    }
-    instance = new OnDemandContainerDataScanner(conf, controller);
-  }
-
-  private static boolean shouldScan(Container<?> container) {
+  private boolean shouldScan(Container<?> container) {
     if (container == null) {
       return false;
     }
     long containerID = container.getContainerData().getContainerID();
-    if (instance == null) {
-      LOG.debug("Skipping on demand scan for container {} since scanner was " +
-          "not initialized.", containerID);
-      return false;
-    }
 
     HddsVolume containerVolume = container.getContainerData().getVolume();
     if (containerVolume.isFailed()) {
@@ -96,11 +78,11 @@ public final class OnDemandContainerDataScanner {
       return false;
     }
 
-    return !ContainerUtils.recentlyScanned(container, instance.minScanGap,
+    return !ContainerUtils.recentlyScanned(container, minScanGap,
         LOG) && container.shouldScanData();
   }
 
-  public static Optional<Future<?>> scanContainer(Container<?> container) {
+  public Optional<Future<?>> scanContainer(Container<?> container) {
     if (!shouldScan(container)) {
       return Optional.empty();
     }
@@ -108,7 +90,7 @@ public final class OnDemandContainerDataScanner {
     Future<?> resultFuture = null;
     long containerId = container.getContainerData().getContainerID();
     if (addContainerToScheduledContainers(containerId)) {
-      resultFuture = instance.scanExecutor.submit(() -> {
+      resultFuture = scanExecutor.submit(() -> {
         performOnDemandScan(container);
         removeContainerFromScheduledContainers(containerId);
       });
@@ -116,16 +98,16 @@ public final class OnDemandContainerDataScanner {
     return Optional.ofNullable(resultFuture);
   }
 
-  private static boolean addContainerToScheduledContainers(long containerId) {
-    return instance.containerRescheduleCheckSet.add(containerId);
+  private boolean addContainerToScheduledContainers(long containerId) {
+    return containerRescheduleCheckSet.add(containerId);
   }
 
-  private static void removeContainerFromScheduledContainers(
+  private void removeContainerFromScheduledContainers(
       long containerId) {
-    instance.containerRescheduleCheckSet.remove(containerId);
+    containerRescheduleCheckSet.remove(containerId);
   }
 
-  private static void performOnDemandScan(Container<?> container) {
+  private void performOnDemandScan(Container<?> container) {
     if (!shouldScan(container)) {
       return;
     }
@@ -135,21 +117,21 @@ public final class OnDemandContainerDataScanner {
       ContainerData containerData = container.getContainerData();
       logScanStart(containerData);
 
-      ScanResult result = container.scanData(instance.throttler, instance.canceler);
+      ScanResult result = container.scanData(throttler, canceler);
       // Metrics for skipped containers should not be updated.
       if (result.isDeleted()) {
         LOG.debug("Container [{}] has been deleted during the data scan.", containerId);
       } else {
         if (!result.isHealthy()) {
           logUnhealthyScanResult(containerId, result, LOG);
-          boolean containerMarkedUnhealthy = instance.containerController
+          boolean containerMarkedUnhealthy = containerController
               .markContainerUnhealthy(containerId, result);
           if (containerMarkedUnhealthy) {
-            instance.metrics.incNumUnHealthyContainers();
+            metrics.incNumUnHealthyContainers();
           }
         }
         // TODO HDDS-10374 will need to update the merkle tree here as well.
-        instance.metrics.incNumContainersScanned();
+        metrics.incNumContainersScanned();
       }
 
       // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
@@ -157,7 +139,7 @@ public final class OnDemandContainerDataScanner {
       logScanCompleted(containerData, now);
 
       if (!result.isDeleted()) {
-        instance.containerController.updateDataScanTimestamp(containerId, now);
+        containerController.updateDataScanTimestamp(containerId, now);
       }
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
@@ -169,7 +151,7 @@ public final class OnDemandContainerDataScanner {
     }
   }
 
-  private static void logScanStart(ContainerData containerData) {
+  private void logScanStart(ContainerData containerData) {
     if (LOG.isDebugEnabled()) {
       Optional<Instant> scanTimestamp = containerData.lastDataScanTime();
       Object lastScanTime = scanTimestamp.map(ts -> "at " + ts).orElse("never");
@@ -178,35 +160,17 @@ public final class OnDemandContainerDataScanner {
     }
   }
 
-  private static void logScanCompleted(
+  private void logScanCompleted(
       ContainerData containerData, Instant timestamp) {
     LOG.debug("Completed scan of container {} at {}",
         containerData.getContainerID(), timestamp);
   }
 
-  public static OnDemandScannerMetrics getMetrics() {
-    return instance.metrics;
+  public OnDemandScannerMetrics getMetrics() {
+    return metrics;
   }
 
-  @VisibleForTesting
-  public static DataTransferThrottler getThrottler() {
-    return instance.throttler;
-  }
-
-  @VisibleForTesting
-  public static Canceler getCanceler() {
-    return instance.canceler;
-  }
-
-  public static synchronized void shutdown() {
-    if (instance == null) {
-      return;
-    }
-    instance.shutdownScanner();
-  }
-
-  private synchronized void shutdownScanner() {
-    instance = null;
+  public synchronized void shutdown() {
     metrics.unregister();
     String shutdownMessage = "On-demand container scanner is shutting down.";
     LOG.info(shutdownMessage);
