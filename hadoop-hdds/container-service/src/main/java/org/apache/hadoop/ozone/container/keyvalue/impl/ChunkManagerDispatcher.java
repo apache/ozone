@@ -23,8 +23,8 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersi
 
 import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
-import java.io.FileDescriptor;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.EnumMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -142,7 +142,7 @@ public class ChunkManagerDispatcher implements ChunkManager {
   }
 
   @Override
-  public FileDescriptor getShortCircuitFd(Container container, BlockID blockID)
+  public RandomAccessFile getShortCircuitFd(Container container, BlockID blockID)
       throws StorageContainerException {
     return selectHandler(container).getShortCircuitFd(container, blockID);
   }
