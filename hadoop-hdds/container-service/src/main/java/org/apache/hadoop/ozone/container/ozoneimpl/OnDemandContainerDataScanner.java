@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.ozone.container.ozoneimpl.AbstractBackgroundContainerScanner.logUnhealthyScanResult;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
