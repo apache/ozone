@@ -255,9 +255,10 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   /**
    * Enter safe mode. It does following actions:
-   * 1. Set safe mode status to true.
-   * 2. Emit safe mode status.
-   * @param eventQueue
+   * <ol>
+   * <li>Set safe mode status to true.
+   * <li>Emit safe mode status.
+   * </ol>
    */
   public void enterManualSafeMode(EventPublisher eventQueue) {
     setInManualSafeMode(true);

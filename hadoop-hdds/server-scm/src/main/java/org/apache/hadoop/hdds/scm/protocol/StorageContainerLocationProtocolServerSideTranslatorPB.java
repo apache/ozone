@@ -559,8 +559,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
-            .setEnterSafeModeResponse(enterSafeMode(
-                request.getEnterSafeModeRequest()))
+            .setEnterSafeModeResponse(
+                enterSafeMode(request.getEnterSafeModeRequest()))
             .build();
       case StartReplicationManager:
         return ScmContainerLocationResponse.newBuilder()
@@ -1086,8 +1086,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   }
 
-  public EnterSafeModeResponseProto enterSafeMode(
-      EnterSafeModeRequestProto request)
+  public EnterSafeModeResponseProto enterSafeMode(EnterSafeModeRequestProto request)
       throws IOException {
     return EnterSafeModeResponseProto.newBuilder()
         .setEnteredSafeMode(impl.enterSafeMode()).build();
