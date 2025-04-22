@@ -92,6 +92,16 @@ public class DiskBalancerService extends BackgroundService {
   private Map<DiskBalancerTask, Integer> inProgressTasks;
   private Set<Long> inProgressContainers;
 
+  /**
+   * A map that tracks the total bytes freed from each source volume
+   * during container moves in the current disk balancing cycle.
+   *
+   * Unlike committedBytes, which is used for pre-allocating space on
+   * destination volumes, deltaSizes helps track how much space has
+   * effectively been freed on the source volumes without modifying
+   * their committedBytes (which could otherwise go negative).
+   */
+  private Map<HddsVolume, Long> deltaSizes;
   private MutableVolumeSet volumeSet;
 
   private VolumeChoosingPolicy volumeChoosingPolicy;
@@ -115,6 +125,7 @@ public class DiskBalancerService extends BackgroundService {
 
     inProgressTasks = new ConcurrentHashMap<>();
     inProgressContainers = ConcurrentHashMap.newKeySet();
+    deltaSizes = new ConcurrentHashMap<>();
     volumeSet = ozoneContainer.getVolumeSet();
 
     try {
@@ -338,7 +349,8 @@ public class DiskBalancerService extends BackgroundService {
         queue.add(new DiskBalancerTask(toBalanceContainer, sourceVolume,
             destVolume));
         inProgressContainers.add(toBalanceContainer.getContainerID());
-        sourceVolume.incCommittedBytes(-toBalanceContainer.getBytesUsed());
+        deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
+            - toBalanceContainer.getBytesUsed());
         destVolume.incCommittedBytes(toBalanceContainer.getBytesUsed());
       }
     }
@@ -496,7 +508,8 @@ public class DiskBalancerService extends BackgroundService {
 
     private void postCall() {
       inProgressContainers.remove(containerData.getContainerID());
-      sourceVolume.incCommittedBytes(containerData.getBytesUsed());
+      deltaSizes.put(sourceVolume, deltaSizes.get(sourceVolume) +
+          containerData.getBytesUsed());
       destVolume.incCommittedBytes(-containerData.getBytesUsed());
     }
   }
