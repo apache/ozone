@@ -19,21 +19,28 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
  * A class that encapsulates lifecycleRule andOperator.
  */
+@Immutable
 public final class OmLifecycleRuleAndOperator {
 
   private final Map<String, String> tags;
   private final String prefix;
 
-  private OmLifecycleRuleAndOperator(Map<String, String> tags, String prefix) {
-    this.tags = tags;
-    this.prefix = prefix;
+  private OmLifecycleRuleAndOperator() {
+    throw new UnsupportedOperationException("Default constructor is not supported. Use Builder.");
+  }
+
+  private OmLifecycleRuleAndOperator(Builder builder) {
+    this.tags = Collections.unmodifiableMap(new HashMap<>(builder.tags));
+    this.prefix = builder.prefix;
   }
 
   @Nonnull
@@ -104,7 +111,7 @@ public final class OmLifecycleRuleAndOperator {
     }
 
     public OmLifecycleRuleAndOperator build() {
-      return new OmLifecycleRuleAndOperator(this.tags, this.prefix);
+      return new OmLifecycleRuleAndOperator(this);
     }
   }
 

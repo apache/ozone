@@ -21,6 +21,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
@@ -28,30 +29,26 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
  * This class extends OmLCAction and represents the expiration
  * action type in lifecycle configuration.
  */
-public class OmLCExpiration implements OmLCAction {
+@Immutable
+public final class OmLCExpiration implements OmLCAction {
+  private final int days;
+  private final String date;
 
-  private int days;
-  private String date;
+  private OmLCExpiration() {
+    throw new UnsupportedOperationException("Default constructor is not supported. Use Builder.");
+  }
 
-  OmLCExpiration(int days, String date) {
-    this.days = days;
-    this.date = date;
+  private OmLCExpiration(Builder builder) {
+    this.days = builder.days;
+    this.date = builder.date;
   }
 
   public int getDays() {
     return days;
   }
 
-  public void setDays(int days) {
-    this.days = days;
-  }
-
   public String getDate() {
     return date;
-  }
-
-  public void setDate(String date) {
-    this.date = date;
   }
 
   @Override
@@ -134,7 +131,7 @@ public class OmLCExpiration implements OmLCAction {
     }
 
     public OmLCExpiration build() {
-      return new OmLCExpiration(days, date);
+      return new OmLCExpiration(this);
     }
   }
 }

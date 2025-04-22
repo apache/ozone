@@ -137,9 +137,7 @@ class TestOmLCRule {
     OmLCRule.Builder builder = new OmLCRule.Builder();
     builder.setId("test-rule");
 
-    // Using reflection to bypass the builder's single-action limitation
-    OmLCRule rule = builder.build();
-    rule.setActions(actions);
+    OmLCRule rule = builder.setActions(actions).build();
 
     assertOMException(rule::valid, INVALID_REQUEST, "A rule can have at most one Expiration action");
   }

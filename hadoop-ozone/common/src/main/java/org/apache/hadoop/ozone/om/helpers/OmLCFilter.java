@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import jakarta.annotation.Nullable;
+import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
@@ -26,21 +27,23 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
  * A class that encapsulates lifecycle rule filter.
  * At the moment only prefix is supported in filter.
  */
+@Immutable
 public final class OmLCFilter {
 
   private final String prefix;
-  private final Pair<String, String> tag;
+  private final String tagKey;
+  private final String tagValue;
   private final OmLifecycleRuleAndOperator andOperator;
 
-  public OmLifecycleRuleAndOperator getAndOperator() {
-    return andOperator;
+  private OmLCFilter() {
+    throw new UnsupportedOperationException("Default constructor is not supported. Use Builder.");
   }
 
-  private OmLCFilter(String prefix, Pair<String, String> tag,
-      OmLifecycleRuleAndOperator andOperator) {
-    this.prefix = prefix;
-    this.andOperator = andOperator;
-    this.tag = tag;
+  private OmLCFilter(Builder builder) {
+    this.prefix = builder.prefix;
+    this.andOperator = builder.andOperator;
+    this.tagKey = builder.tagKey;
+    this.tagValue = builder.tagValue;
   }
 
   /**
@@ -52,7 +55,7 @@ public final class OmLCFilter {
    */
   public void valid() throws OMException {
     boolean hasPrefix = prefix != null;
-    boolean hasTag = tag != null;
+    boolean hasTag = tagKey != null && tagValue != null;
     boolean hasAndOperator = andOperator != null;
 
     if ((hasPrefix && (hasTag || hasAndOperator)) || (hasTag && hasAndOperator)) {
@@ -66,6 +69,10 @@ public final class OmLCFilter {
     }
   }
 
+  public OmLifecycleRuleAndOperator getAndOperator() {
+    return andOperator;
+  }
+
   @Nullable
   public String getPrefix() {
     return prefix;
@@ -73,14 +80,15 @@ public final class OmLCFilter {
 
   @Nullable
   public Pair<String, String> getTag() {
-    return tag;
+    return Pair.of(tagKey, tagValue);
   }
 
   @Override
   public String toString() {
     return "OmLCFilter{" +
         "prefix='" + prefix + '\'' +
-        ", tag=" + tag +
+        ", tagKey='" + tagKey + '\'' +
+        ", tagValue='" + tagValue + '\'' +
         ", andOperator=" + andOperator +
         '}';
   }
@@ -90,13 +98,9 @@ public final class OmLCFilter {
    */
   public static class Builder {
     private String prefix = null;
-    private Pair<String, String> tag = null;
+    private String tagKey = null;
+    private String tagValue = null;
     private OmLifecycleRuleAndOperator andOperator = null;
-
-    public Builder setAndOperator(OmLifecycleRuleAndOperator andOp) {
-      this.andOperator = andOp;
-      return this;
-    }
 
     public Builder setPrefix(String lcPrefix) {
       this.prefix = lcPrefix;
@@ -104,12 +108,18 @@ public final class OmLCFilter {
     }
 
     public Builder setTag(String key, String value) {
-      this.tag = Pair.of(key, value);
+      this.tagKey = key;
+      this.tagValue = value;
+      return this;
+    }
+
+    public Builder setAndOperator(OmLifecycleRuleAndOperator andOp) {
+      this.andOperator = andOp;
       return this;
     }
 
     public OmLCFilter build() {
-      return new OmLCFilter(prefix, tag, andOperator);
+      return new OmLCFilter(this);
     }
   }
 

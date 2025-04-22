@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -26,78 +28,64 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 /**
  * A class that encapsulates lifecycle rule.
  */
-public class OmLCRule {
+@Immutable
+public final class OmLCRule {
 
   public static final int LC_ID_LENGTH = 48;
   // Ref: https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html#intro-lifecycle-rule-id
   public static final int LC_ID_MAX_LENGTH = 255;
 
-  private String id;
-  private String prefix;
-  private boolean enabled;
-  private boolean isPrefixEnable;
-  private boolean isTagEnable;
+  private final String id;
+  private final String prefix;
+  private final boolean enabled;
   // List of actions for this rule
-  private List<OmLCAction> actions;
-  private OmLCFilter filter;
+  private final List<OmLCAction> actions;
+  private final OmLCFilter filter;
 
-  OmLCRule(String id, String prefix, boolean enabled,
-      List<OmLCAction> actions, OmLCFilter filter) {
-    this.id = id;
-    this.prefix = prefix;
-    this.enabled = enabled;
-    this.actions = actions;
-    this.filter = filter;
+  private final boolean isPrefixEnable;
+  private final boolean isTagEnable;
 
+  private OmLCRule() {
+    throw new UnsupportedOperationException("Default constructor is not supported. Use Builder.");
+  }
+
+  private OmLCRule(Builder builder) {
+    this.prefix = builder.prefix;
+    this.enabled = builder.enabled;
+    this.actions = Collections.unmodifiableList(new ArrayList<>(builder.actions));
+    this.filter = builder.filter;
     // If no ID is specified in the lifecycle configure, a random ID will be generated
-    if (StringUtils.isEmpty(this.id)) {
+    if (StringUtils.isEmpty(builder.id)) {
       this.id = RandomStringUtils.randomAlphanumeric(LC_ID_LENGTH);
+    } else {
+      this.id = builder.id;
     }
 
     OmLifecycleRuleAndOperator andOperator = filter != null ? filter.getAndOperator() : null;
 
-    if (prefix != null ||
+    this.isPrefixEnable = prefix != null ||
         (filter != null && filter.getPrefix() != null) ||
-        (andOperator != null && andOperator.getPrefix() != null)) {
-      isPrefixEnable = true;
-    }
+        (andOperator != null && andOperator.getPrefix() != null);
 
-    if ((filter != null && filter.getTag() != null) ||
-        (andOperator != null && !andOperator.getTags().isEmpty())) {
-      isTagEnable = true;
-    }
+    this.isTagEnable = (filter != null && filter.getTag() != null) ||
+        (andOperator != null && !andOperator.getTags().isEmpty());
   }
+
 
   public String getId() {
     return id;
-  }
-
-  public void setId(String id) {
-    this.id = id;
   }
 
   public String getPrefix() {
     return prefix;
   }
 
-  public void setPrefix(String prefix) {
-    this.prefix = prefix;
-  }
-
   public boolean isEnabled() {
     return enabled;
   }
 
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
-  }
-
   public List<OmLCAction> getActions() {
     return actions;
-  }
-
-  public void setActions(List<OmLCAction> actions) {
-    this.actions = actions;
   }
 
   /**
@@ -128,10 +116,6 @@ public class OmLCRule {
 
   public boolean isTagEnable() {
     return isTagEnable;
-  }
-
-  public void setFilter(OmLCFilter filter) {
-    this.filter = filter;
   }
 
   /**
@@ -225,6 +209,14 @@ public class OmLCRule {
       return this;
     }
 
+    public Builder setActions(List<OmLCAction> lcAction) {
+      if (lcAction != null) {
+        this.actions = new ArrayList<>();
+        this.actions.addAll(lcAction);
+      }
+      return this;
+    }
+
     public Builder setFilter(OmLCFilter lcFilter) {
       this.filter = lcFilter;
       return this;
@@ -235,7 +227,7 @@ public class OmLCRule {
     }
 
     public OmLCRule build() {
-      return new OmLCRule(id, prefix, enabled, actions, filter);
+      return new OmLCRule(this);
     }
   }
 }

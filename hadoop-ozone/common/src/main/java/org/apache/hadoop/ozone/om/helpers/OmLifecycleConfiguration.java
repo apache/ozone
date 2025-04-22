@@ -18,10 +18,12 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -30,23 +32,28 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 /**
  * A class that encapsulates lifecycle configuration.
  */
-public class OmLifecycleConfiguration extends WithObjectID
+@Immutable
+public final class OmLifecycleConfiguration extends WithObjectID
     implements Auditable {
 
   // Ref: https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html#intro-lifecycle-rule-id
   public static final int LC_MAX_RULES = 1000;
-  private String volume;
-  private String bucket;
-  private String owner;
-  private long creationTime;
-  private List<OmLCRule> rules;
+  private final String volume;
+  private final String bucket;
+  private final String owner;
+  private final long creationTime;
+  private final List<OmLCRule> rules;
+
+  private OmLifecycleConfiguration() {
+    throw new UnsupportedOperationException("Default constructor is not supported. Use Builder.");
+  }
 
   OmLifecycleConfiguration(OmLifecycleConfiguration.Builder builder) {
     super(builder);
     this.volume = builder.volume;
     this.bucket = builder.bucket;
     this.owner = builder.owner;
-    this.rules = builder.rules;
+    this.rules = Collections.unmodifiableList(builder.rules);
     this.creationTime = builder.creationTime;
   }
 
@@ -54,40 +61,20 @@ public class OmLifecycleConfiguration extends WithObjectID
     return rules;
   }
 
-  public void setRules(List<OmLCRule> rules) {
-    this.rules = rules;
-  }
-
   public String getBucket() {
     return bucket;
-  }
-
-  public void setBucket(String bucket) {
-    this.bucket = bucket;
   }
 
   public String getOwner() {
     return owner;
   }
 
-  public void setOwner(String owner) {
-    this.owner = owner;
-  }
-
   public String getVolume() {
     return volume;
   }
 
-  public void setVolume(String volume) {
-    this.volume = volume;
-  }
-
   public long getCreationTime() {
     return creationTime;
-  }
-
-  public void setCreationTime(long creationTime) {
-    this.creationTime = creationTime;
   }
 
   /**
