@@ -46,7 +46,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
 
   private final StreamingDestination destination;
   private boolean headerMode = true;
-  private String currentFileName;
+  private String currentFileName = "";
   private RandomAccessFile destFile;
 
   private FileChannel destFileChannel;
