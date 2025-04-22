@@ -15,8 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.container;
+package org.apache.hadoop.ozone.debug.logs.container;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
@@ -35,7 +38,7 @@ import picocli.CommandLine;
 public class ListContainers implements Callable<Void> {
   
   @CommandLine.Option(names = {"--state"},
-      description = "state of the container",
+      description = "Life cycle state of the container.",
       required = true)
   private HddsProtos.LifeCycleState state;
 
@@ -47,12 +50,26 @@ public class ListContainers implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
+    if (parent.getDbPath() == null) {
+      System.err.println("No database path provided.Please provide a valid database path.");
+      return null;
+    } else {
+      Path providedDbPath = Paths.get(parent.getDbPath());
+      Path parentDir = providedDbPath.getParent();
+
+      if (parentDir != null && !Files.exists(parentDir)) {
+        System.err.println("The parent directory of the provided database path does not exist: " + parentDir);
+        return null;
+      }
+    }
+
+    ContainerDatanodeDatabase.setDatabasePath(parent.getDbPath());
     
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
     try {
       cdd.listContainersByState(state.name(), listOptions.getLimit());
     } catch (Exception e) {
-      System.err.println("Error while retrieving containers with state: " + state + " " + e.getMessage());
+      throw e;
     }
     
     return null;

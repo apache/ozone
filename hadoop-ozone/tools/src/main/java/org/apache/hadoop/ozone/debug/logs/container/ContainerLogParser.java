@@ -15,12 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.container;
+package org.apache.hadoop.ozone.debug.logs.container;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.SQLException;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerLogFileParser;
@@ -31,18 +30,20 @@ import picocli.CommandLine;
  */
 
 @CommandLine.Command(
-    name = "container_log_parse",
-    description = "parse the container logs"
+    name = "parse",
+    description = "Parse container logs and extract key details such as datanode ID, container ID, state, " +
+            "BCSID, timestamp, log level, index value, and messages (if any)."
 )
 public class ContainerLogParser implements Callable<Void> {
   private static final int DEFAULT_THREAD_COUNT = 10;
   
-  @CommandLine.Option(names = {"--parse"},
-      description = "path to the dir which contains log files")
+  @CommandLine.Option(names = {"--path"},
+      description = "Path to the folder which contains container log files to be parsed.",
+      required = true)
   private String path;
 
   @CommandLine.Option(names = {"--thread-count"},
-      description = "Thread count for concurrent processing.",
+      description = "Thread count for concurrent log file processing.",
       defaultValue = "10")
   private int threadCount;
 
@@ -57,36 +58,39 @@ public class ContainerLogParser implements Callable<Void> {
       threadCount = DEFAULT_THREAD_COUNT;
     }
     
-    if (path != null) {
-      Path logPath = Paths.get(path);
-      if (!Files.exists(logPath) || !Files.isDirectory(logPath)) {
-        System.err.println("Invalid path provided: " + path);
-        return null;
-      }
-
-      ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
-      ContainerLogFileParser parser = new ContainerLogFileParser();
-
-      try {
-
-        cdd.createDatanodeContainerLogTable();
-
-        parser.processLogEntries(path, cdd, threadCount);
-
-        cdd.insertLatestContainerLogData();
-        System.out.println("Successfully parsed the log files and updated the respective tables");
-
-      } catch (SQLException e) {
-        System.err.println("Error occurred while processing logs or inserting data into the database: "
-            + e.getMessage());
-      } catch (Exception e) {
-        System.err.println("An unexpected error occurred: " + e.getMessage());
-      }
-
-    } else {
-      System.out.println("path to logs folder not provided");
+    Path logPath = Paths.get(path);
+    if (!Files.exists(logPath) || !Files.isDirectory(logPath)) {
+      System.err.println("Invalid path provided: " + path);
+      return null;
     }
 
+    if (parent.getDbPath() == null) {
+      System.err.println("No database path provided.Please provide a valid database path.");
+      return null;
+    } else {
+      Path providedDbPath = Paths.get(parent.getDbPath());
+      Path parentDir = providedDbPath.getParent();
+
+      if (parentDir != null && !Files.exists(parentDir)) {
+        System.err.println("The parent directory of the provided database path does not exist: " + parentDir);
+        return null;
+      }
+    }
+    
+    ContainerDatanodeDatabase.setDatabasePath(parent.getDbPath());
+    ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
+    ContainerLogFileParser parser = new ContainerLogFileParser();
+
+    try {
+      cdd.createDatanodeContainerLogTable();
+
+      parser.processLogEntries(path, cdd, threadCount);
+
+      cdd.insertLatestContainerLogData();
+      System.out.println("Successfully parsed the log files and updated the respective tables");
+    } catch (Exception e) {
+      throw e;
+    }
     return null;
   }
 

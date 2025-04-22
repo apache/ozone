@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.containerlog.parser;
 
-import java.io.FileNotFoundException;
-import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
@@ -29,9 +27,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sqlite.SQLiteConfig;
@@ -41,37 +36,24 @@ import org.sqlite.SQLiteConfig;
  * Provides methods for table creation, log data insertion, and index setup.
  */
 public class ContainerDatanodeDatabase {
-
-  private static Map<String, String> queries;
-
-  static {
-    loadProperties();
-  }
-
+  
+  private static String databasePath;
+  
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerDatanodeDatabase.class);
+  
 
-  private static void loadProperties() {
-    Properties props = new Properties();
-    try (InputStream inputStream = ContainerDatanodeDatabase.class.getClassLoader()
-        .getResourceAsStream(DBConsts.PROPS_FILE)) {
-
-      if (inputStream != null) {
-        props.load(inputStream);
-        queries = props.entrySet().stream()
-            .collect(Collectors.toMap(
-                e -> e.getKey().toString(),
-                e -> e.getValue().toString()
-            ));
-      } else {
-        throw new FileNotFoundException("Property file '" + DBConsts.PROPS_FILE + "' not found.");
-      }
-    } catch (Exception e) {
-      LOG.error(e.getMessage());
+  public static void setDatabasePath(String dbPath) {
+    if (databasePath == null) {
+      databasePath = dbPath;
     }
   }
 
   private static Connection getConnection() throws Exception {
+    if (databasePath == null) {
+      throw new IllegalStateException("Database path not set");
+    }
+    
     Class.forName(DBConsts.DRIVER);
 
     SQLiteConfig config = new SQLiteConfig();
@@ -82,11 +64,11 @@ public class ContainerDatanodeDatabase {
     config.setSynchronous(SQLiteConfig.SynchronousMode.OFF);
     config.setTempStore(SQLiteConfig.TempStore.MEMORY);
 
-    return DriverManager.getConnection(DBConsts.CONNECTION_PREFIX + DBConsts.DATABASE_NAME, config.toProperties());
+    return DriverManager.getConnection(DBConsts.CONNECTION_PREFIX + databasePath, config.toProperties());
   }
 
   public void createDatanodeContainerLogTable() throws SQLException {
-    String createTableSQL = queries.get("CREATE_DATANODE_CONTAINER_LOG_TABLE");
+    String createTableSQL = DBConsts.CREATE_DATANODE_CONTAINER_LOG_TABLE;
     try (Connection connection = getConnection();
          Statement dropStmt = connection.createStatement();
          Statement createStmt = connection.createStatement()) {
@@ -94,25 +76,29 @@ public class ContainerDatanodeDatabase {
       createStmt.execute(createTableSQL);
       createDatanodeContainerIndex(createStmt);
     } catch (SQLException e) {
+      System.err.println("Error while creating the table: " + e.getMessage());
       LOG.error("Error while creating the table: {}", e.getMessage());
       throw e;
     } catch (Exception e) {
+      System.err.println("Unexpected error: " + e.getMessage());
       LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
 
   private void createContainerLogTable() throws SQLException {
-    String createTableSQL = queries.get("CREATE_CONTAINER_LOG_TABLE");
+    String createTableSQL = DBConsts.CREATE_CONTAINER_LOG_TABLE;
     try (Connection connection = getConnection();
          Statement dropStmt = connection.createStatement();
          Statement createStmt = connection.createStatement()) {
       dropTable(DBConsts.CONTAINER_LOG_TABLE_NAME, dropStmt);
       createStmt.execute(createTableSQL);
     } catch (SQLException e) {
+      System.err.println("Error while creating the table: " + e.getMessage());
       LOG.error("Error while creating the table: {}", e.getMessage());
       throw e;
     } catch (Exception e) {
+      System.err.println("Unexpected error: " + e.getMessage());
       LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
@@ -126,7 +112,7 @@ public class ContainerDatanodeDatabase {
   
   public synchronized void insertContainerDatanodeData(List<DatanodeContainerInfo> transitionList) throws SQLException {
 
-    String insertSQL = queries.get("INSERT_DATANODE_CONTAINER_LOG");
+    String insertSQL = DBConsts.INSERT_DATANODE_CONTAINER_LOG;
 
     long containerId = 0;
     String datanodeId = null;
@@ -162,16 +148,18 @@ public class ContainerDatanodeDatabase {
         preparedStatement.executeBatch();
       }
     } catch (SQLException e) {
+      System.err.println("Failed to insert container log for container " + containerId + " on datanode " + datanodeId);
       LOG.error("Failed to insert container log for container {} on datanode {}", containerId, datanodeId, e);
       throw e;
     } catch (Exception e) {
+      System.err.println("Unexpected error: " + e.getMessage());
       LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
 
   private void createDatanodeContainerIndex(Statement stmt) throws SQLException {
-    String createIndexSQL = queries.get("CREATE_DATANODE_CONTAINER_INDEX");
+    String createIndexSQL = DBConsts.CREATE_DATANODE_CONTAINER_INDEX;
     stmt.execute(createIndexSQL);
   }
 
@@ -182,8 +170,8 @@ public class ContainerDatanodeDatabase {
 
   public void insertLatestContainerLogData() throws SQLException {
     createContainerLogTable();
-    String selectSQL = queries.get("SELECT_LATEST_CONTAINER_LOG");
-    String insertSQL = queries.get("INSERT_CONTAINER_LOG");
+    String selectSQL = DBConsts.SELECT_LATEST_CONTAINER_LOG;
+    String insertSQL = DBConsts.INSERT_CONTAINER_LOG;
 
     try (Connection connection = getConnection();
          PreparedStatement selectStmt = connection.prepareStatement(selectSQL);
@@ -211,6 +199,8 @@ public class ContainerDatanodeDatabase {
             count = 0;
           }
         } catch (SQLException e) {
+          System.err.println("Failed to insert container log entry for container " + containerId + " on datanode "
+              + datanodeId);
           LOG.error("Failed to insert container log entry for container {} on datanode {} ",
               containerId, datanodeId, e);
           throw e;
@@ -221,21 +211,23 @@ public class ContainerDatanodeDatabase {
         insertStmt.executeBatch();
       }
     } catch (SQLException e) {
+      System.err.println("Failed to insert container log entry: " + e.getMessage());
       LOG.error("Failed to insert container log entry: {}", e.getMessage());
       throw e;
     } catch (Exception e) {
+      System.err.println("Unexpected error: " + e.getMessage());
       LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
 
   private void dropTable(String tableName, Statement stmt) throws SQLException {
-    String dropTableSQL = queries.get("DROP_TABLE").replace("{table_name}", tableName);
+    String dropTableSQL = DBConsts.DROP_TABLE.replace("{table_name}", tableName);
     stmt.executeUpdate(dropTableSQL);
   }
 
   private void createContainerLogIndex(Statement stmt) throws SQLException {
-    String createIndexSQL = queries.get("CREATE_INDEX_LATEST_STATE");
+    String createIndexSQL = DBConsts.CREATE_INDEX_LATEST_STATE;
     stmt.execute(createIndexSQL);
   }
 
@@ -258,7 +250,7 @@ public class ContainerDatanodeDatabase {
 
     boolean limitProvided = limit != Integer.MAX_VALUE;
 
-    String baseQuery = queries.get("SELECT_LATEST_CONTAINER_LOGS_BY_STATE");
+    String baseQuery = DBConsts.SELECT_LATEST_CONTAINER_LOGS_BY_STATE;
     String finalQuery = limitProvided ? baseQuery + " LIMIT ?" : baseQuery;
 
     try (Connection connection = getConnection();
@@ -306,7 +298,7 @@ public class ContainerDatanodeDatabase {
         }
       }
     } catch (SQLException e) {
-      throw e;
+      throw new SQLException("Error while retrieving containers with state " + state);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
