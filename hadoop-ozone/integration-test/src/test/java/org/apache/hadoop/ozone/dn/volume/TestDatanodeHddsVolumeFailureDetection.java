@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -71,7 +72,6 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 @Timeout(300)
 class TestDatanodeHddsVolumeFailureDetection {
-
   private static final int KEY_SIZE = 128;
 
   @ParameterizedTest
@@ -230,6 +230,74 @@ class TestDatanodeHddsVolumeFailureDetection {
           // a failed volume should be detected
           DatanodeTestUtils.waitForCheckVolume(volSet, 1L);
           DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
+        } finally {
+          // restore all
+          DatanodeTestUtils.restoreBadVolume(vol0);
+          DatanodeTestUtils.restoreDataDirFromFailure(dbDir);
+        }
+      }
+    }
+  }
+
+  /**
+   * {@link HddsVolume#check(Boolean)} will capture the failures injected by this test and not allow the
+   * test to reach the helper method {@link HddsVolume#checkDbHealth}.
+   * As a workaround, we test the helper method directly.
+   * As we test the helper method directly, we cannot test for schemas older than V3.
+   *
+   * @param schemaV3
+   * @throws Exception
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true})
+  void corruptDbFileWithoutDbHandleCacheInvalidation(boolean schemaV3) throws Exception {
+    try (MiniOzoneCluster cluster = newCluster(schemaV3)) {
+      try (OzoneClient client = cluster.newClient()) {
+        OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+
+        // write a file, will create container1
+        String keyName = UUID.randomUUID().toString();
+        long containerId = createKey(bucket, keyName);
+
+        // close container1
+        HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
+        OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
+        Container<?> c1 = oc.getContainerSet().getContainer(containerId);
+        c1.close();
+
+        // create container2, and container1 is kicked out of cache
+        OzoneConfiguration conf = cluster.getConf();
+        try (ScmClient scmClient = new ContainerOperationClient(conf)) {
+          ContainerWithPipeline c2 = scmClient.createContainer(
+              ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+              OzoneConsts.OZONE);
+          assertEquals(c2.getContainerInfo().getState(), LifeCycleState.OPEN);
+        }
+
+        // corrupt db by rename dir->file
+        File dbDir;
+        if (schemaV3) {
+          dbDir = new File(((KeyValueContainerData) (c1.getContainerData()))
+              .getDbFile().getAbsolutePath());
+        } else {
+          File metadataDir = new File(c1.getContainerFile().getParent());
+          dbDir = new File(metadataDir, "1" + OzoneConsts.DN_CONTAINER_DB);
+        }
+
+        MutableVolumeSet volSet = oc.getVolumeSet();
+        HddsVolume vol0 = (HddsVolume) volSet.getVolumesList().get(0);
+
+        try {
+          DatanodeTestUtils.injectDataDirFailure(dbDir);
+          // simulate bad volume by removing write permission on root dir
+          // refer to HddsVolume.check()
+          DatanodeTestUtils.simulateBadVolume(vol0);
+
+          // one volume health check got automatically executed when the cluster started
+          // the second health should log the rocksdb failure but return a healthy-volume status
+          assertEquals(VolumeCheckResult.HEALTHY, vol0.checkDbHealth(dbDir));
+          // the third health check should log the rocksdb failure and return a failed-volume status
+          assertEquals(VolumeCheckResult.FAILED, vol0.checkDbHealth(dbDir));
         } finally {
           // restore all
           DatanodeTestUtils.restoreBadVolume(vol0);

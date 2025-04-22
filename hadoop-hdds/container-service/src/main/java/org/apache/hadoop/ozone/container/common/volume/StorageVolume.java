@@ -691,7 +691,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     // Once the volume is failed, it will not be checked anymore.
     // The failure counts can be left as is.
     if (currentIOFailureCount.get() > ioFailureTolerance) {
-      LOG.info("Failed IO test for volume {}: the last {} runs " +
+      LOG.error("Failed IO test for volume {}: the last {} runs " +
               "encountered {} out of {} tolerated failures.", this,
           ioTestSlidingWindow.size(), currentIOFailureCount,
           ioFailureTolerance);
