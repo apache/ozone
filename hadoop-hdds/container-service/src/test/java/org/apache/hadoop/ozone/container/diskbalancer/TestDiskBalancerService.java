@@ -256,8 +256,6 @@ public class TestDiskBalancerService {
     when(dispatcher.getHandler(any())).thenReturn(keyValueHandler);
     when(ozoneContainer.getVolumeSet()).thenReturn(volumeSet);
     when(ozoneContainer.getController()).thenReturn(controller);
-    ReplicationSupervisor replicationSupervisor = mock(ReplicationSupervisor.class);
-    when(ozoneContainer.getReplicationSupervisor()).thenReturn(replicationSupervisor);
     return ozoneContainer;
   }
 
