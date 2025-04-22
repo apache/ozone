@@ -43,13 +43,15 @@ This document provides a comprehensive overview of the network ports utilized by
 | :---- | :---- | :---- | :---- |
 | 9860 | ozone.scm.client.port | Hadoop RPC | Communication with Ozone clients for namespace and container management. If ozone.scm.client.address is defined (default is empty), ozone.scm.client.address overrides it. |
 | 9863 | ozone.scm.block.client.port | Hadoop RPC | Communication with Datanodes for block-level operations. |
-| 9876 | ozone.scm.http-address | HTTP | Web UI for monitoring SCM status. |
-| 9877 | ozone.scm.https-address | HTTPS | Secure Web UI for monitoring SCM status. |
 | 9861 | ozone.scm.datanode.port | Hadoop RPC | Port used by DataNodes to communicate with the SCM. If ozone.scm.datanode.address is defined (default is empty), ozone.scm.datanode.address overrides it. |
 | 9961 | ozone.scm.security.service.port  | Hadoop RPC | SCM security server port |
+| 9876 | ozone.scm.http-address | HTTP | Web UI for monitoring SCM status. |
+| 9877 | ozone.scm.https-address | HTTPS | Secure Web UI for monitoring SCM status. |
 | 9894 | ozone.scm.ratis.port  | HTTP/2 | SCM Ratis HA |
 | 9895 | ozone.scm.grpc.port  | HTTP/2 | SCM GRPC server port |
 
+Note : all the above SCM properties are suffixed with \<service_id\>.\<node_id\> in case of HA.
+For example: ozone.scm.client.port.<scm service_id>.<scm_node_id>.
 # **Recon**
 
 | Default Port Number | Configuration Key | Endpoint Protocol | Purpose |
