@@ -21,7 +21,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -33,10 +32,8 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.Shell;
@@ -113,48 +110,49 @@ public class ReplicasVerify extends Handler {
     ObjectNode root = JsonUtils.createObjectNode(null);
     ArrayNode keysArray = root.putArray("keys");
 
+    boolean[] allKeysPassed = {true};
+
     if (!keyName.isEmpty()) {
-      OmKeyInfo keyInfo = ((RpcClient) ozoneClient.getProxy()).getKeyInfo(volumeName, bucketName, keyName, false);
-      processKey(ozoneClient, keyInfo, keysArray);
+      processKey(ozoneClient, volumeName, bucketName, keyName, keysArray, allKeysPassed);
     } else if (!bucketName.isEmpty()) {
       OzoneVolume volume = objectStore.getVolume(volumeName);
       OzoneBucket bucket = volume.getBucket(bucketName);
-      checkBucket(ozoneClient, bucket, keysArray);
+      checkBucket(ozoneClient, bucket, keysArray, allKeysPassed);
     } else if (!volumeName.isEmpty()) {
       OzoneVolume volume = objectStore.getVolume(volumeName);
-      checkVolume(ozoneClient, volume, keysArray);
+      checkVolume(ozoneClient, volume, keysArray, allKeysPassed);
     } else {
       for (Iterator<? extends OzoneVolume> it = objectStore.listVolumes(null); it.hasNext();) {
-        checkVolume(ozoneClient, it.next(), keysArray);
+        checkVolume(ozoneClient, it.next(), keysArray, allKeysPassed);
       }
     }
-
+    root.put("pass", allKeysPassed[0]);
     System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(root));
   }
 
-  void checkVolume(OzoneClient ozoneClient, OzoneVolume volume, ArrayNode keysArray) throws IOException {
+  void checkVolume(OzoneClient ozoneClient, OzoneVolume volume, ArrayNode keysArray, boolean[] allKeysPassed)
+      throws IOException {
     for (Iterator<? extends OzoneBucket> it = volume.listBuckets(null); it.hasNext();) {
       OzoneBucket bucket = it.next();
-      checkBucket(ozoneClient, bucket, keysArray);
+      checkBucket(ozoneClient, bucket, keysArray, allKeysPassed);
     }
   }
 
-  void checkBucket(OzoneClient ozoneClient, OzoneBucket bucket, ArrayNode keysArray) throws IOException {
+  void checkBucket(OzoneClient ozoneClient, OzoneBucket bucket, ArrayNode keysArray, boolean[] allKeysPassed)
+      throws IOException {
     for (Iterator<? extends OzoneKey> it = bucket.listKeys(null); it.hasNext();) {
       OzoneKey key = it.next();
       // TODO: Remove this check once HDDS-12094 is fixed
       if (!key.getName().endsWith("/")) {
-        OmKeyInfo keyInfo = ((RpcClient) ozoneClient.getProxy()).getKeyInfo(
-            bucket.getVolumeName(), bucket.getName(), key.getName(), false);
-        processKey(ozoneClient, keyInfo, keysArray);
+        processKey(ozoneClient, key.getVolumeName(), key.getBucketName(), key.getName(), keysArray, allKeysPassed);
       }
     }
   }
 
-  void processKey(OzoneClient ozoneClient, OmKeyInfo keyInfo, ArrayNode keysArray) {
-    String volumeName = keyInfo.getVolumeName();
-    String bucketName = keyInfo.getBucketName();
-    String keyName = keyInfo.getKeyName();
+  void processKey(OzoneClient ozoneClient, String volumeName, String bucketName, String keyName,
+      ArrayNode keysArray, boolean[] allKeysPassed) throws IOException {
+    OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
+        volumeName, bucketName, keyName, false);
 
     ObjectNode keyNode = JsonUtils.createObjectNode(null);
     keyNode.put("volumeName", volumeName);
@@ -164,66 +162,61 @@ public class ReplicasVerify extends Handler {
     ArrayNode blocksArray = keyNode.putArray("blocks");
     boolean keyPass = true;
 
-    for (OmKeyLocationInfoGroup keyLocationInfoGroup : keyInfo.getKeyLocationVersions()) {
-      for (OmKeyLocationInfo keyLocation : keyLocationInfoGroup.getLocationList()) {
-        long containerID = keyLocation.getContainerID();
-        long localID = keyLocation.getLocalID();
+    for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
+      long containerID = keyLocation.getContainerID();
+      long localID = keyLocation.getLocalID();
 
-        ObjectNode blockNode = JsonUtils.createObjectNode(null);
-        blockNode.put("containerID", containerID);
-        blockNode.put("localID", localID);
+      ObjectNode blockNode = blocksArray.addObject();
+      blockNode.put("containerID", containerID);
+      blockNode.put("blockID", localID);
 
-        ArrayNode replicasArray = blockNode.putArray("replicas");
-        boolean blockPass = true;
+      ArrayNode replicasArray = blockNode.putArray("replicas");
+      boolean blockPass = true;
 
-        for (DatanodeDetails datanode : keyLocation.getPipeline().getNodes()) {
-          ObjectNode datanodeNode = JsonUtils.createObjectNode(null);
-          datanodeNode.put("uuid", datanode.getUuidString());
-          datanodeNode.put("hostname", datanode.getHostName());
+      for (DatanodeDetails datanode : keyLocation.getPipeline().getNodes()) {
+        ObjectNode replicaNode = replicasArray.addObject();
 
-          ArrayNode checksArray = JsonUtils.createArrayNode();
-          boolean replicaPass = true;
+        ObjectNode datanodeNode = replicaNode.putObject("datanode");
+        datanodeNode.put("uuid", datanode.getUuidString());
+        datanodeNode.put("hostname", datanode.getHostName());
 
-          for (ReplicaVerifier verifier : replicaVerifiers) {
-            BlockVerificationResult result = verifier.verifyBlock(datanode, keyLocation);
-            ObjectNode checkNode = JsonUtils.createObjectNode(null);
-            checkNode.put("type", verifier.getType());
-            checkNode.put("pass", result.passed());
+        ArrayNode checksArray = replicaNode.putArray("checks");
+        boolean replicaPass = true;
 
-            ArrayNode failuresArray = checkNode.putArray("failures");
-            for (BlockVerificationResult.FailureDetail failure : result.getFailures().orElse(Collections.emptyList())) {
-              ObjectNode failureNode = JsonUtils.createObjectNode(null);
-              failureNode.put("completed", failure.isCompleted());
-              failureNode.put("message", failure.getFailureMessage());
-              failuresArray.add(failureNode);
-            }
-            checksArray.add(checkNode);
+        for (ReplicaVerifier verifier : replicaVerifiers) {
+          BlockVerificationResult result = verifier.verifyBlock(datanode, keyLocation);
+          ObjectNode checkNode = checksArray.addObject();
+          checkNode.put("type", verifier.getType());
+          checkNode.put("completed", result.isCompleted());
+          checkNode.put("pass", result.passed());
 
-            if (!result.passed()) {
-              replicaPass = false;
-            }
+          ArrayNode failuresArray = checkNode.putArray("failures");
+          for (String failure : result.getFailures()) {
+            failuresArray.addObject().put("message", failure);
           }
+          replicaNode.put("replicaIndex", keyLocation.getPipeline().getReplicaIndex(datanode));
 
-          ObjectNode replicaNode = JsonUtils.createObjectNode(null);
-          replicaNode.set("datanode", datanodeNode);
-          replicaNode.set("checks", checksArray);
-          replicasArray.add(replicaNode);
-
-          if (!replicaPass) {
-            blockPass = false;
+          if (!result.passed()) {
+            replicaPass = false;
           }
         }
-        blocksArray.add(blockNode);
 
-        if (!blockPass) {
-          keyPass = false;
+        if (!replicaPass) {
+          blockPass = false;
         }
+      }
+
+      if (!blockPass) {
+        keyPass = false;
       }
     }
 
+    keyNode.put("pass", keyPass);
+    if (!keyPass) {
+      allKeysPassed[0] = false;
+    }
+
     if (!keyPass || allResults) {
-      keyNode.set("blocks", blocksArray);
-      keyNode.put("pass", keyPass);
       keysArray.add(keyNode);
     }
   }

@@ -63,7 +63,7 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
           client,
           keyLocation.getBlockID(),
           keyLocation.getToken(),
-          Collections.singletonMap(datanode, 1)
+          pipeline.getReplicaIndexes()
       );
 
       boolean hasBlock = response != null && response.hasBlockData();

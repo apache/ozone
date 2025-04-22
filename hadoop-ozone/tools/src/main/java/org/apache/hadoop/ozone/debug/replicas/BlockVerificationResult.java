@@ -19,65 +19,44 @@ package org.apache.hadoop.ozone.debug.replicas;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Json structure for replicas to pass through each check and give output.
  */
 public class BlockVerificationResult {
 
+  private final boolean completed;
   private final boolean pass;
-  private final List<FailureDetail> failures;
+  private final List<String> failures;
 
-  public BlockVerificationResult(boolean pass, List<FailureDetail> failures) {
+  public BlockVerificationResult(boolean completed, boolean pass, List<String> failures) {
+    this.completed = completed;
     this.pass = pass;
     this.failures = failures;
   }
 
   public static BlockVerificationResult pass() {
-    return new BlockVerificationResult(true, null);
+    return new BlockVerificationResult(true, true, Collections.emptyList());
   }
 
   public static BlockVerificationResult failCheck(String message) {
-    return new BlockVerificationResult(false,
-        Collections.singletonList(new FailureDetail(true, message)));
+    return new BlockVerificationResult(true, false, Collections.singletonList(message));
   }
 
   public static BlockVerificationResult failIncomplete(String message) {
-    return new BlockVerificationResult(false,
-        Collections.singletonList(new FailureDetail(false, message)));
+    return new BlockVerificationResult(false, false, Collections.singletonList(message));
+  }
+
+  public boolean isCompleted() {
+    return completed;
   }
 
   public boolean passed() {
     return pass;
   }
 
-  public Optional<List<FailureDetail>> getFailures() {
-    return Optional.ofNullable(failures);
-  }
-
-  /**
-   * Details about the check failure.
-   */
-  public static class FailureDetail {
-    // indicates whether the check finished and failed,
-    // or it was unable to finish due to connection or other issues
-    private final boolean completed;
-    private final String message;
-
-    public FailureDetail(boolean completed, String message) {
-      this.completed = completed;
-      this.message = message;
-    }
-
-    public boolean isCompleted() {
-      return completed;
-    }
-
-    public String getFailureMessage() {
-      return message;
-    }
-
+  public List<String> getFailures() {
+    return failures;
   }
 
 }
