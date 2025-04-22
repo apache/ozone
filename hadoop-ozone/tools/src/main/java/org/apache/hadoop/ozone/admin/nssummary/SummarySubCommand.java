@@ -58,7 +58,7 @@ public class SummarySubCommand implements Callable<Void> {
       printEmptyPathRequest();
       return null;
     }
-    StringBuffer url = new StringBuffer();
+    StringBuilder url = new StringBuilder();
     url.append(parent.getReconWebAddress()).append(ENDPOINT);
 
     printNewLines(1);

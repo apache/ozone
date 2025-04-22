@@ -85,7 +85,7 @@ public class DiskUsageSubCommand implements Callable {
       printEmptyPathRequest();
       return null;
     }
-    StringBuffer url = new StringBuffer();
+    StringBuilder url = new StringBuilder();
     url.append(parent.getReconWebAddress()).append(ENDPOINT);
 
     String response = makeHttpCall(url, parseInputPath(path), listFiles,
