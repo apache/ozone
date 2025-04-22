@@ -24,11 +24,14 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEF
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
@@ -191,6 +194,10 @@ public class TestHddsClientUtils {
     assertEquals(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, address.getPort());
   }
 
+  private String getInvalidNameMessage(String invalidString) {
+    return "Did not reject invalid string [" + invalidString + "] as a name";
+  }
+
   @Test
   public void testVerifyResourceName() {
     final String validName = "my-bucket.01";
@@ -225,8 +232,38 @@ public class TestHddsClientUtils {
 
     for (String name : invalidNames) {
       assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyResourceName(name),
-          "Did not reject invalid string [" + name + "] as a name");
+          getInvalidNameMessage(name));
     }
+
+    // Message should include the name and resource type, if the name is of
+    // illegal length.
+    List<String> resourceTypes = ImmutableList.of("bucket", "volume");
+    for (int i = 0; i < 2; i++) {
+      String resType = resourceTypes.get(i);
+      String otherResType = resourceTypes.get(1 - i);
+      Throwable thrown = assertThrows(
+          IllegalArgumentException.class,
+          () -> HddsClientUtils.verifyResourceName(tooShort, resType, true),
+          getInvalidNameMessage(tooShort));
+
+      String message = thrown.getMessage();
+      assertNotNull(message);
+      assertTrue(message.contains(resType));
+      assertFalse(message.contains(otherResType));
+      assertTrue(thrown.getMessage().contains(tooShort));
+    }
+
+    // However, such names also containing unsupported characters should not be
+    // logged verbatim. This is to avoid vulnerabilities like Log4Shell.
+    final String tooShortInvalidChar = "$a";
+    Throwable thrown = assertThrows(
+        IllegalArgumentException.class,
+        () -> HddsClientUtils.verifyResourceName(tooShortInvalidChar),
+        getInvalidNameMessage(tooShortInvalidChar));
+
+    String message = thrown.getMessage();
+    assertNotNull(message);
+    assertFalse(message.contains(tooShortInvalidChar));
   }
 
   @Test
@@ -250,7 +287,7 @@ public class TestHddsClientUtils {
 
     for (String name : invalidNames) {
       assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyKeyName(name),
-          "Did not reject invalid string [" + name + "] as a name");
+          getInvalidNameMessage(name));
     }
 
     List<String> validNames = new ArrayList<>();

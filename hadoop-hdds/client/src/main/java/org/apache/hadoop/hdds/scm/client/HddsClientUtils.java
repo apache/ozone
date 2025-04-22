@@ -71,7 +71,7 @@ public final class HddsClientUtils {
     if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
         resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
       throw new IllegalArgumentException(resType +
-          " length is illegal, " + "valid length is 3-63 characters");
+          " name '" + resName + "' is of illegal length, " + "valid length is 3-63 characters");
     }
 
     if (resName.charAt(0) == '.' || resName.charAt(0) == '-') {
@@ -150,9 +150,6 @@ public final class HddsClientUtils {
    * @throws IllegalArgumentException
    */
   public static void verifyResourceName(String resName, String resType, boolean isStrictS3) {
-
-    doNameChecks(resName, resType);
-
     boolean isIPv4 = true;
     char prev = (char) 0;
 
@@ -169,6 +166,8 @@ public final class HddsClientUtils {
       throw new IllegalArgumentException(resType +
           " name cannot be an IPv4 address or all numeric");
     }
+
+    doNameChecks(resName, resType);
   }
 
   /**
