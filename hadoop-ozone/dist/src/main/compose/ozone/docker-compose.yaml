@@ -28,7 +28,31 @@ x-replication:
   OZONE-SITE.XML_ozone.server.default.replication: ${OZONE_REPLICATION_FACTOR:-1}
 
 services:
-  datanode:
+  datanode1:
+    <<: *common-config
+    ports:
+      - 19864
+      - 9882
+    environment:
+      <<: *replication
+      OZONE_OPTS:
+    command: [ "ozone","datanode" ]
+    env_file:
+      - docker-config
+      - docker-config-datanode1
+  datanode2:
+    <<: *common-config
+    ports:
+      - 19864
+      - 9882
+    environment:
+        <<: *replication
+        OZONE_OPTS:
+    command: [ "ozone","datanode" ]
+    env_file:
+      - docker-config
+      - docker-config-datanode2
+  datanode3:
     <<: *common-config
     ports:
       - 19864
@@ -37,6 +61,9 @@ services:
       <<: *replication
       OZONE_OPTS:
     command: ["ozone","datanode"]
+    env_file:
+      - docker-config
+      - docker-config-datanode3
   om:
     <<: *common-config
     environment:
