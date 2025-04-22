@@ -94,10 +94,6 @@ public final class OmLCRule {
    * @return the expiration action if present, null otherwise
    */
   public OmLCExpiration getExpiration() {
-    if (actions == null || actions.isEmpty()) {
-      return null;
-    }
-
     for (OmLCAction action : actions) {
       if (action instanceof OmLCExpiration) {
         return (OmLCExpiration) action;
@@ -226,8 +222,10 @@ public final class OmLCRule {
       return filter;
     }
 
-    public OmLCRule build() {
-      return new OmLCRule(this);
+    public OmLCRule build() throws OMException {
+      OmLCRule omLCRule = new OmLCRule(this);
+      omLCRule.valid();
+      return omLCRule;
     }
   }
 }

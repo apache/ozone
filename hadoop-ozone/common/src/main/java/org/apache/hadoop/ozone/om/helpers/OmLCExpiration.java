@@ -130,8 +130,10 @@ public final class OmLCExpiration implements OmLCAction {
       return this;
     }
 
-    public OmLCExpiration build() {
-      return new OmLCExpiration(this);
+    public OmLCExpiration build() throws OMException {
+      OmLCExpiration omLCExpiration = new OmLCExpiration(this);
+      omLCExpiration.valid();
+      return omLCExpiration;
     }
   }
 }

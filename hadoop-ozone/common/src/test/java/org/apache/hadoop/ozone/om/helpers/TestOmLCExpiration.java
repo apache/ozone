@@ -31,135 +31,113 @@ class TestOmLCExpiration {
 
   @Test
   public void testCreateValidOmLCExpiration() {
-    OmLCExpiration exp1 = new OmLCExpiration.Builder()
-        .setDays(30)
-        .build();
-    assertDoesNotThrow(exp1::valid);
+    OmLCExpiration.Builder exp1 = new OmLCExpiration.Builder()
+        .setDays(30);
+    assertDoesNotThrow(exp1::build);
 
-    OmLCExpiration exp2 = new OmLCExpiration.Builder()
-        .setDate("2099-10-10T00:00:00Z")
-        .build();
-    assertDoesNotThrow(exp2::valid);
+    OmLCExpiration.Builder exp2 = new OmLCExpiration.Builder()
+        .setDate("2099-10-10T00:00:00Z");
+    assertDoesNotThrow(exp2::build);
 
-    OmLCExpiration exp3 = new OmLCExpiration.Builder()
-        .setDays(1)
-        .build();
-    assertDoesNotThrow(exp3::valid);
+    OmLCExpiration.Builder exp3 = new OmLCExpiration.Builder()
+        .setDays(1);
+    assertDoesNotThrow(exp3::build);
 
-    OmLCExpiration exp4 = new OmLCExpiration.Builder()
-        .setDate("2099-12-31T00:00:00Z")
-        .build();
-    assertDoesNotThrow(exp4::valid);
+    OmLCExpiration.Builder exp4 = new OmLCExpiration.Builder()
+        .setDate("2099-12-31T00:00:00Z");
+    assertDoesNotThrow(exp4::build);
 
-    OmLCExpiration exp5 = new OmLCExpiration.Builder()
-        .setDate("2099-02-15T00:00:00.000Z")
-        .build();
-    assertDoesNotThrow(exp5::valid);
+    OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder()
+        .setDate("2099-02-15T00:00:00.000Z");
+    assertDoesNotThrow(exp5::build);
   }
 
   @Test
   public void testCreateInValidOmLCExpiration() {
-    OmLCExpiration exp1 = new OmLCExpiration.Builder()
+    OmLCExpiration.Builder exp1 = new OmLCExpiration.Builder()
         .setDays(30)
-        .setDate(getFutureDateString(100))
-        .build();
-    assertOMException(exp1::valid, INVALID_REQUEST,
+        .setDate(getFutureDateString(100));
+    assertOMException(exp1::build, INVALID_REQUEST,
         "Either 'days' or 'date' should be specified, but not both or neither.");
 
-    OmLCExpiration exp2 = new OmLCExpiration.Builder()
-        .setDays(-1)
-        .build();
-    assertOMException(exp2::valid, INVALID_REQUEST,
+    OmLCExpiration.Builder exp2 = new OmLCExpiration.Builder()
+        .setDays(-1);
+    assertOMException(exp2::build, INVALID_REQUEST,
         "'Days' for Expiration action must be a positive integer");
 
-    OmLCExpiration exp3 = new OmLCExpiration.Builder()
-        .setDate(null)
-        .build();
-    assertOMException(exp3::valid, INVALID_REQUEST,
+    OmLCExpiration.Builder exp3 = new OmLCExpiration.Builder()
+        .setDate(null);
+    assertOMException(exp3::build, INVALID_REQUEST,
         "Either 'days' or 'date' should be specified, but not both or neither.");
 
-    OmLCExpiration exp4 = new OmLCExpiration.Builder()
-        .setDate("")
-        .build();
-    assertOMException(exp4::valid, INVALID_REQUEST,
+    OmLCExpiration.Builder exp4 = new OmLCExpiration.Builder()
+        .setDate("");
+    assertOMException(exp4::build, INVALID_REQUEST,
         "Either 'days' or 'date' should be specified, but not both or neither.");
 
-    OmLCExpiration exp5 = new OmLCExpiration.Builder()
-        .build();
-    assertOMException(exp5::valid, INVALID_REQUEST,
+    OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder();
+    assertOMException(exp5::build, INVALID_REQUEST,
         "Either 'days' or 'date' should be specified, but not both or neither.");
 
-    OmLCExpiration exp6 = new OmLCExpiration.Builder()
-        .setDate("10-10-2099")
-        .build();
-    assertOMException(exp6::valid, INVALID_REQUEST,
+    OmLCExpiration.Builder exp6 = new OmLCExpiration.Builder()
+        .setDate("10-10-2099");
+    assertOMException(exp6::build, INVALID_REQUEST,
         "'Date' must be in ISO 8601 format");
 
-    OmLCExpiration exp7 = new OmLCExpiration.Builder()
-        .setDate("2099-12-31T00:00:00")
-        .build();
-    assertOMException(exp7::valid, INVALID_REQUEST,
+    OmLCExpiration.Builder exp7 = new OmLCExpiration.Builder()
+        .setDate("2099-12-31T00:00:00");
+    assertOMException(exp7::build, INVALID_REQUEST,
         "'Date' must be in ISO 8601 format");
 
     // Testing for date in the past
-    OmLCExpiration exp8 = new OmLCExpiration.Builder()
-        .setDate(getFutureDateString(-1))
-        .build();
-    assertOMException(exp8::valid, INVALID_REQUEST,
+    OmLCExpiration.Builder exp8 = new OmLCExpiration.Builder()
+        .setDate(getFutureDateString(-1));
+    assertOMException(exp8::build, INVALID_REQUEST,
         "'Date' must be in the future");
 
-    OmLCExpiration exp9 = new OmLCExpiration.Builder()
-        .setDays(0)
-        .build();
-    assertOMException(exp9::valid, INVALID_REQUEST,
+    OmLCExpiration.Builder exp9 = new OmLCExpiration.Builder()
+        .setDays(0);
+    assertOMException(exp9::build, INVALID_REQUEST,
         "Either 'days' or 'date' should be specified, but not both or neither.");
 
     // 1 minute ago
-    OmLCExpiration exp10 = new OmLCExpiration.Builder()
-        .setDate(getFutureDateString(0, 0, -1))
-        .build();
-    assertOMException(exp10::valid, INVALID_REQUEST,
+    OmLCExpiration.Builder exp10 = new OmLCExpiration.Builder()
+        .setDate(getFutureDateString(0, 0, -1));
+    assertOMException(exp10::build, INVALID_REQUEST,
         "'Date' must be in the future");
   }
 
   @Test
   public void testDateMustBeAtMidnightUTC() {
     // Acceptable date - midnight UTC
-    OmLCExpiration validExp = new OmLCExpiration.Builder()
-        .setDate("2099-10-10T00:00:00Z")
-        .build();
-    assertDoesNotThrow(validExp::valid);
+    OmLCExpiration.Builder validExp = new OmLCExpiration.Builder()
+        .setDate("2099-10-10T00:00:00Z");
+    assertDoesNotThrow(validExp::build);
 
     // Non-midnight UTC dates should be rejected
-    OmLCExpiration exp1 = new OmLCExpiration.Builder()
-        .setDate("2099-10-10T10:00:00Z")
-        .build();
-    assertOMException(exp1::valid, INVALID_REQUEST, "'Date' must be at midnight GMT");
+    OmLCExpiration.Builder exp1 = new OmLCExpiration.Builder()
+        .setDate("2099-10-10T10:00:00Z");
+    assertOMException(exp1::build, INVALID_REQUEST, "'Date' must be at midnight GMT");
 
-    OmLCExpiration exp2 = new OmLCExpiration.Builder()
-        .setDate("2099-10-10T00:30:00Z")
-        .build();
-    assertOMException(exp2::valid, INVALID_REQUEST, "'Date' must be at midnight GMT");
+    OmLCExpiration.Builder exp2 = new OmLCExpiration.Builder()
+        .setDate("2099-10-10T00:30:00Z");
+    assertOMException(exp2::build, INVALID_REQUEST, "'Date' must be at midnight GMT");
 
-    OmLCExpiration exp3 = new OmLCExpiration.Builder()
-        .setDate("2099-10-10T00:00:30Z")
-        .build();
-    assertOMException(exp3::valid, INVALID_REQUEST, "'Date' must be at midnight GMT");
+    OmLCExpiration.Builder exp3 = new OmLCExpiration.Builder()
+        .setDate("2099-10-10T00:00:30Z");
+    assertOMException(exp3::build, INVALID_REQUEST, "'Date' must be at midnight GMT");
 
-    OmLCExpiration exp4 = new OmLCExpiration.Builder()
-        .setDate("2099-10-10T00:00:00.123Z")
-        .build();
-    assertOMException(exp4::valid, INVALID_REQUEST, "'Date' must be at midnight GMT");
+    OmLCExpiration.Builder exp4 = new OmLCExpiration.Builder()
+        .setDate("2099-10-10T00:00:00.123Z");
+    assertOMException(exp4::build, INVALID_REQUEST, "'Date' must be at midnight GMT");
 
     // Non-UTC timezone should be rejected
-    OmLCExpiration exp5 = new OmLCExpiration.Builder()
-        .setDate("2099-10-10T00:00:00+01:00")
-        .build();
-    assertOMException(exp5::valid, INVALID_REQUEST, "'Date' must be at midnight GMT");
+    OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder()
+        .setDate("2099-10-10T00:00:00+01:00");
+    assertOMException(exp5::build, INVALID_REQUEST, "'Date' must be at midnight GMT");
 
-    OmLCExpiration exp8 = new OmLCExpiration.Builder()
-        .setDate("2099-10-10T00:00:00")
-        .build();
-    assertOMException(exp8::valid, INVALID_REQUEST, "ISO 8601 format");
+    OmLCExpiration.Builder exp8 = new OmLCExpiration.Builder()
+        .setDate("2099-10-10T00:00:00");
+    assertOMException(exp8::build, INVALID_REQUEST, "ISO 8601 format");
   }
 }

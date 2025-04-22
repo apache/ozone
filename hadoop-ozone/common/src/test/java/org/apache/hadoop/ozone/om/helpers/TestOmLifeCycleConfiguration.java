@@ -18,12 +18,10 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.VALID_OM_LC_AND_OPERATOR;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getFutureDateString;
-import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperator;
-import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCFilter;
-import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCRule;
+import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperatorBuilder;
+import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCFilterBuilder;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLifecycleConfiguration;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -42,7 +41,7 @@ import org.junit.jupiter.api.Test;
 public class TestOmLifeCycleConfiguration {
 
   @Test
-  public void testCreateValidLCConfiguration() {
+  public void testCreateValidLCConfiguration() throws OMException {
     OmLifecycleConfiguration lcc = new OmLifecycleConfiguration.Builder()
         .setVolume("s3v")
         .setBucket("spark")
@@ -59,7 +58,7 @@ public class TestOmLifeCycleConfiguration {
   }
 
   @Test
-  public void testCreateInValidLCConfiguration() {
+  public void testCreateInValidLCConfiguration() throws OMException {
     OmLCRule rule = new OmLCRule.Builder()
         .setId("spark logs")
         .setAction(new OmLCExpiration.Builder().setDays(30).build())
@@ -67,18 +66,18 @@ public class TestOmLifeCycleConfiguration {
 
     List<OmLCRule> rules = Collections.singletonList(rule);
 
-    OmLifecycleConfiguration lcc0 = getOmLifecycleConfiguration(null, "bucket", "owner", rules);
-    assertOMException(lcc0::valid, INVALID_REQUEST, "Volume cannot be blank");
+    OmLifecycleConfiguration.Builder lcc0 = getOmLifecycleConfiguration(null, "bucket", "owner", rules);
+    assertOMException(lcc0::build, INVALID_REQUEST, "Volume cannot be blank");
 
-    OmLifecycleConfiguration lcc1 = getOmLifecycleConfiguration("volume", null, "owner", rules);
-    assertOMException(lcc1::valid, INVALID_REQUEST, "Bucket cannot be blank");
+    OmLifecycleConfiguration.Builder lcc1 = getOmLifecycleConfiguration("volume", null, "owner", rules);
+    assertOMException(lcc1::build, INVALID_REQUEST, "Bucket cannot be blank");
 
-    OmLifecycleConfiguration lcc2 = getOmLifecycleConfiguration("volume", "bucket", null, rules);
-    assertOMException(lcc2::valid, INVALID_REQUEST, "Owner cannot be blank");
+    OmLifecycleConfiguration.Builder lcc2 = getOmLifecycleConfiguration("volume", "bucket", null, rules);
+    assertOMException(lcc2::build, INVALID_REQUEST, "Owner cannot be blank");
 
-    OmLifecycleConfiguration lcc3 = getOmLifecycleConfiguration(
+    OmLifecycleConfiguration.Builder lcc3 = getOmLifecycleConfiguration(
         "volume", "bucket", "owner", Collections.emptyList());
-    assertOMException(lcc3::valid, INVALID_REQUEST,
+    assertOMException(lcc3::build, INVALID_REQUEST,
         "At least one rules needs to be specified in a lifecycle configuration");
 
     List<OmLCRule> rules4 = new ArrayList<>(
@@ -90,39 +89,13 @@ public class TestOmLifeCycleConfiguration {
           .build();
       rules4.add(r);
     }
-    OmLifecycleConfiguration lcc4 = getOmLifecycleConfiguration("volume", "bucket", "owner", rules4);
-    assertOMException(lcc4::valid, INVALID_REQUEST,
+    OmLifecycleConfiguration.Builder lcc4 = getOmLifecycleConfiguration("volume", "bucket", "owner", rules4);
+    assertOMException(lcc4::build, INVALID_REQUEST,
         "The number of lifecycle rules must not exceed the allowed limit of");
-
-    List<OmLCRule> rules5 = rules4.subList(0, rules4.size() - 2);
-    // last rule is invalid.
-    rules5.add(new OmLCRule.Builder().build());
-  }
-
-
-  @Test
-  public void testInValidFilterInLCConfiguration() {
-    OmLCFilter invalidLCFilter = getOmLCFilter("prefix", Pair.of("key", "value"), VALID_OM_LC_AND_OPERATOR);
-    OmLCRule rule1 = getOmLCRule("id", null, true, 1, invalidLCFilter);
-    OmLifecycleConfiguration lcc0 =
-        getOmLifecycleConfiguration("volume", "bucket", "owner", Collections.singletonList(rule1));
-    assertOMException(lcc0::valid, INVALID_REQUEST,
-        "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
   }
 
   @Test
-  public void testInValidAndOperatorInLCConfiguration() {
-    OmLifecycleRuleAndOperator invalidAndOperator = getOmLCAndOperator("prefix", null);
-    OmLCFilter invalidLCFilter = getOmLCFilter(null, null, invalidAndOperator);
-    OmLCRule rule1 = getOmLCRule("id", null, true, 1, invalidLCFilter);
-    OmLifecycleConfiguration lcc0 =
-        getOmLifecycleConfiguration("volume", "bucket", "owner", Collections.singletonList(rule1));
-    assertOMException(lcc0::valid, INVALID_REQUEST,
-        "'Prefix' alone is not allowed");
-  }
-
-  @Test
-  public void testToBuilder() {
+  public void testToBuilder() throws OMException {
     String volume = "test-volume";
     String bucket = "test-bucket";
     String owner = "test-owner";
@@ -166,7 +139,7 @@ public class TestOmLifeCycleConfiguration {
   }
 
   @Test
-  public void testComplexLifecycleConfiguration() {
+  public void testComplexLifecycleConfiguration() throws OMException {
     List<OmLCRule> rules = new ArrayList<>();
 
     // Rule 1: Simple expiration by days with prefix
@@ -181,7 +154,7 @@ public class TestOmLifeCycleConfiguration {
     rules.add(new OmLCRule.Builder()
         .setId("rule2")
         .setEnabled(true)
-        .setFilter(getOmLCFilter(null, Pair.of("temporary", "true"), null))
+        .setFilter(getOmLCFilterBuilder(null, Pair.of("temporary", "true"), null).build())
         .setAction(new OmLCExpiration.Builder()
             .setDate(getFutureDateString(100))
             .build())
@@ -191,9 +164,11 @@ public class TestOmLifeCycleConfiguration {
     rules.add(new OmLCRule.Builder()
         .setId("rule3")
         .setEnabled(true)
-        .setFilter(getOmLCFilter(null, null,
-            getOmLCAndOperator("/backups/",
-                ImmutableMap.of("tier", "archive", "retention", "short"))))
+        .setFilter(getOmLCFilterBuilder(null, null,
+            getOmLCAndOperatorBuilder("/backups/",
+                ImmutableMap.of("tier", "archive", "retention", "short"))
+                .build())
+            .build())
         .setAction(new OmLCExpiration.Builder().setDays(365).build())
         .build());
 
@@ -209,7 +184,7 @@ public class TestOmLifeCycleConfiguration {
   }
 
   @Test
-  public void testDisabledRule() {
+  public void testDisabledRule() throws OMException {
     OmLCRule rule = new OmLCRule.Builder()
         .setId("disabled-rule")
         .setEnabled(false) // Explicitly disabled

@@ -110,8 +110,10 @@ public final class OmLifecycleRuleAndOperator {
       return this;
     }
 
-    public OmLifecycleRuleAndOperator build() {
-      return new OmLifecycleRuleAndOperator(this);
+    public OmLifecycleRuleAndOperator build() throws OMException {
+      OmLifecycleRuleAndOperator omLifecycleRuleAndOperator = new OmLifecycleRuleAndOperator(this);
+      omLifecycleRuleAndOperator.valid();
+      return omLifecycleRuleAndOperator;
     }
   }
 

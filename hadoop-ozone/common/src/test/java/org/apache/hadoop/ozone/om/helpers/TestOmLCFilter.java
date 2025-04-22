@@ -21,11 +21,12 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.VALID_OM_LC_AND_OPERATOR;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.VALID_OM_LC_FILTER;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
-import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCFilter;
-import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCRule;
+import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCFilterBuilder;
+import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCRuleBuilder;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -34,48 +35,48 @@ import org.junit.jupiter.api.Test;
 class TestOmLCFilter {
 
   @Test
-  public void testInValidOmLCRulePrefixFilterCoExist() {
-    OmLCRule rule1 = getOmLCRule("id", "prefix", true, 1, VALID_OM_LC_FILTER);
-    assertOMException(rule1::valid, INVALID_REQUEST, "Filter and Prefix cannot be used together");
+  public void testInValidOmLCRulePrefixFilterCoExist() throws OMException {
+    OmLCRule.Builder rule1 = getOmLCRuleBuilder("id", "prefix", true, 1, VALID_OM_LC_FILTER);
+    assertOMException(rule1::build, INVALID_REQUEST, "Filter and Prefix cannot be used together");
 
-    OmLCRule rule2 = getOmLCRule("id", "", true, 1, VALID_OM_LC_FILTER);
-    assertOMException(rule2::valid, INVALID_REQUEST, "Filter and Prefix cannot be used together");
+    OmLCRule.Builder rule2 = getOmLCRuleBuilder("id", "", true, 1, VALID_OM_LC_FILTER);
+    assertOMException(rule2::build, INVALID_REQUEST, "Filter and Prefix cannot be used together");
   }
 
   @Test
-  public void testValidFilter() {
-    OmLCFilter lcFilter1 = getOmLCFilter("prefix", null, null);
+  public void testValidFilter() throws OMException {
+    OmLCFilter lcFilter1 = getOmLCFilterBuilder("prefix", null, null).build();
     assertDoesNotThrow(lcFilter1::valid);
 
-    OmLCFilter lcFilter2 = getOmLCFilter(null, Pair.of("key", "value"), null);
+    OmLCFilter lcFilter2 = getOmLCFilterBuilder(null, Pair.of("key", "value"), null).build();
     assertDoesNotThrow(lcFilter2::valid);
 
-    OmLCFilter lcFilter3 = getOmLCFilter(null, null, VALID_OM_LC_AND_OPERATOR);
+    OmLCFilter lcFilter3 = getOmLCFilterBuilder(null, null, VALID_OM_LC_AND_OPERATOR).build();
     assertDoesNotThrow(lcFilter3::valid);
 
-    OmLCFilter lcFilter4 = getOmLCFilter(null, null, null);
+    OmLCFilter lcFilter4 = getOmLCFilterBuilder(null, null, null).build();
     assertDoesNotThrow(lcFilter4::valid);
 
-    OmLCFilter lcFilter5 = getOmLCFilter("", null, null);
+    OmLCFilter lcFilter5 = getOmLCFilterBuilder("", null, null).build();
     assertDoesNotThrow(lcFilter5::valid);
   }
 
   @Test
   public void testInValidFilter() {
-    OmLCFilter lcFilter1 = getOmLCFilter("prefix", Pair.of("key", "value"), VALID_OM_LC_AND_OPERATOR);
-    assertOMException(lcFilter1::valid, INVALID_REQUEST,
+    OmLCFilter.Builder lcFilter1 = getOmLCFilterBuilder("prefix", Pair.of("key", "value"), VALID_OM_LC_AND_OPERATOR);
+    assertOMException(lcFilter1::build, INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
-    OmLCFilter lcFilter2 = getOmLCFilter("prefix", Pair.of("key", "value"), null);
-    assertOMException(lcFilter2::valid, INVALID_REQUEST,
+    OmLCFilter.Builder lcFilter2 = getOmLCFilterBuilder("prefix", Pair.of("key", "value"), null);
+    assertOMException(lcFilter2::build, INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
-    OmLCFilter lcFilter3 = getOmLCFilter("prefix", null, VALID_OM_LC_AND_OPERATOR);
-    assertOMException(lcFilter3::valid, INVALID_REQUEST,
+    OmLCFilter.Builder lcFilter3 = getOmLCFilterBuilder("prefix", null, VALID_OM_LC_AND_OPERATOR);
+    assertOMException(lcFilter3::build, INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
-    OmLCFilter lcFilter4 = getOmLCFilter(null, Pair.of("key", "value"), VALID_OM_LC_AND_OPERATOR);
-    assertOMException(lcFilter4::valid, INVALID_REQUEST,
+    OmLCFilter.Builder lcFilter4 = getOmLCFilterBuilder(null, Pair.of("key", "value"), VALID_OM_LC_AND_OPERATOR);
+    assertOMException(lcFilter4::build, INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
   }

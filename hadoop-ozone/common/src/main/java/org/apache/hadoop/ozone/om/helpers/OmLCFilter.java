@@ -118,8 +118,10 @@ public final class OmLCFilter {
       return this;
     }
 
-    public OmLCFilter build() {
-      return new OmLCFilter(this);
+    public OmLCFilter build() throws OMException {
+      OmLCFilter omLCFilter = new OmLCFilter(this);
+      omLCFilter.valid();
+      return omLCFilter;
     }
   }
 

@@ -20,9 +20,8 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
-import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getFutureDateString;
-import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperator;
-import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCFilter;
+import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperatorBuilder;
+import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCFilterBuilder;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,6 +33,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -42,39 +42,36 @@ import org.junit.jupiter.api.Test;
 class TestOmLCRule {
 
   @Test
-  public void testCreateValidOmLCRule() {
+  public void testCreateValidOmLCRule() throws OMException {
     OmLCExpiration exp = new OmLCExpiration.Builder()
         .setDays(30)
         .build();
 
-    OmLCRule r1 = new OmLCRule.Builder()
+    OmLCRule.Builder r1 = new OmLCRule.Builder()
         .setId("remove Spark logs after 30 days")
         .setEnabled(true)
         .setPrefix("/spark/logs")
-        .setAction(exp)
-        .build();
-    assertDoesNotThrow(r1::valid);
+        .setAction(exp);
+    assertDoesNotThrow(r1::build);
 
-    OmLCRule r2 = new OmLCRule.Builder()
+    OmLCRule.Builder r2 = new OmLCRule.Builder()
         .setEnabled(true)
         .setPrefix("")
-        .setAction(exp)
-        .build();
-    assertDoesNotThrow(r2::valid);
+        .setAction(exp);
+    assertDoesNotThrow(r2::build);
 
     // Empty id should generate a 48 (default) bit one.
-    OmLCRule r3 = new OmLCRule.Builder()
+    OmLCRule.Builder r3 = new OmLCRule.Builder()
         .setEnabled(true)
-        .setAction(exp)
-        .build();
+        .setAction(exp);
 
-    assertDoesNotThrow(r3::valid);
-    assertEquals(OmLCRule.LC_ID_LENGTH, r3.getId().length(),
+    OmLCRule omLCRule = assertDoesNotThrow(r3::build);
+    assertEquals(OmLCRule.LC_ID_LENGTH, omLCRule.getId().length(),
         "Expected a " + OmLCRule.LC_ID_LENGTH + " length generated ID");
   }
 
   @Test
-  public void testCreateInValidOmLCRule() {
+  public void testCreateInValidOmLCRule() throws OMException {
     OmLCExpiration exp = new OmLCExpiration.Builder()
         .setDays(30)
         .build();
@@ -82,46 +79,22 @@ class TestOmLCRule {
     char[] id = new char[OmLCRule.LC_ID_MAX_LENGTH + 1];
     Arrays.fill(id, 'a');
 
-    OmLCRule r1 = new OmLCRule.Builder()
+    OmLCRule.Builder r1 = new OmLCRule.Builder()
         .setId(new String(id))
-        .setAction(exp)
-        .build();
-    assertOMException(r1::valid, INVALID_REQUEST, "ID length should not exceed allowed limit of 255");
+        .setAction(exp);
+    assertOMException(r1::build, INVALID_REQUEST, "ID length should not exceed allowed limit of 255");
 
-    OmLCRule r2 = new OmLCRule.Builder()
+    OmLCRule.Builder r2 = new OmLCRule.Builder()
         .setId("remove Spark logs after 30 days")
         .setEnabled(true)
         .setPrefix("/spark/logs")
-        .setAction(null)
-        .build();
-    assertOMException(r2::valid, INVALID_REQUEST,
+        .setAction(null);
+    assertOMException(r2::build, INVALID_REQUEST,
         "At least one action needs to be specified in a rule");
-
-    OmLCRule r3 = new OmLCRule.Builder()
-        .setId("remove Spark logs after 30 days")
-        .setEnabled(true)
-        .setPrefix("/spark/logs")
-        .setAction(new OmLCExpiration.Builder()
-            .setDays(30)
-            .setDate(getFutureDateString(100))
-            .build())
-        .build();
-    assertOMException(r3::valid, INVALID_REQUEST,
-        "Either 'days' or 'date' should be specified, but not both or neither.");
-
-    OmLCFilter invalidFilter = getOmLCFilter("prefix", Pair.of("key", "value"), null);
-    OmLCRule r5 = new OmLCRule.Builder()
-        .setId("invalid-filter-rule")
-        .setEnabled(true)
-        .setFilter(invalidFilter)
-        .setAction(new OmLCExpiration.Builder().setDays(30).build())
-        .build();
-    assertOMException(r5::valid, INVALID_REQUEST,
-        "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
   }
 
   @Test
-  public void testMultipleActionsInRule() {
+  public void testMultipleActionsInRule() throws OMException {
     OmLCExpiration expiration1 = new OmLCExpiration.Builder()
         .setDays(30)
         .build();
@@ -137,47 +110,45 @@ class TestOmLCRule {
     OmLCRule.Builder builder = new OmLCRule.Builder();
     builder.setId("test-rule");
 
-    OmLCRule rule = builder.setActions(actions).build();
+    OmLCRule.Builder rule = builder.setActions(actions);
 
-    assertOMException(rule::valid, INVALID_REQUEST, "A rule can have at most one Expiration action");
+    assertOMException(rule::build, INVALID_REQUEST, "A rule can have at most one Expiration action");
   }
 
   @Test
-  public void testRuleWithAndOperatorFilter() {
+  public void testRuleWithAndOperatorFilter() throws OMException {
     Map<String, String> tags = ImmutableMap.of("app", "hadoop", "env", "test");
-    OmLifecycleRuleAndOperator andOperator = getOmLCAndOperator("/logs/", tags);
-    OmLCFilter filter = getOmLCFilter(null, null, andOperator);
+    OmLifecycleRuleAndOperator andOperator = getOmLCAndOperatorBuilder("/logs/", tags).build();
+    OmLCFilter filter = getOmLCFilterBuilder(null, null, andOperator).build();
 
-    OmLCRule rule = new OmLCRule.Builder()
+    OmLCRule.Builder builder = new OmLCRule.Builder()
         .setId("and-operator-rule")
         .setEnabled(true)
         .setFilter(filter)
-        .setAction(new OmLCExpiration.Builder().setDays(30).build())
-        .build();
+        .setAction(new OmLCExpiration.Builder().setDays(30).build());
 
-    assertDoesNotThrow(rule::valid);
+    OmLCRule rule = assertDoesNotThrow(builder::build);
     assertTrue(rule.isPrefixEnable());
     assertTrue(rule.isTagEnable());
   }
 
   @Test
-  public void testRuleWithTagFilter() {
-    OmLCFilter filter = getOmLCFilter(null, Pair.of("app", "hadoop"), null);
+  public void testRuleWithTagFilter() throws OMException {
+    OmLCFilter filter = getOmLCFilterBuilder(null, Pair.of("app", "hadoop"), null).build();
 
-    OmLCRule rule = new OmLCRule.Builder()
+    OmLCRule.Builder builder = new OmLCRule.Builder()
         .setId("tag-filter-rule")
         .setEnabled(true)
         .setFilter(filter)
-        .setAction(new OmLCExpiration.Builder().setDays(30).build())
-        .build();
+        .setAction(new OmLCExpiration.Builder().setDays(30).build());
 
-    assertDoesNotThrow(rule::valid);
+    OmLCRule rule = assertDoesNotThrow(builder::build);
     assertFalse(rule.isPrefixEnable());
     assertTrue(rule.isTagEnable());
   }
 
   @Test
-  public void testDuplicateRuleIDs() {
+  public void testDuplicateRuleIDs() throws OMException {
     List<OmLCRule> rules = new ArrayList<>();
 
     rules.add(new OmLCRule.Builder()
@@ -190,13 +161,12 @@ class TestOmLCRule {
         .setAction(new OmLCExpiration.Builder().setDays(60).build())
         .build());
 
-    OmLifecycleConfiguration config = new OmLifecycleConfiguration.Builder()
+    OmLifecycleConfiguration.Builder config = new OmLifecycleConfiguration.Builder()
         .setVolume("volume")
         .setBucket("bucket")
         .setOwner("owner")
-        .setRules(rules)
-        .build();
+        .setRules(rules);
 
-    assertOMException(config::valid, INVALID_REQUEST, "Duplicate rule IDs found");
+    assertOMException(config::build, INVALID_REQUEST, "Duplicate rule IDs found");
   }
 }

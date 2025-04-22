@@ -19,11 +19,12 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
-import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperator;
+import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperatorBuilder;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -32,19 +33,21 @@ import org.junit.jupiter.api.Test;
 class TestOmLifecycleRuleAndOperator {
 
   @Test
-  public void testValidAndOperator() {
-    OmLifecycleRuleAndOperator andOperator1 = getOmLCAndOperator("prefix", Collections.singletonMap("tag1", "value1"));
+  public void testValidAndOperator() throws OMException {
+    OmLifecycleRuleAndOperator andOperator1 =
+        getOmLCAndOperatorBuilder("prefix", Collections.singletonMap("tag1", "value1")).build();
     assertDoesNotThrow(andOperator1::valid);
 
-    OmLifecycleRuleAndOperator andOperator2 = getOmLCAndOperator("", Collections.singletonMap("tag1", "value1"));
+    OmLifecycleRuleAndOperator andOperator2 =
+        getOmLCAndOperatorBuilder("", Collections.singletonMap("tag1", "value1")).build();
     assertDoesNotThrow(andOperator2::valid);
 
-    OmLifecycleRuleAndOperator andOperator3 =
-        getOmLCAndOperator("prefix", ImmutableMap.of("tag1", "value1", "tag2", "value2"));
+    OmLifecycleRuleAndOperator andOperator3 = getOmLCAndOperatorBuilder(
+        "prefix", ImmutableMap.of("tag1", "value1", "tag2", "value2")).build();
     assertDoesNotThrow(andOperator3::valid);
 
-    OmLifecycleRuleAndOperator andOperator4 = getOmLCAndOperator(
-        null, ImmutableMap.of("tag1", "value1", "tag2", "value2"));
+    OmLifecycleRuleAndOperator andOperator4 = getOmLCAndOperatorBuilder(
+        null, ImmutableMap.of("tag1", "value1", "tag2", "value2")).build();
     assertDoesNotThrow(andOperator4::valid);
 
 
@@ -52,15 +55,16 @@ class TestOmLifecycleRuleAndOperator {
 
   @Test
   public void testInValidAndOperator() {
-    OmLifecycleRuleAndOperator andOperator1 = getOmLCAndOperator("prefix", null);
-    assertOMException(andOperator1::valid, INVALID_REQUEST, "'Prefix' alone is not allowed");
+    OmLifecycleRuleAndOperator.Builder andOperator1 = getOmLCAndOperatorBuilder("prefix", null);
+    assertOMException(andOperator1::build, INVALID_REQUEST, "'Prefix' alone is not allowed");
 
-    OmLifecycleRuleAndOperator andOperator2 = getOmLCAndOperator(null, Collections.singletonMap("tag1", "value1"));
-    assertOMException(andOperator2::valid, INVALID_REQUEST,
+    OmLifecycleRuleAndOperator.Builder andOperator2 =
+        getOmLCAndOperatorBuilder(null, Collections.singletonMap("tag1", "value1"));
+    assertOMException(andOperator2::build, INVALID_REQUEST,
         "If 'Tags' are specified without 'Prefix', there should be more than one tag");
 
-    OmLifecycleRuleAndOperator andOperator3 = getOmLCAndOperator(null, null);
-    assertOMException(andOperator3::valid, INVALID_REQUEST, "Either 'Tags' or 'Prefix' must be specified.");
+    OmLifecycleRuleAndOperator.Builder andOperator3 = getOmLCAndOperatorBuilder(null, null);
+    assertOMException(andOperator3::build, INVALID_REQUEST, "Either 'Tags' or 'Prefix' must be specified.");
   }
 
 }

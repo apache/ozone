@@ -36,9 +36,18 @@ import org.junit.jupiter.api.function.Executable;
  */
 public final class OMLCUtils {
 
-  public static final OmLCFilter VALID_OM_LC_FILTER = getOmLCFilter("prefix", null, null);
-  public static final OmLifecycleRuleAndOperator VALID_OM_LC_AND_OPERATOR =
-      getOmLCAndOperator("prefix", Collections.singletonMap("tag1", "value1"));
+  public static final OmLCFilter VALID_OM_LC_FILTER;
+  public static final OmLifecycleRuleAndOperator VALID_OM_LC_AND_OPERATOR;
+
+  static {
+    try {
+      VALID_OM_LC_FILTER = getOmLCFilterBuilder("prefix", null, null).build();
+      VALID_OM_LC_AND_OPERATOR =
+          getOmLCAndOperatorBuilder("prefix", Collections.singletonMap("tag1", "value1")).build();
+    } catch (OMException e) {
+      throw new RuntimeException(e);
+    }
+  }
 
   public static void assertOMException(Executable action, OMException.ResultCodes expectedResultCode,
       String expectedMessageContent) {
@@ -68,17 +77,17 @@ public final class OMLCUtils {
         .format(DateTimeFormatter.ISO_DATE_TIME);
   }
 
-  public static OmLifecycleConfiguration getOmLifecycleConfiguration(
+  public static OmLifecycleConfiguration.Builder getOmLifecycleConfiguration(
       String volume, String bucket, String owner, List<OmLCRule> rules) {
     return new OmLifecycleConfiguration.Builder()
         .setVolume(volume)
         .setBucket(bucket)
         .setOwner(owner)
-        .setRules(rules)
-        .build();
+        .setRules(rules);
   }
 
-  public static OmLCRule getOmLCRule(String id, String prefix, boolean enabled, int expirationDays, OmLCFilter filter) {
+  public static OmLCRule.Builder getOmLCRuleBuilder(String id, String prefix, boolean enabled,
+                                                    int expirationDays, OmLCFilter filter) throws OMException {
     OmLCRule.Builder rBuilder = new OmLCRule.Builder()
         .setEnabled(enabled)
         .setId(id)
@@ -90,25 +99,25 @@ public final class OMLCUtils {
           .setDays(expirationDays).build());
     }
 
-    return rBuilder.build();
+    return rBuilder;
   }
 
-  public static OmLCFilter getOmLCFilter(String filterPrefix, Pair<String, String> filterTag,
-      OmLifecycleRuleAndOperator andOperator) {
+  public static OmLCFilter.Builder getOmLCFilterBuilder(String filterPrefix, Pair<String, String> filterTag,
+                                                OmLifecycleRuleAndOperator andOperator) {
     OmLCFilter.Builder lcfBuilder = new OmLCFilter.Builder()
         .setPrefix(filterPrefix)
         .setAndOperator(andOperator);
     if (filterTag != null) {
       lcfBuilder.setTag(filterTag.getKey(), filterTag.getValue());
     }
-    return lcfBuilder.build();
+    return lcfBuilder;
   }
 
-  public static OmLifecycleRuleAndOperator getOmLCAndOperator(String prefix, Map<String, String> tags) {
+  public static OmLifecycleRuleAndOperator.Builder getOmLCAndOperatorBuilder(
+      String prefix, Map<String, String> tags) {
     return new OmLifecycleRuleAndOperator.Builder()
         .setPrefix(prefix)
-        .setTags(tags)
-        .build();
+        .setTags(tags);
   }
 
   private OMLCUtils() {
