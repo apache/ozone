@@ -57,7 +57,7 @@ public class DirstreamServerHandler extends ChannelInboundHandlerAdapter {
   @Override
   public void channelRead(ChannelHandlerContext ctx, Object msg)
       throws Exception {
-    final StringBuilder id = new StringBuilder();
+    StringBuilder id = new StringBuilder();
     if (!headerProcessed) {
       ByteBuf buffer = (ByteBuf) msg;
       int eolPosition = buffer.forEachByte(ByteProcessor.FIND_LF) - buffer
