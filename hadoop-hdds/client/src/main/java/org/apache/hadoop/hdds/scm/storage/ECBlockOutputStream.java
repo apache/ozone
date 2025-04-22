@@ -91,15 +91,19 @@ public class ECBlockOutputStream extends BlockOutputStream {
 
   @Override
   public synchronized void write(byte[] b, int off, int len) throws IOException {
+    write(b, off, len, true);
+  }
+
+  public synchronized void write(byte[] b, int off, int len, boolean shouldCreateMissingContainer) throws IOException {
     this.currentChunkRspFuture =
         writeChunkToContainer(
-            ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
+            ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)), shouldCreateMissingContainer);
     updateWrittenDataLength(len);
   }
 
   public CompletableFuture<ContainerProtos.ContainerCommandResponseProto> write(
-      ByteBuffer buff) throws IOException {
-    return writeChunkToContainer(ChunkBuffer.wrap(buff));
+      ByteBuffer buff, boolean shouldCreateMissingContainer) throws IOException {
+    return writeChunkToContainer(ChunkBuffer.wrap(buff), shouldCreateMissingContainer);
   }
 
   public CompletableFuture<ContainerProtos.

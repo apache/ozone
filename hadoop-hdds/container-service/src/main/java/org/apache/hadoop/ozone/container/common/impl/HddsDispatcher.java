@@ -287,7 +287,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
        * to get the container created in non writing nodes. If replica index is
        * >0 then we know it's for ec container.
        */
-      if (container == null && ((isWriteStage || isCombinedStage)
+      boolean shouldWriteChunkCreateMissingContainer = (isWriteStage || isCombinedStage);
+      if (shouldWriteChunkCreateMissingContainer && msg.getWriteChunk().hasShouldCreateMissingContainer()) {
+        shouldWriteChunkCreateMissingContainer = msg.getWriteChunk().getShouldCreateMissingContainer();
+      }
+
+      if (container == null && (shouldWriteChunkCreateMissingContainer
           || cmdType == Type.PutSmallFile
           || cmdType == Type.PutBlock)) {
         // If container does not exist, create one for WriteChunk and

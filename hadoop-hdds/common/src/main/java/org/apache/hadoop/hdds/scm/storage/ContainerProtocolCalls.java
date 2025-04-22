@@ -434,13 +434,14 @@ public final class ContainerProtocolCalls  {
    * @param blockID ID of the block
    * @param data the data of the chunk to write
    * @param tokenString serialized block token
+   * @param shouldCreateMissingContainer create the container for accommodating the write chunk request if it is missing
    * @throws IOException if there is an I/O error while performing the call
    */
   @SuppressWarnings("parameternumber")
   public static XceiverClientReply writeChunkAsync(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
       ByteString data, String tokenString,
-      int replicationIndex, BlockData blockData, boolean close)
+      int replicationIndex, BlockData blockData, boolean close, boolean shouldCreateMissingContainer)
       throws IOException, ExecutionException, InterruptedException {
 
     WriteChunkRequestProto.Builder writeChunkRequest =
@@ -452,7 +453,8 @@ public final class ContainerProtocolCalls  {
                 .setReplicaIndex(replicationIndex)
                 .build())
             .setChunkData(chunk)
-            .setData(data);
+            .setData(data)
+            .setShouldCreateMissingContainer(shouldCreateMissingContainer);
     if (blockData != null) {
       PutBlockRequestProto.Builder createBlockRequest =
           PutBlockRequestProto.newBuilder()

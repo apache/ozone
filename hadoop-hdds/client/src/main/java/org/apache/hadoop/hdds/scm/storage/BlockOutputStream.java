@@ -660,14 +660,16 @@ public class BlockOutputStream extends OutputStream {
 
   private void writeChunk(ChunkBuffer buffer) throws IOException {
     writeChunkCommon(buffer);
-    writeChunkToContainer(buffer.duplicate(0, buffer.position()), false, false);
+    writeChunkToContainer(buffer.duplicate(0, buffer.position()),
+        false, false, true);
   }
 
   private CompletableFuture<PutBlockResult> writeChunkAndPutBlock(ChunkBuffer buffer, boolean close)
       throws IOException {
     LOG.debug("WriteChunk and Putblock from flush, buffer={}", buffer);
     writeChunkCommon(buffer);
-    return writeChunkToContainer(buffer.duplicate(0, buffer.position()), true, close);
+    return writeChunkToContainer(buffer.duplicate(0, buffer.position()),
+        true, close, true);
   }
 
   /**
@@ -884,8 +886,10 @@ public class BlockOutputStream extends OutputStream {
    * checksum
    * @return
    */
-  CompletableFuture<ContainerCommandResponseProto> writeChunkToContainer(ChunkBuffer chunk) throws IOException {
-    return writeChunkToContainer(chunk, false, false).thenApply(x -> x.response);
+  CompletableFuture<ContainerCommandResponseProto> writeChunkToContainer(ChunkBuffer chunk,
+      boolean shouldCreateMissingContainer) throws IOException {
+    return writeChunkToContainer(chunk, false, false, shouldCreateMissingContainer)
+        .thenApply(x -> x.response);
   }
 
   /**
@@ -898,7 +902,7 @@ public class BlockOutputStream extends OutputStream {
    * @return
    */
   private CompletableFuture<PutBlockResult> writeChunkToContainer(
-      ChunkBuffer chunk, boolean putBlockPiggybacking, boolean close) throws IOException {
+      ChunkBuffer chunk, boolean putBlockPiggybacking, boolean close, boolean shouldCreateMissingContainer) throws IOException {
     int effectiveChunkSize = chunk.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
@@ -964,7 +968,7 @@ public class BlockOutputStream extends OutputStream {
       }
 
       asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, tokenString, replicationIndex, blockData, close);
+          blockID.get(), data, tokenString, replicationIndex, blockData, close, shouldCreateMissingContainer);
       CompletableFuture<ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
       validateFuture = respFuture.thenApplyAsync(e -> {
