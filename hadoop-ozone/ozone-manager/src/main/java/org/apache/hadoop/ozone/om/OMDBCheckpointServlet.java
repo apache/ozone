@@ -413,7 +413,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
         Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
-        boolean presentInTableCache = null != omMetadataManager.getSnapshotInfoTable()
+        boolean presentInTableCache = null != getOmMetadataManager().getSnapshotInfoTable()
             .getCacheValue(new CacheKey<>(entry.getKey()));
         if (waitForDir && presentInTableCache) {
           waitForDirToExist(path);
@@ -495,6 +495,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                 "Will be picked up in the next batch", file, maxTotalSstSize);
             return false;
           } else {
+            LOG.info("Adding file {}  to copy file list", file.getFileName());
             copySize.addAndGet(fileSize);
           }
         }
@@ -719,6 +720,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // But we need to return path till db.snapshots which contains checkpointState and diffState.
     // So that whole snapshots and compaction information can be transferred to follower.
     return Paths.get(store.getSnapshotsParentDir()).getParent();
+  }
+
+  public OMMetadataManager getOmMetadataManager() {
+    return omMetadataManager;
   }
 
   @Override
