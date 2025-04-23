@@ -761,11 +761,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         context.getParent().triggerHeartbeat();
         activePipelines.computeIfPresent(groupId,
             (key, value) -> new ActivePipelineContext(value.isPipelineLeader(), true));
-      }
-    }
-    LOG.error("pipeline Action {} on pipeline {}.Reason : {}",
+        LOG.error("pipeline Action {} on pipeline {}.Reason : {}",
             action.getAction(), pipelineID,
             action.getClosePipeline().getDetailedReason());
+      }
+    }
   }
 
   @Override
