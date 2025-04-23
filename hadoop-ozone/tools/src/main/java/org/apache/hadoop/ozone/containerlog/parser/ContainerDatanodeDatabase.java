@@ -26,6 +26,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,6 +35,10 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sqlite.SQLiteConfig;
@@ -47,7 +52,15 @@ import org.sqlite.SQLiteConfig;
 public class ContainerDatanodeDatabase {
 
   private static Map<String, String> queries;
-  private static final int DEFAULT_REPLICATION_FACTOR = 3;
+  private static final int DEFAULT_REPLICATION_FACTOR ;
+  static {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    final String replication = configuration.getTrimmed(
+        OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY,
+        OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
+    
+    DEFAULT_REPLICATION_FACTOR = Integer.parseInt(replication.toUpperCase());
+  }
 
   static {
     loadProperties();
@@ -239,6 +252,13 @@ public class ContainerDatanodeDatabase {
     stmt.executeUpdate(dropTableSQL);
   }
 
+  private void createIdxDclContainerStateTime(Connection conn) throws SQLException {
+    String sql = queries.get("CREATE_DCL_CONTAINER_STATE_TIME_INDEX");
+    try (Statement stmt = conn.createStatement()) {
+      stmt.execute(sql);
+    }
+  }
+
   /**
    * Displays detailed information about a container based on its ID, including its state, BCSID, 
    * timestamp, message, and index value. It also checks for issues such as UNHEALTHY 
@@ -251,6 +271,7 @@ public class ContainerDatanodeDatabase {
   public void showContainerDetails(Long containerID) throws SQLException {
 
     try (Connection connection = getConnection()) {
+      createIdxDclContainerStateTime(connection);
       List<DatanodeContainerInfo> logEntries = getContainerLogData(containerID, connection);
 
       if (logEntries.isEmpty()) {
@@ -302,6 +323,16 @@ public class ContainerDatanodeDatabase {
   private void analyzeContainerHealth(Long containerID,
                                       Map<String, DatanodeContainerInfo> latestPerDatanode) {
 
+    Set<String> lifeCycleStates = new HashSet<>();
+    for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
+      lifeCycleStates.add(state.name());
+    }
+
+    Set<String> healthStates = new HashSet<>();
+    for (ReplicationManagerReport.HealthState state : ReplicationManagerReport.HealthState.values()) {
+      healthStates.add(state.name());
+    }
+
     Set<String> unhealthyReplicas = new HashSet<>();
     Set<String> closedReplicas = new HashSet<>();
     Set<String> openReplicas = new HashSet<>();
@@ -309,22 +340,52 @@ public class ContainerDatanodeDatabase {
     Set<String> deletedReplicas = new HashSet<>();
     Set<Long> bcsids = new HashSet<>();
     Set<String> datanodeIds = new HashSet<>();
+    List<String> unhealthyTimestamps = new ArrayList<>();
+    List<String> closedTimestamps = new ArrayList<>();
 
     for (DatanodeContainerInfo entry : latestPerDatanode.values()) {
       String datanodeId = entry.getDatanodeId();
       String state = entry.getState();
       long bcsid = entry.getBcsid();
+      String stateTimestamp = entry.getTimestamp();
 
       datanodeIds.add(datanodeId);
 
-      switch (state.toUpperCase()) {
-      case "UNHEALTHY": unhealthyReplicas.add(datanodeId); break;
-      case "CLOSED": closedReplicas.add(datanodeId); bcsids.add(bcsid); break;
-      case "OPEN": openReplicas.add(datanodeId); break;
-      case "QUASI_CLOSED": quasiclosedReplicas.add(datanodeId); break;
-      case "DELETED": deletedReplicas.add(datanodeId); bcsids.add(bcsid); break;
-      default:
-        break;
+
+
+      if (healthStates.contains(state.toUpperCase())) {
+
+        ReplicationManagerReport.HealthState healthState =
+            ReplicationManagerReport.HealthState.valueOf(state.toUpperCase());
+
+        if (healthState == ReplicationManagerReport.HealthState.UNHEALTHY) {
+          unhealthyReplicas.add(datanodeId);
+          unhealthyTimestamps.add(stateTimestamp);
+        }
+        
+      } else if (lifeCycleStates.contains(state.toUpperCase())) {
+
+        HddsProtos.LifeCycleState lifeCycleState = HddsProtos.LifeCycleState.valueOf(state.toUpperCase());
+
+        switch (lifeCycleState) {
+        case OPEN:
+          openReplicas.add(datanodeId);
+          break;
+        case CLOSED:
+          closedReplicas.add(datanodeId);
+          bcsids.add(bcsid);
+          closedTimestamps.add(stateTimestamp);
+          break;
+        case QUASI_CLOSED:
+          quasiclosedReplicas.add(datanodeId);
+          break;
+        case DELETED:
+          deletedReplicas.add(datanodeId);
+          break;
+        default:
+          break;
+        }
+
       }
     }
 
@@ -332,7 +393,22 @@ public class ContainerDatanodeDatabase {
     int replicaCount = datanodeIds.size();
     
     if (bcsids.size() > 1) {
-      System.out.println("Container " + containerID + " has MISMATCHED REPLICATION.");
+      System.out.println("Container " + containerID + " has MISMATCHED REPLICATION as there are multiple" +
+          " CLOSED containers with varying BCSIDs.");
+    } else if (!closedReplicas.isEmpty()
+        && closedReplicasCount < DEFAULT_REPLICATION_FACTOR) {
+      System.out.println("Container " + containerID + " has fewer CLOSED replicas than required so container" +
+          " is UNDER-REPLICATED.");
+    } else if (!unhealthyReplicas.isEmpty()
+        && closedReplicasCount == DEFAULT_REPLICATION_FACTOR) {
+
+      String latestUnhealthy = Collections.max(unhealthyTimestamps);
+      boolean allClosedNewer = closedTimestamps.stream()
+          .allMatch(ct -> ct.compareTo(latestUnhealthy) > 0);
+
+      if (allClosedNewer) {
+        System.out.println("Container " + containerID + " has newer CLOSED replicas so its not UNHEALTHY.");
+      }
     } else if (unhealthyCount == replicaCount && replicaCount >= DEFAULT_REPLICATION_FACTOR) {
       System.out.println("Container " + containerID + " is UNHEALTHY across all datanodes.");
     } else if (unhealthyCount >= 2 && closedReplicas.size() == replicaCount - unhealthyCount) {
