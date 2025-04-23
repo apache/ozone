@@ -906,7 +906,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     StringBuilder scmBlockAddressBuilder = new StringBuilder();
     for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
       scmBlockAddressBuilder.append(scmNodeInfo.getBlockClientAddress())
-          .append(",");
+          .append(',');
     }
     String scmBlockAddress = scmBlockAddressBuilder.toString();
     if (!StringUtils.isBlank(scmBlockAddress)) {

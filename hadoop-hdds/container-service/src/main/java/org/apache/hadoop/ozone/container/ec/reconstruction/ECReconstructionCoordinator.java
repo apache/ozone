@@ -373,7 +373,7 @@ public class ECReconstructionCoordinator implements Closeable {
       int cnt = 0;
       for (ContainerProtos.ChunkInfo chunkInfo : data.getChunks()) {
         if (cnt > 0) {
-          sb.append("\n");
+          sb.append('\n');
         }
         sb.append("  chunkNum: ")
             .append(++cnt)

@@ -570,7 +570,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     if (!pendingDelete.isEmpty()) {
       sb.append(", PendingDelete: ").append(pendingDelete.size());
     }
-    sb.append(")")
+    sb.append(')')
         .append(", ReplicationConfig: ").append(repConfig)
         .append(", RemainingMaintenanceRedundancy: ")
         .append(remainingMaintenanceRedundancy);

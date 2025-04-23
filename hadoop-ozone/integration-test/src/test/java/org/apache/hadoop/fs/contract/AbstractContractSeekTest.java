@@ -361,7 +361,7 @@ public abstract class AbstractContractSeekTest extends AbstractFSContractTestBas
       sb.append("Sequence of actions:\n");
       for (int j = 0; j < seeks.length; j++) {
         sb.append("seek @ ").append(seeks[j]).append("  ")
-            .append("read ").append(reads[j]).append("\n");
+            .append("read ").append(reads[j]).append('\n');
       }
       LOG.error(sb.toString());
       throw afe;

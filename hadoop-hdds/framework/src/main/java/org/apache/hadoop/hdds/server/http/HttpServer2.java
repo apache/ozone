@@ -1409,7 +1409,7 @@ public final class HttpServer2 implements FilterContainer {
             : STATE_DESCRIPTION_NOT_LIVE)
         .append("), listening at:");
     for (ServerConnector l : listeners) {
-      sb.append(l.getHost()).append(":").append(l.getPort()).append("/,");
+      sb.append(l.getHost()).append(':').append(l.getPort()).append("/,");
     }
     return sb.toString();
   }

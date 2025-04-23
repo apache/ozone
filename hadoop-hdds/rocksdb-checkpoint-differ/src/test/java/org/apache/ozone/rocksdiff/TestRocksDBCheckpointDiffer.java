@@ -996,7 +996,7 @@ public class TestRocksDBCheckpointDiffer {
       for (CompactionNode current : currentLevel) {
         Set<CompactionNode> successors = mutableGraph.successors(current);
         for (CompactionNode succNode : successors) {
-          sb.append(succNode.getFileName()).append(" ");
+          sb.append(succNode.getFileName()).append(' ');
           nextLevel.add(succNode);
         }
       }

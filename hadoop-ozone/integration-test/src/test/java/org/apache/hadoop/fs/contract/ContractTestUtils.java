@@ -1457,9 +1457,9 @@ public final class ContractTestUtils {
     builder.append(nl);
     for (Path path : paths) {
       builder.append("  \"").append(path.toString())
-          .append("\"").append(nl);
+          .append('"').append(nl);
     }
-    builder.append("]");
+    builder.append(']');
     return builder.toString();
   }
 

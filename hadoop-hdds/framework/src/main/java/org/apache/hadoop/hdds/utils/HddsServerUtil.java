@@ -710,7 +710,7 @@ public final class HddsServerUtil {
     StringBuilder b = new StringBuilder(prefix);
     b.append("\n/************************************************************");
     for (String s : msg) {
-      b.append("\n").append(prefix).append(s);
+      b.append('\n').append(prefix).append(s);
     }
     b.append("\n************************************************************/");
     return b.toString();

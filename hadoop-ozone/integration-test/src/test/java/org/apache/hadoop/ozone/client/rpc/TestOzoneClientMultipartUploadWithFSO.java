@@ -870,7 +870,7 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
       StringBuilder key = new StringBuilder();
       int depth = 1 + i % 3; // Creates varying depth (1-3 levels)
       for (int j = 0; j < depth; j++) {
-        key.append("dir").append(j + 1).append("/");
+        key.append("dir").append(j + 1).append('/');
       }
       key.append("file").append(i);
       keys.add(key.toString());
