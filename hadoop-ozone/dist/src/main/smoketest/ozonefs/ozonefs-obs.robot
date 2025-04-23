@@ -35,47 +35,50 @@ Create OBS bucket
 
 Verify mkdir fails on OBS bucket
     ${url} =            Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testdir
-    ${result} =         Execute and checkrc   ozone fs -mkdir ${url}     1
+    ${result} =         Execute and checkrc   ozone fs -mkdir ${url}     255
     Should contain      ${result}             Bucket: ${bucket} has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
 
 Verify put fails on OBS bucket
     ${url} =            Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile
-    ${result} =         Execute and checkrc   ozone fs -put NOTICE.txt ${url}     1
+    ${result} =         Execute and checkrc   ozone fs -put NOTICE.txt ${url}     255
     Should contain      ${result}             Bucket: ${bucket} has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
 
 Verify ls fails on OBS bucket
     ${url} =            Format FS URL         ${SCHEME}    ${volume}    ${bucket}
-    ${result} =         Execute and checkrc   ozone fs -ls ${url}     1
+    ${result} =         Execute and checkrc   ozone fs -ls ${url}     255
     Should contain      ${result}             Bucket: ${bucket} has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
+
+Create key in OBS bucket
+    Execute             ozone sh key put /${volume}/${bucket}/testfile NOTICE.txt
 
 Verify rm fails on OBS bucket
     ${url} =            Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile
-    ${result} =         Execute and checkrc   ozone fs -rm ${url}     1
+    ${result} =         Execute and checkrc   ozone fs -rm ${url}     255
     Should contain      ${result}             Bucket: ${bucket} has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
 
 Verify mv fails on OBS bucket
-    ${url1} =           Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile1
+    ${url1} =           Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile
     ${url2} =           Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile2
-    ${result} =         Execute and checkrc   ozone fs -mv ${url1} ${url2}     1
+    ${result} =         Execute and checkrc   ozone fs -mv ${url1} ${url2}     255
     Should contain      ${result}             Bucket: ${bucket} has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
 
 Verify cp fails on OBS bucket
-    ${url1} =           Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile1
+    ${url1} =           Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile
     ${url2} =           Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile2
-    ${result} =         Execute and checkrc   ozone fs -cp ${url1} ${url2}     1
+    ${result} =         Execute and checkrc   ozone fs -cp ${url1} ${url2}     255
     Should contain      ${result}             Bucket: ${bucket} has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
 
 Verify touch fails on OBS bucket
     ${url} =            Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile
-    ${result} =         Execute and checkrc   ozone fs -touch ${url}     1
+    ${result} =         Execute and checkrc   ozone fs -touch ${url}     255
     Should contain      ${result}             Bucket: ${bucket} has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
 
 Verify cat fails on OBS bucket
     ${url} =            Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile
-    ${result} =         Execute and checkrc   ozone fs -cat ${url}     1
+    ${result} =         Execute and checkrc   ozone fs -cat ${url}     255
     Should contain      ${result}             Bucket: ${bucket} has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
 
 Verify get fails on OBS bucket
     ${url} =            Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile
-    ${result} =         Execute and checkrc   ozone fs -get ${url} /tmp/testfile     1
+    ${result} =         Execute and checkrc   ozone fs -get ${url} /tmp/testfilecopy     255
     Should contain      ${result}             Bucket: ${bucket} has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
