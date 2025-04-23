@@ -278,6 +278,7 @@ public class TestReconcileContainerEventHandler {
       break;
     }
   }
+
   @Test
   public void testReconcileFailsWithNotEligibleReplicas() throws Exception {
     addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
@@ -307,6 +308,7 @@ public class TestReconcileContainerEventHandler {
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
   }
+
   @Test
   public void testReconcileWithUnsupportedReplicationType() throws Exception {
 
@@ -322,6 +324,7 @@ public class TestReconcileContainerEventHandler {
     assertEquals(Result.INELIGIBLE_REPLICATION_TYPE, result.getResult());
     verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
   }
+
   @Test
   public void testScmNotLeader() {
 

@@ -536,6 +536,7 @@ class TestContainerChecksumTreeManager {
     assertEquals(checksumFile.getAbsolutePath(),
         ContainerChecksumTreeManager.getContainerChecksumFile(container).getAbsolutePath());
   }
+
   @Test
   void testGetContainerChecksumInfoSuccess() throws IOException {
     String content = "mock-checksum";
@@ -545,6 +546,7 @@ class TestContainerChecksumTreeManager {
 
     assertEquals(content, result.toStringUtf8(), "Checksum content mismatch");
   }
+
   @Test
   void testGetContainerChecksumInfoFileNotFound() {
 
@@ -552,6 +554,7 @@ class TestContainerChecksumTreeManager {
       checksumManager.getContainerChecksumInfo(container);
     });
   }
+
   @Test
   void testGetContainerChecksumInfoIOException() throws IOException {
     Files.write(checksumFile.toPath(), "test".getBytes());
@@ -560,13 +563,14 @@ class TestContainerChecksumTreeManager {
     boolean changed = checksumFile.setReadable(false);
 
     if (!changed && checksumFile.canRead()) {
-      System.out.println("Warning: Could not make file unreadable for test.");
+      LOG.warn("Warning: Could not make file unreadable for test.");
     }
 
     assertThrows(IOException.class, () -> {
       checksumManager.getContainerChecksumInfo(container);
     });
   }
+
   @Test
   void testChecksumFileExistTrue() throws IOException {
     Files.write(checksumFile.toPath(), "dummy content".getBytes());
@@ -577,6 +581,7 @@ class TestContainerChecksumTreeManager {
     assertTrue(ContainerChecksumTreeManager.checksumFileExist(mockContainer),
             "Expected true since checksum file exists");
   }
+
   @Test
   void testChecksumFileExistFalse() {
 
