@@ -57,7 +57,6 @@ public class ContainerTestVersionInfo {
   }
 
   private final String schemaVersion;
-
   private final ContainerLayoutVersion layout;
 
   /**
