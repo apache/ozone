@@ -182,9 +182,10 @@ public class ReplicasVerify extends Handler {
 
         ArrayNode checksArray = replicaNode.putArray("checks");
         boolean replicaPass = true;
+        int replicaIndex = keyLocation.getPipeline().getReplicaIndex(datanode);
 
         for (ReplicaVerifier verifier : replicaVerifiers) {
-          BlockVerificationResult result = verifier.verifyBlock(datanode, keyLocation);
+          BlockVerificationResult result = verifier.verifyBlock(datanode, keyLocation, replicaIndex);
           ObjectNode checkNode = checksArray.addObject();
           checkNode.put("type", verifier.getType());
           checkNode.put("completed", result.isCompleted());
@@ -194,7 +195,7 @@ public class ReplicasVerify extends Handler {
           for (String failure : result.getFailures()) {
             failuresArray.addObject().put("message", failure);
           }
-          replicaNode.put("replicaIndex", keyLocation.getPipeline().getReplicaIndex(datanode));
+          replicaNode.put("replicaIndex", replicaIndex);
 
           if (!result.passed()) {
             replicaPass = false;

@@ -57,10 +57,12 @@ public class ChecksumVerifier implements ReplicaVerifier {
   }
 
   @Override
-  public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation) {
+  public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation,
+                                             int replicaIndex) {
     Pipeline pipeline = Pipeline.newBuilder(keyLocation.getPipeline())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setNodes(Collections.singletonList(datanode))
+        .setReplicaIndexes(Collections.singletonMap(datanode, replicaIndex))
         .build();
 
     try (InputStream is = new BlockInputStreamFactoryImpl().create(

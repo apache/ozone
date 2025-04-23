@@ -51,11 +51,13 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
   }
 
   @Override
-  public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation) {
+  public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation,
+                                             int replicaIndex) {
     try {
       Pipeline pipeline = Pipeline.newBuilder(keyLocation.getPipeline())
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
           .setNodes(Collections.singletonList(datanode))
+          .setReplicaIndexes(Collections.singletonMap(datanode, replicaIndex))
           .build();
 
       XceiverClientSpi client = xceiverClientManager.acquireClientForReadData(pipeline);

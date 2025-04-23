@@ -23,6 +23,7 @@ key="testfile"
 
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
 
+#TODO HDDS-12890: Add acceptance robot tests for ozone debug replicas verify
 # get block locations for key
 #chunkinfo="${key}-blocks-${prefix}"
 #docker-compose exec -T ${SCM} bash -c "ozone debug replicas chunk-info ${volume}/${bucket}/${key}" > "$chunkinfo"
