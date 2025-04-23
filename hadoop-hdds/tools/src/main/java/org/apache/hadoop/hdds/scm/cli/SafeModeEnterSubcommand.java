@@ -37,6 +37,8 @@ public class SafeModeEnterSubcommand extends ScmSubcommand {
     boolean execReturn = scmClient.enterSafeMode();
     if (execReturn) {
       System.out.println("SCM entered to safe mode successfully.");
+    } else {
+      System.err.println("SCM failed to enter safe mode manually.");
     }
   }
 }

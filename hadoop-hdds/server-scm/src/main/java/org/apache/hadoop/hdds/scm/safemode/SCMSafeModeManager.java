@@ -258,7 +258,7 @@ public class SCMSafeModeManager implements SafeModeManager {
    * <li>Emit safe mode status.
    * </ol>
    */
-  public void enterManualSafeMode(EventPublisher eventQueue) {
+  public void enterManualSafeMode() {
     inManualSafeMode.set(true);
     emitSafeModeStatus();
   }

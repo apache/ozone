@@ -1978,7 +1978,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Allow SCM into safe mode.
    */
   public boolean enterSafeMode() {
-    scmSafeModeManager.enterManualSafeMode(eventQueue);
+    scmSafeModeManager.enterManualSafeMode();
     return true;
   }
 
