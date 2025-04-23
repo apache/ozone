@@ -830,5 +830,10 @@ public class OzoneManagerServiceProviderImpl
   public static Logger getLogger() {
     return LOG;
   }
+
+  @VisibleForTesting
+  public TarExtractor getTarExtractor() {
+    return tarExtractor;
+  }
 }
 
