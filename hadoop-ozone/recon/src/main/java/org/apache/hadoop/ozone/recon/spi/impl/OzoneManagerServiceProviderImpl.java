@@ -243,6 +243,7 @@ public class OzoneManagerServiceProviderImpl
     LOG.info("Starting Ozone Manager Service Provider.");
     scheduler = Executors.newScheduledThreadPool(1, threadFactory);
     try {
+      tarExtractor.start();
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
       LOG.error("Error starting Recon OM Metadata Manager.", ioEx);
@@ -318,7 +319,6 @@ public class OzoneManagerServiceProviderImpl
             OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT),
         TimeUnit.MILLISECONDS);
     LOG.debug("Started the OM DB sync scheduler.");
-    tarExtractor.start();
     scheduler.scheduleWithFixedDelay(() -> {
       try {
         LOG.info("Last known sequence number before sync: {}", getCurrentOMDBSequenceNumber());
@@ -350,6 +350,7 @@ public class OzoneManagerServiceProviderImpl
       // immediately.
       stopSyncDataFromOMThread();
       scheduler = Executors.newScheduledThreadPool(1, threadFactory);
+      tarExtractor.start();
       startSyncDataFromOM(0L);
       return true;
     } else {
@@ -412,7 +413,14 @@ public class OzoneManagerServiceProviderImpl
     // om db snapshot dirs including the last known om db snapshot dir returned by reconUtils.getLastKnownDB
     File lastKnownDB = reconUtils.getLastKnownDB(omSnapshotDBParentDir, RECON_OM_SNAPSHOT_DB);
     if (lastKnownDB != null) {
-      FileUtils.deleteQuietly(lastKnownDB);
+      boolean existingOmSnapshotDBDeleted = FileUtils.deleteQuietly(lastKnownDB);
+      if (existingOmSnapshotDBDeleted) {
+        LOG.info("Successfully deleted existing OM DB snapshot directory: {}",
+            lastKnownDB.getAbsolutePath());
+      } else {
+        LOG.warn("Failed to delete existing OM DB snapshot directory: {}",
+            lastKnownDB.getAbsolutePath());
+      }
     }
 
     // Now below cleanup operation will even remove any left over staging dirs in recon om db dir location which
@@ -422,7 +430,12 @@ public class OzoneManagerServiceProviderImpl
     if (leftOverStagingDirs != null) {
       for (File stagingDir : leftOverStagingDirs) {
         LOG.warn("Cleaning up leftover staging folder from failed extraction: {}", stagingDir.getAbsolutePath());
-        FileUtils.deleteQuietly(stagingDir);
+        boolean stagingDirDeleted = FileUtils.deleteQuietly(stagingDir);
+        if (stagingDirDeleted) {
+          LOG.info("Successfully deleted leftover staging folder: {}", stagingDir.getAbsolutePath());
+        } else {
+          LOG.warn("Failed to delete leftover staging folder: {}", stagingDir.getAbsolutePath());
+        }
       }
     }
 

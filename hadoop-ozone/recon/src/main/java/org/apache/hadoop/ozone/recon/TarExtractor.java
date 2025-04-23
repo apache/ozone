@@ -39,6 +39,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.FileUtils;
@@ -64,6 +65,7 @@ public class TarExtractor {
   private static final Logger LOG =
       LoggerFactory.getLogger(TarExtractor.class);
 
+  private final AtomicBoolean executorServiceStarted = new AtomicBoolean(false);
   private int threadPoolSize;
   private ExecutorService executor;
   private ThreadFactory threadFactory;
@@ -73,7 +75,6 @@ public class TarExtractor {
     this.threadFactory =
         new ThreadFactoryBuilder().setNameFormat("FetchOMDBTar-%d" + threadNamePrefix)
             .build();
-    start();
   }
 
   public void extractTar(InputStream tarStream, Path outputDir)
@@ -161,20 +162,24 @@ public class TarExtractor {
   }
 
   public void start() {
-    this.executor =
-        new ThreadPoolExecutor(0, threadPoolSize, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), threadFactory);
+    if (executorServiceStarted.compareAndSet(false, true)) {
+      this.executor =
+          new ThreadPoolExecutor(0, threadPoolSize, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), threadFactory);
+    }
   }
 
   public void stop() {
-    executor.shutdown();
-    try {
-      if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
-        LOG.warn("Tar Extractor Executor Service did not terminate in time.");
+    if (executorServiceStarted.compareAndSet(true, false)) {
+      executor.shutdown();
+      try {
+        if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+          LOG.warn("Tar Extractor Executor Service did not terminate in time.");
+        }
+      } catch (InterruptedException e) {
+        LOG.warn("Interrupted during shutdown. Forcing shutdown of Tar Extractor Executor Service...");
+        executor.shutdownNow();
+        Thread.currentThread().interrupt();
       }
-    } catch (InterruptedException e) {
-      LOG.warn("Interrupted during shutdown. Forcing shutdown of Tar Extractor Executor Service...");
-      executor.shutdownNow();
-      Thread.currentThread().interrupt();
     }
   }
 }
