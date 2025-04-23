@@ -338,7 +338,7 @@ public class DiskBalancerService extends BackgroundService {
 
     for (int i = 0; i < availableTaskCount; i++) {
       Pair<HddsVolume, HddsVolume> pair = volumeChoosingPolicy
-          .chooseVolume(volumeSet, threshold);
+          .chooseVolume(volumeSet, threshold, deltaSizes);
       if (pair == null) {
         continue;
       }
