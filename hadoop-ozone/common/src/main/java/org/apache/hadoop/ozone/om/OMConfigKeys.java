@@ -318,11 +318,6 @@ public final class OMConfigKeys {
   public static final long    DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT =
       7 * 24 * 60 * 60 * 1000; // 7 days
 
-  public static final String OZONE_DB_CHECKPOINT_TRANSFER_RATE_KEY =
-      "ozone.manager.db.checkpoint.transfer.bandwidthPerSec";
-  public static final long OZONE_DB_CHECKPOINT_TRANSFER_RATE_DEFAULT =
-      0;  //no throttling
-
   // Comma separated acls (users, groups) allowing clients accessing
   // OM client protocol
   // when hadoop.security.authorization is true, this needs to be set in
@@ -619,4 +614,35 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MAX_BUCKET =
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY =
+      "ozone.om.edekcacheloader.initial.delay.ms";
+
+  public static final int OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT = 3000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_KEY = "ozone.om.edekcacheloader.interval.ms";
+
+  public static final int OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT = 1000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_KEY =
+      "ozone.om.edekcacheloader.max-retries";
+  public static final int OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT = 10;
+
+  /**
+   * Configuration properties for Compaction Service.
+   */
+  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.compaction.service.enabled";
+  public static final boolean OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT = false;
+  public static final String OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL =
+      "ozone.om.compaction.service.run.interval";
+  public static final long OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT
+      = TimeUnit.HOURS.toMillis(6);
+
+  public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT
+      = "ozone.om.compaction.service.timeout";
+  public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT_DEFAULT = "10m";
+  public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES
+      = "ozone.om.compaction.service.columnfamilies";
+  public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
+      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable";
 }

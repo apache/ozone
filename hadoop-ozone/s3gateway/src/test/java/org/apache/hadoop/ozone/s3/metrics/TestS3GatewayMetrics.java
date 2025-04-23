@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.TestBucketAcl;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -669,7 +670,7 @@ public class TestS3GatewayMetrics {
 
   private static InputStream getPutTaggingBody() {
     String xml =
-        "<Tagging xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Tagging xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\">" +
             "   <TagSet>" +
             "      <Tag>" +
             "         <Key>tag1</Key>" +

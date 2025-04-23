@@ -61,6 +61,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -97,6 +99,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Lists;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.AfterEach;
@@ -104,6 +107,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -1646,6 +1650,62 @@ public class TestReplicationManager {
     // The target should be DN2 and the deadline should have been updated from the value set in commandDeadline above
     assertEquals(dn2.getUuid(), sentCommand.getLeft());
     assertNotEquals(commandDeadline, sentCommand.getRight().getDeadline());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testNotifyNodeStateChangeWakesUpThread(boolean queueIsEmpty) 
+      throws IOException, InterruptedException, ReflectiveOperationException, TimeoutException {
+
+    AtomicBoolean processAllCalled = new AtomicBoolean(false);
+    ReplicationQueue queue = mock(ReplicationQueue.class);
+    when(queue.isEmpty()).thenReturn(queueIsEmpty);
+    final ReplicationManager customRM = new ReplicationManager(
+        configuration,
+        containerManager,
+        ratisPlacementPolicy,
+        ecPlacementPolicy,
+        eventPublisher,
+        scmContext,
+        nodeManager,
+        clock,
+        containerReplicaPendingOps) {
+          @Override
+          public ReplicationQueue getQueue() {
+            return queue;
+          }
+
+          @Override
+          public synchronized void processAll() {
+            processAllCalled.set(true);
+          }
+        };
+
+    customRM.notifyStatusChanged();
+    customRM.start();
+
+    // wait for the thread become TIMED_WAITING
+    GenericTestUtils.waitFor(
+        () -> customRM.isThreadWaiting(),
+        100,
+        1000);
+
+    // The processAll method will be called when the ReplicationManager's run
+    // method is executed by the replicationMonitor thread.
+    assertTrue(processAllCalled.get());
+    processAllCalled.set(false);
+
+    assertThat(customRM.notifyNodeStateChange()).isEqualTo(queueIsEmpty);
+
+    GenericTestUtils.waitFor(
+        () -> customRM.isThreadWaiting(),
+        100,
+        1000);
+
+    // If the queue is empty, the processAll method should have been called
+    assertEquals(processAllCalled.get(), queueIsEmpty);
+
+    customRM.stop();
   }
 
   @SafeVarargs

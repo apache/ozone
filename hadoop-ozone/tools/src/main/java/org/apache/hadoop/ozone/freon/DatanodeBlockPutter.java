@@ -107,7 +107,7 @@ public class DatanodeBlockPutter extends BaseFreonGenerator implements
 
         timer = getMetrics().timer("put-block");
 
-        byte[] data = RandomStringUtils.randomAscii(chunkSize)
+        byte[] data = RandomStringUtils.secure().nextAscii(chunkSize)
             .getBytes(StandardCharsets.UTF_8);
         Checksum checksum = new Checksum(ChecksumType.CRC32, 1024 * 1024);
         checksumProtobuf = checksum.computeChecksum(data).getProtoBufMessage();

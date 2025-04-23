@@ -741,7 +741,7 @@ public final class OMRequestTestUtils {
     return BucketInfo.newBuilder()
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
-        .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.SSD)
+        .setStorageType(HddsProtos.StorageTypeProto.SSD)
         .setIsVersionEnabled(false)
         .addAllMetadata(getMetadataList());
   }
@@ -1064,7 +1064,7 @@ public final class OMRequestTestUtils {
             .setValue(DatatypeConverter.printHexBinary(
                 new DigestInputStream(
                     new ByteArrayInputStream(
-                        RandomStringUtils.randomAlphanumeric((int) size)
+                        RandomStringUtils.secure().nextAlphanumeric((int) size)
                             .getBytes(StandardCharsets.UTF_8)),
                     eTagProvider)
                     .getMessageDigest().digest()))

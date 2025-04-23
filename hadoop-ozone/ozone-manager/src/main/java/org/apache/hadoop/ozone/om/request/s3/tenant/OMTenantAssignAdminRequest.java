@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
  *   - Update tenantAccessIdTable
  */
 public class OMTenantAssignAdminRequest extends OMClientRequest {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMTenantAssignAdminRequest.class);
 
   public OMTenantAssignAdminRequest(OMRequest omRequest) {

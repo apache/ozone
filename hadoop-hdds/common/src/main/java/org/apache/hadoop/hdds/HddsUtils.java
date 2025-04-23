@@ -372,7 +372,6 @@ public final class HddsUtils {
       if (dnsInterface == null) {
         // Try the legacy configuration keys.
         dnsInterface = conf.get(HDDS_DATANODE_DNS_INTERFACE_KEY);
-        dnsInterface = conf.get(HDDS_DATANODE_DNS_INTERFACE_KEY);
         nameServer = conf.get(HDDS_DATANODE_DNS_NAMESERVER_KEY);
       } else {
         // If HADOOP_SECURITY_DNS_* is set then also attempt hosts file
@@ -632,7 +631,7 @@ public final class HddsUtils {
         "Ancestor should not be null");
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
-        "Path should be a descendant of %s", ancestor);
+        "Path %s should be a descendant of %s", path, ancestor);
   }
 
   public static File createDir(String dirPath) {

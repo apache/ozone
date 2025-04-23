@@ -39,10 +39,10 @@ public class TestOzoneDelegationTokenSelector {
 
     // set dummy details for identifier and password in token.
     byte[] identifier =
-        RandomStringUtils.randomAlphabetic(10)
+        RandomStringUtils.secure().nextAlphabetic(10)
             .getBytes(StandardCharsets.UTF_8);
     byte[] password =
-        RandomStringUtils.randomAlphabetic(10)
+        RandomStringUtils.secure().nextAlphabetic(10)
             .getBytes(StandardCharsets.UTF_8);
 
     Token<OzoneTokenIdentifier> tokenIdentifierToken =

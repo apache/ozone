@@ -98,7 +98,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
         replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocationOnMock -> {
           DatanodeDetails dn = invocationOnMock.getArgument(0);
-          return new NodeStatus(dn.getPersistedOpState(),
+          return NodeStatus.valueOf(dn.getPersistedOpState(),
               HddsProtos.NodeState.HEALTHY);
         });
 

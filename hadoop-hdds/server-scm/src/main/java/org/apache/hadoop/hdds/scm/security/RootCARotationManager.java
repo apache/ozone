@@ -75,7 +75,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RootCARotationManager extends StatefulService {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(RootCARotationManager.class);
 
   private static final String SERVICE_NAME =

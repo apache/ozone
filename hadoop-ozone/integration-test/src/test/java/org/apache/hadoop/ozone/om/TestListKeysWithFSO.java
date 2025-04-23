@@ -21,17 +21,18 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -39,7 +40,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
@@ -95,15 +95,15 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     omBucketArgs = builder.build();
 
-    String fsoBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String fsoBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
     fsoOzoneBucket = ozoneVolume.getBucket(fsoBucketName);
 
-    fsoBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    fsoBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
     fsoOzoneBucket2 = ozoneVolume.getBucket(fsoBucketName);
 
-    fsoBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    fsoBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
     emptyFsoOzoneBucket = ozoneVolume.getBucket(fsoBucketName);
 
@@ -111,11 +111,11 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
     omBucketArgs = builder.build();
-    String legacyBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String legacyBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(legacyBucketName, omBucketArgs);
     legacyOzoneBucket2 = ozoneVolume.getBucket(legacyBucketName);
 
-    legacyBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    legacyBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(legacyBucketName, omBucketArgs);
     emptyLegacyOzoneBucket = ozoneVolume.getBucket(legacyBucketName);
 
@@ -650,10 +650,10 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
 
   private static void readkey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
       throws Exception {
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
     byte[] read = new byte[length];
-    ozoneInputStream.read(read, 0, length);
-    ozoneInputStream.close();
+    try (InputStream ozoneInputStream = ozoneBucket.readKey(key)) {
+      IOUtils.readFully(ozoneInputStream, read);
+    }
 
     assertEquals(new String(input, StandardCharsets.UTF_8), new String(read, StandardCharsets.UTF_8));
   }

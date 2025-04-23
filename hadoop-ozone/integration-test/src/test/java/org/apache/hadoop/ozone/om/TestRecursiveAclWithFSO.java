@@ -127,8 +127,8 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       String keyf4 = "a/b2/d2/d21/f4";
       String keyf5 = "/a/b3/e1/f5";
       String keyf6 = "/a/b3/e2/f6";
-      String file1 = "a/" + "file" + RandomStringUtils.randomNumeric(5);
-      String file2 = "a/b2/d2/" + "file" + RandomStringUtils.randomNumeric(5);
+      String file1 = "a/" + "file" + RandomStringUtils.secure().nextNumeric(5);
+      String file2 = "a/b2/d2/" + "file" + RandomStringUtils.secure().nextNumeric(5);
 
       keys.add(keyf1);
       keys.add(keyf2);

@@ -76,12 +76,12 @@ public final class OzoneUtils {
       maxKey = Integer.parseInt(length);
     } catch (NumberFormatException nfe) {
       throw new IllegalArgumentException(
-          "Invalid max key length, the vaule should be digital.");
+          "Invalid max key length, the value should be digital.");
     }
 
     if (maxKey <= 0) {
       throw new IllegalArgumentException(
-          "Invalid max key length, the vaule should be a positive number.");
+          "Invalid max key length, the value should be a positive number.");
     }
   }
 

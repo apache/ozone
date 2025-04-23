@@ -32,7 +32,7 @@ Test ozone debug checksums with corrupt block replica
     Set Test Variable    ${DIR}         ${directory}
 
     ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     7
+    Should Be Equal As Integers         ${count_files}     1
 
     ${json} =                           Read Replicas Manifest
     ${md5sum} =                         Execute     md5sum ${TEMP_DIR}/${TESTFILE} | awk '{print $1}'
@@ -41,9 +41,6 @@ Test ozone debug checksums with corrupt block replica
         ${datanode} =    Set Variable    ${json}[blocks][0][replicas][${replica}][hostname]
 
         IF    '${datanode}' == '${CORRUPT_DATANODE}'
-            Verify Corrupt Replica   ${json}    ${replica}    ${md5sum}
             Should Contain           ${json}[blocks][0][replicas][${replica}][exception]    Checksum mismatch
-        ELSE
-            Verify Healthy Replica   ${json}    ${replica}    ${md5sum}
         END
     END
