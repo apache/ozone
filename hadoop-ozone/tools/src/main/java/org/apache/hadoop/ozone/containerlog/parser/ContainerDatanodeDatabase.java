@@ -52,7 +52,7 @@ import org.sqlite.SQLiteConfig;
 public class ContainerDatanodeDatabase {
 
   private static Map<String, String> queries;
-  private static final int DEFAULT_REPLICATION_FACTOR ;
+  private static final int DEFAULT_REPLICATION_FACTOR;
   static {
     OzoneConfiguration configuration = new OzoneConfiguration();
     final String replication = configuration.getTrimmed(
