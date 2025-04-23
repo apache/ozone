@@ -126,8 +126,12 @@ public class TestSCMInstallSnapshot {
     DBCheckpoint checkpoint = downloadSnapshot();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     final Path location = checkpoint.getCheckpointLocation();
-    final DBStore db = HAUtils.loadDB(conf, location.getParent().toFile(),
-        location.getFileName().toString(), SCMDBDefinition.get());
+    Path parent = location.getParent();
+    assertNotNull(parent);
+    Path fileName = location.getFileName();
+    assertNotNull(fileName);
+    final DBStore db = HAUtils.loadDB(conf, parent.toFile(),
+        fileName.toString(), SCMDBDefinition.get());
     // Hack the transaction index in the checkpoint so as to ensure the
     // checkpointed transaction index is higher than when it was downloaded
     // from.

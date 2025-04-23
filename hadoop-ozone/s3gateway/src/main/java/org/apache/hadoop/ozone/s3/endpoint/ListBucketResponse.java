@@ -26,13 +26,14 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.ozone.s3.commontypes.BucketMetadata;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
  * Response from the ListBucket RPC Call.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "ListAllMyBucketsResult",
-    namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    namespace = S3Consts.S3_XML_NAMESPACE)
 public class ListBucketResponse {
   @XmlElementWrapper(name = "Buckets")
   @XmlElement(name = "Bucket")

@@ -102,7 +102,7 @@ public final class MoveManager implements
     FAIL_UNEXPECTED_ERROR
   }
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(MoveManager.class);
 
   // TODO - Should pending ops notify under lock to allow MM to schedule a
@@ -300,7 +300,7 @@ public final class MoveManager implements
       }
       startMove(containerInfo, src, tgt, ret);
       LOG.debug("Processed a move request for container {}, from {} to {}",
-          cid, src.getUuidString(), tgt.getUuidString());
+          cid, src, tgt);
       return ret;
     }
   }

@@ -35,7 +35,7 @@ public class ReadOnlyLoadGenerator extends LoadGenerator {
 
   @Override
   public void generateLoad() throws Exception {
-    int index = RandomUtils.nextInt(0, NUM_KEYS);
+    int index = RandomUtils.secure().randomInt(0, NUM_KEYS);
     ByteBuffer buffer = dataBuffer.getBuffer(index);
     String keyName = getKeyName(index);
     replBucket.readKey(buffer, keyName);

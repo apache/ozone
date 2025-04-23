@@ -100,8 +100,7 @@ public class TestRatisPipelineLeader {
     final Logger log = LoggerFactory.getLogger(
         "org.apache.ratis.grpc.server.GrpcClientProtocolService");
     GenericTestUtils.setLogLevel(log, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(log);
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(log);
     try (XceiverClientRatis xceiverClientRatis =
         XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf)) {
       xceiverClientRatis.connect();

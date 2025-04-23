@@ -127,7 +127,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
       //Check if bucket exist
       if (omBucketInfo == null) {
         LOG.debug("Bucket: {} not found ", bucketName);
-        throw new OMException("Bucket doesnt exist",
+        throw new OMException("Bucket doesn't exist",
             OMException.ResultCodes.BUCKET_NOT_FOUND);
       }
 

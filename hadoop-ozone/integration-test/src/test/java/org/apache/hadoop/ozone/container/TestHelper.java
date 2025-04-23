@@ -35,6 +35,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -186,7 +187,7 @@ public final class TestHelper {
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .readKey(keyName)) {
       byte[] readData = new byte[data.length];
-      is.read(readData);
+      IOUtils.readFully(is, readData);
       MessageDigest sha1 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
       sha1.update(data);
       MessageDigest sha2 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);

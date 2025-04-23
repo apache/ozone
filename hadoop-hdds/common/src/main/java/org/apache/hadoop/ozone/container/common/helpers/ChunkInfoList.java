@@ -38,14 +38,14 @@ public class ChunkInfoList {
       ChunkInfoList.class,
       DelegatedCodec.CopyType.SHALLOW);
 
-  public static Codec<ChunkInfoList> getCodec() {
-    return CODEC;
-  }
-
   private final List<ContainerProtos.ChunkInfo> chunks;
 
   public ChunkInfoList(List<ContainerProtos.ChunkInfo> chunks) {
     this.chunks = Collections.unmodifiableList(chunks);
+  }
+
+  public static Codec<ChunkInfoList> getCodec() {
+    return CODEC;
   }
 
   /**

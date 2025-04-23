@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -318,7 +319,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     String xml =
-        "<Tagging xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Tagging xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\">" +
             "   <TagSet>" +
             "      <Tag>" +
             "         <Key>tag1</Key>" +

@@ -72,7 +72,7 @@ import org.slf4j.LoggerFactory;
  */
 @Timeout(300)
 public class TestStorageVolumeChecker {
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestStorageVolumeChecker.class);
 
   private static final int NUM_VOLUMES = 2;

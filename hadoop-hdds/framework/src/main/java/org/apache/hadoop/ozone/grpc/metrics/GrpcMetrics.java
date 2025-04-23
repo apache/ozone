@@ -130,7 +130,7 @@ public class GrpcMetrics implements MetricsSource {
   // exposing internal representation. FindBugs error raised.
   private MutableQuantiles[] grpcQueueTimeMillisQuantiles;
 
-  @Metric("Processsing time")
+  @Metric("Processing time")
   private MutableRate grpcProcessingTime;
 
   // There should be no getter method to avoid

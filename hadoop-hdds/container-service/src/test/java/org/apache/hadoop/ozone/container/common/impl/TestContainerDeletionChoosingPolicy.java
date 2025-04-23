@@ -151,7 +151,7 @@ public class TestContainerDeletionChoosingPolicy {
     List<Integer> numberOfBlocks = new ArrayList<Integer>();
     // create [numContainers + 1] containers
     for (int i = 0; i <= numContainers; i++) {
-      long containerId = RandomUtils.nextLong();
+      long containerId = RandomUtils.secure().randomLong();
       KeyValueContainerData data =
           new KeyValueContainerData(containerId,
               layout,

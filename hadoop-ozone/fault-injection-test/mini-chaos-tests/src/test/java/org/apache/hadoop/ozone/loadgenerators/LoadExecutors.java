@@ -57,7 +57,7 @@ public class LoadExecutors {
 
     while (Time.monotonicNow() - startTime < runTimeMillis) {
       LoadGenerator gen =
-          generators.get(RandomUtils.nextInt(0, numGenerators));
+          generators.get(RandomUtils.secure().randomInt(0, numGenerators));
 
       try {
         gen.generateLoad();

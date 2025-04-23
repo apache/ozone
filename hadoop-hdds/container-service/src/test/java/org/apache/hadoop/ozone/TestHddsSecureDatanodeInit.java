@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -80,7 +81,7 @@ public class TestHddsSecureDatanodeInit {
   private static String[] args = new String[]{};
   private static PrivateKey privateKey;
   private static PublicKey publicKey;
-  private static GenericTestUtils.LogCapturer dnLogs;
+  private static LogCapturer dnLogs;
   private static SecurityConfig securityConfig;
   private static KeyStorage keyStorage;
   private static CertificateCodec certCodec;
@@ -125,8 +126,7 @@ public class TestHddsSecureDatanodeInit {
       service.initializeCertificateClient(service.getCertificateClient());
       return null;
     });
-    dnLogs = GenericTestUtils.LogCapturer.captureLogs(
-        ((DNCertificateClient)service.getCertificateClient()).getLogger());
+    dnLogs = LogCapturer.captureLogs(DNCertificateClient.class);
     certCodec = new CertificateCodec(securityConfig, DN_COMPONENT);
     keyStorage = new KeyStorage(securityConfig, DN_COMPONENT);
     dnLogs.clearOutput();

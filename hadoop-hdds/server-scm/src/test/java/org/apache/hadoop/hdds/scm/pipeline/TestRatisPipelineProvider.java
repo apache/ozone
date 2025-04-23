@@ -64,6 +64,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Test for {@link RatisPipelineProvider}.
@@ -359,6 +361,31 @@ public class TestRatisPipelineProvider {
               "Expected SCMException for large metadata size with replication factor " + factor.toString());
       assertThat(ex.getMessage()).contains(expectedErrorSubstring);
     }
+  }
+
+  @ParameterizedTest
+  @CsvSource({ "1, 2", "2, 5" })
+  public void testCreatePipelineThrowErrorWithDataNodeLimit(int limit, int pipelineCount) throws Exception {
+    init(limit);
+
+    // Create pipelines up to the limit (2 for limit=1, 5 for limit=2).
+    for (int i = 0; i < pipelineCount; i++) {
+      stateManager.addPipeline(
+          provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+              new ArrayList<>(), new ArrayList<>()).getProtobufMessage(ClientVersion.CURRENT_VERSION)
+      );
+    }
+
+    // Verify that creating an additional pipeline throws an exception.
+    SCMException exception = assertThrows(SCMException.class, () ->
+        provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            new ArrayList<>(), new ArrayList<>())
+    );
+
+    // Validate exception message.
+    String expectedError = String.format(
+        "Cannot create pipeline as it would exceed the limit per datanode: %d replicationConfig: RATIS/THREE", limit);
+    assertEquals(expectedError, exception.getMessage());
   }
 
   private void addPipeline(

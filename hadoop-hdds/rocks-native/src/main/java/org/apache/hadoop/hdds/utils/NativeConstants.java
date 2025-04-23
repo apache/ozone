@@ -26,4 +26,5 @@ public final class NativeConstants {
 
   }
   public static final String ROCKS_TOOLS_NATIVE_LIBRARY_NAME = "ozone_rocksdb_tools";
+  public static final String ROCKS_TOOLS_NATIVE_PROPERTY = "rocks_tools_native";
 }

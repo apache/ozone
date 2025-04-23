@@ -66,17 +66,51 @@ import org.slf4j.LoggerFactory;
  * During DN startup, if the VERSION file exists, we verify that the
  * clusterID in the version file matches the clusterID from SCM.
  */
-public abstract class StorageVolume
-    implements Checkable<Boolean, VolumeCheckResult> {
+public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckResult> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(StorageVolume.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StorageVolume.class);
 
   // The name of the directory used for temporary files on the volume.
   public static final String TMP_DIR_NAME = "tmp";
   // The name of the directory where temporary files used to check disk
   // health are written to. This will go inside the tmp directory.
   public static final String TMP_DISK_CHECK_DIR_NAME = "disk-check";
+
+  private volatile VolumeState state;
+
+  // VERSION file properties
+  private String storageID;       // id of the file system
+  private String clusterID;       // id of the cluster
+  private String datanodeUuid;    // id of the DataNode
+  private long cTime;             // creation time of the file system state
+  private int layoutVersion;      // layout version of the storage data
+
+  private final ConfigurationSource conf;
+  private final DatanodeConfiguration dnConf;
+
+  private final StorageType storageType;
+  private final String volumeRoot;
+  private final File storageDir;
+  /** This is the raw storage dir location, saved for logging, to avoid repeated filesystem lookup. */
+  private final String storageDirStr;
+  private String workingDirName;
+  private File tmpDir;
+  private File diskCheckDir;
+
+  private final Optional<VolumeUsage> volumeUsage;
+
+  private final VolumeSet volumeSet;
+
+  /*
+  Fields used to implement IO based disk health checks.
+  If more than ioFailureTolerance IO checks fail out of the last ioTestCount
+  tests run, then the volume is considered failed.
+   */
+  private final int ioTestCount;
+  private final int ioFailureTolerance;
+  private AtomicInteger currentIOFailureCount;
+  private Queue<Boolean> ioTestSlidingWindow;
+  private int healthCheckFileSize;
 
   /**
    * Type for StorageVolume.
@@ -107,40 +141,6 @@ public abstract class StorageVolume
     NOT_FORMATTED,
     NOT_INITIALIZED
   }
-
-  private volatile VolumeState state;
-
-  // VERSION file properties
-  private String storageID;       // id of the file system
-  private String clusterID;       // id of the cluster
-  private String datanodeUuid;    // id of the DataNode
-  private long cTime;             // creation time of the file system state
-  private int layoutVersion;      // layout version of the storage data
-
-  private final ConfigurationSource conf;
-  private final DatanodeConfiguration dnConf;
-
-  private final StorageType storageType;
-  private final String volumeRoot;
-  private final File storageDir;
-  private String workingDirName;
-  private File tmpDir;
-  private File diskCheckDir;
-
-  private final Optional<VolumeUsage> volumeUsage;
-
-  private final VolumeSet volumeSet;
-
-  /*
-  Fields used to implement IO based disk health checks.
-  If more than ioFailureTolerance IO checks fail out of the last ioTestCount
-  tests run, then the volume is considered failed.
-   */
-  private final int ioTestCount;
-  private final int ioFailureTolerance;
-  private AtomicInteger currentIOFailureCount;
-  private Queue<Boolean> ioTestSlidingWindow;
-  private int healthCheckFileSize;
 
   protected StorageVolume(Builder<?> b) throws IOException {
     storageType = b.storageType;
@@ -173,6 +173,7 @@ public abstract class StorageVolume
       this.conf = null;
       this.dnConf = null;
     }
+    this.storageDirStr = storageDir.getAbsolutePath();
   }
 
   public void format(String cid) throws IOException {
@@ -459,7 +460,7 @@ public abstract class StorageVolume
     StorageLocationReport.Builder builder = StorageLocationReport.newBuilder()
         .setFailed(isFailed())
         .setId(getStorageID())
-        .setStorageLocation(volumeRoot)
+        .setStorageLocation(storageDirStr)
         .setStorageType(storageType);
 
     if (!builder.isFailed()) {
@@ -690,7 +691,7 @@ public abstract class StorageVolume
     // Once the volume is failed, it will not be checked anymore.
     // The failure counts can be left as is.
     if (currentIOFailureCount.get() > ioFailureTolerance) {
-      LOG.info("Failed IO test for volume {}: the last {} runs " +
+      LOG.error("Failed IO test for volume {}: the last {} runs " +
               "encountered {} out of {} tolerated failures.", this,
           ioTestSlidingWindow.size(), currentIOFailureCount,
           ioFailureTolerance);

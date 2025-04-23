@@ -470,8 +470,4 @@ public class SCMHAManagerImpl implements SCMHAManager {
     grpcServer.stop();
   }
 
-  @VisibleForTesting
-  public static Logger getLogger() {
-    return LOG;
-  }
 }

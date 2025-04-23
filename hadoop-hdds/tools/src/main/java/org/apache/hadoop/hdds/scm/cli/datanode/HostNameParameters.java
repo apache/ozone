@@ -17,36 +17,23 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
+import org.apache.hadoop.hdds.cli.ItemsFromStdin;
 import picocli.CommandLine;
 
 /** Parameter for specifying list of hostnames. */
 @CommandLine.Command
-public class HostNameParameters {
+public class HostNameParameters extends ItemsFromStdin {
 
-  @CommandLine.Parameters(description = "One or more host names separated by spaces. " +
-      "To read from stdin, specify '-' and supply the host names " +
-      "separated by newlines.",
+  @CommandLine.Parameters(description = "Host names" + FORMAT_DESCRIPTION,
       arity = "1..*",
       paramLabel = "<host name>")
-  private List<String> parameters = new ArrayList<>();
+  public void setHostNames(List<String> arguments) {
+    setItems(arguments);
+  }
 
   public List<String> getHostNames() {
-    List<String> hosts;
-    // Whether to read from stdin
-    if (parameters.get(0).equals("-")) {
-      hosts = new ArrayList<>();
-      Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8.name());
-      while (scanner.hasNextLine()) {
-        hosts.add(scanner.nextLine().trim());
-      }
-    } else {
-      hosts = parameters;
-    }
-    return hosts;
+    return getItems();
   }
 
 }

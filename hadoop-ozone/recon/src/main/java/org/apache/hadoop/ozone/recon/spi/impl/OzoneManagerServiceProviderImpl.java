@@ -467,15 +467,12 @@ public class OzoneManagerServiceProviderImpl
       // RocksDB.
       reconContext.updateHealthStatus(new AtomicBoolean(true));
       reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-
       return new RocksDBCheckpoint(untarredDbDir);
-
     } catch (IOException e) {
       LOG.error("Unable to obtain Ozone Manager DB Snapshot.", e);
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
     }
-
     return null;
   }
 
@@ -825,10 +822,6 @@ public class OzoneManagerServiceProviderImpl
 
   public OzoneManagerSyncMetrics getMetrics() {
     return metrics;
-  }
-
-  public static Logger getLogger() {
-    return LOG;
   }
 
   @VisibleForTesting

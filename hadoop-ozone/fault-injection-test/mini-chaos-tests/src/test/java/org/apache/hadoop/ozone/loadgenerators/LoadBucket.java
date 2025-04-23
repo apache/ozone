@@ -63,7 +63,7 @@ public class LoadBucket {
   }
 
   private boolean isFsOp() {
-    return RandomUtils.nextBoolean();
+    return RandomUtils.secure().randomBoolean();
   }
 
   // Write ops.
