@@ -240,11 +240,12 @@ public class TestSCMInstallSnapshotWithHA {
     // Corrupt the leader checkpoint and install that on the follower. The
     // operation should fail and  should shutdown.
     boolean delete = true;
-    for (File file : leaderCheckpointLocation.toFile()
-        .listFiles()) {
+    File[] files = leaderCheckpointLocation.toFile().listFiles();
+    assertNotNull(files);
+    for (File file : files) {
       if (file.getName().contains(".sst")) {
         if (delete) {
-          file.delete();
+          FileUtils.deleteQuietly(file);
           delete = false;
         } else {
           delete = true;

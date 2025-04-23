@@ -40,6 +40,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -220,7 +221,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
       byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      ozoneInputStream.read(fileContent);
+      IOUtils.readFully(ozoneInputStream, fileContent);
       assertEquals(value, new String(fileContent, UTF_8));
     }
   }
@@ -272,11 +273,9 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     OzoneManager leaderOM = getCluster().getOzoneManager(leaderOMNodeId);
 
-    // Get follower OMs
+    // Get follower OM
     OzoneManager followerOM1 = getCluster().getOzoneManager(
         leaderOM.getPeerNodes().get(0).getNodeId());
-    OzoneManager followerOM2 = getCluster().getOzoneManager(
-        leaderOM.getPeerNodes().get(1).getNodeId());
 
     // Do some transactions so that the log index increases
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);

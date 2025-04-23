@@ -50,6 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -364,7 +365,7 @@ class TestContainerReplication {
           //Reading through file and comparing with input data.
           byte[] readData = new byte[size];
           try (OzoneInputStream inputStream = createInputStream(client)) {
-            inputStream.read(readData);
+            IOUtils.readFully(inputStream, readData);
             Assertions.assertArrayEquals(readData, originalData);
           }
           Assertions.assertEquals(0, failedReadChunkCountMap.size());
@@ -373,7 +374,7 @@ class TestContainerReplication {
             int firstReadLen = 1024 * 3;
             Arrays.fill(readData, (byte) 0);
             //Reading first stripe.
-            inputStream.read(readData, 0, firstReadLen);
+            IOUtils.readFully(inputStream, readData, 0, firstReadLen);
             Assertions.assertEquals(0, failedReadChunkCountMap.size());
             //Checking the initial state as per the latest location.
             assertState(cluster, ImmutableMap.of(1, replicaIndexMap.get(1), 2, replicaIndexMap.get(2),
@@ -402,7 +403,7 @@ class TestContainerReplication {
             assertState(cluster, ImmutableMap.of(1, replicaIndexMap.get(3), 2, replicaIndexMap.get(2),
                 3, replicaIndexMap.get(1), 4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
             // Reading the Stripe 2 from the pre initialized inputStream
-            inputStream.read(readData, firstReadLen, size - firstReadLen);
+            IOUtils.readFully(inputStream, readData, firstReadLen, size - firstReadLen);
             // Asserting there was a failure in the first read chunk.
             Assertions.assertEquals(ImmutableMap.of(1, 1, 3, 1), failedReadChunkCountMap);
             Assertions.assertArrayEquals(readData, originalData);
