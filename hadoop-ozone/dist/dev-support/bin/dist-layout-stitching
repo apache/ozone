@@ -130,16 +130,23 @@ run cp -p -r "${ROOT}/hadoop-ozone/dist/target/Dockerfile" .
 
 run mkdir compose/_keytabs
 
+# Determine CPFLAGS based on system type
+if [ "$(uname)" = "Darwin" ]; then
+  CPFLAGS="--no-clobber"
+else
+  CPFLAGS="--update=none"
+fi
+
 for file in $(find "${ROOT}" -path '*/target/classes/*.classpath' | sort); do
   # We need to add the artifact manually as it's not part the generated classpath desciptor
   module=$(basename "${file%.classpath}")
   sed -i -e "s;$;:\$HDDS_LIB_JARS_DIR/${module}-${HDDS_VERSION}.jar;" "$file"
 
-  cp -n -p -v "$file" share/ozone/classpath/
+  cp $CPFLAGS -p -v "$file" share/ozone/classpath/
 done
 
 for file in $(find "${ROOT}" -path '*/share/ozone/lib/*jar' | sort); do
-  cp -n -p -v "$file" share/ozone/lib/
+  cp $CPFLAGS -p -v "$file" share/ozone/lib/
 done
 
 #workaround for https://issues.apache.org/jira/browse/MRESOURCES-236

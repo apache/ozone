@@ -112,16 +112,15 @@ import org.slf4j.LoggerFactory;
  */
 public final class HddsServerUtil {
 
-  private HddsServerUtil() {
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(HddsServerUtil.class);
 
   private static final int SHUTDOWN_HOOK_PRIORITY = 0;
 
   public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
       "OZONE_RATIS_SNAPSHOT_COMPLETE";
 
-  private static final Logger LOG = LoggerFactory.getLogger(
-      HddsServerUtil.class);
+  private HddsServerUtil() {
+  }
 
   /**
    * Add protobuf-based protocol to the {@link org.apache.hadoop.ipc.RPC.Server}.

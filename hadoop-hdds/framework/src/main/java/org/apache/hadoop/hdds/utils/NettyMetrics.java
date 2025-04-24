@@ -31,24 +31,8 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
  * This class emits Netty metrics.
  */
 public final class NettyMetrics implements MetricsSource {
-  private enum MetricsInfos implements MetricsInfo {
-    USED_DIRECT_MEM("Used direct memory."),
-    MAX_DIRECT_MEM("Max direct memory.");
 
-    private final String desc;
-
-    MetricsInfos(String desc) {
-      this.desc = desc;
-    }
-
-    @Override
-    public String description() {
-      return desc;
-    }
-  }
-
-  public static final String SOURCE_NAME =
-      NettyMetrics.class.getSimpleName();
+  public static final String SOURCE_NAME = NettyMetrics.class.getSimpleName();
 
   public static NettyMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
@@ -68,5 +52,21 @@ public final class NettyMetrics implements MetricsSource {
   public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
+  }
+
+  private enum MetricsInfos implements MetricsInfo {
+    USED_DIRECT_MEM("Used direct memory."),
+    MAX_DIRECT_MEM("Max direct memory.");
+
+    private final String desc;
+
+    MetricsInfos(String desc) {
+      this.desc = desc;
+    }
+
+    @Override
+    public String description() {
+      return desc;
+    }
   }
 }
