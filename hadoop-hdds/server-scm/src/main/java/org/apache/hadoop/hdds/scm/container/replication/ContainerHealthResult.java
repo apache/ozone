@@ -27,17 +27,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  */
 public class ContainerHealthResult {
 
-  /**
-   * All possible container health states.
-   */
-  public enum HealthState {
-    HEALTHY,
-    UNHEALTHY,
-    UNDER_REPLICATED,
-    OVER_REPLICATED,
-    MIS_REPLICATED
-  }
-
   private final ContainerInfo containerInfo;
   private final HealthState healthState;
   private final List<SCMCommand<?>> commands = new ArrayList<>();
@@ -400,5 +389,16 @@ public class ContainerHealthResult {
     public void setIsSafelyOverReplicated(boolean isSafelyOverReplicated) {
       this.isSafelyOverReplicated = isSafelyOverReplicated;
     }
+  }
+
+  /**
+   * All possible container health states.
+   */
+  public enum HealthState {
+    HEALTHY,
+    UNHEALTHY,
+    UNDER_REPLICATED,
+    OVER_REPLICATED,
+    MIS_REPLICATED
   }
 }
