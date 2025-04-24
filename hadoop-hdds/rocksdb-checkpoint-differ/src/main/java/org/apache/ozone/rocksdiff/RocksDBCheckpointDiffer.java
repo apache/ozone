@@ -676,6 +676,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   /**
    * Load existing compaction log from table to the in-memory DAG.
    * This only needs to be done once during OM startup.
+   * It is only for backward compatibility.
    */
   public void loadAllCompactionLogs() {
     synchronized (this) {
@@ -866,7 +867,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         continue;
       }
 
-      CompactionNode infileNode = compactionDag.getCompactionMap().get(fileName);
+      CompactionNode infileNode = compactionDag.getCompactionNode(fileName);
       if (infileNode == null) {
         LOG.debug("Source '{}' SST file '{}' is never compacted",
             src.getDbPath(), fileName);
@@ -1110,7 +1111,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public Set<String> pruneSstFileNodesFromDag(Set<String> sstFileNodes) {
     Set<CompactionNode> startNodes = new HashSet<>();
     for (String sstFileNode : sstFileNodes) {
-      CompactionNode infileNode = compactionDag.getCompactionMap().get(sstFileNode);
+      CompactionNode infileNode = compactionDag.getCompactionNode(sstFileNode);
       if (infileNode == null) {
         LOG.warn("Compaction node doesn't exist for sstFile: {}.", sstFileNode);
         continue;

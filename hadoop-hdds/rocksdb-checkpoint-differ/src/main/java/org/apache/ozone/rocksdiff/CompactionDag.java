@@ -30,7 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Helper methods for creating compaction DAGs.
+ * Wrapper class storing DAGs of SST files for tracking compactions.
  */
 public class CompactionDag {
   private static final Logger LOG = LoggerFactory.getLogger(CompactionDag.class);
@@ -95,20 +95,18 @@ public class CompactionDag {
     Set<String> removedFiles = new HashSet<>();
     Set<CompactionNode> currentLevel = startNodes;
 
-    synchronized (this) {
-      while (!currentLevel.isEmpty()) {
-        Set<CompactionNode> nextLevel = new HashSet<>();
-        for (CompactionNode current : currentLevel) {
-          if (!backwardDag.nodes().contains(current)) {
-            continue;
-          }
-
-          nextLevel.addAll(backwardDag.predecessors(current));
-          backwardDag.removeNode(current);
-          removedFiles.add(current.getFileName());
+    while (!currentLevel.isEmpty()) {
+      Set<CompactionNode> nextLevel = new HashSet<>();
+      for (CompactionNode current : currentLevel) {
+        if (!backwardDag.nodes().contains(current)) {
+          continue;
         }
-        currentLevel = nextLevel;
+
+        nextLevel.addAll(backwardDag.predecessors(current));
+        backwardDag.removeNode(current);
+        removedFiles.add(current.getFileName());
       }
+      currentLevel = nextLevel;
     }
 
     return removedFiles;
@@ -122,21 +120,19 @@ public class CompactionDag {
     Set<String> removedFiles = new HashSet<>();
     Set<CompactionNode> currentLevel = new HashSet<>(startNodes);
 
-    synchronized (this) {
-      while (!currentLevel.isEmpty()) {
-        Set<CompactionNode> nextLevel = new HashSet<>();
-        for (CompactionNode current : currentLevel) {
-          if (!forwardDag.nodes().contains(current)) {
-            continue;
-          }
-
-          nextLevel.addAll(forwardDag.successors(current));
-          forwardDag.removeNode(current);
-          removedFiles.add(current.getFileName());
+    while (!currentLevel.isEmpty()) {
+      Set<CompactionNode> nextLevel = new HashSet<>();
+      for (CompactionNode current : currentLevel) {
+        if (!forwardDag.nodes().contains(current)) {
+          continue;
         }
 
-        currentLevel = nextLevel;
+        nextLevel.addAll(forwardDag.successors(current));
+        forwardDag.removeNode(current);
+        removedFiles.add(current.getFileName());
       }
+
+      currentLevel = nextLevel;
     }
 
     return removedFiles;
@@ -151,5 +147,9 @@ public class CompactionDag {
 
   public ConcurrentMap<String, CompactionNode> getCompactionMap() {
     return compactionNodeMap;
+  }
+
+  public CompactionNode getCompactionNode(String fileName) {
+    return compactionNodeMap.get(fileName);
   }
 }
