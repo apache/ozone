@@ -22,6 +22,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import net.jcip.annotations.Immutable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
@@ -31,7 +32,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
  */
 @Immutable
 public final class OmLCExpiration implements OmLCAction {
-  private final int days;
+  private final Integer days;
   private final String date;
 
   private OmLCExpiration() {
@@ -43,7 +44,7 @@ public final class OmLCExpiration implements OmLCAction {
     this.date = builder.date;
   }
 
-  public int getDays() {
+  public Integer getDays() {
     return days;
   }
 
@@ -58,7 +59,7 @@ public final class OmLCExpiration implements OmLCAction {
 
   /**
    * Validates the expiration configuration.
-   * - Days must be a positive number greater than zero
+   * - Days must be a positive number greater than zero if set
    * - Either days or date should be specified, but not both or neither
    * - The date value must conform to the ISO 8601 format
    * - The date value must be in the future
@@ -68,40 +69,57 @@ public final class OmLCExpiration implements OmLCAction {
    */
   @Override
   public void valid() throws OMException {
-    if (days < 0) {
-      throw new OMException("'Days' for Expiration action must be a positive integer.",
-          OMException.ResultCodes.INVALID_REQUEST);
-    }
-
-    boolean hasDays = days > 0;
-    boolean hasDate = date != null && !date.isEmpty();
+    boolean hasDays = days != null;
+    boolean hasDate = !StringUtils.isBlank(date);
 
     if (hasDays == hasDate) {
       throw new OMException("Invalid lifecycle configuration: Either 'days' or 'date' " +
           "should be specified, but not both or neither.", OMException.ResultCodes.INVALID_REQUEST);
     }
-
-    // The date value must conform to the ISO 8601 format, be in the future, and be at midnight UTC
-    if (hasDate) {
-      try {
-        ZonedDateTime parsedDate = ZonedDateTime.parse(date, DateTimeFormatter.ISO_DATE_TIME);
-        ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-
-        if (parsedDate.isBefore(now)) {
-          throw new OMException("Invalid lifecycle configuration: 'Date' must be in the future",
-              OMException.ResultCodes.INVALID_REQUEST);
-        }
-
-        // Verify that the time is midnight UTC (00:00:00Z)
-        if (parsedDate.getHour() != 0 || parsedDate.getMinute() != 0 || parsedDate.getSecond() != 0
-            || parsedDate.getNano() != 0 || !parsedDate.getZone().equals(ZoneOffset.UTC)) {
-          throw new OMException("Invalid lifecycle configuration: 'Date' must be at midnight GMT",
-              OMException.ResultCodes.INVALID_REQUEST);
-        }
-      } catch (DateTimeParseException ex) {
-        throw new OMException("Invalid lifecycle configuration: 'Date' must be in ISO 8601 format",
+    if (hasDays) {
+      if (days <= 0) {
+        throw new OMException("'Days' for Expiration action must be a positive integer greater than zero.",
             OMException.ResultCodes.INVALID_REQUEST);
       }
+    }
+    if (hasDate) {
+      validateExpirationDate(date);
+    }
+  }
+
+  /**
+   * Validates that the expiration date is:
+   * - In the ISO 8601 format
+   * - In the future
+   * - At midnight UTC (00:00:00Z).
+   *
+   * @param expirationDate The date string to validate
+   * @throws OMException if the date is invalid
+   */
+  private void validateExpirationDate(String expirationDate) throws OMException {
+    try {
+      ZonedDateTime parsedDate = ZonedDateTime.parse(expirationDate, DateTimeFormatter.ISO_DATE_TIME);
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+
+      // The date value must conform to the ISO 8601 format, be in the future.
+      if (parsedDate.isBefore(now)) {
+        throw new OMException("Invalid lifecycle configuration: 'Date' must be in the future",
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
+
+      // Verify that the time is midnight UTC (00:00:00Z)
+      if (parsedDate.getHour() != 0 ||
+          parsedDate.getMinute() != 0 ||
+          parsedDate.getSecond() != 0 ||
+          parsedDate.getNano() != 0 ||
+          !parsedDate.getZone().equals(ZoneOffset.UTC)) {
+
+        throw new OMException("Invalid lifecycle configuration: 'Date' must be at midnight UTC",
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
+    } catch (DateTimeParseException ex) {
+      throw new OMException("Invalid lifecycle configuration: 'Date' must be in ISO 8601 format",
+          OMException.ResultCodes.INVALID_REQUEST);
     }
   }
 
@@ -117,8 +135,8 @@ public final class OmLCExpiration implements OmLCAction {
    * Builder of OmLCExpiration.
    */
   public static class Builder {
-    private int days;
-    private String date = "";
+    private Integer days = null;
+    private String date = null;
 
     public Builder setDays(int lcDays) {
       this.days = lcDays;

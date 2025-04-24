@@ -98,7 +98,7 @@ class TestOmLCExpiration {
     OmLCExpiration.Builder exp9 = new OmLCExpiration.Builder()
         .setDays(0);
     assertOMException(exp9::build, INVALID_REQUEST,
-        "Either 'days' or 'date' should be specified, but not both or neither.");
+        "'Days' for Expiration action must be a positive integer");
 
     // 1 minute ago
     OmLCExpiration.Builder exp10 = new OmLCExpiration.Builder()
