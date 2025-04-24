@@ -58,6 +58,7 @@ public final class OmLifecycleRuleAndOperator {
    * Ensures the following:
    * - Either tags or prefix must be specified.
    * - If there are tags and no prefix, the tags should be more than one.
+   * - Prefix can be "".
    * - Prefix alone is not allowed.
    *
    * @throws OMException if the validation fails.

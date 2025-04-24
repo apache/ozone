@@ -119,6 +119,7 @@ public final class OmLCRule {
    * - ID length should not exceed the allowed limit
    * - At least one action must be specified
    * - Filter and Prefix cannot be used together
+   * - Prefix can be "", in which case the rule applies to all objects in the bucket.
    * - Actions must be valid
    * - Filter must be valid
    * - There must be at most one Expiration action per rule
