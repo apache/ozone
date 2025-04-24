@@ -304,7 +304,7 @@ public final class DBStoreBuilder {
     Set<TableConfig> tableConfigs = new HashSet<>();
 
     // If default column family was not added, add it with the default options.
-    cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME, getDefaultCFOptions());
+    cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME, getCfOptions(DEFAULT_COLUMN_FAMILY_NAME));
 
     for (Map.Entry<String, ManagedColumnFamilyOptions> entry:
         cfOptions.entrySet()) {
@@ -313,7 +313,7 @@ public final class DBStoreBuilder {
 
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
-        tableConfigs.add(new TableConfig(name, getDefaultCFOptions()));
+        tableConfigs.add(new TableConfig(name, getCfOptions(name)));
       } else {
         tableConfigs.add(new TableConfig(name, options));
       }
@@ -329,7 +329,7 @@ public final class DBStoreBuilder {
    * @param defaultCFAutoCompaction
    */
   public DBStoreBuilder disableDefaultCFAutoCompaction(boolean defaultCFAutoCompaction) {
-    ManagedColumnFamilyOptions defaultCFOptions = getDefaultCFOptions();
+    ManagedColumnFamilyOptions defaultCFOptions = getCfOptions(DEFAULT_COLUMN_FAMILY_NAME);
     defaultCFOptions.setDisableAutoCompactions(defaultCFAutoCompaction);
     setDefaultCFOptions(defaultCFOptions);
     return this;
@@ -378,12 +378,15 @@ public final class DBStoreBuilder {
    * @return The {@link ManagedColumnFamilyOptions} that should be used as the default
    * value for this builder if one is not specified by the caller.
    */
-  private ManagedColumnFamilyOptions getDefaultCFOptions() {
+  private ManagedColumnFamilyOptions getCfOptions(String cfName) {
     if (Objects.nonNull(defaultCfOptions)) {
       return defaultCfOptions;
     }
+    if (Objects.isNull(defaultCfProfile)) {
+      throw new RuntimeException();
+    }
     Path configuredPath = optionsPath != null ? optionsPath : dbPath;
-    return defaultCfProfile.getColumnFamilyOptions(configuredPath, DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME);
+    return defaultCfProfile.getColumnFamilyOptions(configuredPath, cfName);
   }
 
   private File getDBFile() throws RocksDatabaseException {
