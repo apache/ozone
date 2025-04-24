@@ -199,7 +199,6 @@ public final class ReplicationManagerUtil {
     return new ExcludedAndUsedNodes(excludedNodes, usedNodes);
   }
 
-
   /**
    * Simple class to hold the excluded and used nodes lists.
    */

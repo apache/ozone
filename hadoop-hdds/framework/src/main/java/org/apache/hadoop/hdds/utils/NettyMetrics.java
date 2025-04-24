@@ -50,13 +50,11 @@ public final class NettyMetrics implements MetricsSource {
   public static final String SOURCE_NAME =
       NettyMetrics.class.getSimpleName();
 
-
   public static NettyMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     NettyMetrics metrics = new NettyMetrics();
     return ms.register(SOURCE_NAME, "Netty metrics", metrics);
   }
-
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {

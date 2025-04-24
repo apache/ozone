@@ -211,7 +211,6 @@ public class TestReconUtils {
         .setOwner("TEST");
   }
 
-
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state) {
     return getDefaultContainerInfoBuilder(state)

@@ -72,5 +72,5 @@ public interface IHeatMapProvider {
 
   default HealthCheckResponse doHeatMapHealthCheck() {
     return new HealthCheckResponse.Builder("Healthy", Response.Status.OK.getStatusCode()).build();
-  };
+  }
 }

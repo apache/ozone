@@ -33,12 +33,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sqlite.SQLiteConfig;
 
-
 /**
  * Handles creation and interaction with the database.
  * Provides methods for table creation, log data insertion, and index setup.
  */
-
 public class ContainerDatanodeDatabase {
 
   private static Map<String, String> queries;

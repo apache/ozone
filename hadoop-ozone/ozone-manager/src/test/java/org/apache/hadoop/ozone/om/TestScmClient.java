@@ -97,6 +97,7 @@ public class TestScmClient {
             true, newHashSet(1L, 3L, 4L))
     );
   }
+
   @ParameterizedTest
   @MethodSource("getContainerLocationsTestCases")
   public void testGetContainerLocations(String testCaseName,

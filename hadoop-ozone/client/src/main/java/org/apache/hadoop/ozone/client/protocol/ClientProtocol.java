@@ -1112,7 +1112,6 @@ public interface ClientProtocol {
    */
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
-
   void setIsS3Request(boolean isS3Request);
 
   /**

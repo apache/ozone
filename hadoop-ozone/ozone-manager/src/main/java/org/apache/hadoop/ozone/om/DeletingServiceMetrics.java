@@ -49,13 +49,13 @@ public final class DeletingServiceMetrics {
         "Metrics tracking the progress of deletion of directories and keys in the OM",
         new DeletingServiceMetrics());
   }
+
   /**
    * Unregister the metrics instance.
    */
   public static void unregister() {
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
-
 
   /*
    * Total directory deletion metrics across all iterations of DirectoryDeletingService since last restart.
@@ -88,9 +88,11 @@ public final class DeletingServiceMetrics {
   public long getNumDirsSentForPurge() {
     return numDirsSentForPurge.value();
   }
+
   public long getNumSubDirsSentForPurge() {
     return numSubDirsSentForPurge.value();
   }
+
   public long getNumSubFilesSentForPurge() {
     return numSubFilesSentForPurge.value();
   }
@@ -124,18 +126,23 @@ public final class DeletingServiceMetrics {
   public void incrNumDirPurged(long dirPurged) {
     this.numDirsPurged.incr(dirPurged);
   }
+
   public void incrNumSubFilesMoved(long subKeys) {
     this.numSubFilesMovedToDeletedTable.incr(subKeys);
   }
+
   public void incrNumSubDirectoriesMoved(long subDirectories) {
     this.numSubDirsMovedToDeletedDirTable.incr(subDirectories);
   }
+
   public long getNumDirsPurged() {
     return numDirsPurged.value();
   }
+
   public long getNumSubFilesMovedToDeletedTable() {
     return numSubFilesMovedToDeletedTable.value();
   }
+
   public long getNumSubDirsMovedToDeletedDirTable() {
     return numSubDirsMovedToDeletedDirTable.value();
   }

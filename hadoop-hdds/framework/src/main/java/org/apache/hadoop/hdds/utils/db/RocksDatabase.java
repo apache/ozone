@@ -76,9 +76,11 @@ public final class RocksDatabase implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
+
   static {
     ManagedRocksObjectUtils.loadRocksDBLibrary();
   }
+
   private static final ManagedReadOptions DEFAULT_READ_OPTION =
       new ManagedReadOptions();
 

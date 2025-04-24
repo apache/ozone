@@ -81,7 +81,6 @@ public final class ReconConstants {
       (double) MAX_FILE_SIZE_UPPER_BOUND / MIN_FILE_SIZE_UPPER_BOUND) /
       Math.log(2)) + 1;
 
-
   // 1125899906842624L = 1PB
   public static final long MAX_CONTAINER_SIZE_UPPER_BOUND = 1125899906842624L;
   // 536870912L = 512MB

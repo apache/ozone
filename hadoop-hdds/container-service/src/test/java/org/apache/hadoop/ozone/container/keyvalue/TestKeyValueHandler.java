@@ -432,7 +432,6 @@ public class TestKeyValueHandler {
     }
   }
 
-
   @Test
   public void testDeleteContainerTimeout() throws IOException {
     final String testDir = tempDir.toString();

@@ -65,6 +65,7 @@ public class ReplicasVerify extends Handler {
     private boolean doExecuteChecksums;
 
   }
+
   private List<ReplicaVerifier> replicaVerifiers;
 
   @Override

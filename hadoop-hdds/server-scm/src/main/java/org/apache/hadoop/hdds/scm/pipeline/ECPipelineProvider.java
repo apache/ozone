@@ -106,7 +106,6 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
     return dead != 0 ? dead : left.getOperationalState().compareTo(right.getOperationalState());
   };
 
-
   @Override
   public Pipeline createForRead(
       ECReplicationConfig replicationConfig,

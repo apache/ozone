@@ -222,6 +222,7 @@ public class ContainerHealthResult {
     public void setHasUnReplicatedOfflineIndexes(boolean val) {
       hasUnReplicatedOfflineIndexes = val;
     }
+
     /**
      * Indicates whether a container has some indexes which are only on nodes
      * which are DECOMMISSIONING or ENTERING_MAINTENANCE. These containers may

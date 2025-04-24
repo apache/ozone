@@ -1558,6 +1558,7 @@ public abstract class TestOmSnapshot {
 
     return response.getSnapshotDiffReport();
   }
+
   @Test
   public void testSnapDiffNoSnapshot() throws Exception {
     String volume = "vol-" + counter.incrementAndGet();

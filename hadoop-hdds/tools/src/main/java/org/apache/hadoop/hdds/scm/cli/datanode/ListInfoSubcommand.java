@@ -78,7 +78,6 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
   private List<Pipeline> pipelines;
 
-
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     pipelines = scmClient.listPipelines();

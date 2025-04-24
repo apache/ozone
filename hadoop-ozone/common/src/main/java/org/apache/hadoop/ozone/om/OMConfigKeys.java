@@ -30,6 +30,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB =
       "ozone.om.snapshot.load.native.lib";
   public static final boolean OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT = true;
+
   /**
    * Never constructed.
    */

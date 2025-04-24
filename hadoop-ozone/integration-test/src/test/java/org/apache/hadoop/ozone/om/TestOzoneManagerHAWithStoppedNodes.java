@@ -96,6 +96,7 @@ import org.slf4j.LoggerFactory;
 public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(
       TestOzoneManagerHAWithStoppedNodes.class);
+
   /**
    * After restarting OMs we need to wait
    * for a leader to be elected and ready.
@@ -466,6 +467,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
       }
     });
   }
+
   /**
    * 1. Stop one of the OM
    * 2. make a call to OM, this will make failover attempts to find new node.

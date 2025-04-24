@@ -910,12 +910,14 @@ public class TestOmMetrics {
         .setAdminName("dummyAdmin")
         .build();
   }
+
   private OmBucketArgs getBucketArgs(OmBucketInfo info) {
     return new OmBucketArgs.Builder()
         .setVolumeName(info.getVolumeName())
         .setBucketName(info.getBucketName())
         .build();
   }
+
   private OmBucketInfo createBucketInfo(boolean isEcBucket) throws IOException {
     OmVolumeArgs volumeArgs = createVolumeArgs();
     writeClient.createVolume(volumeArgs);

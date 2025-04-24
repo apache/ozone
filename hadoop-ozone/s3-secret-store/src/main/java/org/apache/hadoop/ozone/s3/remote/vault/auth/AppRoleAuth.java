@@ -45,7 +45,6 @@ public class AppRoleAuth implements Auth {
     this.secretId = secretId;
   }
 
-
   @Override
   public Vault auth(VaultConfig config) throws VaultException {
     Vault vault = new Vault(config);

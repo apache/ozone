@@ -98,7 +98,6 @@ public class RDBMetrics {
     numDBKeyMayExistMisses.incr();
   }
 
-
   @VisibleForTesting
   public long getNumDBKeyMayExistChecks() {
     return numDBKeyMayExistChecks.value();
