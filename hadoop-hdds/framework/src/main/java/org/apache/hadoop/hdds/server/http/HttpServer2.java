@@ -1703,11 +1703,11 @@ public final class HttpServer2 implements FilterContainer {
   public enum XFrameOption {
     DENY("DENY"), SAMEORIGIN("SAMEORIGIN"), ALLOWFROM("ALLOW-FROM");
 
+    private final String name;
+
     XFrameOption(String name) {
       this.name = name;
     }
-
-    private final String name;
 
     @Override
     public String toString() {
