@@ -93,13 +93,13 @@ public class DiskBalancerService extends BackgroundService {
   private Set<Long> inProgressContainers;
 
   /**
-   * A map that tracks the total bytes freed from each source volume
+   * A map that tracks the total bytes which will be freed from each source volume
    * during container moves in the current disk balancing cycle.
    *
    * Unlike committedBytes, which is used for pre-allocating space on
-   * destination volumes, deltaSizes helps track how much space has
-   * effectively been freed on the source volumes without modifying
-   * their committedBytes (which could otherwise go negative).
+   * destination volumes, deltaSizes helps track how many space will be
+   * freed on the source volumes without modifying their
+   * committedBytes (which could otherwise go negative).
    */
   private Map<HddsVolume, Long> deltaSizes;
   private MutableVolumeSet volumeSet;
