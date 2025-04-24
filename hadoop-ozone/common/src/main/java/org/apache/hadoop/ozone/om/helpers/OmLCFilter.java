@@ -49,6 +49,8 @@ public final class OmLCFilter {
   /**
    * Validates the OmLCFilter.
    * Ensures that only one of prefix, tag, or andOperator is set.
+   * You can specify an empty filter, in which case the rule applies to all objects in the bucket.
+   * Ref: <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-filters.html#filter-examples">...</a>
    * If the validation fails, an OMException is thrown.
    *
    * @throws OMException if the filter is invalid.
