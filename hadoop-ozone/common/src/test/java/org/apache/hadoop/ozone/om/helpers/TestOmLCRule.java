@@ -164,7 +164,6 @@ class TestOmLCRule {
     OmLifecycleConfiguration.Builder config = new OmLifecycleConfiguration.Builder()
         .setVolume("volume")
         .setBucket("bucket")
-        .setOwner("owner")
         .setRules(rules);
 
     assertOMException(config::build, INVALID_REQUEST, "Duplicate rule IDs found");

@@ -78,11 +78,10 @@ public final class OMLCUtils {
   }
 
   public static OmLifecycleConfiguration.Builder getOmLifecycleConfiguration(
-      String volume, String bucket, String owner, List<OmLCRule> rules) {
+      String volume, String bucket, List<OmLCRule> rules) {
     return new OmLifecycleConfiguration.Builder()
         .setVolume(volume)
         .setBucket(bucket)
-        .setOwner(owner)
         .setRules(rules);
   }
 

@@ -40,7 +40,6 @@ public final class OmLifecycleConfiguration extends WithObjectID
   public static final int LC_MAX_RULES = 1000;
   private final String volume;
   private final String bucket;
-  private final String owner;
   private final long creationTime;
   private final List<OmLCRule> rules;
 
@@ -52,7 +51,6 @@ public final class OmLifecycleConfiguration extends WithObjectID
     super(builder);
     this.volume = builder.volume;
     this.bucket = builder.bucket;
-    this.owner = builder.owner;
     this.rules = Collections.unmodifiableList(builder.rules);
     this.creationTime = builder.creationTime;
   }
@@ -65,10 +63,6 @@ public final class OmLifecycleConfiguration extends WithObjectID
     return bucket;
   }
 
-  public String getOwner() {
-    return owner;
-  }
-
   public String getVolume() {
     return volume;
   }
@@ -79,7 +73,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
 
   /**
    * Validates the lifecycle configuration.
-   * - Volume, Bucket and Owner cannot be blank
+   * - Volume and Bucket cannot be blank
    * - At least one rule needs to be specified
    * - Number of rules should not exceed the allowed limit
    * - Rules must have unique IDs
@@ -95,11 +89,6 @@ public final class OmLifecycleConfiguration extends WithObjectID
 
     if (StringUtils.isBlank(bucket)) {
       throw new OMException("Invalid lifecycle configuration: Bucket cannot be blank.",
-          OMException.ResultCodes.INVALID_REQUEST);
-    }
-
-    if (StringUtils.isBlank(owner)) {
-      throw new OMException("Invalid lifecycle configuration: Owner cannot be blank.",
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
@@ -134,7 +123,6 @@ public final class OmLifecycleConfiguration extends WithObjectID
     return new Builder()
         .setVolume(volume)
         .setBucket(this.bucket)
-        .setOwner(this.owner)
         .setCreationTime(this.creationTime)
         .setRules(this.rules)
         .setUpdateID(super.getUpdateID())
@@ -146,7 +134,6 @@ public final class OmLifecycleConfiguration extends WithObjectID
     return "OmLifecycleConfiguration{" +
         "volume='" + volume + '\'' +
         ", bucket='" + bucket + '\'' +
-        ", owner='" + owner + '\'' +
         ", creationTime=" + creationTime +
         ", rulesCount=" + rules.size() +
         ", objectID=" + getObjectID() +
@@ -168,7 +155,6 @@ public final class OmLifecycleConfiguration extends WithObjectID
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, this.volume);
     auditMap.put(OzoneConsts.BUCKET, this.bucket);
-    auditMap.put(OzoneConsts.OWNER, this.owner);
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
 
     return auditMap;
@@ -180,7 +166,6 @@ public final class OmLifecycleConfiguration extends WithObjectID
   public static class Builder extends WithObjectID.Builder {
     private String volume = "";
     private String bucket = "";
-    private String owner = "";
     private long creationTime;
     private List<OmLCRule> rules = new ArrayList<>();
 
@@ -194,11 +179,6 @@ public final class OmLifecycleConfiguration extends WithObjectID
 
     public Builder setBucket(String bucketName) {
       this.bucket = bucketName;
-      return this;
-    }
-
-    public Builder setOwner(String ownerName) {
-      this.owner = ownerName;
       return this;
     }
 

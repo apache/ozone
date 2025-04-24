@@ -45,7 +45,6 @@ public class TestOmLifeCycleConfiguration {
     OmLifecycleConfiguration lcc = new OmLifecycleConfiguration.Builder()
         .setVolume("s3v")
         .setBucket("spark")
-        .setOwner("ozone")
         .setRules(Collections.singletonList(new OmLCRule.Builder()
             .setId("spark logs")
             .setAction(new OmLCExpiration.Builder()
@@ -66,17 +65,14 @@ public class TestOmLifeCycleConfiguration {
 
     List<OmLCRule> rules = Collections.singletonList(rule);
 
-    OmLifecycleConfiguration.Builder lcc0 = getOmLifecycleConfiguration(null, "bucket", "owner", rules);
+    OmLifecycleConfiguration.Builder lcc0 = getOmLifecycleConfiguration(null, "bucket", rules);
     assertOMException(lcc0::build, INVALID_REQUEST, "Volume cannot be blank");
 
-    OmLifecycleConfiguration.Builder lcc1 = getOmLifecycleConfiguration("volume", null, "owner", rules);
+    OmLifecycleConfiguration.Builder lcc1 = getOmLifecycleConfiguration("volume", null, rules);
     assertOMException(lcc1::build, INVALID_REQUEST, "Bucket cannot be blank");
 
-    OmLifecycleConfiguration.Builder lcc2 = getOmLifecycleConfiguration("volume", "bucket", null, rules);
-    assertOMException(lcc2::build, INVALID_REQUEST, "Owner cannot be blank");
-
     OmLifecycleConfiguration.Builder lcc3 = getOmLifecycleConfiguration(
-        "volume", "bucket", "owner", Collections.emptyList());
+        "volume", "bucket", Collections.emptyList());
     assertOMException(lcc3::build, INVALID_REQUEST,
         "At least one rules needs to be specified in a lifecycle configuration");
 
@@ -89,7 +85,7 @@ public class TestOmLifeCycleConfiguration {
           .build();
       rules4.add(r);
     }
-    OmLifecycleConfiguration.Builder lcc4 = getOmLifecycleConfiguration("volume", "bucket", "owner", rules4);
+    OmLifecycleConfiguration.Builder lcc4 = getOmLifecycleConfiguration("volume", "bucket", rules4);
     assertOMException(lcc4::build, INVALID_REQUEST,
         "The number of lifecycle rules must not exceed the allowed limit of");
   }
@@ -98,7 +94,6 @@ public class TestOmLifeCycleConfiguration {
   public void testToBuilder() throws OMException {
     String volume = "test-volume";
     String bucket = "test-bucket";
-    String owner = "test-owner";
     long creationTime = System.currentTimeMillis();
     long objectID = 123456L;
     long updateID = 78910L;
@@ -116,7 +111,6 @@ public class TestOmLifeCycleConfiguration {
     OmLifecycleConfiguration originalConfig = new OmLifecycleConfiguration.Builder()
         .setVolume(volume)
         .setBucket(bucket)
-        .setOwner(owner)
         .setCreationTime(creationTime)
         .addRule(rule1)
         .addRule(rule2)
@@ -129,7 +123,6 @@ public class TestOmLifeCycleConfiguration {
 
     assertEquals(volume, rebuiltConfig.getVolume());
     assertEquals(bucket, rebuiltConfig.getBucket());
-    assertEquals(owner, rebuiltConfig.getOwner());
     assertEquals(creationTime, rebuiltConfig.getCreationTime());
     assertEquals(2, rebuiltConfig.getRules().size());
     assertEquals(rule1.getId(), rebuiltConfig.getRules().get(0).getId());
@@ -175,7 +168,6 @@ public class TestOmLifeCycleConfiguration {
     OmLifecycleConfiguration config = new OmLifecycleConfiguration.Builder()
         .setVolume("test-volume")
         .setBucket("test-bucket")
-        .setOwner("test-owner")
         .setRules(rules)
         .build();
 
