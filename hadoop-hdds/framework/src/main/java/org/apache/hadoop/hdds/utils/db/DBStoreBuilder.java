@@ -296,8 +296,10 @@ public final class DBStoreBuilder {
    * {@link ManagedColumnFamilyOptions} based on {@code prof}.
    */
   public DBStoreBuilder setProfile(DBProfile prof) {
-    setDBOptions(prof.getDBOptions(optionsPath));
-    setDefaultCFOptions(prof.getColumnFamilyOptions(optionsPath, StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY)));
+    Path candidateOptionsPath = optionsPath != null ? optionsPath : dbPath;
+    setDBOptions(prof.getDBOptions(candidateOptionsPath));
+    setDefaultCFOptions(prof.getColumnFamilyOptions(candidateOptionsPath,
+        StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY)));
     return this;
   }
 
