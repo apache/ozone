@@ -50,6 +50,34 @@ class TestOmLCExpiration {
     OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder()
         .setDate("2099-02-15T00:00:00.000Z");
     assertDoesNotThrow(exp5::build);
+
+    OmLCExpiration.Builder exp6 = new OmLCExpiration.Builder()
+        .setDate("2042-04-02T00:00:00Z");
+    assertDoesNotThrow(exp6::build);
+
+    OmLCExpiration.Builder exp7 = new OmLCExpiration.Builder()
+        .setDate("2042-04-02T00:00:00+00:00");
+    assertDoesNotThrow(exp7::build);
+
+    OmLCExpiration.Builder exp8 = new OmLCExpiration.Builder()
+        .setDate("2099-12-31T00:00:00+00:00");
+    assertDoesNotThrow(exp8::build);
+
+    OmLCExpiration.Builder exp9 = new OmLCExpiration.Builder()
+        .setDate("2099-12-31T23:00:00-01:00");
+    assertDoesNotThrow(exp9::build);
+
+    OmLCExpiration.Builder exp10 = new OmLCExpiration.Builder()
+        .setDate("2100-01-01T01:00:00+01:00");
+    assertDoesNotThrow(exp10::build);
+
+    OmLCExpiration.Builder exp11 = new OmLCExpiration.Builder()
+        .setDate("2099-12-31T12:00:00-12:00");
+    assertDoesNotThrow(exp11::build);
+
+    OmLCExpiration.Builder exp12 = new OmLCExpiration.Builder()
+        .setDate("2100-01-01T12:00:00+12:00");
+    assertDoesNotThrow(exp12::build);
   }
 
   @Test
@@ -117,27 +145,23 @@ class TestOmLCExpiration {
     // Non-midnight UTC dates should be rejected
     OmLCExpiration.Builder exp1 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T10:00:00Z");
-    assertOMException(exp1::build, INVALID_REQUEST, "'Date' must be at midnight GMT");
+    assertOMException(exp1::build, INVALID_REQUEST, "'Date' must represent midnight UTC");
 
     OmLCExpiration.Builder exp2 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:30:00Z");
-    assertOMException(exp2::build, INVALID_REQUEST, "'Date' must be at midnight GMT");
+    assertOMException(exp2::build, INVALID_REQUEST, "'Date' must represent midnight UTC");
 
     OmLCExpiration.Builder exp3 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:00:30Z");
-    assertOMException(exp3::build, INVALID_REQUEST, "'Date' must be at midnight GMT");
+    assertOMException(exp3::build, INVALID_REQUEST, "'Date' must represent midnight UTC");
 
     OmLCExpiration.Builder exp4 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:00:00.123Z");
-    assertOMException(exp4::build, INVALID_REQUEST, "'Date' must be at midnight GMT");
+    assertOMException(exp4::build, INVALID_REQUEST, "'Date' must represent midnight UTC");
 
     // Non-UTC timezone should be rejected
     OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:00:00+01:00");
-    assertOMException(exp5::build, INVALID_REQUEST, "'Date' must be at midnight GMT");
-
-    OmLCExpiration.Builder exp8 = new OmLCExpiration.Builder()
-        .setDate("2099-10-10T00:00:00");
-    assertOMException(exp8::build, INVALID_REQUEST, "ISO 8601 format");
+    assertOMException(exp5::build, INVALID_REQUEST, "'Date' must represent midnight UTC");
   }
 }

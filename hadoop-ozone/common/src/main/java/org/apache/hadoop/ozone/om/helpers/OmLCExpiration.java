@@ -90,8 +90,9 @@ public final class OmLCExpiration implements OmLCAction {
   /**
    * Validates that the expiration date is:
    * - In the ISO 8601 format
+   * - Includes both time and time zone (neither can be omitted)
    * - In the future
-   * - At midnight UTC (00:00:00Z).
+   * - Represents midnight UTC (00:00:00Z) when converted to UTC.
    *
    * @param expirationDate The date string to validate
    * @throws OMException if the date is invalid
@@ -100,25 +101,25 @@ public final class OmLCExpiration implements OmLCAction {
     try {
       ZonedDateTime parsedDate = ZonedDateTime.parse(expirationDate, DateTimeFormatter.ISO_DATE_TIME);
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-
+      // Convert to UTC for validation
+      ZonedDateTime dateInUTC = parsedDate.withZoneSameInstant(ZoneOffset.UTC);
       // The date value must conform to the ISO 8601 format, be in the future.
-      if (parsedDate.isBefore(now)) {
+      if (dateInUTC.isBefore(now)) {
         throw new OMException("Invalid lifecycle configuration: 'Date' must be in the future",
             OMException.ResultCodes.INVALID_REQUEST);
       }
-
       // Verify that the time is midnight UTC (00:00:00Z)
-      if (parsedDate.getHour() != 0 ||
-          parsedDate.getMinute() != 0 ||
-          parsedDate.getSecond() != 0 ||
-          parsedDate.getNano() != 0 ||
-          !parsedDate.getZone().equals(ZoneOffset.UTC)) {
-
-        throw new OMException("Invalid lifecycle configuration: 'Date' must be at midnight UTC",
+      if (dateInUTC.getHour() != 0 ||
+          dateInUTC.getMinute() != 0 ||
+          dateInUTC.getSecond() != 0 ||
+          dateInUTC.getNano() != 0) {
+        throw new OMException("Invalid lifecycle configuration: 'Date' must represent midnight UTC (00:00:00Z). " +
+            "Examples: '2042-04-02T00:00:00Z' or '2042-04-02T00:00:00+00:00'",
             OMException.ResultCodes.INVALID_REQUEST);
       }
     } catch (DateTimeParseException ex) {
-      throw new OMException("Invalid lifecycle configuration: 'Date' must be in ISO 8601 format",
+      throw new OMException("Invalid lifecycle configuration: 'Date' must be in ISO 8601 format with " +
+          "time and time zone included. Examples: '2042-04-02T00:00:00Z' or '2042-04-02T00:00:00+00:00'",
           OMException.ResultCodes.INVALID_REQUEST);
     }
   }
