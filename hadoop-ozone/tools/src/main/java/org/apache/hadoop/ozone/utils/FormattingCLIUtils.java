@@ -39,6 +39,7 @@ import java.util.Map;
  * | bigdata-ozone-online31          |  om31   |  LEADER  |
  * +---------------------------------+---------+----------+
  */
+@SuppressWarnings(value = "PMD.AvoidStringBufferField")
 public final class FormattingCLIUtils {
   /** Table title. */
   private String title;
