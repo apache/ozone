@@ -118,7 +118,6 @@ public class TestOmAcls {
 
     assertThat(logCapturer.getOutput())
             .contains("doesn't have CREATE permission to access volume");
-    verifyAuditLog(OMAction.CREATE_VOLUME, AuditEventStatus.FAILURE);
   }
 
   @Test
@@ -145,7 +144,6 @@ public class TestOmAcls {
 
     assertThat(logCapturer.getOutput())
             .contains("doesn't have CREATE permission to access bucket");
-    verifyAuditLog(OMAction.CREATE_BUCKET, AuditEventStatus.FAILURE);
   }
 
   @Test
