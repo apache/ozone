@@ -114,13 +114,15 @@ public final class OmSnapshotUtils {
 
         // Create a link for each line.
         for (String l : lines) {
-          String from = l.split("\t")[1];
-          // from -> checkpoint (om.db)
-          // to -> snapshot
-          String to = l.split("\t")[0];
+          String[] parts = l.split("\t");
+          if (parts.length < 2) {
+            throw new IOException("Invalid line present in the hardlink file: " + l);
+          }
+          String from = parts[1];
+          String to = parts[0];
           Path fullFromPath = Paths.get(dbPath.toString(), from);
           Path fullToPath = Paths.get(dbPath.toString(), to);
-          if (fullToPath.toString().contains(OM_CHECKPOINT_DIR)){
+          if (fullToPath.toString().contains(OM_CHECKPOINT_DIR)) {
             fullToPath = Paths.get(dbPath.toString(), fullToPath.getFileName().toString());
           }
           // Make parent dir if it doesn't exist.

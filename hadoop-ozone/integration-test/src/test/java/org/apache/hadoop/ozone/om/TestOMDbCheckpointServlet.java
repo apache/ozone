@@ -465,17 +465,6 @@ public class TestOMDbCheckpointServlet {
     OmSnapshotUtils.createHardLinks(newDbDir.toPath());
 //     Move snapshot dir to correct location.
     assertTrue(new File(newDbDirName, OM_SNAPSHOT_DIR).renameTo(new File(newDbDir.getParent(), OM_SNAPSHOT_DIR)));
-    Set<String> initialCheckpointSet = getFiles(checkpointLocation,
-        checkpointLocation.toString().length() + 1);
-    Path finalCheckpointLocation = Paths.get(newDbDirName);
-    Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
-        newDbDirLength);
-
-    // initial and final checkpoint sets won't be equal when
-    // includeSnapshotData is true as sst files in snapshot dirs
-    // will be sent first and sst files in active db sst files will be
-    // hardlinks pointing to files in snapshot
-//    assertEquals(initialCheckpointSet, finalCheckpointSet);
 
     String shortSnapshotLocation =
         truncateFileName(metaDirLength, Paths.get(snapshotDirName));
@@ -486,11 +475,6 @@ public class TestOMDbCheckpointServlet {
 
     Set<String> finalFullSet =
         getFiles(Paths.get(testDirName, OM_SNAPSHOT_DIR), testDirLength);
-
-    Set<String> directories = Sets.newHashSet(
-        shortSnapshotLocation, shortSnapshotLocation2,
-        shortCompactionDirLocation);
-//    checkFabricatedLines(directories, fabricatedLinkLines, testDirName);
 
     Set<String> initialFullSet =
         getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
@@ -759,79 +743,6 @@ public class TestOMDbCheckpointServlet {
       }
     }
     return fileSet;
-  }
-
-  /**
-   * Confirm fabricated link lines in hardlink file are properly
-   * formatted: "dir1/fabricatedFile dir2/fabricatedFile".
-   *
-   * The "fabricated" files/links are ones I've created by hand to
-   * fully test the code, (as opposed to the "natural" files/links
-   * created by the create snapshot process).
-   *
-   * @param directories Possible directories for the links to exist in.
-   * @param lines Text lines defining the link paths.
-   * @param testDirName Name of test directory.
-   */
-  private void checkFabricatedLines(Set<String> directories, List<String> lines,
-                                    String testDirName) {
-    // find the real file
-    String realDir = null;
-    for (String dir: directories) {
-      if (Paths.get(testDirName, dir, FABRICATED_FILE_NAME).toFile().exists()) {
-        assertNull(realDir, "Exactly one copy of the fabricated file exists in the tarball");
-        realDir = dir;
-      }
-    }
-
-    assertNotNull(realDir, "real directory found");
-    directories.remove(realDir);
-    Iterator<String> directoryIterator = directories.iterator();
-    String dir0 = directoryIterator.next();
-    String dir1 = directoryIterator.next();
-    assertNotEquals("link directories are different", dir0, dir1);
-
-    for (String line : lines) {
-      String[] files = line.split("\t");
-      assertTrue(
-          files[0].startsWith(dir0) || files[0].startsWith(dir1),
-          "fabricated entry contains valid first directory: " + line);
-      assertTrue(files[1].startsWith(realDir),
-          "fabricated entry contains correct real directory: " + line);
-      Path path0 = Paths.get(files[0]);
-      Path path1 = Paths.get(files[1]);
-      assertEquals(FABRICATED_FILE_NAME,
-          String.valueOf(path0.getFileName()),
-          "fabricated entries contains correct file name: " + line);
-      assertEquals(FABRICATED_FILE_NAME,
-          String.valueOf(path1.getFileName()),
-          "fabricated entries contains correct file name: " + line);
-    }
-  }
-
-  // Validates line in hard link file. should look something like:
-  // "dir1/x.sst x.sst".
-  private void checkLine(String shortSnapshotLocation,
-                            String shortSnapshotLocation2,String shortCheckPointLocation,
-                            String line) {
-    String[] files = line.split("\t");
-    boolean startsWithShortSnapshotLocation = files[0].startsWith(shortSnapshotLocation);
-    boolean startsWithShortSnapshotLocation2 = files[0].startsWith(shortSnapshotLocation2);
-    boolean startsWithCheckPointLocation = files[0].startsWith(shortCheckPointLocation);
-
-
-    assertTrue(startsWithShortSnapshotLocation ||
-        startsWithShortSnapshotLocation2 ,
-        "hl entry starts with valid snapshot dir: " + line);
-
-    String file0 = "";
-    if (startsWithCheckPointLocation){
-      file0 =  files[0].substring(shortCheckPointLocation.length() + 1);
-    } else {
-      file0 = files[0].substring(shortSnapshotLocation.length() + 1);
-    }
-    String file1 = new File(files[1]).getName();
-    assertEquals(file0, file1, "hl filenames are the same");
   }
 
   private void testBootstrapLocking() throws Exception {
