@@ -54,9 +54,9 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
     // The same config instance is used on each datanode, so we can share the
     // corresponding column family options, providing a single shared cache
     // for all containers on a datanode.
-    Path pathToDb = Paths.get(
+    Path optionsPath = Paths.get(
         config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT));
-    cfOptions = dbProfile.getColumnFamilyOptions(config, pathToDb, DEFAULT_COLUMN_FAMILY_NAME);
+    cfOptions = dbProfile.getColumnFamilyOptions(config, optionsPath, DEFAULT_COLUMN_FAMILY_NAME);
     this.dbDef = dbDef;
     this.openReadOnly = openReadOnly;
     start(config);
@@ -66,9 +66,9 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
   public void start(ConfigurationSource config)
       throws IOException {
     if (this.store == null) {
-      String dbPath =
-          config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT);
-      ManagedDBOptions options = dbProfile.getDBOptions(Paths.get(dbPath));
+      Path optionsPath = Paths.get(
+          config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT));
+      ManagedDBOptions options = dbProfile.getDBOptions(optionsPath);
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
 

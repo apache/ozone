@@ -48,17 +48,17 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedDBOptions getDBOptions(Path dbPath) {
+    public ManagedDBOptions getDBOptions(Path optionsPath) {
       ManagedDBOptions option = null;
       try {
-        if (dbPath != null) {
-          option = DBConfigFromFile.readDBOptionsFromFile(dbPath);
+        if (optionsPath != null) {
+          option = DBConfigFromFile.readDBOptionsFromFile(optionsPath);
         }
       } catch (RocksDBException ex) {
-        LOG.error("Unable to read RocksDB DBOptions from {}, exception {}", dbPath, ex);
+        LOG.error("Unable to read RocksDB DBOptions from {}, exception {}", optionsPath, ex);
       }
       if (option != null) {
-        LOG.info("Using RocksDB DBOptions from {}.ini file", dbPath);
+        LOG.info("Using RocksDB DBOptions from {}.ini file", optionsPath);
       } else {
         final int maxBackgroundCompactions = 4;
         final int maxBackgroundFlushes = 2;
@@ -79,20 +79,20 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedColumnFamilyOptions getColumnFamilyOptions(Path dbPath, String cfName) {
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(Path optionsPath, String cfName) {
       ManagedColumnFamilyOptions option = null;
-      if (dbPath == null) {
+      if (optionsPath == null) {
         LOG.debug("RocksDB path is null");
         return null;
       }
       try {
-        option = DBConfigFromFile.readCFOptionsFromFile(dbPath, cfName);
+        option = DBConfigFromFile.readCFOptionsFromFile(optionsPath, cfName);
       } catch (RocksDBException ex) {
-        LOG.error("Unable to read RocksDB CFOptions from {}, exception {}", dbPath, ex);
+        LOG.error("Unable to read RocksDB CFOptions from {}, exception {}", optionsPath, ex);
       }
 
       if (option != null) {
-        LOG.info("Using RocksDB CFOptions from {}.ini file", dbPath);
+        LOG.info("Using RocksDB CFOptions from {}.ini file", optionsPath);
         // TODO HDDS-12695: RocksDB 7.x doesn't read TableConfigs from files, remove this setting once upgraded
         option.setTableFormatConfig(createDefaultBlockBasedTableConfig());
         return option;
@@ -108,7 +108,7 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedBlockBasedTableConfig getBlockBasedTableConfig(Path dbPath, String cfName) {
+    public ManagedBlockBasedTableConfig getBlockBasedTableConfig(Path optionsPath, String cfName) {
       // TODO HDDS-12695: RocksDB 7.x doesn't read TableConfigs from files,
       //  so this can be commented out once upgrade happens.
       /*
@@ -151,23 +151,23 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedDBOptions getDBOptions(Path dbPath) {
+    public ManagedDBOptions getDBOptions(Path optionsPath) {
       final long readAheadSize = toLong(StorageUnit.MB.toBytes(4.00));
-      ManagedDBOptions dbOptions = SSD.getDBOptions(dbPath);
+      ManagedDBOptions dbOptions = SSD.getDBOptions(optionsPath);
       dbOptions.setCompactionReadaheadSize(readAheadSize);
       return dbOptions;
     }
 
     @Override
-    public ManagedColumnFamilyOptions getColumnFamilyOptions(Path dbPath, String cfName) {
-      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions(dbPath, cfName);
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(Path optionsPath, String cfName) {
+      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions(optionsPath, cfName);
       cfOptions.setCompactionStyle(CompactionStyle.LEVEL);
       return cfOptions;
     }
 
     @Override
-    public ManagedBlockBasedTableConfig getBlockBasedTableConfig(Path dbPath, String cfName) {
-      return SSD.getBlockBasedTableConfig(dbPath, cfName);
+    public ManagedBlockBasedTableConfig getBlockBasedTableConfig(Path optionsPath, String cfName) {
+      return SSD.getBlockBasedTableConfig(optionsPath, cfName);
     }
   },
   TEST {
@@ -177,21 +177,21 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedDBOptions getDBOptions(Path dbPath) {
-      return SSD.getDBOptions(dbPath);
+    public ManagedDBOptions getDBOptions(Path optionsPath) {
+      return SSD.getDBOptions(optionsPath);
     }
 
     @Override
-    public ManagedColumnFamilyOptions getColumnFamilyOptions(Path dbPath, String cfName) {
-      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions(dbPath, cfName);
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(Path optionsPath, String cfName) {
+      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions(optionsPath, cfName);
       cfOptions.setCompactionStyle(CompactionStyle.LEVEL);
       cfOptions.setDisableAutoCompactions(true);
       return cfOptions;
     }
 
     @Override
-    public ManagedBlockBasedTableConfig getBlockBasedTableConfig(Path dbPath, String cfName) {
-      return SSD.getBlockBasedTableConfig(dbPath, cfName);
+    public ManagedBlockBasedTableConfig getBlockBasedTableConfig(Path optionsPath, String cfName) {
+      return SSD.getBlockBasedTableConfig(optionsPath, cfName);
     }
   };
 
@@ -202,9 +202,9 @@ public enum DBProfile {
 
   private static final Logger LOG = LoggerFactory.getLogger(DBProfile.class);
 
-  public abstract ManagedDBOptions getDBOptions(Path dbPath);
+  public abstract ManagedDBOptions getDBOptions(Path optionsPath);
 
-  public abstract ManagedColumnFamilyOptions getColumnFamilyOptions(Path dbPath, String cfName);
+  public abstract ManagedColumnFamilyOptions getColumnFamilyOptions(Path optionsPath, String cfName);
 
-  public abstract ManagedBlockBasedTableConfig getBlockBasedTableConfig(Path dbPath, String cfName);
+  public abstract ManagedBlockBasedTableConfig getBlockBasedTableConfig(Path optionsPath, String cfName);
 }

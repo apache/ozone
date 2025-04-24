@@ -118,14 +118,14 @@ public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinitio
     DatanodeDBProfile dbProfile = DatanodeDBProfile
         .getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
 
-    Path pathToDb = Paths.get(
+    Path optionsPath = Paths.get(
         config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT));
 
-    BLOCK_DATA.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "block_data"));
-    METADATA.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "metadata"));
-    DELETE_TRANSACTION.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "delete_txns"));
-    FINALIZE_BLOCKS.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "finalize_blocks"));
-    LAST_CHUNK_INFO.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "last_chunk_info"));
+    BLOCK_DATA.setCfOptions(getCFOptions(config, dbProfile, optionsPath, "block_data"));
+    METADATA.setCfOptions(getCFOptions(config, dbProfile, optionsPath, "metadata"));
+    DELETE_TRANSACTION.setCfOptions(getCFOptions(config, dbProfile, optionsPath, "delete_txns"));
+    FINALIZE_BLOCKS.setCfOptions(getCFOptions(config, dbProfile, optionsPath, "finalize_blocks"));
+    LAST_CHUNK_INFO.setCfOptions(getCFOptions(config, dbProfile, optionsPath, "last_chunk_info"));
   }
 
   @Override
@@ -197,11 +197,11 @@ public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinitio
   }
 
   private ManagedColumnFamilyOptions getCFOptions(
-      ConfigurationSource config, DatanodeDBProfile dbProfile, Path pathToDb, String cfName) {
+      ConfigurationSource config, DatanodeDBProfile dbProfile, Path pathToOptions, String cfName) {
     // Use prefix seek to mitigating seek overhead.
     // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
     return (ManagedColumnFamilyOptions) dbProfile
-        .getColumnFamilyOptions(config, pathToDb, cfName)
+        .getColumnFamilyOptions(config, pathToOptions, cfName)
         .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
   }
 }

@@ -79,6 +79,7 @@ public final class DBStoreBuilder {
 
   private String dbname;
   private Path dbPath;
+  private Path optionsPath;
   private String dbJmxBeanNameName;
   // Maps added column family names to the column family options they were
   // added with. Value will be null if the column family was not added with
@@ -295,8 +296,8 @@ public final class DBStoreBuilder {
    * {@link ManagedColumnFamilyOptions} based on {@code prof}.
    */
   public DBStoreBuilder setProfile(DBProfile prof) {
-    setDBOptions(prof.getDBOptions(dbPath));
-    setDefaultCFOptions(prof.getColumnFamilyOptions(dbPath, StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY)));
+    setDBOptions(prof.getDBOptions(optionsPath));
+    setDefaultCFOptions(prof.getColumnFamilyOptions(optionsPath, StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY)));
     return this;
   }
 
@@ -315,7 +316,7 @@ public final class DBStoreBuilder {
     Set<TableConfig> tableConfigs = new HashSet<>();
 
     // If default column family was not added, add it with the default options.
-    cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME, getCfOptions(dbPath, DEFAULT_COLUMN_FAMILY_NAME));
+    cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME, getCfOptions(DEFAULT_COLUMN_FAMILY_NAME));
 
     for (Map.Entry<String, ManagedColumnFamilyOptions> entry:
         cfOptions.entrySet()) {
@@ -324,7 +325,7 @@ public final class DBStoreBuilder {
 
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
-        tableConfigs.add(new TableConfig(name, getCfOptions(dbPath, name)));
+        tableConfigs.add(new TableConfig(name, getCfOptions(name)));
       } else {
         tableConfigs.add(new TableConfig(name, options));
       }
@@ -340,7 +341,7 @@ public final class DBStoreBuilder {
    * @param defaultCFAutoCompaction
    */
   public DBStoreBuilder disableDefaultCFAutoCompaction(boolean defaultCFAutoCompaction) {
-    ManagedColumnFamilyOptions defaultCFOptions = getCfOptions(dbPath, DEFAULT_COLUMN_FAMILY_NAME);
+    ManagedColumnFamilyOptions defaultCFOptions = getCfOptions(DEFAULT_COLUMN_FAMILY_NAME);
     defaultCFOptions.setDisableAutoCompactions(defaultCFAutoCompaction);
     setDefaultCFOptions(defaultCFOptions);
     return this;
@@ -390,14 +391,15 @@ public final class DBStoreBuilder {
    * @return The {@link ManagedColumnFamilyOptions} that should be used as the default
    * value for this builder if one is not specified by the caller.
    */
-  private ManagedColumnFamilyOptions getCfOptions(Path pathToDb, String cfName) {
+  private ManagedColumnFamilyOptions getCfOptions(String cfName) {
     if (Objects.nonNull(defaultCfOptions)) {
       return defaultCfOptions;
     }
     if (Objects.isNull(defaultCfProfile)) {
       throw new RuntimeException();
     }
-    return defaultCfProfile.getColumnFamilyOptions(pathToDb, cfName);
+    Path configuredPath = optionsPath != null ? optionsPath : dbPath;
+    return defaultCfProfile.getColumnFamilyOptions(configuredPath, cfName);
   }
 
   private File getDBFile() throws IOException {
