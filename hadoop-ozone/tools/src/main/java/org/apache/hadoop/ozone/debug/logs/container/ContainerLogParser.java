@@ -23,6 +23,7 @@ import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerLogFileParser;
+import org.apache.hadoop.ozone.containerlog.parser.DBConsts;
 import picocli.CommandLine;
 
 /**
@@ -63,12 +64,14 @@ public class ContainerLogParser implements Callable<Void> {
       System.err.println("Invalid path provided: " + path);
       return null;
     }
-
+    
+    Path providedDbPath;
     if (parent.getDbPath() == null) {
-      System.err.println("No database path provided.Please provide a valid database path.");
-      return null;
+      providedDbPath = Paths.get(System.getProperty("user.dir"), DBConsts.DEFAULT_DB_FILENAME);
+
+      System.out.println("No database path provided. Creating new database at: " + providedDbPath);
     } else {
-      Path providedDbPath = Paths.get(parent.getDbPath());
+      providedDbPath = Paths.get(parent.getDbPath());
       Path parentDir = providedDbPath.getParent();
 
       if (parentDir != null && !Files.exists(parentDir)) {
@@ -77,7 +80,7 @@ public class ContainerLogParser implements Callable<Void> {
       }
     }
     
-    ContainerDatanodeDatabase.setDatabasePath(parent.getDbPath());
+    ContainerDatanodeDatabase.setDatabasePath(providedDbPath.toString());
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
     ContainerLogFileParser parser = new ContainerLogFileParser();
 

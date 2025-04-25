@@ -27,8 +27,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.sqlite.SQLiteConfig;
 
 /**
@@ -38,9 +36,6 @@ import org.sqlite.SQLiteConfig;
 public class ContainerDatanodeDatabase {
   
   private static String databasePath;
-  
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerDatanodeDatabase.class);
   
 
   public static void setDatabasePath(String dbPath) {
@@ -77,11 +72,9 @@ public class ContainerDatanodeDatabase {
       createDatanodeContainerIndex(createStmt);
     } catch (SQLException e) {
       System.err.println("Error while creating the table: " + e.getMessage());
-      LOG.error("Error while creating the table: {}", e.getMessage());
       throw e;
     } catch (Exception e) {
       System.err.println("Unexpected error: " + e.getMessage());
-      LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
@@ -95,11 +88,9 @@ public class ContainerDatanodeDatabase {
       createStmt.execute(createTableSQL);
     } catch (SQLException e) {
       System.err.println("Error while creating the table: " + e.getMessage());
-      LOG.error("Error while creating the table: {}", e.getMessage());
       throw e;
     } catch (Exception e) {
       System.err.println("Unexpected error: " + e.getMessage());
-      LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
@@ -149,11 +140,9 @@ public class ContainerDatanodeDatabase {
       }
     } catch (SQLException e) {
       System.err.println("Failed to insert container log for container " + containerId + " on datanode " + datanodeId);
-      LOG.error("Failed to insert container log for container {} on datanode {}", containerId, datanodeId, e);
       throw e;
     } catch (Exception e) {
       System.err.println("Unexpected error: " + e.getMessage());
-      LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }
@@ -201,8 +190,6 @@ public class ContainerDatanodeDatabase {
         } catch (SQLException e) {
           System.err.println("Failed to insert container log entry for container " + containerId + " on datanode "
               + datanodeId);
-          LOG.error("Failed to insert container log entry for container {} on datanode {} ",
-              containerId, datanodeId, e);
           throw e;
         }
       }
@@ -212,11 +199,9 @@ public class ContainerDatanodeDatabase {
       }
     } catch (SQLException e) {
       System.err.println("Failed to insert container log entry: " + e.getMessage());
-      LOG.error("Failed to insert container log entry: {}", e.getMessage());
       throw e;
     } catch (Exception e) {
       System.err.println("Unexpected error: " + e.getMessage());
-      LOG.error(e.getMessage());
       throw new RuntimeException(e);
     }
   }

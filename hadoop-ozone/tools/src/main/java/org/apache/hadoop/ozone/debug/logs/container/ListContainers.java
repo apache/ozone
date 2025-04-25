@@ -23,6 +23,7 @@ import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
+import org.apache.hadoop.ozone.containerlog.parser.DBConsts;
 import org.apache.hadoop.ozone.shell.ListOptions;
 import picocli.CommandLine;
 
@@ -50,11 +51,19 @@ public class ListContainers implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
+    Path providedDbPath;
     if (parent.getDbPath() == null) {
-      System.err.println("No database path provided.Please provide a valid database path.");
-      return null;
+      providedDbPath = Paths.get(System.getProperty("user.dir"), DBConsts.DEFAULT_DB_FILENAME);
+
+      if (Files.exists(providedDbPath) && Files.isRegularFile(providedDbPath)) {
+        System.out.println("Using default database file found in current directory: " + providedDbPath);
+      } else {
+        System.err.println("No database path provided and default file '" + DBConsts.DEFAULT_DB_FILENAME + "' not " +
+            "found in current directory. Please provide a valid database path");
+        return null;
+      }
     } else {
-      Path providedDbPath = Paths.get(parent.getDbPath());
+      providedDbPath = Paths.get(parent.getDbPath());
       Path parentDir = providedDbPath.getParent();
 
       if (parentDir != null && !Files.exists(parentDir)) {
@@ -63,7 +72,7 @@ public class ListContainers implements Callable<Void> {
       }
     }
 
-    ContainerDatanodeDatabase.setDatabasePath(parent.getDbPath());
+    ContainerDatanodeDatabase.setDatabasePath(providedDbPath.toString());
     
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
     try {
