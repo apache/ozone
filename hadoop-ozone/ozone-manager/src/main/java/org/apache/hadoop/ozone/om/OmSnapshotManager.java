@@ -862,21 +862,19 @@ public final class OmSnapshotManager implements AutoCloseable {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager = omMetadataManager.getSnapshotChainManager();
     int currentSnapshotNum = snapshotChainManager.getGlobalSnapshotChain().size();
-    int oldCount = inFlightSnapshotCount.get();
-    int newCount = inFlightSnapshotCount.updateAndGet(count -> {
-      if (currentSnapshotNum + count >= fsSnapshotMaxLimit) {
-        return count;
+    
+    synchronized (inFlightSnapshotCount) {
+      int currentCount = inFlightSnapshotCount.get();
+      if (currentSnapshotNum + currentCount >= fsSnapshotMaxLimit) {
+        throw new OMException(
+            String.format("Snapshot limit of %d reached. Cannot create more snapshots. " +
+                "Current snapshots: %d, In-flight creations: %d",
+                fsSnapshotMaxLimit, currentSnapshotNum, currentCount) +
+                " If you already deleted some snapshots, " +
+                "please wait for the background service to complete the cleanup.",
+            OMException.ResultCodes.TOO_MANY_SNAPSHOTS);
       }
-      return count + 1;
-    });
-    if (newCount == oldCount) {
-      throw new OMException(
-          String.format("Snapshot limit of %d reached. Cannot create more snapshots. " +
-              "Current snapshots: %d, In-flight creations: %d",
-              fsSnapshotMaxLimit, currentSnapshotNum, newCount) +
-              " If you already deleted some snapshots, " +
-              "please wait for the background service to complete the cleanup.",
-          OMException.ResultCodes.TOO_MANY_SNAPSHOTS);
+      inFlightSnapshotCount.set(currentCount + 1);
     }
   }
 
