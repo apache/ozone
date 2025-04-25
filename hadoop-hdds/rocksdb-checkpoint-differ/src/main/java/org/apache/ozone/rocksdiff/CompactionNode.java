@@ -32,7 +32,6 @@ public class CompactionNode {
   private final String endKey;
   private final String columnFamily;
 
-
   public CompactionNode(String file, long seqNum, String startKey, String endKey, String columnFamily) {
     fileName = file;
     totalNumberOfKeys = 0L;

@@ -170,7 +170,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public static final Set<String> COLUMN_FAMILIES_TO_TRACK_IN_DAG =
       ImmutableSet.of("keyTable", "directoryTable", "fileTable");
 
-
   private final CompactionDag compactionDag;
 
   /**
