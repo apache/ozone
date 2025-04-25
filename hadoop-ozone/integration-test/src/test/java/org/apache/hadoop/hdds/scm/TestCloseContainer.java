@@ -123,8 +123,7 @@ public class TestCloseContainer {
       throws Exception {
     // Create some keys to write data into the open containers
     for (int i = 0; i < 10; i++) {
-      TestDataUtil.createKey(bucket, "key" + i,
-          "this is the content".getBytes(UTF_8));
+      TestDataUtil.createKey(bucket, "key" + i, "this is the content".getBytes(UTF_8));
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
@@ -245,7 +244,7 @@ public class TestCloseContainer {
     }
 
     // Create 2nd container and check the checksum doesn't match with 1st container
-    TestDataUtil.createKey(bucket, "key2", repConfig, "this is the different content".getBytes());
+    TestDataUtil.createKey(bucket, "key2", repConfig, "this is the different content".getBytes(UTF_8));
     ContainerInfo containerInfo2 = scm.getContainerManager().getContainers().get(1);
     for (HddsDatanodeService hddsDatanode : hddsDatanodes) {
       assertFalse(containerChecksumFileExists(hddsDatanode, containerInfo2));

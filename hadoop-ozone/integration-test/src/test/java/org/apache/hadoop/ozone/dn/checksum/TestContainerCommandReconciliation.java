@@ -237,7 +237,7 @@ public class TestContainerCommandReconciliation {
     StorageContainerException ex = assertThrows(StorageContainerException.class, () ->
         dnClient.getContainerChecksumInfo(containerID, targetDN.getDatanodeDetails()));
     assertEquals(ContainerProtos.Result.IO_EXCEPTION, ex.getResult());
-    assertTrue(ex.getMessage().contains("(No such file or directory"), ex.getMessage() +
+    assertTrue(ex.getMessage().contains("Checksum file does not exist"), ex.getMessage() +
         " did not contain the expected string");
   }
 

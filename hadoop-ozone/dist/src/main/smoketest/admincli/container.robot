@@ -177,7 +177,7 @@ Reset user
 
 Cannot reconcile open container
     # At this point we should have an open Ratis Three container.
-    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -n1
+    ${container} =      Execute          ozone admin container list --state OPEN | jq -r '.[] | select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -n1
     Execute and check rc    ozone admin container reconcile "${container}"    255
     # The container should not yet have any replica checksums.
     # TODO When the scanner is computing checksums automatically, this test may need to be updated.
@@ -186,7 +186,7 @@ Cannot reconcile open container
     Should Be Equal As Strings    0    ${data_checksum}
 
 Close container
-    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
+    ${container} =      Execute          ozone admin container list --state OPEN | jq -r '.[] | select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
                         Execute          ozone admin container close "${container}"
     # The container may either be in CLOSED or CLOSING state at this point. Once we have verified this, we will wait
     # for it to progress to CLOSED.
@@ -196,7 +196,7 @@ Close container
 
 Reconcile closed container
     # Check that info does not show replica checksums, since manual reconciliation has not yet been triggered.
-    ${container} =      Execute          ozone admin container list --state CLOSED | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
+    ${container} =      Execute          ozone admin container list --state CLOSED | jq -r '.[] | select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
     ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
     # 0 is the hex value of an empty checksum. After container close the data checksum should not be 0.
     Should Not Be Equal As Strings    0    ${data_checksum}

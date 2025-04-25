@@ -361,8 +361,6 @@ public class TestKeyValueHandler {
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
     try {
       ContainerSet cset = newContainerSet();
-      int[] interval = new int[1];
-      interval[0] = 2;
       DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
       StateContext context = ContainerTestUtils.getMockContext(
           datanodeDetails, conf);

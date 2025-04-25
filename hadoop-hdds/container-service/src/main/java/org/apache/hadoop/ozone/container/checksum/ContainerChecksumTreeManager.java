@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -368,6 +369,10 @@ public class ContainerChecksumTreeManager {
    */
   public ByteString getContainerChecksumInfo(KeyValueContainerData data) throws IOException {
     File checksumFile = getContainerChecksumFile(data);
+    if (!checksumFile.exists()) {
+      throw new NoSuchFileException("Checksum file does not exist for container #" + data.getContainerID());
+    }
+
     try (InputStream inStream = Files.newInputStream(checksumFile.toPath())) {
       return ByteString.readFrom(inStream);
     }
