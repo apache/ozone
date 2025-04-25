@@ -35,13 +35,17 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
 
   @Override
   public ContainerData chooseContainer(OzoneContainer ozoneContainer,
-      HddsVolume hddsVolume, Set<Long> inProgressContainerIDs) {
+      HddsVolume hddsVolume, Set<Long> inProgressContainerIDs,
+      Set<Long> replicationContainerIDs) {
     Iterator<Container<?>> itr = ozoneContainer.getController()
         .getContainers(hddsVolume);
     while (itr.hasNext()) {
       ContainerData containerData = itr.next().getContainerData();
-      if (!inProgressContainerIDs.contains(
-          containerData.getContainerID()) && containerData.isClosed()) {
+      long containerID = containerData.getContainerID();
+
+      if (containerData.isClosed() && !containerData.isEmpty()
+          && !replicationContainerIDs.contains(containerID)
+          && !inProgressContainerIDs.contains(containerID)) {
         return containerData;
       }
     }
