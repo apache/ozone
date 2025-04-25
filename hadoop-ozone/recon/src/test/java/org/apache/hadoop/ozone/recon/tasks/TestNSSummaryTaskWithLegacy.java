@@ -44,7 +44,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Test for NSSummaryTaskWithLegacy.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestNSSummaryTaskWithLegacy extends TestNSSummaryTaskBase {
+public class TestNSSummaryTaskWithLegacy extends AbstractNSSummaryTaskTest {
 
   private NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
   // Answer Sets

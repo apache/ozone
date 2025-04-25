@@ -53,7 +53,7 @@ import org.mockito.Mockito;
  * Test for NSSummaryTaskWithFSO.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestNSSummaryTaskWithFSO extends TestNSSummaryTaskBase {
+public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
   // Answer Sets
   private static Set<Long> bucketOneAns = new HashSet<>();

@@ -43,7 +43,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Test for NSSummaryTaskWithLegacy focusing on the OBS (Object Store) layout.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestNSSummaryTaskWithLegacyOBSLayout extends TestNSSummaryTaskBase {
+public class TestNSSummaryTaskWithLegacyOBSLayout extends AbstractNSSummaryTaskTest {
 
   private NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
 

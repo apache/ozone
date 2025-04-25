@@ -44,7 +44,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Unit test for NSSummaryTaskWithOBS.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestNSSummaryTaskWithOBS extends TestNSSummaryTaskBase {
+public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
 
   private NSSummaryTaskWithOBS nSSummaryTaskWithOBS;
 

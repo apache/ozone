@@ -45,7 +45,7 @@ import org.junit.jupiter.api.io.TempDir;
  * for the OBS bucket is null.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestNSSummaryTask extends TestNSSummaryTaskBase {
+public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
 
   private NSSummaryTask nSSummaryTask;
 
