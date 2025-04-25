@@ -58,7 +58,6 @@ public class TestPipelineCloseLogsFlood {
   @BeforeEach
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
-    // Make follower‑slowness detection fire quickly so that the log floods
     conf.setTimeDuration(DATANODE_SLOWNESS_TIMEOUT, 10, TimeUnit.SECONDS);
     conf.setTimeDuration(NO_LEADER_TIMEOUT, 10, TimeUnit.SECONDS);
 
@@ -80,7 +79,7 @@ public class TestPipelineCloseLogsFlood {
   @Test
   public void testPipelineCloseLogFloodDoesntOccur() throws Exception {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(XceiverServerRatis.class);
-    GenericTestUtils.setLogLevel(XceiverServerRatis.class, Level.ERROR);
+    GenericTestUtils.setLogLevel(XceiverServerRatis.class, Level.WARN);
 
     client.getObjectStore().createVolume(VOLUME_NAME);
     client.getObjectStore().getVolume(VOLUME_NAME).createBucket(BUCKET_NAME);
@@ -92,12 +91,10 @@ public class TestPipelineCloseLogsFlood {
     }
     // Kill one follower DN so that the pipeline becomes unhealthy
     cluster.shutdownHddsDatanode(1);
-    // Wait (30 sec > a few heartbeat cycles) for multiple slowness callbacks
-    Thread.sleep(30_000L);
+    Thread.sleep(15_000L);
     logCapturer.stopCapturing();
     int occurrences = StringUtils.countMatches(logCapturer.getOutput(), FLOOD_TOKEN);
-    // We expect many duplicates when the bug is present. A threshold of 5 is safe.
-    assertThat(occurrences).isGreaterThan(0);
-    assertThat(occurrences).isLessThan(5);
+    //Follower slowness will happen for 2 pipelines since we are shutting down one node
+    assertThat(occurrences).isEqualTo(2);
   }
 }
