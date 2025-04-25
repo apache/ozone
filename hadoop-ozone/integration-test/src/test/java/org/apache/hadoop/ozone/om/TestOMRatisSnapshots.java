@@ -164,12 +164,12 @@ public class TestOMRatisSnapshots {
     client = OzoneClientFactory.getRpcClient(omServiceId, conf);
     objectStore = client.getObjectStore();
 
-    volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
-        .setOwner("user" + RandomStringUtils.randomNumeric(5))
-        .setAdmin("admin" + RandomStringUtils.randomNumeric(5))
+        .setOwner("user" + RandomStringUtils.secure().nextNumeric(5))
+        .setAdmin("admin" + RandomStringUtils.secure().nextNumeric(5))
         .build();
 
     objectStore.createVolume(volumeName, createVolumeArgs);

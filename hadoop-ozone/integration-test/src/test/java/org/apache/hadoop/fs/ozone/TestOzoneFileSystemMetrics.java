@@ -108,11 +108,11 @@ public abstract class TestOzoneFileSystemMetrics implements NonHATests.TestCase 
         .getOzoneManager().getMetrics().getNumKeys();
 
     int fileLen = 30 * 1024 * 1024;
-    byte[] data = string2Bytes(RandomStringUtils.randomAlphanumeric(fileLen));
+    byte[] data = string2Bytes(RandomStringUtils.secure().nextAlphanumeric(fileLen));
 
-    Path parentDir = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
+    Path parentDir = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
     Path filePath = new Path(parentDir,
-        RandomStringUtils.randomAlphanumeric(5));
+        RandomStringUtils.secure().nextAlphanumeric(5));
 
     switch (op) {
     case Key:

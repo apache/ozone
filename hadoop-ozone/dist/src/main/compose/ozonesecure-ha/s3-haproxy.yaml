@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-x-s3-worker:
-  &s3-worker
+x-common-config:
+  &common-config
+  dns_search: .
   image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
   volumes:
     - ../..:/opt/hadoop
@@ -23,35 +24,41 @@ x-s3-worker:
     - ./krb5.conf:/etc/krb5.conf
   env_file:
     - docker-config
-  command: ["ozone","s3g", "-Dozone.om.transport.class=${OZONE_S3_OM_TRANSPORT:-org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory}"]
 
 services:
+  s3g1:
+    hostname: s3g1
+    <<: *common-config
+    command: ["ozone","s3g"]
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.121
+  s3g2:
+    hostname: s3g2
+    <<: *common-config
+    command: ["ozone","s3g"]
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.122
+  s3g3:
+    hostname: s3g3
+    <<: *common-config
+    command: ["ozone","s3g"]
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.123
   s3g:
     image: haproxy:lts-alpine
     hostname: s3g
     dns_search: .
     volumes:
       - ../..:/opt/hadoop
-      - ../common/s3-haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - ../_keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
+      - ./s3-haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
     ports:
       - 9878:9878
     command: ["haproxy", "-f", "/usr/local/etc/haproxy/haproxy.cfg"]
-  s3g1:
-    <<: *s3-worker
-    hostname: s3g1
-    dns_search: .
-    ports:
-      - 9879:9878
-  s3g2:
-
-    <<: *s3-worker
-    hostname: s3g2
-    dns_search: .
-    ports:
-      - 9880:9878
-  s3g3:
-    <<: *s3-worker
-    hostname: s3g3
-    dns_search: .
-    ports:
-      - 9881:9878
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.120
