@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       RoundRobinVolumeChoosingPolicy.class);
 
   // Stores the index of the next volume to be returned.
@@ -45,7 +45,7 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
       long maxContainerSize) throws IOException {
 
     // No volumes available to choose from
-    if (volumes.size() < 1) {
+    if (volumes.isEmpty()) {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
 

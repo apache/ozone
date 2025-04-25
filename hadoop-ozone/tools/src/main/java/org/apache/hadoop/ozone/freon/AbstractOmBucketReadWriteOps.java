@@ -156,9 +156,12 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     }
 
     int readResult = 0;
-    for (int i = 0; i < readFutures.size(); i++) {
+    int readFuturesCount = readFutures.size();
+
+    for (int i = 0; i < readFuturesCount; i++) {
       readResult += readExecutorCompletionService.take().get();
     }
+
     readService.shutdown();
 
     return readResult;
@@ -196,9 +199,12 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     }
 
     int writeResult = 0;
-    for (int i = 0; i < writeFutures.size(); i++) {
+    int writeFuturesCount = writeFutures.size();
+
+    for (int i = 0; i < writeFuturesCount; i++) {
       writeResult += writeExecutorCompletionService.take().get();
     }
+
     writeService.shutdown();
 
     return writeResult;
@@ -208,7 +214,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
       throws Exception {
     for (int i = 0; i < keyCount; i++) {
       String keyName = path.concat(OzoneConsts.OM_KEY_PREFIX)
-          .concat(RandomStringUtils.randomAlphanumeric(length));
+          .concat(RandomStringUtils.secure().nextAlphanumeric(length));
       if (LOG.isDebugEnabled()) {
         LOG.debug("Key/FileName : {}", keyName);
       }

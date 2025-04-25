@@ -37,8 +37,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BackgroundService {
 
-  @VisibleForTesting
-  public static final Logger LOG =
+  protected static final Logger LOG =
       LoggerFactory.getLogger(BackgroundService.class);
 
   // Executor to launch child tasks
@@ -98,11 +97,10 @@ public abstract class BackgroundService {
   @VisibleForTesting
   public void runPeriodicalTaskNow() throws Exception {
     BackgroundTaskQueue tasks = getTasks();
-    while (tasks.size() > 0) {
+    while (!tasks.isEmpty()) {
       tasks.poll().call();
     }
   }
-
 
   // start service
   public void start() {
@@ -131,7 +129,7 @@ public abstract class BackgroundService {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
 
-      while (tasks.size() > 0) {
+      while (!tasks.isEmpty()) {
         BackgroundTask task = tasks.poll();
         CompletableFuture.runAsync(() -> {
           long startTime = System.nanoTime();

@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 /**
  * Recon Server constants file.
  */
@@ -69,6 +71,7 @@ public final class ReconConstants {
   public static final String CONTAINER_COUNT = "CONTAINER_COUNT";
   public static final String TOTAL_KEYS = "TOTAL_KEYS";
   public static final String TOTAL_USED_BYTES = "TOTAL_USED_BYTES";
+  public static final String STAGING = ".staging_";
 
   // 1125899906842624L = 1PB
   public static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
@@ -79,7 +82,6 @@ public final class ReconConstants {
       (double) MAX_FILE_SIZE_UPPER_BOUND / MIN_FILE_SIZE_UPPER_BOUND) /
       Math.log(2)) + 1;
 
-
   // 1125899906842624L = 1PB
   public static final long MAX_CONTAINER_SIZE_UPPER_BOUND = 1125899906842624L;
   // 536870912L = 512MB
@@ -89,4 +91,18 @@ public final class ReconConstants {
       (double) MAX_CONTAINER_SIZE_UPPER_BOUND /
           MIN_CONTAINER_SIZE_UPPER_BOUND) /
       Math.log(2)) + 1;
+
+  // For file-size count reprocessing: ensure only one task truncates the table.
+  public static final AtomicBoolean FILE_SIZE_COUNT_TABLE_TRUNCATED = new AtomicBoolean(false);
+
+  public static final AtomicBoolean CONTAINER_KEY_TABLES_TRUNCATED = new AtomicBoolean(false);
+
+  /**
+   * Resets the table truncated flag for the given tables. This should be called once per reprocess cycle,
+   * for example by the OM task controller, before the tasks run.
+   */
+  public static void resetTableTruncatedFlags() {
+    FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
+    CONTAINER_KEY_TABLES_TRUNCATED.set(false);
+  }
 }

@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
 @Evolving
 public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(FullTableCache.class);
 
   private final Map<CacheKey<KEY>, CacheValue<VALUE>> cache;
@@ -61,7 +61,6 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   private final ReadWriteLock lock;
 
   private final CacheStatsRecorder statsRecorder;
-
 
   public FullTableCache(String threadNamePrefix) {
     // As for full table cache only we need elements to be inserted in sorted
@@ -160,7 +159,7 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
     }
 
     Set<CacheKey<KEY>> currentCacheKeys;
-    CacheKey<KEY> cachekey;
+
     long lastEpoch = epochs.get(epochs.size() - 1);
     // Acquire lock to avoid race between cleanup and add to cache entry by
     // client requests.
@@ -175,10 +174,8 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
           break;
         }
 
-        for (Iterator<CacheKey<KEY>> iterator = currentCacheKeys.iterator();
-             iterator.hasNext();) {
-          cachekey = iterator.next();
-          cache.computeIfPresent(cachekey, ((k, v) -> {
+        for (CacheKey<KEY> currentCacheKey : currentCacheKeys) {
+          cache.computeIfPresent(currentCacheKey, ((k, v) -> {
             // If cache epoch entry matches with current Epoch, remove entry
             // from cache.
             if (v.getCacheValue() == null && v.getEpoch() == currentEpoch) {

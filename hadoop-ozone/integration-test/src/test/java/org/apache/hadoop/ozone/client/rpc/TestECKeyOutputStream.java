@@ -199,7 +199,7 @@ public class TestECKeyOutputStream {
     try (MockedStatic<Handler> mockedHandler = Mockito.mockStatic(Handler.class, Mockito.CALLS_REAL_METHODS)) {
       Map<String, Handler> handlers = new HashMap<>();
       mockedHandler.when(() -> Handler
-              .getHandlerForContainerType(any(), any(), any(), any(), any(), any(), any(), any()))
+              .getHandlerForContainerType(any(), any(), any(), any(), any(), any(), any(), any(), any()))
           .thenAnswer(i -> {
             Handler handler = Mockito.spy((Handler) i.callRealMethod());
             handlers.put(handler.getDatanodeId(), handler);

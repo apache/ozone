@@ -49,8 +49,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -67,6 +65,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -270,15 +269,11 @@ public class TestReconWithOzoneManager {
   // And Recon should fall back on full snapshot and recover itself.
   @Test
   public void testOmDBSyncWithSeqNumberMismatch() throws Exception {
-    GenericTestUtils.LogCapturer
-        logs = GenericTestUtils.LogCapturer.captureLogs(RDBStore.getLogger());
-    GenericTestUtils.setLogLevel(RDBStore.getLogger(), INFO);
+    LogCapturer logs = LogCapturer.captureLogs(RDBStore.class);
+    GenericTestUtils.setLogLevel(RDBStore.class, INFO);
 
-    GenericTestUtils.LogCapturer
-        omServiceProviderImplLogs = GenericTestUtils.LogCapturer.captureLogs(
-        OzoneManagerServiceProviderImpl.getLogger());
-    GenericTestUtils.setLogLevel(OzoneManagerServiceProviderImpl.getLogger(),
-        INFO);
+    LogCapturer omServiceProviderImplLogs = LogCapturer.captureLogs(OzoneManagerServiceProviderImpl.class);
+    GenericTestUtils.setLogLevel(OzoneManagerServiceProviderImpl.class, INFO);
 
     // add a vol, bucket and key
     addKeys(10, 15);
@@ -414,16 +409,6 @@ public class TestReconWithOzoneManager {
       writeDataToOm("key" + i, "bucket" + i, "vol" + i,
           Collections.singletonList(omKeyLocationInfoGroup));
     }
-  }
-
-  private long getTableKeyCount(TableIterator<String, ? extends
-      Table.KeyValue<String, OmKeyInfo>> iterator) {
-    long keyCount = 0;
-    while (iterator.hasNext()) {
-      keyCount++;
-      iterator.next();
-    }
-    return keyCount;
   }
 
   private static OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,

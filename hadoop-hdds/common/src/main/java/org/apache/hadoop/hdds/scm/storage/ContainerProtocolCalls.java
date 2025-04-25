@@ -86,8 +86,9 @@ import org.slf4j.LoggerFactory;
  * clients.
  */
 public final class ContainerProtocolCalls  {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerProtocolCalls.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ContainerProtocolCalls.class);
+
+  private static final List<Validator> VALIDATORS = createValidators();
 
   /**
    * There is no need to instantiate this class.
@@ -562,6 +563,7 @@ public final class ContainerProtocolCalls  {
       String encodedToken) throws IOException {
     createContainer(client, containerID, encodedToken, null, 0);
   }
+
   /**
    * createContainer call that creates a container on the datanode.
    * @param client  - client
@@ -829,8 +831,6 @@ public final class ContainerProtocolCalls  {
   private static List<Validator> getValidatorList() {
     return VALIDATORS;
   }
-
-  private static final List<Validator> VALIDATORS = createValidators();
 
   private static List<Validator> createValidators() {
     return singletonList(

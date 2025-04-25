@@ -195,7 +195,7 @@ public abstract class BaseFileChecksumHelper {
           "Unknown combine mode: " + getCombineMode());
     }
     return blockChecksumForDebug;
-  };
+  }
 
   /**
    * Compute block checksums block by block and append the raw bytes of the
@@ -384,7 +384,7 @@ public abstract class BaseFileChecksumHelper {
 
   FileChecksum makeCompositeCrcResult() throws IOException {
     long blockSizeHint = 0;
-    if (keyLocationInfos.size() > 0) {
+    if (!keyLocationInfos.isEmpty()) {
       blockSizeHint = keyLocationInfos.get(0).getLength();
     }
     CrcComposer crcComposer =

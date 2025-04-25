@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -78,7 +79,7 @@ import org.slf4j.LoggerFactory;
  * utility class used by SCM and OM for HA.
  */
 public final class HAUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(HAUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HAUtils.class);
 
   private HAUtils() {
   }
@@ -418,7 +419,7 @@ public final class HAUtils {
     long waitDuration =
         conf.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
             OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
-    Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(conf);
+    Collection<String> scmNodes = HddsUtils.getSCMNodeIds(conf);
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
         HddsServerUtil.getScmSecurityClient(conf);
     int expectedCount = scmNodes.size() + 1;

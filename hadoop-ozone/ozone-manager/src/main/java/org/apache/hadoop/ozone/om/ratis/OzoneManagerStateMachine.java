@@ -83,7 +83,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OzoneManagerStateMachine extends BaseStateMachine {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerStateMachine.class);
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
@@ -159,6 +159,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
                                   RaftPeerId newLeaderId) {
+    RaftPeerId currentPeerId = groupMemberId.getPeerId();
+    if (newLeaderId.equals(currentPeerId)) {
+      // warmup cache
+      ozoneManager.initializeEdekCache(ozoneManager.getConfiguration());
+    }
     // Initialize OMHAMetrics
     ozoneManager.omHAMetricsInit(newLeaderId.toString());
     LOG.info("{}: leader changed to {}", groupMemberId, newLeaderId);
@@ -446,7 +451,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         this.setLastAppliedTermIndex(TermIndex.valueOf(
             newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
         LOG.info("{}: OzoneManagerStateMachine un-pause completed. " +
-            "newLastAppliedSnaphsotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
+            "newLastAppliedSnapshotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
                 getId(), newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
       });
     }

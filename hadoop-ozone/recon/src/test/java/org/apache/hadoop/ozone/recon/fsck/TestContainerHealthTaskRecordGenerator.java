@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyInt;
@@ -45,9 +46,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
-import org.hadoop.ozone.recon.schema.tables.records.UnhealthyContainersRecord;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
+import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.recon.schema.generated.tables.records.UnhealthyContainersRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -168,15 +169,14 @@ public class TestContainerHealthTaskRecordGenerator {
             status, (long) 123456, unhealthyContainerStateStatsMap);
 
     // Assert that none of the records are for negative.
-    records.forEach(record -> assertFalse(record.getContainerState()
-        .equals(UnHealthyContainerStates.NEGATIVE_SIZE.toString())));
+    records.forEach(record -> assertNotEquals(
+        UnHealthyContainerStates.NEGATIVE_SIZE.toString(), record.getContainerState()));
 
 
     // Assert that the NEGATIVE_SIZE state is logged
     assertEquals(1, unhealthyContainerStateStatsMap.get(
             UnHealthyContainerStates.NEGATIVE_SIZE).getOrDefault(CONTAINER_COUNT, 0L));
   }
-
 
   @Test
   public void testUnderReplicatedRecordRetainedAndUpdated() {

@@ -71,6 +71,7 @@ import org.apache.hadoop.hdds.scm.container.replication.health.HealthCheck;
 import org.apache.hadoop.hdds.scm.container.replication.health.MismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedContainerHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedStuckReplicationCheck;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisUnhealthyReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.VulnerableUnhealthyReplicasHandler;
@@ -102,7 +103,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ReplicationManager implements SCMService, ContainerReplicaPendingOpsSubscriber {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
 
   /**
@@ -110,12 +111,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    */
   private final ContainerManager containerManager;
 
-
   /**
    * SCMContext from StorageContainerManager.
    */
-  private final SCMContext scmContext;
-
+  private SCMContext scmContext;
 
   /**
    * ReplicationManager specific configuration.
@@ -182,6 +181,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private final RatisUnderReplicationHandler ratisUnderReplicationHandler;
   private final RatisOverReplicationHandler ratisOverReplicationHandler;
   private final RatisMisReplicationHandler ratisMisReplicationHandler;
+  private final QuasiClosedStuckUnderReplicationHandler quasiClosedStuckUnderReplicationHandler;
+  private final QuasiClosedStuckOverReplicationHandler quasiClosedStuckOverReplicationHandler;
   private Thread underReplicatedProcessorThread;
   private Thread overReplicatedProcessorThread;
   private final UnderReplicatedProcessor underReplicatedProcessor;
@@ -248,6 +249,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         new RatisOverReplicationHandler(ratisContainerPlacement, this);
     ratisMisReplicationHandler = new RatisMisReplicationHandler(
         ratisContainerPlacement, conf, this);
+    quasiClosedStuckUnderReplicationHandler =
+        new QuasiClosedStuckUnderReplicationHandler(ratisContainerPlacement, conf, this);
+    quasiClosedStuckOverReplicationHandler = new QuasiClosedStuckOverReplicationHandler(this);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this, rmConf::getUnderReplicatedInterval);
     overReplicatedProcessor =
@@ -262,6 +266,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         .addNext(new MismatchedReplicasHandler(this))
         .addNext(new EmptyContainerHandler(this))
         .addNext(new DeletingContainerHandler(this))
+        .addNext(new QuasiClosedStuckReplicationCheck())
         .addNext(ecReplicationCheckHandler)
         .addNext(ratisReplicationCheckHandler)
         .addNext(new ClosedWithUnhealthyReplicasHandler(this))
@@ -625,6 +630,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     command.setPriority(ReplicationCommandPriority.LOW);
     sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
   }
+
   /**
    * Sends a command to a datanode with the command deadline set to the default
    * in ReplicationManager config.
@@ -746,8 +752,15 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     if (result.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-      handler = isEC ? ecUnderReplicationHandler
-          : ratisUnderReplicationHandler;
+      if (isEC) {
+        handler = ecUnderReplicationHandler;
+      } else {
+        if (QuasiClosedStuckReplicationCheck.shouldHandleAsQuasiClosedStuck(result.getContainerInfo(), replicas)) {
+          handler = quasiClosedStuckUnderReplicationHandler;
+        } else {
+          handler = ratisUnderReplicationHandler;
+        }
+      }
     } else if (result.getHealthState()
         == ContainerHealthResult.HealthState.MIS_REPLICATED) {
       handler = isEC ? ecMisReplicationHandler : ratisMisReplicationHandler;
@@ -769,8 +782,16 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         containerReplicaPendingOps.getPendingOps(containerID);
 
     final boolean isEC = isEC(result.getContainerInfo().getReplicationConfig());
-    final UnhealthyReplicationHandler handler = isEC ? ecOverReplicationHandler
-        : ratisOverReplicationHandler;
+    UnhealthyReplicationHandler handler;
+    if (isEC) {
+      handler = ecOverReplicationHandler;
+    } else {
+      if (QuasiClosedStuckReplicationCheck.shouldHandleAsQuasiClosedStuck(result.getContainerInfo(), replicas)) {
+        handler = quasiClosedStuckOverReplicationHandler;
+      } else {
+        handler = ratisOverReplicationHandler;
+      }
+    }
 
     return handler.processAndSendCommands(replicas,
           pendingOps, result, getRemainingMaintenanceRedundancy(isEC));
@@ -896,6 +917,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     return containerReport;
   }
 
+  public boolean isThreadWaiting() {
+    return replicationMonitor.getState() == Thread.State.TIMED_WAITING;
+  }
+
   /**
    * ReplicationMonitor thread runnable. This wakes up at configured
    * interval and processes all the containers in the system.
@@ -995,20 +1020,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public NodeStatus getNodeStatus(DatanodeDetails datanode)
       throws NodeNotFoundException {
     return nodeManager.getNodeStatus(datanode);
-  }
-
-  /**
-   * An open container is healthy if all its replicas are in the same state as
-   * the container.
-   * @param container The container to check
-   * @param replicas The replicas belonging to the container
-   * @return True if the container is healthy, false otherwise
-   */
-  private boolean isOpenContainerHealthy(
-      ContainerInfo container, Set<ContainerReplica> replicas) {
-    HddsProtos.LifeCycleState state = container.getState();
-    return replicas.stream()
-        .allMatch(r -> compareState(state, r.getState()));
   }
 
   /**
@@ -1120,6 +1131,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + "sent to datanodes. After this timeout the command will be "
             + "retried.")
     private long eventTimeout = Duration.ofMinutes(12).toMillis();
+
     public void setInterval(Duration interval) {
       this.interval = interval;
     }
@@ -1144,6 +1156,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + "the datanodes will not process a command after SCM believes it "
             + "should have expired.")
     private long datanodeTimeoutOffset = Duration.ofMinutes(6).toMillis();
+
     public long getDatanodeTimeoutOffset() {
       return datanodeTimeoutOffset;
     }
@@ -1402,6 +1415,11 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     }
   }
 
+  @VisibleForTesting
+  public void setScmContext(SCMContext context) {
+    scmContext = context;
+  }
+
   @Override
   public String getServiceName() {
     return ReplicationManager.class.getSimpleName();
@@ -1481,6 +1499,37 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       return scmContext.getScm().getPipelineManager()
           .getPipeline(container.getPipelineID()) != null;
     } catch (PipelineNotFoundException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Notify the ReplicationManager that a node state has changed, which might
+   * require container replication. This will wake up the replication monitor
+   * thread if it's sleeping and there's no active replication work in progress.
+   * 
+   * @return true if the replication monitor was woken up, false otherwise
+   */
+  public synchronized boolean notifyNodeStateChange() {
+    if (!running || serviceStatus == ServiceStatus.PAUSING) {
+      return false;
+    }
+
+    if (!isThreadWaiting()) {
+      LOG.debug("Replication monitor is running, not need to wake it up");
+      return false;
+    }
+
+    // Only wake up the thread if there's no active replication work
+    // This prevents creating a new replication queue over and over
+    // when multiple nodes change state in quick succession
+    if (getQueue().isEmpty()) {
+      LOG.debug("Waking up replication monitor due to node state change");
+      // Notify the replication monitor thread to wake up
+      notify();
+      return true;
+    } else {
+      LOG.debug("Replication queue is not empty, not waking up replication monitor");
       return false;
     }
   }

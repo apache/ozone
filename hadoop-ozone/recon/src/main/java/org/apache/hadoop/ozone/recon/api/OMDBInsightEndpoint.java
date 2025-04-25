@@ -78,8 +78,8 @@ import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,7 +104,6 @@ public class OMDBInsightEndpoint {
   private final GlobalStatsDao globalStatsDao;
   private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
-
 
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
@@ -559,7 +558,6 @@ public class OMDBInsightEndpoint {
     keysSummary.put("totalUnreplicatedDataSize", unreplicatedSizeDeleted);
   }
 
-
   private void getPendingForDeletionDirInfo(
       int limit, String prevKey,
       KeyInsightInfoResponse pendingForDeletionKeyInfo) {
@@ -993,7 +991,7 @@ public class OMDBInsightEndpoint {
 
 
     // This API supports startPrefix from bucket level.
-    if (startPrefix == null || startPrefix.length() == 0) {
+    if (startPrefix == null || startPrefix.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
     String[] names = startPrefix.split(OM_KEY_PREFIX);
@@ -1112,7 +1110,6 @@ public class OMDBInsightEndpoint {
     // Iterate over for bucket and volume level search
     retrieveKeysFromTable(fileTable, paramInfo, results);
   }
-
 
   /**
    * Converts a startPrefix path into an objectId path for FSO buckets, using IDs.
@@ -1328,7 +1325,6 @@ public class OMDBInsightEndpoint {
     return omKeyInfo.getVolumeName() + OM_KEY_PREFIX +
         omKeyInfo.getBucketName() + OM_KEY_PREFIX + omKeyInfo.getKeyName();
   }
-
 
   @VisibleForTesting
   public GlobalStatsDao getDao() {

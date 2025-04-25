@@ -116,7 +116,7 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, ozoneConfiguration);
+            reconOMMetadataManager, 10);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
   }
 
@@ -344,7 +344,6 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
   }
-
 
   @Test
   public void testSearchUnderNestedDirectory() throws IOException {

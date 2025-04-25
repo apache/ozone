@@ -275,10 +275,9 @@ public class TestSstFilteringService {
     // Write 25 keys in each bucket, 2 sst files would be generated each for
     // keys in a single bucket
     int keyCount = 25;
-    for (int bucketIdx = 0; bucketIdx < bucketNames.size(); bucketIdx++) {
+    for (String bucketName : bucketNames) {
       for (int i = 1; i <= keyCount; i++) {
-        createKey(writeClient, volumeName, bucketNames.get(bucketIdx),
-            "key" + i);
+        createKey(writeClient, volumeName, bucketName, "key" + i);
       }
       activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
       activeDbStore.getDb().compactRange(OmMetadataManagerImpl.KEY_TABLE);
@@ -336,7 +335,7 @@ public class TestSstFilteringService {
                           int keyCount)
       throws IOException {
     for (int x = 0; x < keyCount; x++) {
-      String keyName = "key-" + RandomStringUtils.randomAlphanumeric(5);
+      String keyName = "key-" + RandomStringUtils.secure().nextAlphanumeric(5);
       createKey(writeClient, volumeName, bucketName, keyName);
     }
   }

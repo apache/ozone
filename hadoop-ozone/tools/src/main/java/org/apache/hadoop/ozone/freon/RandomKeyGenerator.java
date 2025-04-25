@@ -28,9 +28,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -102,7 +105,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
 
   private static final int QUANTILES = 10;
 
-  private static final int CHECK_INTERVAL_MILLIS = 5000;
+  private static final int CHECK_INTERVAL_MILLIS = 100;
 
   private byte[] keyValueBuffer = null;
 
@@ -298,7 +301,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
 
     keyValueBuffer = StringUtils.string2Bytes(
-        RandomStringUtils.randomAscii(bufferSize));
+        RandomStringUtils.secure().nextAscii(bufferSize));
 
     // Compute the common initial digest for all keys without their UUID
     if (validateWrites) {
@@ -544,13 +547,13 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
       String jsonName =
           new SimpleDateFormat("yyyyMMddHHmmss").format(Time.now()) + ".json";
       String jsonPath = jsonDir + "/" + jsonName;
-      try (FileOutputStream os = new FileOutputStream(jsonPath)) {
+      try (OutputStream os = Files.newOutputStream(Paths.get(jsonPath))) {
         ObjectMapper mapper = new ObjectMapper();
         mapper.setVisibility(PropertyAccessor.FIELD,
             JsonAutoDetect.Visibility.ANY);
         ObjectWriter writer = mapper.writerWithDefaultPrettyPrinter();
         writer.writeValue(os, jobInfo);
-      } catch (FileNotFoundException e) {
+      } catch (FileNotFoundException | NoSuchFileException e) {
         out.println("Json File could not be created for the path: " + jsonPath);
         out.println(e);
       } catch (IOException e) {
@@ -609,6 +612,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   int getNumberOfBucketsCleaned() {
     return numberOfBucketsCleaned.get();
   }
+
   /**
    * Returns true if random validation of write is enabled.
    *
@@ -722,7 +726,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
 
   private boolean createVolume(int volumeNumber) {
     String volumeName = "vol-" + volumeNumber + "-"
-        + RandomStringUtils.randomNumeric(5);
+        + RandomStringUtils.secure().nextNumeric(5);
     LOG.trace("Creating volume: {}", volumeName);
     try (AutoCloseable scope = TracingUtil
         .createActivatedSpan("createVolume")) {
@@ -753,7 +757,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
       return false;
     }
     String bucketName = "bucket-" + bucketNumber + "-" +
-        RandomStringUtils.randomNumeric(5);
+        RandomStringUtils.secure().nextNumeric(5);
     LOG.trace("Creating bucket: {} in volume: {}",
         bucketName, volume.getName());
     try (AutoCloseable scope = TracingUtil
@@ -788,7 +792,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     String bucketName = bucket.getName();
     String volumeName = bucket.getVolumeName();
     String keyName = "key-" + keyNumber + "-"
-        + RandomStringUtils.randomNumeric(5);
+        + RandomStringUtils.secure().nextNumeric(5);
     LOG.trace("Adding key: {} in bucket: {} of volume: {}",
         keyName, bucketName, volumeName);
     try {

@@ -115,7 +115,7 @@ public abstract class AbstractContractMultipartUploaderTest extends
         LOG.info("Statistics {}",
             ioStatisticsSourceToString(uploader));
       } catch (Exception e) {
-        LOG.warn("Exeception in teardown", e);
+        LOG.warn("Exception in teardown", e);
       }
     }
 
@@ -128,6 +128,7 @@ public abstract class AbstractContractMultipartUploaderTest extends
    * @return a path to use in the test
    * @throws IOException failure to build the path name up.
    */
+  @Override
   protected Path methodPath() throws IOException {
     return path(getMethodName());
   }

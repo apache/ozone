@@ -183,11 +183,11 @@ public class TestUpgradeFinalizerActions {
       this.actions.put(type, action);
     }
 
+    @Override
     public Optional<? extends UpgradeAction> action(UpgradeActionType phase) {
       return Optional.ofNullable(actions.get(phase));
     }
   }
-
 
   /**
    * Mock DN Upgrade Action that fails.

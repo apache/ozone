@@ -77,7 +77,6 @@ public interface DBDefinition {
    */
   List<DBColumnFamilyDefinition<?, ?>> getColumnFamilies(String name);
 
-
   /**
    * @return The unique column family for the given name.
    */

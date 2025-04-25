@@ -169,7 +169,7 @@ import org.slf4j.LoggerFactory;
  */
 public class KeyValueHandler extends Handler {
 
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
 
   private final BlockManager blockManager;
@@ -194,7 +194,7 @@ public class KeyValueHandler extends Handler {
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender,
                          ContainerChecksumTreeManager checksumManager) {
-    this(config, datanodeId, contSet, volSet, metrics, icrSender, checksumManager, Clock.systemUTC());
+    this(config, datanodeId, contSet, volSet, null, metrics, icrSender, Clock.systemUTC(), checksumManager);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -202,10 +202,11 @@ public class KeyValueHandler extends Handler {
                          String datanodeId,
                          ContainerSet contSet,
                          VolumeSet volSet,
+                         VolumeChoosingPolicy volumeChoosingPolicy,
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender,
-                         ContainerChecksumTreeManager checksumManager,
-                         Clock clock) {
+                         Clock clock,
+                         ContainerChecksumTreeManager checksumManager) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     this.clock = clock;
     blockManager = new BlockManagerImpl(config);
@@ -214,11 +215,8 @@ public class KeyValueHandler extends Handler {
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
     this.checksumManager = checksumManager;
-    try {
-      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    this.volumeChoosingPolicy = volumeChoosingPolicy != null ? volumeChoosingPolicy
+        : VolumeChoosingPolicyFactory.getPolicy(config);
 
     maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -257,11 +255,6 @@ public class KeyValueHandler extends Handler {
       OzoneConfiguration.of(conf).set(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY,
           DEFAULT_LAYOUT.name());
     }
-  }
-
-  @VisibleForTesting
-  public VolumeChoosingPolicy getVolumeChoosingPolicyForTesting() {
-    return volumeChoosingPolicy;
   }
 
   @Override
@@ -2055,10 +2048,6 @@ public class KeyValueHandler extends Handler {
       }
     }
     return null;
-  }
-
-  public static Logger getLogger() {
-    return LOG;
   }
 
   @VisibleForTesting

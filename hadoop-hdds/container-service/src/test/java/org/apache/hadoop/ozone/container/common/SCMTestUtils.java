@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import com.google.protobuf.BlockingService;
@@ -82,7 +83,6 @@ public final class SCMTestUtils {
     return rpcServer;
   }
 
-
   /**
    * Start Datanode RPC server.
    */
@@ -122,12 +122,18 @@ public final class SCMTestUtils {
 
   public static OzoneConfiguration getConf(File testDir) {
     OzoneConfiguration conf = new OzoneConfiguration();
+    File datanodeDir = new File(testDir, "datanode");
+    File metadataDir = new File(testDir, "metadata");
+    File datanodeIdDir = new File(testDir, "datanodeID");
+    assertTrue(datanodeDir.mkdirs());
+    assertTrue(metadataDir.mkdirs());
+    assertTrue(datanodeIdDir.mkdirs());
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
-        new File(testDir, "datanode").getAbsolutePath());
+        datanodeDir.getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        new File(testDir, "metadata").getAbsolutePath());
+        metadataDir.getAbsolutePath());
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR,
-        new File(testDir, "datanodeID").getAbsolutePath());
+        datanodeIdDir.getAbsolutePath());
     conf.setClass(SpaceUsageCheckFactory.Conf.configKeyForClassName(),
         MockSpaceUsageCheckFactory.None.class,
         SpaceUsageCheckFactory.class);

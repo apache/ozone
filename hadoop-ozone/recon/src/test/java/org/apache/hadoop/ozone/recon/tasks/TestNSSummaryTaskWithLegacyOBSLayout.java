@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -94,7 +95,6 @@ public class TestNSSummaryTaskWithLegacyOBSLayout {
   private static final long KEY_SIX_OBJECT_ID = 10L;
   private static final long KEY_SEVEN_OBJECT_ID = 11L;
 
-
   private static final long KEY_ONE_SIZE = 500L;
   private static final long KEY_TWO_OLD_SIZE = 1025L;
   private static final long KEY_TWO_UPDATE_SIZE = 1023L;
@@ -115,6 +115,8 @@ public class TestNSSummaryTaskWithLegacyOBSLayout {
     ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         false);
+    ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
+        10);
 
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(tmpDir)
@@ -132,9 +134,12 @@ public class TestNSSummaryTaskWithLegacyOBSLayout {
 
     populateOMDB();
 
+    long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 10);
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration,
+        nsSummaryFlushToDBMaxThreshold);
   }
 
   /**
@@ -240,7 +245,7 @@ public class TestNSSummaryTaskWithLegacyOBSLayout {
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
       nSSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
-      nSSummaryTaskWithLegacy.processWithLegacy(processEventBatch());
+      nSSummaryTaskWithLegacy.processWithLegacy(processEventBatch(), 0);
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
@@ -349,7 +354,6 @@ public class TestNSSummaryTaskWithLegacyOBSLayout {
       assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE,
           nsSummaryForBucket2.getSizeOfFiles());
     }
-
 
     @Test
     public void testProcessFileBucketSize() {

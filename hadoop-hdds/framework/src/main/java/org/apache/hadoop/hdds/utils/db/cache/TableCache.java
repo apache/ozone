@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability.Evolving;
 @Private
 @Evolving
 public interface TableCache<KEY, VALUE> {
+  CacheResult<?> MAY_EXIST = new CacheResult<>(CacheResult.CacheStatus.MAY_EXIST, null);
 
   /**
    * Return the value for the key if it is present, otherwise return null.
@@ -113,7 +114,8 @@ public interface TableCache<KEY, VALUE> {
   enum CacheType {
     FULL_CACHE, //  This mean's the table maintains full cache. Cache and DB
     // state are same.
-    PARTIAL_CACHE // This is partial table cache, cache state is partial state
+    PARTIAL_CACHE, // This is partial table cache, cache state is partial state
     // compared to DB state.
+    NO_CACHE
   }
 }

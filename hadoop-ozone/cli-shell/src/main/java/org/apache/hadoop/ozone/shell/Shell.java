@@ -68,6 +68,7 @@ public abstract class Shell extends GenericCli {
 
   public Shell() {
     super(new PicocliCommandsFactory());
+    getCmd().setExecutionStrategy(this::execute);
   }
 
   public String name() {
@@ -79,26 +80,19 @@ public abstract class Shell extends GenericCli {
     return name();
   }
 
-  @Override
-  public void run(String[] argv) {
+  private int execute(CommandLine.ParseResult parseResult) {
     name = spec.name();
 
-    try {
-      // parse args to check if interactive mode is requested
-      getCmd().parseArgs(argv);
-    } catch (Exception ignored) {
-      // failure will be reported by regular, non-interactive run
-    }
-
-    if (executionMode != null && (executionMode.interactive || !executionMode.command.isEmpty())) {
+    if (parseResult.hasMatchedOption("--interactive") || parseResult.hasMatchedOption("--execute")) {
       spec.name(""); // use short name (e.g. "token get" instead of "ozone sh token get")
       installBatchExceptionHandler();
       new REPL(this, getCmd(), (PicocliCommandsFactory) getCmd().getFactory(), executionMode.command);
-    } else {
-      TracingUtil.initTracing("shell", getOzoneConf());
-      String spanName = spec.name() + " " + String.join(" ", argv);
-      TracingUtil.executeInNewSpan(spanName, () -> super.run(argv));
+      return 0;
     }
+
+    TracingUtil.initTracing("shell", getOzoneConf());
+    String spanName = spec.name() + " " + String.join(" ", parseResult.originalArgs());
+    return TracingUtil.executeInNewSpan(spanName, () -> new CommandLine.RunLast().execute(parseResult));
   }
 
   private void installBatchExceptionHandler() {

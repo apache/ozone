@@ -56,7 +56,7 @@ import org.apache.ratis.util.MemoizedSupplier;
  * </ul>
  */
 @Immutable
-public class OzoneAcl {
+public final class OzoneAcl {
 
   private static final String ACL_SCOPE_REGEX = ".*\\[(ACCESS|DEFAULT)\\]";
   /**
@@ -64,7 +64,7 @@ public class OzoneAcl {
    * which is similar to Linux POSIX symbolic.
    */
   public static final OzoneAcl LINK_BUCKET_DEFAULT_ACL =
-      new OzoneAcl(IAccessAuthorizer.ACLIdentityType.WORLD, "", ACCESS, READ, WRITE);
+      OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.WORLD, "", ACCESS, READ, WRITE);
 
   private final ACLIdentityType type;
   private final String name;
@@ -77,12 +77,12 @@ public class OzoneAcl {
   @JsonIgnore
   private final Supplier<Integer> hashCodeMethod;
 
-  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, ACLType... acls) {
-    this(type, name, scope, toInt(acls));
+  public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, ACLType... acls) {
+    return new OzoneAcl(type, name, scope, toInt(acls));
   }
 
-  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, EnumSet<ACLType> acls) {
-    this(type, name, scope, toInt(acls));
+  public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, EnumSet<ACLType> acls) {
+    return new OzoneAcl(type, name, scope, toInt(acls));
   }
 
   private OzoneAcl(ACLIdentityType type, String name, AclScope scope, int acls) {
@@ -96,7 +96,6 @@ public class OzoneAcl {
     this.hashCodeMethod = MemoizedSupplier.valueOf(() -> Objects.hash(getName(),
         BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer()), getType().toString(), getAclScope()));
   }
-
 
   private static int toInt(int aclTypeOrdinal) {
     return 1 << aclTypeOrdinal;
@@ -134,7 +133,7 @@ public class OzoneAcl {
     if (type == ACLIdentityType.WORLD || type == ACLIdentityType.ANONYMOUS) {
       if (!name.equals(ACLIdentityType.WORLD.name()) &&
           !name.equals(ACLIdentityType.ANONYMOUS.name()) &&
-          name.length() != 0) {
+          !name.isEmpty()) {
         throw new IllegalArgumentException("Expected name " + type.name() + ", but was: " + name);
       }
       // For type WORLD and ANONYMOUS we allow only one acl to be set.
@@ -142,7 +141,7 @@ public class OzoneAcl {
     }
 
     if (((type == ACLIdentityType.USER) || (type == ACLIdentityType.GROUP))
-        && (name.length() == 0)) {
+        && (name.isEmpty())) {
       throw new IllegalArgumentException(type + " name is required");
     }
 
@@ -194,7 +193,7 @@ public class OzoneAcl {
 
     // TODO : Support sanitation of these user names by calling into
     // userAuth Interface.
-    return new OzoneAcl(aclType, parts[1], aclScope, acls);
+    return OzoneAcl.of(aclType, parts[1], aclScope, acls);
   }
 
   /**

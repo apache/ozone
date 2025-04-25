@@ -67,6 +67,7 @@ public final class OMMetadataManagerTestUtils {
 
   public static final String TEST_USER = "TestUser";
   private static OzoneConfiguration configuration;
+
   private OMMetadataManagerTestUtils() {
   }
 
@@ -382,7 +383,6 @@ public final class OMMetadataManagerTestUtils {
         .put(openKey, omKeyInfo);
   }
 
-
   /**
    * Writes deleted key information to the Ozone Manager metadata table.
    * @param omMetadataManager the Ozone Manager metadata manager
@@ -396,11 +396,11 @@ public final class OMMetadataManagerTestUtils {
                                          String bucketName,
                                          String volName) throws IOException {
     List<OmKeyInfo> infos = new ArrayList<>();
-    for (int i = 0; i < keyNames.size(); i++) {
+    for (String keyName : keyNames) {
       infos.add(new OmKeyInfo.Builder()
           .setBucketName(bucketName)
           .setVolumeName(volName)
-          .setKeyName(keyNames.get(i))
+          .setKeyName(keyName)
           .setDataSize(100L)
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
           .build());

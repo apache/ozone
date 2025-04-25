@@ -94,7 +94,7 @@ public class ReplicatedBlockChecksumComputer extends
     DataChecksum.Type dataChecksumType;
     long bytesPerCrc;
     long chunkSize;
-    Preconditions.checkArgument(chunkInfoList.size() > 0);
+    Preconditions.checkArgument(!chunkInfoList.isEmpty());
 
     final ContainerProtos.ChunkInfo firstChunkInfo = chunkInfoList.get(0);
     switch (firstChunkInfo.getChecksumData().getType()) {

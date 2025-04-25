@@ -141,6 +141,7 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
@@ -287,8 +288,8 @@ public class TestStorageContainerManager {
       // Add 2 TXs per container.
       Map<Long, List<Long>> deletedBlocks = new HashMap<>();
       List<Long> blocks = new ArrayList<>();
-      blocks.add(RandomUtils.nextLong());
-      blocks.add(RandomUtils.nextLong());
+      blocks.add(RandomUtils.secure().randomLong());
+      blocks.add(RandomUtils.secure().randomLong());
       deletedBlocks.put(containerID, blocks);
       addTransactions(cluster.getStorageContainerManager(), delLog,
           deletedBlocks);
@@ -303,7 +304,7 @@ public class TestStorageContainerManager {
       try {
         cluster.getStorageContainerManager().getScmHAManager()
             .asSCMHADBTransactionBuffer().flush();
-        return delLog.getFailedTransactions(-1, 0).size() == 0;
+        return delLog.getFailedTransactions(-1, 0).isEmpty();
       } catch (IOException e) {
         return false;
       }
@@ -358,14 +359,10 @@ public class TestStorageContainerManager {
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
           endpoint.getState());
     }
-    GenericTestUtils.LogCapturer scmDnHBDispatcherLog =
-        GenericTestUtils.LogCapturer.captureLogs(
-            SCMDatanodeHeartbeatDispatcher.LOG);
+    LogCapturer scmDnHBDispatcherLog = LogCapturer.captureLogs(SCMDatanodeHeartbeatDispatcher.class);
     LogManager.getLogger(HeartbeatEndpointTask.class).setLevel(Level.DEBUG);
-    GenericTestUtils.LogCapturer heartbeatEndpointTaskLog =
-        GenericTestUtils.LogCapturer.captureLogs(HeartbeatEndpointTask.LOG);
-    GenericTestUtils.LogCapturer versionEndPointTaskLog =
-        GenericTestUtils.LogCapturer.captureLogs(VersionEndpointTask.LOG);
+    LogCapturer heartbeatEndpointTaskLog = LogCapturer.captureLogs(HeartbeatEndpointTask.class);
+    LogCapturer versionEndPointTaskLog = LogCapturer.captureLogs(VersionEndpointTask.class);
     // Initially empty
     assertThat(scmDnHBDispatcherLog.getOutput()).isEmpty();
     assertThat(versionEndPointTaskLog.getOutput()).isEmpty();
@@ -454,10 +451,10 @@ public class TestStorageContainerManager {
       GenericTestUtils.waitFor(() -> {
         NodeManager nodeManager = cluster.getStorageContainerManager()
             .getScmNodeManager();
-        List<SCMCommand> commands = nodeManager.processHeartbeat(
+        List<SCMCommand<?>> commands = nodeManager.processHeartbeat(
             nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0));
         if (commands != null) {
-          for (SCMCommand cmd : commands) {
+          for (SCMCommand<?> cmd : commands) {
             if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
               List<DeletedBlocksTransaction> deletedTXs =
                   ((DeleteBlocksCommand) cmd).blocksTobeDeleted();
@@ -639,10 +636,10 @@ public class TestStorageContainerManager {
     assertEquals(cluster.getHddsDatanodes().size(), allNodes.size());
 
     for (DatanodeDetails node : allNodes) {
-      DatanodeInfo datanodeInfo = assertInstanceOf(DatanodeInfo.class, nodeManager.getNodeByUuid(node.getUuid()));
+      DatanodeInfo datanodeInfo = assertInstanceOf(DatanodeInfo.class, nodeManager.getNode(node.getID()));
       assertNotNull(datanodeInfo);
       assertThat(datanodeInfo.getLastHeartbeatTime()).isPositive();
-      assertEquals(datanodeInfo.getUuidString(), datanodeInfo.getNetworkName());
+      assertEquals(datanodeInfo.getID().toString(), datanodeInfo.getNetworkName());
       assertEquals("/rack1", datanodeInfo.getNetworkLocation());
     }
   }

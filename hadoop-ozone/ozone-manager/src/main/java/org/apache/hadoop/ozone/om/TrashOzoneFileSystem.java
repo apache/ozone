@@ -71,8 +71,6 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   private final OzoneManager ozoneManager;
 
-  private final String userName;
-
   private final AtomicLong runCount;
 
   private static final ClientId CLIENT_ID = ClientId.randomId();
@@ -84,8 +82,6 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   public TrashOzoneFileSystem(OzoneManager ozoneManager) throws IOException {
     this.ozoneManager = ozoneManager;
-    this.userName =
-          UserGroupInformation.getCurrentUser().getShortUserName();
     this.runCount = new AtomicLong(0);
     setConf(ozoneManager.getConfiguration());
     ozoneConfiguration = OzoneConfiguration.of(getConf());
@@ -208,7 +204,6 @@ public class TrashOzoneFileSystem extends FileSystem {
     return fileStatuses.toArray(new FileStatus[0]);
   }
 
-
   /**
    * converts OzoneFileStatus object to FileStatus.
    */
@@ -247,7 +242,6 @@ public class TrashOzoneFileSystem extends FileSystem {
     throw new UnsupportedOperationException(
         "fs.mkdirs() not implemented in TrashOzoneFileSystem");
   }
-
 
   @Override
   public FileStatus getFileStatus(Path path) throws IOException {
@@ -403,7 +397,7 @@ public class TrashOzoneFileSystem extends FileSystem {
             }
           }
         }
-        if (keyPathList.size() > 0) {
+        if (!keyPathList.isEmpty()) {
           if (!processKeyPath(keyPathList)) {
             return false;
           }
@@ -543,7 +537,6 @@ public class TrashOzoneFileSystem extends FileSystem {
     private final boolean recursive;
     private List<String> keysList;
 
-
     DeleteIterator(Path f, boolean recursive)
         throws IOException {
       super(f);
@@ -621,7 +614,4 @@ public class TrashOzoneFileSystem extends FileSystem {
 
     return userInfo.build();
   }
-
-
-
 }

@@ -109,8 +109,8 @@ public class TestTypedRDBTableStore {
     try (Table<String, String> testTable = createTypedTable(
         "First")) {
       String key =
-          RandomStringUtils.random(10);
-      String value = RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
+      String value = RandomStringUtils.secure().next(10);
       testTable.put(key, value);
       assertFalse(testTable.isEmpty());
       String readValue = testTable.get(key);
@@ -134,36 +134,36 @@ public class TestTypedRDBTableStore {
     List<String> deletedKeys = new LinkedList<>();
     List<String> validKeys = new LinkedList<>();
     String value =
-        RandomStringUtils.random(10);
+        RandomStringUtils.secure().next(10);
     for (int x = 0; x < 100; x++) {
       deletedKeys.add(
-          RandomStringUtils.random(10));
+          RandomStringUtils.secure().next(10));
     }
 
     for (int x = 0; x < 100; x++) {
       validKeys.add(
-          RandomStringUtils.random(10));
+          RandomStringUtils.secure().next(10));
     }
 
     // Write all the keys and delete the keys scheduled for delete.
     //Assert we find only expected keys in the Table.
     try (Table<String, String> testTable = createTypedTable(
         "Fourth")) {
-      for (int x = 0; x < deletedKeys.size(); x++) {
-        testTable.put(deletedKeys.get(x), value);
-        testTable.delete(deletedKeys.get(x));
+      for (String deletedKey : deletedKeys) {
+        testTable.put(deletedKey, value);
+        testTable.delete(deletedKey);
       }
 
-      for (int x = 0; x < validKeys.size(); x++) {
-        testTable.put(validKeys.get(x), value);
+      for (String validKey : validKeys) {
+        testTable.put(validKey, value);
       }
 
-      for (int x = 0; x < validKeys.size(); x++) {
-        assertNotNull(testTable.get(validKeys.get(0)));
+      for (String validKey : validKeys) {
+        assertNotNull(testTable.get(validKey));
       }
 
-      for (int x = 0; x < deletedKeys.size(); x++) {
-        assertNull(testTable.get(deletedKeys.get(0)));
+      for (String deletedKey : deletedKeys) {
+        assertNull(testTable.get(deletedKey));
       }
     }
   }
@@ -176,9 +176,9 @@ public class TestTypedRDBTableStore {
         BatchOperation batch = rdbStore.initBatchOperation()) {
       //given
       String key =
-          RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
       String value =
-          RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
 
       //when
       testTable.putWithBatch(batch, key, value);
@@ -197,9 +197,9 @@ public class TestTypedRDBTableStore {
 
       //given
       String key =
-          RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
       String value =
-          RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
       testTable.put(key, value);
 
       //when
@@ -224,9 +224,9 @@ public class TestTypedRDBTableStore {
         "Sixth")) {
       for (int x = 0; x < iterCount; x++) {
         String key =
-            RandomStringUtils.random(10);
+            RandomStringUtils.secure().next(10);
         String value =
-            RandomStringUtils.random(10);
+            RandomStringUtils.secure().next(10);
         testTable.put(key, value);
       }
       int localCount = 0;
@@ -341,12 +341,12 @@ public class TestTypedRDBTableStore {
     try (Table<String, String> testTable = createTypedTable(
         "Eighth")) {
       String key =
-          RandomStringUtils.random(10);
-      String value = RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
+      String value = RandomStringUtils.secure().next(10);
       testTable.put(key, value);
       assertTrue(testTable.isExist(key));
 
-      String invalidKey = key + RandomStringUtils.random(1);
+      String invalidKey = key + RandomStringUtils.secure().next(1);
       assertFalse(testTable.isExist(invalidKey));
 
       testTable.delete(key);
@@ -359,12 +359,12 @@ public class TestTypedRDBTableStore {
     try (Table<String, String> testTable = createTypedTable(
         "Eighth")) {
       String key =
-          RandomStringUtils.random(10);
-      String value = RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
+      String value = RandomStringUtils.secure().next(10);
       testTable.put(key, value);
       assertNotNull(testTable.getIfExist(key));
 
-      String invalidKey = key + RandomStringUtils.random(1);
+      String invalidKey = key + RandomStringUtils.secure().next(1);
       assertNull(testTable.getIfExist(invalidKey));
 
       testTable.delete(key);
@@ -377,8 +377,8 @@ public class TestTypedRDBTableStore {
     try (Table<String, String> testTable = createTypedTable(
         "Eighth")) {
       String key =
-          RandomStringUtils.random(10);
-      String value = RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
+      String value = RandomStringUtils.secure().next(10);
       testTable.addCacheEntry(new CacheKey<>(key),
           CacheValue.get(1L, value));
       assertTrue(testTable.isExist(key));
@@ -397,8 +397,8 @@ public class TestTypedRDBTableStore {
       final int numKeys = 12345;
       for (int i = 0; i < numKeys; i++) {
         String key =
-            RandomStringUtils.random(10);
-        String value = RandomStringUtils.random(10);
+            RandomStringUtils.secure().next(10);
+        String value = RandomStringUtils.secure().next(10);
         testTable.put(key, value);
       }
       long keyCount = testTable.getEstimatedKeyCount();

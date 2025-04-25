@@ -50,22 +50,32 @@ Create container
 List containers
     ${output} =         Execute          ozone admin container list
                         Should contain   ${output}   OPEN
+                        Should Start With   ${output}   [
+                        Should End With   ${output}   ]
 
 List containers with explicit host
     ${output} =         Execute          ozone admin container list --scm ${SCM}
                         Should contain   ${output}   OPEN
+                        Should Start With   ${output}   [
+                        Should End With   ${output}   ]
 
 List containers with container state
     ${output} =         Execute          ozone admin container list --state=CLOSED
                         Should Not contain   ${output}   OPEN
+                        Should Start With   ${output}   [
+                        Should End With   ${output}   ]
 
 List containers with replication factor ONE
     ${output} =         Execute          ozone admin container list -t RATIS -r ONE
                         Should Not contain   ${output}   THREE
+                        Should Start With   ${output}   [
+                        Should End With   ${output}   ]
 
 List containers with replication factor THREE
     ${output} =         Execute          ozone admin container list -t RATIS -r THREE
                         Should Not contain   ${output}   ONE
+                        Should Start With   ${output}   [
+                        Should End With   ${output}   ]
 
 Container info
     ${output} =         Execute          ozone admin container info "${CONTAINER}"
@@ -93,14 +103,51 @@ Report containers as JSON
 List all containers
     ${output} =         Execute          ozone admin container list --all
                         Should contain   ${output}   OPEN
+                        Should Start With   ${output}   [
+                        Should End With   ${output}   ]
 
 List all containers according to count (batchSize)
     ${output} =         Execute          ozone admin container list --all --count 10
                         Should contain   ${output}   OPEN
+                        Should Start With   ${output}   [
+                        Should End With   ${output}   ]
 
 List all containers from a particular container ID
-    ${output} =         Execute          ozone admin container list --all --start 1
+    ${output} =         Execute          ozone admin container list --all --start 2
                         Should contain   ${output}   OPEN
+                        Should Start With   ${output}   [
+                        Should End With   ${output}   ]
+
+Check JSON array parsing
+    ${output} =         Execute          ozone admin container list
+                        Should Start With   ${output}   [
+                        Should Contain   ${output}   containerID
+                        Should End With   ${output}   ]
+    ${containerIDs} =   Execute          echo '${output}' | jq -r '.[].containerID'
+                        Should Not Be Empty   ${containerIDs}
+
+Check state filtering with JSON array format
+    ${output} =         Execute          ozone admin container list --state=OPEN
+                        Should Start With   ${output}   [
+                        Should End With   ${output}   ]
+    ${states} =         Execute          echo '${output}' | jq -r '.[].state'
+                        Should Contain   ${states}   OPEN
+                        Should Not Contain   ${states}   CLOSED
+
+Check count limit with JSON array format
+    ${output} =         Execute          ozone admin container create
+                        Should contain   ${output}   is created
+    ${output} =         Execute          ozone admin container create
+                        Should contain   ${output}   is created
+    ${output} =         Execute          ozone admin container create
+                        Should contain   ${output}   is created
+    ${output} =         Execute          ozone admin container create
+                        Should contain   ${output}   is created
+    ${output} =         Execute          ozone admin container create
+                        Should contain   ${output}   is created
+    ${output} =         Execute And Ignore Error          ozone admin container list --count 5 2> /dev/null # This logs to error that the list is incomplete
+    ${count} =          Execute          echo '${output}' | jq -r 'length'
+                        Should Be True   ${count} == 5
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin container
@@ -110,7 +157,6 @@ Incomplete command
                         Should contain   ${output}   create
                         Should contain   ${output}   close
                         Should contain   ${output}   report
-                        Should contain   ${output}   upgrade
                         Should contain   ${output}   reconcile
 
 #List containers on unknown host

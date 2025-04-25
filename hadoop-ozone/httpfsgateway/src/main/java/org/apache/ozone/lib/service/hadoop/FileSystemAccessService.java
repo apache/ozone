@@ -38,6 +38,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.ozone.lib.server.BaseService;
 import org.apache.ozone.lib.server.ServiceException;
@@ -112,7 +113,7 @@ public class FileSystemAccessService extends BaseService
           fs = null;
           lastUse = -1;
         } else {
-          lastUse = System.currentTimeMillis();
+          lastUse = Time.monotonicNow();
         }
       }
     }
@@ -125,7 +126,7 @@ public class FileSystemAccessService extends BaseService
     synchronized boolean purgeIfIdle() throws IOException {
       boolean ret = false;
       if (count == 0 && lastUse != -1 &&
-          (System.currentTimeMillis() - lastUse) > timeout) {
+          (Time.monotonicNow() - lastUse) > timeout) {
         fs.close();
         fs = null;
         lastUse = -1;
@@ -166,13 +167,13 @@ public class FileSystemAccessService extends BaseService
       String keytab = System
           .getProperty("user.home") + "/" + defaultName + ".keytab";
       keytab = getServiceConfig().get(KERBEROS_KEYTAB, keytab).trim();
-      if (keytab.length() == 0) {
+      if (keytab.isEmpty()) {
         throw new ServiceException(FileSystemAccessException.ERROR.H01,
             KERBEROS_KEYTAB);
       }
       String principal = defaultName + "/localhost@LOCALHOST";
       principal = getServiceConfig().get(KERBEROS_PRINCIPAL, principal).trim();
-      if (principal.length() == 0) {
+      if (principal.isEmpty()) {
         throw new ServiceException(FileSystemAccessException.ERROR.H01,
             KERBEROS_PRINCIPAL);
       }
@@ -347,7 +348,7 @@ public class FileSystemAccessService extends BaseService
 
   protected void validateNamenode(String namenode)
       throws FileSystemAccessException {
-    if (nameNodeWhitelist.size() > 0 && !nameNodeWhitelist.contains("*")) {
+    if (!nameNodeWhitelist.isEmpty() && !nameNodeWhitelist.contains("*")) {
       if (!nameNodeWhitelist.contains(
           StringUtils.toLowerCase(namenode))) {
         throw new FileSystemAccessException(FileSystemAccessException.ERROR.H05,
@@ -373,8 +374,7 @@ public class FileSystemAccessService extends BaseService
       throw new FileSystemAccessException(FileSystemAccessException.ERROR.H04);
     }
     if (conf.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) == null ||
-        conf.getTrimmed(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY)
-            .length() == 0) {
+        conf.getTrimmed(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY).isEmpty()) {
       throw new FileSystemAccessException(FileSystemAccessException.ERROR.H06,
                                           CommonConfigurationKeysPublic
                                               .FS_DEFAULT_NAME_KEY);

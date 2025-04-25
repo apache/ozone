@@ -144,7 +144,7 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
     conf.setFromObject(balancerConfiguration);
-    GenericTestUtils.setLogLevel(ContainerBalancerTask.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ContainerBalancerTask.class, Level.DEBUG);
 
     int[] sizeArray = testInfo.getTestMethod()
             .filter(method -> method.getName().equals("balancerShouldMoveOnlyPositiveSizeContainers"))
@@ -589,17 +589,5 @@ public class TestContainerBalancerTask {
 
   private void stopBalancer() {
     // do nothing as testcase is not threaded
-  }
-
-  private CompletableFuture<MoveManager.MoveResult>
-      genCompletableFuture(int sleepMilSec) {
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        Thread.sleep(sleepMilSec);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-      return MoveManager.MoveResult.COMPLETED;
-    });
   }
 }

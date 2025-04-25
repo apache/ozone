@@ -647,7 +647,7 @@ public class TestECBlockReconstructedStripeInputStream {
   }
 
   private Integer getRandomStreamIndex(Set<Integer> set) {
-    return set.stream().skip(RandomUtils.nextInt(0, set.size()))
+    return set.stream().skip(RandomUtils.secure().randomInt(0, set.size()))
         .findFirst().orElse(null);
   }
 
@@ -793,8 +793,8 @@ public class TestECBlockReconstructedStripeInputStream {
 
       // Read full stripe
       int read = ecb.read(bufs);
-      for (int j = 0; j < bufs.length; j++) {
-        ECStreamTestUtil.assertBufferMatches(bufs[j], dataGen);
+      for (ByteBuffer buffer : bufs) {
+        ECStreamTestUtil.assertBufferMatches(buffer, dataGen);
       }
       assertEquals(stripeSize(), read);
 

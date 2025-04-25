@@ -112,7 +112,6 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     return resolvedArgs;
   }
 
-
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
@@ -144,7 +143,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     String toKey = null, fromKey = null;
     Result result = null;
     try {
-      if (toKeyName.length() == 0 || fromKeyName.length() == 0) {
+      if (toKeyName.isEmpty() || fromKeyName.isEmpty()) {
         throw new OMException("Key name is empty",
             OMException.ResultCodes.INVALID_KEY_NAME);
       }

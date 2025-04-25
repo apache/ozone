@@ -273,7 +273,6 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       FILE9_SIZE_WITH_REPLICA +
       FILE10_SIZE_WITH_REPLICA;
 
-
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_KEY
       = FILE4_SIZE_WITH_REPLICA;
@@ -304,18 +303,10 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_ONE;
   private static final String KEY_TWO_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_TWO;
-  private static final String KEY_THREE_PATH =
-      ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_THREE;
-  private static final String KEY_FOUR_PATH =
-      ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + KEY_FOUR;
   private static final String KEY_FIVE_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + KEY_FIVE;
   private static final String KEY_EIGHT_PATH =
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE + ROOT_PATH + KEY_EIGHT;
-  private static final String KEY_NINE_PATH =
-      ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE + ROOT_PATH + KEY_NINE;
-  private static final String KEY_TEN_PATH =
-      ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE + ROOT_PATH + KEY_TEN;
   private static final String KEY_ELEVEN_PATH =
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_FOUR + ROOT_PATH + KEY_ELEVEN;
   private static final String KEY4_PATH =
@@ -346,7 +337,6 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE;
 
   private static final long BUCKET_FOUR_DATA_SIZE = FILE_ELEVEN_SIZE;
-
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -382,11 +372,11 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     populateOMDB();
     NSSummaryTaskWithOBS nsSummaryTaskWithOBS =
         new NSSummaryTaskWithOBS(reconNamespaceSummaryManager,
-            reconOMMetadataManager, conf);
+            reconOMMetadataManager, 10);
     nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
     NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy =
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager,
-            reconOMMetadataManager, conf);
+            reconOMMetadataManager, conf, 10);
     nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
     commonUtils = new CommonUtils();
   }
@@ -854,7 +844,6 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         invalidResObj.getResponseCode());
   }
 
-
   @Test
   public void testFileSizeDist() throws Exception {
     checkFileSizeDist(ROOT_PATH, 2, 3, 3, 1);
@@ -1213,7 +1202,6 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     return new OmKeyLocationInfoGroup(0L, locationInfoList);
   }
 
-
   private OmKeyLocationInfoGroup getLocationInfoGroup2() {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     BlockID block4 = new BlockID(CONTAINER_FOUR_ID, 0L);
@@ -1404,42 +1392,42 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     ContainerManager containerManager = mock(ContainerManager.class);
 
     // Container 1 is 3-way replicated
-    ContainerID containerID1 = new ContainerID(CONTAINER_ONE_ID);
+    ContainerID containerID1 = ContainerID.valueOf(CONTAINER_ONE_ID);
     Set<ContainerReplica> containerReplicas1 = generateMockContainerReplicas(
         CONTAINER_ONE_REPLICA_COUNT, containerID1);
     when(containerManager.getContainerReplicas(containerID1))
         .thenReturn(containerReplicas1);
 
     // Container 2 is under replicated with 2 replica
-    ContainerID containerID2 = new ContainerID(CONTAINER_TWO_ID);
+    ContainerID containerID2 = ContainerID.valueOf(CONTAINER_TWO_ID);
     Set<ContainerReplica> containerReplicas2 = generateMockContainerReplicas(
         CONTAINER_TWO_REPLICA_COUNT, containerID2);
     when(containerManager.getContainerReplicas(containerID2))
         .thenReturn(containerReplicas2);
 
     // Container 3 is over replicated with 4 replica
-    ContainerID containerID3 = new ContainerID(CONTAINER_THREE_ID);
+    ContainerID containerID3 = ContainerID.valueOf(CONTAINER_THREE_ID);
     Set<ContainerReplica> containerReplicas3 = generateMockContainerReplicas(
         CONTAINER_THREE_REPLICA_COUNT, containerID3);
     when(containerManager.getContainerReplicas(containerID3))
         .thenReturn(containerReplicas3);
 
     // Container 4 is replicated with 5 replica
-    ContainerID containerID4 = new ContainerID(CONTAINER_FOUR_ID);
+    ContainerID containerID4 = ContainerID.valueOf(CONTAINER_FOUR_ID);
     Set<ContainerReplica> containerReplicas4 = generateMockContainerReplicas(
         CONTAINER_FOUR_REPLICA_COUNT, containerID4);
     when(containerManager.getContainerReplicas(containerID4))
         .thenReturn(containerReplicas4);
 
     // Container 5 is replicated with 2 replica
-    ContainerID containerID5 = new ContainerID(CONTAINER_FIVE_ID);
+    ContainerID containerID5 = ContainerID.valueOf(CONTAINER_FIVE_ID);
     Set<ContainerReplica> containerReplicas5 = generateMockContainerReplicas(
         CONTAINER_FIVE_REPLICA_COUNT, containerID5);
     when(containerManager.getContainerReplicas(containerID5))
         .thenReturn(containerReplicas5);
 
     // Container 6 is replicated with 3 replica
-    ContainerID containerID6 = new ContainerID(CONTAINER_SIX_ID);
+    ContainerID containerID6 = ContainerID.valueOf(CONTAINER_SIX_ID);
     Set<ContainerReplica> containerReplicas6 = generateMockContainerReplicas(
         CONTAINER_SIX_REPLICA_COUNT, containerID6);
     when(containerManager.getContainerReplicas(containerID6))

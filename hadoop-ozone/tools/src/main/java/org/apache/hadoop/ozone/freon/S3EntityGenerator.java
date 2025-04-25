@@ -42,7 +42,7 @@ public class S3EntityGenerator extends BaseFreonGenerator {
         AmazonS3ClientBuilder.standard()
             .withCredentials(new EnvironmentVariableCredentialsProvider());
 
-    if (endpoint.length() > 0) {
+    if (!endpoint.isEmpty()) {
       amazonS3ClientBuilder
           .withPathStyleAccessEnabled(true)
           .withEndpointConfiguration(

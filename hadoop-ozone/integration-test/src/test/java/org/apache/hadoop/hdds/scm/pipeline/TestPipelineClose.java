@@ -83,6 +83,7 @@ public class TestPipelineClose {
   private PipelineManager pipelineManager;
 
   private long pipelineDestroyTimeoutInMillis;
+
   /**
    * Create a MiniDFSCluster for testing.
    *
@@ -189,7 +190,7 @@ public class TestPipelineClose {
     // send closing action for pipeline
     final PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager,
-            SCMContext.emptyContext(), conf);
+            SCMContext.emptyContext());
 
     pipelineActionHandler.onMessage(
         pipelineActionsFromDatanode, new EventQueue());

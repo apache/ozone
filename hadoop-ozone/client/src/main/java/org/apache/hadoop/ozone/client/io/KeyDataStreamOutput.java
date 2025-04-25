@@ -67,7 +67,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     FLUSH, HSYNC, CLOSE, FULL
   }
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(KeyDataStreamOutput.class);
 
   private boolean closed;
@@ -128,7 +128,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
         new BlockDataStreamOutputEntryPool(
             config,
             omClient,
-            requestId, replicationConfig,
+            replicationConfig,
             uploadID, partNumber,
             isMultipart, info,
             unsafeByteBufferConversion,
@@ -519,7 +519,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       this.unsafeByteBufferConversion = enabled;
       return this;
     }
-
 
     public Builder setReplicationConfig(ReplicationConfig replConfig) {
       this.replicationConfig = replConfig;

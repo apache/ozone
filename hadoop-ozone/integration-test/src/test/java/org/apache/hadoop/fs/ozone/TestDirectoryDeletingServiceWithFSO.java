@@ -465,7 +465,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(keyTable, 0);
     assertTrue(volume.getBucket(bucketName).getUsedNamespace() >= 0);
-    assertTrue(volume.getBucket(bucketName).getUsedBytes() == 0);
+    assertEquals(0, volume.getBucket(bucketName).getUsedBytes());
   }
 
   @Test
@@ -551,7 +551,7 @@ public class TestDirectoryDeletingServiceWithFSO {
 
   private void createFileKey(OzoneBucket bucket, String key)
       throws Exception {
-    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
     OzoneOutputStream fileKey = bucket.createKey(key, value.length);
     fileKey.write(value);
     fileKey.close();

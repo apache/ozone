@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +55,7 @@ import org.slf4j.LoggerFactory;
  * DeletedBlockTransaction sent to the DN.
  */
 public class SCMDeletedBlockTransactionStatusManager {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMDeletedBlockTransactionStatusManager.class);
   // Maps txId to set of DNs which are successful in committing the transaction
   private final Map<Long, Set<UUID>> transactionToDNsCommitMap;
@@ -67,7 +66,6 @@ public class SCMDeletedBlockTransactionStatusManager {
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
   private final ContainerManager containerManager;
   private final ScmBlockDeletingServiceMetrics metrics;
-  private final SCMContext scmContext;
   private final long scmCommandTimeoutMs;
 
   /**
@@ -82,13 +80,12 @@ public class SCMDeletedBlockTransactionStatusManager {
 
   public SCMDeletedBlockTransactionStatusManager(
       DeletedBlockLogStateManager deletedBlockLogStateManager,
-      ContainerManager containerManager, SCMContext scmContext,
+      ContainerManager containerManager,
       ScmBlockDeletingServiceMetrics metrics, long scmCommandTimeoutMs) {
     // maps transaction to dns which have committed it.
     this.deletedBlockLogStateManager = deletedBlockLogStateManager;
     this.metrics = metrics;
     this.containerManager = containerManager;
-    this.scmContext = scmContext;
     this.scmCommandTimeoutMs = scmCommandTimeoutMs;
     this.transactionToDNsCommitMap = new ConcurrentHashMap<>();
     this.transactionToRetryCountMap = new ConcurrentHashMap<>();
@@ -101,7 +98,7 @@ public class SCMDeletedBlockTransactionStatusManager {
    * on DeleteBlocksCommand.
    */
   protected static class SCMDeleteBlocksCommandStatusManager {
-    public static final Logger LOG =
+    private static final Logger LOG =
         LoggerFactory.getLogger(SCMDeleteBlocksCommandStatusManager.class);
     private final Map<UUID, Map<Long, CmdStatusData>> scmCmdStatusRecord;
 

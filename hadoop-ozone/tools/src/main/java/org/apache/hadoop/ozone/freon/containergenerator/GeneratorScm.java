@@ -40,7 +40,7 @@ import picocli.CommandLine.Command;
  * Container generator for SCM metadata.
  */
 @Command(name = "cgscm",
-    description = "Offline container metadata generator for Storage Conainer "
+    description = "Offline container metadata generator for Storage Container "
         + "Manager",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
@@ -70,7 +70,6 @@ public class GeneratorScm extends BaseGenerator {
     return null;
   }
 
-
   private void writeScmData(long index) throws Exception {
     timer.time((Callable<Void>) () -> {
       long containerId = getContainerIdOffset() + index;
@@ -84,7 +83,7 @@ public class GeneratorScm extends BaseGenerator {
               .setOwner(getUserId())
               .build();
 
-      containerStore.put(new ContainerID(containerId), containerInfo);
+      containerStore.put(ContainerID.valueOf(containerId), containerInfo);
       return null;
     });
 

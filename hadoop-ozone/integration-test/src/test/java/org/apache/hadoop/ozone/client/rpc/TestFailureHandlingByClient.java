@@ -359,7 +359,6 @@ public class TestFailureHandlingByClient {
     validateData(keyName, data.getBytes(UTF_8));
   }
 
-
   @Test
   public void testContainerExclusionWithClosedContainerException()
       throws Exception {
@@ -478,7 +477,6 @@ public class TestFailureHandlingByClient {
     assertEquals(3 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
     validateData(keyName, data.concat(data).concat(data).getBytes(UTF_8));
   }
-
 
   @Test
   public void testPipelineExclusionWithPipelineFailure() throws Exception {

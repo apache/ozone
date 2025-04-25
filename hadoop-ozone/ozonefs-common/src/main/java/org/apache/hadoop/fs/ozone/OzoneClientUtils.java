@@ -56,9 +56,11 @@ import org.slf4j.LoggerFactory;
 public final class OzoneClientUtils {
   static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientUtils.class);
+
   private OzoneClientUtils() {
     // Not used.
   }
+
   public static BucketLayout resolveLinkBucketLayout(OzoneBucket bucket,
                                                      ObjectStore objectStore,
                                                      Set<Pair<String,
@@ -227,7 +229,7 @@ public final class OzoneClientUtils {
       ClientProtocol rpcClient) throws IOException {
     Preconditions.checkArgument(length >= 0);
 
-    if (keyName.length() == 0) {
+    if (keyName.isEmpty()) {
       return null;
     }
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volume.getName())

@@ -122,9 +122,9 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
 import org.apache.ratis.util.ExitUtils;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -263,7 +263,7 @@ public class ReconStorageContainerManagerFacade
             pipelineManager, scmContext, conf, scmServiceProvider);
 
     PipelineActionHandler pipelineActionHandler =
-        new PipelineActionHandler(pipelineManager, scmContext, conf);
+        new PipelineActionHandler(pipelineManager, scmContext);
 
     ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
     PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(pipelineManager, nodeManager,
@@ -273,17 +273,16 @@ public class ReconStorageContainerManagerFacade
         containerHealthSchemaManager, containerPlacementPolicy,
         reconTaskConfig, reconContainerMetadataManager, conf, taskStatusUpdaterManager);
 
-    this.containerSizeCountTask = new ContainerSizeCountTask(containerManager, scmServiceProvider,
+    this.containerSizeCountTask = new ContainerSizeCountTask(containerManager,
         reconTaskConfig, containerCountBySizeDao, utilizationSchemaDefinition, taskStatusUpdaterManager);
 
     this.dataSource = dataSource;
 
     StaleNodeHandler staleNodeHandler =
-        new ReconStaleNodeHandler(nodeManager, pipelineManager, conf,
-            pipelineSyncTask);
+        new ReconStaleNodeHandler(nodeManager, pipelineManager, pipelineSyncTask);
     DeadNodeHandler deadNodeHandler = new ReconDeadNodeHandler(nodeManager,
         pipelineManager, containerManager, scmServiceProvider,
-        containerHealthTask, pipelineSyncTask, containerSizeCountTask);
+        containerHealthTask, pipelineSyncTask);
 
     ContainerReportHandler containerReportHandler =
         new ReconContainerReportHandler(nodeManager, containerManager);
@@ -553,7 +552,7 @@ public class ReconStorageContainerManagerFacade
                 getListOfContainers(startContainerId,
                     Long.valueOf(containerCountPerCall).intValue(),
                     HddsProtos.LifeCycleState.CLOSED);
-            if (null != listOfContainers && listOfContainers.size() > 0) {
+            if (null != listOfContainers && !listOfContainers.isEmpty()) {
               LOG.info("Got list of containers from SCM : " +
                   listOfContainers.size());
               listOfContainers.forEach(containerInfo -> {

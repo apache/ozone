@@ -45,7 +45,6 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
   private final OmKeyInfo keyInfo;
   private final long blockLength;
 
-
   public ECBlockChecksumComputer(
       List<ContainerProtos.ChunkInfo> chunkInfoList, OmKeyInfo keyInfo, long blockLength) {
     this.chunkInfoList = chunkInfoList;
@@ -70,7 +69,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
   }
 
   private void computeMd5Crc() {
-    Preconditions.checkArgument(chunkInfoList.size() > 0);
+    Preconditions.checkArgument(!chunkInfoList.isEmpty());
 
     final MessageDigest digester = MD5Hash.getDigester();
 
@@ -102,7 +101,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
 
   private void computeCompositeCrc() throws IOException {
     DataChecksum.Type dataChecksumType;
-    Preconditions.checkArgument(chunkInfoList.size() > 0);
+    Preconditions.checkArgument(!chunkInfoList.isEmpty());
 
     final ContainerProtos.ChunkInfo firstChunkInfo = chunkInfoList.get(0);
     switch (firstChunkInfo.getChecksumData().getType()) {

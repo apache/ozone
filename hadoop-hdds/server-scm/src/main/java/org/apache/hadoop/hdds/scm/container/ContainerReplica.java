@@ -56,6 +56,10 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     dataChecksum = b.dataChecksum;
   }
 
+  public ContainerID getContainerID() {
+    return containerID;
+  }
+
   /**
    * Returns the DatanodeDetails to which this replica belongs.
    *

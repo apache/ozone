@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,7 +81,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseFreonGenerator.class);
 
-  private static final int CHECK_INTERVAL_MILLIS = 1000;
+  private static final int CHECK_INTERVAL_MILLIS = 100;
 
   private static final String DIGEST_ALGORITHM = "MD5";
 
@@ -116,11 +117,6 @@ public class BaseFreonGenerator implements FreonSubcommand {
           + " will be generated",
       defaultValue = "")
   private String prefix = "";
-
-  @Option(names = {"--verbose"},
-          description = "More verbose output. "
-              + "Show all the command line Option info.")
-  private boolean verbose;
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
@@ -185,7 +181,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
     while (!completed.get()) {
       long counter = attemptCounter.getAndIncrement();
       if (timebase) {
-        if (System.currentTimeMillis()
+        if (Time.monotonicNow()
             > startTime + TimeUnit.SECONDS.toMillis(durationInSecond)) {
           completed.set(true);
           break;
@@ -285,8 +281,8 @@ public class BaseFreonGenerator implements FreonSubcommand {
     failureCounter = new AtomicLong(0);
     attemptCounter = new AtomicLong(0);
 
-    if (prefix.length() == 0) {
-      prefix = !allowEmptyPrefix() ? RandomStringUtils.randomAlphanumeric(10).toLowerCase() : "";
+    if (prefix.isEmpty()) {
+      prefix = !allowEmptyPrefix() ? RandomStringUtils.secure().nextAlphanumeric(10).toLowerCase() : "";
     } else {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
@@ -324,7 +320,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
             LOG.error("HTTP server can't be stopped.", ex);
           }
           printReport();
-          if (verbose) {
+          if (freonCommand.isVerbose()) {
             printOption();
           }
         }, 10);
@@ -344,7 +340,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
         freonCommand.isInteractive(), realTimeStatusSupplier());
     progressBar.start();
 
-    startTime = System.currentTimeMillis();
+    startTime = Time.monotonicNow();
   }
 
   public Supplier<String> realTimeStatusSupplier() {
@@ -376,7 +372,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
 
     List<String> messages = new LinkedList<>();
     messages.add("Total execution time (sec): " +
-        Math.round((System.currentTimeMillis() - startTime) / 1000.0));
+        Math.round((Time.monotonicNow() - startTime) / 1000.0));
     messages.add("Failures: " + failureCounter.get());
     messages.add("Successful executions: " + successCounter.get());
     if (failureCounter.get() > 0) {
@@ -456,7 +452,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
       pipelines = pipelines
           .peek(p -> log.debug("Found pipeline {}", p.getId().getId()));
     }
-    if (pipelineId != null && pipelineId.length() > 0) {
+    if (pipelineId != null && !pipelineId.isEmpty()) {
       pipeline = pipelines
           .filter(p -> p.getId().toString().equals(pipelineId))
           .findFirst()

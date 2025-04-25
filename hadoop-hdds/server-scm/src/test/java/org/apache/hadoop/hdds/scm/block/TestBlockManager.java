@@ -161,7 +161,7 @@ public class TestBlockManager {
             new ContainerReplicaPendingOps(
                 Clock.system(ZoneId.systemDefault())));
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
-        containerManager, pipelineManager, eventQueue, serviceManager, scmContext) {
+        containerManager, pipelineManager, nodeManager, eventQueue, serviceManager, scmContext) {
       @Override
       public void emitSafeModeStatus() {
         // skip
@@ -324,7 +324,6 @@ public class TestBlockManager {
     });
   }
 
-
   @Test
   void testBlockDistributionWithMultipleDisks() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
@@ -453,7 +452,6 @@ public class TestBlockManager {
     assertEquals("Unsupported block size: " + size,
         t.getMessage());
   }
-
 
   @Test
   public void testAllocateBlockFailureInSafeMode() {

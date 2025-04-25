@@ -23,10 +23,10 @@ import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.Collection;
 import java.util.HashSet;
@@ -341,7 +341,7 @@ public class ContainerChecksumTreeManager {
     File checksumFile = getContainerChecksumFile(data);
     File tmpChecksumFile = getTmpContainerChecksumFile(data);
 
-    try (FileOutputStream tmpOutputStream = new FileOutputStream(tmpChecksumFile)) {
+    try (OutputStream tmpOutputStream = Files.newOutputStream(tmpChecksumFile.toPath())) {
       // Write to a tmp file and rename it into place.
       captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(), () -> {
         checksumInfo.writeTo(tmpOutputStream);
@@ -368,7 +368,7 @@ public class ContainerChecksumTreeManager {
    */
   public ByteString getContainerChecksumInfo(KeyValueContainerData data) throws IOException {
     File checksumFile = getContainerChecksumFile(data);
-    try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+    try (InputStream inStream = Files.newInputStream(checksumFile.toPath())) {
       return ByteString.readFrom(inStream);
     }
   }
@@ -387,7 +387,7 @@ public class ContainerChecksumTreeManager {
         LOG.debug("No checksum file currently exists for container {} at the path {}", containerID, checksumFile);
         return Optional.empty();
       }
-      try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+      try (InputStream inStream = Files.newInputStream(checksumFile.toPath())) {
         return Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
       }
     } catch (IOException ex) {

@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -154,7 +154,7 @@ class TestOMBucketLayoutUpgrade {
   @Test
   @Order(DURING_UPGRADE)
   void finalizeUpgrade() throws Exception {
-    UpgradeFinalizer.StatusAndMessages response =
+    UpgradeFinalization.StatusAndMessages response =
         omClient.finalizeUpgrade("finalize-test");
     System.out.println("Finalization Messages : " + response.msgs());
 
@@ -195,7 +195,7 @@ class TestOMBucketLayoutUpgrade {
    */
   private String createBucketWithLayout(BucketLayout bucketLayout)
       throws Exception {
-    String bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    String bucketName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
     omClient.createBucket(
         new OmBucketInfo.Builder()
             .setVolumeName(VOLUME_NAME)

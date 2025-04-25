@@ -80,7 +80,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
     FAILED
   }
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
 
   private volatile boolean closed;
@@ -643,6 +643,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
 
   private static class CheckpointDummyStripe extends ECChunkBuffers {
     private final long version;
+
     CheckpointDummyStripe(long version) {
       super();
       this.version = version;
@@ -714,9 +715,9 @@ public final class ECKeyOutputStream extends KeyOutputStream
     }
 
     private void clearBuffers(ByteBuffer[] buffers) {
-      for (int i = 0; i < buffers.length; i++) {
-        buffers[i].clear();
-        buffers[i].limit(cellSize);
+      for (ByteBuffer buffer : buffers) {
+        buffer.clear();
+        buffer.limit(cellSize);
       }
     }
 

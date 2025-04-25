@@ -59,8 +59,8 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.test.GenericTestUtils;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -485,7 +485,6 @@ public class TestReconInsightsForDeletedDirectories {
         cluster.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
   }
-
 
   private static BucketLayout getFSOBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;

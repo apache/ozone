@@ -64,7 +64,6 @@ public class TestOMBucketSetPropertyResponse {
     }
   }
 
-
   @Test
   public void testAddToDBBatch() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -95,6 +94,4 @@ public class TestOMBucketSetPropertyResponse {
         bucketName), keyValue.getKey());
     assertEquals(omBucketInfo, keyValue.getValue());
   }
-
-
 }

@@ -82,7 +82,6 @@ public abstract class TestContainerScannersAbstract {
   protected ContainerScannerConfiguration conf;
   protected ContainerController controller;
 
-
   private Collection<Container<?>> containers;
 
   public void setup() {

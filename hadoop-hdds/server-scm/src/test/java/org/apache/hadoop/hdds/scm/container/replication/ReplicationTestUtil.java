@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
@@ -36,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -43,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -51,6 +54,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacem
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -89,6 +93,16 @@ public final class ReplicationTestUtil {
     return createReplicas(containerID, CLOSED, indexes);
   }
 
+  public static Set<ContainerReplica> createEmptyReplicas(ContainerID containerID,
+      ContainerReplicaProto.State replicaState, int... indexes) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (int i : indexes) {
+      replicas.add(createEmptyContainerReplica(
+          containerID, i, IN_SERVICE, replicaState));
+    }
+    return replicas;
+  }
+
   public static Set<ContainerReplica> createReplicas(ContainerID containerID,
       ContainerReplicaProto.State replicaState, int... indexes) {
     Set<ContainerReplica> replicas = new HashSet<>();
@@ -121,6 +135,28 @@ public final class ReplicationTestUtil {
       replicas.add(createContainerReplica(
           containerID, i, IN_SERVICE, replicaState, 123L, 1234L,
           MockDatanodeDetails.randomDatanodeDetails(), originNodeId));
+    }
+    return replicas;
+  }
+
+  public static ContainerReplica createEmptyContainerReplica(ContainerID containerID,
+      int replicaIndex, HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState) {
+    DatanodeDetails datanodeDetails
+        = MockDatanodeDetails.randomDatanodeDetails();
+    return createContainerReplica(containerID, replicaIndex, opState,
+        replicaState, 0L, 0L,
+        datanodeDetails, datanodeDetails.getUuid());
+  }
+
+  public static Set<ContainerReplica> createReplicasWithOriginAndOpState(
+      ContainerID containerID, ContainerReplicaProto.State replicaState,
+      Pair<UUID, HddsProtos.NodeOperationalState>... nodes) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (Pair<UUID, HddsProtos.NodeOperationalState> i : nodes) {
+      replicas.add(createContainerReplica(
+          containerID, 0, i.getRight(), replicaState, 123L, 1234L,
+          MockDatanodeDetails.randomDatanodeDetails(), i.getLeft()));
     }
     return replicas;
   }
@@ -297,6 +333,9 @@ public final class ReplicationTestUtil {
               List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
               long metadataSizeRequired, long dataSizeRequired)
               throws SCMException {
+        long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+        assertEquals(HddsServerUtil.requiredReplicationSpace(containerSize), dataSizeRequired);
         if (nodesRequiredToChoose > 1) {
           throw new IllegalArgumentException("Only one node is allowed");
         }
@@ -325,6 +364,9 @@ public final class ReplicationTestUtil {
               List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
               long metadataSizeRequired, long dataSizeRequired)
               throws SCMException {
+        long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+        assertEquals(HddsServerUtil.requiredReplicationSpace(containerSize), dataSizeRequired);
         throw new SCMException("No nodes available",
                 FAILED_TO_FIND_SUITABLE_NODE);
       }
@@ -352,6 +394,9 @@ public final class ReplicationTestUtil {
           List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
           long metadataSizeRequired, long dataSizeRequired)
           throws SCMException {
+        long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+        assertEquals(HddsServerUtil.requiredReplicationSpace(containerSize), dataSizeRequired);
         if (nodesRequiredToChoose >= throwWhenThisOrMoreNodesRequested) {
           throw new SCMException("No nodes available",
               FAILED_TO_FIND_SUITABLE_NODE);
@@ -473,9 +518,29 @@ public final class ReplicationTestUtil {
    * @param commandsSent Set to add the command to rather than sending it.
    */
   public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+                                                      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      throws NotLeaderException, CommandTargetOverloadedException {
+    mockRMSendThrottledDeleteCommand(mock, commandsSent, new AtomicBoolean(false));
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
+   * sendThrottledDeleteCommand method so that it adds the command created to
+   * the commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @param throwOverloaded If the atomic boolean is true, throw a
+   *                        CommandTargetOverloadedException and set the boolean
+   *                        to false, instead of creating the replicate command.
+   */
+  public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent, AtomicBoolean throwOverloaded)
       throws NotLeaderException, CommandTargetOverloadedException {
     doAnswer((Answer<Void>) invocationOnMock -> {
+      if (throwOverloaded.get()) {
+        throwOverloaded.set(false);
+        throw new CommandTargetOverloadedException("Overloaded");
+      }
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
       int replicaIndex = invocationOnMock.getArgument(1);
       DatanodeDetails target = invocationOnMock.getArgument(2);

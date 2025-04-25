@@ -45,10 +45,10 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,7 +79,7 @@ public class TestReconTasks {
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(ONE, 30000);
-    GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.LOG,
+    GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.class,
         Level.DEBUG);
   }
 
@@ -136,7 +136,7 @@ public class TestReconTasks {
 
     // Make sure Recon's pipeline state is initialized.
     LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() >= 1));
+        () -> (!reconPipelineManager.getPipelines().isEmpty()));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
@@ -216,7 +216,7 @@ public class TestReconTasks {
 
     // Make sure Recon's pipeline state is initialized.
     LambdaTestUtils.await(60000, 1000,
-        () -> (reconPipelineManager.getPipelines().size() >= 1));
+        () -> (!reconPipelineManager.getPipelines().isEmpty()));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
@@ -254,7 +254,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 1;
@@ -292,7 +292,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 0 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 0;
@@ -321,7 +321,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 1;
