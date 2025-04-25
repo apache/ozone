@@ -66,6 +66,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
@@ -873,19 +874,23 @@ public final class OmSnapshotManager implements AutoCloseable {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager = omMetadataManager.getSnapshotChainManager();
     int currentSnapshotNum = snapshotChainManager.getGlobalSnapshotChain().size();
-    
-    synchronized (inFlightSnapshotCount) {
-      int currentCount = inFlightSnapshotCount.get();
-      if (currentSnapshotNum + currentCount >= fsSnapshotMaxLimit) {
-        throw new OMException(
+
+    AtomicReference<OMException> exceptionRef = new AtomicReference<>(null);
+    inFlightSnapshotCount.updateAndGet(count -> {
+      if (currentSnapshotNum + count >= fsSnapshotMaxLimit) {
+        exceptionRef.set(new OMException(
             String.format("Snapshot limit of %d reached. Cannot create more snapshots. " +
                 "Current snapshots: %d, In-flight creations: %d",
-                fsSnapshotMaxLimit, currentSnapshotNum, currentCount) +
+                fsSnapshotMaxLimit, currentSnapshotNum, count) +
                 " If you already deleted some snapshots, " +
                 "please wait for the background service to complete the cleanup.",
-            OMException.ResultCodes.TOO_MANY_SNAPSHOTS);
+            OMException.ResultCodes.TOO_MANY_SNAPSHOTS));
+        return count;
       }
-      inFlightSnapshotCount.set(currentCount + 1);
+      return count + 1;
+    });
+    if (exceptionRef.get() != null) {
+      throw exceptionRef.get();
     }
   }
 
