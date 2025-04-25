@@ -213,7 +213,6 @@ public final class TestHelper {
     waitForContainerClose(cluster, containerIdList.toArray(new Long[0]));
   }
 
-
   public static void waitForContainerClose(OzoneDataStreamOutput outputStream,
       MiniOzoneCluster cluster) throws Exception {
     KeyDataStreamOutput keyOutputStream =

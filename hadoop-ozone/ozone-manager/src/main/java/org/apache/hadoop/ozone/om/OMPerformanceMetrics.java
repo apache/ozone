@@ -61,7 +61,6 @@ public class OMPerformanceMetrics {
   @Metric(about = "resolveBucketLink latency nanoseconds")
   private MutableRate lookupResolveBucketLatencyNs;
 
-
   @Metric(about = "Overall getKeyInfo in nanoseconds")
   private MutableRate getKeyInfoLatencyNs;
 
@@ -168,7 +167,6 @@ public class OMPerformanceMetrics {
   MutableRate getLookupRefreshLocationLatencyNs() {
     return lookupRefreshLocationLatencyNs;
   }
-
 
   MutableRate getLookupGenerateBlockTokenLatencyNs() {
     return lookupGenerateBlockTokenLatencyNs;

@@ -51,6 +51,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
 
   private static final NumberFormat PERCENT_FORMAT
       = NumberFormat.getPercentInstance();
+
   static {
     PERCENT_FORMAT.setMinimumFractionDigits(2);
     PERCENT_FORMAT.setMaximumFractionDigits(2);
@@ -89,7 +90,6 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       defaultValue = "false",
       description = "Format output as JSON")
   private boolean json;
-
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
@@ -241,9 +241,11 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     public long getRemaining() {
       return remaining;
     }
+
     public long getCommitted() {
       return committed;
     }
+
     public long getFreeSpaceToSpare() {
       return freeSpaceToSpare;
     }

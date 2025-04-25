@@ -114,7 +114,6 @@ public final class OMPBHelper {
         beInfo.getKeyName());
   }
 
-
   public static BucketEncryptionInfoProto convert(
       BucketEncryptionKeyInfo beInfo) {
     if (beInfo == null || beInfo.getKeyName() == null) {
@@ -367,7 +366,6 @@ public final class OMPBHelper {
       return version;
     }
   }
-
 
   public static OMRequest processForDebug(OMRequest msg) {
     return msg;

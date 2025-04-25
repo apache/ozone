@@ -310,7 +310,6 @@ public class TestOzoneNativeAuthorizer {
     resetAclsAndValidateAccess(prefixObj, ANONYMOUS, writeClient);
   }
 
-
   private void setVolumeAcl(List<OzoneAcl> ozoneAcls) throws IOException {
     OzoneNativeAclTestUtil.setVolumeAcl(metadataManager, vol, ozoneAcls);
   }

@@ -132,7 +132,7 @@ run mkdir compose/_keytabs
 
 # Determine CPFLAGS based on system type
 if [ "$(uname)" = "Darwin" ]; then
-  CPFLAGS="--no-clobber"
+  CPFLAGS="-n"
 else
   CPFLAGS="--update=none"
 fi

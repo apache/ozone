@@ -75,6 +75,4 @@ public class OmUpgradeConfig {
   public void setDefaultLayoutVersionOnInit(int defaultLayoutVersionOnInit) {
     this.defaultLayoutVersionOnInit = defaultLayoutVersionOnInit;
   }
-
-
 }

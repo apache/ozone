@@ -37,6 +37,7 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
 
   private static String part1 = UUID.randomUUID().toString();
   private static String part2 = UUID.randomUUID().toString();
+
   @Test
   public void fromStreamWithNamespace() throws IOException {
     //GIVEN

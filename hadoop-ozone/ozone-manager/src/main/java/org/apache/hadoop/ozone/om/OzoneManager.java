@@ -365,7 +365,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                   "persists, the service may be down. Possible cause: only one OM is up, or " +
                   "other OMs are unable to respond to Ratis leader vote messages";
 
-
   // This is set for read requests when OMRequest has S3Authentication set,
   // and it is reset when read request is processed.
   private static final ThreadLocal<S3Authentication> S3_AUTH =
@@ -1759,6 +1758,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OMPerformanceMetrics getPerfMetrics() {
     return perfMetrics;
   }
+
   public DeletingServiceMetrics getDeletionMetrics() {
     return omDeletionMetrics;
   }
@@ -2719,8 +2719,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     return omMetadataReader.checkAcls(obj, context, throwIfPermissionDenied);
   }
-
-
 
   /**
    * Return true if Ozone acl's are enabled, else false.
@@ -4325,6 +4323,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public long getMaxUserVolumeCount() {
     return config.getMaxUserVolumeCount();
   }
+
   /**
    * Return true, if the current OM node is leader and in ready state to
    * process the requests.
@@ -4880,7 +4879,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return rcReader.get().getObjectTagging(args);
     }
   }
-
 
   /**
    * Write down Layout version of a finalized feature to DB on finalization.

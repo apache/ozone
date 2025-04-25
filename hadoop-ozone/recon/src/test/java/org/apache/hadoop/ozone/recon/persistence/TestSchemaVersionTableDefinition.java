@@ -79,7 +79,6 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
     assertEquals(expectedPairs, actualPairs, "Column definitions do not match expected values.");
   }
 
-
   @Test
   public void testSchemaVersionCRUDOperations() throws SQLException {
     Connection connection = getConnection();

@@ -377,6 +377,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       dispatcher.buildMissingContainerSetAndValidate(container2BCSIDMap);
     }
   }
+
   /**
    * As a part of taking snapshot with Ratis StateMachine, it will persist
    * the existing container set in the snapshotFile.

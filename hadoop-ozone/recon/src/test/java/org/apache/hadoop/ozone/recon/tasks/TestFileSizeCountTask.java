@@ -496,7 +496,6 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .getCount().longValue());
   }
 
-
   @Test
   public void testTruncateTableExceptionPropagation() {
     // Mock DSLContext and FileCountBySizeDao

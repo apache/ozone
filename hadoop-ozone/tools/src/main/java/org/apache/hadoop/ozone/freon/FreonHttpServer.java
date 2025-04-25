@@ -30,7 +30,6 @@ public class FreonHttpServer extends BaseHttpServer {
     super(conf, "freon");
   }
 
-
   @Override protected String getHttpAddressKey() {
     return OzoneConfigKeys.OZONE_FREON_HTTP_ADDRESS_KEY;
   }

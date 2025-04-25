@@ -330,7 +330,6 @@ public class TestOzoneManagerServiceProviderImpl {
     }
   }
 
-
   static RocksDatabase getRocksDatabase(OMMetadataManager om) {
     return ((RDBStore)om.getStore()).getDb();
   }

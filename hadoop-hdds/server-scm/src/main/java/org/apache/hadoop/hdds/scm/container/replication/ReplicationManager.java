@@ -111,12 +111,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    */
   private final ContainerManager containerManager;
 
-
   /**
    * SCMContext from StorageContainerManager.
    */
   private SCMContext scmContext;
-
 
   /**
    * ReplicationManager specific configuration.
@@ -632,6 +630,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     command.setPriority(ReplicationCommandPriority.LOW);
     sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
   }
+
   /**
    * Sends a command to a datanode with the command deadline set to the default
    * in ReplicationManager config.

@@ -120,13 +120,11 @@ public class SstFilteringService extends BackgroundService
     running.set(true);
   }
 
-
   private class SstFilteringTask implements BackgroundTask {
 
     private boolean isSnapshotDeleted(SnapshotInfo snapshotInfo) {
       return snapshotInfo == null || snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
     }
-
 
     /**
      * Marks the snapshot as SSTFiltered by creating a file in snapshot directory.

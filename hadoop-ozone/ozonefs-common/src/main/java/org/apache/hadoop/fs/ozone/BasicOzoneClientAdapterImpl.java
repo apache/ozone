@@ -427,7 +427,6 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     }
   }
 
-
   @Override
   public Iterator<BasicKeyInfo> listKeys(String pathKey) throws IOException {
     incrementCounter(Statistic.OBJECTS_LIST, 1);

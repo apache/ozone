@@ -215,8 +215,6 @@ public class TestOMUpgradeFinalizer {
     assertFalse(status.msgs().isEmpty());
   }
 
-
-
   private VerificationMode once() {
     return times(1);
   }

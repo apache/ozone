@@ -59,7 +59,6 @@ public class ConfigFileGenerator extends AbstractProcessor {
         }
       };
 
-
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
       RoundEnvironment roundEnv) {

@@ -1981,7 +1981,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     assertThat(exception.getMessage()).contains("Invalid path Name");
   }
 
-
   @Test
   void testRenameFile() throws Exception {
     final String dir = "/dir" + RandomUtils.secure().randomInt(0, 1000);
@@ -2212,7 +2211,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   }
 
-
   @Test
   void testCreateAndCheckECFileDiskUsage() throws Exception {
     String key = "eckeytest";
@@ -2234,7 +2232,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     //clean up
     ofs.delete(filePath, true);
   }
-
 
   @Test
   void testCreateAndCheckRatisFileDiskUsage() throws Exception {
@@ -2371,7 +2368,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     assertHasPathCapabilities(fs, getBucketPath(), FS_ACLS);
     assertHasPathCapabilities(fs, getBucketPath(), FS_CHECKSUMS);
   }
-
 
   @Test
   void testSnapshotDiff() throws Exception {

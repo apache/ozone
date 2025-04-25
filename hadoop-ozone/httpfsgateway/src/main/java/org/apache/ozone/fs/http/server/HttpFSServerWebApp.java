@@ -115,6 +115,7 @@ public class HttpFSServerWebApp extends ServerWebApp {
     FSOperations.setBufferSize(config);
     DefaultMetricsSystem.initialize("HttpFSServer");
   }
+
   /**
    * Returns HttpFSServer server singleton, configuration and services are
    * accessible through it.

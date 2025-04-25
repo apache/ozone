@@ -93,7 +93,6 @@ public class TestNSSummaryTaskWithOBS {
   private static final long KEY_SIX_OBJECT_ID = 10L;
   private static final long KEY_SEVEN_OBJECT_ID = 11L;
 
-
   private static final long KEY_ONE_SIZE = 500L;
   private static final long KEY_TWO_OLD_SIZE = 1025L;
   private static final long KEY_TWO_UPDATE_SIZE = 1023L;
@@ -349,7 +348,6 @@ public class TestNSSummaryTaskWithOBS {
       assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE,
           nsSummaryForBucket2.getSizeOfFiles());
     }
-
 
     @Test
     public void testProcessFileBucketSize() {

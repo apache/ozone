@@ -124,6 +124,7 @@ public class TestSecureContainerServer {
   private static OzoneBlockTokenSecretManager blockTokenSecretManager;
   private static ContainerTokenSecretManager containerTokenSecretManager;
   private static VolumeChoosingPolicy volumeChoosingPolicy;
+
   @BeforeAll
   public static void setup() throws Exception {
     DefaultMetricsSystem.setMiniClusterMode(true);

@@ -75,7 +75,6 @@ public class TestS3GrpcOmTransport {
 
   private String serverName;
 
-
   private ServiceException createNotLeaderException() {
     RaftPeerId raftPeerId = RaftPeerId.getRaftPeerId("testNodeId");
 

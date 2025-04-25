@@ -70,7 +70,6 @@ public class GeneratorScm extends BaseGenerator {
     return null;
   }
 
-
   private void writeScmData(long index) throws Exception {
     timer.time((Callable<Void>) () -> {
       long containerId = getContainerIdOffset() + index;

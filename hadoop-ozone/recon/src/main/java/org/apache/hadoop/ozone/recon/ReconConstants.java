@@ -73,7 +73,6 @@ public final class ReconConstants {
   public static final String TOTAL_USED_BYTES = "TOTAL_USED_BYTES";
   public static final String STAGING = ".staging_";
 
-
   // 1125899906842624L = 1PB
   public static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
   // 1024 = 1KB
@@ -82,7 +81,6 @@ public final class ReconConstants {
   public static final int NUM_OF_FILE_SIZE_BINS = (int) Math.ceil(Math.log(
       (double) MAX_FILE_SIZE_UPPER_BOUND / MIN_FILE_SIZE_UPPER_BOUND) /
       Math.log(2)) + 1;
-
 
   // 1125899906842624L = 1PB
   public static final long MAX_CONTAINER_SIZE_UPPER_BOUND = 1125899906842624L;

@@ -248,6 +248,7 @@ public class NodeImpl implements Node {
         NetUtils.addSuffix(nodePath).startsWith(
             NetUtils.addSuffix(this.getNetworkFullPath()));
   }
+
   @Override
   public boolean isDescendant(Node node) {
     if (node == null) {

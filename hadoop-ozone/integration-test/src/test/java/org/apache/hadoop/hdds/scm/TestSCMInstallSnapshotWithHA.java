@@ -303,7 +303,6 @@ public class TestSCMInstallSnapshotWithHA {
     }
   }
 
-
   static StorageContainerManager getLeader(MiniOzoneHAClusterImpl impl) {
     for (StorageContainerManager scm : impl.getStorageContainerManagers()) {
       if (scm.checkLeader()) {
