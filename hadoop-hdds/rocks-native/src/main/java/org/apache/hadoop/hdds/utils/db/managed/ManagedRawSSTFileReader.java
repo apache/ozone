@@ -32,6 +32,12 @@ import org.slf4j.LoggerFactory;
  */
 public class ManagedRawSSTFileReader<T> implements Closeable {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ManagedRawSSTFileReader.class);
+
+  private final String fileName;
+  // Native address of pointer to the object.
+  private final long nativeHandle;
+
   public static boolean tryLoadLibrary() {
     try {
       loadLibrary();
@@ -49,11 +55,6 @@ public class ManagedRawSSTFileReader<T> implements Closeable {
     }
     return true;
   }
-
-  private final String fileName;
-  // Native address of pointer to the object.
-  private final long nativeHandle;
-  private static final Logger LOG = LoggerFactory.getLogger(ManagedRawSSTFileReader.class);
 
   public ManagedRawSSTFileReader(final ManagedOptions options, final String fileName, final int readAheadSize) {
     this.fileName = fileName;

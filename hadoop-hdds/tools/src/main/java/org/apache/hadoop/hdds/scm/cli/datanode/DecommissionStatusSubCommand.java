@@ -49,6 +49,8 @@ import picocli.CommandLine;
 
 public class DecommissionStatusSubCommand extends ScmSubcommand {
 
+  private String errorMessage = "Error getting pipeline and container metrics for ";
+
   @CommandLine.Option(names = { "--id" },
       description = "Show info by datanode UUID",
       defaultValue = "")
@@ -121,8 +123,6 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
       System.out.println(containers);
     }
   }
-
-  private String errorMessage = "Error getting pipeline and container metrics for ";
 
   public String getErrorMessage() {
     return errorMessage;
