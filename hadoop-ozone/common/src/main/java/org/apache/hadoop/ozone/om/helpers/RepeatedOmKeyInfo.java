@@ -93,7 +93,6 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     return new ImmutablePair<Long, Long>(unreplicatedSize, replicatedSize);
   }
 
-
   // HDDS-7041. Return a new ArrayList to avoid ConcurrentModifyException
   public List<OmKeyInfo> cloneOmKeyInfoList() {
     return new ArrayList<>(omKeyInfoList);

@@ -65,7 +65,6 @@ public class OmTableInsightTask implements ReconOmTask {
   private Map<String, Long> unReplicatedSizeMap;
   private Map<String, Long> replicatedSizeMap;
 
-
   @Inject
   public OmTableInsightTask(GlobalStatsDao globalStatsDao,
                              Configuration sqlConfiguration,
@@ -234,7 +233,6 @@ public class OmTableInsightTask implements ReconOmTask {
     }
   }
 
-
   private void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                  String tableName) {
     OmTableHandler tableHandler = tableHandlers.get(tableName);
@@ -248,7 +246,6 @@ public class OmTableInsightTask implements ReconOmTask {
       }
     }
   }
-
 
   private void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                                  String tableName) {

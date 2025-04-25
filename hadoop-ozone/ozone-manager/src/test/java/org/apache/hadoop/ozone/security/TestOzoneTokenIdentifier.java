@@ -194,7 +194,6 @@ public class TestOzoneTokenIdentifier {
     testSymmetricTokenPerfHelper(hmacSHA256, 1024);
   }
 
-
   public void testSymmetricTokenPerfHelper(String hmacAlgorithm, int keyLen) {
     final int testTokenCount = 1000;
     List<OzoneTokenIdentifier> tokenIds = new ArrayList<>();
@@ -251,7 +250,6 @@ public class TestOzoneTokenIdentifier {
       assertEquals(id, id2);
     }
   }
-
 
   public OzoneTokenIdentifier getIdentifierInst() {
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();

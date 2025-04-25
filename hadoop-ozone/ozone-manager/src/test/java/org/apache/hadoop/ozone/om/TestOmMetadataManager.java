@@ -97,7 +97,6 @@ public class TestOmMetadataManager {
   @TempDir
   private File folder;
 
-
   @BeforeEach
   public void setup() throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
@@ -1029,7 +1028,6 @@ public class TestOmMetadataManager {
     assertEquals(snapshotsASnapshotIDMap.keySet(), expectedSnapshot);
     assertNull(lastSnapshot);
   }
-
 
   @ParameterizedTest
   @MethodSource("listSnapshotWithInvalidPathCases")

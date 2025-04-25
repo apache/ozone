@@ -116,7 +116,6 @@ public class TestCommitInRatis {
         .getStorageContainerLocationClient();
   }
 
-
   /**
    * Shutdown MiniDFSCluster.
    */

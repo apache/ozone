@@ -438,7 +438,6 @@ public class TestOzoneManagerSnapshotAcl {
     assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
   }
 
-
   private void setup(BucketLayout bucketLayout)
       throws IOException {
     UserGroupInformation.setLoginUser(UGI1);

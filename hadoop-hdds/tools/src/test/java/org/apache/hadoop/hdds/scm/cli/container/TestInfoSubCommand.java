@@ -165,7 +165,6 @@ public class TestInfoSubCommand {
     validateJsonMultiOutput();
   }
 
-
   @Test
   public void testMultipleContainersCanBePassedJson() throws Exception {
     when(scmClient.getContainerReplicas(anyLong())).thenReturn(getReplicas(true));
@@ -306,7 +305,6 @@ public class TestInfoSubCommand {
     Matcher matcher = pattern.matcher(json);
     assertTrue(matcher.matches());
   }
-
 
   private List<ContainerReplicaInfo> getReplicas(boolean includeIndex) {
     List<ContainerReplicaInfo> replicas = new ArrayList<>();

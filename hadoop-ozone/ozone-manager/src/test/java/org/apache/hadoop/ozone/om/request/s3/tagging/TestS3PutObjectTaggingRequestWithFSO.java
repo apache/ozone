@@ -90,6 +90,4 @@ public class TestS3PutObjectTaggingRequestWithFSO extends TestS3PutObjectTagging
   protected S3PutObjectTaggingRequest getPutObjectTaggingRequest(OMRequest originalRequest) {
     return new S3PutObjectTaggingRequestWithFSO(originalRequest, getBucketLayout());
   }
-
-
 }

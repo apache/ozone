@@ -182,7 +182,6 @@ public class ListSubcommand extends ScmSubcommand {
     } while (fetchedCount > 0);
   }
 
-
   private static class NonClosingOutputStream extends OutputStream {
 
     private final OutputStream delegate;

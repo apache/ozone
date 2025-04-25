@@ -264,6 +264,7 @@ public class TestKeyManagerImpl {
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
   }
+
   private static void mockBlockClient() {
     ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null,
         conf);
@@ -272,6 +273,7 @@ public class TestKeyManagerImpl {
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
   }
+
   private static void createBucket(String volumeName, String bucketName,
                                    boolean isVersionEnabled)
       throws IOException {
@@ -1474,7 +1476,6 @@ public class TestKeyManagerImpl {
 
   }
 
-
   @Test
   public void testRefreshPipelineException() throws Exception {
 
@@ -1626,6 +1627,7 @@ public class TestKeyManagerImpl {
         .setNodes(new ArrayList<>())
         .build();
   }
+
   /**
    * Creates a depth two directory.
    *
@@ -1664,13 +1666,12 @@ public class TestKeyManagerImpl {
 
     for (OzoneFileStatus fileStatus : fileStatuses) {
       String normalizedKeyName = fileStatus.getTrimmedName();
-      String parent =
-          Paths.get(fileStatus.getKeyInfo().getKeyName()).getParent()
-              .toString();
       if (!recursive) {
+        Path parent = Paths.get(fileStatus.getKeyInfo().getKeyName()).getParent();
         // if recursive is false, verify all the statuses have the input
         // directory as parent
-        assertEquals(parent, directory);
+        assertNotNull(parent);
+        assertEquals(directory, parent.toString());
       }
       // verify filestatus is present in directory or file set accordingly
       if (fileStatus.isDirectory()) {

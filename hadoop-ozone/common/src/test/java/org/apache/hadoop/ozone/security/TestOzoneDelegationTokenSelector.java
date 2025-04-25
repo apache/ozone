@@ -33,7 +33,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestOzoneDelegationTokenSelector {
 
-
   @Test
   public void testTokenSelector() {
 
@@ -77,10 +76,7 @@ public class TestOzoneDelegationTokenSelector {
 
   }
 
-
   private Text getService() {
     return new Text("om1:9862,om2:9862,om3:9862");
   }
-
-
 }

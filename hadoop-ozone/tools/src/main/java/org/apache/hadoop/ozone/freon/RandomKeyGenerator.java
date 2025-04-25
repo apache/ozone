@@ -612,6 +612,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   int getNumberOfBucketsCleaned() {
     return numberOfBucketsCleaned.get();
   }
+
   /**
    * Returns true if random validation of write is enabled.
    *

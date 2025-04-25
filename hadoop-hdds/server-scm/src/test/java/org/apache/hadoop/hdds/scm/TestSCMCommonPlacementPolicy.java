@@ -525,7 +525,6 @@ public class TestSCMCommonPlacementPolicy {
     private List<Node> racks;
     private int rackCnt;
 
-
     /**
      * Creates Dummy Placement Policy with dn index to rack Mapping
      * in round robin fashion (rack Index = dn Index % total number of racks).
@@ -559,8 +558,6 @@ public class TestSCMCommonPlacementPolicy {
                       entry -> datanodeDetails.get(entry.getKey()),
                       entry -> racks.get(entry.getValue())));
     }
-
-
 
     @Override
     public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {

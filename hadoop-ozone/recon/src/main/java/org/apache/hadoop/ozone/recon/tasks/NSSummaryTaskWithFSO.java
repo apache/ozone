@@ -230,6 +230,4 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     LOG.debug("Completed a reprocess run of NSSummaryTaskWithFSO");
     return true;
   }
-
-
 }

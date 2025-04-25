@@ -43,6 +43,7 @@ public class FailureManager {
   private final List<Failures> failures;
   private ScheduledFuture scheduledFuture;
   private final ScheduledExecutorService executorService;
+
   public FailureManager(MiniOzoneChaosCluster cluster,
                         Configuration conf,
                         Set<Class<? extends Failures>> clazzes) {

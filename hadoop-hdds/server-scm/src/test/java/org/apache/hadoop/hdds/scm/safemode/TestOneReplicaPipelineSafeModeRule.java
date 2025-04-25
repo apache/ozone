@@ -153,7 +153,6 @@ public class TestOneReplicaPipelineSafeModeRule {
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
   }
 
-
   @Test
   public void testOneReplicaPipelineRuleMixedPipelines() throws Exception {
 

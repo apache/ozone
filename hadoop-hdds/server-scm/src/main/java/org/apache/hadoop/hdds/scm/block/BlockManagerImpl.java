@@ -70,6 +70,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private ObjectName mxBean;
   private final SequenceIdGenerator sequenceIdGen;
   private ScmBlockDeletingServiceMetrics metrics;
+
   /**
    * Constructor.
    *

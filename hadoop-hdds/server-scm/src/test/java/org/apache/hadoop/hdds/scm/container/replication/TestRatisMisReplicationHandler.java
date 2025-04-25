@@ -173,7 +173,6 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
             pendingOp, 0, 1, 0);
   }
 
-
   @Test
   public void testAllSourcesOverloaded() throws IOException {
     ReplicationManager replicationManager = getReplicationManager();

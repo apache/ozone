@@ -168,6 +168,7 @@ public final class ContainerCommandResponseBuilders {
         .setListBlock(builder)
         .build();
   }
+
   /**
    * Returns successful getCommittedBlockLength Response.
    * @param msg - Request.
@@ -281,6 +282,7 @@ public final class ContainerCommandResponseBuilders {
         .setGetSmallFile(getSmallFile)
         .build();
   }
+
   /**
    * Returns a ReadContainer Response.
    *
