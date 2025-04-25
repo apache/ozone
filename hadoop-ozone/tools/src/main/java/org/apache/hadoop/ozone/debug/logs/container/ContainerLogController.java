@@ -42,6 +42,7 @@ public class ContainerLogController {
   public String getDbPath() {
     return dbPath;
   }
+  
   public void setDbPath(String dbPath) {
     this.dbPath = dbPath;
   }

@@ -37,7 +37,6 @@ public class ContainerDatanodeDatabase {
   
   private static String databasePath;
   
-
   public static void setDatabasePath(String dbPath) {
     if (databasePath == null) {
       databasePath = dbPath;

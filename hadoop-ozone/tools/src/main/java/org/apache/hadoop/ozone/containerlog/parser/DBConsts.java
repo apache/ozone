@@ -25,6 +25,7 @@ public final class DBConsts {
   private DBConsts() {
     //Never constructed
   }
+  
   public static final String DEFAULT_DB_FILENAME = "container_datanode.db";
   public static final String DRIVER = "org.sqlite.JDBC";
   public static final String CONNECTION_PREFIX = "jdbc:sqlite:";
