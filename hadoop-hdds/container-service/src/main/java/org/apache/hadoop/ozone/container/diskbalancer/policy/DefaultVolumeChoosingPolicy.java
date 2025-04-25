@@ -29,6 +29,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Choose a random volume for balancing.
+ *
+ * Source volumes use deltaMap to simulate space that will be freed (pre-deleted).
+ * Destination volumes use committedBytes to account for space already reserved.
+ * Both deltaMap and committedBytes are considered to calculate usage.
  */
 public class DefaultVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
@@ -46,15 +50,15 @@ public class DefaultVolumeChoosingPolicy implements VolumeChoosingPolicy {
         .filter(volume ->
             Math.abs(
                 ((double)((volume.getCurrentUsage().getCapacity() - volume.getCurrentUsage().getAvailable())
-                    + deltaMap.getOrDefault(volume, 0L)))
+                    + deltaMap.getOrDefault(volume, 0L) + volume.getCommittedBytes()))
                     / volume.getCurrentUsage().getCapacity() - idealUsage) >= threshold)
         .sorted((v1, v2) ->
             Double.compare(
                 (double) ((v2.getCurrentUsage().getCapacity() - v2.getCurrentUsage().getAvailable())
-                    + deltaMap.getOrDefault(v2, 0L)) /
+                    + deltaMap.getOrDefault(v2, 0L) + v2.getCommittedBytes()) /
                     v2.getCurrentUsage().getCapacity(),
                 (double) ((v1.getCurrentUsage().getCapacity() - v1.getCurrentUsage().getAvailable())
-                    + deltaMap.getOrDefault(v1, 0L)) /
+                    + deltaMap.getOrDefault(v1, 0L) + v1.getCommittedBytes()) /
                     v1.getCurrentUsage().getCapacity()))
         .collect(Collectors.toList());
 

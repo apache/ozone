@@ -92,10 +92,15 @@ public class DiskBalancerService extends BackgroundService {
   private Map<DiskBalancerTask, Integer> inProgressTasks;
   private Set<Long> inProgressContainers;
 
-  // Every time a container is decided to be moved from Vol A to Vol B,
-  // the size will be deducted from Vol A and added to Vol B.
-  // This map is used to help calculate the expected storage size after
-  // the container balancing finished.
+  /**
+   * A map that tracks the total bytes which will be freed from each source volume
+   * during container moves in the current disk balancing cycle.
+   *
+   * Unlike committedBytes, which is used for pre-allocating space on
+   * destination volumes, deltaSizes helps track how many space will be
+   * freed on the source volumes without modifying their
+   * committedBytes (which could otherwise go negative).
+   */
   private Map<HddsVolume, Long> deltaSizes;
   private MutableVolumeSet volumeSet;
 
@@ -346,8 +351,7 @@ public class DiskBalancerService extends BackgroundService {
         inProgressContainers.add(toBalanceContainer.getContainerID());
         deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
             - toBalanceContainer.getBytesUsed());
-        deltaSizes.put(destVolume, deltaSizes.getOrDefault(destVolume, 0L)
-            + toBalanceContainer.getBytesUsed());
+        destVolume.incCommittedBytes(toBalanceContainer.getBytesUsed());
       }
     }
 
@@ -506,8 +510,7 @@ public class DiskBalancerService extends BackgroundService {
       inProgressContainers.remove(containerData.getContainerID());
       deltaSizes.put(sourceVolume, deltaSizes.get(sourceVolume) +
           containerData.getBytesUsed());
-      deltaSizes.put(destVolume, deltaSizes.get(destVolume)
-          - containerData.getBytesUsed());
+      destVolume.incCommittedBytes(-containerData.getBytesUsed());
     }
   }
 
