@@ -255,7 +255,6 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     private static final MetricsInfo HOST_START_TIME = Interns.info("StartTimeDN",
         "Time at which decommissioning was started");
 
-
     public ContainerStateInWorkflow(String host,
                                     long sufficiently,
                                     long under,
