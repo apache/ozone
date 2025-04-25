@@ -1067,6 +1067,20 @@ public class SCMClientProtocolServer implements
     }
   }
 
+  /**
+   * Check if SCM is in manual safe mode.
+   *
+   * @return Returns true if SCM is in manual safe mode else returns false.
+   * @throws IOException In case of exception while connecting SCM
+   */
+  @Override
+  public boolean inManualSafeMode() throws IOException {
+    AUDIT.logReadSuccess(
+        buildAuditMessageForSuccess(SCMAction.IN_SAFE_MODE, null)
+    );
+    return scm.inManualSafeMode();
+  }
+
   @Override
   public void startReplicationManager() throws IOException {
     try {

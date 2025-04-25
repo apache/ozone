@@ -464,6 +464,11 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public boolean inManualSafeMode() throws IOException {
+    return storageContainerLocationClient.inManualSafeMode();
+  }
+
+  @Override
   public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
       throws IOException {
     return storageContainerLocationClient.getSafeModeRuleStatuses();

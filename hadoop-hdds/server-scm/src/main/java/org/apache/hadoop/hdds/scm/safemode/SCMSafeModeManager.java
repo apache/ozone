@@ -299,6 +299,11 @@ public class SCMSafeModeManager implements SafeModeManager {
     }
     return inSafeMode.get() || inManualSafeMode.get();
   }
+
+  public boolean isManualSafeModeEnabled() {
+    return inManualSafeMode.get();
+  }
+
   /**
    * Get the safe mode status of all rules.
    *

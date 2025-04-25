@@ -88,6 +88,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InManualSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
@@ -881,6 +882,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             builder -> builder.setEnterSafeModeRequest(request))
             .getEnterSafeModeResponse();
     return resp.getEnteredSafeMode();
+  }
+
+  @Override
+  public boolean inManualSafeMode() throws IOException {
+    InManualSafeModeRequestProto request =
+        InManualSafeModeRequestProto.getDefaultInstance();
+
+    return submitRequest(Type.InManualSafeMode,
+        builder -> builder.setInManualSafeModeRequest(request))
+        .getInManualSafeModeResponse().getInManualSafeMode();
   }
 
   @Override

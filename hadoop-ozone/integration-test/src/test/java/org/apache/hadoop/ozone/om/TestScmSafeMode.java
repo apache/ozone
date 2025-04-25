@@ -386,7 +386,6 @@ public class TestScmSafeMode {
     cluster = builder.build();
     cluster.startHddsDatanodes();
     cluster.waitForClusterToBeReady();
-    cluster.waitTobeOutOfSafeMode();
 
     StorageContainerManager scm = cluster.getStorageContainerManager();
     assertFalse(scm.isInSafeMode(), "SCM should begin out of safe mode");
@@ -395,6 +394,7 @@ public class TestScmSafeMode {
     boolean entered = scm.getClientProtocolServer().enterSafeMode();
     assertTrue(entered, "enterSafeMode() should return true");
     assertTrue(scm.isInSafeMode(), "SCM must now report safe mode");
+    assertTrue(scm.inManualSafeMode(), "SCM must now report manual safe mode");
 
     // ‑‑ Any write‑type operation must fail
     SCMException ex = assertThrows(SCMException.class,
@@ -406,5 +406,6 @@ public class TestScmSafeMode {
     // ‑‑ Force exit and wait until SCM leaves safe mode
     scm.getClientProtocolServer().forceExitSafeMode();
     assertFalse(scm.isInSafeMode(), "SCM should have exited safe mode");
+    assertFalse(scm.inManualSafeMode(), "SCM should no longer be in manual safe mode");
   }
 }

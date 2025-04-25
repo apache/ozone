@@ -95,6 +95,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InManualSafeModeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InManualSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
@@ -561,6 +563,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setEnterSafeModeResponse(
                 enterSafeMode(request.getEnterSafeModeRequest()))
+            .build();
+      case InManualSafeMode:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setInManualSafeModeResponse(
+                inManualSafeMode(request.getInManualSafeModeRequest()))
             .build();
       case StartReplicationManager:
         return ScmContainerLocationResponse.newBuilder()
@@ -1090,6 +1099,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     return EnterSafeModeResponseProto.newBuilder()
         .setEnteredSafeMode(impl.enterSafeMode()).build();
+  }
+
+  public InManualSafeModeResponseProto inManualSafeMode(InManualSafeModeRequestProto request)
+      throws IOException {
+    return InManualSafeModeResponseProto.newBuilder()
+        .setInManualSafeMode(impl.inManualSafeMode()).build();
   }
 
   public StartReplicationManagerResponseProto startReplicationManager(

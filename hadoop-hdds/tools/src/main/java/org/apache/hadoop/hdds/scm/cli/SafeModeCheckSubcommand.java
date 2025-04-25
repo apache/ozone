@@ -37,10 +37,11 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean execReturn = scmClient.inSafeMode();
+    boolean inManualSafeMode = scmClient.inManualSafeMode();
 
     // Output data list
     if (execReturn) {
-      System.out.println("SCM is in safe mode.");
+      System.out.println(inManualSafeMode ? "SCM is in manual safe mode." : "SCM is in safe mode.");
     } else {
       System.out.println("SCM is out of safe mode.");
     }

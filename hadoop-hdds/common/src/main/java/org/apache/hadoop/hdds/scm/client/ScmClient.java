@@ -315,6 +315,14 @@ public interface ScmClient extends Closeable {
   boolean inSafeMode() throws IOException;
 
   /**
+   * Check if SCM is in safe mode.
+   *
+   * @return Returns true if SCM is in manual safe mode else returns false.
+   * @throws IOException In case of exception while connecting SCM
+   */
+  boolean inManualSafeMode() throws IOException;
+
+  /**
    * Get the safe mode status of all rules.
    *
    * @return map of rule statuses.

@@ -386,6 +386,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
   boolean enterSafeMode() throws IOException;
 
   /**
+   * Check if SCM is in safe mode.
+   *
+   * @return Returns true if SCM is in safe mode else returns false.
+   * @throws IOException In case of exception while connecting SCM
+   */
+  boolean inManualSafeMode() throws IOException;
+
+  /**
    * Start ReplicationManager.
    */
   void startReplicationManager() throws IOException;
