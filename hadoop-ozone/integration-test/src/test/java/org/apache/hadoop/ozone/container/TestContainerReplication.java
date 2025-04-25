@@ -237,7 +237,6 @@ class TestContainerReplication {
     return locations.getLocationList().get(0);
   }
 
-
   public void assertState(MiniOzoneCluster cluster, Map<Integer, DatanodeDetails> expectedReplicaMap)
       throws IOException {
     OmKeyLocationInfo keyLocation = lookupKeyFirstLocation(cluster);
@@ -268,7 +267,6 @@ class TestContainerReplication {
           }
         });
   }
-
 
   private static void deleteContainer(MiniOzoneCluster cluster, DatanodeDetails dn, long containerId)
       throws IOException {
@@ -316,7 +314,6 @@ class TestContainerReplication {
       }
     }
   }
-
 
   @Test
   @Flaky("HDDS-11087")

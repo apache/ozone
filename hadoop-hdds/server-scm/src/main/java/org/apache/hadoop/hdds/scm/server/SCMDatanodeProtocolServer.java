@@ -437,7 +437,6 @@ public class SCMDatanodeProtocolServer implements
     }
   }
 
-
   public void join() throws InterruptedException {
     LOG.trace("Join RPC server for DataNodes");
     datanodeRpcServer.join();

@@ -25,6 +25,4 @@ public class TestXORRawCoder extends TestXORRawCoderBase {
   public TestXORRawCoder() {
     super(XORRawErasureCoderFactory.class, XORRawErasureCoderFactory.class);
   }
-
-
 }

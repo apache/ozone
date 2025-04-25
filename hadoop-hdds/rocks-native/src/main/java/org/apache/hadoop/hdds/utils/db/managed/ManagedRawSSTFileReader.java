@@ -75,7 +75,6 @@ public class ManagedRawSSTFileReader<T> implements Closeable {
 
   private native long newRawSSTFileReader(long optionsHandle, String filePath, int readSize);
 
-
   private native long newIterator(long handle, boolean hasFrom, long fromSliceHandle, boolean hasTo,
                                   long toSliceHandle);
 

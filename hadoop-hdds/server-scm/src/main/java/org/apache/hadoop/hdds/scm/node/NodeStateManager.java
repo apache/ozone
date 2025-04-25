@@ -95,7 +95,6 @@ public class NodeStateManager implements Runnable, Closeable {
   private static final Logger LOG = LoggerFactory
       .getLogger(NodeStateManager.class);
 
-
   /**
    * StateMachine for node lifecycle.
    */

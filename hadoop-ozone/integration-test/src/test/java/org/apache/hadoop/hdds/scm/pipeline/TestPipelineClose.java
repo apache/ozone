@@ -83,6 +83,7 @@ public class TestPipelineClose {
   private PipelineManager pipelineManager;
 
   private long pipelineDestroyTimeoutInMillis;
+
   /**
    * Create a MiniDFSCluster for testing.
    *

@@ -141,6 +141,7 @@ public class TestPermissionCheck {
         bucketEndpoint.delete("bucketName"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
+
   @Test
   public void testListMultiUpload() throws IOException {
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);

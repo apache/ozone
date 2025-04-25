@@ -84,7 +84,6 @@ public class TestBlockData {
     return info.getLen();
   }
 
-
   static void removeChunk(List<ContainerProtos.ChunkInfo> expected,
       BlockData computed) {
     final int i = ThreadLocalRandom.current().nextInt(expected.size());

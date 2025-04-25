@@ -116,6 +116,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
   public boolean isAtTheEnd() {
     return getCurrentFileName().equals(END_MARKER);
   }
+
   @Override
   public void channelUnregistered(ChannelHandlerContext ctx) {
     try {

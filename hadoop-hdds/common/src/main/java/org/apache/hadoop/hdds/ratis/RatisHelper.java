@@ -413,7 +413,6 @@ public final class RatisHelper {
     });
   }
 
-
   private static Map<String, String> getDatanodeRatisPrefixProps(
       ConfigurationSource configuration) {
     return configuration.getPropsMatchPrefixAndTrimPrefix(
@@ -531,7 +530,6 @@ public final class RatisHelper {
     return RaftPeer.newBuilder(peer).setPriority(priority).build();
   }
 
-
   /**
    * Use raft client to send admin request, transfer the leadership.
    * 1. Set priority and send setConfiguration request
@@ -646,7 +644,6 @@ public final class RatisHelper {
     assertTrue(max >= interval, () -> "max: " + maxDuration + " < interval:" + pollInterval);
     return (int) (max / interval);
   }
-
 
   public static void setFirstElectionTimeoutDuration(
       ConfigurationSource conf, RaftProperties properties, String configKey) {

@@ -222,7 +222,6 @@ public final class HddsServerUtil {
                 ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT)));
   }
 
-
   /**
    * Retrieve the socket address that should be used by DataNodes to connect
    * to Recon.
@@ -267,7 +266,6 @@ public final class HddsServerUtil {
     return conf.getTimeDuration(HDDS_HEARTBEAT_INTERVAL,
         HDDS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
-
 
   /**
    * Heartbeat Interval - Defines the initial heartbeat frequency from a datanode to

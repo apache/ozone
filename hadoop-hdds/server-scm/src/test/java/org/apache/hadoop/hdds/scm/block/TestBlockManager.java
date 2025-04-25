@@ -324,7 +324,6 @@ public class TestBlockManager {
     });
   }
 
-
   @Test
   void testBlockDistributionWithMultipleDisks() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
@@ -453,7 +452,6 @@ public class TestBlockManager {
     assertEquals("Unsupported block size: " + size,
         t.getMessage());
   }
-
 
   @Test
   public void testAllocateBlockFailureInSafeMode() {

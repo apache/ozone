@@ -102,7 +102,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Changes the owner of a volume.
    * @param volume  - Name of the volume.
@@ -115,7 +114,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Changes the Quota on a volume.
@@ -130,7 +128,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Checks if the specified user can access this volume.
    * @param volume - volume
@@ -143,7 +140,6 @@ public interface OzoneManagerProtocol
       throws IOException {
     throw new UnsupportedOperationException("This operation is not supported.");
   }
-
 
   /**
    * Gets the volume information.
@@ -162,7 +158,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Lists volumes accessible by a specific user.
@@ -197,7 +192,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Gets the bucket information.
    * @param volumeName - Volume name.
@@ -229,7 +223,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Open the given key and return an open key session.
@@ -338,7 +331,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Rename existing keys within a bucket.
    * @param omRenameKeys Includes volume, bucket, and fromKey toKey name map
@@ -350,7 +342,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Deletes an existing key.
    *
@@ -361,7 +352,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Deletes existing key/keys. This interface supports delete
@@ -391,7 +381,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Deletes an existing empty bucket from volume.
    * @param volume - Name of the volume.
@@ -402,7 +391,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Returns a list of buckets represented by {@link OmBucketInfo}
@@ -550,8 +538,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
-
   /**
    * Commit Multipart upload part file.
    * @param omKeyArgs
@@ -564,7 +550,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Complete Multipart upload Request.
@@ -580,7 +565,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Abort multipart upload.
    * @param omKeyArgs
@@ -590,7 +574,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Returns list of parts of a multipart upload key.
@@ -638,7 +621,7 @@ public interface OzoneManagerProtocol
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach");
-  };
+  }
 
   /**
    * Set secret key for accessId.
@@ -927,7 +910,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * OzoneFS api to creates an output stream for a file.
    *
@@ -947,7 +929,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * OzoneFS api to lookup for a file.
@@ -1028,7 +1009,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Remove acl for Ozone object. Return true if acl is removed successfully
    * else false.
@@ -1041,7 +1021,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Acls to be set for given Ozone object. This operations reset ACL for
@@ -1142,6 +1121,7 @@ public interface OzoneManagerProtocol
       throws IOException;
 
   UUID refetchSecretKey() throws IOException;
+
   /**
    * Enter, leave, or get safe mode.
    *

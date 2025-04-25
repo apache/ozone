@@ -215,6 +215,7 @@ public final class FormattingCLIUtils {
   private static class TableRow {
     private TableRowType tableRowType;
     private List<String> data;
+
     TableRow(TableRowType tableRowType, List<String> data) {
       this.tableRowType = tableRowType;
       this.data = data;

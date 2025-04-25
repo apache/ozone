@@ -468,7 +468,6 @@ public class TestRDBTableStore {
     }
   }
 
-
   @Test
   public void testCountEstimatedRowsInTable() throws Exception {
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Eighth")) {
@@ -551,7 +550,6 @@ public class TestRDBTableStore {
       testTable.put(key, value);
     }
   }
-
 
   @Test
   public void testPrefixedIterator() throws Exception {
@@ -641,7 +639,6 @@ public class TestRDBTableStore {
       assertThrows(IOException.class, () -> testTable.iterator("abc"));
     }
   }
-
 
   @Test
   public void testPrefixedRangeKVs() throws Exception {

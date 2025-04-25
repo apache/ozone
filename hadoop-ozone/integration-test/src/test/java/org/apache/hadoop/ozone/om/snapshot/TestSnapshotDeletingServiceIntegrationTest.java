@@ -773,7 +773,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         bucket.getName()));
   }
 
-
   /*
       Flow
       ----
@@ -843,7 +842,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         bucket.getName() + "snap2");
     assertTableRowCount(snapshotInfoTable, countMap.get(snapshotInfoTable.getName()) +  2);
   }
-
 
   private void verifySnapshotChain(SnapshotInfo deletedSnapshot,
                                    String nextSnapshot)
