@@ -576,7 +576,6 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     createAndAssertKeys(ozoneBucket, keys);
   }
 
-
   private static List<String> getExpectedKeyList(String keyPrefix,
       String startKey, OzoneBucket legacyBucket, boolean shallow)
       throws Exception {

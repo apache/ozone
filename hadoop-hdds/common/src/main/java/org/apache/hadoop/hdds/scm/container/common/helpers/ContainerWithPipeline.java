@@ -66,7 +66,6 @@ public class ContainerWithPipeline implements Comparator<ContainerWithPipeline>,
     return builder.build();
   }
 
-
   @Override
   public String toString() {
     return containerInfo.toString() + " | " + pipeline.toString();

@@ -168,10 +168,12 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
         .incrCommandsSent(delta);
   }
+
   public void incrDNCommandsSuccess(UUID id, long delta) {
     numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
         .incrCommandsSuccess(delta);
   }
+
   public void incrDNCommandsFailure(UUID id, long delta) {
     numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
         .incrCommandsFailure(delta);
@@ -312,6 +314,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     }
     return sent;
   }
+
   public long getNumCommandsDatanodeSuccess() {
     long successCount = 0;
     for (DatanodeCommandCounts v : numCommandsDatanode.values()) {
@@ -319,6 +322,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     }
     return successCount;
   }
+
   public long getNumCommandsDatanodeFailed() {
     long failCount = 0;
     for (DatanodeCommandCounts v : numCommandsDatanode.values()) {

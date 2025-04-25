@@ -520,7 +520,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       return this;
     }
 
-
     public Builder setReplicationConfig(ReplicationConfig replConfig) {
       this.replicationConfig = replConfig;
       return this;

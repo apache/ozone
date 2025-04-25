@@ -48,9 +48,11 @@ public final class DatabaseHelper {
   private DatabaseHelper() {
     //Never constructed
   }
+
   static {
     loadProperties();
   }
+
   private static final Logger LOG =
       LoggerFactory.getLogger(DatabaseHelper.class);
   private static Map<String, String> properties;

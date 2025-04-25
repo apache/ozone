@@ -162,7 +162,6 @@ public final class OmSnapshotMetrics implements OmMetadataReaderMetrics {
   private @Metric
       MutableCounterLong numFSOps;
 
-
   private @Metric
       MutableCounterLong numGetObjectTagging;
   private @Metric

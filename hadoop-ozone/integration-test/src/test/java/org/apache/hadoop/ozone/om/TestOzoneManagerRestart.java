@@ -118,7 +118,6 @@ public class TestOzoneManagerRestart {
 
   }
 
-
   @Test
   public void testRestartOMWithBucketOperation() throws Exception {
     String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
@@ -148,7 +147,6 @@ public class TestOzoneManagerRestart {
     ozoneBucket = ozoneVolume.getBucket(bucketName);
     assertEquals(bucketName, ozoneBucket.getName());
   }
-
 
   @Test
   public void testRestartOMWithKeyOperation() throws Exception {

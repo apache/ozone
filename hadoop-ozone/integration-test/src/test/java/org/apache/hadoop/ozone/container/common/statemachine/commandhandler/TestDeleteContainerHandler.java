@@ -550,7 +550,6 @@ public class TestDeleteContainerHandler {
 
   }
 
-
   private void clearBlocksTable(Container container) throws IOException {
     try (DBHandle dbHandle
              = BlockUtils.getDB(

@@ -667,7 +667,6 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     }
   }
 
-
   private class Task implements Callable<Void> {
 
     private final DBColumnFamilyDefinition dbColumnFamilyDefinition;

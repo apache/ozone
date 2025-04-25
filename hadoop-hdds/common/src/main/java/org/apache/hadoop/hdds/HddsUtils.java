@@ -99,7 +99,6 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Stable
 public final class HddsUtils {
 
-
   private static final Logger LOG = LoggerFactory.getLogger(HddsUtils.class);
 
   public static final ByteString REDACTED =

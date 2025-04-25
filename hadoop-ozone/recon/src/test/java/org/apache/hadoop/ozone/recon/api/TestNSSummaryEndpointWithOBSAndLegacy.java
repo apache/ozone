@@ -273,7 +273,6 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       FILE9_SIZE_WITH_REPLICA +
       FILE10_SIZE_WITH_REPLICA;
 
-
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_KEY
       = FILE4_SIZE_WITH_REPLICA;
@@ -338,7 +337,6 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE;
 
   private static final long BUCKET_FOUR_DATA_SIZE = FILE_ELEVEN_SIZE;
-
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -846,7 +844,6 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         invalidResObj.getResponseCode());
   }
 
-
   @Test
   public void testFileSizeDist() throws Exception {
     checkFileSizeDist(ROOT_PATH, 2, 3, 3, 1);
@@ -1204,7 +1201,6 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
 
     return new OmKeyLocationInfoGroup(0L, locationInfoList);
   }
-
 
   private OmKeyLocationInfoGroup getLocationInfoGroup2() {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();

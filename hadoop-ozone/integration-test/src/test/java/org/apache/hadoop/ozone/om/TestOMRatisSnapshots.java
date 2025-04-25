@@ -515,9 +515,11 @@ public class TestOMRatisSnapshots {
   static class IncrementData {
     private List<String> keys;
     private SnapshotInfo snapshotInfo;
+
     public List<String> getKeys() {
       return keys;
     }
+
     public SnapshotInfo getSnapshotInfo() {
       return snapshotInfo;
     }
@@ -1135,6 +1137,7 @@ public class TestOMRatisSnapshots {
     private final File snapshotDir;
     private final List<Set<String>> sstSetList;
     private final Path tempDir;
+
     SnapshotMaxSizeInjector(OzoneManager om, File snapshotDir,
                             List<Set<String>> sstSetList, Path tempDir) {
       this.om = om;

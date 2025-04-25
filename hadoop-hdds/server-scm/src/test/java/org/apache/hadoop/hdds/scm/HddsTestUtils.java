@@ -258,18 +258,19 @@ public final class HddsTestUtils {
     return createStorageReport(nodeId, path, capacity, used, remaining,
             type, false);
   }
-    /**
-     * Creates storage report with the given information.
-     *
-     * @param nodeId    datanode id
-     * @param path      storage dir
-     * @param capacity  storage size
-     * @param used      space used
-     * @param remaining space remaining
-     * @param type      type of storage
-     *
-     * @return StorageReportProto
-     */
+
+  /**
+   * Creates storage report with the given information.
+   *
+   * @param nodeId    datanode id
+   * @param path      storage dir
+   * @param capacity  storage size
+   * @param used      space used
+   * @param remaining space remaining
+   * @param type      type of storage
+   *
+   * @return StorageReportProto
+   */
   public static StorageReportProto createStorageReport(DatanodeID nodeId, String path,
       long capacity, long used, long remaining, StorageTypeProto type,
                                                        boolean failed) {
@@ -356,7 +357,6 @@ public final class HddsTestUtils {
     }
     return getContainerReports(containerInfos);
   }
-
 
   public static PipelineReportsProto getRandomPipelineReports() {
     return PipelineReportsProto.newBuilder().build();
@@ -632,7 +632,6 @@ public final class HddsTestUtils {
         .setOwner("TEST");
   }
 
-
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state) {
     return getDefaultContainerInfoBuilder(state)
@@ -755,8 +754,6 @@ public final class HddsTestUtils {
     return Sets.newHashSet(getReplicasWithReplicaIndex(containerId, state,
             usedBytes, keyCount, sequenceId, Arrays.asList(datanodeDetails)));
   }
-
-
 
   public static Pipeline getRandomPipeline() {
     List<DatanodeDetails> nodes = new ArrayList<>();

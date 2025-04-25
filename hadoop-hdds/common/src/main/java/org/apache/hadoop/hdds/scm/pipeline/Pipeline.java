@@ -223,7 +223,6 @@ public final class Pipeline {
     return getNodeSet().equals(pipeline.getNodeSet());
   }
 
-
   /**
    * Return the replica index of the specific datanode in the datanode set.
    * <p>
@@ -604,6 +603,7 @@ public final class Pipeline {
       this.leaderId = leaderId1;
       return this;
     }
+
     public Builder setNodes(List<DatanodeDetails> nodes) {
       this.nodeStatus = new LinkedHashMap<>();
       nodes.forEach(node -> nodeStatus.put(node, -1L));
@@ -641,7 +641,6 @@ public final class Pipeline {
       this.suggestedLeaderId = uuid;
       return this;
     }
-
 
     public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> indexes) {
       this.replicaIndexes = indexes == null ? ImmutableMap.of() : ImmutableMap.copyOf(indexes);

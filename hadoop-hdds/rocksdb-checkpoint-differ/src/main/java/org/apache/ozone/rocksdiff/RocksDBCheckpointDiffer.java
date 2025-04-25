@@ -786,6 +786,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     Preconditions.checkNotNull(activeRocksDB,
         "activeRocksDB must be set before calling loadAllCompactionLogs.");
   }
+
   /**
    * Helper function that prepends SST file name with SST backup directory path
    * (or DB checkpoint path if compaction hasn't happened yet as SST files won't
@@ -1173,7 +1174,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       throw new RuntimeException(e);
     }
   }
-
 
   /**
    * Returns the list of input files from the compaction entries which are

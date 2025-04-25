@@ -111,12 +111,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    */
   private final ContainerManager containerManager;
 
-
   /**
    * SCMContext from StorageContainerManager.
    */
   private SCMContext scmContext;
-
 
   /**
    * ReplicationManager specific configuration.
@@ -632,6 +630,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     command.setPriority(ReplicationCommandPriority.LOW);
     sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
   }
+
   /**
    * Sends a command to a datanode with the command deadline set to the default
    * in ReplicationManager config.
@@ -1132,6 +1131,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + "sent to datanodes. After this timeout the command will be "
             + "retried.")
     private long eventTimeout = Duration.ofMinutes(12).toMillis();
+
     public void setInterval(Duration interval) {
       this.interval = interval;
     }
@@ -1156,6 +1156,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + "the datanodes will not process a command after SCM believes it "
             + "should have expired.")
     private long datanodeTimeoutOffset = Duration.ofMinutes(6).toMillis();
+
     public long getDatanodeTimeoutOffset() {
       return datanodeTimeoutOffset;
     }

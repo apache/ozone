@@ -187,7 +187,6 @@ public interface ReconContainerMetadataManager {
   Map<Long, ContainerMetadata> getContainers(int limit, long prevContainer)
       throws IOException;
 
-
   SeekableIterator<Long, ContainerMetadata> getContainersIterator() throws IOException;
 
   /**

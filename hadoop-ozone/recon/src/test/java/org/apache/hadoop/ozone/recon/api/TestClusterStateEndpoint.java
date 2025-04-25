@@ -81,7 +81,6 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
     super();
   }
 
-
   @BeforeEach
   public void setUp() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -120,7 +119,6 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
     pipelineID = pipeline.getId();
     reconPipelineManager.addPipeline(pipeline);
   }
-
 
   @Test
   public void testGetContainerCounts() throws Exception {
@@ -161,7 +159,6 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
     assertEquals("scmServiceId", clusterStateResponse.getScmServiceId());
     assertEquals("omServiceId", clusterStateResponse.getOmServiceId());
   }
-
 
   ContainerInfo newContainerInfo(long containerId,
                                  HddsProtos.LifeCycleState state) {

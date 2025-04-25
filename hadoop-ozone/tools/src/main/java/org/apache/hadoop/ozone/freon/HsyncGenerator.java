@@ -91,7 +91,6 @@ public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>
   public HsyncGenerator() {
   }
 
-
   @VisibleForTesting
   HsyncGenerator(OzoneConfiguration ozoneConfiguration) {
     this.configuration = ozoneConfiguration;

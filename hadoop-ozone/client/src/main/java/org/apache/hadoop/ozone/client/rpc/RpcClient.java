@@ -1704,7 +1704,6 @@ public class RpcClient implements ClientProtocol {
     ozoneManagerClient.renameKeys(omRenameKeys);
   }
 
-
   @Override
   public List<OzoneKey> listKeys(String volumeName, String bucketName,
                                  String keyPrefix, String prevKey,
@@ -2456,6 +2455,7 @@ public class RpcClient implements ClientProtocol {
           new MultipartInputStream(keyInfo.getKeyName(), cryptoInputStreams));
     }
   }
+
   private OzoneDataStreamOutput createDataStreamOutput(OpenKeySession openKey)
       throws IOException {
     final ReplicationConfig replicationConfig

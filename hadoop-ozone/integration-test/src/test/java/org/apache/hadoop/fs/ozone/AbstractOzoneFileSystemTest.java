@@ -2020,7 +2020,6 @@ abstract class AbstractOzoneFileSystemTest {
     assertEquals(owner, fileStatus.getGroup());
   }
 
-
   @Test
   public void testDirectory() throws IOException {
     assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));

@@ -43,6 +43,8 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Evolving
 public interface SpaceUsageCheckFactory {
 
+  String CONFIG_PREFIX = "hdds.datanode.du.factory";
+
   /**
    * Creates configuration for the HDDS volume rooted at {@code dir}.
    *
@@ -109,8 +111,6 @@ public interface SpaceUsageCheckFactory {
   static DUFactory defaultImplementation() {
     return new DUFactory();
   }
-
-  String CONFIG_PREFIX = "hdds.datanode.du.factory";
 
   /**
    * Configuration for {@link SpaceUsageCheckFactory}.

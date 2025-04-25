@@ -79,7 +79,6 @@ public class TestSCMSafeModeWithPipelineRules {
     pipelineManager = scm.getPipelineManager();
   }
 
-
   @Test
   void testScmSafeMode() throws Exception {
     int datanodeCount = 6;
@@ -168,7 +167,6 @@ public class TestSCMSafeModeWithPipelineRules {
       cluster.shutdown();
     }
   }
-
 
   private void waitForRatis3NodePipelines(int numPipelines)
       throws TimeoutException, InterruptedException {

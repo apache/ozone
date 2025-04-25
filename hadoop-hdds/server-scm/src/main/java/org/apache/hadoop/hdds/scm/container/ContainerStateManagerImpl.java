@@ -517,7 +517,6 @@ public final class ContainerStateManagerImpl
     return null;
   }
 
-
   @Override
   public void removeContainer(final HddsProtos.ContainerID id)
       throws IOException {
@@ -588,6 +587,7 @@ public final class ContainerStateManagerImpl
       this.transactionBuffer = buffer;
       return this;
     }
+
     public Builder setConfiguration(final Configuration config) {
       conf = config;
       return this;

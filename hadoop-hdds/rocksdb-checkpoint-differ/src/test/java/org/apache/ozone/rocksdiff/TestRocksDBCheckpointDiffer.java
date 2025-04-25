@@ -1168,7 +1168,6 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
   }
 
-
   /**
    * Test cases for pruneBackwardDag.
    */

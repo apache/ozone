@@ -84,7 +84,6 @@ public class TestContainerReader {
   private ContainerSet containerSet;
   private OzoneConfiguration conf;
 
-
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private UUID datanodeId;
   private String clusterId = UUID.randomUUID().toString();

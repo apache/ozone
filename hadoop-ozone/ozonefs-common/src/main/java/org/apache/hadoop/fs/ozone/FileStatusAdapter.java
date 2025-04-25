@@ -77,7 +77,6 @@ public final class FileStatusAdapter {
     this.isErasureCoded = isErasureCoded;
   }
 
-
   public Path getPath() {
     return path;
   }

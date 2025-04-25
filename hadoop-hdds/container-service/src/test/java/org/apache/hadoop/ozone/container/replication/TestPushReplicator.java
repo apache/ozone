@@ -81,7 +81,6 @@ class TestPushReplicator {
     output.assertClosedExactlyOnce();
   }
 
-
   @Test
   void uploadFailsWithException() throws IOException {
     // GIVEN

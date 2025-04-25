@@ -70,6 +70,7 @@ public class TestECPipelineProvider {
       mock(PipelineStateManager.class);
   private PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
   private long containerSizeBytes;
+
   @BeforeEach
   public void setup() throws IOException, NodeNotFoundException {
     conf = new OzoneConfiguration();
@@ -94,7 +95,6 @@ public class TestECPipelineProvider {
     when(nodeManager.getNodeStatus(any()))
         .thenReturn(NodeStatus.inServiceHealthy());
   }
-
 
   @Test
   public void testSimplePipelineCanBeCreatedWithIndexes() throws IOException {
