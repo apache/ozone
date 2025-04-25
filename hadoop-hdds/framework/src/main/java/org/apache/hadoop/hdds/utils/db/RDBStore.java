@@ -209,7 +209,6 @@ public class RDBStore implements DBStore {
     return rocksDBCheckpointDiffer;
   }
 
-
   /**
    * Returns the RocksDB's DBOptions.
    */

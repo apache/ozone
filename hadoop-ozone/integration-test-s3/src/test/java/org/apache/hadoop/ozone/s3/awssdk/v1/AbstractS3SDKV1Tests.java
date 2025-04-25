@@ -296,7 +296,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     // Upload some objects to the bucket
     for (int i = 1; i <= 10; i++) {
-      s3Client.putObject(bucketName, "key-" + i, RandomStringUtils.randomAlphanumeric(1024));
+      s3Client.putObject(bucketName, "key-" + i, RandomStringUtils.secure().nextAlphanumeric(1024));
     }
 
     // Bucket deletion should fail if there are still keys in the bucket
@@ -542,7 +542,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     );
 
     for (String keyName: keyNames) {
-      s3Client.putObject(bucketName, keyName, RandomStringUtils.randomAlphanumeric(5));
+      s3Client.putObject(bucketName, keyName, RandomStringUtils.secure().nextAlphanumeric(5));
     }
 
     ListObjectsRequest listObjectsRequest = new ListObjectsRequest()
@@ -581,7 +581,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     );
 
     for (String keyName: keyNames) {
-      s3Client.putObject(bucketName, keyName, RandomStringUtils.randomAlphanumeric(5));
+      s3Client.putObject(bucketName, keyName, RandomStringUtils.secure().nextAlphanumeric(5));
     }
 
     ListObjectsV2Request listObjectsRequest = new ListObjectsV2Request()
@@ -948,7 +948,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     // Upload some objects to the bucket
     AmazonServiceException ase = assertThrows(AmazonServiceException.class,
         () -> s3Client.putObject(bucketName, keyName,
-            RandomStringUtils.randomAlphanumeric(1024)));
+            RandomStringUtils.secure().nextAlphanumeric(1024)));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(403, ase.getStatusCode());

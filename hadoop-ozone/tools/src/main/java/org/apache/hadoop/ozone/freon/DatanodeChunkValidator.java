@@ -76,7 +76,6 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
   private Checksum checksum;
   private ContainerProtos.ChecksumData checksumProtobuf;
 
-
   @Override
   public Void call() throws Exception {
 
@@ -131,7 +130,6 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
     checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, chunkSize);
     checksumReference = computeChecksum(response);
   }
-
 
   private void validateChunk(long stepNo) throws Exception {
     ContainerCommandRequestProto request = createReadChunkRequest(stepNo);
@@ -201,6 +199,4 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
           readChunk.getDataBuffers().getBuffersList());
     }
   }
-
-
 }

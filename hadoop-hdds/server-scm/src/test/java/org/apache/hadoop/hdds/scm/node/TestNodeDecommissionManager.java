@@ -101,6 +101,7 @@ public class TestNodeDecommissionManager {
     id++;
     return builder.build();
   }
+
   private ContainerInfo getMockContainer(ReplicationConfig rep, ContainerID conId) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder()
         .setReplicationConfig(rep)

@@ -142,7 +142,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
 
     client = cluster.newClient();
     ObjectStore store = client.getObjectStore();
-    String volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    String volumeName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
 

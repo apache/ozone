@@ -70,7 +70,6 @@ class DatanodeSimulationState {
   private Map<Long, ContainerReplicaProto.State> containers =
       new HashMap<>();
 
-
   // indicate if this node is in read-only mode, no pipeline should be created.
   private volatile boolean readOnly = false;
 

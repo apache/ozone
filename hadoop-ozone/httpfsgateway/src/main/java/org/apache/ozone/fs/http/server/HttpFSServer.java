@@ -101,6 +101,7 @@ public class HttpFSServer {
   enum AccessMode {
     READWRITE, WRITEONLY, READONLY;
   }
+
   private static final Logger AUDIT_LOG
       = LoggerFactory.getLogger("httpfsaudit");
   private static final Logger LOG = LoggerFactory.getLogger(HttpFSServer.class);

@@ -65,12 +65,10 @@ public class SnapshotDiffReportOzone
    */
   private final String bucketName;
 
-
   /**
    * subsequent token for the diff report.
    */
   private final String token;
-
 
   public SnapshotDiffReportOzone(final String snapshotRoot,
       final String volumeName,
@@ -149,7 +147,7 @@ public class SnapshotDiffReportOzone
         report.getDiffListList().stream()
             .map(SnapshotDiffReportOzone::fromProtobufDiffReportEntry)
             .collect(Collectors.toList()),
-        report.getToken());
+        report.hasToken() ? report.getToken() : null);
   }
 
   public static DiffType fromProtobufDiffType(
@@ -189,7 +187,6 @@ public class SnapshotDiffReportOzone
     }
     return builder.build();
   }
-
 
   public static DiffReportEntry getDiffReportEntry(final DiffType type,
       final String sourcePath) {

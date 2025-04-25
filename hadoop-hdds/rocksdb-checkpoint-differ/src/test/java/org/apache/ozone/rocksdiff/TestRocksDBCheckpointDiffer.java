@@ -979,7 +979,7 @@ public class TestRocksDBCheckpointDiffer {
 
   private void writeKeysAndCheckpointing() throws RocksDBException {
     for (int i = 0; i < NUM_ROW; ++i) {
-      String generatedString = RandomStringUtils.randomAlphabetic(7);
+      String generatedString = RandomStringUtils.secure().nextAlphabetic(7);
       String keyStr = "Key-" + i + "-" + generatedString;
       String valueStr = "Val-" + i + "-" + generatedString;
       byte[] key = keyStr.getBytes(UTF_8);
@@ -1300,7 +1300,6 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(expectedDag, originalDag);
     assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
   }
-
 
   /**
    * Test cases for pruneBackwardDag.
@@ -2009,7 +2008,7 @@ public class TestRocksDBCheckpointDiffer {
 
     try (ManagedFlushOptions flushOptions = new ManagedFlushOptions()) {
       for (int i = 0; i < numberOfKeys; ++i) {
-        String generatedString = RandomStringUtils.randomAlphabetic(7);
+        String generatedString = RandomStringUtils.secure().nextAlphabetic(7);
         String keyStr = keyPrefix + i + "-" + generatedString;
         String valueStr = valuePrefix + i + "-" + generatedString;
         byte[] key = keyStr.getBytes(UTF_8);

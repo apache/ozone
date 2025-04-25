@@ -96,7 +96,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     // call create Container again
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.random(RandomUtils.secure().randomInt(0, 1024)).getBytes(UTF_8);
+        RandomStringUtils.secure().next(RandomUtils.secure().randomInt(0, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,

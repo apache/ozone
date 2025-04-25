@@ -26,6 +26,7 @@
     PMD Ruleset for Apache Ozone
   </description>
 
+  <rule ref="category/java/bestpractices.xml/AvoidStringBufferField" />
   <rule ref="category/java/bestpractices.xml/ForLoopCanBeForeach"/>
   <rule ref="category/java/bestpractices.xml/MissingOverride"/>
   <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>

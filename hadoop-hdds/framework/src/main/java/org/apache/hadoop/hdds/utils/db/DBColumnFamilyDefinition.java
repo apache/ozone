@@ -32,23 +32,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
  * @param <VALUE> they type of the value.
  */
 public class DBColumnFamilyDefinition<KEY, VALUE> {
-  public static Map<String, DBColumnFamilyDefinition<?, ?>> newUnmodifiableMap(
-      DBColumnFamilyDefinition<?, ?>... families) {
-    return newUnmodifiableMap(Collections.emptyMap(), families);
-  }
-
-  public static Map<String, DBColumnFamilyDefinition<?, ?>> newUnmodifiableMap(
-      Map<String, DBColumnFamilyDefinition<?, ?>> existing,
-      DBColumnFamilyDefinition<?, ?>... families) {
-    return CollectionUtils.newUnmodifiableMap(Arrays.asList(families),
-        DBColumnFamilyDefinition::getName, existing);
-  }
-
-  public static Map<String, List<DBColumnFamilyDefinition<?, ?>>>
-      newUnmodifiableMultiMap(DBColumnFamilyDefinition<?, ?>... families) {
-    return CollectionUtils.newUnmodifiableMultiMap(Arrays.asList(families),
-        DBColumnFamilyDefinition::getName);
-  }
 
   private final String tableName;
 
@@ -63,6 +46,25 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
     this.keyCodec = keyCodec;
     this.valueCodec = valueCodec;
     this.cfOptions = null;
+  }
+
+  public static Map<String, DBColumnFamilyDefinition<?, ?>> newUnmodifiableMap(
+      DBColumnFamilyDefinition<?, ?>... families) {
+    return newUnmodifiableMap(Collections.emptyMap(), families);
+  }
+
+  public static Map<String, DBColumnFamilyDefinition<?, ?>> newUnmodifiableMap(
+      Map<String, DBColumnFamilyDefinition<?, ?>> existing,
+      DBColumnFamilyDefinition<?, ?>... families) {
+    return CollectionUtils.newUnmodifiableMap(Arrays.asList(families),
+        DBColumnFamilyDefinition::getName, existing);
+  }
+
+  public static Map<String, List<DBColumnFamilyDefinition<?, ?>>> newUnmodifiableMultiMap(
+      DBColumnFamilyDefinition<?, ?>... families
+  ) {
+    return CollectionUtils.newUnmodifiableMultiMap(Arrays.asList(families),
+        DBColumnFamilyDefinition::getName);
   }
 
   public Table<KEY, VALUE> getTable(DBStore db) throws IOException {

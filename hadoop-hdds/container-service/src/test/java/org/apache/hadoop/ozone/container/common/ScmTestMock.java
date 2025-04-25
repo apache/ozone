@@ -292,7 +292,6 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
     }
   }
 
-
   /**
    * Return the number of StorageReports of a datanode.
    * @param datanodeDetails

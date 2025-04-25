@@ -41,7 +41,6 @@ public class ScmOption extends AbstractMixin {
       description = "The destination scm (host:port)")
   private String scm;
 
-
   @CommandLine.Option(names = {"--service-id", "-id"}, description =
       "ServiceId of SCM HA Cluster")
   private String scmServiceId;

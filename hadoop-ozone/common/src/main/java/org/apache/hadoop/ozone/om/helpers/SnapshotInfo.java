@@ -552,6 +552,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         "SnapshotId is needed to create checkpoint directory");
     return SEPARATOR + snapshotId;
   }
+
   /**
    * Get the name of the checkpoint directory, (non-static).
    */

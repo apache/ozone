@@ -554,7 +554,6 @@ public abstract class AbstractContractGetFileStatusTest extends AbstractFSContra
     return count;
   }
 
-
   @Test
   public void testListStatusFiltering() throws Throwable {
     describe("Call listStatus() against paths and directories with filtering");

@@ -36,7 +36,8 @@ import org.slf4j.LoggerFactory;
  */
 public class TestOzoneLockProvider {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TestOzoneLockProvider.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOzoneLockProvider.class);
 
   private OzoneManager ozoneManager;
   private OzoneLockStrategy ozoneLockStrategy;

@@ -834,7 +834,6 @@ public final class OmUtils {
     return normalizedPath.toString();
   }
 
-
   /**
    * For a given service ID, return list of configured OM hosts.
    * @param conf configuration

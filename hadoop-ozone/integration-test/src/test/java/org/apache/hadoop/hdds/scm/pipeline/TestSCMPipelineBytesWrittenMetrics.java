@@ -79,7 +79,7 @@ public class TestSCMPipelineBytesWrittenMetrics {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.randomAlphabetic(numBytes);
+    String value = RandomStringUtils.secure().nextAlphabetic(numBytes);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);

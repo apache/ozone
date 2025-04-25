@@ -108,12 +108,10 @@ abstract class TestContainerStateMachine {
         RaftGroupId.randomId(), dispatcher, controller, executor, ratisServer, conf, "containerOp");
   }
 
-
   @AfterEach
   public void teardown() {
     stateMachine.close();
   }
-
 
   @AfterAll
   public void shutdown() {
