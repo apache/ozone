@@ -31,6 +31,9 @@ import org.apache.commons.lang3.ClassUtils;
  * This class is immutable.
  */
 public final class CodecRegistry {
+
+  private final CodecMap valueCodecs;
+
   /** To build {@link CodecRegistry}. */
   public static class Builder {
     private final Map<Class<?>, Codec<?>> codecs = new HashMap<>();
@@ -77,8 +80,6 @@ public final class CodecRegistry {
       return null;
     }
   }
-
-  private final CodecMap valueCodecs;
 
   private CodecRegistry(Map<Class<?>, Codec<?>> valueCodecs) {
     this.valueCodecs = new CodecMap(valueCodecs);

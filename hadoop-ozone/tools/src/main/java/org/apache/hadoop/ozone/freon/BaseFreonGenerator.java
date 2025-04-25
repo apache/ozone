@@ -282,7 +282,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
     attemptCounter = new AtomicLong(0);
 
     if (prefix.isEmpty()) {
-      prefix = !allowEmptyPrefix() ? RandomStringUtils.randomAlphanumeric(10).toLowerCase() : "";
+      prefix = !allowEmptyPrefix() ? RandomStringUtils.secure().nextAlphanumeric(10).toLowerCase() : "";
     } else {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);

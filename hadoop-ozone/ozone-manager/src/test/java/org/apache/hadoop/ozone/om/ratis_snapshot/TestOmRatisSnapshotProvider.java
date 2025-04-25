@@ -60,7 +60,6 @@ public class TestOmRatisSnapshotProvider {
       "Content-Disposition: form-data; name=\""
           + OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]\""
           + CR_NL + CR_NL;
-  private StringBuilder sb;
   private File targetFile;
 
   @BeforeEach
@@ -79,16 +78,13 @@ public class TestOmRatisSnapshotProvider {
     omRatisSnapshotProvider =
         new OmRatisSnapshotProvider(snapshotDir, peerNodesMap, httpPolicy,
             false, connectionFactory);
-
-    sb = new StringBuilder();
-    sb.append("--").append(MULTIPART_FORM_DATA_BOUNDARY).append(CR_NL);
-    sb.append(CONTENT_DISPOSITION);
   }
 
   @Test
   public void testDownloadSnapshot() throws IOException,
       AuthenticationException {
     URL omCheckpointUrl = mock(URL.class);
+    StringBuilder sb = getStringBuilder();
     when(leader.getOMDBCheckpointEndpointUrl(anyBoolean(), anyBoolean()))
         .thenReturn(omCheckpointUrl);
 
@@ -117,6 +113,7 @@ public class TestOmRatisSnapshotProvider {
     String fileName = "file1.sst";
     sstFiles.add(fileName);
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    StringBuilder sb = getStringBuilder();
     when(connection.getOutputStream()).thenReturn(outputStream);
 
 
@@ -132,6 +129,7 @@ public class TestOmRatisSnapshotProvider {
   public void testWriteFormDataWithoutSstFile() throws IOException {
     HttpURLConnection connection = mock(HttpURLConnection.class);
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    StringBuilder sb = getStringBuilder();
     when(connection.getOutputStream()).thenReturn(outputStream);
 
     OmRatisSnapshotProvider.writeFormData(connection, new ArrayList<>());
@@ -139,6 +137,13 @@ public class TestOmRatisSnapshotProvider {
     sb.append("--").append(MULTIPART_FORM_DATA_BOUNDARY).append("--").append(CR_NL);
     assertEquals(sb.toString(),
         new String(outputStream.toByteArray(), StandardCharsets.UTF_8));
+  }
+
+  private static StringBuilder getStringBuilder() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("--").append(MULTIPART_FORM_DATA_BOUNDARY).append(CR_NL);
+    sb.append(CONTENT_DISPOSITION);
+    return sb;
   }
 
 }

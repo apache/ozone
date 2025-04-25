@@ -456,7 +456,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         this.setLastAppliedTermIndex(TermIndex.valueOf(
             newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
         LOG.info("{}: OzoneManagerStateMachine un-pause completed. " +
-            "newLastAppliedSnaphsotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
+            "newLastAppliedSnapshotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
                 getId(), newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
       });
     }

@@ -15,23 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.test.tag;
+package org.apache.hadoop.ozone.repair.datanode;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import org.junit.jupiter.api.Tag;
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
+import org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeContainerSchema;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 
 /**
- * Annotation to mark JUnit5 test classes that require native libraries.
+ * Ozone Repair CLI for Datanode.
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
-@Retention(RetentionPolicy.RUNTIME)
-@Tag("native")
-public @interface Native {
-  /**
-   * Native Library being used.
-   */
-  String value();
+@CommandLine.Command(name = "datanode",
+    subcommands = {
+        UpgradeContainerSchema.class,
+    },
+    description = "Tools to repair Datanode")
+@MetaInfServices(RepairSubcommand.class)
+public class DatanodeRepair implements RepairSubcommand {
+
 }

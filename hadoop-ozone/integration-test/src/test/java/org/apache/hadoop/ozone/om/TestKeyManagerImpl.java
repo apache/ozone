@@ -356,12 +356,12 @@ public class TestKeyManagerImpl {
   public void testCreateDirectory() throws IOException {
     // Create directory where the parent directory does not exist
     StringBuffer keyNameBuf = new StringBuffer();
-    keyNameBuf.append(RandomStringUtils.randomAlphabetic(5));
+    keyNameBuf.append(RandomStringUtils.secure().nextAlphabetic(5));
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyNameBuf.toString())
         .build();
     for (int i = 0; i < 5; i++) {
-      keyNameBuf.append("/").append(RandomStringUtils.randomAlphabetic(5));
+      keyNameBuf.append("/").append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     String keyName = keyNameBuf.toString();
     writeClient.createDirectory(keyArgs);
@@ -373,7 +373,7 @@ public class TestKeyManagerImpl {
     }
 
     // make sure create directory fails where parent is a file
-    keyName = RandomStringUtils.randomAlphabetic(5);
+    keyName = RandomStringUtils.secure().nextAlphabetic(5);
     keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
@@ -388,7 +388,7 @@ public class TestKeyManagerImpl {
     assertEquals(e.getResult(), OMException.ResultCodes.FILE_ALREADY_EXISTS);
 
     // create directory where parent is root
-    keyName = RandomStringUtils.randomAlphabetic(5);
+    keyName = RandomStringUtils.secure().nextAlphabetic(5);
     keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
@@ -402,7 +402,7 @@ public class TestKeyManagerImpl {
   @Test
   public void testOpenFile() throws IOException {
     // create key
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
@@ -426,9 +426,9 @@ public class TestKeyManagerImpl {
     // try to create a file where parent directories do not exist and
     // recursive flag is set to false
     StringBuffer keyNameBuf = new StringBuffer();
-    keyNameBuf.append(RandomStringUtils.randomAlphabetic(5));
+    keyNameBuf.append(RandomStringUtils.secure().nextAlphabetic(5));
     for (int i = 0; i < 5; i++) {
-      keyNameBuf.append("/").append(RandomStringUtils.randomAlphabetic(5));
+      keyNameBuf.append("/").append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     keyName = keyNameBuf.toString();
     keyArgs = createBuilder()
@@ -716,7 +716,7 @@ public class TestKeyManagerImpl {
 
   @Test
   public void testLookupFile() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
@@ -756,7 +756,7 @@ public class TestKeyManagerImpl {
 
   @Test
   public void testLookupKeyWithLocation() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
         .setSortDatanodesInPipeline(true)
@@ -848,7 +848,7 @@ public class TestKeyManagerImpl {
 
   @Test
   public void testLatestLocationVersion() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder(VERSIONED_BUCKET_NAME)
         .setKeyName(keyName)
         .setLatestVersionLocation(true)
@@ -1192,7 +1192,7 @@ public class TestKeyManagerImpl {
   @ValueSource(booleans = {true, false})
   public void testListStatus(boolean enablePath) throws IOException {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
-    String superDir = RandomStringUtils.randomAlphabetic(5);
+    String superDir = RandomStringUtils.secure().nextAlphabetic(5);
 
     int numDirectories = 5;
     int numFiles = 5;
@@ -1274,7 +1274,7 @@ public class TestKeyManagerImpl {
   @Test
   public void testGetFileStatus() throws IOException {
     // create a key
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
         .setLatestVersionLocation(true)
@@ -1515,7 +1515,7 @@ public class TestKeyManagerImpl {
 
   @Test
   void testGetAllPartsWhenZeroPartNumber() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
 
     String volume = VOLUME_NAME;
 
@@ -1541,7 +1541,7 @@ public class TestKeyManagerImpl {
 
   @Test
   void testGetParticularPart() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
 
     String volume = VOLUME_NAME;
 
@@ -1565,7 +1565,7 @@ public class TestKeyManagerImpl {
 
   @Test
   void testGetNotExistedPart() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
 
     String volume = VOLUME_NAME;
 
@@ -1664,13 +1664,12 @@ public class TestKeyManagerImpl {
 
     for (OzoneFileStatus fileStatus : fileStatuses) {
       String normalizedKeyName = fileStatus.getTrimmedName();
-      String parent =
-          Paths.get(fileStatus.getKeyInfo().getKeyName()).getParent()
-              .toString();
       if (!recursive) {
+        Path parent = Paths.get(fileStatus.getKeyInfo().getKeyName()).getParent();
         // if recursive is false, verify all the statuses have the input
         // directory as parent
-        assertEquals(parent, directory);
+        assertNotNull(parent);
+        assertEquals(directory, parent.toString());
       }
       // verify filestatus is present in directory or file set accordingly
       if (fileStatus.isDirectory()) {
@@ -1706,7 +1705,7 @@ public class TestKeyManagerImpl {
       throws IOException {
     Set<String> keyNames = new TreeSet<>();
     for (int i = 0; i < numDirectories; i++) {
-      String keyName = parent + "/" + RandomStringUtils.randomAlphabetic(5);
+      String keyName = parent + "/" + RandomStringUtils.secure().nextAlphabetic(5);
       OmKeyArgs keyArgs = createBuilder().setKeyName(keyName).build();
       writeClient.createDirectory(keyArgs);
       keyNames.add(keyName);
@@ -1719,7 +1718,7 @@ public class TestKeyManagerImpl {
       Map<String, List<String>> fileMap, int numFiles) throws IOException {
     List<String> keyNames = new ArrayList<>();
     for (int i = 0; i < numFiles; i++) {
-      String keyName = parent + "/" + RandomStringUtils.randomAlphabetic(5);
+      String keyName = parent + "/" + RandomStringUtils.secure().nextAlphabetic(5);
       OmKeyArgs keyArgs = createBuilder().setKeyName(keyName).build();
       OpenKeySession keySession = writeClient.createFile(keyArgs, false, false);
       keyArgs.setLocationInfoList(

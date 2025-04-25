@@ -13,9 +13,4 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <FindBugsFilter>
-    <!-- Test -->
-    <Match>
-      <Class name=""/>
-      <Bug pattern="DLS_DEAD_LOCAL_STORE" />
-    </Match>
- </FindBugsFilter>
+</FindBugsFilter>

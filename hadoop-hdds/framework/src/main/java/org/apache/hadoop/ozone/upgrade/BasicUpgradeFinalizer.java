@@ -239,7 +239,7 @@ public abstract class BasicUpgradeFinalizer
   private void assertClientId(String id) throws UpgradeException {
     if (this.clientID == null || !this.clientID.equals(id)) {
       throw new UpgradeException("Unknown client tries to get finalization " +
-          "status.\n The requestor is not the initiating client of the " +
+          "status.\n The requester is not the initiating client of the " +
           "finalization, if you want to take over, and get unsent status " +
           "messages, check -takeover option.", INVALID_REQUEST);
     }

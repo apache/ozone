@@ -152,7 +152,7 @@ class DatanodeSimulationState {
       // to avoid peaks.
       if (state.nextFullContainerReport == Instant.MIN) {
         state.nextFullContainerReport = Instant.now().plusMillis(
-            RandomUtils.nextLong(1, fullContainerReportDurationMs));
+            RandomUtils.secure().randomLong(1, fullContainerReportDurationMs));
       } else {
         state.nextFullContainerReport = Instant.now()
             .plusMillis(fullContainerReportDurationMs);
