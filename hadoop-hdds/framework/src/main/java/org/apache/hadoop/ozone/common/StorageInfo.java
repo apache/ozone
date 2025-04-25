@@ -187,7 +187,6 @@ public class StorageInfo {
     Preconditions.checkNotNull(creationTime);
   }
 
-
   public void writeTo(File to)
       throws IOException {
     IOUtils.writePropertiesToFile(to, properties);

@@ -51,7 +51,6 @@ public class MaintenanceSubCommand extends ScmSubcommand {
       description = "Forcefully try to decommission the datanode(s)")
   private boolean force;
 
-
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     List<String> hosts = hostNameParams.getHostNames();

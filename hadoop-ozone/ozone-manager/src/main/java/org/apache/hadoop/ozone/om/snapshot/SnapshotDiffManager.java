@@ -1485,6 +1485,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           toObject.getClass().getName());
     }
   }
+
   private boolean areAclsSame(OmDirectoryInfo fromObject,
                               OmDirectoryInfo toObject) {
     return fromObject.getAcls().equals(toObject.getAcls());

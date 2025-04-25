@@ -146,7 +146,6 @@ public abstract class TestSCMMXBean implements NonHATests.TestCase {
     verifyEquals(data, containerStateCount);
   }
 
-
   /**
    * An internal function used to compare a TabularData returned
    * by JMX with the expected data in a Map.

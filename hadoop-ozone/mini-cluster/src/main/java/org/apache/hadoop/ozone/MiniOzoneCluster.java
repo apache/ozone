@@ -193,6 +193,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
    */
   void restartHddsDatanode(DatanodeDetails dn, boolean waitForDatanode)
       throws InterruptedException, TimeoutException, IOException;
+
   /**
    * Shutdown a particular HddsDatanode.
    *
@@ -408,6 +409,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
   /** Service to manage as part of the mini cluster. */
   interface Service {
     void start(OzoneConfiguration conf) throws Exception;
+
     void stop() throws Exception;
   }
 }

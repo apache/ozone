@@ -258,6 +258,7 @@ public class TestContainerServer {
     @Override
     public void shutdown() {
     }
+
     @Override
     public Handler getHandler(ContainerProtos.ContainerType containerType) {
       return null;

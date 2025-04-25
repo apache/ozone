@@ -105,7 +105,6 @@ public class OMDBInsightEndpoint {
   private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
 
-
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
                              ReconOMMetadataManager omMetadataManager,
@@ -558,7 +557,6 @@ public class OMDBInsightEndpoint {
     keysSummary.put("totalReplicatedDataSize", replicatedSizeDeleted);
     keysSummary.put("totalUnreplicatedDataSize", unreplicatedSizeDeleted);
   }
-
 
   private void getPendingForDeletionDirInfo(
       int limit, String prevKey,
@@ -1113,7 +1111,6 @@ public class OMDBInsightEndpoint {
     retrieveKeysFromTable(fileTable, paramInfo, results);
   }
 
-
   /**
    * Converts a startPrefix path into an objectId path for FSO buckets, using IDs.
    * <p>
@@ -1328,7 +1325,6 @@ public class OMDBInsightEndpoint {
     return omKeyInfo.getVolumeName() + OM_KEY_PREFIX +
         omKeyInfo.getBucketName() + OM_KEY_PREFIX + omKeyInfo.getKeyName();
   }
-
 
   @VisibleForTesting
   public GlobalStatsDao getDao() {

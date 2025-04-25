@@ -150,7 +150,9 @@ public class LoadBucket {
     }
 
     abstract void doFsOp(Path p) throws IOException;
+
     abstract void doBucketOp(String key) throws IOException;
+
     abstract void doPostOp() throws IOException;
 
     @Override

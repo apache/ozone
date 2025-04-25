@@ -89,7 +89,6 @@ public abstract class TestOzoneManagerHA {
   private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
   private static OzoneClient client;
 
-
   public MiniOzoneHAClusterImpl getCluster() {
     return cluster;
   }

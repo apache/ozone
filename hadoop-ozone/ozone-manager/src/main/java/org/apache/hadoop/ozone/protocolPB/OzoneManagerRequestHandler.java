@@ -179,7 +179,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private final OzoneManager impl;
   private FaultInjector injector;
 
-
   public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
   }
@@ -488,6 +487,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       return Status.INTERNAL_ERROR;
     }
   }
+
   /**
    * Validates that the incoming OM request has required parameters.
    * TODO: Add more validation checks before writing the request to Ratis log.
@@ -1114,7 +1114,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
-
   @RequestFeatureValidator(
       conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
@@ -1573,6 +1572,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setStatus(impl.getQuotaRepairStatus())
         .build();
   }
+
   private OzoneManagerProtocolProtos.StartQuotaRepairResponse startQuotaRepair(
       OzoneManagerProtocolProtos.StartQuotaRepairRequest req) throws IOException {
     impl.startQuotaRepair(req.getBucketsList());

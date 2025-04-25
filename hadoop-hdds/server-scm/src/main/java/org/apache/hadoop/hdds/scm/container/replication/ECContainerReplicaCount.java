@@ -330,6 +330,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     distinct.addAll(maintenanceIndexes.keySet());
     return distinct;
   }
+
   /**
    * Returns an unsorted list of indexes which need additional copies to
    * ensure the container is sufficiently replicated. These missing indexes will
@@ -544,8 +545,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   public boolean isSufficientlyReplicated() {
     return isSufficientlyReplicated(false);
   }
-
-
 
   @Override
   public String toString() {

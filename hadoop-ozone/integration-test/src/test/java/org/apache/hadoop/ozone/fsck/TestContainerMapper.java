@@ -71,7 +71,6 @@ public class TestContainerMapper {
   private static OzoneConfiguration conf;
   private static List<String> keyList = new ArrayList<>();
 
-
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();

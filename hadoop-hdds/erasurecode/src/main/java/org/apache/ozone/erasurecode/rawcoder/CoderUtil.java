@@ -96,7 +96,6 @@ public final class CoderUtil {
     }
   }
 
-
   /**
    * Convert an array of this chunks to an array of ByteBuffers.
    *
@@ -135,8 +134,6 @@ public final class CoderUtil {
     directBuffer.flip();
     return directBuffer;
   }
-
-
 
   /**
    * Find the valid input from all the inputs.

@@ -65,7 +65,6 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   private @Metric MutableCounterLong listMultipartUploadsFailure;
   private @Metric MutableCounterLong listKeyCount;
 
-
   // RootEndpoint
   private @Metric MutableCounterLong listS3BucketsSuccess;
   private @Metric MutableCounterLong listS3BucketsFailure;

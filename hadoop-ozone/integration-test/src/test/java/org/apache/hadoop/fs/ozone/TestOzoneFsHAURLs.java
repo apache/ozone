@@ -87,7 +87,6 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
   private static final String OFS_IMPL_VALUE =
       "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem";
 
-
   @BeforeAll
   void initClass() throws Exception {
     cluster = cluster();

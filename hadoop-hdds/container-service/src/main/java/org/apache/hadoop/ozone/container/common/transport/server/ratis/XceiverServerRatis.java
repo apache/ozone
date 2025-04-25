@@ -879,6 +879,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     triggerPipelineClose(groupId, msg,
         ClosePipelineInfo.Reason.STATEMACHINE_TRANSACTION_FAILED);
   }
+
   /**
    * The fact that the snapshot contents cannot be used to actually catch up
    * the follower, it is the reason to initiate close pipeline and

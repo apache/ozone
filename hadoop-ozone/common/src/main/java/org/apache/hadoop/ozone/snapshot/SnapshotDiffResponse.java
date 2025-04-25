@@ -45,6 +45,7 @@ public class SnapshotDiffResponse {
       return JobStatus.valueOf(jobStatusProto.name());
     }
   }
+
   /**
    * Snapshot diff job sub-status enum.
    */

@@ -55,7 +55,6 @@ public final class HddsPolicyProvider extends PolicyProvider {
     return SUPPLIER.get();
   }
 
-
   @Override
   public Service[] getServices() {
     return DN_SERVICES.toArray(new Service[0]);

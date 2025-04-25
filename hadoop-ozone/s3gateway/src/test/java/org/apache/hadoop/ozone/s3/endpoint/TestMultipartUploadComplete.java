@@ -196,7 +196,6 @@ public class TestMultipartUploadComplete {
     assertEquals("custom-value2", headResponse.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "custom-key2"));
   }
 
-
   @Test
   public void testMultipartInvalidPartOrderError() throws Exception {
 

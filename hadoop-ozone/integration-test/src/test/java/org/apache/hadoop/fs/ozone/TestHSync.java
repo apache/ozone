@@ -456,7 +456,6 @@ public class TestHSync {
     }
   }
 
-
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   public void testOfsHSync(boolean incrementalChunkList) throws Exception {
@@ -820,7 +819,6 @@ public class TestHSync {
       }
     }, 500, 3000);
   }
-
 
   public static Stream<Arguments> concurrentExceptionHandling() {
     return Stream.of(
@@ -1571,9 +1569,11 @@ public class TestHSync {
 
   private static class ErrorInjectorImpl implements ErrorInjector {
     private final AtomicInteger remaining = new AtomicInteger();
+
     void start(int count) {
       remaining.set(count);
     }
+
     @Override
     public RaftClientReply getResponse(ContainerProtos.ContainerCommandRequestProto request, ClientId clientId,
         Pipeline pipeline) {

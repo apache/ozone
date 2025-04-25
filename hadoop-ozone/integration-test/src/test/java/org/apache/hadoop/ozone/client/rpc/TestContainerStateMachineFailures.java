@@ -261,7 +261,6 @@ public class TestContainerStateMachineFailures {
     key.close();
   }
 
-
   @Test
   @Flaky("HDDS-12215")
   public void testContainerStateMachineRestartWithDNChangePipeline()

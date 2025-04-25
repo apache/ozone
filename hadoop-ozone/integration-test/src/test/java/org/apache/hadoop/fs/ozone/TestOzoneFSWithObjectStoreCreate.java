@@ -156,7 +156,6 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
 
   }
 
-
   @Test
   public void testObjectStoreCreateWithO3fs() throws Exception {
     OzoneVolume ozoneVolume =
@@ -240,7 +239,6 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
 
   }
 
-
   @Test
   public void testKeyCreationFailDuetoDirectoryCreationBeforeCommit()
       throws Exception {
@@ -260,7 +258,6 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     OMException ex = assertThrows(OMException.class, () -> ozoneOutputStream.close());
     assertEquals(NOT_A_FILE, ex.getResult());
   }
-
 
   @Test
   public void testMPUFailDuetoDirectoryCreationBeforeComplete()
@@ -333,7 +330,6 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     OMException ex = assertThrows(OMException.class, () -> ozoneBucket.createKey("t1/t2", 0));
     assertEquals(NOT_A_FILE, ex.getResult());
   }
-
 
   @Test
   public void testListKeysWithNotNormalizedPath() throws Exception {

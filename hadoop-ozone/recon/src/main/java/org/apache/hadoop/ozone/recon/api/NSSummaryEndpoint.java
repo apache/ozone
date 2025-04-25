@@ -51,6 +51,7 @@ public class NSSummaryEndpoint {
   private final ReconOMMetadataManager omMetadataManager;
 
   private final OzoneStorageContainerManager reconSCM;
+
   @Inject
   public NSSummaryEndpoint(ReconNamespaceSummaryManager namespaceSummaryManager,
                            ReconOMMetadataManager omMetadataManager,
