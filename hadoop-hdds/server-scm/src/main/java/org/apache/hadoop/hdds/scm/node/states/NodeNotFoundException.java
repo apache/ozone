@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
  */
 public class NodeNotFoundException extends NodeException {
 
-
   /**
    * Constructs an {@code NodeNotFoundException} with {@code null}
    * as its error detail message.

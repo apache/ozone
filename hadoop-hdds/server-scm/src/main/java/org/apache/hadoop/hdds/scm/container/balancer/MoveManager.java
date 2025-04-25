@@ -300,7 +300,7 @@ public final class MoveManager implements
       }
       startMove(containerInfo, src, tgt, ret);
       LOG.debug("Processed a move request for container {}, from {} to {}",
-          cid, src.getUuidString(), tgt.getUuidString());
+          cid, src, tgt);
       return ret;
     }
   }

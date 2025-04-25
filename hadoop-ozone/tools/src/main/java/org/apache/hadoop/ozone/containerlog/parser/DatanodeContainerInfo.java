@@ -21,73 +21,117 @@ package org.apache.hadoop.ozone.containerlog.parser;
  *Holds information about a container.
  */
 
-public class DatanodeContainerInfo {
+public final class DatanodeContainerInfo {
 
-  private String timestamp;
-  private String state;
-  private long bcsid;
-  private String errorMessage;
-  private String logLevel;
-  private int indexValue;
+  private final long containerId;
+  private final String datanodeId;
+  private final String timestamp;
+  private final String state;
+  private final long bcsid;
+  private final String errorMessage;
+  private final String logLevel;
+  private final int indexValue;
 
-  public DatanodeContainerInfo() {
+  private DatanodeContainerInfo(Builder builder) {
+    this.containerId = builder.containerId;
+    this.datanodeId = builder.datanodeId;
+    this.timestamp = builder.timestamp;
+    this.state = builder.state;
+    this.bcsid = builder.bcsid;
+    this.errorMessage = builder.errorMessage;
+    this.logLevel = builder.logLevel;
+    this.indexValue = builder.indexValue;
   }
-  public DatanodeContainerInfo(String timestamp, String state, long bcsid, String errorMessage,
-                               String logLevel, int indexValue) {
-    this.timestamp = timestamp;
-    this.state = state;
-    this.bcsid = bcsid;
-    this.errorMessage = errorMessage;
-    this.logLevel = logLevel;
-    this.indexValue = indexValue;
+
+  /**
+   * Builder for DatanodeContainerInfo.
+   */
+
+  public static class Builder {
+    private long containerId;
+    private String datanodeId;
+    private String timestamp;
+    private String state;
+    private long bcsid;
+    private String errorMessage;
+    private String logLevel;
+    private int indexValue;
+
+    public Builder setContainerId(long containerId) {
+      this.containerId = containerId;
+      return this;
+    }
+
+    public Builder setDatanodeId(String datanodeId) {
+      this.datanodeId = datanodeId;
+      return this;
+    }
+
+    public Builder setTimestamp(String timestamp) {
+      this.timestamp = timestamp;
+      return this;
+    }
+
+    public Builder setState(String state) {
+      this.state = state;
+      return this;
+    }
+
+    public Builder setBcsid(long bcsid) {
+      this.bcsid = bcsid;
+      return this;
+    }
+
+    public Builder setErrorMessage(String errorMessage) {
+      this.errorMessage = errorMessage;
+      return this;
+    }
+
+    public Builder setLogLevel(String logLevel) {
+      this.logLevel = logLevel;
+      return this;
+    }
+
+    public Builder setIndexValue(int indexValue) {
+      this.indexValue = indexValue;
+      return this;
+    }
+
+    public DatanodeContainerInfo build() {
+      return new DatanodeContainerInfo(this);
+    }
+  }
+
+  public long getContainerId() {
+    return containerId;
+  }
+
+  public String getDatanodeId() {
+    return datanodeId;
   }
 
   public String getTimestamp() {
     return timestamp;
   }
 
-  public void setTimestamp(String timestamp) {
-    this.timestamp = timestamp;
-  }
-
   public String getState() {
     return state;
-  }
-
-  public void setState(String state) {
-    this.state = state;
   }
 
   public long getBcsid() {
     return bcsid;
   }
 
-  public void setBcsid(long bcsid) {
-    this.bcsid = bcsid;
-  }
-
   public String getErrorMessage() {
     return errorMessage;
-  }
-
-  public void setErrorMessage(String errorMessage) {
-    this.errorMessage = errorMessage;
   }
 
   public String getLogLevel() {
     return logLevel;
   }
 
-  public void setLogLevel(String logLevel) {
-    this.logLevel = logLevel;
-  }
-
   public int getIndexValue() {
     return indexValue;
   }
-
-  public void setIndexValue(int indexValue) {
-    this.indexValue = indexValue;
-  }
-
 }
+

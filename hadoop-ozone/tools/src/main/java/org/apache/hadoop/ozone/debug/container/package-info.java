@@ -16,6 +16,7 @@
  */
 
 /**
- * Contains all of the container related scm commands.
+ * Provides functionality for managing container log operations, including parsing, processing, and storing log data.
  */
-package org.apache.hadoop.hdds.scm.cli.container.upgrade;
+
+package org.apache.hadoop.ozone.debug.container;

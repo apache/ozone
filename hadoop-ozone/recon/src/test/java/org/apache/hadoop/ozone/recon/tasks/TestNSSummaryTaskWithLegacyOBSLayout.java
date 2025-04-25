@@ -259,7 +259,6 @@ public class TestNSSummaryTaskWithLegacyOBSLayout extends AbstractNSSummaryTaskT
           nsSummaryForBucket2.getSizeOfFiles());
     }
 
-
     @Test
     public void testProcessFileBucketSize() {
       int[] fileDistBucket1 = nsSummaryForBucket1.getFileSizeBucket();

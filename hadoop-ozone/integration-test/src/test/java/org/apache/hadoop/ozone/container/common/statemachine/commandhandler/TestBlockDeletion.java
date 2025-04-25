@@ -93,6 +93,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
@@ -211,7 +212,7 @@ public class TestBlockDeletion {
     String bucketName = UUID.randomUUID().toString();
     LogCapturer logCapturer = LogCapturer.captureLogs(DeleteBlocksCommandHandler.class);
 
-    String value = RandomStringUtils.random(1024 * 1024);
+    String value = RandomStringUtils.secure().next(1024 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -345,7 +346,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(1024 * 1024);
+    String value = RandomStringUtils.secure().next(1024 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -456,7 +457,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(10 * 10);
+    String value = RandomStringUtils.secure().next(10 * 10);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -586,7 +587,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(1024 * 1024);
+    String value = RandomStringUtils.secure().next(1024 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -787,7 +788,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(64 * 1024);
+    String value = RandomStringUtils.secure().next(64 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -821,7 +822,7 @@ public class TestBlockDeletion {
 
     // Wait for block delete command sent from OM
     OzoneTestUtils.flushAndWaitForDeletedBlockLog(scm);
-    long start = System.currentTimeMillis();
+    long start = Time.monotonicNow();
     // Wait for all blocks been deleted.
     GenericTestUtils.waitFor(() -> {
       try {
@@ -833,7 +834,7 @@ public class TestBlockDeletion {
       }
       return false;
     }, 100, 30000);
-    long end = System.currentTimeMillis();
+    long end = Time.monotonicNow();
     System.out.println("Block deletion costs " + (end - start) + "ms");
   }
 }

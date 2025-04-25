@@ -68,10 +68,6 @@ public final class Pipeline {
       Pipeline.class,
       DelegatedCodec.CopyType.UNSUPPORTED);
 
-  public static Codec<Pipeline> getCodec() {
-    return CODEC;
-  }
-
   private static final Logger LOG = LoggerFactory.getLogger(Pipeline.class);
   private final PipelineID id;
   private final ReplicationConfig replicationConfig;
@@ -115,6 +111,10 @@ public final class Pipeline {
     replicaIndexes = b.replicaIndexes;
     creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
     stateEnterTime = Instant.now();
+  }
+
+  public static Codec<Pipeline> getCodec() {
+    return CODEC;
   }
 
   /**
@@ -222,7 +222,6 @@ public final class Pipeline {
   public boolean sameDatanodes(Pipeline pipeline) {
     return getNodeSet().equals(pipeline.getNodeSet());
   }
-
 
   /**
    * Return the replica index of the specific datanode in the datanode set.
@@ -604,6 +603,7 @@ public final class Pipeline {
       this.leaderId = leaderId1;
       return this;
     }
+
     public Builder setNodes(List<DatanodeDetails> nodes) {
       this.nodeStatus = new LinkedHashMap<>();
       nodes.forEach(node -> nodeStatus.put(node, -1L));
@@ -641,7 +641,6 @@ public final class Pipeline {
       this.suggestedLeaderId = uuid;
       return this;
     }
-
 
     public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> indexes) {
       this.replicaIndexes = indexes == null ? ImmutableMap.of() : ImmutableMap.copyOf(indexes);

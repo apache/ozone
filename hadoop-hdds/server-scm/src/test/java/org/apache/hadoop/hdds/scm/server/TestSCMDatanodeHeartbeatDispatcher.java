@@ -51,7 +51,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestSCMDatanodeHeartbeatDispatcher {
 
-
   @Test
   public void testNodeReportDispatcher() throws IOException {
 

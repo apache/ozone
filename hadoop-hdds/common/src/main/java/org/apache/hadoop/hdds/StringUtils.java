@@ -27,11 +27,10 @@ import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
  * Simple utility class to collection string conversion methods.
  */
 public final class StringUtils {
+  private static final Charset UTF8 = StandardCharsets.UTF_8;
 
   private StringUtils() {
   }
-
-  private static final Charset UTF8 = StandardCharsets.UTF_8;
 
   /**
    * Decode a specific range of bytes of the given byte array to a string

@@ -45,7 +45,6 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Stable
 public final class DecommissionUtils {
 
-
   private static final Logger LOG = LoggerFactory.getLogger(DecommissionUtils.class);
 
   private DecommissionUtils() {

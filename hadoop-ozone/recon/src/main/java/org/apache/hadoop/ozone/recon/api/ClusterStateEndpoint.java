@@ -72,8 +72,6 @@ public class ClusterStateEndpoint {
   private OzoneConfiguration ozoneConfiguration;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
-
-
   @Inject
   ClusterStateEndpoint(OzoneStorageContainerManager reconSCM,
                        GlobalStatsDao globalStatsDao,

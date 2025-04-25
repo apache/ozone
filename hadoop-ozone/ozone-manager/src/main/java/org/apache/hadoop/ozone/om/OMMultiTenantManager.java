@@ -136,6 +136,7 @@ public interface OMMultiTenantManager {
    */
   TenantUserList listUsersInTenant(String tenantID, String prefix)
       throws IOException;
+
   /**
    * Given an access ID return its corresponding tenant.
    * @param accessID

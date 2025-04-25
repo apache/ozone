@@ -247,6 +247,7 @@ public abstract class AbstractNSSummaryTaskTest {
         .setParentObjectID(parentObjectId)
         .build();
   }
+
   /**
    * Build a directory as key info for put/update action.
    * We don't need to set size.

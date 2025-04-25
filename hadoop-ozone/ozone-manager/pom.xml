@@ -208,6 +208,11 @@
           <artifactId>jersey-bundle</artifactId>
         </exclusion>
         <exclusion>
+          <!-- depend on jcl-over-slf4j instead -->
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
@@ -284,29 +289,6 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
-    </dependency>
-    <!-- Override ranger-intg jackson version -->
-    <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-core-asl</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-jaxrs</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>org.codehaus.jackson</groupId>
-          <artifactId>jackson-core-asl</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.codehaus.jackson</groupId>
-          <artifactId>jackson-mapper-asl</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-mapper-asl</artifactId>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>

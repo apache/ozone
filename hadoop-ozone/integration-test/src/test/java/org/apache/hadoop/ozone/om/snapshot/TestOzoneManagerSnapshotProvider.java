@@ -84,10 +84,10 @@ public class TestOzoneManagerSnapshotProvider {
 
   @Test
   public void testDownloadCheckpoint() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)

@@ -131,7 +131,6 @@ public class TestOzoneContainer {
     }
   }
 
-
   static OzoneConfiguration newOzoneConfiguration() {
     final OzoneConfiguration conf = new OzoneConfiguration();
     return conf;
@@ -449,8 +448,6 @@ public class TestOzoneContainer {
     }
   }
 
-
-
   @Test
   public void testCloseContainer(
       @TempDir File ozoneMetaDir, @TempDir File hddsNodeDir) throws Exception {
@@ -594,7 +591,6 @@ public class TestOzoneContainer {
       }
     }
   }
-
 
   // Runs a set of commands as Async calls and verifies that calls indeed worked
   // as expected.

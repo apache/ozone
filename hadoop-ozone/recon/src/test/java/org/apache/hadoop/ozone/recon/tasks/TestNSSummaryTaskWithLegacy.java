@@ -398,7 +398,6 @@ public class TestNSSummaryTaskWithLegacy extends AbstractNSSummaryTaskTest {
     }
   }
 
-
   private static BucketLayout getBucketLayout() {
     return BucketLayout.LEGACY;
   }

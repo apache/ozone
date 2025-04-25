@@ -399,7 +399,6 @@ public abstract class AbstractContractDistCpTest
     return inputFileNew1;
   }
 
-
   @Test
   public void testTrackDeepDirectoryStructureToRemote() throws Exception {
     describe("copy a deep directory structure from local to remote");
@@ -435,7 +434,7 @@ public abstract class AbstractContractDistCpTest
             .withDirectWrite(shouldUseDirectWrite())
             .withOverwrite(false)));
 
-    lsR("tracked udpate", remoteFS, destDir);
+    lsR("tracked update", remoteFS, destDir);
     // new file went over
     Path outputFileNew1 = new Path(outputSubDir2, "newfile1");
     ContractTestUtils.assertIsFile(remoteFS, outputFileNew1);
@@ -828,6 +827,7 @@ public abstract class AbstractContractDistCpTest
                     Collections.singletonList(srcDir), destDir)
                     .withDirectWrite(true)));
   }
+
   /**
    * Run distcp srcDir destDir.
    * @param srcDir local source directory

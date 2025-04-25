@@ -108,7 +108,6 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
     return omRequestBuilder.build();
   }
 
-
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     boolean acquiredBucketLock = false;

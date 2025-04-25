@@ -826,7 +826,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
             .setDataSize(1000L)
             .setLocationInfoList(new ArrayList<>())
-            .setOwnerName("user" + RandomStringUtils.randomNumeric(5))
+            .setOwnerName("user" + RandomStringUtils.secure().nextNumeric(5))
             .build();
     //Open and Commit the Key in the Key Manager.
     OpenKeySession session = writeClient.openKey(keyArg);

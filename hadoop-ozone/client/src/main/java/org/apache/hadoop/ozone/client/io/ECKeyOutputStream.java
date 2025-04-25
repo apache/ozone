@@ -643,6 +643,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
 
   private static class CheckpointDummyStripe extends ECChunkBuffers {
     private final long version;
+
     CheckpointDummyStripe(long version) {
       super();
       this.version = version;

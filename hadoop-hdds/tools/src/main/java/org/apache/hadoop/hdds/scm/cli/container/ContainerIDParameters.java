@@ -15,26 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.server.http;
+package org.apache.hadoop.hdds.scm.cli.container;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.util.List;
+import org.apache.hadoop.hdds.cli.ItemsFromStdin;
+import picocli.CommandLine;
 
-import org.junit.jupiter.api.Test;
+/** Parameter for specifying list of container IDs. */
+@CommandLine.Command
+public class ContainerIDParameters extends ItemsFromStdin {
 
-/**
- * Test Http request log appender.
- */
-public class TestHttpRequestLogAppender {
-
-  @Test
-  public void testParameterPropagation() {
-
-    HttpRequestLogAppender requestLogAppender = new HttpRequestLogAppender();
-    requestLogAppender.setFilename("jetty-namenode-yyyy_mm_dd.log");
-    requestLogAppender.setRetainDays(17);
-    assertEquals("jetty-namenode-yyyy_mm_dd.log",
-        requestLogAppender.getFilename(), "Filename mismatch");
-    assertEquals(17, requestLogAppender.getRetainDays(),
-        "Retain days mismatch");
+  @CommandLine.Parameters(description = "Container IDs" + FORMAT_DESCRIPTION,
+      arity = "1..*",
+      paramLabel = "<container ID>")
+  public void setContainerIDs(List<String> arguments) {
+    setItems(arguments);
   }
 }

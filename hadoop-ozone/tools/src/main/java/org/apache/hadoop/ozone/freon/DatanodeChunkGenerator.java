@@ -100,10 +100,8 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
   private ByteString dataToWrite;
   private ChecksumData checksumProtobuf;
 
-
   @Override
   public Void call() throws Exception {
-
 
     OzoneConfiguration ozoneConf = createOzoneConfiguration();
     if (OzoneSecurityUtil.isSecurityEnabled(ozoneConf)) {
@@ -181,13 +179,12 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     return !(pipelineIds.equals("") && datanodes.equals(""));
   }
 
-
   private void runTest()
       throws IOException {
 
     timer = getMetrics().timer("chunk-write");
 
-    byte[] data = RandomStringUtils.randomAscii(chunkSize)
+    byte[] data = RandomStringUtils.secure().nextAscii(chunkSize)
         .getBytes(StandardCharsets.UTF_8);
 
     dataToWrite = ByteString.copyFrom(data);

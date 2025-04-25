@@ -99,9 +99,9 @@ public class TestDBStoreBuilder {
 
     try (Table<byte[], byte[]> firstTable = dbStore.getTable("FIRST")) {
       byte[] key =
-          RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
       byte[] value =
-          RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
       firstTable.put(key, value);
       byte[] temp = firstTable.get(key);
       assertArrayEquals(value, temp);
@@ -121,9 +121,9 @@ public class TestDBStoreBuilder {
         .build()) {
       try (Table<byte[], byte[]> firstTable = dbStore.getTable("First")) {
         byte[] key =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
         byte[] value =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
         byte[] temp = firstTable.get(key);
         assertArrayEquals(value, temp);
@@ -148,9 +148,9 @@ public class TestDBStoreBuilder {
         .build()) {
       try (Table<byte[], byte[]> firstTable = dbStore.getTable("First")) {
         byte[] key =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
         byte[] value =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
         byte[] temp = firstTable.get(key);
         assertArrayEquals(value, temp);
