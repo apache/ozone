@@ -27,6 +27,8 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Class defining Safe mode exit criteria according to number of DataNodes
@@ -36,6 +38,7 @@ public class DataNodeSafeModeRule extends
     SafeModeExitRule<NodeRegistrationContainerReport> {
 
   private static final String NAME = "DataNodeSafeModeRule";
+  private static final Logger LOG = LogManager.getLogger(NAME);
 
   // Min DataNodes required to exit safe mode.
   private int requiredDns;
@@ -66,7 +69,17 @@ public class DataNodeSafeModeRule extends
     if (validateBasedOnReportProcessing()) {
       return registeredDns >= requiredDns;
     }
-    return nodeManager.getNodes(NodeStatus.inServiceHealthy()).size() >= requiredDns;
+
+    int healthyCount = nodeManager.getNodes(NodeStatus.inServiceHealthy()).size();
+    int healthyReadOnlyCount = nodeManager.getNodes(NodeStatus.inServiceHealthyReadOnly()).size();
+    int staleCount = nodeManager.getNodes(NodeStatus.inServiceStale()).size();
+
+    if (healthyCount + healthyReadOnlyCount + staleCount == 1) {
+      LOG.warn("Only one Datanode is available in the cluster. " +
+          "Consider setting 'hdds.scm.safemode.min.datanode=1' in the configuration.");
+    }
+
+    return healthyCount >= requiredDns;
   }
 
   @Override
