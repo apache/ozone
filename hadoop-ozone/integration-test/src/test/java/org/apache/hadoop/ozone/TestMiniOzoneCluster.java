@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -267,7 +266,7 @@ public class TestMiniOzoneCluster {
         + "-" + cluster.getClusterId();
     assertEquals(name, cluster.getName());
 
-    final String baseDir = GenericTestUtils.getTempPath(name);
+    final String baseDir = MiniOzoneCluster.Builder.getTempPath(name);
     assertEquals(baseDir, cluster.getBaseDir());
 
 

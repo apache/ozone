@@ -66,47 +66,15 @@ import org.slf4j.LoggerFactory;
  * During DN startup, if the VERSION file exists, we verify that the
  * clusterID in the version file matches the clusterID from SCM.
  */
-public abstract class StorageVolume
-    implements Checkable<Boolean, VolumeCheckResult> {
+public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckResult> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(StorageVolume.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StorageVolume.class);
 
   // The name of the directory used for temporary files on the volume.
   public static final String TMP_DIR_NAME = "tmp";
   // The name of the directory where temporary files used to check disk
   // health are written to. This will go inside the tmp directory.
   public static final String TMP_DISK_CHECK_DIR_NAME = "disk-check";
-
-  /**
-   * Type for StorageVolume.
-   */
-  public enum VolumeType {
-    DATA_VOLUME,
-    META_VOLUME,
-    DB_VOLUME,
-  }
-
-  /**
-   * VolumeState represents the different states a StorageVolume can be in.
-   * NORMAL          =&gt; Volume can be used for storage
-   * FAILED          =&gt; Volume has failed due and can no longer be used for
-   *                    storing containers.
-   * NON_EXISTENT    =&gt; Volume Root dir does not exist
-   * INCONSISTENT    =&gt; Volume Root dir is not empty but VERSION file is
-   *                    missing or Volume Root dir is not a directory
-   * NOT_FORMATTED   =&gt; Volume Root exists but not formatted(no VERSION file)
-   * NOT_INITIALIZED =&gt; VERSION file exists but has not been verified for
-   *                    correctness.
-   */
-  public enum VolumeState {
-    NORMAL,
-    FAILED,
-    NON_EXISTENT,
-    INCONSISTENT,
-    NOT_FORMATTED,
-    NOT_INITIALIZED
-  }
 
   private volatile VolumeState state;
 
@@ -143,6 +111,36 @@ public abstract class StorageVolume
   private AtomicInteger currentIOFailureCount;
   private Queue<Boolean> ioTestSlidingWindow;
   private int healthCheckFileSize;
+
+  /**
+   * Type for StorageVolume.
+   */
+  public enum VolumeType {
+    DATA_VOLUME,
+    META_VOLUME,
+    DB_VOLUME,
+  }
+
+  /**
+   * VolumeState represents the different states a StorageVolume can be in.
+   * NORMAL          =&gt; Volume can be used for storage
+   * FAILED          =&gt; Volume has failed due and can no longer be used for
+   *                    storing containers.
+   * NON_EXISTENT    =&gt; Volume Root dir does not exist
+   * INCONSISTENT    =&gt; Volume Root dir is not empty but VERSION file is
+   *                    missing or Volume Root dir is not a directory
+   * NOT_FORMATTED   =&gt; Volume Root exists but not formatted(no VERSION file)
+   * NOT_INITIALIZED =&gt; VERSION file exists but has not been verified for
+   *                    correctness.
+   */
+  public enum VolumeState {
+    NORMAL,
+    FAILED,
+    NON_EXISTENT,
+    INCONSISTENT,
+    NOT_FORMATTED,
+    NOT_INITIALIZED
+  }
 
   protected StorageVolume(Builder<?> b) throws IOException {
     storageType = b.storageType;
@@ -693,7 +691,7 @@ public abstract class StorageVolume
     // Once the volume is failed, it will not be checked anymore.
     // The failure counts can be left as is.
     if (currentIOFailureCount.get() > ioFailureTolerance) {
-      LOG.info("Failed IO test for volume {}: the last {} runs " +
+      LOG.error("Failed IO test for volume {}: the last {} runs " +
               "encountered {} out of {} tolerated failures.", this,
           ioTestSlidingWindow.size(), currentIOFailureCount,
           ioFailureTolerance);

@@ -447,6 +447,4 @@ public class TestContainerReplicaPendingOps {
     // subscriber
     verifyNoMoreInteractions(subscriber1);
   }
-
-
 }

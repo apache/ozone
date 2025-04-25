@@ -39,6 +39,7 @@ import java.util.Map;
  * | bigdata-ozone-online31          |  om31   |  LEADER  |
  * +---------------------------------+---------+----------+
  */
+@SuppressWarnings(value = "PMD.AvoidStringBufferField")
 public final class FormattingCLIUtils {
   /** Table title. */
   private String title;
@@ -214,6 +215,7 @@ public final class FormattingCLIUtils {
   private static class TableRow {
     private TableRowType tableRowType;
     private List<String> data;
+
     TableRow(TableRowType tableRowType, List<String> data) {
       this.tableRowType = tableRowType;
       this.data = data;

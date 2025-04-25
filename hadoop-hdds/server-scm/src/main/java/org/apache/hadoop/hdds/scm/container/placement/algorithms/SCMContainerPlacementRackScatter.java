@@ -473,7 +473,7 @@ public final class SCMContainerPlacementRackScatter
       if (maxRetry == 0) {
         // avoid the infinite loop
         LOG.info("No satisfied datanode to meet the constraints. "
-            + "Metadatadata size required: {} Data size required: {}, scope "
+            + "Metadata size required: {} Data size required: {}, scope "
             + "{}, excluded nodes {}",
             metadataSizeRequired, dataSizeRequired, scope, excludedNodes);
         return null;

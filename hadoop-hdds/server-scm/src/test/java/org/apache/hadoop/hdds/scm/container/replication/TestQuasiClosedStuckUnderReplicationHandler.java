@@ -70,7 +70,6 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private QuasiClosedStuckUnderReplicationHandler handler;
 
-
   @BeforeEach
   void setup(@TempDir File testDir) throws NodeNotFoundException,
       CommandTargetOverloadedException, NotLeaderException {

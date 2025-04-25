@@ -195,7 +195,7 @@ class TestOMBucketLayoutUpgrade {
    */
   private String createBucketWithLayout(BucketLayout bucketLayout)
       throws Exception {
-    String bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    String bucketName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
     omClient.createBucket(
         new OmBucketInfo.Builder()
             .setVolumeName(VOLUME_NAME)

@@ -214,6 +214,7 @@ public final class HttpServer2 implements FilterContainer {
   private static final String X_FRAME_OPTIONS = "X-FRAME-OPTIONS";
   private static final Pattern PATTERN_HTTP_HEADER_REGEX =
       Pattern.compile(HTTP_HEADER_REGEX);
+
   /**
    * Class to construct instances of HTTP server with specific options.
    */
@@ -1509,7 +1510,6 @@ public final class HttpServer2 implements FilterContainer {
     return adminsAcl != null && adminsAcl.isUserAllowed(remoteUserUGI);
   }
 
-
   /**
    * A very simple servlet to serve up a text representation of the current
    * stack traces. It both returns the stacks to the caller and logs them.
@@ -1703,11 +1703,11 @@ public final class HttpServer2 implements FilterContainer {
   public enum XFrameOption {
     DENY("DENY"), SAMEORIGIN("SAMEORIGIN"), ALLOWFROM("ALLOW-FROM");
 
+    private final String name;
+
     XFrameOption(String name) {
       this.name = name;
     }
-
-    private final String name;
 
     @Override
     public String toString() {

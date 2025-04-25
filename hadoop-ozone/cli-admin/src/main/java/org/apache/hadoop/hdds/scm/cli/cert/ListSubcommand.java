@@ -131,7 +131,7 @@ public class ListSubcommand extends ScmCertSubcommand {
     private String validFrom;
     private String expiry;
     private Map<String, String> subjectDN = new LinkedHashMap<>();
-    private Map<String, String> issuerDN = new LinkedHashMap<>();;
+    private Map<String, String> issuerDN = new LinkedHashMap<>();
 
     Certificate(X509Certificate cert) {
       serialNumber = cert.getSerialNumber();

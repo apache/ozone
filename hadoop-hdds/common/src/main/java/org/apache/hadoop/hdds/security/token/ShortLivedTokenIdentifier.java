@@ -74,7 +74,6 @@ public abstract class ShortLivedTokenIdentifier extends TokenIdentifier {
     return expiry;
   }
 
-
   public String getOwnerId() {
     return ownerId;
   }

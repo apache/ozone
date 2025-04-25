@@ -231,7 +231,6 @@ public final class HddsClientUtils {
         .getMaxOutstandingRequests();
   }
 
-
   // This will return the underlying exception after unwrapping
   // the exception to see if it matches with expected exception
   // list otherwise will return the exception back.

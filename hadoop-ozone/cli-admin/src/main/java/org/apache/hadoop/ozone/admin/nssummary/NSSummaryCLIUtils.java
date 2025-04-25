@@ -43,14 +43,14 @@ public final class NSSummaryCLIUtils {
 
   private static final String OFS_PREFIX = "ofs://";
 
-  public static String makeHttpCall(StringBuffer url, String path,
+  public static String makeHttpCall(StringBuilder url, String path,
                                     boolean isSpnegoEnabled,
                                     ConfigurationSource conf)
       throws Exception {
     return makeHttpCall(url, path, false, false, isSpnegoEnabled, conf);
   }
 
-  public static String makeHttpCall(StringBuffer url, String path,
+  public static String makeHttpCall(StringBuilder url, String path,
                                     boolean listFile, boolean withReplica,
                                     boolean isSpnegoEnabled,
                                     ConfigurationSource conf)

@@ -244,7 +244,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
       boolean flg = parentFile.mkdirs();
       if (!flg) {
         throw new IOException("An exception occurred while creating " +
-            "the directory. Directorys: " + parentFile.getAbsolutePath());
+            "the directory. Directory: " + parentFile.getAbsolutePath());
       }
     }
 
@@ -666,7 +666,6 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
       return WRITER;
     }
   }
-
 
   private class Task implements Callable<Void> {
 

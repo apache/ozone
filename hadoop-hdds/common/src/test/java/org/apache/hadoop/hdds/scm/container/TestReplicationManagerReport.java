@@ -71,7 +71,6 @@ class TestReplicationManagerReport {
         report.getStat(HddsProtos.LifeCycleState.QUASI_CLOSED));
   }
 
-
   @Test
   void testJsonOutput() throws IOException {
     report.increment(HddsProtos.LifeCycleState.OPEN);

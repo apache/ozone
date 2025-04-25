@@ -70,7 +70,6 @@ class DatanodeSimulationState {
   private Map<Long, ContainerReplicaProto.State> containers =
       new HashMap<>();
 
-
   // indicate if this node is in read-only mode, no pipeline should be created.
   private volatile boolean readOnly = false;
 
@@ -152,7 +151,7 @@ class DatanodeSimulationState {
       // to avoid peaks.
       if (state.nextFullContainerReport == Instant.MIN) {
         state.nextFullContainerReport = Instant.now().plusMillis(
-            RandomUtils.nextLong(1, fullContainerReportDurationMs));
+            RandomUtils.secure().randomLong(1, fullContainerReportDurationMs));
       } else {
         state.nextFullContainerReport = Instant.now()
             .plusMillis(fullContainerReportDurationMs);

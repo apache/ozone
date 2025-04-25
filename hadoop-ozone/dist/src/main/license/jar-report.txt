@@ -32,7 +32,6 @@ share/ozone/lib/commons-digester.jar
 share/ozone/lib/commons-io.jar
 share/ozone/lib/commons-lang3.jar
 share/ozone/lib/commons-lang.jar
-share/ozone/lib/commons-logging.jar
 share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
@@ -122,6 +121,7 @@ share/ozone/lib/javax.interceptor-api.jar
 share/ozone/lib/javax.servlet-api.jar
 share/ozone/lib/jaxb-runtime.jar
 share/ozone/lib/jcip-annotations.jar
+share/ozone/lib/jcl-over-slf4j.jar
 share/ozone/lib/jersey-cdi1x.jar
 share/ozone/lib/jersey-client.jar
 share/ozone/lib/jersey-client.jar

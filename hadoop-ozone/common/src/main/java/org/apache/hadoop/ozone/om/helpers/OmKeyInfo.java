@@ -805,7 +805,6 @@ public final class OmKeyInfo extends WithParentObjectId
         '}';
   }
 
-
   public boolean isKeyInfoSame(OmKeyInfo omKeyInfo, boolean checkPath,
                                boolean checkKeyLocationVersions,
                                boolean checkModificationTime,

@@ -70,6 +70,7 @@ public interface IAccessAuthorizer {
             + " > 16, check the commit of this change and update the code.");
       }
     }
+
     private static ACLType[] vals = ACLType.values();
 
     public static int getNoOfAcls() {
@@ -177,6 +178,7 @@ public interface IAccessAuthorizer {
     public String toString() {
       return value;
     }
+
     /**
      * String value for this Enum.
      */
