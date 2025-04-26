@@ -296,7 +296,7 @@ public class BucketEndpoint extends EndpointBase {
 
   private int validateMaxKeys(int maxKeys) throws OS3Exception {
     if (maxKeys <= 0) {
-      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, "maxKeys must be > 0");
+      throw newError(S3ErrorTable.INVALID_ARGUMENT, "maxKeys must be > 0");
     }
 
     return Math.min(maxKeys, 1000);
