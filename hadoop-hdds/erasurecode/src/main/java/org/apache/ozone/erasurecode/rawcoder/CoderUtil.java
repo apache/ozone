@@ -26,11 +26,11 @@ import org.apache.ozone.erasurecode.ECChunk;
  */
 public final class CoderUtil {
 
-  private CoderUtil() {
-    // No called
-  }
-
   private static byte[] emptyChunk = new byte[4096];
+
+  private CoderUtil() {
+    // Not called
+  }
 
   /**
    * Make sure to return an empty chunk buffer for the desired length.
