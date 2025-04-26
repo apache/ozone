@@ -308,7 +308,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
         maxValueRecorder.put(name, maxValue);
         valueRecorder.put(name, curValue);
         instantsRecorder.put(name, now);
-        sb.append(" ")
+        sb.append(' ')
             .append(name)
             .append(": rate ")
             .append(rate)

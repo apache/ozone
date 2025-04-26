@@ -99,7 +99,7 @@ public class XException extends Exception {
     if (template == null) {
       StringBuilder sb = new StringBuilder();
       for (int i = 0; i < args.length; i++) {
-        sb.append(" {").append(i).append("}");
+        sb.append(" {").append(i).append('}');
       }
       template = sb.deleteCharAt(0).toString();
     }

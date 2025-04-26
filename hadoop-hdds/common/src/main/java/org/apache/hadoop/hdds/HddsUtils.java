@@ -845,7 +845,7 @@ public final class HddsUtils {
     if (elements != null && elements.length > startIndex) {
       final StringBuilder sb = new StringBuilder();
       for (int line = startIndex; line < elements.length; line++) {
-        sb.append(elements[line]).append("\n");
+        sb.append(elements[line]).append('\n');
       }
       return sb.toString();
     }

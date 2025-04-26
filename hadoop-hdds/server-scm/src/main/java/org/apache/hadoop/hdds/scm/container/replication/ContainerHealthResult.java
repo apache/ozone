@@ -294,7 +294,7 @@ public class ContainerHealthResult {
       if (requeueCount > 0) {
         sb.append(" requeued:").append(requeueCount);
       }
-      return sb.append("}").toString();
+      return sb.append('}').toString();
     }
   }
 
