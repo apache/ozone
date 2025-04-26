@@ -66,6 +66,7 @@ public final class S3Acl {
     public String getValue() {
       return value;
     }
+
     /**
      * String value for this Enum.
      */
@@ -77,7 +78,6 @@ public final class S3Acl {
     ACLType(String val) {
       value = val;
     }
-
 
     public static ACLType getType(String typeStr) {
       for (ACLType type: ACLType.values()) {

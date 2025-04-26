@@ -156,7 +156,6 @@ public class ListPartsResponse {
     @XmlElement(name = OzoneConsts.ETAG)
     private String eTag;
 
-
     @XmlElement(name = "Size")
     private long size;
 

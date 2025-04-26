@@ -49,6 +49,7 @@ public class TestOzoneLockProvider {
         new Object[]{false, true},
         new Object[]{false, false});
   }
+
   private boolean keyPathLockEnabled;
   private boolean enableFileSystemPaths;
 

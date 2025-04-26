@@ -174,7 +174,6 @@ public class ReconUtils {
     Archiver.extract(tarFile, destPath);
   }
 
-
   /**
    * Constructs the full path of a key from its OmKeyInfo using a bottom-up approach, starting from the leaf node.
    *
@@ -225,7 +224,6 @@ public class ReconUtils {
     fullPath.append(keyName);
     return fullPath.toString();
   }
-
 
   /**
    * Constructs the prefix path to a key from its key name and parent ID using a bottom-up approach, starting from the
@@ -570,7 +568,6 @@ public class ReconUtils {
     int binIndex = getContainerSizeBinIndex(containerSize);
     return (long) Math.pow(2, (29 + binIndex));
   }
-
 
   public static int getFileSizeBinIndex(long fileSize) {
     Preconditions.checkArgument(fileSize >= 0,

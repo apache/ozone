@@ -266,7 +266,6 @@ public class TestOzoneManagerHASnapshot {
         .isSnapshotChainCorrupted());
   }
 
-
   private void createFileKey(OzoneBucket bucket, String keyName)
       throws IOException {
     byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);

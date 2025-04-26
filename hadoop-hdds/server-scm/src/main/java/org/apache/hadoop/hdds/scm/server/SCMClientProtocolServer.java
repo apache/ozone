@@ -1543,7 +1543,6 @@ public class SCMClientProtocolServer implements
     return scm.getScmContext().isInSafeMode();
   }
 
-
   /**
    * Query the System for Nodes.
    *

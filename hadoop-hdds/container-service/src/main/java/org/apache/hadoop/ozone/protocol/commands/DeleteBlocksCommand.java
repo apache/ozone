@@ -30,7 +30,6 @@ public class DeleteBlocksCommand extends
 
   private List<DeletedBlocksTransaction> blocksTobeDeleted;
 
-
   public DeleteBlocksCommand(List<DeletedBlocksTransaction> blocks) {
     super();
     this.blocksTobeDeleted = blocks;

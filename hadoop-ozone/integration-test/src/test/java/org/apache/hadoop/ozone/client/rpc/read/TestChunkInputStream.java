@@ -57,7 +57,6 @@ class TestChunkInputStream extends TestInputStreamBase {
     }
   }
 
-
   /**
    * Test to verify that data read from chunks is stored in a list of buffers
    * with max capacity equal to the bytes per checksum.

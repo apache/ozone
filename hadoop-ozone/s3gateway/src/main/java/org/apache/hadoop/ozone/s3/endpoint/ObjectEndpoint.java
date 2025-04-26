@@ -1490,7 +1490,6 @@ public class ObjectEndpoint extends EndpointBase {
     return Response.noContent().build();
   }
 
-
   @VisibleForTesting
   public void setOzoneConfiguration(OzoneConfiguration config) {
     this.ozoneConfiguration = config;

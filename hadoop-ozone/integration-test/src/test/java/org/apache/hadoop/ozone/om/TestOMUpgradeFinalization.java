@@ -60,10 +60,12 @@ class TestOMUpgradeFinalization {
   public void setup() throws Exception {
     AuditLogTestUtils.truncateAuditLogFile();
   }
+
   @AfterAll
   public static void shutdown() {
     AuditLogTestUtils.deleteAuditLogFile();
   }
+
   @Test
   void testOMUpgradeFinalizationWithOneOMDown() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();

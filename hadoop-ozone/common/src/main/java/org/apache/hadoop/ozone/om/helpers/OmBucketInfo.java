@@ -215,7 +215,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     return modificationTime;
   }
 
-
   /**
    * Returns bucket encryption key info.
    * @return bucket encryption key info
@@ -249,7 +248,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   public String getSourceBucket() {
     return sourceBucket;
   }
-
 
   public long getUsedBytes() {
     return usedBytes;
@@ -587,7 +585,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
     return bib.build();
   }
-
 
   /**
    * Parses BucketInfo protobuf and creates OmBucketInfo.

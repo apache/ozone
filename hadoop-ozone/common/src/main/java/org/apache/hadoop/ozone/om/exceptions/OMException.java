@@ -98,6 +98,7 @@ public class OMException extends IOException {
   public String toString() {
     return result + " " + super.toString();
   }
+
   /**
    * Error codes to make it easy to decode these exceptions.
    */

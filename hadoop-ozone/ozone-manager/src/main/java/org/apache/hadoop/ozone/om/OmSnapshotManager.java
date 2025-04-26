@@ -705,7 +705,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     return true;
   }
 
-
   /**
    * Returns OmSnapshot object and skips active check.
    * This should only be used for API calls initiated by background service e.g. purgeKeys, purgeSnapshot,

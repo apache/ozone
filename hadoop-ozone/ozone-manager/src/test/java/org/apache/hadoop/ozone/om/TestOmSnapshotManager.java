@@ -387,7 +387,6 @@ class TestOmSnapshotManager {
         getINode(f1FileLink.toPath()), "link matches original file");
   }
 
-
   @Test
   public void testGetSnapshotInfo() throws IOException {
     SnapshotInfo s1 = createSnapshotInfo("vol", "buck");
@@ -412,6 +411,7 @@ class TestOmSnapshotManager {
         omMetadataManager, SNAPSHOT_INFO_TABLE, snapshotInfoTable);
     when(snapshotInfoTable.get(s1.getTableKey())).thenReturn(s1);
   }
+
   /*
    * Test that exclude list is generated correctly.
    */

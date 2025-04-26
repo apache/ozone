@@ -109,7 +109,6 @@ public class TestKeyValueContainerIntegrityChecks {
     return conf;
   }
 
-
   /**
    * Creates a container with normal and deleted blocks.
    * First it will insert normal blocks, and then it will insert
