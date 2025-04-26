@@ -334,15 +334,15 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   @Override
   public String toString() {
     StringBuilder buffer = new StringBuilder()
-        .append("numBlockDeletionTransactionCreated = ").append(numBlockDeletionTransactionCreated.value()).append("\t")
+        .append("numBlockDeletionTransactionCreated = ").append(numBlockDeletionTransactionCreated.value()).append('\t')
         .append("numBlockDeletionTransactionCompleted = ")
-        .append(numBlockDeletionTransactionCompleted.value()).append("\t")
-        .append("numBlockDeletionCommandSent = ").append(numBlockDeletionCommandSent.value()).append("\t")
-        .append("numBlockDeletionCommandSuccess = ").append(numBlockDeletionCommandSuccess.value()).append("\t")
-        .append("numBlockDeletionCommandFailure = ").append(numBlockDeletionCommandFailure.value()).append("\t")
-        .append("numBlockDeletionTransactionSent = ").append(numBlockDeletionTransactionSent.value()).append("\t")
-        .append("numBlockDeletionTransactionSuccess = ").append(numBlockDeletionTransactionSuccess.value()).append("\t")
-        .append("numBlockDeletionTransactionFailure = ").append(numBlockDeletionTransactionFailure.value()).append("\t")
+        .append(numBlockDeletionTransactionCompleted.value()).append('\t')
+        .append("numBlockDeletionCommandSent = ").append(numBlockDeletionCommandSent.value()).append('\t')
+        .append("numBlockDeletionCommandSuccess = ").append(numBlockDeletionCommandSuccess.value()).append('\t')
+        .append("numBlockDeletionCommandFailure = ").append(numBlockDeletionCommandFailure.value()).append('\t')
+        .append("numBlockDeletionTransactionSent = ").append(numBlockDeletionTransactionSent.value()).append('\t')
+        .append("numBlockDeletionTransactionSuccess = ").append(numBlockDeletionTransactionSuccess.value()).append('\t')
+        .append("numBlockDeletionTransactionFailure = ").append(numBlockDeletionTransactionFailure.value()).append('\t')
         .append("numDeletionCommandsPerDatanode = ").append(numCommandsDatanode);
     return buffer.toString();
   }

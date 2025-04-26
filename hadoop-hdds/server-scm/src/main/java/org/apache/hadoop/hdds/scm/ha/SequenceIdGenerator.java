@@ -76,13 +76,6 @@ public class SequenceIdGenerator {
 
   private static final long INVALID_SEQUENCE_ID = 0;
 
-  static class Batch {
-    // The upper bound of the batch.
-    private long lastId = INVALID_SEQUENCE_ID;
-    // The next id to be allocated in this batch.
-    private long nextId = lastId + 1;
-  }
-
   private final Map<String, Batch> sequenceIdToBatchMap;
 
   private final Lock lock;
@@ -432,5 +425,12 @@ public class SequenceIdGenerator {
     if (sequenceIdTable.get(ROOT_CERTIFICATE_ID) != null) {
       sequenceIdTable.delete(ROOT_CERTIFICATE_ID);
     }
+  }
+
+  static class Batch {
+    // The upper bound of the batch.
+    private long lastId = INVALID_SEQUENCE_ID;
+    // The next id to be allocated in this batch.
+    private long nextId = lastId + 1;
   }
 }
