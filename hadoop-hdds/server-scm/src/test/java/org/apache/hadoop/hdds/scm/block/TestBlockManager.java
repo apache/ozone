@@ -575,7 +575,7 @@ public class TestBlockManager {
   public void testBlockAllocationWithNoAvailablePipelines()
       throws IOException {
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
-      pipelineManager.closePipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline.getId());
     }
     assertEquals(0, pipelineManager.getPipelines(replicationConfig).size());
     assertNotNull(blockManager
