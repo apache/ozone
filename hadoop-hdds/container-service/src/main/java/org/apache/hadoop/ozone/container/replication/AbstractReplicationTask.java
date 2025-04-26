@@ -144,7 +144,7 @@ public abstract class AbstractReplicationTask {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder()
-        .append(getStatus()).append(" ")
+        .append(getStatus()).append(' ')
         .append(getCommandForDebug());
     if (getStatus() == Status.QUEUED) {
       sb.append(", queued at ").append(getQueued());

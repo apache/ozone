@@ -379,7 +379,7 @@ public class SCMClientProtocolServer implements
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
         strContainerIDs.append(ContainerID.valueOf(containerID).toString());
-        strContainerIDs.append(",");
+        strContainerIDs.append(',');
       } catch (IOException ex) {
         AUDIT.logReadFailure(buildAuditMessageForFailure(
             SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,

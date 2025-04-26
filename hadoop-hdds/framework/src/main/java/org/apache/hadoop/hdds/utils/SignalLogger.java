@@ -94,7 +94,7 @@ public enum SignalLogger {
         log.info("Error installing UNIX signal handler for {}", signal, e);
       }
     }
-    bld.append("]");
+    bld.append(']');
     if (log.isInfoEnabled()) {
       log.info(bld.toString());
     }

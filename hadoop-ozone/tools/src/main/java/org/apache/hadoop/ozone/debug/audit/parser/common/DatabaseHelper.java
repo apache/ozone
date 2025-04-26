@@ -209,9 +209,9 @@ public final class DatabaseHelper {
         while (rs.next()) {
           for (int index = 1; index <= cols; index++) {
             result.append(rs.getObject(index));
-            result.append("\t");
+            result.append('\t');
           }
-          result.append("\n");
+          result.append('\n');
         }
       }
     }
