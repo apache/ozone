@@ -46,11 +46,10 @@ import org.slf4j.LoggerFactory;
  */
 public final class ReplicationManagerUtil {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ReplicationManagerUtil.class);
+
   private ReplicationManagerUtil() {
   }
-
-  private static final Logger LOG = LoggerFactory.getLogger(
-      ReplicationManagerUtil.class);
 
   /**
    * Using the passed placement policy attempt to select a list of datanodes to

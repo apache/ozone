@@ -1132,14 +1132,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + "retried.")
     private long eventTimeout = Duration.ofMinutes(12).toMillis();
 
-    public void setInterval(Duration interval) {
-      this.interval = interval;
-    }
-
-    public void setEventTimeout(Duration timeout) {
-      this.eventTimeout = timeout.toMillis();
-    }
-
     /**
      * When a command has a deadline in SCM, the datanode timeout should be
      * slightly less. This duration is the number of seconds to subtract from
@@ -1157,14 +1149,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + "should have expired.")
     private long datanodeTimeoutOffset = Duration.ofMinutes(6).toMillis();
 
-    public long getDatanodeTimeoutOffset() {
-      return datanodeTimeoutOffset;
-    }
-
-    public void setDatanodeTimeoutOffset(long val) {
-      datanodeTimeoutOffset = val;
-    }
-
     /**
      * The number of container replica which must be available for a node to
      * enter maintenance.
@@ -1180,10 +1164,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             " container below this level, the node will remain in the " +
             " entering maintenance state until a new replica is created.")
     private int maintenanceReplicaMinimum = 2;
-
-    public void setMaintenanceReplicaMinimum(int replicaCount) {
-      this.maintenanceReplicaMinimum = replicaCount;
-    }
 
     /**
      * Defines how many redundant replicas of a container must be online for a
@@ -1235,10 +1215,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int datanodeReplicationLimit = 20;
 
-    public int getDatanodeReplicationLimit() {
-      return datanodeReplicationLimit;
-    }
-
     @Config(key = "datanode.reconstruction.weight",
         type = ConfigType.INT,
         defaultValue = "3",
@@ -1251,10 +1227,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int reconstructionCommandWeight = 3;
 
-    public int getReconstructionCommandWeight() {
-      return reconstructionCommandWeight;
-    }
-
     @Config(key = "datanode.delete.container.limit",
         type = ConfigType.INT,
         defaultValue = "40",
@@ -1266,10 +1238,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             "limiting load"
     )
     private int datanodeDeleteLimit = 40;
-
-    public int getDatanodeDeleteLimit() {
-      return datanodeDeleteLimit;
-    }
 
     @Config(key = "inflight.limit.factor",
         type = ConfigType.DOUBLE,
@@ -1289,12 +1257,32 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private double inflightReplicationLimitFactor = 0.75;
 
+    public long getDatanodeTimeoutOffset() {
+      return datanodeTimeoutOffset;
+    }
+
+    public void setDatanodeTimeoutOffset(long val) {
+      datanodeTimeoutOffset = val;
+    }
+
+    public int getReconstructionCommandWeight() {
+      return reconstructionCommandWeight;
+    }
+
+    public int getDatanodeDeleteLimit() {
+      return datanodeDeleteLimit;
+    }
+
     public double getInflightReplicationLimitFactor() {
       return inflightReplicationLimitFactor;
     }
 
     public void setInflightReplicationLimitFactor(double factor) {
       this.inflightReplicationLimitFactor = factor;
+    }
+
+    public int getDatanodeReplicationLimit() {
+      return datanodeReplicationLimit;
     }
 
     public void setDatanodeReplicationLimit(int limit) {
@@ -1311,6 +1299,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     public Duration getInterval() {
       return interval;
+    }
+
+    public void setInterval(Duration interval) {
+      this.interval = interval;
     }
 
     public Duration getUnderReplicatedInterval() {
@@ -1333,8 +1325,16 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       return eventTimeout;
     }
 
+    public void setEventTimeout(Duration timeout) {
+      this.eventTimeout = timeout.toMillis();
+    }
+
     public int getMaintenanceReplicaMinimum() {
       return maintenanceReplicaMinimum;
+    }
+
+    public void setMaintenanceReplicaMinimum(int replicaCount) {
+      this.maintenanceReplicaMinimum = replicaCount;
     }
 
     public boolean isPush() {
