@@ -46,10 +46,6 @@ import org.apache.hadoop.util.StopWatch;
  */
 public final class RawErasureCoderBenchmark {
 
-  private RawErasureCoderBenchmark() {
-    // prevent instantiation
-  }
-
   // target size of input data buffer
   private static final int TARGET_BUFFER_SIZE_MB = 126;
 
@@ -60,6 +56,10 @@ public final class RawErasureCoderBenchmark {
       Collections.unmodifiableList(
           Arrays.asList(new DummyRawErasureCoderFactory(),
               new RSRawErasureCoderFactory()));
+
+  private RawErasureCoderBenchmark() {
+    // prevent instantiation
+  }
 
   enum CODER {
     DUMMY_CODER("Dummy coder"),
