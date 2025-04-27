@@ -102,6 +102,9 @@ import org.slf4j.event.Level;
  * Tests the Ratis snapshots feature in OM.
  */
 public class TestOMRatisSnapshots {
+  // tried up to 1000 snapshots and this test works, but some of the
+  //  timeouts have to be increased.
+  private static final int SNAPSHOTS_TO_CREATE = 100;
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -188,10 +191,6 @@ public class TestOMRatisSnapshots {
       cluster.shutdown();
     }
   }
-
-  // tried up to 1000 snapshots and this test works, but some of the
-  //  timeouts have to be increased.
-  private static final int SNAPSHOTS_TO_CREATE = 100;
 
   @Test
   public void testInstallSnapshot(@TempDir Path tempDir) throws Exception {

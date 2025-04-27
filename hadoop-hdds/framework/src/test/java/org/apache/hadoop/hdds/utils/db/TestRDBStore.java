@@ -56,6 +56,17 @@ import org.rocksdb.StatsLevel;
  * RDBStore Tests.
  */
 public class TestRDBStore {
+
+  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
+  private final List<String> families =
+      Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+          "First", "Second", "Third",
+          "Fourth", "Fifth",
+          "Sixth");
+  private RDBStore rdbStore = null;
+  private ManagedDBOptions options;
+  private Set<TableConfig> configSet;
+
   static ManagedDBOptions newManagedDBOptions() {
     final ManagedDBOptions options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
@@ -80,16 +91,6 @@ public class TestRDBStore {
         CodecRegistry.newBuilder().build(), false, null, false,
         maxDbUpdatesSizeThreshold, true, null, true);
   }
-
-  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
-  private final List<String> families =
-      Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-          "First", "Second", "Third",
-          "Fourth", "Fifth",
-          "Sixth");
-  private RDBStore rdbStore = null;
-  private ManagedDBOptions options;
-  private Set<TableConfig> configSet;
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
