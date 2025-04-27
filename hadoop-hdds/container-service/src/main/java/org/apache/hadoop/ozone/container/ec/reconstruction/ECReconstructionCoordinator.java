@@ -464,6 +464,7 @@ public class ECReconstructionCoordinator implements Closeable {
     if (ecReconstructWriteExecutor.isInitialized()) {
       ecReconstructWriteExecutor.get().shutdownNow();
     }
+    ecReconstructReadExecutor.shutdownNow();
   }
 
   private Pipeline rebuildInputPipeline(ECReplicationConfig repConfig,
