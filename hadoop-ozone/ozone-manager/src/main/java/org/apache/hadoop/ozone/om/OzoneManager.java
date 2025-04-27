@@ -481,22 +481,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private String omHostName;
 
-  /**
-   * OM Startup mode.
-   */
-  public enum StartupOption {
-    REGUALR,
-    BOOTSTRAP,
-    FORCE_BOOTSTRAP
-  }
-
-  private enum State {
-    INITIALIZED,
-    BOOTSTRAPPING,
-    RUNNING,
-    STOPPED
-  }
-
   // Used in MiniOzoneCluster testing
   private State omState;
   private Thread emptier;
@@ -5156,5 +5140,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OMExecutionFlow getOmExecutionFlow() {
     return omExecutionFlow;
+  }
+
+  /**
+   * OM Startup mode.
+   */
+  public enum StartupOption {
+    REGUALR,
+    BOOTSTRAP,
+    FORCE_BOOTSTRAP
+  }
+
+  private enum State {
+    INITIALIZED,
+    BOOTSTRAPPING,
+    RUNNING,
+    STOPPED
   }
 }

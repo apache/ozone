@@ -58,6 +58,10 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeySetAclRequest.class);
 
+  private String path;
+  private List<OzoneAcl> ozoneAcls;
+  private OzoneObj obj;
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     long modificationTime = Time.now();
@@ -70,10 +74,6 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
         .setUserInfo(getUserInfo())
         .build();
   }
-
-  private String path;
-  private List<OzoneAcl> ozoneAcls;
-  private OzoneObj obj;
 
   public OMKeySetAclRequest(OMRequest omRequest, OzoneManager ozoneManager) {
     super(omRequest);
