@@ -31,18 +31,6 @@ public class OMPerformanceMetrics {
   private static final String SOURCE_NAME =
       OMPerformanceMetrics.class.getSimpleName();
 
-  public static OMPerformanceMetrics register() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-            "OzoneManager Request Performance",
-            new OMPerformanceMetrics());
-  }
-
-  public static void unregister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
-  }
-
   @Metric(about = "Overall lookupKey in nanoseconds")
   private MutableRate lookupLatencyNs;
 
@@ -159,6 +147,18 @@ public class OMPerformanceMetrics {
 
   @Metric(about = "Latency of each iteration of OpenKeyCleanupService in ms")
   private MutableGaugeLong openKeyCleanupServiceLatencyMs;
+
+  public static OMPerformanceMetrics register() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    return ms.register(SOURCE_NAME,
+        "OzoneManager Request Performance",
+        new OMPerformanceMetrics());
+  }
+
+  public static void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(SOURCE_NAME);
+  }
 
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
