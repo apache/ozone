@@ -55,6 +55,14 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeySetTimesRequest.class);
 
+  private final String volumeName;
+
+  private final String bucketName;
+
+  private final String keyName;
+
+  private final long modificationTime;
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     OMRequest request = super.preExecute(ozoneManager);
@@ -80,11 +88,6 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
                 .setMtime(getModificationTime()))
         .build();
   }
-
-  private final String volumeName;
-  private final String bucketName;
-  private final String keyName;
-  private final long modificationTime;
 
   public OMKeySetTimesRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
