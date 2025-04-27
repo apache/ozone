@@ -94,7 +94,7 @@ public class BucketEndpoint extends EndpointBase {
       LoggerFactory.getLogger(BucketEndpoint.class);
 
   private boolean listKeysShallowEnabled;
-  private int maxKeysLimit;
+  private int maxKeysLimit = 1000;
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
