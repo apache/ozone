@@ -33,12 +33,11 @@ import org.slf4j.LoggerFactory;
 public class OzoneDelegationTokenSelector
     extends AbstractDelegationTokenSelector<OzoneTokenIdentifier> {
 
+  private static final Logger LOG = LoggerFactory.getLogger(OzoneDelegationTokenSelector.class);
+
   public OzoneDelegationTokenSelector() {
     super(OzoneTokenIdentifier.KIND_NAME);
   }
-
-  private static final Logger LOG = LoggerFactory
-      .getLogger(OzoneDelegationTokenSelector.class);
 
   @Override
   public Token<OzoneTokenIdentifier> selectToken(Text service,

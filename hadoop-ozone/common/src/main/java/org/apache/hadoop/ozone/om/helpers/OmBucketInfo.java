@@ -48,10 +48,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       OmBucketInfo::getProtobuf,
       OmBucketInfo.class);
 
-  public static Codec<OmBucketInfo> getCodec() {
-    return CODEC;
-  }
-
   /**
    * Name of the volume in which the bucket belongs to.
    */
@@ -127,6 +123,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.bucketLayout = b.bucketLayout;
     this.owner = b.owner;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
+  }
+
+  public static Codec<OmBucketInfo> getCodec() {
+    return CODEC;
   }
 
   /**
