@@ -260,41 +260,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static final String COMPACTION_LOG_TABLE =
       "compactionLogTable";
 
-  private class TableInitializer {
-    private final boolean addCacheMetrics;
-
-    TableInitializer(boolean addCacheMetrics) {
-      this.addCacheMetrics = addCacheMetrics;
-    }
-
-    <KEY, VALUE> TypedTable<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition)
-        throws IOException {
-      return get(definition.getTable(store));
-    }
-
-    <KEY, VALUE> TypedTable<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition, CacheType cacheType)
-        throws IOException {
-      return get(definition.getTable(store, cacheType));
-    }
-
-    private <KEY, VALUE> TypedTable<KEY, VALUE> get(TypedTable<KEY, VALUE> table) {
-      Objects.requireNonNull(table, "table == null");
-      final String name = table.getName();
-      final Table<?, ?> previousTable = tableMap.put(name, table);
-      if (previousTable != null) {
-        LOG.warn("Overwriting an existing table {}: {}", name, previousTable);
-      }
-
-      if (addCacheMetrics) {
-        final TableCacheMetrics previous = tableCacheMetricsMap.put(name, table.createCacheMetrics());
-        if (previous != null) {
-          previous.unregister();
-        }
-      }
-      return table;
-    }
-  }
-
   private DBStore store;
 
   private final IOzoneManagerLock lock;
@@ -2184,6 +2149,41 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       if (batchOperator instanceof BatchOperation) {
         s3SecretTable.deleteWithBatch((BatchOperation) batchOperator, id);
       }
+    }
+  }
+
+  private class TableInitializer {
+    private final boolean addCacheMetrics;
+
+    TableInitializer(boolean addCacheMetrics) {
+      this.addCacheMetrics = addCacheMetrics;
+    }
+
+    <KEY, VALUE> TypedTable<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition)
+        throws IOException {
+      return get(definition.getTable(store));
+    }
+
+    <KEY, VALUE> TypedTable<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition, CacheType cacheType)
+        throws IOException {
+      return get(definition.getTable(store, cacheType));
+    }
+
+    private <KEY, VALUE> TypedTable<KEY, VALUE> get(TypedTable<KEY, VALUE> table) {
+      Objects.requireNonNull(table, "table == null");
+      final String name = table.getName();
+      final Table<?, ?> previousTable = tableMap.put(name, table);
+      if (previousTable != null) {
+        LOG.warn("Overwriting an existing table {}: {}", name, previousTable);
+      }
+
+      if (addCacheMetrics) {
+        final TableCacheMetrics previous = tableCacheMetricsMap.put(name, table.createCacheMetrics());
+        if (previous != null) {
+          previous.unregister();
+        }
+      }
+      return table;
     }
   }
 }
