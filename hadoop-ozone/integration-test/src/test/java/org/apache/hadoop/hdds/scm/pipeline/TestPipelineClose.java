@@ -167,7 +167,7 @@ public class TestPipelineClose {
     assertEquals(1, setOpen.size());
 
     pipelineManager
-        .closePipeline(ratisContainer.getPipeline(), false);
+        .closePipeline(ratisContainer.getPipeline().getId());
     GenericTestUtils.waitFor(() -> {
       try {
         return containerManager
