@@ -35,13 +35,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 public final class OMHAMetrics implements MetricsSource {
 
   public static final String SOURCE_NAME = OMHAMetrics.class.getSimpleName();
-
   private final OMHAMetricsInfo omhaMetricsInfo = new OMHAMetricsInfo();
-
   private MetricsRegistry metricsRegistry;
 
   private String currNodeId;
-
   private String leaderId;
 
   /**

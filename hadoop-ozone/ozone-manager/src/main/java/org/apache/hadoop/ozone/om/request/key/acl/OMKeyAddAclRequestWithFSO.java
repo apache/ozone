@@ -49,9 +49,7 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
       LoggerFactory.getLogger(OMKeyAddAclRequestWithFSO.class);
 
   private String path;
-
   private List<OzoneAcl> ozoneAcls;
-
   private OzoneObj obj;
 
   @Override

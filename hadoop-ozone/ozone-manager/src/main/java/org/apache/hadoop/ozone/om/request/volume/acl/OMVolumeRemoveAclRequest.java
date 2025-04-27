@@ -51,9 +51,7 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
       (acls, volArgs) -> volArgs.removeAcl(acls.get(0));
 
   private final List<OzoneAcl> ozoneAcls;
-
   private final String volumeName;
-
   private final OzoneObj obj;
 
   @Override

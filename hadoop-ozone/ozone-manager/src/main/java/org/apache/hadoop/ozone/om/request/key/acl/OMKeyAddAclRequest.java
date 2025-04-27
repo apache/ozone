@@ -73,6 +73,7 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
         .setUserInfo(getUserInfo())
         .build();
   }
+
   public OMKeyAddAclRequest(OMRequest omRequest, OzoneManager ozoneManager) {
     super(omRequest);
     OzoneManagerProtocolProtos.AddAclRequest addAclRequest =

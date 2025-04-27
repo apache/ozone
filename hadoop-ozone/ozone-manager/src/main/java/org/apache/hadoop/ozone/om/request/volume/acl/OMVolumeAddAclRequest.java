@@ -51,9 +51,7 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
       (acls, volArgs) -> volArgs.addAcl(acls.get(0));
 
   private final List<OzoneAcl> ozoneAcls;
-
   private final String volumeName;
-
   private final OzoneObj obj;
 
   @Override

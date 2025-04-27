@@ -67,7 +67,6 @@ public final class OMPolicyProvider extends PolicyProvider {
     return SUPPLIER.get();
   }
 
-
   @Override
   public Service[] getServices() {
     return OM_SERVICES.toArray(new Service[0]);

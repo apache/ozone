@@ -58,9 +58,7 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
       LoggerFactory.getLogger(OMKeyRemoveAclRequest.class);
 
   private String path;
-
   private List<OzoneAcl> ozoneAcls;
-
   private OzoneObj obj;
 
   @Override

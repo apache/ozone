@@ -56,11 +56,8 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
       LoggerFactory.getLogger(OMKeySetTimesRequest.class);
 
   private final String volumeName;
-
   private final String bucketName;
-
   private final String keyName;
-
   private final long modificationTime;
 
   @Override
