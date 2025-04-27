@@ -183,7 +183,7 @@ public class TestLeaderChoosePolicy {
 
       int destroyNum = RandomUtils.secure().randomInt(0, pipelines.size());
       for (int k = 0; k <= destroyNum; k++) {
-        pipelineManager.closePipeline(pipelines.get(k), false);
+        pipelineManager.closePipeline(pipelines.get(k).getId());
       }
 
       waitForPipelines(pipelineNum);

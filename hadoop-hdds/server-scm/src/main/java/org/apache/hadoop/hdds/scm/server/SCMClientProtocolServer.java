@@ -882,7 +882,7 @@ public class SCMClientProtocolServer implements
       PipelineManager pipelineManager = scm.getPipelineManager();
       Pipeline pipeline =
           pipelineManager.getPipeline(PipelineID.getFromProtobuf(pipelineID));
-      pipelineManager.closePipeline(pipeline, true);
+      pipelineManager.closePipeline(pipeline.getId());
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.CLOSE_PIPELINE, auditMap));
     } catch (Exception ex) {

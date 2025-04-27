@@ -239,7 +239,7 @@ public class TestContainerCommandsEC {
             Pipeline.PipelineState.OPEN)
         .forEach(p -> {
           try {
-            scm.getPipelineManager().closePipeline(p, false);
+            scm.getPipelineManager().closePipeline(p.getId());
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
@@ -271,7 +271,7 @@ public class TestContainerCommandsEC {
             ANY_USER, ContainerID.valueOf(orphanContainerID));
 
     // Close the container by closing the pipeline
-    scm.getPipelineManager().closePipeline(orphanPipeline, false);
+    scm.getPipelineManager().closePipeline(orphanPipeline.getId());
 
     // Find the datanode hosting Replica index = 2
     HddsDatanodeService dn2Service = null;
