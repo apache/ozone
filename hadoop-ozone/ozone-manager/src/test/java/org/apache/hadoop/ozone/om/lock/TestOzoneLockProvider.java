@@ -43,7 +43,6 @@ public class TestOzoneLockProvider {
   private OzoneLockStrategy ozoneLockStrategy;
 
   private boolean keyPathLockEnabled;
-
   private boolean enableFileSystemPaths;
 
   public static Collection<Object[]> data() {

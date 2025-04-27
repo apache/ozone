@@ -40,9 +40,7 @@ import org.apache.hadoop.util.Time;
 public class ObjectStoreStub extends ObjectStore {
 
   private static OzoneConfiguration conf = new OzoneConfiguration();
-
   private Map<String, OzoneVolumeStub> volumes = new HashMap<>();
-
   private Map<String, Boolean> bucketEmptyStatus = new HashMap<>();
 
   public ObjectStoreStub() {
