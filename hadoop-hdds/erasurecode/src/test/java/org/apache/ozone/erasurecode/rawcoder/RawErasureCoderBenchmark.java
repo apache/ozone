@@ -85,7 +85,7 @@ public final class RawErasureCoderBenchmark {
     StringBuilder sb = new StringBuilder(
         "Available coders with coderIndex:\n");
     for (CODER coder : CODER.values()) {
-      sb.append(coder.ordinal()).append(":").append(coder).append("\n");
+      sb.append(coder.ordinal()).append(':').append(coder).append('\n');
     }
     System.out.println(sb);
   }

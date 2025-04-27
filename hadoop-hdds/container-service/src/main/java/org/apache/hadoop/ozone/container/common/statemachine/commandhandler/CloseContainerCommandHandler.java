@@ -227,4 +227,9 @@ public class CloseContainerCommandHandler implements CommandHandler {
   public int getThreadPoolActivePoolSize() {
     return executor.getActiveCount();
   }
+
+  @Override
+  public void stop() {
+    executor.shutdownNow();
+  }
 }

@@ -235,7 +235,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder(128)
-        .append("{")
+        .append('{')
         .append(" id=").append(id)
         .append(" dir=").append(storageLocation)
         .append(" type=").append(storageType);
