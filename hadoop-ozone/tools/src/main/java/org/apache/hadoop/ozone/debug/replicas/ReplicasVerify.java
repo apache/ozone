@@ -17,16 +17,32 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import static com.amazonaws.protocol.json.SdkStructuredPlainJsonFactory.JSON_FACTORY;
+
+import com.fasterxml.jackson.core.JsonEncoding;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SequenceWriter;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
-import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -67,21 +83,72 @@ public class ReplicasVerify extends Handler {
   @CommandLine.ArgGroup(exclusive = false, multiplicity = "1")
   private Verification verification;
 
-  private List<ReplicaVerifier> replicaVerifiers;
+  static class Verification {
+    @CommandLine.Option(names = "--checksums",
+        description = "Do client side data checksum validation of all replicas.",
+        // value will be true only if the "--checksums" option was specified on the CLI
+        defaultValue = "false")
+    private boolean doExecuteChecksums;
+
+    @CommandLine.Option(names = "--block-existence",
+        description = "Check for block existence on datanodes.",
+        defaultValue = "false")
+    private boolean doExecuteBlockExistence;
+  }
+
+  @CommandLine.Option(names = "--threads",
+      description = "Number of threads to use for verification",
+      defaultValue = "10")
+  private int threadCount;
+
+  private ExecutorService verificationExecutor;
+  private ExecutorService writerExecutor;
+  private ThreadLocal<List<ReplicaVerifier>> threadLocalVerifiers;
+  private List<CompletableFuture<Void>> allFutures;
+
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+      .configure(SerializationFeature.INDENT_OUTPUT, true);
+  private static final ObjectWriter WRITER = OBJECT_MAPPER.writer();
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
-    replicaVerifiers = new ArrayList<>();
+    allFutures = new ArrayList<>();
+    verificationExecutor = Executors.newFixedThreadPool(threadCount);
+    writerExecutor = Executors.newSingleThreadExecutor();
+    threadLocalVerifiers = ThreadLocal.withInitial(() -> {
+      List<ReplicaVerifier> verifiers = new ArrayList<>();
+      try {
+        if (verification.doExecuteChecksums) {
+          verifiers.add(new ChecksumVerifier(getConf()));
+        }
 
-    if (verification.doExecuteChecksums) {
-      replicaVerifiers.add(new ChecksumVerifier(getConf()));
+        if (verification.doExecuteBlockExistence) {
+          verifiers.add(new BlockExistenceVerifier(getConf()));
+        }
+      } catch (IOException e) {
+        LOG.error("Error initializing verifiers", e);
+        throw new RuntimeException("Error initializing verifiers", e);
+      }
+      return verifiers;
+    });
+
+    try {
+      createOutputDirectory();
+      findCandidateKeys(client, address);
+    } finally {
+      verificationExecutor.shutdown();
+      writerExecutor.shutdown();
+
+      try {
+        // Wait for all tasks to complete
+        verificationExecutor.awaitTermination(1, TimeUnit.DAYS);
+        writerExecutor.awaitTermination(1, TimeUnit.DAYS);
+        threadLocalVerifiers.remove();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        LOG.error("Interrupted while waiting for verification to complete", e);
+      }
     }
-
-    if (verification.doExecuteBlockExistence) {
-      replicaVerifiers.add(new BlockExistenceVerifier(getConf()));
-    }
-
-    findCandidateKeys(client, address);
   }
 
   @Override
@@ -95,132 +162,178 @@ public class ReplicasVerify extends Handler {
     String bucketName = address.getBucketName();
     String keyName = address.getKeyName();
 
-    ObjectNode root = JsonUtils.createObjectNode(null);
-    ArrayNode keysArray = root.putArray("keys");
-
     AtomicBoolean allKeysPassed = new AtomicBoolean(true);
+    File outputFile = new File(outputDir, "replicas-verify-result.json");
 
-    if (!keyName.isEmpty()) {
-      processKey(ozoneClient, volumeName, bucketName, keyName, keysArray, allKeysPassed);
-    } else if (!bucketName.isEmpty()) {
-      OzoneVolume volume = objectStore.getVolume(volumeName);
-      OzoneBucket bucket = volume.getBucket(bucketName);
-      checkBucket(ozoneClient, bucket, keysArray, allKeysPassed);
-    } else if (!volumeName.isEmpty()) {
-      OzoneVolume volume = objectStore.getVolume(volumeName);
-      checkVolume(ozoneClient, volume, keysArray, allKeysPassed);
-    } else {
-      for (Iterator<? extends OzoneVolume> it = objectStore.listVolumes(null); it.hasNext();) {
-        checkVolume(ozoneClient, it.next(), keysArray, allKeysPassed);
+    try (OutputStream outputStream = Files.newOutputStream(outputFile.toPath());
+         JsonGenerator jsonGenerator = JSON_FACTORY.createGenerator(outputStream, JsonEncoding.UTF8)) {
+      // open json
+      jsonGenerator.useDefaultPrettyPrinter();
+      jsonGenerator.writeStartObject();
+      jsonGenerator.writeFieldName("keys");
+      jsonGenerator.writeStartArray();
+      jsonGenerator.flush();
+
+      try (SequenceWriter sequenceWriter = createSequenceWriter(false, jsonGenerator)) {
+        // Process keys based on the provided address
+        if (!keyName.isEmpty()) {
+          processKey(ozoneClient, volumeName, bucketName, keyName, sequenceWriter, allKeysPassed);
+        } else if (!bucketName.isEmpty()) {
+          OzoneVolume volume = objectStore.getVolume(volumeName);
+          OzoneBucket bucket = volume.getBucket(bucketName);
+          checkBucket(ozoneClient, bucket, sequenceWriter, allKeysPassed);
+        } else if (!volumeName.isEmpty()) {
+          OzoneVolume volume = objectStore.getVolume(volumeName);
+          checkVolume(ozoneClient, volume, sequenceWriter, allKeysPassed);
+        } else {
+          for (Iterator<? extends OzoneVolume> it = objectStore.listVolumes(null); it.hasNext();) {
+            checkVolume(ozoneClient, it.next(), sequenceWriter, allKeysPassed);
+          }
+        }
+
+        // Wait for all futures to complete
+        CompletableFuture<Void> allOf = CompletableFuture.allOf(allFutures.toArray(new CompletableFuture[0]));
+        try {
+          allOf.join();
+        } catch (Exception e) {
+          LOG.error("Error during verification", e);
+        }
+      }
+
+      // close json
+      try {
+        jsonGenerator.writeEndArray();
+        jsonGenerator.writeBooleanField("pass", allKeysPassed.get());
+        jsonGenerator.writeEndObject();
+      } catch (Exception e) {
+        LOG.error("Exception in closing the JSON structure", e);
       }
     }
-    root.put("pass", allKeysPassed.get());
-    System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(root));
   }
 
-  void checkVolume(OzoneClient ozoneClient, OzoneVolume volume, ArrayNode keysArray, AtomicBoolean allKeysPassed)
-      throws IOException {
+  void checkVolume(OzoneClient ozoneClient, OzoneVolume volume,
+      SequenceWriter sequenceWriter, AtomicBoolean allKeysPassed) throws IOException {
     for (Iterator<? extends OzoneBucket> it = volume.listBuckets(null); it.hasNext();) {
       OzoneBucket bucket = it.next();
-      checkBucket(ozoneClient, bucket, keysArray, allKeysPassed);
+      checkBucket(ozoneClient, bucket, sequenceWriter, allKeysPassed);
     }
   }
 
-  void checkBucket(OzoneClient ozoneClient, OzoneBucket bucket, ArrayNode keysArray, AtomicBoolean allKeysPassed)
-      throws IOException {
+  void checkBucket(OzoneClient ozoneClient, OzoneBucket bucket,
+      SequenceWriter sequenceWriter, AtomicBoolean allKeysPassed) throws IOException {
     for (Iterator<? extends OzoneKey> it = bucket.listKeys(null); it.hasNext();) {
       OzoneKey key = it.next();
       // TODO: Remove this check once HDDS-12094 is fixed
       if (!key.getName().endsWith("/")) {
-        processKey(ozoneClient, key.getVolumeName(), key.getBucketName(), key.getName(), keysArray, allKeysPassed);
+        processKey(ozoneClient, key.getVolumeName(), key.getBucketName(),
+            key.getName(), sequenceWriter, allKeysPassed);
       }
     }
   }
 
-  void processKey(OzoneClient ozoneClient, String volumeName, String bucketName, String keyName,
-      ArrayNode keysArray, AtomicBoolean allKeysPassed) throws IOException {
-    OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
-        volumeName, bucketName, keyName, false);
+  private void processKey(OzoneClient ozoneClient, String volumeName, String bucketName,
+      String keyName, SequenceWriter sequenceWriter, AtomicBoolean allKeysPassed) {
+    CompletableFuture<Void> future =
+        CompletableFuture.supplyAsync(() ->
+                verifyKey(ozoneClient, volumeName, bucketName, keyName), verificationExecutor)
+            .handleAsync((keyResult, throwable) -> {
+              if (throwable != null) {
+                LOG.error("Error verifying key: {}/{}/{}", volumeName, bucketName, keyName, throwable);
+                return new KeyVerificationResult(volumeName, bucketName, keyName, new ArrayList<>(), false);
+              }
+              return keyResult;
+            }, verificationExecutor)
+            .thenAcceptAsync(keyResult ->
+                writeVerificationResult(sequenceWriter, allKeysPassed, keyResult), writerExecutor);
+    allFutures.add(future);
+  }
 
-    ObjectNode keyNode = JsonUtils.createObjectNode(null);
-    keyNode.put("volumeName", volumeName);
-    keyNode.put("bucketName", bucketName);
-    keyNode.put("name", keyName);
-
-    ArrayNode blocksArray = keyNode.putArray("blocks");
-    boolean keyPass = true;
-
-    for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
-      long containerID = keyLocation.getContainerID();
-      long localID = keyLocation.getLocalID();
-
-      ObjectNode blockNode = blocksArray.addObject();
-      blockNode.put("containerID", containerID);
-      blockNode.put("blockID", localID);
-
-      ArrayNode replicasArray = blockNode.putArray("replicas");
-      boolean blockPass = true;
-
-      for (DatanodeDetails datanode : keyLocation.getPipeline().getNodes()) {
-        ObjectNode replicaNode = replicasArray.addObject();
-
-        ObjectNode datanodeNode = replicaNode.putObject("datanode");
-        datanodeNode.put("uuid", datanode.getUuidString());
-        datanodeNode.put("hostname", datanode.getHostName());
-
-        ArrayNode checksArray = replicaNode.putArray("checks");
-        boolean replicaPass = true;
-        int replicaIndex = keyLocation.getPipeline().getReplicaIndex(datanode);
-
-        for (ReplicaVerifier verifier : replicaVerifiers) {
-          BlockVerificationResult result = verifier.verifyBlock(datanode, keyLocation, replicaIndex);
-          ObjectNode checkNode = checksArray.addObject();
-          checkNode.put("type", verifier.getType());
-          checkNode.put("completed", result.isCompleted());
-          checkNode.put("pass", result.passed());
-
-          ArrayNode failuresArray = checkNode.putArray("failures");
-          for (String failure : result.getFailures()) {
-            failuresArray.addObject().put("message", failure);
-          }
-          replicaNode.put("replicaIndex", replicaIndex);
-
-          if (!result.passed()) {
-            replicaPass = false;
-          }
-        }
-
-        if (!replicaPass) {
-          blockPass = false;
-        }
+  private void writeVerificationResult(SequenceWriter sequenceWriter,
+      AtomicBoolean allKeysPassed, KeyVerificationResult keyResult) {
+    try {
+      allKeysPassed.compareAndSet(true, keyResult.isKeyPass());
+      if (!keyResult.isKeyPass() || allResults) {
+        ObjectNode keyNode = OBJECT_MAPPER.convertValue(keyResult, ObjectNode.class);
+        sequenceWriter.write(keyNode);
       }
-
-      if (!blockPass) {
-        keyPass = false;
-      }
-    }
-
-    keyNode.put("pass", keyPass);
-    if (!keyPass) {
-      allKeysPassed.set(false);
-    }
-
-    if (!keyPass || allResults) {
-      keysArray.add(keyNode);
+    } catch (IOException e) {
+      LOG.error("Error writing verification result", e);
+      throw new CompletionException(e);
     }
   }
 
-  static class Verification {
-    @CommandLine.Option(names = "--checksums",
-        description = "Do client side data checksum validation of all replicas.",
-        // value will be true only if the "--checksums" option was specified on the CLI
-        defaultValue = "false")
-    private boolean doExecuteChecksums;
+  private KeyVerificationResult verifyKey(OzoneClient ozoneClient, String volumeName,
+      String bucketName, String keyName) {
+    try {
+      boolean keyPass = true;
+      OmKeyInfo keyInfo =
+          ozoneClient.getProxy().getKeyInfo(volumeName, bucketName, keyName, false);
 
-    @CommandLine.Option(names = "--block-existence",
-        description = "Check for block existence on datanodes.",
-        defaultValue = "false")
-    private boolean doExecuteBlockExistence;
+      List<KeyVerificationResult.BlockVerificationData> blockResults = new ArrayList<>();
+      List<ReplicaVerifier> localVerifiers = threadLocalVerifiers.get();
 
+      for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
+        long containerID = keyLocation.getContainerID();
+        long localID = keyLocation.getLocalID();
+
+        List<KeyVerificationResult.ReplicaVerificationData> replicaResults = new ArrayList<>();
+        boolean blockPass = true;
+
+        for (DatanodeDetails datanode : keyLocation.getPipeline().getNodes()) {
+          List<KeyVerificationResult.CheckData> checkResults = new ArrayList<>();
+          boolean replicaPass = true;
+          int replicaIndex = keyLocation.getPipeline().getReplicaIndex(datanode);
+
+          for (ReplicaVerifier verifier : localVerifiers) {
+            BlockVerificationResult result = verifier.verifyBlock(datanode, keyLocation, replicaIndex);
+            KeyVerificationResult.CheckData checkResult = new KeyVerificationResult.CheckData(verifier.getType(),
+                result.isCompleted(), result.passed(), result.getFailures());
+            checkResults.add(checkResult);
+
+            if (!result.passed()) {
+              replicaPass = false;
+            }
+          }
+
+          KeyVerificationResult.ReplicaVerificationData replicaResult =
+              new KeyVerificationResult.ReplicaVerificationData(datanode, replicaIndex, checkResults, replicaPass);
+          replicaResults.add(replicaResult);
+
+          if (!replicaPass) {
+            blockPass = false;
+          }
+        }
+
+        KeyVerificationResult.BlockVerificationData blockResult =
+            new KeyVerificationResult.BlockVerificationData(containerID, localID, replicaResults, blockPass);
+        blockResults.add(blockResult);
+
+        if (!blockPass) {
+          keyPass = false;
+        }
+      }
+
+      return new KeyVerificationResult(volumeName, bucketName, keyName, blockResults, keyPass);
+    } catch (IOException e) {
+      throw new CompletionException(e);
+    }
+  }
+
+  private SequenceWriter createSequenceWriter(boolean doWrapinArray, JsonGenerator jsonGenerator) throws IOException {
+    SequenceWriter sequenceWriter = WRITER.writeValues(jsonGenerator);
+    sequenceWriter.init(doWrapinArray);
+    return sequenceWriter;
+  }
+
+  private void createOutputDirectory() throws IOException {
+    Path path = Paths.get(outputDir);
+    if (!Files.exists(path)) {
+      try {
+        Files.createDirectories(path);
+        System.out.println("Successfully created directory: " + path.toAbsolutePath());
+      } catch (IOException e) {
+        throw new IOException(String.format("Failed to create directory %s: %s", path, e.getMessage()));
+      }
+    }
   }
 }
