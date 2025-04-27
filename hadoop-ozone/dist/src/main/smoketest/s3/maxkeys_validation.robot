@@ -26,6 +26,15 @@ Suite Setup       Setup s3 tests
 ${ENDPOINT_URL}   http://s3g:9878
 ${BUCKET}         generated
 
+*** Keywords ***
+Prepare Many Objects In Bucket
+    [Arguments]    ${count}=1100
+    Execute    mkdir -p /tmp/manyfiles
+    FOR    ${i}    IN RANGE    ${count}
+        Execute    echo "test-${i}" > /tmp/manyfiles/obj-${i}
+    END
+    Execute    aws s3 cp /tmp/manyfiles s3://${BUCKET}/ --recursive --endpoint-url=${ENDPOINT_URL}
+
 *** Test Cases ***
 
 List objects with negative max-keys should fail
@@ -35,3 +44,15 @@ List objects with negative max-keys should fail
 List objects with zero max-keys should fail
     ${result} =    Execute AWSS3APICli and checkrc    list-objects-v2 --bucket ${BUCKET} --max-keys 0    255
     Should Contain    ${result}    InvalidArgument
+
+List objects with max-keys exceeding config limit should not return more than limit
+    Prepare Many Objects In Bucket    1100
+    ${result}=    Run    aws s3api list-objects-v2 --bucket ${BUCKET} --max-keys 9999 --endpoint-url=${ENDPOINT_URL}
+    ${count}=     Evaluate    len([obj for obj in json.loads('''${result}''').get('Contents', [])])    json
+    Should Be True    ${count} <= 1000
+
+List objects with max-keys less than config limit should return correct count
+    Prepare Many Objects In Bucket    1100
+    ${result}=    Run    aws s3api list-objects-v2 --bucket ${BUCKET} --max-keys 500 --endpoint-url=${ENDPOINT_URL}
+    ${count}=     Evaluate    len([obj for obj in json.loads('''${result}''').get('Contents', [])])    json
+    Should Be True    ${count} == 500
