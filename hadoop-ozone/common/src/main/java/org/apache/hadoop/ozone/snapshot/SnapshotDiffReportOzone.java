@@ -41,19 +41,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
 public class SnapshotDiffReportOzone
     extends org.apache.hadoop.hdfs.protocol.SnapshotDiffReport {
 
+  private static final String LINE_SEPARATOR = System.getProperty("line.separator", "\n");
+
   private static final Codec<DiffReportEntry> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(DiffReportEntryProto.getDefaultInstance()),
       SnapshotDiffReportOzone::fromProtobufDiffReportEntry,
       SnapshotDiffReportOzone::toProtobufDiffReportEntry,
       DiffReportEntry.class,
       DelegatedCodec.CopyType.SHALLOW);
-
-  public static Codec<DiffReportEntry> getDiffReportEntryCodec() {
-    return CODEC;
-  }
-
-  private static final String LINE_SEPARATOR = System.getProperty(
-      "line.separator", "\n");
 
   /**
    * Volume name to which the snapshot bucket belongs.
@@ -80,6 +75,10 @@ public class SnapshotDiffReportOzone
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.token = token;
+  }
+
+  public static Codec<DiffReportEntry> getDiffReportEntryCodec() {
+    return CODEC;
   }
 
   @Override

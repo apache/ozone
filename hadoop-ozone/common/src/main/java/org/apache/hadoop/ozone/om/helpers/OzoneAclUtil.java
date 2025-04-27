@@ -46,11 +46,11 @@ import org.slf4j.LoggerFactory;
 public final class OzoneAclUtil {
   static final Logger LOG = LoggerFactory.getLogger(OzoneAclUtil.class);
 
-  private OzoneAclUtil() {
-  }
-
   private static ACLType[] userRights;
   private static ACLType[] groupRights;
+
+  private OzoneAclUtil() {
+  }
 
   /**
    * Helper function to get default access acl list for current user.
