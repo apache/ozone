@@ -646,7 +646,8 @@ public class ObjectEndpoint extends EndpointBase {
 
     ResponseBuilder response = Response.ok().status(HttpStatus.SC_OK)
         .header("Content-Length", key.getDataSize())
-        .header("Content-Type", "binary/octet-stream");
+        .header("Content-Type", "binary/octet-stream")
+        .header("x-amz-storage-class", "STANDARD");
 
     String eTag = key.getMetadata().get(ETAG);
     if (eTag != null) {

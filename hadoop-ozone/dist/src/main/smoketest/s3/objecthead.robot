@@ -60,3 +60,13 @@ Head non existing key
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/non-existent   255
                         Should contain          ${result}    404
                         Should contain          ${result}    Not Found
+
+
+HeadObject Should Return StorageClass
+                        Execute                            echo "Randomtext" > /tmp/testfile
+    ${put_result} =     Execute AWSS3APICli and checkrc    put-object --bucket ${BUCKET} --key ${PREFIX}/object-exist --body /tmp/testfile    0
+
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/object-exist    0
+                        Should Contain          ${result}    "StorageClass": "STANDARD"
+
+    ${result} =         Execute AWSS3APICli and checkrc    delete-object --bucket ${BUCKET} --key ${PREFIX}/object-exist    0
