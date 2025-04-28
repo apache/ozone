@@ -122,7 +122,7 @@ public class TestDiskBalancer {
       }
     }, 5000, 60000); // poll every 5s, timeout after 60s
 
-    // Wait until the DiskBalancer status becomes STOPPED automatically (after even)
+    // Wait until the Dis-kBalancer status becomes STOPPED automatically (after even)
     GenericTestUtils.waitFor(() -> {
       try {
         List<HddsProtos.DatanodeDiskBalancerInfoProto> statusList =
