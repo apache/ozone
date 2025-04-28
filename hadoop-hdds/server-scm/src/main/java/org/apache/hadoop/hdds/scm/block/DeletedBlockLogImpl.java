@@ -285,12 +285,28 @@ public class DeletedBlockLogImpl
     lock.lock();
     try {
       ArrayList<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
+      long currentBatchSizeBytes = 0;
+      final long maxBatchSizeBytes = 25 * 1024 * 1024; // 25MB
       for (Map.Entry< Long, List< Long > > entry :
           containerBlocksMap.entrySet()) {
         long nextTXID = sequenceIdGen.getNextId(DEL_TXN_ID);
         DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
             entry.getKey(), entry.getValue());
         txsToBeAdded.add(tx);
+        // Rough size estimation: 8 bytes txnId + 8 bytes containerId + (block count * 8 bytes) + 2 bytes(count)
+        long txSize = 8L + 8L + tx.getLocalIDList().size() * 8L + 2L;
+        currentBatchSizeBytes += txSize;
+
+        if (currentBatchSizeBytes >= maxBatchSizeBytes) {
+          deletedBlockLogStateManager.addTransactionsToDB(txsToBeAdded);
+          metrics.incrBlockDeletionTransactionCreated(txsToBeAdded.size());
+          txsToBeAdded.clear();
+          currentBatchSizeBytes = 0;
+        }
+      }
+      if (!txsToBeAdded.isEmpty()) {
+        deletedBlockLogStateManager.addTransactionsToDB(txsToBeAdded);
+        metrics.incrBlockDeletionTransactionCreated(txsToBeAdded.size());
       }
 
       deletedBlockLogStateManager.addTransactionsToDB(txsToBeAdded);
