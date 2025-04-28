@@ -19,12 +19,12 @@ package org.apache.hadoop.hdds.utils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_INITIAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_INITIAL_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_RECON;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_RECON_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_RECON_INITIAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_RECON_INITIAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_INITIAL_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -275,8 +275,8 @@ public final class HddsServerUtil {
    * @return - HB interval in milli seconds.
    */
   public static long getScmInitialHeartbeatInterval(ConfigurationSource conf) {
-    return conf.getTimeDuration(HDDS_HEARTBEAT_INTERVAL_INITIAL,
-        HDDS_HEARTBEAT_INTERVAL_INITIAL_DEFAULT, TimeUnit.MILLISECONDS);
+    return conf.getTimeDuration(HDDS_INITIAL_HEARTBEAT_INTERVAL,
+        HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -287,8 +287,8 @@ public final class HddsServerUtil {
    * @return - HB interval in milli seconds.
    */
   public static long getReconHeartbeatInterval(ConfigurationSource conf) {
-    return conf.getTimeDuration(HDDS_HEARTBEAT_INTERVAL_RECON,
-        HDDS_HEARTBEAT_INTERVAL_RECON_DEFAULT, TimeUnit.MILLISECONDS);
+    return conf.getTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
+        HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -299,8 +299,8 @@ public final class HddsServerUtil {
    * @return - HB interval in milli seconds.
    */
   public static long getInitialReconHeartbeatInterval(ConfigurationSource conf) {
-    return conf.getTimeDuration(HDDS_HEARTBEAT_INTERVAL_RECON_INITIAL,
-        HDDS_HEARTBEAT_INTERVAL_RECON_INITIAL_DEFAULT, TimeUnit.MILLISECONDS);
+    return conf.getTimeDuration(HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL,
+        HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
 
   /**

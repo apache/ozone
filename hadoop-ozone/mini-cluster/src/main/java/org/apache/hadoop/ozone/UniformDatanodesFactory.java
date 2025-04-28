@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_INITIAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_RECON_INITIAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_INITIAL_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -117,8 +117,8 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
       dnConf.setInt(TESTING_DATANODE_VERSION_CURRENT, currentVersion.toProtoValue());
     }
     dnConf.set(HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY, "1s");
-    dnConf.set(HDDS_HEARTBEAT_INTERVAL_INITIAL, "500ms");
-    dnConf.set(HDDS_HEARTBEAT_INTERVAL_RECON_INITIAL, "500ms");
+    dnConf.set(HDDS_INITIAL_HEARTBEAT_INTERVAL, "500ms");
+    dnConf.set(HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL, "500ms");
     return dnConf;
   }
 
