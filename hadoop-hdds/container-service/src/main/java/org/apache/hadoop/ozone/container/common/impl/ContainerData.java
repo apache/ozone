@@ -56,152 +56,6 @@ import org.yaml.snakeyaml.Yaml;
  * represented on disk by the .container file.
  */
 public abstract class ContainerData {
-  /**
-   * Block byte used, block count and pending deletion count.
-   * This class is immutable.
-   */
-  public static class BlockByteAndCounts {
-    private final long bytes;
-    private final long count;
-    private final long pendingDeletion;
-
-    public BlockByteAndCounts(long bytes, long count, long pendingDeletion) {
-      this.bytes = bytes;
-      this.count = count;
-      this.pendingDeletion = pendingDeletion;
-    }
-
-    public long getBytes() {
-      return bytes;
-    }
-
-    public long getCount() {
-      return count;
-    }
-
-    public long getPendingDeletion() {
-      return pendingDeletion;
-    }
-  }
-
-  /**
-   * Read/write/block statistics of a container.
-   * This class is thread-safe -- all methods are synchronized.
-   */
-  public static class Statistics {
-    private long readBytes;
-    private long readCount;
-
-    private long writeBytes;
-    private long writeCount;
-
-    private long blockBytes;
-    private long blockCount;
-    private long blockPendingDeletion;
-
-    public synchronized long getWriteBytes() {
-      return writeBytes;
-    }
-
-    public synchronized long getBlockBytes() {
-      return blockBytes;
-    }
-
-    public synchronized BlockByteAndCounts getBlockByteAndCounts() {
-      return new BlockByteAndCounts(blockBytes, blockCount, blockPendingDeletion);
-    }
-
-    public synchronized long getBlockPendingDeletion() {
-      return blockPendingDeletion;
-    }
-
-    public synchronized void incrementBlockCount() {
-      blockCount++;
-    }
-
-    /** Update for reading a block with the given length. */
-    public synchronized void updateRead(long length) {
-      readCount++;
-      readBytes += length;
-    }
-
-    /** Update for writing a block with the given length. */
-    public synchronized void updateWrite(long length, boolean overwrite) {
-      if (!overwrite) {
-        blockBytes += length;
-      }
-      writeCount++;
-      writeBytes += length;
-    }
-
-    public synchronized void updateDeletion(long deletedBytes, long deletedBlockCount, long processedBlockCount) {
-      blockBytes -= deletedBytes;
-      blockCount -= deletedBlockCount;
-      blockPendingDeletion -= processedBlockCount;
-    }
-
-    public synchronized void updateBlocks(long bytes, long count, long pendingDeletionIncrement) {
-      blockBytes = bytes;
-      blockCount = count;
-      blockPendingDeletion += pendingDeletionIncrement;
-    }
-
-    public synchronized ContainerDataProto.Builder setContainerDataProto(ContainerDataProto.Builder b) {
-      if (blockBytes > 0) {
-        b.setBytesUsed(blockBytes);
-      }
-      return b.setBlockCount(blockCount);
-    }
-
-    public synchronized ContainerReplicaProto.Builder setContainerReplicaProto(ContainerReplicaProto.Builder b) {
-      return b.setReadBytes(readBytes)
-          .setReadCount(readCount)
-          .setWriteBytes(writeBytes)
-          .setWriteCount(writeCount)
-          .setUsed(blockBytes)
-          .setKeyCount(blockCount);
-    }
-
-    public synchronized void addBlockPendingDeletion(long count) {
-      blockPendingDeletion += count;
-    }
-
-    public synchronized void resetBlockPendingDeletion() {
-      blockPendingDeletion = 0;
-    }
-
-    public synchronized void assertRead(long expectedBytes, long expectedCount) {
-      Preconditions.assertSame(expectedBytes, readBytes, "readBytes");
-      Preconditions.assertSame(expectedCount, readCount, "readCount");
-    }
-
-    public synchronized void assertWrite(long expectedBytes, long expectedCount) {
-      Preconditions.assertSame(expectedBytes, writeBytes, "writeBytes");
-      Preconditions.assertSame(expectedCount, writeCount, "writeCount");
-    }
-
-    public synchronized void assertBlock(long expectedBytes, long expectedCount, long expectedPendingDeletion) {
-      Preconditions.assertSame(expectedBytes, blockBytes, "blockBytes");
-      Preconditions.assertSame(expectedCount, blockCount, "blockCount");
-      Preconditions.assertSame(expectedPendingDeletion, blockPendingDeletion, "blockPendingDeletion");
-    }
-
-    public synchronized void setBlockCountForTesting(long count) {
-      blockCount = count;
-    }
-
-    public synchronized void setBlockBytesForTesting(long bytes) {
-      blockBytes = bytes;
-    }
-
-    @Override
-    public synchronized String toString() {
-      return "Statistics{read(" + readBytes + " bytes, #" + readCount + ")"
-          + ", write(" + writeBytes + " bytes, #" + writeCount + ")"
-          + ", block(" + blockBytes + " bytes, #" + blockCount
-          + ", pendingDelete=" + blockPendingDeletion + ")}";
-    }
-  }
 
   //Type of the container.
   // For now, we support only KeyValueContainer.
@@ -699,5 +553,152 @@ public abstract class ContainerData {
         + ", " + (isEmpty ? "empty" : "non-empty")
         + ", ri=" + replicaIndex
         + ", origin=[dn_" + originNodeId + ", pipeline_" + originPipelineId + "])";
+  }
+
+  /**
+   * Block byte used, block count and pending deletion count.
+   * This class is immutable.
+   */
+  public static class BlockByteAndCounts {
+    private final long bytes;
+    private final long count;
+    private final long pendingDeletion;
+
+    public BlockByteAndCounts(long bytes, long count, long pendingDeletion) {
+      this.bytes = bytes;
+      this.count = count;
+      this.pendingDeletion = pendingDeletion;
+    }
+
+    public long getBytes() {
+      return bytes;
+    }
+
+    public long getCount() {
+      return count;
+    }
+
+    public long getPendingDeletion() {
+      return pendingDeletion;
+    }
+  }
+
+  /**
+   * Read/write/block statistics of a container.
+   * This class is thread-safe -- all methods are synchronized.
+   */
+  public static class Statistics {
+    private long readBytes;
+    private long readCount;
+
+    private long writeBytes;
+    private long writeCount;
+
+    private long blockBytes;
+    private long blockCount;
+    private long blockPendingDeletion;
+
+    public synchronized long getWriteBytes() {
+      return writeBytes;
+    }
+
+    public synchronized long getBlockBytes() {
+      return blockBytes;
+    }
+
+    public synchronized BlockByteAndCounts getBlockByteAndCounts() {
+      return new BlockByteAndCounts(blockBytes, blockCount, blockPendingDeletion);
+    }
+
+    public synchronized long getBlockPendingDeletion() {
+      return blockPendingDeletion;
+    }
+
+    public synchronized void incrementBlockCount() {
+      blockCount++;
+    }
+
+    /** Update for reading a block with the given length. */
+    public synchronized void updateRead(long length) {
+      readCount++;
+      readBytes += length;
+    }
+
+    /** Update for writing a block with the given length. */
+    public synchronized void updateWrite(long length, boolean overwrite) {
+      if (!overwrite) {
+        blockBytes += length;
+      }
+      writeCount++;
+      writeBytes += length;
+    }
+
+    public synchronized void updateDeletion(long deletedBytes, long deletedBlockCount, long processedBlockCount) {
+      blockBytes -= deletedBytes;
+      blockCount -= deletedBlockCount;
+      blockPendingDeletion -= processedBlockCount;
+    }
+
+    public synchronized void updateBlocks(long bytes, long count, long pendingDeletionIncrement) {
+      blockBytes = bytes;
+      blockCount = count;
+      blockPendingDeletion += pendingDeletionIncrement;
+    }
+
+    public synchronized ContainerDataProto.Builder setContainerDataProto(ContainerDataProto.Builder b) {
+      if (blockBytes > 0) {
+        b.setBytesUsed(blockBytes);
+      }
+      return b.setBlockCount(blockCount);
+    }
+
+    public synchronized ContainerReplicaProto.Builder setContainerReplicaProto(ContainerReplicaProto.Builder b) {
+      return b.setReadBytes(readBytes)
+          .setReadCount(readCount)
+          .setWriteBytes(writeBytes)
+          .setWriteCount(writeCount)
+          .setUsed(blockBytes)
+          .setKeyCount(blockCount);
+    }
+
+    public synchronized void addBlockPendingDeletion(long count) {
+      blockPendingDeletion += count;
+    }
+
+    public synchronized void resetBlockPendingDeletion() {
+      blockPendingDeletion = 0;
+    }
+
+    public synchronized void assertRead(long expectedBytes, long expectedCount) {
+      Preconditions.assertSame(expectedBytes, readBytes, "readBytes");
+      Preconditions.assertSame(expectedCount, readCount, "readCount");
+    }
+
+    public synchronized void assertWrite(long expectedBytes, long expectedCount) {
+      Preconditions.assertSame(expectedBytes, writeBytes, "writeBytes");
+      Preconditions.assertSame(expectedCount, writeCount, "writeCount");
+    }
+
+    public synchronized void assertBlock(long expectedBytes, long expectedCount, long expectedPendingDeletion) {
+      Preconditions.assertSame(expectedBytes, blockBytes, "blockBytes");
+      Preconditions.assertSame(expectedCount, blockCount, "blockCount");
+      Preconditions.assertSame(expectedPendingDeletion, blockPendingDeletion, "blockPendingDeletion");
+    }
+
+    public synchronized void setBlockCountForTesting(long count) {
+      blockCount = count;
+    }
+
+    public synchronized void setBlockBytesForTesting(long bytes) {
+      blockBytes = bytes;
+    }
+
+    @Override
+    public synchronized String toString() {
+      return "Statistics{read(" + readBytes + " bytes, #" + readCount + ")"
+          + ", write(" + writeBytes + " bytes, #" + writeCount + ")"
+          + ", block(" + blockBytes + " bytes, #" + blockCount
+          + ", pendingDelete=" + blockPendingDeletion + ")}";
+    }
   }
 }
