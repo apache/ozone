@@ -51,6 +51,11 @@ public final class HddsClientUtils {
   static final int MAX_BUCKET_NAME_LENGTH_IN_LOG =
       2 * OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH;
 
+  private static final String VALID_LENGTH_MESSAGE = String.format(
+      "valid length is %d-%d characters",
+      OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH,
+      OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH);
+
   private static final List<Class<? extends Exception>> EXCEPTION_LIST =
       ImmutableList.<Class<? extends Exception>>builder()
           .add(TimeoutException.class)
@@ -74,7 +79,7 @@ public final class HddsClientUtils {
     if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH) {
       throw new IllegalArgumentException(resType +
           " name '" + resName + "' is too short, " +
-          "valid length is 3-63 characters");
+          VALID_LENGTH_MESSAGE);
     }
 
     if (resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
@@ -90,7 +95,7 @@ public final class HddsClientUtils {
 
       throw new IllegalArgumentException(resType +
           " name '" + nameToReport + "' is too long, " +
-          "valid length is 3-63 characters");
+          VALID_LENGTH_MESSAGE);
     }
 
     if (resName.charAt(0) == '.' || resName.charAt(0) == '-') {

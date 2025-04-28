@@ -234,9 +234,9 @@ public class TestHddsClientUtils {
     }
   }
 
-  private void doTestBadResourceNameReported(String name, String reason) {
-    // The message should include the name, resource type, and expected reason
-    // for rejecting the name.
+  private void doTestBadResourceNameLengthReported(String name, String reason) {
+    // The message should include the name, resource type, range for acceptable
+    // length, and expected reason for rejecting the name.
     List<String> resourceTypes = ImmutableList.of("bucket", "volume");
     for (int i = 0; i < 2; i++) {
       String resType = resourceTypes.get(i);
@@ -252,6 +252,10 @@ public class TestHddsClientUtils {
       assertThat(message).doesNotContain(otherResType);
       assertThat(message).contains(name);
       assertThat(message).contains(reason);
+      assertThat(message).contains(
+          Integer.toString(OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH));
+      assertThat(message).contains(
+          Integer.toString(OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH));
     }
   }
 
@@ -260,7 +264,7 @@ public class TestHddsClientUtils {
     final String tooShort = StringUtils.repeat("a",
         OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH - 1);
 
-    doTestBadResourceNameReported(tooShort, "too short");
+    doTestBadResourceNameLengthReported(tooShort, "too short");
   }
 
   @Test
@@ -269,7 +273,7 @@ public class TestHddsClientUtils {
     final String tooLong = StringUtils.repeat("a",
         OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH + 1);
 
-    doTestBadResourceNameReported(tooLong, "too long");
+    doTestBadResourceNameLengthReported(tooLong, "too long");
   }
 
   @Test
