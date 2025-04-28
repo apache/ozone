@@ -20,15 +20,12 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -38,7 +35,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.slf4j.event.Level;
 
 /**
  * Tests pipeline close logs.
@@ -46,21 +42,20 @@ import org.slf4j.event.Level;
 @Timeout(300)
 public class TestPipelineCloseLogsFlood {
   private static final String FLOOD_TOKEN = "pipeline Action CLOSE";
-  private static final String DATANODE_SLOWNESS_TIMEOUT = "hdds.ratis.raft.server.rpc.slowness.timeout";
-  private static final String NO_LEADER_TIMEOUT = "hdds.ratis.raft.server.notification.no-leader.timeout";
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME = "bucket1";
+  private static final String KEY_NAME = "key1";
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;
-  private OzoneConfiguration conf;
 
   @BeforeEach
   public void setUp() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.setTimeDuration(DATANODE_SLOWNESS_TIMEOUT, 10, TimeUnit.SECONDS);
-    conf.setTimeDuration(NO_LEADER_TIMEOUT, 10, TimeUnit.SECONDS);
-
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeRatisServerConfig ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
+    ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(10));
+    ratisServerConfig.setNoLeaderTimeout(Duration.ofMinutes(5));
+    conf.setFromObject(ratisServerConfig);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3);
     cluster = builder.build();
@@ -79,19 +74,16 @@ public class TestPipelineCloseLogsFlood {
   @Test
   public void testPipelineCloseLogFloodDoesntOccur() throws Exception {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(XceiverServerRatis.class);
-    GenericTestUtils.setLogLevel(XceiverServerRatis.class, Level.WARN);
 
     client.getObjectStore().createVolume(VOLUME_NAME);
     client.getObjectStore().getVolume(VOLUME_NAME).createBucket(BUCKET_NAME);
     OzoneBucket ozoneBucket =  client.getObjectStore().getVolume(VOLUME_NAME).getBucket(BUCKET_NAME);
-    ReplicationConfig config = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE);
 
-    try (OutputStream out = ozoneBucket.createKey("key", 1024, config, new HashMap<>())) {
-      out.write(new byte[1024]);
-    }
+    TestDataUtil.createKey(ozoneBucket, KEY_NAME, new byte[1024]);
     // Kill one follower DN so that the pipeline becomes unhealthy
     cluster.shutdownHddsDatanode(1);
-    Thread.sleep(15_000L);
+    // wait for time > follower slowness timeout
+    Thread.sleep(13_000);
     logCapturer.stopCapturing();
     int occurrences = StringUtils.countMatches(logCapturer.getOutput(), FLOOD_TOKEN);
     //Follower slowness will happen for 2 pipelines since we are shutting down one node
