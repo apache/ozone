@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
-
 /**
  * Test OmSnapshot for FSO bucket type when native lib is disabled.
  */
