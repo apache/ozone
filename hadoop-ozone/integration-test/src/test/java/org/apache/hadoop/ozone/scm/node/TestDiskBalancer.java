@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DiskBalancerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -122,7 +122,7 @@ public class TestDiskBalancer {
       }
     }, 5000, 60000); // poll every 5s, timeout after 60s
 
-    // Wait until the Dis-kBalancer status becomes STOPPED automatically (after even)
+    // Wait until the DiskBalancer status becomes STOPPED automatically (after even)
     GenericTestUtils.waitFor(() -> {
       try {
         List<HddsProtos.DatanodeDiskBalancerInfoProto> statusList =
@@ -137,7 +137,7 @@ public class TestDiskBalancer {
     }, 1000, 30000); // poll every 1s, timeout after 30s
   }
 
-@Test
+  @Test
   public void testDatanodeDiskBalancerStatus() throws IOException {
     // TODO: Test status command with datanodes in balancing
   }
