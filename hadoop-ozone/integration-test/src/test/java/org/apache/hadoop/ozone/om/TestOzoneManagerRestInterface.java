@@ -43,13 +43,11 @@ import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * This class is to test the REST interface exposed by OzoneManager.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestOzoneManagerRestInterface implements NonHATests.TestCase {
 
   private MiniOzoneCluster cluster;

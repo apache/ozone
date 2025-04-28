@@ -62,12 +62,10 @@ import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests the containerStateMachine failure handling.
  */
-@Timeout(300)
 public class TestContainerStateMachine {
 
   private MiniOzoneCluster cluster;

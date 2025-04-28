@@ -46,7 +46,6 @@ import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -56,7 +55,6 @@ import org.junit.jupiter.params.provider.MethodSource;
  * in a legacy/OBS bucket layout type.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(1200)
 public abstract class TestListKeys implements NonHATests.TestCase {
 
   private OzoneBucket legacyOzoneBucket;

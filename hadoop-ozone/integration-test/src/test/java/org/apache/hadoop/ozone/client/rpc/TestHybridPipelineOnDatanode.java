@@ -50,12 +50,10 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests Hybrid Pipeline Creation and IO on same set of Datanodes.
  */
-@Timeout(300)
 public class TestHybridPipelineOnDatanode {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;

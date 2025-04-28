@@ -72,13 +72,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 /**
  * Test HSync upgrade.
  */
-@Timeout(value = 300)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestHSyncUpgrade {
   private MiniOzoneCluster cluster;

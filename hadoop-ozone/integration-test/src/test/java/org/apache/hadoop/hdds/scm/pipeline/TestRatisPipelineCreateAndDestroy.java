@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for RatisPipelineUtils.
@@ -75,7 +74,7 @@ public class TestRatisPipelineCreateAndDestroy {
     cluster.shutdown();
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
+  @Test
   public void testAutomaticPipelineCreationOnPipelineDestroy()
       throws Exception {
     int numOfDatanodes = 6;
@@ -96,7 +95,7 @@ public class TestRatisPipelineCreateAndDestroy {
     waitForPipelines(2);
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
+  @Test
   public void testAutomaticPipelineCreationDisablingFactorONE()
       throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
@@ -119,7 +118,7 @@ public class TestRatisPipelineCreateAndDestroy {
     waitForPipelines(2);
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
+  @Test
   public void testPipelineCreationOnNodeRestart() throws Exception {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
         5, TimeUnit.SECONDS);
