@@ -87,12 +87,8 @@ public class TestStorageVolumeChecker {
    */
   private VolumeCheckResult expectedVolumeHealth;
 
-  private ContainerLayoutVersion layoutVersion;
-
-  private void initTest(VolumeCheckResult result,
-      ContainerLayoutVersion layout) {
+  private void initTest(VolumeCheckResult result) {
     this.expectedVolumeHealth = result;
-    this.layoutVersion = layout;
     setup();
   }
 
@@ -127,9 +123,9 @@ public class TestStorageVolumeChecker {
   @ParameterizedTest
   @MethodSource("provideTestData")
   public void testCheckOneVolume(
-      VolumeCheckResult checkResult, ContainerLayoutVersion layout,
+      VolumeCheckResult checkResult,
       TestInfo testInfo) throws Exception {
-    initTest(checkResult, layout);
+    initTest(checkResult);
     LOG.info("Executing {}", testInfo.getTestMethod());
     final HddsVolume volume = makeVolumes(1, expectedVolumeHealth).get(0);
     final StorageVolumeChecker checker =
@@ -173,8 +169,8 @@ public class TestStorageVolumeChecker {
   @ParameterizedTest
   @MethodSource("provideTestData")
   public void testCheckAllVolumes(VolumeCheckResult checkResult,
-      ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
-    initTest(checkResult, layout);
+      TestInfo testInfo) throws Exception {
+    initTest(checkResult);
     LOG.info("Executing {}", testInfo.getTestMethod());
 
     final List<HddsVolume> volumes = makeVolumes(
@@ -212,7 +208,7 @@ public class TestStorageVolumeChecker {
   @MethodSource("provideTestData")
   public void testVolumeDeletion(VolumeCheckResult checkResult,
       ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
-    initTest(checkResult, layout);
+    initTest(checkResult);
     LOG.info("Executing {}", testInfo.getTestMethod());
 
     DatanodeConfiguration dnConf =
