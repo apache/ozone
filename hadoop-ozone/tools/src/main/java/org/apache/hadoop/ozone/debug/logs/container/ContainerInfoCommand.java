@@ -17,8 +17,12 @@
 
 package org.apache.hadoop.ozone.debug.logs.container;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
+import org.apache.hadoop.ozone.containerlog.parser.DBConsts;
 import picocli.CommandLine;
 
 /**
@@ -27,7 +31,8 @@ import picocli.CommandLine;
 
 @CommandLine.Command(
     name = "info",
-    description = "provides details of a single container"
+    description = "provides complete state transition history of each replica for a single container along with " +
+        "analysis over the container"
 )
 public class ContainerInfoCommand implements Callable<Void> {
 
@@ -44,6 +49,29 @@ public class ContainerInfoCommand implements Callable<Void> {
       System.err.println("Invalid container ID: " + containerId);
       return null;
     }
+
+    Path providedDbPath;
+    if (parent.getDbPath() == null) {
+      providedDbPath = Paths.get(System.getProperty("user.dir"), DBConsts.DEFAULT_DB_FILENAME);
+
+      if (Files.exists(providedDbPath) && Files.isRegularFile(providedDbPath)) {
+        System.out.println("Using default database file found in current directory: " + providedDbPath);
+      } else {
+        System.err.println("No database path provided and default file '" + DBConsts.DEFAULT_DB_FILENAME + "' not " +
+            "found in current directory. Please provide a valid database path");
+        return null;
+      }
+    } else {
+      providedDbPath = Paths.get(parent.getDbPath());
+      Path parentDir = providedDbPath.getParent();
+
+      if (parentDir != null && !Files.exists(parentDir)) {
+        System.err.println("The parent directory of the provided database path does not exist: " + parentDir);
+        return null;
+      }
+    }
+
+    ContainerDatanodeDatabase.setDatabasePath(providedDbPath.toString());
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
     try {
