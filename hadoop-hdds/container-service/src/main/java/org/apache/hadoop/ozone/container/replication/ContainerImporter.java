@@ -88,7 +88,7 @@ public class ContainerImporter {
   }
 
   public void importContainer(long containerID, Path tarFilePath,
-      HddsVolume hddsVolume, CopyContainerCompression compression)
+      HddsVolume targetVolume, CopyContainerCompression compression)
       throws IOException {
     if (!importContainerProgress.add(containerID)) {
       deleteFileQuietely(tarFilePath);
@@ -104,11 +104,6 @@ public class ContainerImporter {
         LOG.warn(log);
         throw new StorageContainerException(log,
             ContainerProtos.Result.CONTAINER_EXISTS);
-      }
-
-      HddsVolume targetVolume = hddsVolume;
-      if (targetVolume == null) {
-        targetVolume = chooseNextVolume();
       }
 
       KeyValueContainerData containerData;

@@ -25,8 +25,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.slf4j.Logger;
@@ -81,15 +81,6 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
 
     try {
       targetVolume = containerImporter.chooseNextVolume();
-      // Increment committed bytes and verify if it doesn't cross the space left.
-      targetVolume.incCommittedBytes(containerSize * 2);
-      StorageLocationReport volumeReport = targetVolume.getReport();
-      // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
-      if (volumeReport.getUsableSpace() <= 0) {
-        LOG.warn("Container {} replication was unsuccessful, no space left on volume {}", containerID, volumeReport);
-        task.setStatus(Status.FAILED);
-        return;
-      }
       // Wait for the download. This thread pool is limiting the parallel
       // downloads, so it's ok to block here and wait for the full download.
       Path tarFilePath =
@@ -114,7 +105,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       task.setStatus(Status.FAILED);
     } finally {
       if (targetVolume != null) {
-        targetVolume.incCommittedBytes(-containerSize * 2);
+        targetVolume.incCommittedBytes(-HddsServerUtil.requiredReplicationSpace(containerSize));
       }
     }
   }

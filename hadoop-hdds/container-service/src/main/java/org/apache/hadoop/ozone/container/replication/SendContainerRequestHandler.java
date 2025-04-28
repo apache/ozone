@@ -27,11 +27,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.util.DiskChecker;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -87,16 +86,6 @@ class SendContainerRequestHandler
       if (containerId == -1) {
         containerId = req.getContainerID();
         volume = importer.chooseNextVolume();
-        // Increment committed bytes and verify if it doesn't cross the space left.
-        volume.incCommittedBytes(importer.getDefaultContainerSize() * 2);
-        StorageLocationReport volumeReport = volume.getReport();
-        // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
-        if (volumeReport.getUsableSpace() <= 0) {
-          volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
-          LOG.warn("Container {} import was unsuccessful, no space left on volume {}", containerId, volumeReport);
-          volume = null;
-          throw new DiskChecker.DiskOutOfSpaceException("No more available volumes");
-        }
 
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);
@@ -130,7 +119,7 @@ class SendContainerRequestHandler
       responseObserver.onError(t);
     } finally {
       if (volume != null) {
-        volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
+        volume.incCommittedBytes(-HddsServerUtil.requiredReplicationSpace(importer.getDefaultContainerSize()));
       }
     }
   }
@@ -159,7 +148,7 @@ class SendContainerRequestHandler
       }
     } finally {
       if (volume != null) {
-        volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
+        volume.incCommittedBytes(-HddsServerUtil.requiredReplicationSpace(importer.getDefaultContainerSize()));
       }
     }
   }

@@ -69,9 +69,8 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
     }
 
     int count = volumesWithEnoughSpace.size();
-    if (count == 1) {
-      return volumesWithEnoughSpace.get(0);
-    } else {
+    HddsVolume selectedVolume = volumesWithEnoughSpace.get(0);
+    if (count > 1) {
       // Even if we don't have too many volumes in volumesWithEnoughSpace, this
       // algorithm will still help us choose the volume with larger
       // available space than other volumes.
@@ -93,10 +92,9 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
           - firstVolume.getCommittedBytes();
       long secondAvailable = secondVolume.getCurrentUsage().getAvailable()
           - secondVolume.getCommittedBytes();
-      HddsVolume selectedVolume = firstAvailable < secondAvailable ? secondVolume : firstVolume;
-
-      selectedVolume.incCommittedBytes(maxContainerSize);
-      return selectedVolume;
+      selectedVolume = firstAvailable < secondAvailable ? secondVolume : firstVolume;
     }
+    selectedVolume.incCommittedBytes(maxContainerSize);
+    return selectedVolume;
   }
 }

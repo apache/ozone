@@ -29,7 +29,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.ORIGIN_PIPELINE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STATE;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import jakarta.annotation.Nullable;
@@ -214,21 +213,14 @@ public abstract class ContainerData {
         (state != oldState)) {
       releaseCommitSpace();
     }
-
-    /**
-     * commit space when container transitions (back) to Open.
-     * when? perhaps closing a container threw an exception
-     */
-    if ((state == ContainerDataProto.State.OPEN) &&
-        (state != oldState)) {
-      Preconditions.checkState(getMaxSize() > 0);
-      commitSpace();
-    }
   }
 
-  @VisibleForTesting
-  void setCommittedSpace(boolean committedSpace) {
-    this.committedSpace = committedSpace;
+  public void setCommittedSpace(boolean committed) {
+    if (committed) {
+      //we don't expect duplicate space commit
+      Preconditions.checkState(!committedSpace);
+    }
+    committedSpace = committed;
   }
 
   /**
@@ -356,7 +348,7 @@ public abstract class ContainerData {
     setState(ContainerDataProto.State.CLOSED);
   }
 
-  private void releaseCommitSpace() {
+  public void releaseCommitSpace() {
     long unused = getMaxSize() - getBytesUsed();
 
     // only if container size < max size

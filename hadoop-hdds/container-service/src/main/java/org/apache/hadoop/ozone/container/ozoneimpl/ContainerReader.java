@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 
 import com.google.common.base.Preconditions;
@@ -202,49 +203,54 @@ public class ContainerReader implements Runnable {
       throws IOException {
     switch (containerData.getContainerType()) {
     case KeyValueContainer:
-      if (containerData instanceof KeyValueContainerData) {
-        KeyValueContainerData kvContainerData = (KeyValueContainerData)
-            containerData;
-        containerData.setVolume(hddsVolume);
-        KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
-        KeyValueContainer kvContainer = new KeyValueContainer(kvContainerData,
-            config);
-        if (kvContainer.getContainerState() == RECOVERING) {
-          if (shouldDelete) {
-            // delete Ratis replicated RECOVERING containers
-            if (kvContainer.getContainerData().getReplicaIndex() == 0) {
-              cleanupContainer(hddsVolume, kvContainer);
-            } else {
-              kvContainer.markContainerUnhealthy();
-              LOG.info("Stale recovering container {} marked UNHEALTHY",
-                  kvContainerData.getContainerID());
-              containerSet.addContainer(kvContainer);
-            }
-          }
-          return;
-        }
-        if (kvContainer.getContainerState() == DELETED) {
-          if (shouldDelete) {
-            cleanupContainer(hddsVolume, kvContainer);
-          }
-          return;
-        }
-        try {
-          containerSet.addContainer(kvContainer);
-        } catch (StorageContainerException e) {
-          if (e.getResult() != ContainerProtos.Result.CONTAINER_EXISTS) {
-            throw e;
-          }
-          if (shouldDelete) {
-            resolveDuplicate((KeyValueContainer) containerSet.getContainer(
-                kvContainer.getContainerData().getContainerID()), kvContainer);
-          }
-        }
-      } else {
+      if (!(containerData instanceof KeyValueContainerData)) {
         throw new StorageContainerException("Container File is corrupted. " +
             "ContainerType is KeyValueContainer but cast to " +
             "KeyValueContainerData failed. ",
             ContainerProtos.Result.CONTAINER_METADATA_ERROR);
+      }
+
+      KeyValueContainerData kvContainerData = (KeyValueContainerData)
+          containerData;
+      containerData.setVolume(hddsVolume);
+      KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
+      KeyValueContainer kvContainer = new KeyValueContainer(kvContainerData,
+          config);
+      if (kvContainer.getContainerState() == RECOVERING) {
+        if (shouldDelete) {
+          // delete Ratis replicated RECOVERING containers
+          if (kvContainer.getContainerData().getReplicaIndex() == 0) {
+            cleanupContainer(hddsVolume, kvContainer);
+          } else {
+            kvContainer.markContainerUnhealthy();
+            LOG.info("Stale recovering container {} marked UNHEALTHY",
+                kvContainerData.getContainerID());
+            containerSet.addContainer(kvContainer);
+          }
+        }
+        return;
+      } else if (kvContainer.getContainerState() == DELETED) {
+        if (shouldDelete) {
+          cleanupContainer(hddsVolume, kvContainer);
+        }
+        return;
+      }
+
+      try {
+        if (kvContainer.getContainerState() == OPEN) {
+          // only open container would get new data written in
+          containerData.commitSpace();
+        }
+        containerSet.addContainer(kvContainer);
+      } catch (StorageContainerException e) {
+        if (e.getResult() != ContainerProtos.Result.CONTAINER_EXISTS) {
+          throw e;
+        }
+        if (shouldDelete) {
+          resolveDuplicate((KeyValueContainer) containerSet.getContainer(
+              kvContainer.getContainerData().getContainerID()), kvContainer);
+        }
+        containerData.releaseCommitSpace();
       }
       break;
     default:
