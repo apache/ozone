@@ -33,6 +33,7 @@ public final class DBConsts {
   public static final int BATCH_SIZE = 2500;
   public static final String DATANODE_CONTAINER_LOG_TABLE_NAME = "DatanodeContainerLogTable";
   public static final String CONTAINER_LOG_TABLE_NAME = "ContainerLogTable";
+
   public static final String CREATE_DATANODE_CONTAINER_LOG_TABLE = 
       "CREATE TABLE IF NOT EXISTS DatanodeContainerLogTable (datanode_id TEXT NOT NULL, " +
           "container_id INTEGER NOT NULL, timestamp TEXT NOT NULL, container_state TEXT, bcsid INTEGER, " +
@@ -67,4 +68,5 @@ public final class DBConsts {
           "WHERE sub_dcl.datanode_id = cl.datanode_id AND" +
           " sub_dcl.container_id = cl.container_id AND sub_dcl.bcsid = cl.latest_bcsid" +
           " AND sub_dcl.container_state = cl.latest_state)";
+
 }
