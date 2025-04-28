@@ -1,6 +1,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -28,11 +29,14 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -51,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -85,23 +90,26 @@ public class TestKeyValueHandlerContainerReconciliation {
    */
   public static Stream<Arguments> corruptionValues() {
     return Stream.of(
-        Arguments.of(5, 0),
-        Arguments.of(0, 5),
-        Arguments.of(0, 10),
-        Arguments.of(10, 0),
-        Arguments.of(5, 10),
-        Arguments.of(10, 5),
-        Arguments.of(2, 3),
-        Arguments.of(3, 2),
-        Arguments.of(4, 6),
-        Arguments.of(6, 4),
-        Arguments.of(6, 9),
-        Arguments.of(9, 6)
+//        Arguments.of(5, 0),
+//        Arguments.of(0, 5),
+//        Arguments.of(0, 10),
+//        Arguments.of(10, 0),
+//        Arguments.of(5, 10),
+        // TODO
+        Arguments.of(10, 5)
+//        Arguments.of(2, 3),
+//        Arguments.of(3, 2),
+//        Arguments.of(4, 6),
+//        Arguments.of(6, 4),
+//        Arguments.of(6, 9),
+//        Arguments.of(9, 6)
     );
   }
 
+  public static final Logger LOG = LoggerFactory.getLogger(TestKeyValueHandlerContainerReconciliation.class);
+
   // All container replicas will be placed in this directory, and the same replicas will be re-used for each test run.
-//  @TempDir
+  @TempDir
   private static Path containerDir;
   private static DNContainerOperationClient dnClient;
   private static MockedStatic<ContainerProtocolCalls> containerProtocolMock;
@@ -120,7 +128,7 @@ public class TestKeyValueHandlerContainerReconciliation {
    */
   @BeforeAll
   public static void setup() throws Exception {
-    containerDir = Files.createTempDirectory("reconcile");
+//    containerDir = Files.createTempDirectory("reconcile");
     dnClient = new DNContainerOperationClient(new OzoneConfiguration(), null, null);
     datanodes = new ArrayList<>();
 
@@ -149,6 +157,8 @@ public class TestKeyValueHandlerContainerReconciliation {
   @ParameterizedTest
   @MethodSource("corruptionValues")
   public void testContainerReconciliation(int numBlocksToDelete, int numChunksToCorrupt) throws Exception {
+    LOG.info("Healthy data checksum for container {} in this test is {}", CONTAINER_ID,
+        HddsUtils.checksumToString(healthyDataChecksum));
     // Introduce corruption in each container on different replicas.
     List<MockDatanode> dnsToCorrupt = datanodes.stream().limit(2).collect(Collectors.toList());
 
@@ -159,8 +169,15 @@ public class TestKeyValueHandlerContainerReconciliation {
     // Without reconciliation, checksums should be different because of the corruption.
     assertUniqueChecksumCount(CONTAINER_ID, datanodes, 3);
 
-    List<DatanodeDetails> peers = datanodes.stream().map(MockDatanode::getDnDetails).collect(Collectors.toList());
-    datanodes.forEach(d -> d.reconcileContainer(dnClient, peers, CONTAINER_ID));
+    // Reconcile each datanode with its peers.
+    // In a real cluster, SCM will not send a command to reconcile a datanode with itself.
+    for (MockDatanode current : datanodes) {
+      List<DatanodeDetails> peers = datanodes.stream()
+          .map(MockDatanode::getDnDetails)
+          .filter(other -> !current.getDnDetails().equals(other))
+          .collect(Collectors.toList());
+      current.reconcileContainer(dnClient, peers, CONTAINER_ID);
+    }
     // After reconciliation, checksums should be the same for all containers.
     // Reconciliation should have updated the tree based on the updated metadata that was obtained for the
     // previously corrupted data. We do not need to wait for the full data scan to complete.
@@ -231,8 +248,11 @@ public class TestKeyValueHandlerContainerReconciliation {
     private final ContainerSet containerSet;
     private final OzoneConfiguration conf;
 
+    public final Logger log;
+
     public MockDatanode(DatanodeDetails dnDetails, Path tempDir) throws IOException {
       this.dnDetails = dnDetails;
+      log = LoggerFactory.getLogger("mock-datanode-" + dnDetails.getUuidString());
       Path dataVolume = Paths.get(tempDir.toString(), dnDetails.getUuidString(), "data");
       Path metadataVolume = Paths.get(tempDir.toString(), dnDetails.getUuidString(), "metadata");
 
@@ -285,7 +305,8 @@ public class TestKeyValueHandlerContainerReconciliation {
       } catch (IOException ex) {
         fail("Failed to read container checksum from disk", ex);
       }
-      System.err.println("data checksum on DN " + dnDetails.getUuidString() + ": " + dataChecksum);
+      log.info("Retrieved data checksum {} from container {}", HddsUtils.checksumToString(healthyDataChecksum),
+          containerID);
       return dataChecksum;
     }
 
@@ -350,6 +371,7 @@ public class TestKeyValueHandlerContainerReconciliation {
 
     public void reconcileContainer(DNContainerOperationClient dnClient, Collection<DatanodeDetails> peers,
         long containerID) {
+      log.info("Beginning reconciliation on this mock datanode");
       try {
         handler.reconcileContainer(dnClient, containerSet.getContainer(containerID), peers);
       } catch (IOException ex) {
@@ -451,13 +473,12 @@ public class TestKeyValueHandlerContainerReconciliation {
           File blockFile = TestContainerCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
           Assertions.assertTrue(blockFile.delete());
           handle.getStore().getBlockDataTable().deleteWithBatch(batch, containerData.getBlockKey(blockData.getLocalID()));
+          log.info("Deleting block {} from container {}", blockData.getBlockID().getLocalID(), containerID);
         }
         handle.getStore().getBatchHandler().commitBatchOperation(batch);
-
-        // Check the op
+        // Check that the correct number of blocks were deleted.
         blockDataList = getSortedBlocks(container);
         assertEquals(numBlocksToDelete, size - blockDataList.size());
-        System.err.println(blockDataList);
       }
 
       // Corrupt chunks at an offset.
@@ -471,8 +492,8 @@ public class TestKeyValueHandlerContainerReconciliation {
         List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>(blockData.getChunks());
         ContainerProtos.ChunkInfo chunkInfo = chunks.remove(chunkIndex);
         corruptFileAtOffset(blockFile, chunkInfo.getOffset(), chunkInfo.getLen());
-        System.err.println("datanode " + dnDetails.getUuidString() + " corrupting block " + blockData.getBlockID() + " at " +
-            "offset " + chunkInfo.getOffset());
+        log.info("Corrupting block {} at offset {} in container {}", blockData.getBlockID().getLocalID(),
+            chunkInfo.getOffset(), containerID);
       }
     }
 

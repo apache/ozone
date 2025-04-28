@@ -1521,9 +1521,16 @@ public class KeyValueHandler extends Handler {
       // Try creating the checksum info from RocksDB metadata if it is not present.
       checksumInfo = updateAndGetContainerChecksum(containerData);
     }
-    long oldDataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
 
+    // Data checksum before reconciling with any peers.
+    long originalDataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
+    // Final checksum after reconciling with all peers.
+    long dataChecksum = originalDataChecksum;
+
+    int successfulPeerCount = 0;
     for (DatanodeDetails peer : peers) {
+      // Data checksum updated after each peer reconciles.
+      long previousDataChecksum = dataChecksum;
       long start = Instant.now().toEpochMilli();
       ContainerProtos.ContainerChecksumInfo peerChecksumInfo = dnClient.getContainerChecksumInfo(
           containerID, peer);
@@ -1569,21 +1576,24 @@ public class KeyValueHandler extends Handler {
       // Update checksum based on RocksDB metadata. The read chunk validates the checksum of the data
       // we read. So we can update the checksum only based on the RocksDB metadata.
       ContainerProtos.ContainerChecksumInfo updatedChecksumInfo = updateAndGetContainerChecksum(containerData);
-      long dataChecksum = updatedChecksumInfo.getContainerMerkleTree().getDataChecksum();
+      dataChecksum = updatedChecksumInfo.getContainerMerkleTree().getDataChecksum();
 
       long duration = Instant.now().toEpochMilli() - start;
-      if (dataChecksum == oldDataChecksum) {
+      if (dataChecksum == previousDataChecksum) {
         metrics.incContainerReconciledWithoutChanges();
         LOG.info("Container {} reconciled with peer {}. No change in checksum. Current checksum {}. Time taken {} ms",
             containerID, peer.toString(), checksumToString(dataChecksum), duration);
       } else {
         metrics.incContainerReconciledWithChanges();
         LOG.warn("Container {} reconciled with peer {}. Checksum updated from {} to {}. Time taken {} ms",
-            containerID, peer.toString(), checksumToString(oldDataChecksum),
+            containerID, peer.toString(), checksumToString(previousDataChecksum),
             checksumToString(dataChecksum), duration);
       }
-      ContainerLogger.logReconciled(container.getContainerData(), oldDataChecksum, peer);
+      ContainerLogger.logReconciled(container.getContainerData(), previousDataChecksum, peer);
+      successfulPeerCount++;
     }
+    LOG.info("Completed reconciliation for container {} with {}/{} peers. Checksum updated from {} to {}", containerID,
+        successfulPeerCount, peers.size(), checksumToString(originalDataChecksum), checksumToString(dataChecksum));
 
     // Trigger manual on demand scanner
     containerSet.scanContainer(containerID);
@@ -1626,7 +1636,8 @@ public class KeyValueHandler extends Handler {
     Token<OzoneBlockTokenIdentifier> blockToken = dnClient.getTokenHelper().getBlockToken(blockID, 0L);
     if (getBlockManager().blockExists(container, blockID)) {
       LOG.warn("Block {} already exists in container {}. The block should not exist and our container merkle tree" +
-              " is stale. Skipping reconciliation for this block.", blockID, containerData.getContainerID());
+              " is stale. Skipping reconciliation for this block.", blockID.getLocalID(),
+          containerData.getContainerID());
       return;
     }
 
