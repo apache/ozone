@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -58,7 +59,6 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocat
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -162,8 +162,8 @@ public class DiskBalancerService extends BackgroundService {
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
       Path tmpDir = getDiskBalancerTmpDir(volume);
       try {
-        FileUtils.deleteFully(tmpDir);
-        FileUtils.createDirectories(tmpDir);
+        FileUtils.deleteDirectory(tmpDir.toFile());
+        FileUtils.forceMkdir(tmpDir.toFile());
       } catch (IOException ex) {
         LOG.warn("Can not reconstruct tmp directory under volume {}", volume,
             ex);
@@ -482,11 +482,11 @@ public class DiskBalancerService extends BackgroundService {
         totalBalancedBytes.addAndGet(containerSize);
       } catch (IOException e) {
         moveSucceeded = false;
-        LOG.warn("Failed to move container {}", containerData, e);
+        LOG.warn("Failed to move container {}", containerId, e);
         if (diskBalancerTmpDir != null) {
           try {
             File dir = new File(String.valueOf(diskBalancerTmpDir));
-            org.apache.commons.io.FileUtils.deleteDirectory(dir);
+            FileUtils.deleteDirectory(dir);
           } catch (IOException ex) {
             LOG.warn("Failed to delete tmp directory {}", diskBalancerTmpDir,
                 ex);
@@ -495,9 +495,9 @@ public class DiskBalancerService extends BackgroundService {
         if (diskBalancerDestDir != null) {
           try {
             File dir = new File(String.valueOf(diskBalancerDestDir));
-            org.apache.commons.io.FileUtils.deleteDirectory(dir);
+            FileUtils.deleteDirectory(dir);
           } catch (IOException ex) {
-            LOG.warn("Failed to delete dest directory {}: {}.",
+            LOG.warn("Failed to delete dest directory {}",
                 diskBalancerDestDir, ex);
           }
         }

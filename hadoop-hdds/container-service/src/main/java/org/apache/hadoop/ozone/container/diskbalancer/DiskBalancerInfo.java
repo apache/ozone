@@ -76,7 +76,7 @@ public class DiskBalancerInfo {
     this.threshold = diskBalancerConf.getThreshold();
     this.bandwidthInMB = diskBalancerConf.getDiskBandwidthInMB();
     this.parallelThread = diskBalancerConf.getParallelThread();
-    this.stopAfterDiskEven = diskBalancerConf.getStopAfterDiskEven();
+    this.stopAfterDiskEven = diskBalancerConf.isStopAfterDiskEven();
     this.version = DiskBalancerVersion.DEFAULT_VERSION;
   }
 
@@ -90,8 +90,8 @@ public class DiskBalancerInfo {
     if (parallelThread != diskBalancerConf.getParallelThread()) {
       setParallelThread(diskBalancerConf.getParallelThread());
     }
-    if (stopAfterDiskEven != diskBalancerConf.getStopAfterDiskEven()) {
-      setStopAfterDiskEven(diskBalancerConf.getStopAfterDiskEven());
+    if (stopAfterDiskEven != diskBalancerConf.isStopAfterDiskEven()) {
+      setStopAfterDiskEven(diskBalancerConf.isStopAfterDiskEven());
     }
   }
 
