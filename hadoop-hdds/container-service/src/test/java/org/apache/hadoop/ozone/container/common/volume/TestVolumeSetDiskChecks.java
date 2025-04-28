@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory;
  * Verify that {@link MutableVolumeSet} correctly checks for failed disks
  * during initialization.
  */
-@Timeout(300)
+@Timeout(30)
 public class TestVolumeSetDiskChecks {
   @TempDir
   private Path tempDir;
