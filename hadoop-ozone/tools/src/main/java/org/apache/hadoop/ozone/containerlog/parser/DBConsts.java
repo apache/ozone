@@ -63,11 +63,6 @@ public final class DBConsts {
           "WHERE sub_dcl.datanode_id = cl.datanode_id AND" +
           " sub_dcl.container_id = cl.container_id AND sub_dcl.bcsid = cl.latest_bcsid" +
           " AND sub_dcl.container_state = cl.latest_state)";
-  public static final String CONTAINER_DETAILS_QUERY = "SELECT d.timestamp, d.container_id, d.datanode_id, " +
-      "d.container_state, d.bcsid, d.error_message, d.index_value FROM DatanodeContainerLogTable d " +
-      "WHERE d.container_id = ? ORDER BY d.datanode_id ASC, d.timestamp ASC;";
-  public static final String CREATE_DCL_CONTAINER_STATE_TIME_INDEX = "CREATE INDEX IF NOT EXISTS " +
-      "idx_dcl_container_state_time ON DatanodeContainerLogTable(container_id, container_state, timestamp);";
   
   private DBConsts() {
     //Never constructed
