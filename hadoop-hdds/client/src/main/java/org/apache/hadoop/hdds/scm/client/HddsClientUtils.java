@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
@@ -49,7 +48,6 @@ import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class HddsClientUtils {
-  @VisibleForTesting
   static final int MAX_BUCKET_NAME_LENGTH_IN_LOG =
       2 * OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH;
 
