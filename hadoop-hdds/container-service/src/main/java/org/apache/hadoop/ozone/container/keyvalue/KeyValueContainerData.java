@@ -81,7 +81,6 @@ public class KeyValueContainerData extends ContainerData {
 
   private String schemaVersion;
 
-
   private long deleteTransactionId;
 
   private long blockCommitSequenceId;
