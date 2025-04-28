@@ -712,10 +712,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       while (iter.hasNext()) {
         StorageContainerManager scm = iter.next();
         stringBuilder.append(scm.getDatanodeRpcAddress().getHostString())
-            .append(":")
+            .append(':')
             .append(scm.getDatanodeRpcAddress().getPort());
         if (iter.hasNext()) {
-          stringBuilder.append(",");
+          stringBuilder.append(',');
         }
 
       }

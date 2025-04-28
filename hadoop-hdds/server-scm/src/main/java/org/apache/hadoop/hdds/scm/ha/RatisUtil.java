@@ -57,7 +57,6 @@ public final class RatisUtil {
   private RatisUtil() {
   }
 
-
   /**
    * Constructs new Raft Properties instance using {@link ConfigurationSource}.
    *

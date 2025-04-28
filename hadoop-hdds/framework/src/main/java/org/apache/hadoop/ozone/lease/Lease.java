@@ -49,7 +49,6 @@ public class Lease<T> {
    */
   private Callable<Void> callback;
 
-
   /**
    * Creates a lease on the specified resource with given timeout.
    *

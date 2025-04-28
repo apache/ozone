@@ -48,6 +48,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
@@ -56,7 +57,6 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
@@ -444,7 +444,7 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
 
     // upload part 1.
     byte[] data = generateData(5 * 1024 * 1024,
-        (byte) RandomUtils.nextLong());
+        (byte) RandomUtils.secure().randomLong());
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
@@ -475,7 +475,7 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
 
     byte[] fileContent = new byte[data.length];
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
-      inputStream.read(fileContent);
+      IOUtils.readFully(inputStream, fileContent);
     }
     StringBuilder sb = new StringBuilder(data.length);
 
@@ -870,7 +870,7 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
       StringBuilder key = new StringBuilder();
       int depth = 1 + i % 3; // Creates varying depth (1-3 levels)
       for (int j = 0; j < depth; j++) {
-        key.append("dir").append(j + 1).append("/");
+        key.append("dir").append(j + 1).append('/');
       }
       key.append("file").append(i);
       keys.add(key.toString());

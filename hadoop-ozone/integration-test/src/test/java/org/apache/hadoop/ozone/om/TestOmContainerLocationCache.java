@@ -242,7 +242,6 @@ public class TestOmContainerLocationCache {
         && argument.getNodes().isEmpty();
   }
 
-
   private static ArgumentMatcher<Pipeline> matchPipeline(DatanodeDetails dn) {
     return argument -> argument != null && !argument.getNodes().isEmpty()
         && argument.getNodes().get(0).getUuid().equals(dn.getUuid());

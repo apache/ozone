@@ -39,6 +39,7 @@ import java.util.Map;
  * | bigdata-ozone-online31          |  om31   |  LEADER  |
  * +---------------------------------+---------+----------+
  */
+@SuppressWarnings(value = "PMD.AvoidStringBufferField")
 public final class FormattingCLIUtils {
   /** Table title. */
   private String title;
@@ -132,12 +133,12 @@ public final class FormattingCLIUtils {
       if (this.title.length() > maxTitleSize) {
         this.title = this.title.substring(0, maxTitleSize);
       }
-      this.join.append("+");
+      this.join.append('+');
       for (int i = 0; i < maxTitleSize + 2; i++) {
-        this.join.append("-");
+        this.join.append('-');
       }
       this.join.append("+\n")
-          .append("|")
+          .append('|')
           .append(StrUtils.center(this.title, maxTitleSize + 2, ' '))
           .append("|\n");
       this.lastTableRowType = TableRowType.TITLE;
@@ -176,14 +177,14 @@ public final class FormattingCLIUtils {
    * @param data dataLine
    */
   private void buildRowBorder(List<String> data) {
-    this.join.append("+");
+    this.join.append('+');
     for (int i = 0, len = data.size(); i < len; i++) {
       for (int j = 0; j < this.maxColMap.get(i) + 2; j++) {
-        this.join.append("-");
+        this.join.append('-');
       }
-      this.join.append("+");
+      this.join.append('+');
     }
-    this.join.append("\n");
+    this.join.append('\n');
   }
 
   /**
@@ -191,12 +192,12 @@ public final class FormattingCLIUtils {
    * @param data dataLine
    */
   private void buildRowLine(List<String> data) {
-    this.join.append("|");
+    this.join.append('|');
     for (int i = 0, len = data.size(); i < len; i++) {
       this.join.append(StrUtils.center(data.get(i), this.maxColMap.get(i) + 2, ' '))
-          .append("|");
+          .append('|');
     }
-    this.join.append("\n");
+    this.join.append('\n');
   }
 
   /**
@@ -214,6 +215,7 @@ public final class FormattingCLIUtils {
   private static class TableRow {
     private TableRowType tableRowType;
     private List<String> data;
+
     TableRow(TableRowType tableRowType, List<String> data) {
       this.tableRowType = tableRowType;
       this.data = data;

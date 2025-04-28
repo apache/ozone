@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.Upgra
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -253,8 +254,7 @@ public class TestScmHAFinalization {
 
     init(conf, new DefaultUpgradeFinalizationExecutor<>(), numInactiveSCMs);
 
-    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
-        .captureLogs(FinalizationStateManagerImpl.LOG);
+    LogCapturer logCapture = LogCapturer.captureLogs(FinalizationStateManagerImpl.class);
 
     StorageContainerManager inactiveScm = cluster.getInactiveSCM().next();
     LOG.info("Inactive SCM node ID: {}", inactiveScm.getSCMNodeId());

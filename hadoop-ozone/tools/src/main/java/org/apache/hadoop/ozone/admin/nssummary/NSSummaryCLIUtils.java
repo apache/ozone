@@ -37,20 +37,16 @@ import picocli.CommandLine.Help.Ansi;
  */
 public final class NSSummaryCLIUtils {
 
-  private NSSummaryCLIUtils() {
-
-  }
-
   private static final String OFS_PREFIX = "ofs://";
 
-  public static String makeHttpCall(StringBuffer url, String path,
+  public static String makeHttpCall(StringBuilder url, String path,
                                     boolean isSpnegoEnabled,
                                     ConfigurationSource conf)
       throws Exception {
     return makeHttpCall(url, path, false, false, isSpnegoEnabled, conf);
   }
 
-  public static String makeHttpCall(StringBuffer url, String path,
+  public static String makeHttpCall(StringBuilder url, String path,
                                     boolean listFile, boolean withReplica,
                                     boolean isSpnegoEnabled,
                                     ConfigurationSource conf)
@@ -153,5 +149,9 @@ public final class NSSummaryCLIUtils {
       return path.substring(OFS_PREFIX.length());
     }
     return path.substring(idx);
+  }
+
+  private NSSummaryCLIUtils() {
+
   }
 }

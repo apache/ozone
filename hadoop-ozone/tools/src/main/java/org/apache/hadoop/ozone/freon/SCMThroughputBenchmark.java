@@ -113,17 +113,8 @@ import picocli.CommandLine;
 @SuppressWarnings("java:S2245") // no need for secure random
 public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcommand {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMThroughputBenchmark.class);
-
-  /**
-   * Type of benchmarks.
-   */
-  public enum BenchmarkType {
-    AllocateBlocks,
-    AllocateContainers,
-    ProcessReports,
-  }
 
   @CommandLine.ParentCommand
   private Freon freon;
@@ -920,5 +911,14 @@ public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcom
 
   private static PipelineReportsProto createPipelineReport() {
     return PipelineReportsProto.newBuilder().build();
+  }
+
+  /**
+   * Type of benchmarks.
+   */
+  public enum BenchmarkType {
+    AllocateBlocks,
+    AllocateContainers,
+    ProcessReports,
   }
 }

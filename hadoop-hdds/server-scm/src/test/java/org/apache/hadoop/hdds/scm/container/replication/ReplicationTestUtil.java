@@ -138,6 +138,7 @@ public final class ReplicationTestUtil {
     }
     return replicas;
   }
+
   public static ContainerReplica createEmptyContainerReplica(ContainerID containerID,
       int replicaIndex, HddsProtos.NodeOperationalState opState,
       ContainerReplicaProto.State replicaState) {

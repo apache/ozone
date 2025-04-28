@@ -111,7 +111,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
 
     assertThrows(ContainerNotFoundException.class, () ->
         containerManager.deleteContainer(
-            ContainerID.valueOf(RandomUtils.nextLong(10000, 20000))));
+            ContainerID.valueOf(RandomUtils.secure().randomLong(10000, 20000))));
     // deleteContainer should fail, so it should have the old metric value.
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     assertEquals(getLongCounter("NumSuccessfulDeleteContainers",

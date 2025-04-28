@@ -43,14 +43,6 @@ public class DatanodeRatisServerConfig {
   )
   private long requestTimeOut = Duration.ofSeconds(60).toMillis();
 
-  public long getRequestTimeOut() {
-    return requestTimeOut;
-  }
-
-  public void setRequestTimeOut(Duration duration) {
-    this.requestTimeOut = duration.toMillis();
-  }
-
   @Config(key = "watch.timeout",
       defaultValue = "30s",
       type = ConfigType.TIME,
@@ -63,14 +55,6 @@ public class DatanodeRatisServerConfig {
   )
   private long watchTimeOut = Duration.ofSeconds(30).toMillis();
 
-  public long getWatchTimeOut() {
-    return watchTimeOut;
-  }
-
-  public void setWatchTimeOut(Duration duration) {
-    this.watchTimeOut = duration.toMillis();
-  }
-
   @Config(key = "notification.no-leader.timeout",
       defaultValue = "300s",
       type = ConfigType.TIME,
@@ -80,14 +64,6 @@ public class DatanodeRatisServerConfig {
           "changes its role to Candidate."
   )
   private long noLeaderTimeout = Duration.ofSeconds(300).toMillis();
-
-  public long getNoLeaderTimeout() {
-    return noLeaderTimeout;
-  }
-
-  public void setNoLeaderTimeout(Duration duration) {
-    this.noLeaderTimeout = duration.toMillis();
-  }
 
   @Config(key = "rpc.slowness.timeout",
       defaultValue = "300s",
@@ -99,14 +75,6 @@ public class DatanodeRatisServerConfig {
   )
   private long followerSlownessTimeout = Duration.ofSeconds(300).toMillis();
 
-  public long getFollowerSlownessTimeout() {
-    return followerSlownessTimeout;
-  }
-
-  public void setFollowerSlownessTimeout(Duration duration) {
-    this.followerSlownessTimeout = duration.toMillis();
-  }
-
   @Config(key = "write.element-limit",
       defaultValue = "1024",
       type = ConfigType.INT,
@@ -115,14 +83,6 @@ public class DatanodeRatisServerConfig {
           "leader starts rejecting requests from client."
   )
   private int leaderNumPendingRequests;
-
-  public int getLeaderNumPendingRequests() {
-    return leaderNumPendingRequests;
-  }
-
-  public void setLeaderNumPendingRequests(int leaderNumPendingRequests) {
-    this.leaderNumPendingRequests = leaderNumPendingRequests;
-  }
 
   @Config(key = "datastream.request.threads",
       defaultValue = "20",
@@ -133,14 +93,6 @@ public class DatanodeRatisServerConfig {
   )
   private int streamRequestThreads;
 
-  public int getStreamRequestThreads() {
-    return streamRequestThreads;
-  }
-
-  public void setStreamRequestThreads(int streamRequestThreads) {
-    this.streamRequestThreads = streamRequestThreads;
-  }
-
   @Config(key = "datastream.client.pool.size",
       defaultValue = "10",
       type = ConfigType.INT,
@@ -149,14 +101,6 @@ public class DatanodeRatisServerConfig {
           "for datastream write."
   )
   private int clientPoolSize;
-
-  public int getClientPoolSize() {
-    return clientPoolSize;
-  }
-
-  public void setClientPoolSize(int clientPoolSize) {
-    this.clientPoolSize = clientPoolSize;
-  }
 
   @Config(key = "delete.ratis.log.directory",
           defaultValue = "true",
@@ -167,14 +111,6 @@ public class DatanodeRatisServerConfig {
   )
   private boolean shouldDeleteRatisLogDirectory;
 
-  public boolean shouldDeleteRatisLogDirectory() {
-    return shouldDeleteRatisLogDirectory;
-  }
-
-  public void setLeaderNumPendingRequests(boolean delete) {
-    this.shouldDeleteRatisLogDirectory = delete;
-  }
-
   @Config(key = "leaderelection.pre-vote",
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
@@ -182,14 +118,6 @@ public class DatanodeRatisServerConfig {
       description = "Flag to enable/disable ratis election pre-vote."
   )
   private boolean preVoteEnabled = true;
-
-  public boolean isPreVoteEnabled() {
-    return preVoteEnabled;
-  }
-
-  public void setPreVote(boolean preVote) {
-    this.preVoteEnabled = preVote;
-  }
 
   /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
   @Config(key = "log.appender.wait-time.min",
@@ -203,6 +131,78 @@ public class DatanodeRatisServerConfig {
           "retrying."
   )
   private long logAppenderWaitTimeMin;
+
+  public long getRequestTimeOut() {
+    return requestTimeOut;
+  }
+
+  public void setRequestTimeOut(Duration duration) {
+    this.requestTimeOut = duration.toMillis();
+  }
+
+  public long getWatchTimeOut() {
+    return watchTimeOut;
+  }
+
+  public void setWatchTimeOut(Duration duration) {
+    this.watchTimeOut = duration.toMillis();
+  }
+
+  public long getNoLeaderTimeout() {
+    return noLeaderTimeout;
+  }
+
+  public void setNoLeaderTimeout(Duration duration) {
+    this.noLeaderTimeout = duration.toMillis();
+  }
+
+  public long getFollowerSlownessTimeout() {
+    return followerSlownessTimeout;
+  }
+
+  public void setFollowerSlownessTimeout(Duration duration) {
+    this.followerSlownessTimeout = duration.toMillis();
+  }
+
+  public int getLeaderNumPendingRequests() {
+    return leaderNumPendingRequests;
+  }
+
+  public void setLeaderNumPendingRequests(int leaderNumPendingRequests) {
+    this.leaderNumPendingRequests = leaderNumPendingRequests;
+  }
+
+  public int getStreamRequestThreads() {
+    return streamRequestThreads;
+  }
+
+  public void setStreamRequestThreads(int streamRequestThreads) {
+    this.streamRequestThreads = streamRequestThreads;
+  }
+
+  public int getClientPoolSize() {
+    return clientPoolSize;
+  }
+
+  public void setClientPoolSize(int clientPoolSize) {
+    this.clientPoolSize = clientPoolSize;
+  }
+
+  public boolean shouldDeleteRatisLogDirectory() {
+    return shouldDeleteRatisLogDirectory;
+  }
+
+  public void setLeaderNumPendingRequests(boolean delete) {
+    this.shouldDeleteRatisLogDirectory = delete;
+  }
+
+  public boolean isPreVoteEnabled() {
+    return preVoteEnabled;
+  }
+
+  public void setPreVote(boolean preVote) {
+    this.preVoteEnabled = preVote;
+  }
 
   public long getLogAppenderWaitTimeMin() {
     return logAppenderWaitTimeMin;

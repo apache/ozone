@@ -93,10 +93,10 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
 
    */
   private void createDir(long counter) throws Exception {
-    String dirString = RandomStringUtils.randomAlphanumeric(length);
+    String dirString = RandomStringUtils.secure().nextAlphanumeric(length);
     for (int i = 1; i <= depth; i++) {
       dirString = dirString.concat("/").concat(RandomStringUtils.
-          randomAlphanumeric(length));
+          secure().nextAlphanumeric(length));
     }
     Path file = new Path(getRootPath().concat("/").concat(dirString));
     getFileSystem().mkdirs(file.getParent());

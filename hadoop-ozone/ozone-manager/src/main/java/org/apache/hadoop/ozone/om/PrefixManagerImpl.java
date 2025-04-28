@@ -90,7 +90,6 @@ public class PrefixManagerImpl implements PrefixManager {
     }
   }
 
-
   @Override
   public OMMetadataManager getMetadataManager() {
     return metadataManager;

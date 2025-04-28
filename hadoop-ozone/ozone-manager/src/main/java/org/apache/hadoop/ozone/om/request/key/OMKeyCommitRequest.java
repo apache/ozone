@@ -77,7 +77,7 @@ import org.slf4j.LoggerFactory;
 public class OMKeyCommitRequest extends OMKeyRequest {
 
   @VisibleForTesting
-  public static final Logger LOG = LoggerFactory.getLogger(OMKeyCommitRequest.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OMKeyCommitRequest.class);
 
   public OMKeyCommitRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);

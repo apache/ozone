@@ -252,11 +252,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return dbCheckpoint;
   }
 
-
   // Convenience class for keeping track of the tmp dirs.
   static class DirectoryData {
     private final File originalDir;
     private final File tmpDir;
+
     DirectoryData(Path tmpdir, String dirStr) throws IOException {
       originalDir = new File(dirStr);
       tmpDir = new File(tmpdir.toString(), getOriginalDir().getName());

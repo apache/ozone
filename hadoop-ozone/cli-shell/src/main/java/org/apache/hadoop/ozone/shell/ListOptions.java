@@ -26,19 +26,6 @@ public class ListOptions {
 
   @CommandLine.ArgGroup(exclusive = true)
   private ExclusiveLimit exclusiveLimit = new ExclusiveLimit();
-  
-  static class ExclusiveLimit {
-    @CommandLine.Option(names = {"--length", "-l"},
-        description = "Maximum number of items to list",
-        defaultValue = "100",
-        showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
-    private int limit;
-
-    @CommandLine.Option(names = {"--all", "-a"},
-        description = "List all results",
-        defaultValue = "false")
-    private boolean all;
-  }
 
   @CommandLine.Option(names = {"--start", "-s"},
       description = "The item to start the listing from.\n" +
@@ -71,5 +58,18 @@ public class ListOptions {
 
   public String getPrefix() {
     return prefix;
+  }
+
+  static class ExclusiveLimit {
+    @CommandLine.Option(names = {"--length", "-l"},
+        description = "Maximum number of items to list",
+        defaultValue = "100",
+        showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+    private int limit;
+
+    @CommandLine.Option(names = {"--all", "-a"},
+        description = "List all results",
+        defaultValue = "false")
+    private boolean all;
   }
 }

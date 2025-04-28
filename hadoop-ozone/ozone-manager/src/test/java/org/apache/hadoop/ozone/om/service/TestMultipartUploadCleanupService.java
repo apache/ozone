@@ -161,16 +161,16 @@ class TestMultipartUploadCleanupService {
     String volume = UUID.randomUUID().toString();
     String bucket = UUID.randomUUID().toString();
     for (int x = 0; x < mpuKeyCount; x++) {
-      if (RandomUtils.nextBoolean()) {
+      if (RandomUtils.secure().randomBoolean()) {
         bucket = UUID.randomUUID().toString();
-        if (RandomUtils.nextBoolean()) {
+        if (RandomUtils.secure().randomBoolean()) {
           volume = UUID.randomUUID().toString();
         }
       }
       String key = UUID.randomUUID().toString();
       createVolumeAndBucket(volume, bucket, bucketLayout);
 
-      final int numParts = RandomUtils.nextInt(0, 5);
+      final int numParts = RandomUtils.secure().randomInt(0, 5);
       // Create the MPU key
       createIncompleteMPUKey(volume, bucket, key, numParts);
     }
