@@ -308,9 +308,6 @@ public class DeletedBlockLogImpl
         deletedBlockLogStateManager.addTransactionsToDB(txsToBeAdded);
         metrics.incrBlockDeletionTransactionCreated(txsToBeAdded.size());
       }
-
-      deletedBlockLogStateManager.addTransactionsToDB(txsToBeAdded);
-      metrics.incrBlockDeletionTransactionCreated(txsToBeAdded.size());
     } finally {
       lock.unlock();
     }
