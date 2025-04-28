@@ -45,9 +45,6 @@ import org.slf4j.LoggerFactory;
  * Database helper for ozone audit parser tool.
  */
 public final class DatabaseHelper {
-  private DatabaseHelper() {
-    //Never constructed
-  }
 
   static {
     loadProperties();
@@ -56,6 +53,10 @@ public final class DatabaseHelper {
   private static final Logger LOG =
       LoggerFactory.getLogger(DatabaseHelper.class);
   private static Map<String, String> properties;
+
+  private DatabaseHelper() {
+    //Never constructed
+  }
 
   public static boolean setup(String dbName, String logs) throws Exception {
     if (createAuditTable(dbName)) {

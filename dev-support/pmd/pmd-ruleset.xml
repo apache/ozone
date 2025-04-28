@@ -42,5 +42,12 @@
   <rule ref="category/java/performance.xml/StringInstantiation"/>
   <rule ref="category/java/performance.xml/UseStringBufferLength"/>
 
+  <rule ref="category/java/codestyle.xml/FieldDeclarationsShouldBeAtStartOfClass">
+    <properties>
+      <property name="ignoreAnonymousClassDeclarations" value="false" />
+      <property name="ignoreEnumDeclarations" value="false" />
+    </properties>
+  </rule>
+
   <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
 </ruleset>
