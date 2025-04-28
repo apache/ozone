@@ -489,6 +489,11 @@ public class DeletedBlockLogImpl
   }
 
   @Override
+  public int getTransactionToDNsCommitMapSize() {
+    return getSCMDeletedBlockTransactionStatusManager().getTransactionToDNsCommitMapSize();
+  }
+
+  @Override
   public void onDatanodeDead(UUID dnId) {
     getSCMDeletedBlockTransactionStatusManager().onDatanodeDead(dnId);
   }

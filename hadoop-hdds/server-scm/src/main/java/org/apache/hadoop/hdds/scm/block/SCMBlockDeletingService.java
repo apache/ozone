@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_TXN_DN_COMMIT_MAP_SIZE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_TXN_DN_COMMIT_MAP_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 
@@ -93,6 +95,7 @@ public class SCMBlockDeletingService extends BackgroundService
   private final long safemodeExitRunDelayMillis;
   private final long deleteBlocksPendingCommandLimit;
   private final Clock clock;
+  private final int transactionToDNsCommitMapSize;
 
   @SuppressWarnings("parameternumber")
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
@@ -115,6 +118,8 @@ public class SCMBlockDeletingService extends BackgroundService
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
     this.deleteBlocksPendingCommandLimit = dnConf.getBlockDeleteQueueLimit();
+    this.transactionToDNsCommitMapSize =
+        conf.getInt(HDDS_SCM_TXN_DN_COMMIT_MAP_SIZE, HDDS_SCM_TXN_DN_COMMIT_MAP_SIZE_DEFAULT);
     this.clock = clock;
     this.deletedBlockLog = deletedBlockLog;
     this.nodeManager = nodeManager;
@@ -167,6 +172,12 @@ public class SCMBlockDeletingService extends BackgroundService
           final Set<DatanodeDetails> included =
               getDatanodesWithinCommandLimit(datanodes);
           int blockDeletionLimit = getBlockDeleteTXNum();
+          int txnToDNsCommitMapSize = deletedBlockLog.getTransactionToDNsCommitMapSize();
+          if (txnToDNsCommitMapSize >= transactionToDNsCommitMapSize) {
+            LOG.warn("Skipping block deletion as transactionToDNsCommitMap size = {}, exceeds threshold {}",
+                txnToDNsCommitMapSize, transactionToDNsCommitMapSize);
+            return EmptyTaskResult.newResult();
+          }
           DatanodeDeletedBlockTransactions transactions =
               deletedBlockLog.getTransactions(blockDeletionLimit, included);
 
