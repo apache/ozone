@@ -236,7 +236,6 @@ public class TestDecommissionStatusSubCommand {
     assertFalse(m.find());
   }
 
-
   private List<HddsProtos.Node> getNodeDetails(int n) {
     List<HddsProtos.Node> nodesList = new ArrayList<>();
 

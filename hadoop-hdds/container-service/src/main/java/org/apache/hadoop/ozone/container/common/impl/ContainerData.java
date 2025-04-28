@@ -322,7 +322,6 @@ public abstract class ContainerData {
     return containerType;
   }
 
-
   /**
    * Returns the state of the container.
    * @return ContainerLifeCycleState

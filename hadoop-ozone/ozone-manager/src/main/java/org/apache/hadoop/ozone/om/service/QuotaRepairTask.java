@@ -75,6 +75,7 @@ public class QuotaRepairTask {
   private static final AtomicLong RUN_CNT = new AtomicLong(0);
   private final OzoneManager om;
   private ExecutorService executor;
+
   public QuotaRepairTask(OzoneManager ozoneManager) {
     this.om = ozoneManager;
   }
@@ -96,6 +97,7 @@ public class QuotaRepairTask {
   public static String getStatus() {
     return REPAIR_STATUS.toString();
   }
+
   private boolean repairTask(List<String> buckets) {
     LOG.info("Starting quota repair task {}", REPAIR_STATUS);
     OMMetadataManager activeMetaManager = null;

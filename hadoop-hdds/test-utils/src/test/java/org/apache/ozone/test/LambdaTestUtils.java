@@ -36,13 +36,13 @@ import org.slf4j.LoggerFactory;
  * with jitter: test author gets to choose).
  */
 public final class LambdaTestUtils {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(LambdaTestUtils.class);
+
+  private static final Logger LOG = LoggerFactory.getLogger(LambdaTestUtils.class);
+
+  public static final String NULL_RESULT = "(null)";
 
   private LambdaTestUtils() {
   }
-
-  public static final String NULL_RESULT = "(null)";
 
   /**
    * Interface to implement for converting a timeout into some form

@@ -609,7 +609,7 @@ public class TestHddsDispatcher {
   private ContainerCommandRequestProto getWriteChunkRequest0(
       String datanodeId, Long containerId, Long localId, int chunkNum) {
     final int lenOfBytes = 32;
-    ByteString chunkData = ByteString.copyFrom(RandomUtils.nextBytes(32));
+    ByteString chunkData = ByteString.copyFrom(RandomUtils.secure().randomBytes(32));
 
     ContainerProtos.ChunkInfo chunk = ContainerProtos.ChunkInfo
         .newBuilder()
@@ -638,7 +638,7 @@ public class TestHddsDispatcher {
   }
 
   static ContainerCommandRequestProto newPutSmallFile(Long containerId, Long localId) {
-    ByteString chunkData = ByteString.copyFrom(RandomUtils.nextBytes(32));
+    ByteString chunkData = ByteString.copyFrom(RandomUtils.secure().randomBytes(32));
     return newPutSmallFile(new BlockID(containerId, localId), chunkData);
   }
 

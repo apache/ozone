@@ -288,8 +288,8 @@ public class TestStorageContainerManager {
       // Add 2 TXs per container.
       Map<Long, List<Long>> deletedBlocks = new HashMap<>();
       List<Long> blocks = new ArrayList<>();
-      blocks.add(RandomUtils.nextLong());
-      blocks.add(RandomUtils.nextLong());
+      blocks.add(RandomUtils.secure().randomLong());
+      blocks.add(RandomUtils.secure().randomLong());
       deletedBlocks.put(containerID, blocks);
       addTransactions(cluster.getStorageContainerManager(), delLog,
           deletedBlocks);
@@ -639,7 +639,7 @@ public class TestStorageContainerManager {
       DatanodeInfo datanodeInfo = assertInstanceOf(DatanodeInfo.class, nodeManager.getNode(node.getID()));
       assertNotNull(datanodeInfo);
       assertThat(datanodeInfo.getLastHeartbeatTime()).isPositive();
-      assertEquals(datanodeInfo.getUuidString(), datanodeInfo.getNetworkName());
+      assertEquals(datanodeInfo.getID().toString(), datanodeInfo.getNetworkName());
       assertEquals("/rack1", datanodeInfo.getNetworkLocation());
     }
   }

@@ -146,7 +146,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     }
   }
 
-
   @Override
   public synchronized void refresh(boolean forceRefresh) {
     if (forceRefresh) {
@@ -183,7 +182,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     getSafeModeMetrics().setNumHealthyPipelinesThreshold(
         healthyPipelineThresholdCount);
   }
-
 
   @Override
   protected synchronized void cleanup() {

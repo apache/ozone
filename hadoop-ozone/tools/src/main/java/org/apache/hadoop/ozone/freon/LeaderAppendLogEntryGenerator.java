@@ -133,7 +133,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
 
     OzoneConfiguration conf = createOzoneConfiguration();
 
-    byte[] data = RandomStringUtils.randomAscii(chunkSize)
+    byte[] data = RandomStringUtils.secure().nextAscii(chunkSize)
         .getBytes(StandardCharsets.UTF_8);
     dataToWrite = ByteString.copyFrom(data);
 

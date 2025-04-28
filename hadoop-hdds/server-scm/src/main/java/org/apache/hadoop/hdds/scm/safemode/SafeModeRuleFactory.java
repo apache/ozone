@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
  */
 public final class SafeModeRuleFactory {
 
-
   private final ConfigurationSource config;
   private final SCMContext scmContext;
   private final EventQueue eventQueue;

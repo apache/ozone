@@ -102,7 +102,6 @@ public abstract class BackgroundService {
     }
   }
 
-
   // start service
   public void start() {
     exec.scheduleWithFixedDelay(service, 0, interval, unit);

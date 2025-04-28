@@ -188,9 +188,9 @@ public class TestCertificateCodec {
     LocalDateTime startDate = LocalDateTime.now();
     LocalDateTime endDate = startDate.plusDays(1);
     return SelfSignedCertificate.newBuilder()
-        .setSubject(RandomStringUtils.randomAlphabetic(4))
-        .setClusterID(RandomStringUtils.randomAlphabetic(4))
-        .setScmID(RandomStringUtils.randomAlphabetic(4))
+        .setSubject(RandomStringUtils.secure().nextAlphabetic(4))
+        .setClusterID(RandomStringUtils.secure().nextAlphabetic(4))
+        .setScmID(RandomStringUtils.secure().nextAlphabetic(4))
         .setBeginDate(startDate)
         .setEndDate(endDate)
         .setConfiguration(securityConfig)

@@ -450,7 +450,6 @@ public class TestReplicationSupervisor {
 
   }
 
-
   private File containerTarFile(
       long containerId, ContainerData containerData) throws IOException {
     File yamlFile = new File(tempDir, "container.yaml");

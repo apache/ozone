@@ -215,7 +215,7 @@ public class TestDeleteContainerHandler {
     File lingeringBlock =
         new File(containerInternalObj.
             getContainerData().getChunksPath() + "/1.block");
-    lingeringBlock.createNewFile();
+    FileUtils.touch(lingeringBlock);
 
     // Check container exists before sending delete container command
     assertFalse(isContainerDeleted(hddsDatanodeService, containerId.getId()));
@@ -333,7 +333,7 @@ public class TestDeleteContainerHandler {
     File lingeringBlock =
         new File(containerInternalObj.
             getContainerData().getChunksPath() + "/1.block");
-    lingeringBlock.createNewFile();
+    FileUtils.touch(lingeringBlock);
 
     // Check container exists before sending delete container command
     assertFalse(isContainerDeleted(hddsDatanodeService, containerId.getId()));
@@ -401,7 +401,7 @@ public class TestDeleteContainerHandler {
     File lingeringBlock =
         new File(containerInternalObj.
             getContainerData().getChunksPath() + "/1.block");
-    lingeringBlock.createNewFile();
+    FileUtils.touch(lingeringBlock);
     ContainerMetrics metrics =
         hddsDatanodeService
             .getDatanodeStateMachine().getContainer().getMetrics();
@@ -548,7 +548,6 @@ public class TestDeleteContainerHandler {
     assertTrue(isContainerDeleted(hddsDatanodeService, containerId.getId()));
 
   }
-
 
   private void clearBlocksTable(Container container) throws IOException {
     try (DBHandle dbHandle

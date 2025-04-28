@@ -223,7 +223,6 @@ public final class Pipeline {
     return getNodeSet().equals(pipeline.getNodeSet());
   }
 
-
   /**
    * Return the replica index of the specific datanode in the datanode set.
    * <p>
@@ -522,20 +521,20 @@ public final class Pipeline {
   @Override
   public String toString() {
     final StringBuilder b =
-        new StringBuilder(getClass().getSimpleName()).append("{");
+        new StringBuilder(getClass().getSimpleName()).append('{');
     b.append(" Id: ").append(id.getId());
     b.append(", Nodes: [");
     for (DatanodeDetails datanodeDetails : nodeStatus.keySet()) {
       b.append(" {").append(datanodeDetails);
       b.append(", ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails)).append("},");
     }
-    b.append("]");
+    b.append(']');
     b.append(", ReplicationConfig: ").append(replicationConfig);
     b.append(", State:").append(getPipelineState());
     b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");
     b.append(", CreationTimestamp").append(getCreationTimestamp()
         .atZone(ZoneId.systemDefault()));
-    b.append("}");
+    b.append('}');
     return b.toString();
   }
 
@@ -604,6 +603,7 @@ public final class Pipeline {
       this.leaderId = leaderId1;
       return this;
     }
+
     public Builder setNodes(List<DatanodeDetails> nodes) {
       this.nodeStatus = new LinkedHashMap<>();
       nodes.forEach(node -> nodeStatus.put(node, -1L));
@@ -641,7 +641,6 @@ public final class Pipeline {
       this.suggestedLeaderId = uuid;
       return this;
     }
-
 
     public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> indexes) {
       this.replicaIndexes = indexes == null ? ImmutableMap.of() : ImmutableMap.copyOf(indexes);

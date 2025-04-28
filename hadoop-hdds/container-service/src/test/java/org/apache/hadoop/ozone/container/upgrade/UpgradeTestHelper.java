@@ -179,7 +179,6 @@ public final class UpgradeTestHelper {
     return vol;
   }
 
-
   public static void dispatchRequest(
       ContainerDispatcher dispatcher,
       ContainerProtos.ContainerCommandRequestProto request) {

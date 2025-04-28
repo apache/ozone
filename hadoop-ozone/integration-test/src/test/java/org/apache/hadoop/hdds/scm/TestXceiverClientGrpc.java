@@ -189,9 +189,11 @@ public class TestXceiverClientGrpc {
           node -> assertEquals(NodeOperationalState.IN_SERVICE, node.getPersistedOpState()));
 
       randomPipeline.getNodes().get(
-          RandomUtils.nextInt(0, nodeCount)).setPersistedOpState(NodeOperationalState.IN_MAINTENANCE);
+          RandomUtils.secure().randomInt(0, nodeCount)).
+          setPersistedOpState(NodeOperationalState.IN_MAINTENANCE);
       randomPipeline.getNodes().get(
-          RandomUtils.nextInt(0, nodeCount)).setPersistedOpState(NodeOperationalState.IN_MAINTENANCE);
+          RandomUtils.secure().randomInt(0, nodeCount)).
+          setPersistedOpState(NodeOperationalState.IN_MAINTENANCE);
       try (XceiverClientGrpc client = new XceiverClientGrpc(randomPipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(

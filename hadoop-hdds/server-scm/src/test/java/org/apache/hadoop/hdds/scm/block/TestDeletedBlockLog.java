@@ -205,8 +205,8 @@ public class TestDeletedBlockLog {
   private Map<Long, List<Long>> generateData(int dataSize,
       HddsProtos.LifeCycleState state) throws IOException {
     Map<Long, List<Long>> blockMap = new HashMap<>();
-    int continerIDBase = RandomUtils.nextInt(0, 100);
-    int localIDBase = RandomUtils.nextInt(0, 1000);
+    int continerIDBase = RandomUtils.secure().randomInt(0, 100);
+    int localIDBase = RandomUtils.secure().randomInt(0, 1000);
     for (int i = 0; i < dataSize; i++) {
       long containerID = continerIDBase + i;
       updateContainerMetadata(containerID, state);
@@ -434,7 +434,6 @@ public class TestDeletedBlockLog {
     assertEquals(30 * THREE, blocks.size());
   }
 
-
   @Test
   public void testSCMDelIteratorProgress() throws Exception {
     int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
@@ -570,7 +569,6 @@ public class TestDeletedBlockLog {
               "second transactions %s for Dn %s", txSet1, txSet2, dnId));
     }
   }
-
 
   private void assertContainsAllTransactions(
       DatanodeDeletedBlockTransactions transactions1,
@@ -752,7 +750,7 @@ public class TestDeletedBlockLog {
     List<Long> txIDs;
     // Randomly add/get/commit/increase transactions.
     for (int i = 0; i < 100; i++) {
-      int state = RandomUtils.nextInt(0, 4);
+      int state = RandomUtils.secure().randomInt(0, 4);
       if (state == 0) {
         addTransactions(generateData(10), true);
         added += 10;
@@ -851,7 +849,7 @@ public class TestDeletedBlockLog {
     // add two transactions for same container
     containerID = blocks.get(0).getContainerID();
     Map<Long, List<Long>> deletedBlocksMap = new HashMap<>();
-    long localId = RandomUtils.nextLong();
+    long localId = RandomUtils.secure().randomLong();
     deletedBlocksMap.put(containerID, new LinkedList<>(
         Collections.singletonList(localId)));
     addTransactions(deletedBlocksMap, true);

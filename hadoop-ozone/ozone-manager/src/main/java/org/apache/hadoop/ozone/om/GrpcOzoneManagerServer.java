@@ -194,6 +194,7 @@ public class GrpcOzoneManagerServer {
       omS3gGrpcMetrics.unRegister();
     }
   }
+
   public int getPort() {
     return port;
   }

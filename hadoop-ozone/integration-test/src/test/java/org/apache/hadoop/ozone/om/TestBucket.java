@@ -18,13 +18,13 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.RandomStringUtils.randomNumeric;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -121,13 +121,13 @@ public final class TestBucket {
       ObjectStore objectStore = client.getObjectStore();
       if (volume == null) { // TODO add setVolume
         if (volumeName == null) { // TODO add setVolumeName
-          volumeName = "vol" + randomNumeric(10);
+          volumeName = "vol" + RandomStringUtils.secure().nextNumeric(10);
         }
         objectStore.createVolume(volumeName);
         volume = objectStore.getVolume(volumeName);
       }
       if (bucketName == null) { // TODO add setBucketName
-        bucketName = "bucket" + randomNumeric(10);
+        bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(10);
       }
       volume.createBucket(bucketName);
       return new TestBucket(volume.getBucket(bucketName));

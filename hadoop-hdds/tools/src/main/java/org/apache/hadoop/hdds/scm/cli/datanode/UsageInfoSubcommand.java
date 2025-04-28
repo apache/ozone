@@ -51,6 +51,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
 
   private static final NumberFormat PERCENT_FORMAT
       = NumberFormat.getPercentInstance();
+
   static {
     PERCENT_FORMAT.setMinimumFractionDigits(2);
     PERCENT_FORMAT.setMaximumFractionDigits(2);
@@ -58,27 +59,6 @@ public class UsageInfoSubcommand extends ScmSubcommand {
 
   @CommandLine.ArgGroup(multiplicity = "1")
   private ExclusiveArguments exclusiveArguments;
-
-  private static class ExclusiveArguments {
-    @CommandLine.Option(names = {"--address"}, paramLabel = "ADDRESS",
-        description = "Show info by datanode ip or hostname address.",
-        defaultValue = "")
-    private String address;
-
-    @CommandLine.Option(names = {"--uuid"}, paramLabel = "UUID", description =
-        "Show info by datanode UUID.", defaultValue = "")
-    private String uuid;
-
-    @CommandLine.Option(names = {"-m", "--most-used"},
-        description = "Show the most used datanodes.",
-        defaultValue = "false")
-    private boolean mostUsed;
-
-    @CommandLine.Option(names = {"-l", "--least-used"},
-        description = "Show the least used datanodes.",
-        defaultValue = "false")
-    private boolean leastUsed;
-  }
 
   @CommandLine.Option(names = {"-c", "--count"}, description = "Number of " +
       "datanodes to display (Default: ${DEFAULT-VALUE}).",
@@ -89,7 +69,6 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       defaultValue = "false",
       description = "Format output as JSON")
   private boolean json;
-
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
@@ -241,9 +220,11 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     public long getRemaining() {
       return remaining;
     }
+
     public long getCommitted() {
       return committed;
     }
+
     public long getFreeSpaceToSpare() {
       return freeSpaceToSpare;
     }
@@ -285,5 +266,26 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     public long getPipelineCount() {
       return pipelineCount;
     }
+  }
+
+  private static class ExclusiveArguments {
+    @CommandLine.Option(names = {"--address"}, paramLabel = "ADDRESS",
+        description = "Show info by datanode ip or hostname address.",
+        defaultValue = "")
+    private String address;
+
+    @CommandLine.Option(names = {"--uuid"}, paramLabel = "UUID", description =
+        "Show info by datanode UUID.", defaultValue = "")
+    private String uuid;
+
+    @CommandLine.Option(names = {"-m", "--most-used"},
+        description = "Show the most used datanodes.",
+        defaultValue = "false")
+    private boolean mostUsed;
+
+    @CommandLine.Option(names = {"-l", "--least-used"},
+        description = "Show the least used datanodes.",
+        defaultValue = "false")
+    private boolean leastUsed;
   }
 }

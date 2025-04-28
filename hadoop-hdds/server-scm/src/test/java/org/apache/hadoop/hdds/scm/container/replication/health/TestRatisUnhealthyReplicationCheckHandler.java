@@ -390,6 +390,4 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     assertEquals(1,
         report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
   }
-
-
 }

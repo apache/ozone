@@ -111,7 +111,7 @@ class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(client, keyName);
     int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -196,7 +196,7 @@ class TestBlockOutputStreamWithFailures {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes at least putBlock for first flushSize worth of data
@@ -280,7 +280,7 @@ class TestBlockOutputStreamWithFailures {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes atleast putBlock for first flushSize worth of data
@@ -376,7 +376,7 @@ class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(client, keyName);
     int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -433,7 +433,7 @@ class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(client, keyName);
     int dataLength = 167;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -498,7 +498,7 @@ class TestBlockOutputStreamWithFailures {
     OzoneOutputStream key =
         createKey(client, keyName, 0, ReplicationFactor.ONE);
     int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -587,7 +587,7 @@ class TestBlockOutputStreamWithFailures {
       OzoneOutputStream key =
           createKey(client, keyName, 0, ReplicationFactor.ONE);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes at least putBlock for first flushSize worth of data
@@ -678,7 +678,7 @@ class TestBlockOutputStreamWithFailures {
           createKey(client, keyName, 3 * BLOCK_SIZE,
               ReplicationFactor.ONE);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes at least putBlock for first flushSize worth of data
