@@ -105,7 +105,7 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
                     OmPrefixInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<OzoneTokenIdentifier, Long>
-            DTOKEN_TABLE =
+      DELEGATION_TOKEN_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.DELEGATION_TOKEN_TABLE,
                     TokenIdentifierCodec.get(),
@@ -228,7 +228,7 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           DELETED_DIR_TABLE,
           DELETED_TABLE,
           DIRECTORY_TABLE,
-          DTOKEN_TABLE,
+          DELEGATION_TOKEN_TABLE,
           FILE_TABLE,
           KEY_TABLE,
           META_TABLE,
