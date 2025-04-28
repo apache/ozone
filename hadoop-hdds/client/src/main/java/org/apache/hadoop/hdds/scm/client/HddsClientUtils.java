@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
@@ -48,6 +49,10 @@ import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class HddsClientUtils {
+  @VisibleForTesting
+  static final int MAX_BUCKET_NAME_LENGTH_IN_LOG =
+      2 * OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH;
+
   private static final List<Class<? extends Exception>> EXCEPTION_LIST =
       ImmutableList.<Class<? extends Exception>>builder()
           .add(TimeoutException.class)
@@ -68,10 +73,26 @@ public final class HddsClientUtils {
       throw new IllegalArgumentException(resType + " name is null");
     }
 
-    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
-        resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH) {
       throw new IllegalArgumentException(resType +
-          " name '" + resName + "' is of illegal length, " + "valid length is 3-63 characters");
+          " name '" + resName + "' is too short, " +
+          "valid length is 3-63 characters");
+    }
+
+    if (resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+      String nameToReport;
+
+      if (resName.length() > MAX_BUCKET_NAME_LENGTH_IN_LOG) {
+        nameToReport = String.format(
+            "%s...",
+            resName.substring(0, MAX_BUCKET_NAME_LENGTH_IN_LOG));
+      } else {
+        nameToReport = resName;
+      }
+
+      throw new IllegalArgumentException(resType +
+          " name '" + nameToReport + "' is too long, " +
+          "valid length is 3-63 characters");
     }
 
     if (resName.charAt(0) == '.' || resName.charAt(0) == '-') {
