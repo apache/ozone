@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.jupiter.api.AfterAll;
@@ -130,8 +131,7 @@ public class TestSCMInstallSnapshot {
     assertNotNull(parent);
     Path fileName = location.getFileName();
     assertNotNull(fileName);
-    final DBStore db = HAUtils.loadDB(conf, parent.toFile(),
-        fileName.toString(), SCMDBDefinition.get());
+    final DBStore db = DBStoreBuilder.newBuilder(conf, SCMDBDefinition.get(), location.toFile()).build();
     // Hack the transaction index in the checkpoint so as to ensure the
     // checkpointed transaction index is higher than when it was downloaded
     // from.

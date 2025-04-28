@@ -75,9 +75,9 @@ public class RDBStore implements DBStore {
   private final ManagedStatistics statistics;
 
   @SuppressWarnings("parameternumber")
-  public RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
+  RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
-                  CodecRegistry registry, boolean readOnly,
+                  boolean readOnly,
                   String dbJmxBeanName, boolean enableCompactionDag,
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,

@@ -73,7 +73,6 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
-import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -86,7 +85,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
-import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -372,8 +370,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     omEpoch = 0;
     int maxOpenFiles = conf.getInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
-    setStore(loadDB(conf, dir, name, true, Optional.of(Boolean.TRUE),
-        maxOpenFiles, false, false, true));
+    this.store = newDBStoreBuilder(conf, name, dir)
+        .setOpenReadOnly(true)
+        .disableDefaultCFAutoCompaction(true)
+        .setMaxNumberOfOpenFiles(maxOpenFiles)
+        .setEnableCompactionDag(false)
+        .setCreateCheckpointDirs(false)
+        .setEnableRocksDbMetrics(true)
+        .build();
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
   }
@@ -404,10 +408,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         // Check if the snapshot directory exists.
         checkSnapshotDirExist(checkpoint);
       }
-      setStore(loadDB(conf, metaDir, dbName, false,
-          java.util.Optional.of(Boolean.TRUE), maxOpenFiles, false, false,
-          conf.getBoolean(OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED,
-              OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT)));
+      final boolean enableRocksDBMetrics = conf.getBoolean(
+          OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED,
+          OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT);
+      this.store = newDBStoreBuilder(conf, dbName, metaDir)
+          .setOpenReadOnly(false)
+          .disableDefaultCFAutoCompaction(true)
+          .setMaxNumberOfOpenFiles(maxOpenFiles)
+          .setEnableCompactionDag(false)
+          .setCreateCheckpointDirs(false)
+          .setEnableRocksDbMetrics(enableRocksDBMetrics)
+          .build();
+
       initializeOmTables(CacheType.PARTIAL_CACHE, false);
     } catch (IOException e) {
       stop();
@@ -531,74 +543,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles) throws IOException {
-    return loadDB(configuration, metaDir, OM_DB_NAME, false,
-        java.util.Optional.empty(), maxOpenFiles, true, true, true);
-  }
-
-  @SuppressWarnings("checkstyle:parameternumber")
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-      String dbName, boolean readOnly,
-      java.util.Optional<Boolean> disableAutoCompaction,
-      int maxOpenFiles,
-      boolean enableCompactionDag,
-      boolean createCheckpointDirs,
-      boolean enableRocksDBMetrics)
-      throws IOException {
-    RocksDBConfiguration rocksDBConfiguration =
-        configuration.getObject(RocksDBConfiguration.class);
-    DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
-        rocksDBConfiguration).setName(dbName)
-        .setOpenReadOnly(readOnly)
-        .setPath(Paths.get(metaDir.getPath()))
-        .setEnableCompactionDag(enableCompactionDag)
-        .setCreateCheckpointDirs(createCheckpointDirs)
+    return newDBStoreBuilder(configuration, null, metaDir)
+        .setOpenReadOnly(false)
+        .setEnableCompactionDag(true)
+        .setCreateCheckpointDirs(true)
+        .setEnableRocksDbMetrics(true)
         .setMaxNumberOfOpenFiles(maxOpenFiles)
-        .setEnableRocksDbMetrics(enableRocksDBMetrics);
-    disableAutoCompaction.ifPresent(
-            dbStoreBuilder::disableDefaultCFAutoCompaction);
-    return addOMTablesAndCodecs(dbStoreBuilder).build();
+        .build();
   }
 
-  public static DBStoreBuilder addOMTablesAndCodecs(DBStoreBuilder builder) {
-
-    return builder.addTable(USER_TABLE)
-        .addTable(VOLUME_TABLE)
-        .addTable(BUCKET_TABLE)
-        .addTable(KEY_TABLE)
-        .addTable(DELETED_TABLE)
-        .addTable(OPEN_KEY_TABLE)
-        .addTable(MULTIPARTINFO_TABLE)
-        .addTable(DELEGATION_TOKEN_TABLE)
-        .addTable(S3_SECRET_TABLE)
-        .addTable(PREFIX_TABLE)
-        .addTable(DIRECTORY_TABLE)
-        .addTable(FILE_TABLE)
-        .addTable(OPEN_FILE_TABLE)
-        .addTable(DELETED_DIR_TABLE)
-        .addTable(TRANSACTION_INFO_TABLE)
-        .addTable(META_TABLE)
-        .addTable(TENANT_ACCESS_ID_TABLE)
-        .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
-        .addTable(TENANT_STATE_TABLE)
-        .addTable(SNAPSHOT_INFO_TABLE)
-        .addTable(SNAPSHOT_RENAMED_TABLE)
-        .addTable(COMPACTION_LOG_TABLE)
-        .addCodec(OzoneTokenIdentifier.class, TokenIdentifierCodec.get())
-        .addCodec(OmKeyInfo.class, OmKeyInfo.getCodec(true))
-        .addCodec(RepeatedOmKeyInfo.class, RepeatedOmKeyInfo.getCodec(true))
-        .addCodec(OmBucketInfo.class, OmBucketInfo.getCodec())
-        .addCodec(OmVolumeArgs.class, OmVolumeArgs.getCodec())
-        .addProto2Codec(PersistedUserVolumeInfo.getDefaultInstance())
-        .addCodec(OmMultipartKeyInfo.class, OmMultipartKeyInfo.getCodec())
-        .addCodec(S3SecretValue.class, S3SecretValue.getCodec())
-        .addCodec(OmPrefixInfo.class, OmPrefixInfo.getCodec())
-        .addCodec(TransactionInfo.class, TransactionInfo.getCodec())
-        .addCodec(OmDirectoryInfo.class, OmDirectoryInfo.getCodec())
-        .addCodec(OmDBTenantState.class, OmDBTenantState.getCodec())
-        .addCodec(OmDBAccessIdInfo.class, OmDBAccessIdInfo.getCodec())
-        .addCodec(OmDBUserPrincipalInfo.class, OmDBUserPrincipalInfo.getCodec())
-        .addCodec(SnapshotInfo.class, SnapshotInfo.getCodec())
-        .addCodec(CompactionLogEntry.class, CompactionLogEntry.getCodec());
+  private static DBStoreBuilder newDBStoreBuilder(OzoneConfiguration conf, String name, File dir) {
+    return DBStoreBuilder.newBuilder(conf, OMDBDefinition.get(), name, dir.toPath());
   }
 
   /**
