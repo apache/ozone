@@ -24,6 +24,28 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESH
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.COMPACTION_LOG_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELEGATION_TOKEN_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.META_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.PREFIX_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.S3_SECRET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_RENAMED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_STATE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.USER_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,6 +79,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -954,12 +977,38 @@ public class TestOmMetadataManager {
     }
   }
 
+  static final String[] ALL_TABLES = new String[] {
+      USER_TABLE,
+      VOLUME_TABLE,
+      BUCKET_TABLE,
+      KEY_TABLE,
+      DELETED_TABLE,
+      OPEN_KEY_TABLE,
+      MULTIPARTINFO_TABLE,
+      S3_SECRET_TABLE,
+      DELEGATION_TOKEN_TABLE,
+      PREFIX_TABLE,
+      TRANSACTION_INFO_TABLE,
+      DIRECTORY_TABLE,
+      FILE_TABLE,
+      DELETED_DIR_TABLE,
+      OPEN_FILE_TABLE,
+      META_TABLE,
+      TENANT_ACCESS_ID_TABLE,
+      PRINCIPAL_TO_ACCESS_IDS_TABLE,
+      TENANT_STATE_TABLE,
+      SNAPSHOT_INFO_TABLE,
+      SNAPSHOT_RENAMED_TABLE,
+      COMPACTION_LOG_TABLE
+  };
+
   @Test
   public void testAllTablesAreProperInOMMetadataManagerImpl() {
-    Set<String> tablesByDefinition =
-        new HashSet<>(Arrays.asList(OmMetadataManagerImpl.ALL_TABLES));
-    Set<String> tablesInManager = omMetadataManager.listTableNames();
+    final Set<String> expected = new HashSet<>(Arrays.asList(ALL_TABLES));
+    final Set<String> tablesByDefinition = new HashSet<>(OMDBDefinition.get().getColumnFamilyNames());
+    assertEquals(expected, tablesByDefinition);
 
+    final Set<String> tablesInManager = omMetadataManager.listTableNames();
     assertEquals(tablesByDefinition, tablesInManager);
   }
 
