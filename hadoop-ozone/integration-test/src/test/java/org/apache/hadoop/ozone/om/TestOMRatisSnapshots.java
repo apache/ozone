@@ -92,6 +92,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -101,6 +102,7 @@ import org.slf4j.event.Level;
 /**
  * Tests the Ratis snapshots feature in OM.
  */
+@Timeout(5000)
 public class TestOMRatisSnapshots {
 
   private MiniOzoneHAClusterImpl cluster = null;
