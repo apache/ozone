@@ -306,6 +306,10 @@ public class ContainerChecksumTreeManager {
     // chunks from us when they reconcile.
   }
 
+  public static long getDatachecksum(ContainerProtos.ContainerChecksumInfo checksumInfo) {
+    return checksumInfo.getContainerMerkleTree().getDataChecksum();
+  }
+
   /**
    * Returns the container checksum tree file for the specified container without deserializing it.
    */

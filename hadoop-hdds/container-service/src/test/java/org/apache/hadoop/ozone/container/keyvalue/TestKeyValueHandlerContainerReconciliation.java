@@ -135,6 +135,8 @@ public class TestKeyValueHandlerContainerReconciliation {
     // Create a container with 15 blocks and 3 replicas.
     for (int i = 0; i < NUM_DATANODES; i++) {
       DatanodeDetails dnDetails = randomDatanodeDetails();
+      // Use this fake host name to track the node through the test since it's easier to visualize than a UUID.
+      dnDetails.setHostName("dn" + (i + 1));
       MockDatanode dn = new MockDatanode(dnDetails, containerDir);
       dn.addContainerWithBlocks(CONTAINER_ID, 15);
       datanodes.add(dn);
@@ -252,9 +254,9 @@ public class TestKeyValueHandlerContainerReconciliation {
 
     public MockDatanode(DatanodeDetails dnDetails, Path tempDir) throws IOException {
       this.dnDetails = dnDetails;
-      log = LoggerFactory.getLogger("mock-datanode-" + dnDetails.getUuidString());
-      Path dataVolume = Paths.get(tempDir.toString(), dnDetails.getUuidString(), "data");
-      Path metadataVolume = Paths.get(tempDir.toString(), dnDetails.getUuidString(), "metadata");
+      log = LoggerFactory.getLogger("mock-datanode-" + dnDetails.getHostName());
+      Path dataVolume = Paths.get(tempDir.toString(), dnDetails.getHostName(), "data");
+      Path metadataVolume = Paths.get(tempDir.toString(), dnDetails.getHostName(), "metadata");
 
       this.conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, dataVolume.toString());
