@@ -94,13 +94,6 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   @ParentCommand
   private Freon freon;
 
-  enum FreonOps {
-    VOLUME_CREATE,
-    BUCKET_CREATE,
-    KEY_CREATE,
-    KEY_WRITE
-  }
-
   private static final String DURATION_FORMAT = "HH:mm:ss,SSS";
 
   private static final int QUANTILES = 10;
@@ -1217,5 +1210,12 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   @VisibleForTesting
   public int getThreadPoolSize() {
     return threadPoolSize;
+  }
+
+  enum FreonOps {
+    VOLUME_CREATE,
+    BUCKET_CREATE,
+    KEY_CREATE,
+    KEY_WRITE
   }
 }
