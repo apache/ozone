@@ -47,14 +47,6 @@ import org.apache.ratis.util.function.CheckedBiConsumer;
  */
 public abstract class OMVolumeAclRequest extends OMVolumeRequest {
 
-  /**
-   * Volume ACL operation.
-   */
-  public interface VolumeAclOp extends
-      CheckedBiConsumer<List<OzoneAcl>, OmVolumeArgs, IOException> {
-    // just a shortcut to avoid having to repeat long list of generic parameters
-  }
-
   private final VolumeAclOp omVolumeAclOp;
 
   OMVolumeAclRequest(OzoneManagerProtocolProtos.OMRequest omRequest,
@@ -200,4 +192,12 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
    */
   abstract void onComplete(Result result, Exception ex, long trxnLogIndex,
       AuditLogger auditLogger, Map<String, String> auditMap);
+
+  /**
+   * Volume ACL operation.
+   */
+  public interface VolumeAclOp extends
+      CheckedBiConsumer<List<OzoneAcl>, OmVolumeArgs, IOException> {
+    // just a shortcut to avoid having to repeat long list of generic parameters
+  }
 }

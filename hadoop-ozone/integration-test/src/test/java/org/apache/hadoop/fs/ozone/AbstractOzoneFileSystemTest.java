@@ -149,11 +149,6 @@ abstract class AbstractOzoneFileSystemTest {
       p -> !p.toUri().getPath().startsWith(TRASH_ROOT.toString());
   private String fsRoot;
 
-  AbstractOzoneFileSystemTest(boolean setDefaultFs, BucketLayout layout) {
-    enabledFileSystemPaths = setDefaultFs;
-    bucketLayout = layout;
-  }
-
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractOzoneFileSystemTest.class);
 
@@ -175,6 +170,11 @@ abstract class AbstractOzoneFileSystemTest {
   private static final UserGroupInformation UGI_USER1 = UserGroupInformation
       .createUserForTesting(USER1,  new String[] {"usergroup"});
   private OzoneFileSystem userO3fs;
+
+  AbstractOzoneFileSystemTest(boolean setDefaultFs, BucketLayout layout) {
+    enabledFileSystemPaths = setDefaultFs;
+    bucketLayout = layout;
+  }
 
   @BeforeAll
   void init() throws Exception {

@@ -73,6 +73,35 @@ public final class OzoneManagerDoubleBuffer {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerDoubleBuffer.class);
 
+  private Queue<Entry> currentBuffer;
+  private Queue<Entry> readyBuffer;
+  /**
+   * Limit the number of un-flushed transactions for {@link OzoneManagerStateMachine}.
+   */
+  private final Semaphore unFlushedTransactions;
+
+  /** To flush the buffers. */
+  private final Daemon daemon;
+  /** Is the {@link #daemon} running? */
+  private final AtomicBoolean isRunning = new AtomicBoolean(false);
+  /** Notify flush operations are completed by the {@link #daemon}. */
+  private final FlushNotifier flushNotifier;
+
+  private final OMMetadataManager omMetadataManager;
+
+  private final Consumer<TermIndex> updateLastAppliedIndex;
+
+  private final S3SecretManager s3SecretManager;
+
+  private final boolean isTracingEnabled;
+
+  private final OzoneManagerDoubleBufferMetrics metrics = OzoneManagerDoubleBufferMetrics.create();
+
+  /** Accumulative count (for testing and debug only). */
+  private final AtomicLong flushedTransactionCount = new AtomicLong();
+  /** The number of flush iterations (for testing and debug only). */
+  private final AtomicLong flushIterations = new AtomicLong();
+
   /** Entry for {@link #currentBuffer} and {@link #readyBuffer}. */
   private static class Entry {
     private final TermIndex termIndex;
@@ -159,35 +188,6 @@ public final class OzoneManagerDoubleBuffer {
   static Semaphore newSemaphore(int permits) {
     return permits > 0 ? new Semaphore(permits) : null;
   }
-
-  private Queue<Entry> currentBuffer;
-  private Queue<Entry> readyBuffer;
-  /**
-   * Limit the number of un-flushed transactions for {@link OzoneManagerStateMachine}.
-   */
-  private final Semaphore unFlushedTransactions;
-
-  /** To flush the buffers. */
-  private final Daemon daemon;
-  /** Is the {@link #daemon} running? */
-  private final AtomicBoolean isRunning = new AtomicBoolean(false);
-  /** Notify flush operations are completed by the {@link #daemon}. */
-  private final FlushNotifier flushNotifier;
-
-  private final OMMetadataManager omMetadataManager;
-
-  private final Consumer<TermIndex> updateLastAppliedIndex;
-
-  private final S3SecretManager s3SecretManager;
-
-  private final boolean isTracingEnabled;
-
-  private final OzoneManagerDoubleBufferMetrics metrics = OzoneManagerDoubleBufferMetrics.create();
-
-  /** Accumulative count (for testing and debug only). */
-  private final AtomicLong flushedTransactionCount = new AtomicLong();
-  /** The number of flush iterations (for testing and debug only). */
-  private final AtomicLong flushIterations = new AtomicLong();
 
   private OzoneManagerDoubleBuffer(Builder b) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
@@ -613,21 +613,6 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   static class FlushNotifier {
-    static class Entry {
-      private final CompletableFuture<Integer> future = new CompletableFuture<>();
-      private int count;
-
-      private CompletableFuture<Integer> await() {
-        count++;
-        return future;
-      }
-
-      private int complete() {
-        Preconditions.assertTrue(future.complete(count));
-        return future.join();
-      }
-    }
-
     /** The size of the map is at most two since it uses {@link #flushCount} + 2 in {@link #await()} .*/
     private final Map<Integer, Entry> flushFutures = new TreeMap<>();
     private int awaitCount;
@@ -651,6 +636,21 @@ public final class OzoneManagerDoubleBuffer {
       }
       LOG.debug("notifyFlush {}, awaitCount: {} -> {}", flush, await, awaitCount);
       return await;
+    }
+
+    static class Entry {
+      private final CompletableFuture<Integer> future = new CompletableFuture<>();
+      private int count;
+
+      private CompletableFuture<Integer> await() {
+        count++;
+        return future;
+      }
+
+      private int complete() {
+        Preconditions.assertTrue(future.complete(count));
+        return future.join();
+      }
     }
   }
 }

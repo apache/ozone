@@ -46,18 +46,6 @@ public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
   @CommandLine.ArgGroup(multiplicity = "1")
   private TransactionsOption group;
 
-  static class TransactionsOption {
-    @CommandLine.Option(names = {"-a", "--all"},
-        description = "Get all the failed transactions.")
-    private boolean getAll;
-
-    @CommandLine.Option(names = {"-c", "--count"},
-        defaultValue = "20",
-        description = "Get at most the count number of the" +
-            " failed transactions.")
-    private int count;
-  }
-
   @CommandLine.Option(names = {"-s", "--startTxId", "--start-tx-id"},
       defaultValue = "0",
       description = "The least transaction ID to start with, default 0." +
@@ -88,5 +76,17 @@ public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
     } else {
       System.out.println(result);
     }
+  }
+
+  static class TransactionsOption {
+    @CommandLine.Option(names = {"-a", "--all"},
+        description = "Get all the failed transactions.")
+    private boolean getAll;
+
+    @CommandLine.Option(names = {"-c", "--count"},
+        defaultValue = "20",
+        description = "Get at most the count number of the" +
+            " failed transactions.")
+    private int count;
   }
 }
