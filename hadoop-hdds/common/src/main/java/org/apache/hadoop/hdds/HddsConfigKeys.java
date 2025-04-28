@@ -74,10 +74,6 @@ public final class HddsConfigKeys {
   public static final String HDDS_CONTAINER_CLOSE_THRESHOLD =
       "hdds.container.close.threshold";
   public static final float HDDS_CONTAINER_CLOSE_THRESHOLD_DEFAULT = 0.9f;
-
-  public static final String HDDS_SCM_TXN_DN_COMMIT_MAP_SIZE = "hdds.scm.txn.dn.commit.map.size";
-
-  public static final int HDDS_SCM_TXN_DN_COMMIT_MAP_SIZE_DEFAULT = 5000000;
   public static final String HDDS_SCM_SAFEMODE_ENABLED =
       "hdds.scm.safemode.enabled";
 
