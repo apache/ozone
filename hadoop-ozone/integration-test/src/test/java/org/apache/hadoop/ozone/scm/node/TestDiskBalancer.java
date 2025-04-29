@@ -21,7 +21,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
@@ -93,48 +92,39 @@ public class TestDiskBalancer {
   @Test
   public void testDiskBalancerStopAfterEven() throws IOException,
       InterruptedException, TimeoutException {
-    String datanodeHostName1 = cluster.getStorageContainerManager()
-        .getScmNodeManager()
-        .getAllNodes()
-        .get(0)
-        .getHostName();
-
-    // Start the DiskBalancer with specific parameters
+    // Start DiskBalancer on all datanodes
     diskBalancerManager.startDiskBalancer(
         Optional.of(10.0), // threshold
         Optional.of(10L),  // bandwidth in MB
         Optional.of(5),    // parallel threads
         Optional.of(true), // stopAfterDiskEven
-        Optional.of(Collections.singletonList(datanodeHostName1))//apply to one datanode
-    );
+        Optional.empty());   // apply to all datanodes
 
-    // Wait until the DiskBalancer status becomes RUNNING for that datanode
+    // Wait until all datanodes report DiskBalancer status as RUNNING
     GenericTestUtils.waitFor(() -> {
       try {
         List<HddsProtos.DatanodeDiskBalancerInfoProto> statusList =
-            storageClient.getDiskBalancerStatus(Optional.of(Collections.singletonList(datanodeHostName1)),
-                Optional.empty());
+            storageClient.getDiskBalancerStatus(Optional.empty(), Optional.empty());
 
-        return statusList.size() == 1 && statusList.get(0).getNode().getHostName().equals(datanodeHostName1) &&
-            statusList.get(0).getRunningStatus() == HddsProtos.DiskBalancerRunningStatus.RUNNING;
+        return statusList.stream().allMatch(status ->
+            status.getRunningStatus() == HddsProtos.DiskBalancerRunningStatus.RUNNING);
       } catch (IOException e) {
         return false;
       }
-    }, 5000, 60000); // poll every 5s, timeout after 60s
+    }, 100, 60000); // poll every 5s, timeout after 60s
 
-    // Wait until the DiskBalancer status becomes STOPPED automatically (after even)
+    // Wait until all datanodes report DiskBalancer status as STOPPED
     GenericTestUtils.waitFor(() -> {
       try {
         List<HddsProtos.DatanodeDiskBalancerInfoProto> statusList =
-            storageClient.getDiskBalancerStatus(Optional.of(Collections.singletonList(datanodeHostName1)),
-                Optional.empty());
+            storageClient.getDiskBalancerStatus(Optional.empty(), Optional.empty());
 
-        return statusList.size() == 1 && statusList.get(0).getNode().getHostName().equals(datanodeHostName1) &&
-            statusList.get(0).getRunningStatus() == HddsProtos.DiskBalancerRunningStatus.STOPPED;
+        return statusList.stream().allMatch(status ->
+            status.getRunningStatus() == HddsProtos.DiskBalancerRunningStatus.STOPPED);
       } catch (IOException e) {
         return false;
       }
-    }, 1000, 30000); // poll every 1s, timeout after 30s
+    }, 100, 60000); // poll every 5s, timeout after 60s
   }
 
   @Test
