@@ -33,6 +33,8 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
+
 /**
  * Mixin to handle common data and metadata scan operations among background and on-demand scanners.
  */
@@ -77,14 +79,16 @@ public class ContainerScannerMixin {
       }
 
       if (updatedDataChecksum != originalDataChecksum) {
-        String message = "Container data checksum updated from " + originalDataChecksum + " to " + updatedDataChecksum;
+        String message =
+            "Container data checksum updated from " + checksumToString(originalDataChecksum) + " to " +
+                checksumToString(updatedDataChecksum);
         if (hasChecksumFile) {
+          log.warn(message);
+          ContainerLogger.logChecksumUpdated(containerData, originalDataChecksum);
+        } else {
           // If this is the first time the scanner has run with the feature to generate a checksum file, don't
           // log a warning for the checksum update.
           log.debug(message);
-        } else {
-          log.warn(message);
-          ContainerLogger.logChecksumUpdated(containerData, originalDataChecksum);
         }
       }
 
@@ -133,7 +137,8 @@ public class ContainerScannerMixin {
       return false;
     }
 
-    return !recentlyScanned(container.getContainerData());
+//    return !recentlyScanned(container.getContainerData());
+    return true;
   }
 
   public boolean shouldScanData(Container<?> container) {
