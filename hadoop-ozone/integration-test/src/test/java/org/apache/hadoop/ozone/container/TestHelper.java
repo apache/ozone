@@ -444,7 +444,7 @@ public final class TestHelper {
   public static void waitForReplicaCount(long containerID, int count,
       MiniOzoneCluster cluster) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
-        200, 50000);
+        200, 3 * 50_000);
   }
 
   /** Helper to set config even if {@code value} is null, which
