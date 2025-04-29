@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 
 import com.google.common.base.Preconditions;
@@ -237,10 +236,7 @@ public class ContainerReader implements Runnable {
       }
 
       try {
-        if (kvContainer.getContainerState() == OPEN) {
-          // only open container would get new data written in
-          containerData.commitSpace();
-        }
+        containerData.commitSpace();
         containerSet.addContainer(kvContainer);
       } catch (StorageContainerException e) {
         if (e.getResult() != ContainerProtos.Result.CONTAINER_EXISTS) {
