@@ -192,7 +192,6 @@ public class TestIncrementalContainerReportHandler {
     }
   }
 
-
   @Test
   public void testClosingToClosed() throws IOException, TimeoutException {
     final IncrementalContainerReportHandler reportHandler =

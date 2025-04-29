@@ -434,7 +434,6 @@ public class TestDeletedBlockLog {
     assertEquals(30 * THREE, blocks.size());
   }
 
-
   @Test
   public void testSCMDelIteratorProgress() throws Exception {
     int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
@@ -570,7 +569,6 @@ public class TestDeletedBlockLog {
               "second transactions %s for Dn %s", txSet1, txSet2, dnId));
     }
   }
-
 
   private void assertContainsAllTransactions(
       DatanodeDeletedBlockTransactions transactions1,

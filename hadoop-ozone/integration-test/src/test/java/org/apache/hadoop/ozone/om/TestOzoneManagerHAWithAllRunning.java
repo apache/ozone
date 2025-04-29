@@ -244,7 +244,6 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
         () -> objectStore.deleteVolume(volumeName));
   }
 
-
   @Test
   public void testAllBucketOperations() throws Exception {
     String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);

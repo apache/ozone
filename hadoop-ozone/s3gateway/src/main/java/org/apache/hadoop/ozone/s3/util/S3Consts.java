@@ -26,11 +26,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 @InterfaceAudience.Private
 public final class S3Consts {
 
-  //Never Constructed
-  private S3Consts() {
-
-  }
-
   public static final String COPY_SOURCE_HEADER = "x-amz-copy-source";
   public static final String COPY_SOURCE_HEADER_RANGE =
       "x-amz-copy-source-range";
@@ -50,7 +45,6 @@ public final class S3Consts {
   public static final String STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER =
       "STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER";
 
-
   // Constants related to Range Header
   public static final String COPY_SOURCE_IF_PREFIX = "x-amz-copy-source-if-";
   public static final String COPY_SOURCE_IF_MODIFIED_SINCE =
@@ -64,7 +58,6 @@ public final class S3Consts {
   public static final String ACCEPT_RANGE_HEADER = "Accept-Ranges";
   public static final String CONTENT_RANGE_HEADER = "Content-Range";
 
-
   public static final Pattern RANGE_HEADER_MATCH_PATTERN =
       Pattern.compile("bytes=(?<start>[0-9]*)-(?<end>[0-9]*)");
 
@@ -76,7 +69,6 @@ public final class S3Consts {
   // Constants related to custom metadata
   public static final String CUSTOM_METADATA_HEADER_PREFIX = "x-amz-meta-";
   public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
-
 
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";
@@ -95,6 +87,10 @@ public final class S3Consts {
   public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
   public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
 
+  //Never Constructed
+  private S3Consts() {
+
+  }
 
   /**
    * Copy directive for metadata and tags.

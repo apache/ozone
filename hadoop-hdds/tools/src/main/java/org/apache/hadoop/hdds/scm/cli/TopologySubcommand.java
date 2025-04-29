@@ -181,9 +181,9 @@ public class TopologySubcommand extends ScmSubcommand
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < ports.size(); i++) {
       HddsProtos.Port port = ports.get(i);
-      sb.append(port.getName()).append("=").append(port.getValue());
+      sb.append(port.getName()).append('=').append(port.getValue());
       if (i < ports.size() - 1) {
-        sb.append(",");
+        sb.append(',');
       }
     }
     return sb.toString();

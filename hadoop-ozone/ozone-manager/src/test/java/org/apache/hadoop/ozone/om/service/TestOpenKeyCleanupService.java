@@ -457,7 +457,6 @@ class TestOpenKeyCleanupService {
     return omKeyInfo;
   }
 
-
   void waitForOpenKeyCleanup(boolean hsync, BucketLayout layout)
       throws Exception {
     GenericTestUtils.waitFor(() -> 0 == getExpiredOpenKeys(hsync, layout),

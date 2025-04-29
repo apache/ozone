@@ -47,7 +47,6 @@ public class TracingFilter implements ContainerRequestFilter,
   @Context
   private ResourceInfo resourceInfo;
 
-
   @Override
   public void filter(ContainerRequestContext requestContext) {
     finishAndCloseActiveSpan();

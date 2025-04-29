@@ -324,7 +324,6 @@ public class TestBlockManager {
     });
   }
 
-
   @Test
   void testBlockDistributionWithMultipleDisks() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
@@ -454,7 +453,6 @@ public class TestBlockManager {
         t.getMessage());
   }
 
-
   @Test
   public void testAllocateBlockFailureInSafeMode() {
     scm.getScmContext().updateSafeModeStatus(
@@ -577,7 +575,7 @@ public class TestBlockManager {
   public void testBlockAllocationWithNoAvailablePipelines()
       throws IOException {
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
-      pipelineManager.closePipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline.getId());
     }
     assertEquals(0, pipelineManager.getPipelines(replicationConfig).size());
     assertNotNull(blockManager

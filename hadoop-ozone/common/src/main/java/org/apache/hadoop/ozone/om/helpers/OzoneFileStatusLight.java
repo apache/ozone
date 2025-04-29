@@ -132,7 +132,7 @@ public class OzoneFileStatusLight {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append(getClass().getSimpleName());
-    sb.append("{");
+    sb.append('{');
     if (keyInfo == null) {
       sb.append("<root>");
     } else {
@@ -141,7 +141,7 @@ public class OzoneFileStatusLight {
         sb.append(" (dir)");
       }
     }
-    sb.append("}");
+    sb.append('}');
     return sb.toString();
   }
 

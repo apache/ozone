@@ -63,6 +63,7 @@ public class TestAuditParser {
       .getClassLoader().getResource("testaudit.log").getPath();
   private static final String LOGS1 = TestAuditParser.class
       .getClassLoader().getResource("testloadaudit.log").getPath();
+
   /**
    * Creates output directory which will be used by the test-cases.
    * If a test-case needs a separate directory, it has to create a random

@@ -1263,7 +1263,6 @@ public class TestOzoneShellHA {
 
   }
 
-
   @Test
   @SuppressWarnings("methodlength")
   public void testShQuota() throws Exception {
@@ -1848,7 +1847,6 @@ public class TestOzoneShellHA {
           e.getCause().getMessage());
     }
   }
-
 
   @Test
   public void testKeyDeleteOrSkipTrashWhenTrashEnableFSO()

@@ -34,6 +34,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestOzoneAddress {
 
+  private OzoneAddress address;
+
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
         {"o3://localhost:9878/"},
@@ -43,8 +45,6 @@ public class TestOzoneAddress {
         {""}
     });
   }
-
-  private OzoneAddress address;
 
   @ParameterizedTest
   @MethodSource("data")

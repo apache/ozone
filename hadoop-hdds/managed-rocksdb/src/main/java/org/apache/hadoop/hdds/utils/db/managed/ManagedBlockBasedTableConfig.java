@@ -48,7 +48,6 @@ public class ManagedBlockBasedTableConfig extends BlockBasedTableConfig {
 
     blockCacheHolder = blockCache;
     super.setBlockCache(blockCache);
-    super.setCacheIndexAndFilterBlocks(true);
     return this;
   }
 

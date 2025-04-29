@@ -427,7 +427,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
     }
   }
 
-
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
   public void selectedContainerShouldNotAlreadyHaveBeenSelected(@Nonnull MockedSCM mockedSCM)

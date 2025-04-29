@@ -83,8 +83,6 @@ public class TestNormalizePaths {
     assertThat(ex.getMessage()).contains("Invalid KeyPath");
   }
 
-
-
   @Test
   public void testNormalizePathsDisable() throws OMException {
 

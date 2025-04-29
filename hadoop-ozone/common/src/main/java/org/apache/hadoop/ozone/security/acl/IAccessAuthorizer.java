@@ -70,6 +70,7 @@ public interface IAccessAuthorizer {
             + " > 16, check the commit of this change and update the code.");
       }
     }
+
     private static ACLType[] vals = ACLType.values();
 
     public static int getNoOfAcls() {
@@ -173,10 +174,6 @@ public interface IAccessAuthorizer {
 
     // TODO: Add support for acl checks based on CLIENT_IP.
 
-    @Override
-    public String toString() {
-      return value;
-    }
     /**
      * String value for this Enum.
      */
@@ -189,6 +186,11 @@ public interface IAccessAuthorizer {
      */
     ACLIdentityType(String val) {
       value = val;
+    }
+
+    @Override
+    public String toString() {
+      return value;
     }
   }
 

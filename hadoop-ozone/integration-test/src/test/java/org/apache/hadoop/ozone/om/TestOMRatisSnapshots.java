@@ -104,6 +104,9 @@ import org.slf4j.event.Level;
  */
 @Timeout(5000)
 public class TestOMRatisSnapshots {
+  // tried up to 1000 snapshots and this test works, but some of the
+  //  timeouts have to be increased.
+  private static final int SNAPSHOTS_TO_CREATE = 100;
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -190,10 +193,6 @@ public class TestOMRatisSnapshots {
       cluster.shutdown();
     }
   }
-
-  // tried up to 1000 snapshots and this test works, but some of the
-  //  timeouts have to be increased.
-  private static final int SNAPSHOTS_TO_CREATE = 100;
 
   @Test
   public void testInstallSnapshot(@TempDir Path tempDir) throws Exception {
@@ -515,9 +514,11 @@ public class TestOMRatisSnapshots {
   static class IncrementData {
     private List<String> keys;
     private SnapshotInfo snapshotInfo;
+
     public List<String> getKeys() {
       return keys;
     }
+
     public SnapshotInfo getSnapshotInfo() {
       return snapshotInfo;
     }
@@ -1135,6 +1136,7 @@ public class TestOMRatisSnapshots {
     private final File snapshotDir;
     private final List<Set<String>> sstSetList;
     private final Path tempDir;
+
     SnapshotMaxSizeInjector(OzoneManager om, File snapshotDir,
                             List<Set<String>> sstSetList, Path tempDir) {
       this.om = om;

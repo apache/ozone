@@ -159,7 +159,7 @@ public final class ReplicateContainerCommand
     StringBuilder sb = new StringBuilder();
     sb.append(getType());
     sb.append(": cmdID: ").append(getId())
-        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", encodedToken: \"").append(getEncodedToken()).append('"')
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline());
     sb.append(", containerId=").append(getContainerID());

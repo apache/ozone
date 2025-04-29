@@ -93,6 +93,7 @@ public class TestContentGenerator {
       @Override
       public void hflush() throws IOException {
       }
+
       @Override
       public void hsync() throws IOException {
       }
@@ -102,6 +103,7 @@ public class TestContentGenerator {
         return true;
       }
     }
+
     ContentGenerator generator = new ContentGenerator(20, 8, 3,
         ContentGenerator.SyncOptions.HSYNC);
 

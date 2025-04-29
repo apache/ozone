@@ -173,7 +173,6 @@ public class SCMSafeModeManager implements SafeModeManager {
     }
   }
 
-
   public synchronized void validateSafeModeExitRules(String ruleName,
       EventPublisher eventQueue) {
 
@@ -277,6 +276,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     }
     return inSafeMode.get();
   }
+
   /**
    * Get the safe mode status of all rules.
    *
@@ -355,7 +355,6 @@ public class SCMSafeModeManager implements SafeModeManager {
   public DataNodeSafeModeRule getDataNodeSafeModeRule() {
     return (DataNodeSafeModeRule) exitRules.get(DN_EXIT_RULE);
   }
-
 
   /**
    * Class used during SafeMode status event.

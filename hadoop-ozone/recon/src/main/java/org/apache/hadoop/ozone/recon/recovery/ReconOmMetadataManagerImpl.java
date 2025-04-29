@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
@@ -112,7 +113,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   @Override
   public Table<String, KeyEntityInfoProtoWrapper> getKeyTableLite(BucketLayout bucketLayout) throws IOException {
     String tableName = bucketLayout.isFileSystemOptimized() ? FILE_TABLE : KEY_TABLE;
-    return getStore().getTable(tableName, String.class, KeyEntityInfoProtoWrapper.class);
+    return getStore().getTable(tableName, StringCodec.get(), KeyEntityInfoProtoWrapper.getCodec());
   }
 
   @Override
