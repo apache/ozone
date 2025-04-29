@@ -63,7 +63,6 @@ public class TestDeletingContainerHandler {
   private ECReplicationConfig ecReplicationConfig;
   private RatisReplicationConfig ratisReplicationConfig;
 
-
   @BeforeEach
   public void setup() throws IOException {
 
@@ -133,7 +132,6 @@ public class TestDeletingContainerHandler {
     //ec container
     cleanupIfNoReplicaExist(ecReplicationConfig, 1);
   }
-
 
   private void cleanupIfNoReplicaExist(
       ReplicationConfig replicationConfig, int times) {

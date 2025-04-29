@@ -17,6 +17,7 @@
 
 #suite:upgrade
 
+set -u -o pipefail
 
 TEST_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 source "$TEST_DIR/testlib.sh"
@@ -24,9 +25,6 @@ source "$TEST_DIR/testlib.sh"
 # Export variables needed by tests and ../testlib.sh.
 export TEST_DIR
 export COMPOSE_DIR="$TEST_DIR"
-
-RESULT=0
-run_test_scripts ${tests} || RESULT=$?
 
 RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 

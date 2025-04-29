@@ -43,8 +43,6 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests unhealthy container functionality in the {@link KeyValueContainer}
@@ -52,8 +50,6 @@ import org.slf4j.LoggerFactory;
  */
 @Timeout(600)
 public class TestKeyValueContainerMarkUnhealthy {
-  public static final Logger LOG = LoggerFactory.getLogger(
-      TestKeyValueContainerMarkUnhealthy.class);
 
   @TempDir
   private Path folder;

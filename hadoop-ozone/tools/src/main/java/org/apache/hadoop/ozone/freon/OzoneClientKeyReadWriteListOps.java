@@ -143,16 +143,8 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
           LoggerFactory.getLogger(OzoneClientKeyReadWriteListOps.class);
 
   private static final AtomicLong NEXT_NUMBER = new AtomicLong();
-  /**
-   * Task type of read task, or write task.
-   */
-  public enum TaskType {
-    READ_TASK,
-    WRITE_TASK,
-    LIST_TASK
-  }
-  private KeyGeneratorUtil kg;
 
+  private KeyGeneratorUtil kg;
 
   @Override
   public Void call() throws Exception {
@@ -169,7 +161,7 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
 
       timer = getMetrics().timer("key-read-write-list");
       if (objectSizeInBytes >= 0) {
-        keyContent = RandomUtils.nextBytes(objectSizeInBytes);
+        keyContent = RandomUtils.secure().randomBytes(objectSizeInBytes);
       }
       if (kg == null) {
         kg = new KeyGeneratorUtil();
@@ -276,5 +268,14 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
   @Override
   public boolean allowEmptyPrefix() {
     return true;
+  }
+
+  /**
+   * Task type of read task, or write task.
+   */
+  public enum TaskType {
+    READ_TASK,
+    WRITE_TASK,
+    LIST_TASK
   }
 }

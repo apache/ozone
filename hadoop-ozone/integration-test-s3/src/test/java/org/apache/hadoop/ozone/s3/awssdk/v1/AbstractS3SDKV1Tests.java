@@ -101,6 +101,9 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
 import org.apache.ozone.test.OzoneTestBase;
@@ -293,7 +296,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     // Upload some objects to the bucket
     for (int i = 1; i <= 10; i++) {
-      s3Client.putObject(bucketName, "key-" + i, RandomStringUtils.randomAlphanumeric(1024));
+      s3Client.putObject(bucketName, "key-" + i, RandomStringUtils.secure().nextAlphanumeric(1024));
     }
 
     // Bucket deletion should fail if there are still keys in the bucket
@@ -363,6 +366,32 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
     assertEquals("37b51d194a7513e45b56f6524f2d51f2", putObjectResult.getETag());
+  }
+
+  @Test
+  public void testPutDoubleSlashPrefixObject() throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = "//dir1";
+    final String content = "bar";
+    OzoneConfiguration conf = cluster.getConf();
+    // Create a FSO bucket for test
+    try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf)) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+      OmBucketInfo.Builder bucketInfo = new OmBucketInfo.Builder()
+          .setVolumeName(volume.getName())
+          .setBucketName(bucketName)
+          .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      OzoneManagerProtocol ozoneManagerProtocol = store.getClientProxy().getOzoneManagerClient();
+      ozoneManagerProtocol.createBucket(bucketInfo.build());
+    }
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2", putObjectResult.getETag());
+
+    S3Object object = s3Client.getObject(bucketName, keyName);
+    assertEquals(content.length(), object.getObjectMetadata().getContentLength());
   }
 
   @Test
@@ -513,7 +542,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     );
 
     for (String keyName: keyNames) {
-      s3Client.putObject(bucketName, keyName, RandomStringUtils.randomAlphanumeric(5));
+      s3Client.putObject(bucketName, keyName, RandomStringUtils.secure().nextAlphanumeric(5));
     }
 
     ListObjectsRequest listObjectsRequest = new ListObjectsRequest()
@@ -552,7 +581,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     );
 
     for (String keyName: keyNames) {
-      s3Client.putObject(bucketName, keyName, RandomStringUtils.randomAlphanumeric(5));
+      s3Client.putObject(bucketName, keyName, RandomStringUtils.secure().nextAlphanumeric(5));
     }
 
     ListObjectsV2Request listObjectsRequest = new ListObjectsV2Request()
@@ -919,7 +948,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     // Upload some objects to the bucket
     AmazonServiceException ase = assertThrows(AmazonServiceException.class,
         () -> s3Client.putObject(bucketName, keyName,
-            RandomStringUtils.randomAlphanumeric(1024)));
+            RandomStringUtils.secure().nextAlphanumeric(1024)));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(403, ase.getStatusCode());

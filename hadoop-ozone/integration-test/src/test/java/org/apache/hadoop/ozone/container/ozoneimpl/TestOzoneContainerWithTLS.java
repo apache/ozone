@@ -46,7 +46,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.slf4j.LoggerFactory.getLogger;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -77,9 +76,11 @@ import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -90,8 +91,6 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 /**
@@ -143,8 +142,7 @@ public class TestOzoneContainerWithTLS {
     dn = aDatanode();
     pipeline = createPipeline(singletonList(dn));
 
-    Logger logger = LoggerFactory.getLogger(ClientTrustManager.class);
-    setLogLevel(logger, Level.DEBUG);
+    setLogLevel(ClientTrustManager.class, Level.DEBUG);
   }
 
   @Test
@@ -224,7 +222,7 @@ public class TestOzoneContainerWithTLS {
 
   @Test
   public void testLongLivingClientWithCertRenews() throws Exception {
-    LogCapturer logs = captureLogs(getLogger(ClientTrustManager.class));
+    LogCapturer logs = captureLogs(ClientTrustManager.class);
     OzoneContainer container = createAndStartOzoneContainerInstance();
 
     ScmClientConfig scmClientConf = conf.getObject(ScmClientConfig.class);
@@ -308,8 +306,9 @@ public class TestOzoneContainerWithTLS {
     OzoneContainer container = null;
     try {
       StateContext stateContext = ContainerTestUtils.getMockContext(dn, conf);
+      VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
       container = new OzoneContainer(
-          null, dn, conf, stateContext, caClient, keyClient);
+          null, dn, conf, stateContext, caClient, keyClient, volumeChoosingPolicy);
       MutableVolumeSet volumeSet = container.getVolumeSet();
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempFolder.toFile()));
@@ -326,7 +325,7 @@ public class TestOzoneContainerWithTLS {
 
   private void assertDownloadContainerFails(long containerId,
       List<DatanodeDetails> sourceDatanodes) {
-    LogCapturer logCapture = captureLogs(SimpleContainerDownloader.LOG);
+    LogCapturer logCapture = captureLogs(SimpleContainerDownloader.class);
     SimpleContainerDownloader downloader =
         new SimpleContainerDownloader(conf, caClient);
     Path file = downloader.getContainerDataFromReplicas(containerId,

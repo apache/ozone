@@ -31,11 +31,12 @@ import org.apache.ratis.util.function.CheckedFunction;
 /**
  * Codecs to serialize/deserialize Protobuf v2 messages.
  */
-public final class Proto2Codec<M extends MessageLite>
-    implements Codec<M> {
-  private static final ConcurrentMap<Class<? extends MessageLite>,
-                                     Codec<? extends MessageLite>> CODECS
-      = new ConcurrentHashMap<>();
+public final class Proto2Codec<M extends MessageLite> implements Codec<M> {
+  private static final ConcurrentMap<Class<? extends MessageLite>, Codec<? extends MessageLite>> CODECS =
+      new ConcurrentHashMap<>();
+
+  private final Class<M> clazz;
+  private final Parser<M> parser;
 
   /**
    * @return the {@link Codec} for the given class.
@@ -45,9 +46,6 @@ public final class Proto2Codec<M extends MessageLite>
         key -> new Proto2Codec<>(t));
     return (Codec<T>) codec;
   }
-
-  private final Class<M> clazz;
-  private final Parser<M> parser;
 
   private Proto2Codec(M m) {
     this.clazz = (Class<M>) m.getClass();

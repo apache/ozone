@@ -94,13 +94,6 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   @ParentCommand
   private Freon freon;
 
-  enum FreonOps {
-    VOLUME_CREATE,
-    BUCKET_CREATE,
-    KEY_CREATE,
-    KEY_WRITE
-  }
-
   private static final String DURATION_FORMAT = "HH:mm:ss,SSS";
 
   private static final int QUANTILES = 10;
@@ -301,7 +294,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
 
     keyValueBuffer = StringUtils.string2Bytes(
-        RandomStringUtils.randomAscii(bufferSize));
+        RandomStringUtils.secure().nextAscii(bufferSize));
 
     // Compute the common initial digest for all keys without their UUID
     if (validateWrites) {
@@ -612,6 +605,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   int getNumberOfBucketsCleaned() {
     return numberOfBucketsCleaned.get();
   }
+
   /**
    * Returns true if random validation of write is enabled.
    *
@@ -725,7 +719,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
 
   private boolean createVolume(int volumeNumber) {
     String volumeName = "vol-" + volumeNumber + "-"
-        + RandomStringUtils.randomNumeric(5);
+        + RandomStringUtils.secure().nextNumeric(5);
     LOG.trace("Creating volume: {}", volumeName);
     try (AutoCloseable scope = TracingUtil
         .createActivatedSpan("createVolume")) {
@@ -756,7 +750,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
       return false;
     }
     String bucketName = "bucket-" + bucketNumber + "-" +
-        RandomStringUtils.randomNumeric(5);
+        RandomStringUtils.secure().nextNumeric(5);
     LOG.trace("Creating bucket: {} in volume: {}",
         bucketName, volume.getName());
     try (AutoCloseable scope = TracingUtil
@@ -791,7 +785,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     String bucketName = bucket.getName();
     String volumeName = bucket.getVolumeName();
     String keyName = "key-" + keyNumber + "-"
-        + RandomStringUtils.randomNumeric(5);
+        + RandomStringUtils.secure().nextNumeric(5);
     LOG.trace("Adding key: {} in bucket: {} of volume: {}",
         keyName, bucketName, volumeName);
     try {
@@ -1216,5 +1210,12 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   @VisibleForTesting
   public int getThreadPoolSize() {
     return threadPoolSize;
+  }
+
+  enum FreonOps {
+    VOLUME_CREATE,
+    BUCKET_CREATE,
+    KEY_CREATE,
+    KEY_WRITE
   }
 }

@@ -29,7 +29,6 @@ public class DataMoveInfo {
   private final Map<UUID, Long> sizeEnteringNodes;
   private final Map<UUID, Long> sizeLeavingNodes;
 
-
   public DataMoveInfo(
       long sizeScheduledForMove,
       long dataSizeMoved,

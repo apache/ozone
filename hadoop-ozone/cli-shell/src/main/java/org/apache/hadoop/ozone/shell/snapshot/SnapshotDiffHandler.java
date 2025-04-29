@@ -73,7 +73,6 @@ public class SnapshotDiffHandler extends Handler {
       hidden = true)
   private boolean forceFullDiff;
 
-
   @CommandLine.Option(names = {"-c", "--cancel"},
       description = "Request to cancel a running SnapshotDiff job. " +
           "If the job is not IN_PROGRESS, the request will fail.",
@@ -161,7 +160,6 @@ public class SnapshotDiffHandler extends Handler {
     }
     return diffReportNode;
   }
-
 
   private ObjectNode getJsonObject(SnapshotDiffReport.DiffReportEntry diffReportEntry) {
     ObjectNode diffReportNode = JsonUtils.createObjectNode(null);

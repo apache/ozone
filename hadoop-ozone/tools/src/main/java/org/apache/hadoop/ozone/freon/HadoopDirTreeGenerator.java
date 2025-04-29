@@ -184,7 +184,7 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
 
   private String makeDirWithGivenNumberOfFiles(String parent)
           throws Exception {
-    String dir = RandomStringUtils.randomAlphanumeric(length);
+    String dir = RandomStringUtils.secure().nextAlphanumeric(length);
     dir = parent.concat("/").concat(dir);
     getFileSystem().mkdirs(new Path(dir));
     totalDirsCnt.incrementAndGet();
@@ -195,7 +195,7 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
 
   private void createFile(String dir, long counter) throws Exception {
     String fileName = dir.concat("/").concat(RandomStringUtils.
-            randomAlphanumeric(length));
+            secure().nextAlphanumeric(length));
     Path file = new Path(fileName);
     if (LOG.isDebugEnabled()) {
       LOG.debug("FilePath:{}", file);

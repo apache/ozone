@@ -317,12 +317,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     if (failedOmSet.size() >= numOzoneManagers / 2) {
       return false;
     }
-    return RandomUtils.nextBoolean();
+    return RandomUtils.secure().randomBoolean();
   }
 
   // Datanode specific
   private int getNumberOfDnToFail() {
-    return RandomUtils.nextBoolean() ? 1 : 2;
+    return RandomUtils.secure().randomBoolean() ? 1 : 2;
   }
 
   public Set<DatanodeDetails> dnToFail() {
@@ -395,7 +395,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     if (failedScmSet.size() >= numStorageContainerManagers / 2) {
       return false;
     }
-    return RandomUtils.nextBoolean();
+    return RandomUtils.secure().randomBoolean();
   }
 
 }

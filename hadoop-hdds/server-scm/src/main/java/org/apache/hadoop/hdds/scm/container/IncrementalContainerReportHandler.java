@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container;
 import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -35,37 +36,47 @@ import org.slf4j.LoggerFactory;
 /**
  * Handles incremental container reports from datanode.
  */
-public class IncrementalContainerReportHandler extends
-    AbstractContainerReportHandler
+public class IncrementalContainerReportHandler
+    extends AbstractContainerReportHandler
     implements EventHandler<IncrementalContainerReportFromDatanode> {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       IncrementalContainerReportHandler.class);
 
-  private final NodeManager nodeManager;
-
   public IncrementalContainerReportHandler(
       final NodeManager nodeManager,
       final ContainerManager containerManager,
       final SCMContext scmContext) {
-    super(containerManager, scmContext, LOG);
-    this.nodeManager = nodeManager;
+    super(nodeManager, containerManager, scmContext);
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return LOG;
   }
 
   @Override
   public void onMessage(final IncrementalContainerReportFromDatanode report,
                         final EventPublisher publisher) {
-    final DatanodeDetails dnFromReport = report.getDatanodeDetails();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing incremental container report from data node {}", dnFromReport);
-    }
-    final DatanodeDetails dd = nodeManager.getNode(dnFromReport.getID());
-    if (dd == null) {
-      LOG.warn("Received container report from unknown datanode {}",
-          dnFromReport);
+    final DatanodeDetails datanode = getDatanodeDetails(report);
+    if (datanode == null) {
       return;
     }
+    processICR(report, publisher, datanode);
+  }
 
+  protected DatanodeDetails getDatanodeDetails(final IncrementalContainerReportFromDatanode report) {
+    final DatanodeDetails dnFromReport = report.getDatanodeDetails();
+    getLogger().debug("Processing incremental container report from datanode {}", dnFromReport);
+    final DatanodeDetails dd = getNodeManager().getNode(dnFromReport.getID());
+    if (dd == null) {
+      getLogger().warn("Datanode not found: {}", dnFromReport);
+    }
+    return dd;
+  }
+
+  protected void processICR(IncrementalContainerReportFromDatanode report,
+      EventPublisher publisher, DatanodeDetails dd) {
     boolean success = false;
     // HDDS-5249 - we must ensure that an ICR and FCR for the same datanode
     // do not run at the same time or it can result in a data consistency
@@ -74,52 +85,44 @@ public class IncrementalContainerReportHandler extends
     synchronized (dd) {
       for (ContainerReplicaProto replicaProto :
           report.getReport().getReportList()) {
+        Object detailsForLogging = getDetailsForLogging(null, replicaProto, dd);
         ContainerID id = ContainerID.valueOf(replicaProto.getContainerID());
-        ContainerInfo container = null;
+        final ContainerInfo container;
         try {
           try {
             container = getContainerManager().getContainer(id);
             // Ensure we reuse the same ContainerID instance in containerInfo
             id = container.containerID();
+            detailsForLogging = getDetailsForLogging(container, replicaProto, dd);
           } finally {
-            if (replicaProto.getState().equals(
-                ContainerReplicaProto.State.DELETED)) {
-              nodeManager.removeContainer(dd, id);
+            if (replicaProto.getState() == State.DELETED) {
+              getNodeManager().removeContainer(dd, id);
             } else {
-              nodeManager.addContainer(dd, id);
+              getNodeManager().addContainer(dd, id);
             }
           }
           if (ContainerReportValidator.validate(container, dd, replicaProto)) {
-            processContainerReplica(dd, container, replicaProto, publisher);
+            processContainerReplica(dd, container, replicaProto, publisher, detailsForLogging);
           }
           success = true;
         } catch (ContainerNotFoundException e) {
-          LOG.warn("Container {} not found!", replicaProto.getContainerID());
+          getLogger().warn("Container not found: {}", detailsForLogging);
         } catch (NodeNotFoundException ex) {
-          LOG.error("Received ICR from unknown datanode {}",
-              report.getDatanodeDetails(), ex);
+          getLogger().error("{}: {}", ex, detailsForLogging);
         } catch (ContainerReplicaNotFoundException e) {
-          LOG.warn("Container {} replica not found!",
-              replicaProto.getContainerID());
+          getLogger().warn("Container replica not found: {}", detailsForLogging, e);
         } catch (SCMException ex) {
           if (ex.getResult() == SCMException.ResultCodes.SCM_NOT_LEADER) {
-            LOG.info("Failed to process {} container {}: {}",
-                replicaProto.getState(), id, ex.getMessage());
+            getLogger().info("SCM_NOT_LEADER: Failed to process {}", detailsForLogging);
           } else {
-            LOG.error("Exception while processing ICR for container {}",
-                replicaProto.getContainerID(), ex);
+            getLogger().info("Failed to process {}", detailsForLogging, ex);
           }
         } catch (IOException | InvalidStateTransitionException e) {
-          LOG.error("Exception while processing ICR for container {}",
-              replicaProto.getContainerID(), e);
+          getLogger().info("Failed to process {}", detailsForLogging, e);
         }
       }
     }
 
     getContainerManager().notifyContainerReportProcessing(false, success);
-  }
-
-  protected NodeManager getNodeManager() {
-    return this.nodeManager;
   }
 }

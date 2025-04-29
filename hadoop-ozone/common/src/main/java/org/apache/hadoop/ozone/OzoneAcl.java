@@ -97,7 +97,6 @@ public final class OzoneAcl {
         BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer()), getType().toString(), getAclScope()));
   }
 
-
   private static int toInt(int aclTypeOrdinal) {
     return 1 << aclTypeOrdinal;
   }

@@ -29,11 +29,6 @@ import org.apache.hadoop.security.token.TokenIdentifier;
  * Helper class for converting protobuf objects.
  */
 public final class OzonePBHelper {
-
-  private OzonePBHelper() {
-    // no instances
-  }
-
   // Borrowed from ProtobufHelper.java in hadoop-common involving protobuf
   // messages to avoid breakage due to shading of protobuf in Hadoop-3.3+.
   /**
@@ -44,8 +39,11 @@ public final class OzonePBHelper {
    * This map should not be accessed directly. Used the getFixedByteString
    * methods instead.
    */
-  private static final Map<Object, ByteString>
-      FIXED_BYTE_STRING_CACHE = new ConcurrentHashMap<>();
+  private static final Map<Object, ByteString> FIXED_BYTE_STRING_CACHE = new ConcurrentHashMap<>();
+
+  private OzonePBHelper() {
+    // no instances
+  }
 
   /**
    * Get the ByteString for frequently used fixed and small set strings.

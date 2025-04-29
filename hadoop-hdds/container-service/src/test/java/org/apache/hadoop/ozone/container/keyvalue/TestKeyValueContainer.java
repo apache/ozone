@@ -492,7 +492,6 @@ public class TestKeyValueContainer {
     container.update(metadata, true);
   }
 
-
   /**
    * Set container state to CLOSED.
    */
@@ -626,7 +625,6 @@ public class TestKeyValueContainer {
     assertNotNull(keyValueContainer.getContainerReport());
   }
 
-
   @ContainerTestVersionInfo.ContainerTest
   public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -667,10 +665,8 @@ public class TestKeyValueContainer {
     });
 
     assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, exception.getResult());
-    assertThat(exception)
-        .hasMessageStartingWith("Updating a closed container without force option is not allowed. ContainerID: ");
+    assertThat(exception).hasMessageContaining(keyValueContainerData.toString());
   }
-
 
   @ContainerTestVersionInfo.ContainerTest
   public void testContainerRocksDB(ContainerTestVersionInfo versionInfo)
@@ -882,6 +878,7 @@ public class TestKeyValueContainer {
           TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
           container.importContainerData(fis, packer);
           containerList.add(container);
+          assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, container.getContainerData().getState());
         }
       }
 
@@ -891,12 +888,16 @@ public class TestKeyValueContainer {
               CONF).getStore();
       List<LiveFileMetaData> fileMetaDataList1 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
+      // When using Table.loadFromFile() in loadKVContainerData(),
+      // there were as many SST files generated as the number of imported containers
+      // After moving away from using Table.loadFromFile(), no SST files are generated unless the db is force flushed
+      assertEquals(0, fileMetaDataList1.size());
       hddsVolume.compactDb();
       // Sleep a while to wait for compaction to complete
       Thread.sleep(7000);
       List<LiveFileMetaData> fileMetaDataList2 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
-      assertThat(fileMetaDataList2.size()).isLessThan(fileMetaDataList1.size());
+      assertThat(fileMetaDataList2).hasSizeLessThanOrEqualTo(fileMetaDataList1.size());
     } finally {
       // clean up
       for (KeyValueContainer c : containerList) {

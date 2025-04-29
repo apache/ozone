@@ -86,7 +86,7 @@ public class TestHtmlQuoting {
 
     doReturn(null).when(mockReq).getParameter("x");
     assertNull(quoter.getParameter("x"),
-        "Test that missing parameters dont cause NPE");
+        "Test that missing parameters don't cause NPE");
 
     doReturn(new String[] {"a<b", "b"}).when(mockReq)
         .getParameterValues("x");
@@ -95,6 +95,6 @@ public class TestHtmlQuoting {
 
     doReturn(null).when(mockReq).getParameterValues("x");
     assertNull(quoter.getParameterValues("x"),
-        "Test that missing parameters dont cause NPE for array");
+        "Test that missing parameters don't cause NPE for array");
   }
 }

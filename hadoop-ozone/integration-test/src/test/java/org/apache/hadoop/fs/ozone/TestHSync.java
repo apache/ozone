@@ -456,7 +456,6 @@ public class TestHSync {
     }
   }
 
-
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   public void testOfsHSync(boolean incrementalChunkList) throws Exception {
@@ -723,7 +722,8 @@ public class TestHSync {
     // test file with all blocks pre-allocated
     omMetrics.resetNumKeyHSyncs();
     long writtenSize = 0;
-    try (OzoneOutputStream outputStream = bucket.createKey("key-" + RandomStringUtils.randomNumeric(5),
+    try (OzoneOutputStream outputStream = bucket.createKey("key-" +
+            RandomStringUtils.secure().nextNumeric(5),
         BLOCK_SIZE * 2, ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>())) {
       // make sure at least writing 2 blocks data
       while (writtenSize <= BLOCK_SIZE) {
@@ -819,7 +819,6 @@ public class TestHSync {
       }
     }, 500, 3000);
   }
-
 
   public static Stream<Arguments> concurrentExceptionHandling() {
     return Stream.of(
@@ -1205,7 +1204,7 @@ public class TestHSync {
 
     final String keyName = UUID.randomUUID().toString();
     int fileSize = 16 << 11;
-    String s = RandomStringUtils.randomAlphabetic(bufferSize);
+    String s = RandomStringUtils.secure().nextAlphabetic(bufferSize);
     ByteBuffer byteBuffer = ByteBuffer.wrap(s.getBytes(StandardCharsets.UTF_8));
 
     int writtenSize = 0;
@@ -1328,7 +1327,7 @@ public class TestHSync {
       outputStream1.write(data2.getBytes(UTF_8), 0, data2.length());
       outputStream1.hsync();
       // write more data
-      String s = RandomStringUtils.randomAlphabetic(BLOCK_SIZE);
+      String s = RandomStringUtils.secure().nextAlphabetic(BLOCK_SIZE);
       byte[] newData = s.getBytes(StandardCharsets.UTF_8);
       outputStream1.write(newData);
 
@@ -1570,9 +1569,11 @@ public class TestHSync {
 
   private static class ErrorInjectorImpl implements ErrorInjector {
     private final AtomicInteger remaining = new AtomicInteger();
+
     void start(int count) {
       remaining.set(count);
     }
+
     @Override
     public RaftClientReply getResponse(ContainerProtos.ContainerCommandRequestProto request, ClientId clientId,
         Pipeline pipeline) {

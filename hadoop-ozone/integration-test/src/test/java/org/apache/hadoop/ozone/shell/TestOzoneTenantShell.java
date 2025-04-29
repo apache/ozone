@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.shell;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
@@ -82,8 +81,6 @@ public class TestOzoneTenantShell {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
   }
 
-  private static final String DEFAULT_ENCODING = UTF_8.name();
-
   /**
    * Set the timeout for every test.
    */
@@ -115,9 +112,7 @@ public class TestOzoneTenantShell {
   @BeforeAll
   public static void init() throws Exception {
     // Remove audit log output if it exists
-    if (AUDIT_LOG_FILE.exists()) {
-      AUDIT_LOG_FILE.delete();
-    }
+    FileUtils.deleteQuietly(AUDIT_LOG_FILE);
 
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
@@ -134,8 +129,7 @@ public class TestOzoneTenantShell {
     }
 
     testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
-    testFile.getParentFile().mkdirs();
-    testFile.createNewFile();
+    FileUtils.touch(testFile);
 
     ozoneSh = new OzoneShell();
     tenantShell = new TenantShell();
@@ -160,9 +154,7 @@ public class TestOzoneTenantShell {
       cluster.shutdown();
     }
 
-    if (AUDIT_LOG_FILE.exists()) {
-      AUDIT_LOG_FILE.delete();
-    }
+    FileUtils.deleteQuietly(AUDIT_LOG_FILE);
   }
 
   @BeforeEach
@@ -172,14 +164,14 @@ public class TestOzoneTenantShell {
     ozoneSh.getCmd().setOut(new PrintWriter(out));
     ozoneSh.getCmd().setErr(new PrintWriter(err));
     // Suppress OMNotLeaderException in the log
-    GenericTestUtils.setLogLevel(RetryInvocationHandler.LOG, Level.WARN);
+    GenericTestUtils.setLogLevel(RetryInvocationHandler.class, Level.WARN);
     // Enable debug logging for interested classes
-    GenericTestUtils.setLogLevel(OMTenantCreateRequest.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMTenantCreateRequest.class, Level.DEBUG);
     GenericTestUtils.setLogLevel(
-        OMTenantAssignUserAccessIdRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(AuthorizerLockImpl.LOG, Level.DEBUG);
+        OMTenantAssignUserAccessIdRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(AuthorizerLockImpl.class, Level.DEBUG);
 
-    GenericTestUtils.setLogLevel(OMRangerBGSyncService.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMRangerBGSyncService.class, Level.DEBUG);
   }
 
   /**

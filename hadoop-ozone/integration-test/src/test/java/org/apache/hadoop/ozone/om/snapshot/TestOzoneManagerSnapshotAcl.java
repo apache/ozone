@@ -106,7 +106,7 @@ public class TestOzoneManagerSnapshotAcl {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     final String omServiceId = "om-service-test-1"
-        + RandomStringUtils.randomNumeric(32);
+        + RandomStringUtils.secure().nextNumeric(32);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
@@ -219,7 +219,7 @@ public class TestOzoneManagerSnapshotAcl {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
-    final long numEntries = Long.parseLong(RandomStringUtils.randomNumeric(1));
+    final long numEntries = Long.parseLong(RandomStringUtils.secure().nextNumeric(1));
 
     // WHEN-THEN
     assertDoesNotThrow(
@@ -237,7 +237,7 @@ public class TestOzoneManagerSnapshotAcl {
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
     final OmKeyArgs keyArgs = getOmKeyArgs(false);
-    final long numEntries = Long.parseLong(RandomStringUtils.randomNumeric(1));
+    final long numEntries = Long.parseLong(RandomStringUtils.secure().nextNumeric(1));
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
@@ -296,7 +296,7 @@ public class TestOzoneManagerSnapshotAcl {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
-    final int maxKeys = Integer.parseInt(RandomStringUtils.randomNumeric(1));
+    final int maxKeys = Integer.parseInt(RandomStringUtils.secure().nextNumeric(1));
 
     // WHEN-THEN
     assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
@@ -310,7 +310,7 @@ public class TestOzoneManagerSnapshotAcl {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
-    final int maxKeys = Integer.parseInt(RandomStringUtils.randomNumeric(1));
+    final int maxKeys = Integer.parseInt(RandomStringUtils.secure().nextNumeric(1));
 
     // WHEN
     UserGroupInformation.setLoginUser(UGI2);
@@ -438,7 +438,6 @@ public class TestOzoneManagerSnapshotAcl {
     assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
   }
 
-
   private void setup(BucketLayout bucketLayout)
       throws IOException {
     UserGroupInformation.setLoginUser(UGI1);
@@ -562,8 +561,8 @@ public class TestOzoneManagerSnapshotAcl {
   }
 
   private void createKey(OzoneBucket bucket) throws IOException {
-    keyName = KEY_PREFIX + RandomStringUtils.randomNumeric(32);
-    byte[] data = RandomStringUtils.randomAscii(1).getBytes(UTF_8);
+    keyName = KEY_PREFIX + RandomStringUtils.secure().nextNumeric(32);
+    byte[] data = RandomStringUtils.secure().nextAscii(1).getBytes(UTF_8);
     final OzoneOutputStream fileKey = bucket.createKey(keyName, data.length);
     fileKey.write(data);
     fileKey.close();
@@ -573,7 +572,7 @@ public class TestOzoneManagerSnapshotAcl {
       throws IOException {
     final String snapshotPrefix = "snapshot-";
     final String snapshotName =
-        snapshotPrefix + RandomStringUtils.randomNumeric(32);
+        snapshotPrefix + RandomStringUtils.secure().nextNumeric(32);
     objectStore.createSnapshot(volumeName, bucketName, snapshotName);
     snapshotKeyPrefix = OmSnapshotManager
         .getSnapshotPrefix(snapshotName);
@@ -616,7 +615,7 @@ public class TestOzoneManagerSnapshotAcl {
   private void createBucket(BucketLayout bucketLayout,
       OzoneVolume volume) throws IOException {
     final String bucketPrefix = "bucket-";
-    bucketName = bucketPrefix + RandomStringUtils.randomNumeric(32);
+    bucketName = bucketPrefix + RandomStringUtils.secure().nextNumeric(32);
     final BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setOwner(ADMIN)
         .setBucketLayout(bucketLayout).build();
@@ -625,7 +624,7 @@ public class TestOzoneManagerSnapshotAcl {
 
   private void createVolume() throws IOException {
     final String volumePrefix = "volume-";
-    volumeName = volumePrefix + RandomStringUtils.randomNumeric(32);
+    volumeName = volumePrefix + RandomStringUtils.secure().nextNumeric(32);
     final VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin(ADMIN)
         .setOwner(ADMIN)

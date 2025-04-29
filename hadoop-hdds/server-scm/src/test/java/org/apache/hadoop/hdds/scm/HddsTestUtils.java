@@ -36,9 +36,11 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
@@ -51,7 +53,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -160,8 +161,8 @@ public final class HddsTestUtils {
    */
   public static NodeReportProto getRandomNodeReport(int numberOfStorageReport,
       int numberOfMetadataStorageReport) {
-    UUID nodeId = UUID.randomUUID();
-    return getRandomNodeReport(nodeId, File.separator + nodeId,
+    DatanodeID nodeId = DatanodeID.randomID();
+    return getRandomNodeReport(nodeId, File.separator + nodeId.getID(),
         numberOfStorageReport, numberOfMetadataStorageReport);
   }
 
@@ -176,7 +177,7 @@ public final class HddsTestUtils {
    *
    * @return NodeReportProto
    */
-  public static NodeReportProto getRandomNodeReport(UUID nodeId,
+  public static NodeReportProto getRandomNodeReport(DatanodeID nodeId,
       String basePath, int numberOfStorageReport,
       int numberOfMetadataStorageReport) {
     List<StorageReportProto> storageReports = new ArrayList<>();
@@ -218,7 +219,7 @@ public final class HddsTestUtils {
    *
    * @return StorageReportProto
    */
-  public static StorageReportProto getRandomStorageReport(UUID nodeId,
+  public static StorageReportProto getRandomStorageReport(DatanodeID nodeId,
       String path) {
     return createStorageReport(nodeId, path,
         random.nextInt(1000),
@@ -243,7 +244,7 @@ public final class HddsTestUtils {
         StorageTypeProto.DISK);
   }
 
-  public static StorageReportProto createStorageReport(UUID nodeId, String path,
+  public static StorageReportProto createStorageReport(DatanodeID nodeId, String path,
       long capacity) {
     return createStorageReport(nodeId, path,
         capacity,
@@ -252,24 +253,25 @@ public final class HddsTestUtils {
         StorageTypeProto.DISK);
   }
 
-  public static StorageReportProto createStorageReport(UUID nodeId, String path,
+  public static StorageReportProto createStorageReport(DatanodeID nodeId, String path,
        long capacity, long used, long remaining, StorageTypeProto type) {
     return createStorageReport(nodeId, path, capacity, used, remaining,
             type, false);
   }
-    /**
-     * Creates storage report with the given information.
-     *
-     * @param nodeId    datanode id
-     * @param path      storage dir
-     * @param capacity  storage size
-     * @param used      space used
-     * @param remaining space remaining
-     * @param type      type of storage
-     *
-     * @return StorageReportProto
-     */
-  public static StorageReportProto createStorageReport(UUID nodeId, String path,
+
+  /**
+   * Creates storage report with the given information.
+   *
+   * @param nodeId    datanode id
+   * @param path      storage dir
+   * @param capacity  storage size
+   * @param used      space used
+   * @param remaining space remaining
+   * @param type      type of storage
+   *
+   * @return StorageReportProto
+   */
+  public static StorageReportProto createStorageReport(DatanodeID nodeId, String path,
       long capacity, long used, long remaining, StorageTypeProto type,
                                                        boolean failed) {
     Preconditions.checkNotNull(nodeId);
@@ -355,7 +357,6 @@ public final class HddsTestUtils {
     }
     return getContainerReports(containerInfos);
   }
-
 
   public static PipelineReportsProto getRandomPipelineReports() {
     return PipelineReportsProto.newBuilder().build();
@@ -622,7 +623,7 @@ public final class HddsTestUtils {
   private static ContainerInfo.Builder getDefaultContainerInfoBuilder(
       final HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
-        .setContainerID(RandomUtils.nextLong())
+        .setContainerID(RandomUtils.secure().randomLong())
         .setReplicationConfig(
             RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE))
@@ -630,7 +631,6 @@ public final class HddsTestUtils {
         .setSequenceId(10000L)
         .setOwner("TEST");
   }
-
 
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state) {
@@ -755,8 +755,6 @@ public final class HddsTestUtils {
             usedBytes, keyCount, sequenceId, Arrays.asList(datanodeDetails)));
   }
 
-
-
   public static Pipeline getRandomPipeline() {
     List<DatanodeDetails> nodes = new ArrayList<>();
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -815,7 +813,7 @@ public final class HddsTestUtils {
     for (int i = 0; i < numContainers; i++) {
       ContainerInfo.Builder builder = new ContainerInfo.Builder();
       containerInfoList.add(builder
-          .setContainerID(RandomUtils.nextLong())
+          .setContainerID(RandomUtils.secure().randomLong())
           .setReplicationConfig(ratisReplicationConfig)
           .build());
     }
@@ -836,7 +834,7 @@ public final class HddsTestUtils {
     for (int i = 0; i < numContainers; i++) {
       ContainerInfo.Builder builder = new ContainerInfo.Builder();
       containerInfoList.add(builder
-          .setContainerID(RandomUtils.nextLong())
+          .setContainerID(RandomUtils.secure().randomLong())
           .setOwner("test-owner")
           .setPipelineID(PipelineID.randomId())
           .setReplicationConfig(eCReplicationConfig)

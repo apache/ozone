@@ -57,7 +57,6 @@ public final class RatisUtil {
   private RatisUtil() {
   }
 
-
   /**
    * Constructs new Raft Properties instance using {@link ConfigurationSource}.
    *
@@ -138,6 +137,8 @@ public final class RatisUtil {
                             OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT_DEFAULT,
                     TimeUnit.MILLISECONDS),
             TimeUnit.MILLISECONDS));
+    RatisHelper.setFirstElectionTimeoutDuration(
+        ozoneConf, properties, ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT);
   }
 
   /**
