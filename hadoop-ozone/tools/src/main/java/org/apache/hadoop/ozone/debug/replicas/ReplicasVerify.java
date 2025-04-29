@@ -80,6 +80,9 @@ public class ReplicasVerify extends Handler {
     if (verification.doExecuteBlockExistence) {
       replicaVerifiers.add(new BlockExistenceVerifier(getConf()));
     }
+    if (verification.doExecuteContainerState) {
+      replicaVerifiers.add(new ReplicaStateVerifier(getConf()));
+    }
 
     findCandidateKeys(client, address);
   }
@@ -221,6 +224,12 @@ public class ReplicasVerify extends Handler {
         description = "Check for block existence on datanodes.",
         defaultValue = "false")
     private boolean doExecuteBlockExistence;
+
+    @CommandLine.Option(names = "--container-state",
+        description = "Check the container and replica states",
+        // value will be true only if the "--container-state" option was specified on the CLI
+        defaultValue = "false")
+    private boolean doExecuteContainerState;
 
   }
 }
