@@ -50,13 +50,11 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test cases for ContainerMapper.
  */
-@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestContainerMapper {
   @TempDir
   private static Path dbPath;

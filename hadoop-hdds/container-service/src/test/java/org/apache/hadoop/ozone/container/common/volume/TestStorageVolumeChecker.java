@@ -59,7 +59,6 @@ import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.FakeTimer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -70,7 +69,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Tests for {@link StorageVolumeChecker}.
  */
-@Timeout(300)
 public class TestStorageVolumeChecker {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestStorageVolumeChecker.class);

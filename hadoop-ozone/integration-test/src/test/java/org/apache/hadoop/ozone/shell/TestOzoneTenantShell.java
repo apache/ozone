@@ -59,7 +59,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +71,6 @@ import picocli.CommandLine;
  * TODO: HDDS-6338. Add a Kerberized version of this
  * TODO: HDDS-6336. Add a mock Ranger server to test Ranger HTTP endpoint calls
  */
-@Timeout(300)
 public class TestOzoneTenantShell {
 
   private static final Logger LOG =
