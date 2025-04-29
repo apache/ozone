@@ -72,7 +72,7 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
       options.setInfoLogLevel(level);
       options.setMaxLogFileSize(dc.getRocksdbLogMaxFileSize());
       options.setKeepLogFileNum(dc.getRocksdbLogMaxFileNum());
-      this.store = initDBStore(DBStoreBuilder.newBuilder(config, dbDef)
+      this.store = initDBStore(DBStoreBuilder.newBuilder(config, dbDef, null, null)
           .setDBOptions(options)
           .setDefaultCFOptions(cfOptions)
           .setOpenReadOnly(openReadOnly), options, config);
