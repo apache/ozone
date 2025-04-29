@@ -53,33 +53,6 @@ public interface DBStore extends Closeable, BatchOperationHandler {
   }
 
   /**
-   * Gets an existing TableStore with implicit key/value conversion and
-   * with default cache type for cache. Default cache type is partial cache.
-   *
-   * @param name - Name of the TableStore to get
-   * @param keyType
-   * @param valueType
-   * @return - TableStore.
-   * @throws IOException on Failure
-   */
-  <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
-      Class<KEY> keyType, Class<VALUE> valueType) throws IOException;
-
-  /**
-   * Gets an existing TableStore with implicit key/value conversion and
-   * with specified cache type.
-   * @param name - Name of the TableStore to get
-   * @param keyType
-   * @param valueType
-   * @param cacheType
-   * @return - TableStore.
-   * @throws IOException
-   */
-  <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
-      Class<KEY> keyType, Class<VALUE> valueType,
-      TableCache.CacheType cacheType) throws IOException;
-
-  /**
    * Gets table store with implict key/value conversion.
    *
    * @param name - table name
