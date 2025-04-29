@@ -66,8 +66,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Verify that {@link MutableVolumeSet} correctly checks for failed disks
@@ -78,8 +76,6 @@ public class TestVolumeSetDiskChecks {
   @TempDir
   private Path tempDir;
 
-  private static final Logger LOG = LoggerFactory.getLogger(
-      TestVolumeSetDiskChecks.class);
   @TempDir
   private File dir;
 

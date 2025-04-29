@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.shell;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
@@ -81,8 +80,6 @@ public class TestOzoneTenantShell {
   static {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
   }
-
-  private static final String DEFAULT_ENCODING = UTF_8.name();
 
   /**
    * Set the timeout for every test.
