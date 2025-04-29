@@ -42,7 +42,7 @@ import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdds.utils.db.cache.TableCache;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
@@ -309,13 +309,13 @@ public class TestRDBTableStore {
 
   @Test
   public void putGetTypedTableCodec() throws Exception {
-    try (Table<String, String> testTable = rdbStore.getTable("Ten", String.class, String.class)) {
+    try (Table<String, String> testTable = rdbStore.getTable("Ten", StringCodec.get(), StringCodec.get())) {
       testTable.put("test1", "123");
       assertFalse(testTable.isEmpty());
       assertEquals("123", testTable.get("test1"));
     }
     try (Table<String, ByteString> testTable = rdbStore.getTable("Ten",
-        StringCodec.get(), ByteStringCodec.get(), TableCache.CacheType.NO_CACHE)) {
+        StringCodec.get(), ByteStringCodec.get(), CacheType.NO_CACHE)) {
       assertEquals("123", testTable.get("test1").toStringUtf8());
     }
   }
@@ -407,8 +407,7 @@ public class TestRDBTableStore {
     final String tableName = families.get(0);
     try (RDBTable testTable = rdbStore.getTable(tableName)) {
       final TypedTable<String, String> typedTable = new TypedTable<>(
-          testTable, CodecRegistry.newBuilder().build(),
-          String.class, String.class);
+          testTable, StringCodec.get(), StringCodec.get(), CacheType.PARTIAL_CACHE);
 
       for (int i = 0; i < 20; i++) {
         final int valueSize = TypedTable.BUFFER_SIZE_DEFAULT * i / 4;
@@ -594,7 +593,7 @@ public class TestRDBTableStore {
     final List<Map<String, String>> data = generateKVs(prefixes, keyCount);
 
     try (TypedTable<String, String> table = rdbStore.getTable(
-        "PrefixFirst", String.class, String.class)) {
+        "PrefixFirst", StringCodec.get(), StringCodec.get())) {
       populateTable(table, data);
       for (String prefix : prefixes) {
         assertIterator(keyCount, prefix, table);
@@ -633,7 +632,7 @@ public class TestRDBTableStore {
   @Test
   public void testStringPrefixedIteratorCloseDb() throws Exception {
     try (Table<String, String> testTable = rdbStore.getTable(
-        "PrefixFirst", String.class, String.class)) {
+        "PrefixFirst", StringCodec.get(), StringCodec.get())) {
       // iterator should seek to right pos in the middle
       rdbStore.close();
       assertThrows(IOException.class, () -> testTable.iterator("abc"));
