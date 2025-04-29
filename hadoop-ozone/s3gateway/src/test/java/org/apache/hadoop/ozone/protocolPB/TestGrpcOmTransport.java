@@ -33,14 +33,12 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Tests for GrpcOmTransport.
  */
-@Timeout(3000)
 public class TestGrpcOmTransport {
 
   private static final Logger LOG =
