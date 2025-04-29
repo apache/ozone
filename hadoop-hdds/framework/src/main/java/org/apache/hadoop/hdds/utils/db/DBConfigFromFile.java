@@ -120,8 +120,7 @@ public final class DBConfigFromFile {
       closeDescriptors(descriptors);
     }
   }
-
-
+  
   public static ManagedColumnFamilyOptions readCFOptionsFromFile(Path dbPath, String cfName) throws RocksDBException {
     List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
     String validatedCfName = StringUtil.isEmpty(cfName) ? StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY) : cfName;

@@ -371,7 +371,6 @@ public final class DBStoreBuilder {
     return dbOptions;
   }
 
-
   /**
    * Attempts to get RocksDB {@link ManagedColumnFamilyOptions} from an ini config
    * file. If that file does not exist, the value of {@code getColumnFamilyOptions}
