@@ -34,9 +34,9 @@ import org.sqlite.SQLiteConfig;
  * Provides methods for table creation, log data insertion, and index setup.
  */
 public class ContainerDatanodeDatabase {
-  
+
   private static String databasePath;
-  
+
   public static void setDatabasePath(String dbPath) {
     if (databasePath == null) {
       databasePath = dbPath;
@@ -47,7 +47,7 @@ public class ContainerDatanodeDatabase {
     if (databasePath == null) {
       throw new IllegalStateException("Database path not set");
     }
-    
+
     Class.forName(DBConsts.DRIVER);
 
     SQLiteConfig config = new SQLiteConfig();
@@ -99,14 +99,14 @@ public class ContainerDatanodeDatabase {
    *
    * @param transitionList List of container log entries to insert into the table.
    */
-  
+
   public synchronized void insertContainerDatanodeData(List<DatanodeContainerInfo> transitionList) throws SQLException {
 
     String insertSQL = DBConsts.INSERT_DATANODE_CONTAINER_LOG;
 
     long containerId = 0;
     String datanodeId = null;
-    
+
     try (Connection connection = getConnection();
          PreparedStatement preparedStatement = connection.prepareStatement(insertSQL)) {
 
@@ -165,9 +165,9 @@ public class ContainerDatanodeDatabase {
          PreparedStatement selectStmt = connection.prepareStatement(selectSQL);
          ResultSet resultSet = selectStmt.executeQuery();
          PreparedStatement insertStmt = connection.prepareStatement(insertSQL)) {
-      
+
       int count = 0;
-      
+
       while (resultSet.next()) {
         String datanodeId = resultSet.getString("datanode_id");
         long containerId = resultSet.getLong("container_id");
@@ -273,7 +273,7 @@ public class ContainerDatanodeDatabase {
             writer.printf("%-25s | %-35s | %-15d | %-15d | %-40s | %-12d%n",
                 timestamp, datanodeId, containerId, latestBcsid, errorMessage, indexValue);
           }
-          
+
           if (count == 0) {
             writer.printf("No containers found for state: %s%n", state);
           } else {
@@ -288,4 +288,3 @@ public class ContainerDatanodeDatabase {
     }
   }
 }
-

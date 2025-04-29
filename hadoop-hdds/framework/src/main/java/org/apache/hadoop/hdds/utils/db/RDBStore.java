@@ -243,7 +243,7 @@ public class RDBStore implements DBStore {
 
   @Override
   public <K, V> void move(K key, Table<K, V> source,
-                                Table<K, V> dest) throws IOException {
+                          Table<K, V> dest) throws IOException {
     try (BatchOperation batchOperation = initBatchOperation()) {
 
       V value = source.get(key);
@@ -255,14 +255,14 @@ public class RDBStore implements DBStore {
 
   @Override
   public <K, V> void move(K key, V value, Table<K, V> source,
-                                Table<K, V> dest) throws IOException {
+                          Table<K, V> dest) throws IOException {
     move(key, key, value, source, dest);
   }
 
   @Override
   public <K, V> void move(K sourceKey, K destKey, V value,
-                                Table<K, V> source,
-                                Table<K, V> dest) throws IOException {
+                          Table<K, V> source,
+                          Table<K, V> dest) throws IOException {
     try (BatchOperation batchOperation = initBatchOperation()) {
       dest.putWithBatch(batchOperation, destKey, value);
       source.deleteWithBatch(batchOperation, sourceKey);
@@ -372,7 +372,7 @@ public class RDBStore implements DBStore {
     long cumulativeDBUpdateLogBatchSize = 0L;
     DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
     try (ManagedTransactionLogIterator logIterator =
-        db.getUpdatesSince(sequenceNumber)) {
+             db.getUpdatesSince(sequenceNumber)) {
 
       // If Recon's sequence number is out-of-date and the iterator is invalid,
       // throw SNNFE and let Recon fall back to full snapshot.

@@ -720,10 +720,10 @@ public class TestOmMetadataManager {
     final String volumeName = UUID.randomUUID().toString();
     // Add volume, bucket, key entries to DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+        omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
-            bucketName);
+        bucketName);
     final int numExpiredOpenKeys = 4;
     final int numUnexpiredOpenKeys = 1;
     final long clientID = 1000L;
@@ -990,7 +990,7 @@ public class TestOmMetadataManager {
   }
 
   private void addKeysToOM(String volumeName, String bucketName,
-      String keyName, int i) throws Exception {
+                           String keyName, int i) throws Exception {
 
     if (i % 2 == 0) {
       OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
@@ -1001,31 +1001,6 @@ public class TestOmMetadataManager {
           omMetadataManager);
     }
   }
-
-  static final String[] ALL_TABLES = new String[] {
-      USER_TABLE,
-      VOLUME_TABLE,
-      BUCKET_TABLE,
-      KEY_TABLE,
-      DELETED_TABLE,
-      OPEN_KEY_TABLE,
-      MULTIPARTINFO_TABLE,
-      S3_SECRET_TABLE,
-      DELEGATION_TOKEN_TABLE,
-      PREFIX_TABLE,
-      TRANSACTION_INFO_TABLE,
-      DIRECTORY_TABLE,
-      FILE_TABLE,
-      DELETED_DIR_TABLE,
-      OPEN_FILE_TABLE,
-      META_TABLE,
-      TENANT_ACCESS_ID_TABLE,
-      PRINCIPAL_TO_ACCESS_IDS_TABLE,
-      TENANT_STATE_TABLE,
-      SNAPSHOT_INFO_TABLE,
-      SNAPSHOT_RENAMED_TABLE,
-      COMPACTION_LOG_TABLE
-  };
 
   @Test
   public void testAllTablesAreProperInOMMetadataManagerImpl() {
@@ -1130,7 +1105,7 @@ public class TestOmMetadataManager {
 
   @Test
   public void testListSnapshotDoesNotListOtherBucketSnapshots()
-          throws Exception {
+      throws Exception {
     String vol1 = "vol1";
     String bucket1 = "bucket1";
     String bucket2 = "bucket2";
@@ -1143,12 +1118,12 @@ public class TestOmMetadataManager {
 
     for (int i = 1; i <= 2; i++) {
       OMRequestTestUtils.addSnapshotToTable(vol1, bucket1,
-              snapshotName1 + i, omMetadataManager);
+          snapshotName1 + i, omMetadataManager);
     }
 
     for (int i = 1; i <= 5; i++) {
       OMRequestTestUtils.addSnapshotToTable(vol1, bucket2,
-              snapshotName2 + i, omMetadataManager);
+          snapshotName2 + i, omMetadataManager);
     }
 
     //Test listing snapshots only lists snapshots of specified bucket
@@ -1185,8 +1160,8 @@ public class TestOmMetadataManager {
 
       // Create multipart key info
       OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
-          volumeName, bucketName, key,
-          RatisReplicationConfig.getInstance(ONE))
+              volumeName, bucketName, key,
+              RatisReplicationConfig.getInstance(ONE))
           .build();
 
       OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils

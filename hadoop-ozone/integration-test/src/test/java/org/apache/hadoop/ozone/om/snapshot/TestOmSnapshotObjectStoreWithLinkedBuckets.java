@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 
-
 /**
  * Test OmSnapshot for Object Store bucket type.
  */
