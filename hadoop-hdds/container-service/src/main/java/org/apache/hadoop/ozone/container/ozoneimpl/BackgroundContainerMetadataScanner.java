@@ -36,17 +36,16 @@ public class BackgroundContainerMetadataScanner extends
     AbstractBackgroundContainerScanner {
   public static final Logger LOG =
       LoggerFactory.getLogger(BackgroundContainerMetadataScanner.class);
-
   private final ContainerMetadataScannerMetrics metrics;
   private final ContainerController controller;
-  private final long minScanGap;
+  private final ContainerScannerMixin scannerMixin;
 
   public BackgroundContainerMetadataScanner(ContainerScannerConfiguration conf,
                                             ContainerController controller) {
     super("ContainerMetadataScanner", conf.getMetadataScanInterval());
     this.controller = controller;
     this.metrics = ContainerMetadataScannerMetrics.create();
-    this.minScanGap = conf.getContainerScanMinGap();
+    this.scannerMixin = new ContainerScannerMixin(LOG, controller, metrics, conf);
   }
 
   @Override
@@ -58,21 +57,11 @@ public class BackgroundContainerMetadataScanner extends
   @Override
   public void scanContainer(Container<?> container)
       throws IOException, InterruptedException {
-    // There is one background container metadata scanner per datanode.
-    // If this container's volume has failed, skip the container.
-    // The iterator returned by getContainerIterator may have stale results.
-    ContainerData data = container.getContainerData();
-    long containerID = data.getContainerID();
-    HddsVolume containerVolume = data.getVolume();
-    if (containerVolume.isFailed()) {
-      LOG.debug("Skipping scan of container {}. Its volume {} has failed.",
-          containerID, containerVolume);
+    if (!scannerMixin.shouldScanMetadata(container)) {
       return;
     }
 
-    if (!shouldScan(container)) {
-      return;
-    }
+    long containerID = container.getContainerData().getContainerID();
 
     MetadataScanResult result = container.scanMetaData();
     if (result.isDeleted()) {
@@ -80,11 +69,7 @@ public class BackgroundContainerMetadataScanner extends
       return;
     }
     if (!result.isHealthy()) {
-      logUnhealthyScanResult(containerID, result, LOG);
-      boolean containerMarkedUnhealthy = controller.markContainerUnhealthy(containerID, result);
-      if (containerMarkedUnhealthy) {
-        metrics.incNumUnHealthyContainers();
-      }
+      scannerMixin.handleUnhealthyScanResult(containerID, result);
     }
 
     // Do not update the scan timestamp after the scan since this was just a
@@ -97,9 +82,4 @@ public class BackgroundContainerMetadataScanner extends
     return this.metrics;
   }
 
-  private boolean shouldScan(Container<?> container) {
-    // Full data scan also does a metadata scan. If a full data scan was done
-    // recently, we can skip this metadata scan.
-    return !ContainerUtils.recentlyScanned(container, minScanGap, LOG);
-  }
 }
