@@ -46,6 +46,15 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   private static final Logger LOG =
       LoggerFactory.getLogger(ECPipelineProvider.class);
 
+  static final Comparator<NodeStatus> CREATE_FOR_READ_COMPARATOR = (left, right) -> {
+    final int healthy = Boolean.compare(right.isHealthy(), left.isHealthy());
+    if (healthy != 0) {
+      return healthy;
+    }
+    final int dead = Boolean.compare(left.isDead(), right.isDead());
+    return dead != 0 ? dead : left.getOperationalState().compareTo(right.getOperationalState());
+  };
+
   // TODO - EC Placement Policy. Standard Network Aware topology will not work
   //        for EC as it stands. We may want an "as many racks as possible"
   //        policy. HDDS-5326.
@@ -96,16 +105,6 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
     return createPipelineInternal(replicationConfig, nodes, dnIndexes);
   }
-
-  static final Comparator<NodeStatus> CREATE_FOR_READ_COMPARATOR = (left, right) -> {
-    final int healthy = Boolean.compare(right.isHealthy(), left.isHealthy());
-    if (healthy != 0) {
-      return healthy;
-    }
-    final int dead = Boolean.compare(left.isDead(), right.isDead());
-    return dead != 0 ? dead : left.getOperationalState().compareTo(right.getOperationalState());
-  };
-
 
   @Override
   public Pipeline createForRead(

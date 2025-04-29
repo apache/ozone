@@ -354,9 +354,9 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     StringBuilder keys = new StringBuilder();
     for (int i = 0; i < deletedKeyInfos.size(); i++) {
       OmKeyInfo key = deletedKeyInfos.get(i);
-      keys.append("{").append(KEY).append("=").append(key.getKeyName()).append(", ");
-      keys.append(DATA_SIZE).append("=").append(key.getDataSize()).append(", ");
-      keys.append(REPLICATION_CONFIG).append("=").append(key.getReplicationConfig()).append("}");
+      keys.append('{').append(KEY).append('=').append(key.getKeyName()).append(", ");
+      keys.append(DATA_SIZE).append('=').append(key.getDataSize()).append(", ");
+      keys.append(REPLICATION_CONFIG).append('=').append(key.getReplicationConfig()).append('}');
       if (i < deletedKeyInfos.size() - 1) {
         keys.append(", ");
       }

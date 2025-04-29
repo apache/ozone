@@ -650,7 +650,7 @@ final class TestSecureOzoneCluster {
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugi, null),
-          RandomStringUtils.randomAscii(5));
+          RandomStringUtils.secure().nextAscii(5));
 
       // Since client is already connected get a delegation token
       Token<OzoneTokenIdentifier> token = omClient.getDelegationToken(
@@ -738,7 +738,7 @@ final class TestSecureOzoneCluster {
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugi, null),
-          RandomStringUtils.randomAscii(5));
+          RandomStringUtils.secure().nextAscii(5));
 
       // Creates a secret since it does not exist
       S3SecretValue attempt1 = omClient.getS3Secret(username);
@@ -799,7 +799,7 @@ final class TestSecureOzoneCluster {
       final OzoneManagerProtocolClientSideTranslatorPB omClientNonAdmin =
           new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugiNonAdmin, null),
-          RandomStringUtils.randomAscii(5));
+          RandomStringUtils.secure().nextAscii(5));
 
       OMException omException = assertThrows(OMException.class,
           () -> omClientNonAdmin.getS3Secret("HADOOP/JOHN"));
@@ -997,6 +997,7 @@ final class TestSecureOzoneCluster {
           1000, certificateLifetime * 1000);
     }
   }
+
   /**
    * Test unexpected SCMGetCertResponseProto returned from SCM.
    */
@@ -1188,7 +1189,7 @@ final class TestSecureOzoneCluster {
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(newConf, ugi, null),
-          RandomStringUtils.randomAscii(5));
+          RandomStringUtils.secure().nextAscii(5));
 
       // Since client is already connected get a delegation token
       Token<OzoneTokenIdentifier> token1 = omClient.getDelegationToken(

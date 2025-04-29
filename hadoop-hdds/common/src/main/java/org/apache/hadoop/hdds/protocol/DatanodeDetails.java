@@ -412,7 +412,6 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     return getPort(Name.STANDALONE);
   }
 
-
   /**
    * Starts building a new DatanodeDetails from the protobuf input.
    *
@@ -678,7 +677,6 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     return obj instanceof DatanodeDetails &&
         id.equals(((DatanodeDetails) obj).id);
   }
-
 
   /**
    * Checks hostname, ipAddress and port of the 2 nodes are the same.

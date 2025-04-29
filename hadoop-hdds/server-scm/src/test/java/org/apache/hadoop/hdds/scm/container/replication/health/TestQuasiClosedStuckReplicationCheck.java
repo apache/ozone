@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-
 /**
  * Tests for the QuasiClosedStuckReplicationCheck class.
  */

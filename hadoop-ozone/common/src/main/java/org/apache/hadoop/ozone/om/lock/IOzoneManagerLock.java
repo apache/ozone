@@ -31,7 +31,6 @@ public interface IOzoneManagerLock extends StripedLockProvider {
 
   OMLockDetails acquireReadLocks(OzoneManagerLock.Resource resource, Collection<String[]> resources);
 
-
   OMLockDetails acquireWriteLock(OzoneManagerLock.Resource resource,
                                  String... resources);
 

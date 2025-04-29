@@ -78,9 +78,9 @@ public class TestOmSnapshotDisabledRestart {
     // Verify that OM start up will indeed fail when there are still snapshots
     // while snapshot feature is disabled.
 
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "buck-" + RandomStringUtils.randomNumeric(5);
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "buck-" + RandomStringUtils.secure().nextNumeric(5);
+    String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);

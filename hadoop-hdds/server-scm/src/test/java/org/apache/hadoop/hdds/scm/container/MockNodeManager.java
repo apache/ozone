@@ -270,12 +270,11 @@ public class MockNodeManager implements NodeManager {
         long used = nodeMetricMap.get(dd).getScmUsed().get();
         long remaining = nodeMetricMap.get(dd).getRemaining().get();
         StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-            di.getID(), "/data1-" + di.getUuidString(),
+            di.getID(), "/data1-" + di.getID(),
             capacity, used, remaining, null);
         MetadataStorageReportProto metaStorage1 =
             HddsTestUtils.createMetadataStorageReport(
-                "/metadata1-" + di.getUuidString(), capacity, used,
-                remaining, null);
+                "/metadata1-" + di.getID(), capacity, used, remaining, null);
         di.updateStorageReports(Collections.singletonList(storage1));
         di.updateMetaDataStorageReports(Collections.singletonList(metaStorage1));
 

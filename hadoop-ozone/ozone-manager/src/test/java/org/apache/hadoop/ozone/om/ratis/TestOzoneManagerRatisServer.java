@@ -236,6 +236,4 @@ public class TestOzoneManagerRatisServer {
     assertEquals(raftGroupId.toByteString().size(), 16);
     newOmRatisServer.stop();
   }
-
-
 }

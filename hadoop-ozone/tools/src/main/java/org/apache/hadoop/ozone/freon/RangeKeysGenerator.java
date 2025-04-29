@@ -71,7 +71,6 @@ public class RangeKeysGenerator extends BaseFreonGenerator
           defaultValue = "0")
   private int startIndex;
 
-
   @CommandLine.Option(names = {"-k", "--key-encode"},
           description = "The algorithm to generate key names. " +
                   "Options are pureIndex, md5",
@@ -100,7 +99,6 @@ public class RangeKeysGenerator extends BaseFreonGenerator
   private OzoneClient[] ozoneClients;
   private ContentGenerator contentGenerator;
   private Timer timer;
-
 
   @Override
   public Void call() throws Exception {
@@ -149,7 +147,6 @@ public class RangeKeysGenerator extends BaseFreonGenerator
       return null;
     });
   }
-
 
   public void loopRunner(Function<Integer, String> keyNameGeneratorfunc,
                          OzoneClient client, int start, int end)

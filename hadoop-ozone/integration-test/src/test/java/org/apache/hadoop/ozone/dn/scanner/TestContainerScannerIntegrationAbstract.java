@@ -122,7 +122,6 @@ public abstract class TestContainerScannerIntegrationAbstract {
     getOzoneContainer().resumeContainerScrub();
   }
 
-
   @AfterAll
   static void shutdown() throws IOException {
     if (ozClient != null) {

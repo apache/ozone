@@ -95,7 +95,6 @@ class TestManagedRawSSTFileIterator {
     ManagedRawSSTFileReader.loadLibrary();
   }
 
-
   @ParameterizedTest
   @MethodSource("keyValueFormatArgs")
   public void testSSTDumpIteratorWithKeyFormat(String keyFormat, String valueFormat) throws Exception {

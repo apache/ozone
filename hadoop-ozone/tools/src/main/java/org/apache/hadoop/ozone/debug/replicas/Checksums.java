@@ -58,7 +58,6 @@ public class Checksums implements ReplicaVerifier {
   private static final String JSON_PROPERTY_REPLICA_UUID = "uuid";
   private static final String JSON_PROPERTY_REPLICA_EXCEPTION = "exception";
 
-
   private String outputDir;
   private OzoneClient client;
 

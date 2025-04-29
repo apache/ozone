@@ -205,7 +205,6 @@ public class TestSCMSafeModeManager {
         100, 1000 * 5);
   }
 
-
   private OzoneConfiguration createConf(double healthyPercent,
       double oneReplicaPercent) {
     OzoneConfiguration conf = new OzoneConfiguration(config);
@@ -431,7 +430,6 @@ public class TestSCMSafeModeManager {
               pipelineReportsProto.build()));
     }
   }
-
 
   @Test
   public void testDisableSafeMode() {

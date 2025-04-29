@@ -734,7 +734,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
   }
 
-
   /**
    * Update the processing details.
    *

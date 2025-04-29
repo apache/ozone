@@ -188,15 +188,19 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       this.container = container;
       this.connectionManager = connectionManager;
     }
+
     public DeleteBlocksCommand getCmd() {
       return this.cmd;
     }
+
     public StateContext getContext() {
       return this.context;
     }
+
     public OzoneContainer getContainer() {
       return this.container;
     }
+
     public SCMConnectionManager getConnectionManager() {
       return this.connectionManager;
     }
@@ -208,6 +212,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   public static final class DeleteBlockTransactionExecutionResult {
     private final DeleteBlockTransactionResult result;
     private final boolean lockAcquisitionFailed;
+
     public DeleteBlockTransactionExecutionResult(
         DeleteBlockTransactionResult result, boolean lockAcquisitionFailed) {
       this.result = result;

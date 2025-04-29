@@ -199,6 +199,35 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public static final Set<String> COLUMN_FAMILIES_TO_TRACK_IN_DAG =
       ImmutableSet.of("keyTable", "directoryTable", "fileTable");
 
+  // Hash table to track CompactionNode for a given SST File.
+  private final ConcurrentHashMap<String, CompactionNode> compactionNodeMap =
+      new ConcurrentHashMap<>();
+
+  // We are maintaining a two way DAG. This allows easy traversal from
+  // source snapshot to destination snapshot as well as the other direction.
+
+  private final MutableGraph<CompactionNode> forwardCompactionDAG =
+      GraphBuilder.directed().build();
+
+  private final MutableGraph<CompactionNode> backwardCompactionDAG =
+      GraphBuilder.directed().build();
+
+  public static final Integer DEBUG_DAG_BUILD_UP = 2;
+  public static final Integer DEBUG_DAG_TRAVERSAL = 3;
+  public static final Integer DEBUG_DAG_LIVE_NODES = 4;
+  public static final Integer DEBUG_READ_ALL_DB_KEYS = 5;
+  private static final HashSet<Integer> DEBUG_LEVEL = new HashSet<>();
+
+  static {
+    addDebugLevel(DEBUG_DAG_BUILD_UP);
+    addDebugLevel(DEBUG_DAG_TRAVERSAL);
+    addDebugLevel(DEBUG_DAG_LIVE_NODES);
+  }
+
+  static {
+    RocksDB.loadLibrary();
+  }
+
   /**
    * This is a package private constructor and should not be used other than
    * testing. Caller should use RocksDBCheckpointDifferHolder#getInstance() to
@@ -348,35 +377,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         }
       }
     }
-  }
-
-  // Hash table to track CompactionNode for a given SST File.
-  private final ConcurrentHashMap<String, CompactionNode> compactionNodeMap =
-      new ConcurrentHashMap<>();
-
-  // We are maintaining a two way DAG. This allows easy traversal from
-  // source snapshot to destination snapshot as well as the other direction.
-
-  private final MutableGraph<CompactionNode> forwardCompactionDAG =
-      GraphBuilder.directed().build();
-
-  private final MutableGraph<CompactionNode> backwardCompactionDAG =
-      GraphBuilder.directed().build();
-
-  public static final Integer DEBUG_DAG_BUILD_UP = 2;
-  public static final Integer DEBUG_DAG_TRAVERSAL = 3;
-  public static final Integer DEBUG_DAG_LIVE_NODES = 4;
-  public static final Integer DEBUG_READ_ALL_DB_KEYS = 5;
-  private static final HashSet<Integer> DEBUG_LEVEL = new HashSet<>();
-
-  static {
-    addDebugLevel(DEBUG_DAG_BUILD_UP);
-    addDebugLevel(DEBUG_DAG_TRAVERSAL);
-    addDebugLevel(DEBUG_DAG_LIVE_NODES);
-  }
-
-  static {
-    RocksDB.loadLibrary();
   }
 
   public static void addDebugLevel(Integer level) {
@@ -848,6 +848,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     Preconditions.checkNotNull(activeRocksDB,
         "activeRocksDB must be set before calling loadAllCompactionLogs.");
   }
+
   /**
    * Helper function that prepends SST file name with SST backup directory path
    * (or DB checkpoint path if compaction hasn't happened yet as SST files won't
@@ -1241,7 +1242,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       throw new RuntimeException(e);
     }
   }
-
 
   /**
    * Returns the list of input files from the compaction entries which are
