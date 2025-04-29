@@ -21,9 +21,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.apache.hadoop.hdds.StringUtils.bytes2String;
+import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.util.Time.now;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
@@ -46,10 +49,12 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
+import com.google.common.util.concurrent.Striped;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -71,6 +76,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -79,16 +85,23 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedFlushOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.lock.StripedLockProvider;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -99,6 +112,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -184,11 +198,15 @@ public class TestRocksDBCheckpointDiffer {
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS)).thenReturn(0L);
 
+    when(config.getInt(
+        OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE,
+        OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT)).thenReturn(2000);
+
     rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
         SST_BACK_UP_DIR_NAME,
         COMPACTION_LOG_DIR_NAME,
         ACTIVE_DB_DIR_NAME,
-        config, null);
+        config, new StripedLock());
 
     ManagedColumnFamilyOptions cfOpts = new ManagedColumnFamilyOptions();
     cfOpts.optimizeUniversalStyleCompaction();
@@ -1891,6 +1909,101 @@ public class TestRocksDBCheckpointDiffer {
     );
   }
 
+
+  /**
+   * Test that backup SST files are pruned on loading previous compaction logs.
+   */
+  @EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
+  @Test
+  public void testPruneSSTFileValues()
+      throws Exception {
+    ManagedRawSSTFileReader.setIsLibraryLoaded(ManagedRawSSTFileReader.loadLibrary());
+    // Create src files in backup directory.
+    List<String> filesInBackupDir = Arrays.asList("000078", "000073");
+    for (String fileName : filesInBackupDir) {
+      createSSTFileWithKeys(sstBackUpDir.toPath(), fileName, 1, 1);
+    }
+
+    // Create compacted files in active DB directory.
+    createSSTFileWithKeys(activeDbDir.toPath(), "000081", 1, 1);
+
+    // Load dummy previous compaction logs.
+    CompactionLogEntry dummyEntry = new CompactionLogEntry(178, System.currentTimeMillis(),
+        Arrays.asList(new CompactionFileInfo("000078",
+                "/volume/bucket1/key-0000001411",
+                "/volume/bucket2/key-0000099649",
+                "keyTable"),
+            new CompactionFileInfo("000073",
+                "/volume/bucket1/key-0000000730",
+                "/volume/bucket2/key-0000097010",
+                "keyTable")),
+        Collections.singletonList(new CompactionFileInfo("000081",
+            "/volume/bucket1/key-0000000730",
+            "/volume/bucket2/key-0000099649",
+            "keyTable")),
+        null
+    );
+    rocksDBCheckpointDiffer.addToCompactionLogTable(dummyEntry);
+    rocksDBCheckpointDiffer.loadAllCompactionLogs();
+
+    // Run the SST file pruner.
+    waitForLock(rocksDBCheckpointDiffer, RocksDBCheckpointDiffer::pruneSstFileValues);
+
+    // Verify that files are pruned.
+    try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
+        activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
+      managedRocksIterator.get().seekToFirst();
+      while (managedRocksIterator.get().isValid()) {
+        byte[] value = managedRocksIterator.get().value();
+        CompactionLogEntry compactionLogEntry =
+            CompactionLogEntry.getFromProtobuf(
+                CompactionLogEntryProto.parseFrom(value));
+
+        compactionLogEntry.getInputFileInfoList().forEach(
+            f -> {
+              String fileName = f.getFileName();
+              File file = sstBackUpDir.toPath().resolve(fileName + SST_FILE_EXTENSION).toFile();
+              if (COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(f.getColumnFamily())
+                  && filesInBackupDir.contains(fileName)) {
+                assertTrue(f.isPruned());
+                try (ManagedRawSSTFileReader<byte[]> sstFileReader = new ManagedRawSSTFileReader<>(
+                    new ManagedOptions(), file.getAbsolutePath(), 2 * 1024 * 1024);
+                     ManagedRawSSTFileIterator<byte[]> itr = sstFileReader.newIterator(
+                         keyValue -> keyValue.getValue(), null, null)) {
+                  while (itr.hasNext()) {
+                    assertEquals(0, itr.next().length);
+                  }
+                }
+              } else {
+                assertFalse(f.isPruned());
+              }
+            });
+        managedRocksIterator.get().next();
+      }
+    }
+  }
+
+  private void createSSTFileWithKeys(Path dir, String fileName, int nKeys, int nTombstones)
+      throws Exception {
+    File file = Files.createFile(
+        dir.resolve(fileName + SST_FILE_EXTENSION)).toFile();
+    try (ManagedEnvOptions envOptions = new ManagedEnvOptions();
+         ManagedOptions managedOptions = new ManagedOptions();
+         ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions)) {
+
+      sstFileWriter.open(file.getAbsolutePath());
+      String generatedString = RandomStringUtils.randomAlphabetic(7);
+      for (int n = 0; n < nKeys; n++) {
+        sstFileWriter.put(("key" + n + "-" + generatedString).getBytes(StandardCharsets.UTF_8),
+            ("value" + n + "-" + generatedString).getBytes(StandardCharsets.UTF_8));
+      }
+      for (int n = nKeys; n < nKeys + nTombstones; n++) {
+        sstFileWriter.delete(("key" + n + "-" + generatedString).getBytes(StandardCharsets.UTF_8));
+      }
+      sstFileWriter.finish();
+    }
+  }
+
   /**
    * Tests core SST diff list logic. Does not involve DB.
    * Focuses on testing edge cases in internalGetSSTDiffList().
@@ -2113,5 +2226,14 @@ public class TestRocksDBCheckpointDiffer {
                                  boolean expectedResult) {
     assertEquals(expectedResult, rocksDBCheckpointDiffer
         .shouldSkipCompaction(columnFamilyBytes, inputFiles, outputFiles));
+  }
+
+  private class StripedLock implements StripedLockProvider {
+
+    @Override
+    public Striped<ReadWriteLock> getStripedLock(String key) {
+      return SimpleStriped.readWriteLock(512, false);
+    }
+
   }
 }

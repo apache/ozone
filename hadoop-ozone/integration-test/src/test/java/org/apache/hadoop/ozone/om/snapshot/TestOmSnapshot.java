@@ -21,7 +21,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
@@ -90,12 +92,17 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
@@ -137,6 +144,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.CompactionNode;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Slow;
@@ -216,6 +224,9 @@ public abstract class TestOmSnapshot {
     conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion());
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, KeyManagerImpl.DISABLE_VALUE);
+    if (!disableNativeDiff) {
+      conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 1, TimeUnit.SECONDS);
+    }
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .build();
@@ -2478,6 +2489,45 @@ public abstract class TestOmSnapshot {
     assertEquals(200,
         fetchReportPage(volume1, bucket3, "bucket3-snap1", "bucket3-snap3",
             null, 0).getDiffList().size());
+
+    if (!disableNativeDiff) {
+      // Verify backup SST files are pruned on DB compactions.
+      Thread.sleep(1000);
+
+      RocksDatabase db = getRdbStore().getDb();
+      java.nio.file.Path sstBackUpDir = java.nio.file.Paths.get(getRdbStore()
+            .getRocksDBCheckpointDiffer().getSSTBackupDir());
+
+      try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
+          db.getManagedRocksDb().get().newIterator(db.getColumnFamily(COMPACTION_LOG_TABLE).getHandle()))) {
+        managedRocksIterator.get().seekToFirst();
+        while (managedRocksIterator.get().isValid()) {
+          byte[] value = managedRocksIterator.get().value();
+          CompactionLogEntry compactionLogEntry =
+              CompactionLogEntry.getFromProtobuf(
+                  CompactionLogEntryProto.parseFrom(value));
+
+          compactionLogEntry.getInputFileInfoList().forEach(
+              f -> {
+                java.nio.file.Path file = sstBackUpDir.resolve(f.getFileName() + ".sst");
+                if (COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(f.getColumnFamily()) &&
+                    java.nio.file.Files.exists(file)) {
+                  assertTrue(f.isPruned());
+                  try (ManagedRawSSTFileReader<byte[]> sstFileReader = new ManagedRawSSTFileReader<>(
+                           new ManagedOptions(), file.toFile().getAbsolutePath(), 2 * 1024 * 1024);
+                       ManagedRawSSTFileIterator<byte[]> itr = sstFileReader.newIterator(
+                           keyValue -> keyValue.getValue(), null, null)) {
+                    while (itr.hasNext()) {
+                      assertEquals(0, itr.next().length);
+                    }
+                  }
+                } else {
+                  assertFalse(f.isPruned());
+                }
+              });
+        }
+      }
+    }
   }
 
   @Test

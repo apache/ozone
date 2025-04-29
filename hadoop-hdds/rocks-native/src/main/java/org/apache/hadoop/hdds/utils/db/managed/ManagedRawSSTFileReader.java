@@ -32,6 +32,8 @@ import org.slf4j.LoggerFactory;
  */
 public class ManagedRawSSTFileReader<T> implements Closeable {
 
+  private static boolean isLibraryLoaded = false;
+
   public static boolean tryLoadLibrary() {
     try {
       loadLibrary();
@@ -48,6 +50,14 @@ public class ManagedRawSSTFileReader<T> implements Closeable {
       throw new NativeLibraryNotLoadedException(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
     }
     return true;
+  }
+
+  public static void setIsLibraryLoaded(boolean isLibraryLoaded) {
+    ManagedRawSSTFileReader.isLibraryLoaded = isLibraryLoaded;
+  }
+
+  public static boolean isLibraryLoaded() {
+    return isLibraryLoaded;
   }
 
   private final String fileName;
