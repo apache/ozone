@@ -34,10 +34,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -1096,5 +1102,38 @@ public class TestKeyValueContainer {
         importedContainer.getContainerData().getSchemaVersion());
     assertEquals(pendingDeleteBlockCount,
         importedContainer.getContainerData().getNumPendingDeletionBlocks());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerCreationCommitSpaceReserve(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    keyValueContainerData = spy(keyValueContainerData);
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
+    keyValueContainer = spy(keyValueContainer);
+
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    // verify that
+    verify(volumeChoosingPolicy).chooseVolume(anyList(), anyLong()); // this would reserve commit space
+    verify(keyValueContainerData, times(0)).releaseCommitSpace();
+    assertTrue(keyValueContainerData.isCommittedSpace());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerCreationCommitSpaceReserveWithException(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    keyValueContainerData = spy(keyValueContainerData);
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
+    keyValueContainer = spy(keyValueContainer);
+
+    doThrow(new IOException("test")).when(keyValueContainer).createContainerMetaData(any(File.class), any(File.class),
+        any(File.class), anyString(), any(ConfigurationSource.class));
+    assertThrows(IOException.class, () -> keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId));
+
+    verify(volumeChoosingPolicy).chooseVolume(anyList(), anyLong()); // this would reserve commit space
+    verify(keyValueContainerData).releaseCommitSpace();
+    assertFalse(keyValueContainerData.isCommittedSpace());
   }
 }

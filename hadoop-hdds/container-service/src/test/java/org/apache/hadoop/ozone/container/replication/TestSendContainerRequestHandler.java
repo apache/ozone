@@ -49,13 +49,11 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for {@link SendContainerRequestHandler}.
  */
-@Timeout(300)
 public class TestSendContainerRequestHandler {
 
   @TempDir

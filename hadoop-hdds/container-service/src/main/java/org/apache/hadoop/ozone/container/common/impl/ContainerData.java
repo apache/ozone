@@ -215,6 +215,10 @@ public abstract class ContainerData {
     }
   }
 
+  public boolean isCommittedSpace() {
+    return committedSpace;
+  }
+
   public void setCommittedSpace(boolean committed) {
     if (committed) {
       //we don't expect duplicate space commit
