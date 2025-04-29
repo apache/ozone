@@ -87,7 +87,6 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
   private static final String OFS_IMPL_VALUE =
       "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem";
 
-
   @BeforeAll
   void initClass() throws Exception {
     cluster = cluster();
@@ -105,12 +104,12 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
 
     assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
-    volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
 
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
-    bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     retVolumeinfo.createBucket(bucketName);
 
     rootPath = String.format("%s://%s.%s.%s/", OzoneConsts.OZONE_URI_SCHEME,

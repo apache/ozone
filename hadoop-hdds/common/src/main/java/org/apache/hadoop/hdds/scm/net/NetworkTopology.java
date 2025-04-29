@@ -27,10 +27,12 @@ public interface NetworkTopology {
   /** Exception for invalid network topology detection. */
   class InvalidTopologyException extends RuntimeException {
     private static final long serialVersionUID = 1L;
+
     public InvalidTopologyException(String msg) {
       super(msg);
     }
   }
+
   /**
    * Add a leaf node. This will be called when a new datanode is added.
    * @param node node to be added; can be null

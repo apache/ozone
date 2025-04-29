@@ -15,23 +15,25 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.test.tag;
+package org.apache.hadoop.ozone.debug.logs;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import org.junit.jupiter.api.Tag;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import org.apache.hadoop.ozone.debug.logs.container.ContainerLogController;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 
 /**
- * Annotation to mark JUnit5 test classes that require native libraries.
+ * Entry point for Ozone debug log parsing and analysis commands.
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
-@Retention(RetentionPolicy.RUNTIME)
-@Tag("native")
-public @interface Native {
-  /**
-   * Native Library being used.
-   */
-  String value();
+
+@CommandLine.Command(
+    name = "log",
+    subcommands = {
+        ContainerLogController.class
+    },
+    description = "This serves as a common entry point for all commands that parse and analyze logs," +
+        "regardless of their source or type and require logs to be extracted first."
+)
+@MetaInfServices(DebugSubcommand.class)
+public class LogParser implements DebugSubcommand {
 }

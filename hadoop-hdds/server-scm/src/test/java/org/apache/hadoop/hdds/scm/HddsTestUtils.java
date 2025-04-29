@@ -258,18 +258,19 @@ public final class HddsTestUtils {
     return createStorageReport(nodeId, path, capacity, used, remaining,
             type, false);
   }
-    /**
-     * Creates storage report with the given information.
-     *
-     * @param nodeId    datanode id
-     * @param path      storage dir
-     * @param capacity  storage size
-     * @param used      space used
-     * @param remaining space remaining
-     * @param type      type of storage
-     *
-     * @return StorageReportProto
-     */
+
+  /**
+   * Creates storage report with the given information.
+   *
+   * @param nodeId    datanode id
+   * @param path      storage dir
+   * @param capacity  storage size
+   * @param used      space used
+   * @param remaining space remaining
+   * @param type      type of storage
+   *
+   * @return StorageReportProto
+   */
   public static StorageReportProto createStorageReport(DatanodeID nodeId, String path,
       long capacity, long used, long remaining, StorageTypeProto type,
                                                        boolean failed) {
@@ -356,7 +357,6 @@ public final class HddsTestUtils {
     }
     return getContainerReports(containerInfos);
   }
-
 
   public static PipelineReportsProto getRandomPipelineReports() {
     return PipelineReportsProto.newBuilder().build();
@@ -623,7 +623,7 @@ public final class HddsTestUtils {
   private static ContainerInfo.Builder getDefaultContainerInfoBuilder(
       final HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
-        .setContainerID(RandomUtils.nextLong())
+        .setContainerID(RandomUtils.secure().randomLong())
         .setReplicationConfig(
             RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE))
@@ -631,7 +631,6 @@ public final class HddsTestUtils {
         .setSequenceId(10000L)
         .setOwner("TEST");
   }
-
 
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state) {
@@ -756,8 +755,6 @@ public final class HddsTestUtils {
             usedBytes, keyCount, sequenceId, Arrays.asList(datanodeDetails)));
   }
 
-
-
   public static Pipeline getRandomPipeline() {
     List<DatanodeDetails> nodes = new ArrayList<>();
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -816,7 +813,7 @@ public final class HddsTestUtils {
     for (int i = 0; i < numContainers; i++) {
       ContainerInfo.Builder builder = new ContainerInfo.Builder();
       containerInfoList.add(builder
-          .setContainerID(RandomUtils.nextLong())
+          .setContainerID(RandomUtils.secure().randomLong())
           .setReplicationConfig(ratisReplicationConfig)
           .build());
     }
@@ -837,7 +834,7 @@ public final class HddsTestUtils {
     for (int i = 0; i < numContainers; i++) {
       ContainerInfo.Builder builder = new ContainerInfo.Builder();
       containerInfoList.add(builder
-          .setContainerID(RandomUtils.nextLong())
+          .setContainerID(RandomUtils.secure().randomLong())
           .setOwner("test-owner")
           .setPipelineID(PipelineID.randomId())
           .setReplicationConfig(eCReplicationConfig)

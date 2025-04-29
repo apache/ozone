@@ -467,6 +467,7 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(edek);
     return edek;
   }
+
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args, ResolvedBucket bucket,
       String clientAddress) throws IOException {
@@ -606,6 +607,7 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
   }
+
   /**
    * Refresh pipeline info in OM by asking SCM.
    * @param keyList a list of OmKeyInfo
@@ -1541,6 +1543,7 @@ public class KeyManagerImpl implements KeyManager {
         .setOwnerName(keyInfo.getOwnerName())
         .build();
   }
+
   /**
    * OzoneFS api to lookup for a file.
    *
@@ -2057,6 +2060,7 @@ public class KeyManagerImpl implements KeyManager {
     }
     return nodeSet;
   }
+
   private void slimLocationVersion(OmKeyInfo... keyInfos) {
     if (keyInfos != null) {
       for (OmKeyInfo keyInfo : keyInfos) {

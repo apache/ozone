@@ -195,11 +195,11 @@ public class InfoSubcommand extends ScmSubcommand {
 
   private static String buildReplicaDetails(ContainerReplicaInfo replica) {
     StringBuilder sb = new StringBuilder()
-        .append("State: ").append(replica.getState()).append(";");
+        .append("State: ").append(replica.getState()).append(';');
     if (replica.getReplicaIndex() != -1) {
-      sb.append(" ReplicaIndex: ").append(replica.getReplicaIndex()).append(";");
+      sb.append(" ReplicaIndex: ").append(replica.getReplicaIndex()).append(';');
     }
-    sb.append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(";")
+    sb.append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(';')
         .append(" Location: ").append(buildDatanodeDetails(replica.getDatanodeDetails()));
     return sb.toString();
   }

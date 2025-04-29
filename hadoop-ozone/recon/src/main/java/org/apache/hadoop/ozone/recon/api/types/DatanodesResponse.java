@@ -47,7 +47,6 @@ public class DatanodesResponse {
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   private Map<String, String> failedNodeErrorResponseMap;
 
-
   public DatanodesResponse() {
     this(0, new ArrayList<>());
   }

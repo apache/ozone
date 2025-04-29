@@ -83,6 +83,21 @@ public class FileSystemAccessService extends BaseService
   public static final String FILE_SYSTEM_SERVICE_CREATED
       = "FileSystemAccessService.created";
 
+  private static final String HTTPFS_FS_USER = "httpfs.fs.user";
+
+  private Collection<String> nameNodeWhitelist;
+
+  private Configuration serviceHadoopConf;
+
+  private Configuration fileSystemConf;
+
+  private AtomicInteger unmanagedFileSystems = new AtomicInteger();
+
+  private ConcurrentHashMap<String, CachedFileSystem> fsCache =
+      new ConcurrentHashMap<String, CachedFileSystem>();
+
+  private long purgeTimeout;
+
   private static class CachedFileSystem {
     private FileSystem fs;
     private long lastUse;
@@ -140,21 +155,6 @@ public class FileSystemAccessService extends BaseService
   public FileSystemAccessService() {
     super(PREFIX);
   }
-
-  private Collection<String> nameNodeWhitelist;
-
-  // Suppressed because serviceHadoopConf only used in this class and in the
-  // tests, which will be removed later.
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  Configuration serviceHadoopConf;
-  private Configuration fileSystemConf;
-
-  private AtomicInteger unmanagedFileSystems = new AtomicInteger();
-
-  private ConcurrentHashMap<String, CachedFileSystem> fsCache =
-      new ConcurrentHashMap<String, CachedFileSystem>();
-
-  private long purgeTimeout;
 
   @Override
   protected void init() throws ServiceException {
@@ -324,8 +324,6 @@ public class FileSystemAccessService extends BaseService
   protected void setRequiredServiceHadoopConf(Configuration conf) {
     conf.set("fs.hdfs.impl.disable.cache", "true");
   }
-
-  private static final String HTTPFS_FS_USER = "httpfs.fs.user";
 
   protected FileSystem createFileSystem(Configuration namenodeConf)
       throws IOException {

@@ -84,7 +84,6 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
         withDeadlineAfter(timeout, TimeUnit.SECONDS);
   }
 
-
   @Override
   public CompletableFuture<Path> download(final Path outputPath) {
     // By default, on every checkpoint, the rocks db will be flushed

@@ -76,11 +76,28 @@ public final class RocksDatabase implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
+
   static {
     ManagedRocksObjectUtils.loadRocksDBLibrary();
   }
-  private static final ManagedReadOptions DEFAULT_READ_OPTION =
-      new ManagedReadOptions();
+
+  private static final ManagedReadOptions DEFAULT_READ_OPTION = new ManagedReadOptions();
+
+  private final String name;
+  private final Throwable creationStackTrace = new Throwable("Object creation stack trace");
+
+  private final ManagedRocksDB db;
+  private final ManagedDBOptions dbOptions;
+  private final ManagedWriteOptions writeOptions;
+  private final List<ColumnFamilyDescriptor> descriptors;
+  /** column family names -> {@link ColumnFamily}. */
+  private final Map<String, ColumnFamily> columnFamilies;
+  /** {@link ColumnFamilyHandle#getID()} -> column family names. */
+  private final Supplier<Map<Integer, String>> columnFamilyNames;
+
+  private final AtomicBoolean isClosed = new AtomicBoolean();
+  /** Count the number of operations running concurrently. */
+  private final AtomicLong counter = new AtomicLong();
 
   static String bytes2String(byte[] bytes) {
     return StringCodec.get().fromPersistedFormat(bytes);
@@ -330,22 +347,6 @@ public final class RocksDatabase implements Closeable {
       return "ColumnFamily-" + getName();
     }
   }
-
-  private final String name;
-  private final Throwable creationStackTrace = new Throwable("Object creation stack trace");
-
-  private final ManagedRocksDB db;
-  private final ManagedDBOptions dbOptions;
-  private final ManagedWriteOptions writeOptions;
-  private final List<ColumnFamilyDescriptor> descriptors;
-  /** column family names -> {@link ColumnFamily}. */
-  private final Map<String, ColumnFamily> columnFamilies;
-  /** {@link ColumnFamilyHandle#getID()} -> column family names. */
-  private final Supplier<Map<Integer, String>> columnFamilyNames;
-
-  private final AtomicBoolean isClosed = new AtomicBoolean();
-  /** Count the number of operations running concurrently. */
-  private final AtomicLong counter = new AtomicLong();
 
   private RocksDatabase(File dbFile, ManagedRocksDB db,
       ManagedDBOptions dbOptions, ManagedWriteOptions writeOptions,

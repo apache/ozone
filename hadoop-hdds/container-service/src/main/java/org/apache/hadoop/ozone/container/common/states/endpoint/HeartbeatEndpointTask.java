@@ -504,7 +504,7 @@ public class HeartbeatEndpointTask
 
       if (conf == null) {
         LOG.error("No config specified.");
-        throw new IllegalArgumentException("A valid configration is needed to" +
+        throw new IllegalArgumentException("A valid configuration is needed to" +
             " construct HeartbeatEndpointTask task");
       }
 

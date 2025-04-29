@@ -38,14 +38,6 @@ public class ReconSqlDbConfig {
   )
   private String driverClass;
 
-  public String getDriverClass() {
-    return driverClass;
-  }
-
-  public void setDriverClass(String driverClass) {
-    this.driverClass = driverClass;
-  }
-
   @Config(key = "jdbc.url",
       type = ConfigType.STRING,
       defaultValue = "jdbc:derby:${ozone.recon.db.dir}/ozone_recon_derby.db",
@@ -53,14 +45,6 @@ public class ReconSqlDbConfig {
       description = "Ozone Recon SQL database jdbc url."
   )
   private String jdbcUrl;
-
-  public String getJdbcUrl() {
-    return jdbcUrl;
-  }
-
-  public void setJdbcUrl(String jdbcUrl) {
-    this.jdbcUrl = jdbcUrl;
-  }
 
   @Config(key = "username",
       type = ConfigType.STRING,
@@ -70,14 +54,6 @@ public class ReconSqlDbConfig {
   )
   private String username;
 
-  public String getUsername() {
-    return username;
-  }
-
-  public void setUsername(String username) {
-    this.username = username;
-  }
-
   @Config(key = "password",
       type = ConfigType.STRING,
       defaultValue = "",
@@ -85,14 +61,6 @@ public class ReconSqlDbConfig {
       description = "Ozone Recon SQL database password."
   )
   private String password;
-
-  public String getPassword() {
-    return password;
-  }
-
-  public void setPassword(String password) {
-    this.password = password;
-  }
 
   @Config(key = "auto.commit",
       type = ConfigType.BOOLEAN,
@@ -103,14 +71,6 @@ public class ReconSqlDbConfig {
   )
   private boolean autoCommit;
 
-  public boolean isAutoCommit() {
-    return autoCommit;
-  }
-
-  public void setAutoCommit(boolean autoCommit) {
-    this.autoCommit = autoCommit;
-  }
-
   @Config(key = "conn.timeout",
       type = ConfigType.TIME,
       defaultValue = "30000ms",
@@ -120,14 +80,6 @@ public class ReconSqlDbConfig {
   )
   private long connectionTimeout;
 
-  public long getConnectionTimeout() {
-    return connectionTimeout;
-  }
-
-  public void setConnectionTimeout(long connectionTimeout) {
-    this.connectionTimeout = connectionTimeout;
-  }
-
   @Config(key = "conn.max.active",
       type = ConfigType.INT,
       defaultValue = "5",
@@ -135,14 +87,6 @@ public class ReconSqlDbConfig {
       description = "The max active connections to the SQL database."
   )
   private int maxActiveConnections;
-
-  public int getMaxActiveConnections() {
-    return maxActiveConnections;
-  }
-
-  public void setMaxActiveConnections(int maxActiveConnections) {
-    this.maxActiveConnections = maxActiveConnections;
-  }
 
   @Config(key = "conn.max.age",
       type = ConfigType.TIME, timeUnit = SECONDS,
@@ -152,14 +96,6 @@ public class ReconSqlDbConfig {
   )
   private long connectionMaxAge;
 
-  public long getConnectionMaxAge() {
-    return connectionMaxAge;
-  }
-
-  public void setConnectionMaxAge(long connectionMaxAge) {
-    this.connectionMaxAge = connectionMaxAge;
-  }
-
   @Config(key = "conn.idle.max.age",
       type = ConfigType.TIME, timeUnit = SECONDS,
       defaultValue = "3600s",
@@ -167,14 +103,6 @@ public class ReconSqlDbConfig {
       description = "Sets maximum time to live for idle connection in seconds."
   )
   private long connectionIdleMaxAge;
-
-  public long getConnectionIdleMaxAge() {
-    return connectionIdleMaxAge;
-  }
-
-  public void setConnectionIdleMaxAge(long connectionIdleMaxAge) {
-    this.connectionIdleMaxAge = connectionIdleMaxAge;
-  }
 
   @Config(key = "conn.idle.test.period",
       type = ConfigType.TIME, timeUnit = SECONDS,
@@ -184,14 +112,6 @@ public class ReconSqlDbConfig {
   )
   private long connectionIdleTestPeriod;
 
-  public long getConnectionIdleTestPeriod() {
-    return connectionIdleTestPeriod;
-  }
-
-  public void setConnectionIdleTestPeriod(long connectionIdleTestPeriod) {
-    this.connectionIdleTestPeriod = connectionIdleTestPeriod;
-  }
-
   @Config(key = "conn.idle.test",
       type = ConfigType.STRING,
       defaultValue = "SELECT 1",
@@ -200,14 +120,6 @@ public class ReconSqlDbConfig {
           "test for dead connections."
   )
   private String idleTestQuery;
-
-  public String getIdleTestQuery() {
-    return idleTestQuery;
-  }
-
-  public void setIdleTestQuery(String idleTestQuery) {
-    this.idleTestQuery = idleTestQuery;
-  }
 
   @Config(key = "jooq.dialect",
       type = ConfigType.STRING,
@@ -219,6 +131,94 @@ public class ReconSqlDbConfig {
           ".jooq/org/jooq/SQLDialect.html to specify different dialect."
   )
   private String sqlDbDialect;
+
+  public String getDriverClass() {
+    return driverClass;
+  }
+
+  public void setDriverClass(String driverClass) {
+    this.driverClass = driverClass;
+  }
+
+  public String getJdbcUrl() {
+    return jdbcUrl;
+  }
+
+  public void setJdbcUrl(String jdbcUrl) {
+    this.jdbcUrl = jdbcUrl;
+  }
+
+  public String getUsername() {
+    return username;
+  }
+
+  public void setUsername(String username) {
+    this.username = username;
+  }
+
+  public String getPassword() {
+    return password;
+  }
+
+  public void setPassword(String password) {
+    this.password = password;
+  }
+
+  public boolean isAutoCommit() {
+    return autoCommit;
+  }
+
+  public void setAutoCommit(boolean autoCommit) {
+    this.autoCommit = autoCommit;
+  }
+
+  public long getConnectionTimeout() {
+    return connectionTimeout;
+  }
+
+  public void setConnectionTimeout(long connectionTimeout) {
+    this.connectionTimeout = connectionTimeout;
+  }
+
+  public int getMaxActiveConnections() {
+    return maxActiveConnections;
+  }
+
+  public void setMaxActiveConnections(int maxActiveConnections) {
+    this.maxActiveConnections = maxActiveConnections;
+  }
+
+  public long getConnectionMaxAge() {
+    return connectionMaxAge;
+  }
+
+  public void setConnectionMaxAge(long connectionMaxAge) {
+    this.connectionMaxAge = connectionMaxAge;
+  }
+
+  public long getConnectionIdleMaxAge() {
+    return connectionIdleMaxAge;
+  }
+
+  public void setConnectionIdleMaxAge(long connectionIdleMaxAge) {
+    this.connectionIdleMaxAge = connectionIdleMaxAge;
+  }
+
+  public long getConnectionIdleTestPeriod() {
+    return connectionIdleTestPeriod;
+  }
+
+  public void setConnectionIdleTestPeriod(long connectionIdleTestPeriod) {
+    this.connectionIdleTestPeriod = connectionIdleTestPeriod;
+  }
+
+  public String getIdleTestQuery() {
+    return idleTestQuery;
+  }
+
+  public void setIdleTestQuery(String idleTestQuery) {
+    this.idleTestQuery = idleTestQuery;
+  }
 
   public String getSqlDbDialect() {
     return sqlDbDialect;

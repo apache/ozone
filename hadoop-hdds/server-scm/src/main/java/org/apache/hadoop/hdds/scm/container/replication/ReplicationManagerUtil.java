@@ -46,11 +46,10 @@ import org.slf4j.LoggerFactory;
  */
 public final class ReplicationManagerUtil {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ReplicationManagerUtil.class);
+
   private ReplicationManagerUtil() {
   }
-
-  private static final Logger LOG = LoggerFactory.getLogger(
-      ReplicationManagerUtil.class);
 
   /**
    * Using the passed placement policy attempt to select a list of datanodes to
@@ -99,7 +98,7 @@ public final class ReplicationManagerUtil {
       }
     }
     throw new SCMException(String.format("Placement Policy: %s did not return"
-            + " any nodes. Number of required Nodes %d, Datasize Required: %d",
+            + " any nodes. Number of required Nodes %d, Data size Required: %d",
         policy.getClass(), requiredNodes, dataSizeRequired),
         SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
   }
@@ -198,7 +197,6 @@ public final class ReplicationManagerUtil {
     }
     return new ExcludedAndUsedNodes(excludedNodes, usedNodes);
   }
-
 
   /**
    * Simple class to hold the excluded and used nodes lists.

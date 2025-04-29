@@ -28,9 +28,6 @@ import org.rocksdb.ColumnFamilyDescriptor;
  * Class that maintains Table Configuration.
  */
 public class TableConfig implements AutoCloseable {
-  static TableConfig newTableConfig(Path dbPath, String cfName) {
-    return new TableConfig(cfName, DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions(dbPath, cfName));
-  }
 
   private final String name;
   private final ManagedColumnFamilyOptions columnFamilyOptions;
@@ -48,6 +45,11 @@ public class TableConfig implements AutoCloseable {
   public TableConfig(String name, ManagedColumnFamilyOptions columnFamilyOptions) {
     this.name = name;
     this.columnFamilyOptions = columnFamilyOptions;
+  }
+
+  static TableConfig newTableConfig(Path dbPath, String name) {
+    return new TableConfig(name,
+        DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions(dbPath, name));
   }
 
   /**

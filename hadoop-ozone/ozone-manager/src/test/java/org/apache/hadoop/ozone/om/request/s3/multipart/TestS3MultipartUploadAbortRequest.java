@@ -33,7 +33,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
 
-
   @Test
   public void testPreExecute() throws IOException {
     String volumeName = UUID.randomUUID().toString();
@@ -120,7 +119,6 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         omClientResponse.getOMResponse().getStatus());
 
   }
-
 
   @Test
   public void testValidateAndUpdateCacheVolumeNotFound() throws Exception {

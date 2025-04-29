@@ -86,7 +86,6 @@ public class TestSCMContainerPlacementRackAware {
   private SCMContainerPlacementMetrics metrics;
   private static final int NODE_PER_RACK = 5;
 
-
   private static IntStream numDatanodes() {
     return IntStream.rangeClosed(3, 15);
   }
@@ -117,11 +116,11 @@ public class TestSCMContainerPlacementRackAware {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getID(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
           STORAGE_CAPACITY, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
-          "/metadata1-" + datanodeInfo.getUuidString(),
+          "/metadata1-" + datanodeInfo.getID(),
           STORAGE_CAPACITY, 0, 100L, null);
       datanodeInfo.updateStorageReports(
           new ArrayList<>(Arrays.asList(storage1)));
@@ -133,39 +132,39 @@ public class TestSCMContainerPlacementRackAware {
     if (datanodeCount > 4) {
       StorageReportProto storage2 = HddsTestUtils.createStorageReport(
           dnInfos.get(2).getID(),
-          "/data1-" + datanodes.get(2).getUuidString(),
+          "/data1-" + datanodes.get(2).getID(),
           STORAGE_CAPACITY, 90L, 10L, null);
       dnInfos.get(2).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage2)));
       StorageReportProto storage3 = HddsTestUtils.createStorageReport(
           dnInfos.get(3).getID(),
-          "/data1-" + dnInfos.get(3).getUuidString(),
+          "/data1-" + dnInfos.get(3).getID(),
           STORAGE_CAPACITY, 80L, 20L, null);
       dnInfos.get(3).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage3)));
       StorageReportProto storage4 = HddsTestUtils.createStorageReport(
           dnInfos.get(4).getID(),
-          "/data1-" + dnInfos.get(4).getUuidString(),
+          "/data1-" + dnInfos.get(4).getID(),
           STORAGE_CAPACITY, 70L, 30L, null);
       dnInfos.get(4).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage4)));
     } else if (datanodeCount > 3) {
       StorageReportProto storage2 = HddsTestUtils.createStorageReport(
           dnInfos.get(2).getID(),
-          "/data1-" + dnInfos.get(2).getUuidString(),
+          "/data1-" + dnInfos.get(2).getID(),
           STORAGE_CAPACITY, 90L, 10L, null);
       dnInfos.get(2).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage2)));
       StorageReportProto storage3 = HddsTestUtils.createStorageReport(
           dnInfos.get(3).getID(),
-          "/data1-" + dnInfos.get(3).getUuidString(),
+          "/data1-" + dnInfos.get(3).getID(),
           STORAGE_CAPACITY, 80L, 20L, null);
       dnInfos.get(3).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage3)));
     } else if (datanodeCount > 2) {
       StorageReportProto storage2 = HddsTestUtils.createStorageReport(
           dnInfos.get(2).getID(),
-          "/data1-" + dnInfos.get(2).getUuidString(),
+          "/data1-" + dnInfos.get(2).getID(),
           STORAGE_CAPACITY, 84L, 16L, null);
       dnInfos.get(2).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage2)));
@@ -460,11 +459,11 @@ public class TestSCMContainerPlacementRackAware {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          dnInfo.getID(), "/data1-" + dnInfo.getUuidString(),
+          dnInfo.getID(), "/data1-" + dnInfo.getID(),
           STORAGE_CAPACITY, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
-          "/metadata1-" + dnInfo.getUuidString(),
+          "/metadata1-" + dnInfo.getID(),
           STORAGE_CAPACITY, 0, 100L, null);
       dnInfo.updateStorageReports(
           new ArrayList<>(Arrays.asList(storage1)));
@@ -621,7 +620,7 @@ public class TestSCMContainerPlacementRackAware {
 
     for (int i = 0; i < 10; i++) {
       // Set a random DN to in_service and ensure it is always picked
-      int index = RandomUtils.nextInt(0, dnInfos.size());
+      int index = RandomUtils.secure().randomInt(0, dnInfos.size());
       dnInfos.get(index).setNodeStatus(NodeStatus.inServiceHealthy());
       try {
         List<DatanodeDetails> datanodeDetails =
@@ -814,6 +813,7 @@ public class TestSCMContainerPlacementRackAware {
         datanodeDetails.get(0).getUuid() && excludedNodes.get(1).getUuid() !=
         datanodeDetails.get(1).getUuid());
   }
+
   @ParameterizedTest
   @ValueSource(ints = {11, 12, 13, 14, 15})
   public void testNoFallbackWithUsedNodes(int datanodeCount) {

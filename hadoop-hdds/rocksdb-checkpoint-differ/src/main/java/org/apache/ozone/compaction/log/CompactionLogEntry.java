@@ -39,10 +39,6 @@ public final class CompactionLogEntry implements
       CompactionLogEntry::getProtobuf,
       CompactionLogEntry.class);
 
-  public static Codec<CompactionLogEntry> getCodec() {
-    return CODEC;
-  }
-
   private final long dbSequenceNumber;
   private final long compactionTime;
   private final List<CompactionFileInfo> inputFileInfoList;
@@ -60,6 +56,10 @@ public final class CompactionLogEntry implements
     this.inputFileInfoList = inputFileInfoList;
     this.outputFileInfoList = outputFileInfoList;
     this.compactionReason = compactionReason;
+  }
+
+  public static Codec<CompactionLogEntry> getCodec() {
+    return CODEC;
   }
 
   public List<CompactionFileInfo> getInputFileInfoList() {

@@ -202,7 +202,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   KeyDeletingService getDeletingService();
 
-
   OmMultipartUploadList listMultipartUploads(String volumeName,
           String bucketName, String prefix,
           String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination) throws OMException;

@@ -181,6 +181,7 @@ public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinitio
   public static String getKeyWithoutPrefix(String keyWithPrefix) {
     return keyWithPrefix.substring(keyWithPrefix.indexOf(separator) + 1);
   }
+
   /**
    *
    * @param key rocksDB original key

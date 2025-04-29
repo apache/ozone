@@ -497,7 +497,6 @@ public class TestKeyValueContainer {
     container.update(metadata, true);
   }
 
-
   /**
    * Set container state to CLOSED.
    */
@@ -631,7 +630,6 @@ public class TestKeyValueContainer {
     assertNotNull(keyValueContainer.getContainerReport());
   }
 
-
   @ContainerTestVersionInfo.ContainerTest
   public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -672,10 +670,8 @@ public class TestKeyValueContainer {
     });
 
     assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, exception.getResult());
-    assertThat(exception)
-        .hasMessageStartingWith("Updating a closed container without force option is not allowed. ContainerID: ");
+    assertThat(exception).hasMessageContaining(keyValueContainerData.toString());
   }
-
 
   @ContainerTestVersionInfo.ContainerTest
   public void testContainerRocksDB(ContainerTestVersionInfo versionInfo)

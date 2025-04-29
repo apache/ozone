@@ -69,31 +69,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   private final TableCache<KEY, VALUE> cache;
 
   /**
-   * The same as this(rawTable, codecRegistry, keyType, valueType,
-   *                  CacheType.PARTIAL_CACHE).
-   */
-  TypedTable(RDBTable rawTable, CodecRegistry codecRegistry, Class<KEY> keyType, Class<VALUE> valueType)
-      throws IOException {
-    this(rawTable, codecRegistry, keyType, valueType, CacheType.PARTIAL_CACHE);
-  }
-
-  /**
-   * Create an TypedTable from the raw table with specified cache type.
-   *
-   * @param rawTable The underlying (untyped) table in RocksDB.
-   * @param codecRegistry To look up codecs.
-   * @param keyType The key type.
-   * @param valueType The value type.
-   * @param cacheType How to cache the entries?
-   * @throws IOException if failed to iterate the raw table.
-   */
-  TypedTable(RDBTable rawTable, CodecRegistry codecRegistry, Class<KEY> keyType, Class<VALUE> valueType,
-      CacheType cacheType) throws IOException {
-    this(rawTable, codecRegistry.getCodecFromClass(keyType), codecRegistry.getCodecFromClass(valueType),
-        cacheType);
-  }
-
-  /**
    * Create an TypedTable from the raw table with specified cache type.
    *
    * @param rawTable The underlying (untyped) table in RocksDB.
@@ -102,8 +77,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * @param cacheType How to cache the entries?
    * @throws IOException
    */
-  public TypedTable(
-      RDBTable rawTable, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, CacheType cacheType) throws IOException {
+  TypedTable(RDBTable rawTable, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, CacheType cacheType) throws IOException {
     this.rawTable = Objects.requireNonNull(rawTable, "rawTable==null");
     this.keyCodec = Objects.requireNonNull(keyCodec, "keyCodec == null");
     this.valueCodec = Objects.requireNonNull(valueCodec, "valueCodec == null");
