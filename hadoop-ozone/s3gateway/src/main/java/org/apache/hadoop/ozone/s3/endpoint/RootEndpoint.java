@@ -63,7 +63,7 @@ public class RootEndpoint extends EndpointBase {
       }
 
       OzoneVolume volume = getVolume();
-      response.setOwner(new S3Owner(volume.getName(), volume.getName()));
+      response.setOwner(new S3Owner(volume.getOwner(), volume.getOwner()));
 
       while (bucketIterator.hasNext()) {
         OzoneBucket next = bucketIterator.next();

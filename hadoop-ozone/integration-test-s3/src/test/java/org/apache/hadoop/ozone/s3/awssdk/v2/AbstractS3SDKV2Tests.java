@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
@@ -57,6 +59,7 @@ import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
 import software.amazon.awssdk.services.s3.model.CreateMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.Tag;
 import software.amazon.awssdk.services.s3.model.Tagging;
@@ -82,6 +85,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
   private static MiniOzoneCluster cluster = null;
   private static S3Client s3Client = null;
+  private static S3AsyncClient s3AsyncClient = null;
 
   /**
    * Create a MiniOzoneCluster with S3G enabled for testing.
@@ -95,7 +99,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    s3Client = new S3ClientFactory(s3g.getConf()).createS3ClientV2();
+    S3ClientFactory s3ClientFactory = new S3ClientFactory(s3g.getConf());
+    s3Client = s3ClientFactory.createS3ClientV2();
+    s3AsyncClient = s3ClientFactory.createS3AsyncClientV2();
   }
 
   /**
@@ -193,6 +199,26 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     HeadObjectResponse headObjectResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
     assertTrue(headObjectResponse.hasMetadata());
     assertEquals(userMetadata, headObjectResponse.metadata());
+  }
+
+  @Test
+  public void listBuckets() throws Exception {
+    final String bucketName = getBucketName();
+    final String expectedOwner = UserGroupInformation.getCurrentUser().getUserName();
+
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    ListBucketsResponse syncResponse = s3Client.listBuckets();
+    assertEquals(1, syncResponse.buckets().size());
+    assertEquals(bucketName, syncResponse.buckets().get(0).name());
+    assertEquals(expectedOwner, syncResponse.owner().displayName());
+    assertEquals(expectedOwner, syncResponse.owner().id());
+
+    ListBucketsResponse asyncResponse = s3AsyncClient.listBuckets().join();
+    assertEquals(1, asyncResponse.buckets().size());
+    assertEquals(bucketName, asyncResponse.buckets().get(0).name());
+    assertEquals(expectedOwner, asyncResponse.owner().displayName());
+    assertEquals(expectedOwner, asyncResponse.owner().id());
   }
 
   private String getBucketName() {

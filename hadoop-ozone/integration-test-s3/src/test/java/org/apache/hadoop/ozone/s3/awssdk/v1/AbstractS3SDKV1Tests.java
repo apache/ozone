@@ -106,6 +106,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -250,7 +251,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   @Test
-  public void testListBuckets() {
+  public void testListBuckets() throws IOException {
     List<String> bucketNames = new ArrayList<>();
     for (int i = 0; i <= 5; i++) {
       String bucketName = getBucketName(String.valueOf(i));
@@ -263,6 +264,14 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         .map(Bucket::getName).collect(Collectors.toList());
 
     assertThat(listBucketNames).containsAll(bucketNames);
+
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    String expectOwner = ugi.getShortUserName();
+
+    Owner s3AccountOwner = s3Client.getS3AccountOwner();
+
+    assertThat(s3AccountOwner.getDisplayName()).isEqualTo(expectOwner);
+    assertThat(s3AccountOwner.getId()).isEqualTo(expectOwner);
   }
 
   @Test

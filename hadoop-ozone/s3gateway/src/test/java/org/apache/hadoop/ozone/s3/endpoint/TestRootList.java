@@ -64,8 +64,8 @@ public class TestRootList {
     }
     response = (ListBucketResponse) rootEndpoint.get().getEntity();
     assertEquals(10, response.getBucketsNum());
-    assertEquals(DEFAULT_VOLUME, response.getOwner().getDisplayName());
-    assertEquals(DEFAULT_VOLUME, response.getOwner().getId());
+    assertEquals("root", response.getOwner().getDisplayName());
+    assertEquals("root", response.getOwner().getId());
   }
 
 }
