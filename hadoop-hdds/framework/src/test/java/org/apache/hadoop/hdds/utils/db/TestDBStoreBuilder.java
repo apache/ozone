@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -203,11 +202,7 @@ public class TestDBStoreBuilder {
       }
     };
 
-    try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
-        .setName("SampleStore").setPath(newFolder.toPath()).build()) {
-      assertInstanceOf(RDBStore.class, dbStore);
-
-      RDBStore rdbStore = (RDBStore) dbStore;
+    try (RDBStore rdbStore = DBStoreBuilder.newBuilder(conf, sampleDB, "SampleStore", newFolder.toPath()).build()) {
       Collection<RocksDatabase.ColumnFamily> cfFamilies =
           rdbStore.getColumnFamilies();
 
@@ -267,13 +262,9 @@ public class TestDBStoreBuilder {
       }
     };
 
-    try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
-            .setName("SampleStore")
-            .disableDefaultCFAutoCompaction(disableAutoCompaction)
-            .setPath(newFolder.toPath()).build()) {
-      assertInstanceOf(RDBStore.class, dbStore);
-
-      RDBStore rdbStore = (RDBStore) dbStore;
+    try (RDBStore rdbStore = DBStoreBuilder.newBuilder(conf, sampleDB, "SampleStore", newFolder.toPath())
+        .disableDefaultCFAutoCompaction(disableAutoCompaction)
+        .build()) {
       Collection<RocksDatabase.ColumnFamily> cfFamilies =
               rdbStore.getColumnFamilies();
 

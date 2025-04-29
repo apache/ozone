@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -92,13 +93,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
    */
   private void initializeNewRdbStore(File dbFile) throws IOException {
     try {
-      DBStoreBuilder dbStoreBuilder =
-          DBStoreBuilder.newBuilder(ozoneConfiguration)
-          .setName(dbFile.getName())
-          .setPath(dbFile.toPath().getParent());
-      addOMTablesAndCodecs(dbStoreBuilder);
-      dbStoreBuilder.addCodec(KeyEntityInfoProtoWrapper.class, KeyEntityInfoProtoWrapper.getCodec());
-      setStore(dbStoreBuilder.build());
+      setStore(DBStoreBuilder.newBuilder(ozoneConfiguration, OMDBDefinition.get(), dbFile).build());
       LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
