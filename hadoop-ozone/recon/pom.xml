@@ -149,7 +149,7 @@
     <!-- visible only for ContainerOperationClient -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-tools</artifactId>
+      <artifactId>ozone-cli-admin</artifactId>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
