@@ -38,7 +38,6 @@ import org.apache.ratis.server.raftlog.segmented.SegmentedRaftLogOutputStream;
 import org.apache.ratis.util.SizeInBytes;
 import picocli.CommandLine;
 
-
 /**
  * Tool to omit a raft log in a ratis segment file.
  */
@@ -59,16 +58,6 @@ public class OMRatisLogRepair extends RepairTool {
 
   @CommandLine.ArgGroup(multiplicity = "1")
   private ExclusiveArguments exclusiveArguments;
-
-  private static final class ExclusiveArguments {
-    @CommandLine.Option(names = {"-s", "--segment-path"},
-        description = "Path of the input segment file")
-    private File segmentFile;
-
-    @CommandLine.Option(names = {"-d", "--ratis-log-dir"},
-        description = "Path of the ratis log directory")
-    private File logDir;
-  }
 
   @CommandLine.Option(names = {"-b", "--backup"},
       required = true,
@@ -239,5 +228,15 @@ public class OMRatisLogRepair extends RepairTool {
 
     throw new IllegalArgumentException("Invalid index (" + index
         + ") for log directory: \"" + exclusiveArguments.logDir + "\". None of the segment files have the index.");
+  }
+
+  private static final class ExclusiveArguments {
+    @CommandLine.Option(names = {"-s", "--segment-path"},
+        description = "Path of the input segment file")
+    private File segmentFile;
+
+    @CommandLine.Option(names = {"-d", "--ratis-log-dir"},
+        description = "Path of the ratis log directory")
+    private File logDir;
   }
 }
