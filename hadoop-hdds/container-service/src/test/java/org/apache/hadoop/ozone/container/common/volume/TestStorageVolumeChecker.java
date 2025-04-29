@@ -34,7 +34,6 @@ import java.io.File;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -59,7 +58,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.FakeTimer;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -70,7 +69,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Tests for {@link StorageVolumeChecker}.
  */
-@Timeout(300)
 public class TestStorageVolumeChecker {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestStorageVolumeChecker.class);
@@ -87,8 +85,12 @@ public class TestStorageVolumeChecker {
    */
   private VolumeCheckResult expectedVolumeHealth;
 
-  private void initTest(VolumeCheckResult result) {
+  private ContainerLayoutVersion layoutVersion;
+
+  private void initTest(VolumeCheckResult result,
+      ContainerLayoutVersion layout) {
     this.expectedVolumeHealth = result;
+    this.layoutVersion = layout;
     setup();
   }
 
@@ -102,19 +104,13 @@ public class TestStorageVolumeChecker {
    * Run each test case for each possible value of {@link VolumeCheckResult}.
    * Including "null" for 'throw exception'.
    */
-  private static List<VolumeCheckResult> volumeCheckResults() {
-    List<VolumeCheckResult> list = new ArrayList<>(Arrays.asList(VolumeCheckResult.values()));
-    list.add(null);
-    return list;
-  }
-
   private static List<Arguments> provideTestData() {
-    List<VolumeCheckResult> volumeCheckResults = volumeCheckResults();
     List<Arguments> values = new ArrayList<>();
     for (ContainerLayoutVersion layout : ContainerLayoutVersion.values()) {
-      for (VolumeCheckResult result : volumeCheckResults) {
+      for (VolumeCheckResult result : VolumeCheckResult.values()) {
         values.add(Arguments.of(result, layout));
       }
+      values.add(Arguments.of(null, layout));
     }
     return values;
   }
@@ -123,18 +119,23 @@ public class TestStorageVolumeChecker {
   /**
    * Test {@link StorageVolumeChecker#checkVolume} propagates the
    * check to the delegate checker.
+   *
+   * @throws Exception
    */
   @ParameterizedTest
-  @MethodSource("volumeCheckResults")
-  public void testCheckOneVolume(VolumeCheckResult checkResult) throws Exception {
-    initTest(checkResult);
+  @MethodSource("provideTestData")
+  public void testCheckOneVolume(
+      VolumeCheckResult checkResult, ContainerLayoutVersion layout,
+      TestInfo testInfo) throws Exception {
+    initTest(checkResult, layout);
+    LOG.info("Executing {}", testInfo.getTestMethod());
     final HddsVolume volume = makeVolumes(1, expectedVolumeHealth).get(0);
     final StorageVolumeChecker checker =
         new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer(), "");
     checker.setDelegateChecker(new DummyChecker());
     final AtomicLong numCallbackInvocations = new AtomicLong(0);
 
-    /*
+    /**
      * Request a check and ensure it triggered {@link HddsVolume#check}.
      */
     boolean result =
@@ -164,11 +165,15 @@ public class TestStorageVolumeChecker {
   /**
    * Test {@link StorageVolumeChecker#checkAllVolumes} propagates
    * checks for all volumes to the delegate checker.
+   *
+   * @throws Exception
    */
   @ParameterizedTest
-  @MethodSource("volumeCheckResults")
-  public void testCheckAllVolumes(VolumeCheckResult checkResult) throws Exception {
-    initTest(checkResult);
+  @MethodSource("provideTestData")
+  public void testCheckAllVolumes(VolumeCheckResult checkResult,
+      ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
+    initTest(checkResult, layout);
+    LOG.info("Executing {}", testInfo.getTestMethod());
 
     final List<HddsVolume> volumes = makeVolumes(
         NUM_VOLUMES, expectedVolumeHealth);
@@ -198,12 +203,15 @@ public class TestStorageVolumeChecker {
   /**
    * Test {@link StorageVolumeChecker#checkAllVolumes} propagates
    * checks for all volumes to the delegate checker.
+   *
+   * @throws Exception
    */
   @ParameterizedTest
   @MethodSource("provideTestData")
   public void testVolumeDeletion(VolumeCheckResult checkResult,
-      ContainerLayoutVersion layout) throws Exception {
-    initTest(checkResult);
+      ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
+    initTest(checkResult, layout);
+    LOG.info("Executing {}", testInfo.getTestMethod());
 
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
@@ -270,7 +278,7 @@ public class TestStorageVolumeChecker {
         return Optional.of(
             Futures.immediateFuture(target.check(context)));
       } catch (Exception e) {
-        LOG.info("check routine threw exception", e);
+        LOG.info("check routine threw exception {}", e);
         return Optional.of(Futures.immediateFailedFuture(e));
       }
     }
