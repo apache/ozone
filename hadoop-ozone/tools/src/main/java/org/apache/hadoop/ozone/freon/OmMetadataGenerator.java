@@ -73,26 +73,6 @@ import picocli.CommandLine.Option;
 public class OmMetadataGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
-  enum Operation {
-    CREATE_FILE,
-    CREATE_STREAM_FILE,
-    LOOKUP_FILE,
-    READ_FILE,
-    LIST_STATUS,
-    LIST_STATUS_LIGHT,
-    CREATE_KEY,
-    CREATE_STREAM_KEY,
-    LOOKUP_KEY,
-    GET_KEYINFO,
-    HEAD_KEY,
-    READ_KEY,
-    LIST_KEYS,
-    LIST_KEYS_LIGHT,
-    INFO_BUCKET,
-    INFO_VOLUME,
-    MIXED,
-  }
-
   @Option(names = {"-v", "--volume"},
       description = "Name of the volume which contains the test data. Will be"
           + " created if missing.",
@@ -463,5 +443,25 @@ public class OmMetadataGenerator extends BaseFreonGenerator
   @Override
   public boolean allowEmptyPrefix() {
     return true;
+  }
+
+  enum Operation {
+    CREATE_FILE,
+    CREATE_STREAM_FILE,
+    LOOKUP_FILE,
+    READ_FILE,
+    LIST_STATUS,
+    LIST_STATUS_LIGHT,
+    CREATE_KEY,
+    CREATE_STREAM_KEY,
+    LOOKUP_KEY,
+    GET_KEYINFO,
+    HEAD_KEY,
+    READ_KEY,
+    LIST_KEYS,
+    LIST_KEYS_LIGHT,
+    INFO_BUCKET,
+    INFO_VOLUME,
+    MIXED,
   }
 }

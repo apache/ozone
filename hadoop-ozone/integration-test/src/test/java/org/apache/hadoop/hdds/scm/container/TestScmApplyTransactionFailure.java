@@ -67,7 +67,7 @@ public abstract class TestScmApplyTransactionFailure implements HATests.TestCase
     Pipeline pipeline = pipelines.get(0);
 
     // if testing for not-found pipeline, remove pipeline when closing.
-    pipelineManager.closePipeline(pipeline, true);
+    pipelineManager.closePipeline(pipeline.getId());
 
     // adding container to a closed pipeline should yield an error.
     ContainerInfoProto containerInfo = createContainer(pipeline);

@@ -118,8 +118,165 @@ import org.slf4j.event.Level;
  */
 public class TestRocksDBCheckpointDiffer {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestRocksDBCheckpointDiffer.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestRocksDBCheckpointDiffer.class);
+
+  private static final List<List<String>> SST_FILES_BY_LEVEL = Arrays.asList(
+      Arrays.asList("000015", "000013", "000011", "000009"),
+      Arrays.asList("000018", "000016", "000017", "000026", "000024", "000022",
+          "000020"),
+      Arrays.asList("000027", "000030", "000028", "000029", "000031", "000039",
+          "000037", "000035", "000033"),
+      Arrays.asList("000040", "000044", "000042", "000043", "000045", "000041",
+          "000046", "000054", "000052", "000050", "000048"),
+      Arrays.asList("000059", "000055", "000056", "000060", "000057", "000058")
+  );
+
+  private static final List<List<CompactionNode>> COMPACTION_NODES_BY_LEVEL =
+      SST_FILES_BY_LEVEL.stream()
+          .map(sstFiles ->
+              sstFiles.stream()
+                  .map(
+                      sstFile -> new CompactionNode(sstFile,
+                          1000L,
+                          Long.parseLong(sstFile.substring(0, 6)),
+                          null, null, null
+                      ))
+                  .collect(Collectors.toList()))
+          .collect(Collectors.toList());
+
+  private final List<CompactionLogEntry> compactionLogEntryList = Arrays.asList(
+      new CompactionLogEntry(101, System.currentTimeMillis(),
+          Arrays.asList(
+              new CompactionFileInfo("000068", "/volume/bucket2",
+                  "/volume/bucket2", "bucketTable"),
+              new CompactionFileInfo("000057", "/volume/bucket1",
+                  "/volume/bucket1", "bucketTable")),
+          Collections.singletonList(
+              new CompactionFileInfo("000086", "/volume/bucket1",
+                  "/volume/bucket2", "bucketTable")),
+          null),
+      new CompactionLogEntry(178, System.currentTimeMillis(),
+          Arrays.asList(new CompactionFileInfo("000078",
+                  "/volume/bucket1/key-0000001411",
+                  "/volume/bucket2/key-0000099649",
+                  "keyTable"),
+              new CompactionFileInfo("000075",
+                  "/volume/bucket1/key-0000016536",
+                  "/volume/bucket2/key-0000098897",
+                  "keyTable"),
+              new CompactionFileInfo("000073",
+                  "/volume/bucket1/key-0000000730",
+                  "/volume/bucket2/key-0000097010",
+                  "keyTable"),
+              new CompactionFileInfo("000071",
+                  "/volume/bucket1/key-0000001820",
+                  "/volume/bucket2/key-0000097895",
+                  "keyTable"),
+              new CompactionFileInfo("000063",
+                  "/volume/bucket1/key-0000001016",
+                  "/volume/bucket1/key-0000099930",
+                  "keyTable")),
+          Collections.singletonList(new CompactionFileInfo("000081",
+              "/volume/bucket1/key-0000000730",
+              "/volume/bucket2/key-0000099649",
+              "keyTable")),
+          null
+      ),
+      new CompactionLogEntry(233, System.currentTimeMillis(),
+          Arrays.asList(
+              new CompactionFileInfo("000086", "/volume/bucket1",
+                  "/volume/bucket2", "bucketTable"),
+              new CompactionFileInfo("000088", "/volume/bucket3",
+                  "/volume/bucket3", "bucketTable")),
+          Collections.singletonList(
+              new CompactionFileInfo("000110", "/volume/bucket1",
+                  "/volume/bucket3", "bucketTable")
+          ),
+          null),
+      new CompactionLogEntry(256, System.currentTimeMillis(),
+          Arrays.asList(new CompactionFileInfo("000081",
+                  "/volume/bucket1/key-0000000730",
+                  "/volume/bucket2/key-0000099649",
+                  "keyTable"),
+              new CompactionFileInfo("000103",
+                  "/volume/bucket1/key-0000017460",
+                  "/volume/bucket3/key-0000097450",
+                  "keyTable"),
+              new CompactionFileInfo("000099",
+                  "/volume/bucket1/key-0000002310",
+                  "/volume/bucket3/key-0000098286",
+                  "keyTable"),
+              new CompactionFileInfo("000097",
+                  "/volume/bucket1/key-0000005965",
+                  "/volume/bucket3/key-0000099136",
+                  "keyTable"),
+              new CompactionFileInfo("000095",
+                  "/volume/bucket1/key-0000012424",
+                  "/volume/bucket3/key-0000083904",
+                  "keyTable")),
+          Collections.singletonList(new CompactionFileInfo("000106",
+              "/volume/bucket1/key-0000000730",
+              "/volume/bucket3/key-0000099136",
+              "keyTable")),
+          null),
+      new CompactionLogEntry(397, now(),
+          Arrays.asList(new CompactionFileInfo("000106",
+                  "/volume/bucket1/key-0000000730",
+                  "/volume/bucket3/key-0000099136",
+                  "keyTable"),
+              new CompactionFileInfo("000128",
+                  "/volume/bucket2/key-0000005031",
+                  "/volume/bucket3/key-0000084385",
+                  "keyTable"),
+              new CompactionFileInfo("000125",
+                  "/volume/bucket2/key-0000003491",
+                  "/volume/bucket3/key-0000088414",
+                  "keyTable"),
+              new CompactionFileInfo("000123",
+                  "/volume/bucket2/key-0000007390",
+                  "/volume/bucket3/key-0000094627",
+                  "keyTable"),
+              new CompactionFileInfo("000121",
+                  "/volume/bucket2/key-0000003232",
+                  "/volume/bucket3/key-0000094246",
+                  "keyTable")),
+          Collections.singletonList(new CompactionFileInfo("000131",
+              "/volume/bucket1/key-0000000730",
+              "/volume/bucket3/key-0000099136",
+              "keyTable")),
+          null
+      )
+  );
+
+  private static Map<String, String> columnFamilyToPrefixMap1 =
+      new HashMap<String, String>() {
+        {
+          put("keyTable", "/volume/bucket1/");
+          // Simply using bucketName instead of ID for the test.
+          put("directoryTable", "/volume/bucket1/");
+          put("fileTable", "/volume/bucket1/");
+        }
+      };
+
+  private static Map<String, String> columnFamilyToPrefixMap2 =
+      new HashMap<String, String>() {
+        {
+          put("keyTable", "/volume/bucket2/");
+          // Simply using bucketName instead of ID for the test.
+          put("directoryTable", "/volume/bucket2/");
+          put("fileTable", "/volume/bucket2/");
+        }
+      };
+
+  private static Map<String, String> columnFamilyToPrefixMap3 =
+      new HashMap<String, String>() {
+        {
+          put("keyTable", "/volume/bucket3/");
+          // Simply using bucketName instead of ID for the test.
+          put("directoryTable", "/volume/bucket3/");
+          put("fileTable", "/volume/bucket3/");
+        }
+      };
 
   private static final int NUM_ROW = 250000;
   private static final int SNAPSHOT_EVERY_SO_MANY_KEYS = 49999;
@@ -1005,30 +1162,6 @@ public class TestRocksDBCheckpointDiffer {
     }
   }
 
-  private static final List<List<String>> SST_FILES_BY_LEVEL = Arrays.asList(
-      Arrays.asList("000015", "000013", "000011", "000009"),
-      Arrays.asList("000018", "000016", "000017", "000026", "000024", "000022",
-          "000020"),
-      Arrays.asList("000027", "000030", "000028", "000029", "000031", "000039",
-          "000037", "000035", "000033"),
-      Arrays.asList("000040", "000044", "000042", "000043", "000045", "000041",
-          "000046", "000054", "000052", "000050", "000048"),
-      Arrays.asList("000059", "000055", "000056", "000060", "000057", "000058")
-  );
-
-  private static final List<List<CompactionNode>> COMPACTION_NODES_BY_LEVEL =
-      SST_FILES_BY_LEVEL.stream()
-          .map(sstFiles ->
-              sstFiles.stream()
-                  .map(
-                      sstFile -> new CompactionNode(sstFile,
-                          1000L,
-                          Long.parseLong(sstFile.substring(0, 6)),
-                          null, null, null
-                      ))
-                  .collect(Collectors.toList()))
-          .collect(Collectors.toList());
-
   /**
    * Creates a backward compaction DAG from a list of level nodes.
    * It assumes that at each level files get compacted to the half of number
@@ -1702,140 +1835,6 @@ public class TestRocksDBCheckpointDiffer {
       fileOutputStream.write(context.getBytes(UTF_8));
     }
   }
-
-  private final List<CompactionLogEntry> compactionLogEntryList = Arrays.asList(
-      new CompactionLogEntry(101, System.currentTimeMillis(),
-          Arrays.asList(
-              new CompactionFileInfo("000068", "/volume/bucket2",
-                  "/volume/bucket2", "bucketTable"),
-              new CompactionFileInfo("000057", "/volume/bucket1",
-                  "/volume/bucket1", "bucketTable")),
-          Collections.singletonList(
-              new CompactionFileInfo("000086", "/volume/bucket1",
-                  "/volume/bucket2", "bucketTable")),
-          null),
-      new CompactionLogEntry(178, System.currentTimeMillis(),
-          Arrays.asList(new CompactionFileInfo("000078",
-                  "/volume/bucket1/key-0000001411",
-                  "/volume/bucket2/key-0000099649",
-                  "keyTable"),
-              new CompactionFileInfo("000075",
-                  "/volume/bucket1/key-0000016536",
-                  "/volume/bucket2/key-0000098897",
-                  "keyTable"),
-              new CompactionFileInfo("000073",
-                  "/volume/bucket1/key-0000000730",
-                  "/volume/bucket2/key-0000097010",
-                  "keyTable"),
-              new CompactionFileInfo("000071",
-                  "/volume/bucket1/key-0000001820",
-                  "/volume/bucket2/key-0000097895",
-                  "keyTable"),
-              new CompactionFileInfo("000063",
-                  "/volume/bucket1/key-0000001016",
-                  "/volume/bucket1/key-0000099930",
-                  "keyTable")),
-          Collections.singletonList(new CompactionFileInfo("000081",
-              "/volume/bucket1/key-0000000730",
-              "/volume/bucket2/key-0000099649",
-              "keyTable")),
-          null
-      ),
-      new CompactionLogEntry(233, System.currentTimeMillis(),
-          Arrays.asList(
-              new CompactionFileInfo("000086", "/volume/bucket1",
-                  "/volume/bucket2", "bucketTable"),
-              new CompactionFileInfo("000088", "/volume/bucket3",
-                  "/volume/bucket3", "bucketTable")),
-          Collections.singletonList(
-              new CompactionFileInfo("000110", "/volume/bucket1",
-                  "/volume/bucket3", "bucketTable")
-          ),
-          null),
-      new CompactionLogEntry(256, System.currentTimeMillis(),
-          Arrays.asList(new CompactionFileInfo("000081",
-                  "/volume/bucket1/key-0000000730",
-                  "/volume/bucket2/key-0000099649",
-                  "keyTable"),
-              new CompactionFileInfo("000103",
-                  "/volume/bucket1/key-0000017460",
-                  "/volume/bucket3/key-0000097450",
-                  "keyTable"),
-              new CompactionFileInfo("000099",
-                  "/volume/bucket1/key-0000002310",
-                  "/volume/bucket3/key-0000098286",
-                  "keyTable"),
-              new CompactionFileInfo("000097",
-                  "/volume/bucket1/key-0000005965",
-                  "/volume/bucket3/key-0000099136",
-                  "keyTable"),
-              new CompactionFileInfo("000095",
-                  "/volume/bucket1/key-0000012424",
-                  "/volume/bucket3/key-0000083904",
-                  "keyTable")),
-          Collections.singletonList(new CompactionFileInfo("000106",
-              "/volume/bucket1/key-0000000730",
-              "/volume/bucket3/key-0000099136",
-              "keyTable")),
-          null),
-      new CompactionLogEntry(397, now(),
-          Arrays.asList(new CompactionFileInfo("000106",
-                  "/volume/bucket1/key-0000000730",
-                  "/volume/bucket3/key-0000099136",
-                  "keyTable"),
-              new CompactionFileInfo("000128",
-                  "/volume/bucket2/key-0000005031",
-                  "/volume/bucket3/key-0000084385",
-                  "keyTable"),
-              new CompactionFileInfo("000125",
-                  "/volume/bucket2/key-0000003491",
-                  "/volume/bucket3/key-0000088414",
-                  "keyTable"),
-              new CompactionFileInfo("000123",
-                  "/volume/bucket2/key-0000007390",
-                  "/volume/bucket3/key-0000094627",
-                  "keyTable"),
-              new CompactionFileInfo("000121",
-                  "/volume/bucket2/key-0000003232",
-                  "/volume/bucket3/key-0000094246",
-                  "keyTable")),
-          Collections.singletonList(new CompactionFileInfo("000131",
-              "/volume/bucket1/key-0000000730",
-              "/volume/bucket3/key-0000099136",
-              "keyTable")),
-          null
-      )
-  );
-
-  private static Map<String, String> columnFamilyToPrefixMap1 =
-      new HashMap<String, String>() {
-        {
-          put("keyTable", "/volume/bucket1/");
-          // Simply using bucketName instead of ID for the test.
-          put("directoryTable", "/volume/bucket1/");
-          put("fileTable", "/volume/bucket1/");
-        }
-      };
-
-  private static Map<String, String> columnFamilyToPrefixMap2 =
-      new HashMap<String, String>() {
-        {
-          put("keyTable", "/volume/bucket2/");
-          // Simply using bucketName instead of ID for the test.
-          put("directoryTable", "/volume/bucket2/");
-          put("fileTable", "/volume/bucket2/");
-        }
-      };
-
-  private static Map<String, String> columnFamilyToPrefixMap3 =
-      new HashMap<String, String>() {
-        {
-          put("keyTable", "/volume/bucket3/");
-          // Simply using bucketName instead of ID for the test.
-          put("directoryTable", "/volume/bucket3/");
-          put("fileTable", "/volume/bucket3/");
-        }
-      };
 
   /**
    * Test cases for testGetSSTDiffListWithoutDB.

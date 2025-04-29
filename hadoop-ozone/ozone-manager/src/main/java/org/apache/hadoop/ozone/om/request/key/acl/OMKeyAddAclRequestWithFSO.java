@@ -48,6 +48,10 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyAddAclRequestWithFSO.class);
 
+  private String path;
+  private List<OzoneAcl> ozoneAcls;
+  private OzoneObj obj;
+
   @Override
   public OzoneManagerProtocolProtos.OMRequest preExecute(
       OzoneManager ozoneManager) throws IOException {
@@ -59,10 +63,6 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
     return getOmRequest().toBuilder().setAddAclRequest(addAclRequestBuilder)
         .setUserInfo(getUserInfo()).build();
   }
-
-  private String path;
-  private List<OzoneAcl> ozoneAcls;
-  private OzoneObj obj;
 
   public OMKeyAddAclRequestWithFSO(
       OzoneManagerProtocolProtos.OMRequest omReq, BucketLayout bucketLayout) {

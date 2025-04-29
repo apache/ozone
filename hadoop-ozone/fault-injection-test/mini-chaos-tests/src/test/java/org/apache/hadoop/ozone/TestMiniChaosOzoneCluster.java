@@ -55,8 +55,6 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private final List<Class<? extends LoadGenerator>> loadClasses
       = new ArrayList<>();
 
-  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
-
   @Option(names = {"-d", "--num-datanodes", "--numDatanodes"},
       description = "num of datanodes. Full name --numDatanodes will be" +
           " removed in later versions.")
@@ -219,4 +217,6 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     numMinutes = 2;
     startChaosCluster();
   }
+
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
 }

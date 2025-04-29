@@ -15,20 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.audit.parser.common;
-
 /**
- * Constants used for ozone audit parser.
+ * Provides functionality for managing container log operations, including parsing, processing, 
+ * storing extracted data into DB and analysis.
  */
-public final class ParserConsts {
-  public static final String DRIVER = "org.sqlite.JDBC";
-  public static final String CONNECTION_PREFIX = "jdbc:sqlite:";
-  public static final String DATE_REGEX = "^\\d{4}-\\d{2}-\\d{2}.*$";
-  public static final String PROPS_FILE = "commands.properties";
-  public static final String INSERT_AUDITS = "insertAuditEntry";
-  public static final String CREATE_AUDIT_TABLE = "createAuditTable";
 
-  private ParserConsts() {
-    //Never constructed
-  }
-}
+package org.apache.hadoop.ozone.debug.logs.container;
