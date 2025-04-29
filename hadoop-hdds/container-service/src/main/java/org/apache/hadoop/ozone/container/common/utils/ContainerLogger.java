@@ -128,7 +128,7 @@ public final class ContainerLogger {
    * @param containerData The container that was imported to this datanode.
    */
   public static void logImported(ContainerData containerData) {
-    LOG.info(getMessage(containerData));
+    LOG.info(getMessage(containerData, "Container imported"));
   }
 
   /**
@@ -137,7 +137,7 @@ public final class ContainerLogger {
    * @param containerData The container that was exported from this datanode.
    */
   public static void logExported(ContainerData containerData) {
-    LOG.info(getMessage(containerData));
+    LOG.info(getMessage(containerData, "Container exported"));
   }
 
   /**

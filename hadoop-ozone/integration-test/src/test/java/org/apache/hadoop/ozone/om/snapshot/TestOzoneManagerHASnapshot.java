@@ -107,14 +107,14 @@ public class TestOzoneManagerHASnapshot {
   @Test
   public void testSnapshotDiffWhenOmLeaderRestart()
       throws Exception {
-    String snapshot1 = "snap-" + RandomStringUtils.randomNumeric(10);
-    String snapshot2 = "snap-" + RandomStringUtils.randomNumeric(10);
+    String snapshot1 = "snap-" + RandomStringUtils.secure().nextNumeric(10);
+    String snapshot2 = "snap-" + RandomStringUtils.secure().nextNumeric(10);
 
-    createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(10));
+    createFileKey(ozoneBucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
     store.createSnapshot(volumeName, bucketName, snapshot1);
 
     for (int i = 0; i < 100; i++) {
-      createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(10));
+      createFileKey(ozoneBucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
     }
 
     store.createSnapshot(volumeName, bucketName, snapshot2);
@@ -162,9 +162,9 @@ public class TestOzoneManagerHASnapshot {
 
   @Test
   public void testSnapshotIdConsistency() throws Exception {
-    createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(10));
+    createFileKey(ozoneBucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
 
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(10);
+    String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(10);
 
     store.createSnapshot(volumeName, bucketName, snapshotName);
     List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
@@ -247,8 +247,8 @@ public class TestOzoneManagerHASnapshot {
     for (int i = 0; i < 100; i++) {
       int index = i % 10;
       createFileKey(ozoneBuckets.get(index),
-          "key-" + RandomStringUtils.randomNumeric(10));
-      String snapshot1 = "snapshot-" + RandomStringUtils.randomNumeric(10);
+          "key-" + RandomStringUtils.secure().nextNumeric(10));
+      String snapshot1 = "snapshot-" + RandomStringUtils.secure().nextNumeric(10);
       store.createSnapshot(volumeNames.get(index),
           bucketNames.get(index), snapshot1);
     }
@@ -266,10 +266,9 @@ public class TestOzoneManagerHASnapshot {
         .isSnapshotChainCorrupted());
   }
 
-
   private void createFileKey(OzoneBucket bucket, String keyName)
       throws IOException {
-    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
     try (OzoneOutputStream fileKey = bucket.createKey(keyName, value.length)) {
       fileKey.write(value);
     }
@@ -293,7 +292,7 @@ public class TestOzoneManagerHASnapshot {
     int numKeys = 5;
     List<String> keys = new ArrayList<>();
     for (int i = 0; i < numKeys; i++) {
-      String keyName = "key-" + RandomStringUtils.randomNumeric(10);
+      String keyName = "key-" + RandomStringUtils.secure().nextNumeric(10);
       createFileKey(ozoneBucket, keyName);
       keys.add(keyName);
     }
@@ -308,7 +307,7 @@ public class TestOzoneManagerHASnapshot {
       ozoneBucket.deleteKey(keys.get(i));
     }
 
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(10);
+    String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(10);
     createSnapshot(volumeName, bucketName, snapshotName);
 
     store.deleteSnapshot(volumeName, bucketName, snapshotName);

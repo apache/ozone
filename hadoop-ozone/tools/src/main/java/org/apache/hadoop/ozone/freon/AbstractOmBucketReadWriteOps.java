@@ -214,7 +214,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
       throws Exception {
     for (int i = 0; i < keyCount; i++) {
       String keyName = path.concat(OzoneConsts.OM_KEY_PREFIX)
-          .concat(RandomStringUtils.randomAlphanumeric(length));
+          .concat(RandomStringUtils.secure().nextAlphanumeric(length));
       if (LOG.isDebugEnabled()) {
         LOG.debug("Key/FileName : {}", keyName);
       }

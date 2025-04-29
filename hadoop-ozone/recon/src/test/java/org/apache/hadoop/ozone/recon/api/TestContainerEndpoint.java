@@ -964,7 +964,6 @@ public class TestContainerEndpoint {
     assertEquals(0, records.size());
   }
 
-
   @Test
   public void testUnhealthyContainersInvalidState() {
     WebApplicationException e = assertThrows(WebApplicationException.class,
@@ -1078,7 +1077,6 @@ public class TestContainerEndpoint {
           3, 3, 0, null); // Added for NEGATIVE_SIZE state
     }
   }
-
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
                                       int misRep) {
@@ -1328,7 +1326,6 @@ public class TestContainerEndpoint {
     assertEquals("OM", containerDiscrepancyInfo.getExistsAt());
   }
 
-
   @Test
   public void testGetContainerInsightsNonSCMContainersWithPrevKey()
       throws IOException, TimeoutException {
@@ -1479,7 +1476,6 @@ public class TestContainerEndpoint {
     assertEquals("SCM", containerDiscrepancyInfo2.getExistsAt());
   }
 
-
   @Test
   public void testContainerMissingFilter()
       throws IOException, TimeoutException {
@@ -1530,7 +1526,6 @@ public class TestContainerEndpoint {
     assertThat(missingContainerIdsSCM).contains(1L);
     assertThat(missingContainerIdsSCM).contains(2L);
   }
-
 
   @Test
   public void testGetOmContainersDeletedInSCM() throws Exception {
@@ -1617,7 +1612,6 @@ public class TestContainerEndpoint {
     assertEquals(omContainers.get(2L).getNumberOfKeys(), containerDiscrepancyInfoList.get(0).getNumberOfKeys());
     assertEquals(1, containerDiscrepancyInfoList.size());
   }
-
 
   @Test
   public void testGetOmContainersDeletedInSCMLimitParam() throws Exception {
@@ -1817,6 +1811,4 @@ public class TestContainerEndpoint {
       }
     }
   }
-
-
 }

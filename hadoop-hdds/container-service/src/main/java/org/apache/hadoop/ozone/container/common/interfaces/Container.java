@@ -39,24 +39,6 @@ public interface Container<CONTAINERDATA extends ContainerData> {
    * Encapsulates the result of a container scan.
    */
   class ScanResult {
-    /**
-     * Represents the reason a container scan failed and a container should
-     * be marked unhealthy.
-     */
-    public enum FailureType {
-      MISSING_CONTAINER_DIR,
-      MISSING_METADATA_DIR,
-      MISSING_CONTAINER_FILE,
-      MISSING_CHUNKS_DIR,
-      MISSING_CHUNK_FILE,
-      CORRUPT_CONTAINER_FILE,
-      CORRUPT_CHUNK,
-      INCONSISTENT_CHUNK_LENGTH,
-      INACCESSIBLE_DB,
-      WRITE_FAILURE,
-      DELETED_CONTAINER
-    }
-
     private final boolean healthy;
     private final File unhealthyFile;
     private final FailureType failureType;
@@ -94,6 +76,24 @@ public interface Container<CONTAINERDATA extends ContainerData> {
     public Throwable getException() {
       return exception;
     }
+
+    /**
+     * Represents the reason a container scan failed and a container should
+     * be marked unhealthy.
+     */
+    public enum FailureType {
+      MISSING_CONTAINER_DIR,
+      MISSING_METADATA_DIR,
+      MISSING_CONTAINER_FILE,
+      MISSING_CHUNKS_DIR,
+      MISSING_CHUNK_FILE,
+      CORRUPT_CONTAINER_FILE,
+      CORRUPT_CHUNK,
+      INCONSISTENT_CHUNK_LENGTH,
+      INACCESSIBLE_DB,
+      WRITE_FAILURE,
+      DELETED_CONTAINER
+    }
   }
 
   /**
@@ -126,6 +126,9 @@ public interface Container<CONTAINERDATA extends ContainerData> {
    * @throws StorageContainerException
    */
   void update(Map<String, String> metaData, boolean forceUpdate)
+      throws StorageContainerException;
+
+  void update(Map<String, String> metaData, boolean forceUpdate, String containerMetadataPath)
       throws StorageContainerException;
 
   void updateDataScanTimestamp(Instant timestamp)

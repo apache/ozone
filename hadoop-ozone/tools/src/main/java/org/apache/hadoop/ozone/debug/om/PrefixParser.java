@@ -48,18 +48,6 @@ import picocli.CommandLine;
     description = "Parse prefix contents")
 public class PrefixParser implements Callable<Void> {
 
-  /**
-   * Types to represent the level or path component type.
-   */
-  public enum Types {
-    VOLUME,
-    BUCKET,
-    FILE,
-    DIRECTORY,
-    INTERMEDIATE_DIRECTORY,
-    NON_EXISTENT_DIRECTORY,
-  }
-
   private final int[] parserStats = new int[Types.values().length];
 
   @CommandLine.Option(names = {"--db"},
@@ -247,5 +235,17 @@ public class PrefixParser implements Callable<Void> {
 
   public int getParserStats(Types type) {
     return parserStats[type.ordinal()];
+  }
+
+  /**
+   * Types to represent the level or path component type.
+   */
+  public enum Types {
+    VOLUME,
+    BUCKET,
+    FILE,
+    DIRECTORY,
+    INTERMEDIATE_DIRECTORY,
+    NON_EXISTENT_DIRECTORY,
   }
 }

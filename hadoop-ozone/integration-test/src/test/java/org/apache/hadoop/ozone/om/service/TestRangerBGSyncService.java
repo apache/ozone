@@ -156,10 +156,8 @@ public class TestRangerBGSyncService {
     conf = new OzoneConfiguration();
     simulateOzoneSiteXmlConfig();
 
-    GenericTestUtils.setLogLevel(OMRangerBGSyncService.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(
-        LoggerFactory.getLogger(RangerClientMultiTenantAccessController.class),
-        Level.INFO);
+    GenericTestUtils.setLogLevel(OMRangerBGSyncService.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(RangerClientMultiTenantAccessController.class, Level.INFO);
   }
 
   @AfterAll

@@ -98,7 +98,6 @@ public final class DBStoreBuilder {
   private RocksDBConfiguration rocksDBConfiguration;
   // Flag to indicate if the RocksDB should be opened readonly.
   private boolean openReadOnly = false;
-  private int maxFSSnapshots = 0;
   private final DBProfile defaultCfProfile;
   private boolean enableCompactionDag;
   private boolean createCheckpointDirs = true;
@@ -230,18 +229,14 @@ public final class DBStoreBuilder {
       }
 
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
-          registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
-          enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
-          configuration, enableRocksDbMetrics);
+          registry.build(), openReadOnly, dbJmxBeanNameName, enableCompactionDag,
+          maxDbUpdatesSizeThreshold, createCheckpointDirs, configuration,
+          enableRocksDbMetrics);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
   }
 
-  public DBStoreBuilder setMaxFSSnapshots(int maxFSSnapshots) {
-    this.maxFSSnapshots = maxFSSnapshots;
-    return this;
-  }
   public DBStoreBuilder setName(String name) {
     dbname = name;
     return this;
@@ -307,6 +302,7 @@ public final class DBStoreBuilder {
     this.enableRocksDbMetrics = enableRocksDbMetrics;
     return this;
   }
+
   /**
    * Set the {@link ManagedDBOptions} and default
    * {@link ManagedColumnFamilyOptions} based on {@code prof}.

@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
  */
 @ConfigGroup(prefix = "hdds.scm")
 public class ScmConfig extends ReconfigurableConfig {
+  public static final String HDDS_SCM_UNKNOWN_CONTAINER_ACTION = "hdds.scm.unknown-container.action";
 
   @Config(key = "kerberos.principal",
       type = ConfigType.STRING,
@@ -150,7 +151,6 @@ public class ScmConfig extends ReconfigurableConfig {
     this.principal = kerberosPrincipal;
   }
 
-
   public void setKerberosKeytab(String kerberosKeytab) {
     this.keytab = kerberosKeytab;
   }
@@ -207,14 +207,8 @@ public class ScmConfig extends ReconfigurableConfig {
    * {@code @KerberosInfo(serverPrincipal = ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)}
    */
   public static class ConfigStrings {
-    public static final String HDDS_SCM_KERBEROS_PRINCIPAL_KEY =
-          "hdds.scm.kerberos.principal";
-    public static final String HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY =
-          "hdds.scm.kerberos.keytab.file";
-    public static final String HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION =
-        "hdds.scm.init.default.layout.version";
+    public static final String HDDS_SCM_KERBEROS_PRINCIPAL_KEY = "hdds.scm.kerberos.principal";
+    public static final String HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY = "hdds.scm.kerberos.keytab.file";
+    public static final String HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION = "hdds.scm.init.default.layout.version";
   }
-
-  public static final String HDDS_SCM_UNKNOWN_CONTAINER_ACTION =
-      "hdds.scm.unknown-container.action";
 }

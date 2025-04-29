@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 public final class SCMContainerPlacementRackAware
     extends SCMCommonPlacementPolicy {
   @VisibleForTesting
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRackAware.class);
   private final NetworkTopology networkTopology;
   private boolean fallback;
@@ -514,7 +514,7 @@ public final class SCMContainerPlacementRackAware
       if (maxRetry == 0) {
         // avoid the infinite loop
         String errMsg = "No satisfied datanode to meet the space constrains. "
-            + "metadatadata size required: " + metadataSizeRequired +
+            + "metadata size required: " + metadataSizeRequired +
             " data size required: " + dataSizeRequired;
         LOG.info(errMsg);
         throw new SCMException(errMsg, null);

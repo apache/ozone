@@ -37,6 +37,7 @@ public class OMFinalizeUpgradeResponse extends OMClientResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFinalizeUpgradeResponse.class);
   private int layoutVersionToWrite = -1;
+
   public OMFinalizeUpgradeResponse(
       OzoneManagerProtocolProtos.OMResponse omResponse,
       int layoutVersionToWrite) {

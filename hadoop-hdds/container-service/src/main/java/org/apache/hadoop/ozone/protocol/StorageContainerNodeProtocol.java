@@ -71,7 +71,7 @@ public interface StorageContainerNodeProtocol {
    */
   default List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails) {
     return processHeartbeat(datanodeDetails, null);
-  };
+  }
 
   /**
    * Send heartbeat to indicate the datanode is alive and doing well.

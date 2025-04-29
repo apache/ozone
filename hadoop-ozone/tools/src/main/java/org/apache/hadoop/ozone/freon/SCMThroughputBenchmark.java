@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -59,7 +60,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -113,17 +113,8 @@ import picocli.CommandLine;
 @SuppressWarnings("java:S2245") // no need for secure random
 public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcommand {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMThroughputBenchmark.class);
-
-  /**
-   * Type of benchmarks.
-   */
-  public enum BenchmarkType {
-    AllocateBlocks,
-    AllocateContainers,
-    ProcessReports,
-  }
 
   @CommandLine.ParentCommand
   private Freon freon;
@@ -920,5 +911,14 @@ public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcom
 
   private static PipelineReportsProto createPipelineReport() {
     return PipelineReportsProto.newBuilder().build();
+  }
+
+  /**
+   * Type of benchmarks.
+   */
+  public enum BenchmarkType {
+    AllocateBlocks,
+    AllocateContainers,
+    ProcessReports,
   }
 }

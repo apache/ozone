@@ -647,7 +647,7 @@ public class TestECBlockReconstructedStripeInputStream {
   }
 
   private Integer getRandomStreamIndex(Set<Integer> set) {
-    return set.stream().skip(RandomUtils.nextInt(0, set.size()))
+    return set.stream().skip(RandomUtils.secure().randomInt(0, set.size()))
         .findFirst().orElse(null);
   }
 

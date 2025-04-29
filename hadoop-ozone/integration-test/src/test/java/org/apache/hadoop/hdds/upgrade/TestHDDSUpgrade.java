@@ -210,7 +210,6 @@ public class TestHDDSUpgrade {
     scmVersionManager = scm.getLayoutVersionManager();
   }
 
-
   /*
    * helper function to create a Key.
    */
@@ -409,7 +408,7 @@ public class TestHDDSUpgrade {
           new ArrayList<>(cluster.getHddsDatanodes());
       for (HddsDatanodeService ds: currentDataNodes) {
         DatanodeDetails dn = ds.getDatanodeDetails();
-        LOG.info("Restarting datanode {}", dn.getUuidString());
+        LOG.info("Restarting datanode {}", dn);
         cluster.restartHddsDatanode(dn, false);
       }
       cluster.waitForClusterToBeReady();

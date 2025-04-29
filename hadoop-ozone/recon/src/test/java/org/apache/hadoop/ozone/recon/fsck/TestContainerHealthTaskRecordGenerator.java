@@ -178,7 +178,6 @@ public class TestContainerHealthTaskRecordGenerator {
             UnHealthyContainerStates.NEGATIVE_SIZE).getOrDefault(CONTAINER_COUNT, 0L));
   }
 
-
   @Test
   public void testUnderReplicatedRecordRetainedAndUpdated() {
     // under replicated container

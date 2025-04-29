@@ -29,7 +29,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContai
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.util.DiskChecker;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -50,7 +52,7 @@ class SendContainerRequestHandler
   private long containerId = -1;
   private long nextOffset;
   private OutputStream output;
-  private HddsVolume volume;
+  private HddsVolume volume = null;
   private Path path;
   private CopyContainerCompression compression;
   private final ZeroCopyMessageMarshaller<SendContainerRequest> marshaller;
@@ -85,6 +87,17 @@ class SendContainerRequestHandler
       if (containerId == -1) {
         containerId = req.getContainerID();
         volume = importer.chooseNextVolume();
+        // Increment committed bytes and verify if it doesn't cross the space left.
+        volume.incCommittedBytes(importer.getDefaultContainerSize() * 2);
+        StorageLocationReport volumeReport = volume.getReport();
+        // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
+        if (volumeReport.getUsableSpace() <= 0) {
+          volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
+          LOG.warn("Container {} import was unsuccessful, no space left on volume {}", containerId, volumeReport);
+          volume = null;
+          throw new DiskChecker.DiskOutOfSpaceException("No more available volumes");
+        }
+
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);
         path = dir.resolve(ContainerUtils.getContainerTarName(containerId));
@@ -110,32 +123,44 @@ class SendContainerRequestHandler
 
   @Override
   public void onError(Throwable t) {
-    LOG.warn("Error receiving container {} at {}", containerId, nextOffset, t);
-    closeOutput();
-    deleteTarball();
-    responseObserver.onError(t);
+    try {
+      LOG.warn("Error receiving container {} at {}", containerId, nextOffset, t);
+      closeOutput();
+      deleteTarball();
+      responseObserver.onError(t);
+    } finally {
+      if (volume != null) {
+        volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
+      }
+    }
   }
 
   @Override
   public void onCompleted() {
-    if (output == null) {
-      LOG.warn("Received container without any parts");
-      return;
-    }
-
-    LOG.info("Container {} is downloaded with size {}, starting to import.",
-        containerId, nextOffset);
-    closeOutput();
-
     try {
-      importer.importContainer(containerId, path, volume, compression);
-      LOG.info("Container {} is replicated successfully", containerId);
-      responseObserver.onNext(SendContainerResponse.newBuilder().build());
-      responseObserver.onCompleted();
-    } catch (Throwable t) {
-      LOG.warn("Failed to import container {}", containerId, t);
-      deleteTarball();
-      responseObserver.onError(t);
+      if (output == null) {
+        LOG.warn("Received container without any parts");
+        return;
+      }
+
+      LOG.info("Container {} is downloaded with size {}, starting to import.",
+          containerId, nextOffset);
+      closeOutput();
+
+      try {
+        importer.importContainer(containerId, path, volume, compression);
+        LOG.info("Container {} is replicated successfully", containerId);
+        responseObserver.onNext(SendContainerResponse.newBuilder().build());
+        responseObserver.onCompleted();
+      } catch (Throwable t) {
+        LOG.warn("Failed to import container {}", containerId, t);
+        deleteTarball();
+        responseObserver.onError(t);
+      }
+    } finally {
+      if (volume != null) {
+        volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
+      }
     }
   }
 

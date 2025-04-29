@@ -79,7 +79,7 @@ public class TestReconTasks {
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(ONE, 30000);
-    GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.LOG,
+    GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.class,
         Level.DEBUG);
   }
 

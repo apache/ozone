@@ -23,8 +23,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED;
@@ -71,6 +69,7 @@ import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
@@ -78,6 +77,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
@@ -85,6 +85,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -259,61 +260,38 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static final String COMPACTION_LOG_TABLE =
       "compactionLogTable";
 
-  static final String[] ALL_TABLES = new String[] {
-      USER_TABLE,
-      VOLUME_TABLE,
-      BUCKET_TABLE,
-      KEY_TABLE,
-      DELETED_TABLE,
-      OPEN_KEY_TABLE,
-      MULTIPARTINFO_TABLE,
-      S3_SECRET_TABLE,
-      DELEGATION_TOKEN_TABLE,
-      PREFIX_TABLE,
-      TRANSACTION_INFO_TABLE,
-      DIRECTORY_TABLE,
-      FILE_TABLE,
-      DELETED_DIR_TABLE,
-      OPEN_FILE_TABLE,
-      META_TABLE,
-      TENANT_ACCESS_ID_TABLE,
-      PRINCIPAL_TO_ACCESS_IDS_TABLE,
-      TENANT_STATE_TABLE,
-      SNAPSHOT_INFO_TABLE,
-      SNAPSHOT_RENAMED_TABLE,
-      COMPACTION_LOG_TABLE
-  };
-
   private DBStore store;
 
   private final IOzoneManagerLock lock;
 
-  private Table userTable;
-  private Table volumeTable;
-  private Table bucketTable;
-  private Table<String, OmKeyInfo> keyTable;
-  private Table deletedTable;
-  private Table<String, OmKeyInfo> openKeyTable;
-  private Table<String, OmMultipartKeyInfo> multipartInfoTable;
-  private Table<String, S3SecretValue> s3SecretTable;
-  private Table dTokenTable;
-  private Table prefixTable;
-  private Table<String, OmDirectoryInfo> dirTable;
-  private Table<String, OmKeyInfo> fileTable;
-  private Table<String, OmKeyInfo> openFileTable;
-  private Table transactionInfoTable;
-  private Table metaTable;
+  private TypedTable<String, PersistedUserVolumeInfo> userTable;
+  private TypedTable<String, OmVolumeArgs> volumeTable;
+  private TypedTable<String, OmBucketInfo> bucketTable;
+  private TypedTable<String, OmKeyInfo> keyTable;
+
+  private TypedTable<String, OmKeyInfo> openKeyTable;
+  private TypedTable<String, OmMultipartKeyInfo> multipartInfoTable;
+  private TypedTable<String, RepeatedOmKeyInfo> deletedTable;
+
+  private TypedTable<String, OmDirectoryInfo> dirTable;
+  private TypedTable<String, OmKeyInfo> fileTable;
+  private TypedTable<String, OmKeyInfo> openFileTable;
+  private TypedTable<String, OmKeyInfo> deletedDirTable;
+
+  private TypedTable<String, S3SecretValue> s3SecretTable;
+  private TypedTable<OzoneTokenIdentifier, Long> dTokenTable;
+  private TypedTable<String, OmPrefixInfo> prefixTable;
+  private TypedTable<String, TransactionInfo> transactionInfoTable;
+  private TypedTable<String, String> metaTable;
 
   // Tables required for multi-tenancy
-  private Table tenantAccessIdTable;
-  private Table principalToAccessIdsTable;
-  private Table tenantStateTable;
+  private TypedTable<String, OmDBAccessIdInfo> tenantAccessIdTable;
+  private TypedTable<String, OmDBUserPrincipalInfo> principalToAccessIdsTable;
+  private TypedTable<String, OmDBTenantState> tenantStateTable;
 
-  private Table snapshotInfoTable;
-  private Table snapshotRenamedTable;
-  private Table compactionLogTable;
-
-  private Table deletedDirTable;
+  private TypedTable<String, SnapshotInfo> snapshotInfoTable;
+  private TypedTable<String, String> snapshotRenamedTable;
+  private TypedTable<String, CompactionLogEntry> compactionLogTable;
 
   private OzoneManager ozoneManager;
 
@@ -399,7 +377,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
   }
-
 
   // metadata constructor for snapshots
   OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
@@ -509,25 +486,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return multipartInfoTable;
   }
 
-  private void checkTableStatus(Table table, String name,
-      boolean addCacheMetrics) throws IOException {
-    String logMessage = "Unable to get a reference to %s table. Cannot " +
-        "continue.";
-    String errMsg = "Inconsistent DB state, Table - %s. Please check the logs" +
-        "for more info.";
-    if (table == null) {
-      LOG.error(String.format(logMessage, name));
-      throw new IOException(String.format(errMsg, name));
-    }
-    this.tableMap.put(name, table);
-    if (addCacheMetrics) {
-      if (tableCacheMetricsMap.containsKey(name)) {
-        tableCacheMetricsMap.get(name).unregister();
-      }
-      tableCacheMetricsMap.put(name, table.createCacheMetrics());
-    }
-  }
-
   /**
    * Start metadata manager.
    */
@@ -552,9 +510,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             "state.";
         ExitUtils.terminate(1, errorMsg, LOG);
       }
-
-      RocksDBConfiguration rocksDBConfiguration =
-          configuration.getObject(RocksDBConfiguration.class);
 
       // As When ratis is not enabled, when we perform put/commit to rocksdb we
       // should turn on sync flag. This needs to be done as when we return
@@ -589,15 +544,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       boolean createCheckpointDirs,
       boolean enableRocksDBMetrics)
       throws IOException {
-    final int maxFSSnapshots = configuration.getInt(
-        OZONE_OM_FS_SNAPSHOT_MAX_LIMIT, OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
     RocksDBConfiguration rocksDBConfiguration =
         configuration.getObject(RocksDBConfiguration.class);
     DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
         rocksDBConfiguration).setName(dbName)
         .setOpenReadOnly(readOnly)
         .setPath(Paths.get(metaDir.getPath()))
-        .setMaxFSSnapshots(maxFSSnapshots)
         .setEnableCompactionDag(enableCompactionDag)
         .setCreateCheckpointDirs(createCheckpointDirs)
         .setMaxNumberOfOpenFiles(maxOpenFiles)
@@ -657,110 +609,50 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   protected void initializeOmTables(CacheType cacheType,
                                     boolean addCacheMetrics)
       throws IOException {
-    userTable =
-        this.store.getTable(USER_TABLE, String.class,
-            PersistedUserVolumeInfo.class);
-    checkTableStatus(userTable, USER_TABLE, addCacheMetrics);
+    final TableInitializer initializer = new TableInitializer(addCacheMetrics);
 
-    volumeTable =
-        this.store.getTable(VOLUME_TABLE, String.class, OmVolumeArgs.class,
-            cacheType);
-    checkTableStatus(volumeTable, VOLUME_TABLE, addCacheMetrics);
+    userTable = initializer.get(OMDBDefinition.USER_TABLE);
 
-    bucketTable =
-        this.store.getTable(BUCKET_TABLE, String.class, OmBucketInfo.class,
-            cacheType);
+    volumeTable = initializer.get(OMDBDefinition.VOLUME_TABLE, cacheType);
+    bucketTable = initializer.get(OMDBDefinition.BUCKET_TABLE, cacheType);
+    keyTable = initializer.get(OMDBDefinition.KEY_TABLE);
 
-    checkTableStatus(bucketTable, BUCKET_TABLE, addCacheMetrics);
+    openKeyTable = initializer.get(OMDBDefinition.OPEN_KEY_TABLE);
+    multipartInfoTable = initializer.get(OMDBDefinition.MULTIPART_INFO_TABLE);
+    deletedTable = initializer.get(OMDBDefinition.DELETED_TABLE);
 
-    keyTable = this.store.getTable(KEY_TABLE, String.class, OmKeyInfo.class);
-    checkTableStatus(keyTable, KEY_TABLE, addCacheMetrics);
+    dirTable = initializer.get(OMDBDefinition.DIRECTORY_TABLE);
+    fileTable = initializer.get(OMDBDefinition.FILE_TABLE);
+    openFileTable = initializer.get(OMDBDefinition.OPEN_FILE_TABLE);
+    deletedDirTable = initializer.get(OMDBDefinition.DELETED_DIR_TABLE);
 
-    deletedTable = this.store.getTable(DELETED_TABLE, String.class,
-        RepeatedOmKeyInfo.class);
-    checkTableStatus(deletedTable, DELETED_TABLE, addCacheMetrics);
+    dTokenTable = initializer.get(OMDBDefinition.DELEGATION_TOKEN_TABLE);
+    s3SecretTable = initializer.get(OMDBDefinition.S3_SECRET_TABLE);
+    prefixTable = initializer.get(OMDBDefinition.PREFIX_TABLE);
 
-    openKeyTable =
-        this.store.getTable(OPEN_KEY_TABLE, String.class,
-            OmKeyInfo.class);
-    checkTableStatus(openKeyTable, OPEN_KEY_TABLE, addCacheMetrics);
+    transactionInfoTable = initializer.get(OMDBDefinition.TRANSACTION_INFO_TABLE);
 
-    multipartInfoTable = this.store.getTable(MULTIPARTINFO_TABLE,
-        String.class, OmMultipartKeyInfo.class);
-    checkTableStatus(multipartInfoTable, MULTIPARTINFO_TABLE, addCacheMetrics);
-
-    dTokenTable = this.store.getTable(DELEGATION_TOKEN_TABLE,
-        OzoneTokenIdentifier.class, Long.class);
-    checkTableStatus(dTokenTable, DELEGATION_TOKEN_TABLE, addCacheMetrics);
-
-    s3SecretTable = this.store.getTable(S3_SECRET_TABLE, String.class,
-        S3SecretValue.class);
-    checkTableStatus(s3SecretTable, S3_SECRET_TABLE, addCacheMetrics);
-
-    prefixTable = this.store.getTable(PREFIX_TABLE, String.class,
-        OmPrefixInfo.class);
-    checkTableStatus(prefixTable, PREFIX_TABLE, addCacheMetrics);
-
-    dirTable = this.store.getTable(DIRECTORY_TABLE, String.class,
-            OmDirectoryInfo.class);
-    checkTableStatus(dirTable, DIRECTORY_TABLE, addCacheMetrics);
-
-    fileTable = this.store.getTable(FILE_TABLE, String.class,
-            OmKeyInfo.class);
-    checkTableStatus(fileTable, FILE_TABLE, addCacheMetrics);
-
-    openFileTable = this.store.getTable(OPEN_FILE_TABLE, String.class,
-            OmKeyInfo.class);
-    checkTableStatus(openFileTable, OPEN_FILE_TABLE, addCacheMetrics);
-
-    deletedDirTable = this.store.getTable(DELETED_DIR_TABLE, String.class,
-        OmKeyInfo.class);
-    checkTableStatus(deletedDirTable, DELETED_DIR_TABLE, addCacheMetrics);
-
-    transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
-        String.class, TransactionInfo.class);
-    checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE,
-        addCacheMetrics);
-
-    metaTable = this.store.getTable(META_TABLE, String.class, String.class);
-    checkTableStatus(metaTable, META_TABLE, addCacheMetrics);
+    metaTable = initializer.get(OMDBDefinition.META_TABLE);
 
     // accessId -> OmDBAccessIdInfo (tenantId, secret, Kerberos principal)
-    tenantAccessIdTable = this.store.getTable(TENANT_ACCESS_ID_TABLE,
-        String.class, OmDBAccessIdInfo.class);
-    checkTableStatus(tenantAccessIdTable, TENANT_ACCESS_ID_TABLE,
-        addCacheMetrics);
+    tenantAccessIdTable = initializer.get(OMDBDefinition.TENANT_ACCESS_ID_TABLE);
 
     // User principal -> OmDBUserPrincipalInfo (a list of accessIds)
-    principalToAccessIdsTable = this.store.getTable(
-        PRINCIPAL_TO_ACCESS_IDS_TABLE,
-        String.class, OmDBUserPrincipalInfo.class);
-    checkTableStatus(principalToAccessIdsTable, PRINCIPAL_TO_ACCESS_IDS_TABLE,
-        addCacheMetrics);
+    principalToAccessIdsTable = initializer.get(OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE);
 
     // tenant name -> tenant (tenant states)
-    tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
-        String.class, OmDBTenantState.class);
-    checkTableStatus(tenantStateTable, TENANT_STATE_TABLE, addCacheMetrics);
+    tenantStateTable = initializer.get(OMDBDefinition.TENANT_STATE_TABLE);
 
     // TODO: [SNAPSHOT] Consider FULL_CACHE for snapshotInfoTable since
     //  exclusiveSize in SnapshotInfo can be frequently updated.
     // path -> snapshotInfo (snapshot info for snapshot)
-    snapshotInfoTable = this.store.getTable(SNAPSHOT_INFO_TABLE,
-        String.class, SnapshotInfo.class);
-    checkTableStatus(snapshotInfoTable, SNAPSHOT_INFO_TABLE, addCacheMetrics);
+    snapshotInfoTable = initializer.get(OMDBDefinition.SNAPSHOT_INFO_TABLE);
 
     // volumeName/bucketName/objectID -> renamedKey or renamedDir
-    snapshotRenamedTable = this.store.getTable(SNAPSHOT_RENAMED_TABLE,
-        String.class, String.class);
-    checkTableStatus(snapshotRenamedTable, SNAPSHOT_RENAMED_TABLE,
-        addCacheMetrics);
+    snapshotRenamedTable = initializer.get(OMDBDefinition.SNAPSHOT_RENAMED_TABLE);
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
-    compactionLogTable = this.store.getTable(COMPACTION_LOG_TABLE,
-        String.class, CompactionLogEntry.class);
-    checkTableStatus(compactionLogTable, COMPACTION_LOG_TABLE,
-        addCacheMetrics);
+    compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE);
   }
 
   /**
@@ -2156,6 +2048,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     renameKey.append(OM_KEY_PREFIX).append(objectID);
     return renameKey.toString();
   }
+
   @Override
   public String getMultipartKey(long volumeId, long bucketId,
                                 long parentID, String fileName,
@@ -2256,6 +2149,41 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       if (batchOperator instanceof BatchOperation) {
         s3SecretTable.deleteWithBatch((BatchOperation) batchOperator, id);
       }
+    }
+  }
+
+  private class TableInitializer {
+    private final boolean addCacheMetrics;
+
+    TableInitializer(boolean addCacheMetrics) {
+      this.addCacheMetrics = addCacheMetrics;
+    }
+
+    <KEY, VALUE> TypedTable<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition)
+        throws IOException {
+      return get(definition.getTable(store));
+    }
+
+    <KEY, VALUE> TypedTable<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition, CacheType cacheType)
+        throws IOException {
+      return get(definition.getTable(store, cacheType));
+    }
+
+    private <KEY, VALUE> TypedTable<KEY, VALUE> get(TypedTable<KEY, VALUE> table) {
+      Objects.requireNonNull(table, "table == null");
+      final String name = table.getName();
+      final Table<?, ?> previousTable = tableMap.put(name, table);
+      if (previousTable != null) {
+        LOG.warn("Overwriting an existing table {}: {}", name, previousTable);
+      }
+
+      if (addCacheMetrics) {
+        final TableCacheMetrics previous = tableCacheMetricsMap.put(name, table.createCacheMetrics());
+        if (previous != null) {
+          previous.unregister();
+        }
+      }
+      return table;
     }
   }
 }

@@ -40,6 +40,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT;
@@ -80,6 +88,7 @@ import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -150,6 +159,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
+import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.MultipartUploadCleanupService;
@@ -198,6 +208,7 @@ public class KeyManagerImpl implements KeyManager {
   private BackgroundService multipartUploadCleanupService;
   private SnapshotDirectoryCleaningService snapshotDirectoryCleaningService;
   private DNSToSwitchMapping dnsToSwitchMapping;
+  private CompactionService compactionService;
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OzoneConfiguration conf, OMPerformanceMetrics metrics) {
@@ -227,6 +238,10 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public void start(OzoneConfiguration configuration) {
+    boolean isCompactionEnabled = configuration.getBoolean(OZONE_OM_COMPACTION_SERVICE_ENABLED,
+        OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT);
+    startCompactionService(configuration, isCompactionEnabled);
+
     boolean isSnapshotDeepCleaningEnabled = configuration.getBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED,
         OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT);
     if (keyDeletingService == null) {
@@ -363,6 +378,27 @@ public class KeyManagerImpl implements KeyManager {
             : new CachedDNSToSwitchMapping(newInstance));
   }
 
+  private void startCompactionService(OzoneConfiguration configuration,
+                                      boolean isCompactionServiceEnabled) {
+    if (compactionService == null && isCompactionServiceEnabled) {
+      long compactionInterval = configuration.getTimeDuration(
+          OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL,
+          OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = configuration.getTimeDuration(
+          OZONE_OM_COMPACTION_SERVICE_TIMEOUT,
+          OZONE_OM_COMPACTION_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      String compactionColumnFamilies = configuration.get(
+          OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES,
+          OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT);
+      String[] tables = compactionColumnFamilies.split(",");
+      compactionService = new CompactionService(ozoneManager, TimeUnit.MILLISECONDS,
+          compactionInterval, serviceTimeout, Arrays.asList(tables));
+      compactionService.start();
+    }
+  }
+
   KeyProviderCryptoExtension getKMSProvider() {
     return kmsProvider;
   }
@@ -397,6 +433,10 @@ public class KeyManagerImpl implements KeyManager {
       snapshotDirectoryCleaningService.shutdown();
       snapshotDirectoryCleaningService = null;
     }
+    if (compactionService != null) {
+      compactionService.shutdown();
+      compactionService = null;
+    }
   }
 
   private OmBucketInfo getBucketInfo(String volumeName, String bucketName)
@@ -427,6 +467,7 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(edek);
     return edek;
   }
+
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args, ResolvedBucket bucket,
       String clientAddress) throws IOException {
@@ -566,6 +607,7 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
   }
+
   /**
    * Refresh pipeline info in OM by asking SCM.
    * @param keyList a list of OmKeyInfo
@@ -696,6 +738,7 @@ public class KeyManagerImpl implements KeyManager {
     */
     if (startKey != null) {
       tableIterator.seek(startKey);
+    } else {
       tableIterator.seekToFirst();
     }
     int currentCount = 0;
@@ -804,6 +847,11 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public SnapshotDirectoryCleaningService getSnapshotDirectoryService() {
     return snapshotDirectoryCleaningService;
+  }
+
+  @Override
+  public CompactionService getCompactionService() {
+    return compactionService;
   }
 
   public boolean isSstFilteringSvcEnabled() {
@@ -1495,6 +1543,7 @@ public class KeyManagerImpl implements KeyManager {
         .setOwnerName(keyInfo.getOwnerName())
         .build();
   }
+
   /**
    * OzoneFS api to lookup for a file.
    *
@@ -2011,6 +2060,7 @@ public class KeyManagerImpl implements KeyManager {
     }
     return nodeSet;
   }
+
   private void slimLocationVersion(OmKeyInfo... keyInfos) {
     if (keyInfos != null) {
       for (OmKeyInfo keyInfo : keyInfos) {

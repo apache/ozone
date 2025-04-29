@@ -40,7 +40,17 @@ import org.slf4j.LoggerFactory;
  * This class is not thread safe.
  */
 public class Checksum {
-  public static final Logger LOG = LoggerFactory.getLogger(Checksum.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Checksum.class);
+
+  private final ChecksumType checksumType;
+
+  private final int bytesPerChecksum;
+
+  /**
+   * Caches computeChecksum() result when requested.
+   * This must be manually cleared when a new block chunk has been started.
+   */
+  private final ChecksumCache checksumCache;
 
   private static Function<ByteBuffer, ByteString> newMessageDigestFunction(
       String algorithm) {
@@ -96,14 +106,6 @@ public class Checksum {
       return constructor.get();
     }
   }
-
-  private final ChecksumType checksumType;
-  private final int bytesPerChecksum;
-  /**
-   * Caches computeChecksum() result when requested.
-   * This must be manually cleared when a new block chunk has been started.
-   */
-  private final ChecksumCache checksumCache;
 
   /**
    * BlockOutputStream needs to call this method to clear the checksum cache

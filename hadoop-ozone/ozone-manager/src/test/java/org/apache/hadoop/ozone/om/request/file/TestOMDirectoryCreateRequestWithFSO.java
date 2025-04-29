@@ -741,11 +741,11 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
   @Nonnull
   private String createDirKey(List<String> dirs, int depth) {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     dirs.add(keyName);
     StringBuffer buf = new StringBuffer(keyName);
     for (int i = 0; i < depth; i++) {
-      String dirName = RandomStringUtils.randomAlphabetic(5);
+      String dirName = RandomStringUtils.secure().nextAlphabetic(5);
       dirs.add(dirName);
       buf.append(OzoneConsts.OM_KEY_PREFIX);
       buf.append(dirName);

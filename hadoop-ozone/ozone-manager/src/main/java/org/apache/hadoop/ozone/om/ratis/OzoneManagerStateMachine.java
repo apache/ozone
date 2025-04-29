@@ -83,7 +83,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OzoneManagerStateMachine extends BaseStateMachine {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerStateMachine.class);
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
@@ -225,7 +225,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .append(", index=").append(index)
         .append(", New Peer list: ");
     newPeers.forEach(peer -> logBuilder.append(peer.getId().toStringUtf8())
-        .append("(")
+        .append('(')
         .append(peer.getAddress())
         .append("), "));
     LOG.info(logBuilder.substring(0, logBuilder.length() - 2));
@@ -451,7 +451,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         this.setLastAppliedTermIndex(TermIndex.valueOf(
             newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
         LOG.info("{}: OzoneManagerStateMachine un-pause completed. " +
-            "newLastAppliedSnaphsotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
+            "newLastAppliedSnapshotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
                 getId(), newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
       });
     }

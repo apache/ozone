@@ -83,6 +83,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -95,13 +96,13 @@ import org.slf4j.LoggerFactory;
 @Singleton
 public class ReconUtils {
 
-  public ReconUtils() {
-  }
-
   private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
 
   private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
+
+  public ReconUtils() {
+  }
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
@@ -173,7 +174,6 @@ public class ReconUtils {
     Archiver.extract(tarFile, destPath);
   }
 
-
   /**
    * Constructs the full path of a key from its OmKeyInfo using a bottom-up approach, starting from the leaf node.
    *
@@ -224,7 +224,6 @@ public class ReconUtils {
     fullPath.append(keyName);
     return fullPath.toString();
   }
-
 
   /**
    * Constructs the prefix path to a key from its key name and parent ID using a bottom-up approach, starting from the
@@ -393,12 +392,12 @@ public class ReconUtils {
     });
 
     executor.submit(() -> {
-      long startTime = System.currentTimeMillis();
+      long startTime = Time.monotonicNow();
       log.info("Rebuilding NSSummary tree...");
       try {
         reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
       } finally {
-        long endTime = System.currentTimeMillis();
+        long endTime = Time.monotonicNow();
         log.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
       }
     });
@@ -433,6 +432,7 @@ public class ReconUtils {
    */
   public File getLastKnownDB(File reconDbDir, String fileNamePrefix) {
     String lastKnownSnapshotFileName = null;
+    File lastKnownSnapshotFile = null;
     long lastKnonwnSnapshotTs = Long.MIN_VALUE;
     if (reconDbDir != null) {
       File[] snapshotFiles = reconDbDir.listFiles((dir, name) ->
@@ -447,8 +447,17 @@ public class ReconUtils {
             }
             long snapshotTimestamp = Long.parseLong(fileNameSplits[1]);
             if (lastKnonwnSnapshotTs < snapshotTimestamp) {
+              if (lastKnownSnapshotFile != null) {
+                try {
+                  FileUtils.deleteDirectory(lastKnownSnapshotFile);
+                } catch (IOException e) {
+                  log.warn("Error deleting existing om db snapshot directory: {}",
+                      lastKnownSnapshotFile.getAbsolutePath());
+                }
+              }
               lastKnonwnSnapshotTs = snapshotTimestamp;
               lastKnownSnapshotFileName = fileName;
+              lastKnownSnapshotFile = snapshotFile;
             }
           } catch (NumberFormatException nfEx) {
             log.warn("Unknown file found in Recon DB dir : {}", fileName);
@@ -559,7 +568,6 @@ public class ReconUtils {
     int binIndex = getContainerSizeBinIndex(containerSize);
     return (long) Math.pow(2, (29 + binIndex));
   }
-
 
   public static int getFileSizeBinIndex(long fileSize) {
     Preconditions.checkArgument(fileSize >= 0,
