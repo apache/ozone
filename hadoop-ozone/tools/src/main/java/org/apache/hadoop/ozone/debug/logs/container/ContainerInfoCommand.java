@@ -21,8 +21,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
-import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
-import org.apache.hadoop.ozone.containerlog.parser.DBConsts;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
+import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
+import org.apache.hadoop.ozone.debug.logs.container.utils.SQLDBConstants;
 import picocli.CommandLine;
 
 /**
@@ -34,7 +35,7 @@ import picocli.CommandLine;
     description = "provides complete state transition history of each replica for a single container along with " +
         "analysis over the container"
 )
-public class ContainerInfoCommand implements Callable<Void> {
+public class ContainerInfoCommand extends AbstractSubcommand implements Callable<Void> {
 
   @CommandLine.Parameters(index = "0", description = "Container ID")
   private Long containerId;
@@ -46,18 +47,18 @@ public class ContainerInfoCommand implements Callable<Void> {
   public Void call() throws Exception {
 
     if (containerId < 0) {
-      System.err.println("Invalid container ID: " + containerId);
+      err().println("Invalid container ID: " + containerId);
       return null;
     }
 
     Path providedDbPath;
     if (parent.getDbPath() == null) {
-      providedDbPath = Paths.get(System.getProperty("user.dir"), DBConsts.DEFAULT_DB_FILENAME);
+      providedDbPath = Paths.get(System.getProperty("user.dir"), SQLDBConstants.DEFAULT_DB_FILENAME);
 
       if (Files.exists(providedDbPath) && Files.isRegularFile(providedDbPath)) {
-        System.out.println("Using default database file found in current directory: " + providedDbPath);
+        out().println("Using default database file found in current directory: " + providedDbPath);
       } else {
-        System.err.println("No database path provided and default file '" + DBConsts.DEFAULT_DB_FILENAME + "' not " +
+        err().println("No database path provided and default file '" + SQLDBConstants.DEFAULT_DB_FILENAME + "' not " +
             "found in current directory. Please provide a valid database path");
         return null;
       }
@@ -66,7 +67,7 @@ public class ContainerInfoCommand implements Callable<Void> {
       Path parentDir = providedDbPath.getParent();
 
       if (parentDir != null && !Files.exists(parentDir)) {
-        System.err.println("The parent directory of the provided database path does not exist: " + parentDir);
+        err().println("The parent directory of the provided database path does not exist: " + parentDir);
         return null;
       }
     }
@@ -77,7 +78,7 @@ public class ContainerInfoCommand implements Callable<Void> {
     try {
       cdd.showContainerDetails(containerId);
     } catch (Exception e) {
-      System.err.println("Error while retrieving container with id: " + containerId + " " + e.getMessage());
+      throw e;
     }
 
     return null;

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.containerlog.parser;
+package org.apache.hadoop.ozone.debug.logs.container.utils;
 
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -69,25 +69,25 @@ public class ContainerDatanodeDatabase {
       throw new IllegalStateException("Database path not set");
     }
     
-    Class.forName(DBConsts.DRIVER);
+    Class.forName(SQLDBConstants.DRIVER);
 
     SQLiteConfig config = new SQLiteConfig();
 
     config.setJournalMode(SQLiteConfig.JournalMode.OFF);
-    config.setCacheSize(DBConsts.CACHE_SIZE);
+    config.setCacheSize(SQLDBConstants.CACHE_SIZE);
     config.setLockingMode(SQLiteConfig.LockingMode.EXCLUSIVE);
     config.setSynchronous(SQLiteConfig.SynchronousMode.OFF);
     config.setTempStore(SQLiteConfig.TempStore.MEMORY);
 
-    return DriverManager.getConnection(DBConsts.CONNECTION_PREFIX + databasePath, config.toProperties());
+    return DriverManager.getConnection(SQLDBConstants.CONNECTION_PREFIX + databasePath, config.toProperties());
   }
 
   public void createDatanodeContainerLogTable() throws SQLException {
-    String createTableSQL = DBConsts.CREATE_DATANODE_CONTAINER_LOG_TABLE;
+    String createTableSQL = SQLDBConstants.CREATE_DATANODE_CONTAINER_LOG_TABLE;
     try (Connection connection = getConnection();
          Statement dropStmt = connection.createStatement();
          Statement createStmt = connection.createStatement()) {
-      dropTable(DBConsts.DATANODE_CONTAINER_LOG_TABLE_NAME, dropStmt);
+      dropTable(SQLDBConstants.DATANODE_CONTAINER_LOG_TABLE_NAME, dropStmt);
       createStmt.execute(createTableSQL);
       createDatanodeContainerIndex(createStmt);
     } catch (SQLException e) {
@@ -100,11 +100,11 @@ public class ContainerDatanodeDatabase {
   }
 
   private void createContainerLogTable() throws SQLException {
-    String createTableSQL = DBConsts.CREATE_CONTAINER_LOG_TABLE;
+    String createTableSQL = SQLDBConstants.CREATE_CONTAINER_LOG_TABLE;
     try (Connection connection = getConnection();
          Statement dropStmt = connection.createStatement();
          Statement createStmt = connection.createStatement()) {
-      dropTable(DBConsts.CONTAINER_LOG_TABLE_NAME, dropStmt);
+      dropTable(SQLDBConstants.CONTAINER_LOG_TABLE_NAME, dropStmt);
       createStmt.execute(createTableSQL);
     } catch (SQLException e) {
       System.err.println("Error while creating the table: " + e.getMessage());
@@ -123,7 +123,7 @@ public class ContainerDatanodeDatabase {
   
   public synchronized void insertContainerDatanodeData(List<DatanodeContainerInfo> transitionList) throws SQLException {
 
-    String insertSQL = DBConsts.INSERT_DATANODE_CONTAINER_LOG;
+    String insertSQL = SQLDBConstants.INSERT_DATANODE_CONTAINER_LOG;
 
     long containerId = 0;
     String datanodeId = null;
@@ -149,7 +149,7 @@ public class ContainerDatanodeDatabase {
 
         count++;
 
-        if (count % DBConsts.BATCH_SIZE == 0) {
+        if (count % SQLDBConstants.BATCH_SIZE == 0) {
           preparedStatement.executeBatch();
           count = 0;
         }
@@ -168,7 +168,7 @@ public class ContainerDatanodeDatabase {
   }
 
   private void createDatanodeContainerIndex(Statement stmt) throws SQLException {
-    String createIndexSQL = DBConsts.CREATE_DATANODE_CONTAINER_INDEX;
+    String createIndexSQL = SQLDBConstants.CREATE_DATANODE_CONTAINER_INDEX;
     stmt.execute(createIndexSQL);
   }
 
@@ -179,8 +179,8 @@ public class ContainerDatanodeDatabase {
 
   public void insertLatestContainerLogData() throws SQLException {
     createContainerLogTable();
-    String selectSQL = DBConsts.SELECT_LATEST_CONTAINER_LOG;
-    String insertSQL = DBConsts.INSERT_CONTAINER_LOG;
+    String selectSQL = SQLDBConstants.SELECT_LATEST_CONTAINER_LOG;
+    String insertSQL = SQLDBConstants.INSERT_CONTAINER_LOG;
 
     try (Connection connection = getConnection();
          PreparedStatement selectStmt = connection.prepareStatement(selectSQL);
@@ -203,7 +203,7 @@ public class ContainerDatanodeDatabase {
 
           count++;
 
-          if (count % DBConsts.BATCH_SIZE == 0) {
+          if (count % SQLDBConstants.BATCH_SIZE == 0) {
             insertStmt.executeBatch();
             count = 0;
           }
@@ -227,12 +227,12 @@ public class ContainerDatanodeDatabase {
   }
 
   private void dropTable(String tableName, Statement stmt) throws SQLException {
-    String dropTableSQL = DBConsts.DROP_TABLE.replace("{table_name}", tableName);
+    String dropTableSQL = SQLDBConstants.DROP_TABLE.replace("{table_name}", tableName);
     stmt.executeUpdate(dropTableSQL);
   }
 
   private void createContainerLogIndex(Statement stmt) throws SQLException {
-    String createIndexSQL = DBConsts.CREATE_INDEX_LATEST_STATE;
+    String createIndexSQL = SQLDBConstants.CREATE_INDEX_LATEST_STATE;
     stmt.execute(createIndexSQL);
   }
 
@@ -255,7 +255,7 @@ public class ContainerDatanodeDatabase {
 
     boolean limitProvided = limit != Integer.MAX_VALUE;
 
-    String baseQuery = DBConsts.SELECT_LATEST_CONTAINER_LOGS_BY_STATE;
+    String baseQuery = SQLDBConstants.SELECT_LATEST_CONTAINER_LOGS_BY_STATE;
     String finalQuery = limitProvided ? baseQuery + " LIMIT ?" : baseQuery;
 
     try (Connection connection = getConnection();
@@ -310,7 +310,7 @@ public class ContainerDatanodeDatabase {
   }
 
   private void createIdxDclContainerStateTime(Connection conn) throws SQLException {
-    String sql = DBConsts.CREATE_DCL_CONTAINER_STATE_TIME_INDEX;
+    String sql = SQLDBConstants.CREATE_DCL_CONTAINER_STATE_TIME_INDEX;
     try (Statement stmt = conn.createStatement()) {
       stmt.execute(sql);
     }
@@ -371,7 +371,7 @@ public class ContainerDatanodeDatabase {
       analyzeContainerHealth(containerID, latestPerDatanode);
 
     } catch (SQLException e) {
-      throw e;
+      throw new SQLException("Error while retrieving container with ID " + containerID);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -527,7 +527,7 @@ public class ContainerDatanodeDatabase {
 
   private List<DatanodeContainerInfo> getContainerLogData(Long containerID, Connection connection)
       throws SQLException {
-    String query = DBConsts.CONTAINER_DETAILS_QUERY;
+    String query = SQLDBConstants.CONTAINER_DETAILS_QUERY;
     List<DatanodeContainerInfo> logEntries = new ArrayList<>();
 
     try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {

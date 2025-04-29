@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.containerlog.parser;
+package org.apache.hadoop.ozone.debug.logs.container.utils;
 
 /**
  * Constants used for ContainerDatanodeDatabase.
  */
-public final class DBConsts {
+public final class SQLDBConstants {
   
   public static final String DEFAULT_DB_FILENAME = "container_datanode.db";
   public static final String DRIVER = "org.sqlite.JDBC";
@@ -69,7 +69,7 @@ public final class DBConsts {
   public static final String CREATE_DCL_CONTAINER_STATE_TIME_INDEX = "CREATE INDEX IF NOT EXISTS " +
       "idx_dcl_container_state_time ON DatanodeContainerLogTable(container_id, container_state, timestamp);";
   
-  private DBConsts() {
+  private SQLDBConstants() {
     //Never constructed
   }
 }
