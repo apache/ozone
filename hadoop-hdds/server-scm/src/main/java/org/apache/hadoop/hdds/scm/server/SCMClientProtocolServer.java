@@ -379,7 +379,7 @@ public class SCMClientProtocolServer implements
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
         strContainerIDs.append(ContainerID.valueOf(containerID).toString());
-        strContainerIDs.append(",");
+        strContainerIDs.append(',');
       } catch (IOException ex) {
         AUDIT.logReadFailure(buildAuditMessageForFailure(
             SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
@@ -882,7 +882,7 @@ public class SCMClientProtocolServer implements
       PipelineManager pipelineManager = scm.getPipelineManager();
       Pipeline pipeline =
           pipelineManager.getPipeline(PipelineID.getFromProtobuf(pipelineID));
-      pipelineManager.closePipeline(pipeline, true);
+      pipelineManager.closePipeline(pipeline.getId());
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.CLOSE_PIPELINE, auditMap));
     } catch (Exception ex) {

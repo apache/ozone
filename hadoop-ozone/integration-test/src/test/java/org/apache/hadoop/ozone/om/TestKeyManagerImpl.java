@@ -363,7 +363,7 @@ public class TestKeyManagerImpl {
         .setKeyName(keyNameBuf.toString())
         .build();
     for (int i = 0; i < 5; i++) {
-      keyNameBuf.append("/").append(RandomStringUtils.secure().nextAlphabetic(5));
+      keyNameBuf.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     String keyName = keyNameBuf.toString();
     writeClient.createDirectory(keyArgs);
@@ -430,7 +430,7 @@ public class TestKeyManagerImpl {
     StringBuffer keyNameBuf = new StringBuffer();
     keyNameBuf.append(RandomStringUtils.secure().nextAlphabetic(5));
     for (int i = 0; i < 5; i++) {
-      keyNameBuf.append("/").append(RandomStringUtils.secure().nextAlphabetic(5));
+      keyNameBuf.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     keyName = keyNameBuf.toString();
     keyArgs = createBuilder()

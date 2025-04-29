@@ -47,14 +47,6 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerReportHandler.class);
 
-  enum UnknownContainerAction {
-    WARN, DELETE;
-
-    static UnknownContainerAction parse(String s) {
-      return s.equals(DELETE.name()) ? DELETE : WARN;
-    }
-  }
-
   private final UnknownContainerAction unknownContainerHandleAction;
 
   /**
@@ -271,6 +263,14 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         getLogger().warn("Failed to remove container replica: container {} not found in datanode {}",
             id, datanodeDetails, e);
       }
+    }
+  }
+
+  enum UnknownContainerAction {
+    WARN, DELETE;
+
+    static UnknownContainerAction parse(String s) {
+      return s.equals(DELETE.name()) ? DELETE : WARN;
     }
   }
 }

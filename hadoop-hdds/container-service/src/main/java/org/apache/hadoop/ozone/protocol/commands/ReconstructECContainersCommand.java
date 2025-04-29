@@ -131,7 +131,7 @@ public class ReconstructECContainersCommand
     StringBuilder sb = new StringBuilder();
     sb.append(getType())
         .append(": cmdID: ").append(getId())
-        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", encodedToken: \"").append(getEncodedToken()).append('"')
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline())
         .append(", containerID: ").append(containerID)
@@ -139,7 +139,7 @@ public class ReconstructECContainersCommand
         .append(", sources: [").append(getSources().stream()
             .map(a -> a.dnDetails
                 + " replicaIndex: " + a.getReplicaIndex())
-            .collect(Collectors.joining(", "))).append("]")
+            .collect(Collectors.joining(", "))).append(']')
         .append(", targets: ").append(getTargetDatanodes())
         .append(", missingIndexes: ").append(
             Arrays.toString(missingContainerIndexes.toByteArray()));

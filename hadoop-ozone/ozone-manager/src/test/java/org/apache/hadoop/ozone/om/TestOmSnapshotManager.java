@@ -66,7 +66,7 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -128,8 +128,7 @@ class TestOmSnapshotManager {
   public void testSnapshotFeatureFlagSafetyCheck() throws IOException {
     // Verify that the snapshot feature config safety check method
     // is returning the expected value.
-
-    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    final TypedTable<String, SnapshotInfo> snapshotInfoTable = mock(TypedTable.class);
     HddsWhiteboxTestUtils.setInternalState(
         om.getMetadataManager(), SNAPSHOT_INFO_TABLE, snapshotInfoTable);
 
@@ -147,9 +146,9 @@ class TestOmSnapshotManager {
     GenericTestUtils.setLogLevel(RDBStore.class, Level.DEBUG);
     LogCapturer logCapture = LogCapturer.captureLogs(RDBStore.class);
     // set up db tables
-    Table<String, OmVolumeArgs> volumeTable = mock(Table.class);
-    Table<String, OmBucketInfo> bucketTable = mock(Table.class);
-    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    final TypedTable<String, OmVolumeArgs> volumeTable = mock(TypedTable.class);
+    final TypedTable<String, OmBucketInfo> bucketTable = mock(TypedTable.class);
+    final TypedTable<String, SnapshotInfo> snapshotInfoTable = mock(TypedTable.class);
     HddsWhiteboxTestUtils.setInternalState(
         om.getMetadataManager(), VOLUME_TABLE, volumeTable);
     HddsWhiteboxTestUtils.setInternalState(
@@ -655,9 +654,9 @@ class TestOmSnapshotManager {
   public void testCreateSnapshotIdempotent() throws Exception {
     // set up db tables
     LogCapturer logCapturer = LogCapturer.captureLogs(OmSnapshotManager.class);
-    Table<String, OmVolumeArgs> volumeTable = mock(Table.class);
-    Table<String, OmBucketInfo> bucketTable = mock(Table.class);
-    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    final TypedTable<String, OmVolumeArgs> volumeTable = mock(TypedTable.class);
+    final TypedTable<String, OmBucketInfo> bucketTable = mock(TypedTable.class);
+    final TypedTable<String, SnapshotInfo> snapshotInfoTable = mock(TypedTable.class);
     HddsWhiteboxTestUtils.setInternalState(
         om.getMetadataManager(), VOLUME_TABLE, volumeTable);
     HddsWhiteboxTestUtils.setInternalState(

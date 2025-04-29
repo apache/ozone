@@ -42,10 +42,6 @@ public final class OzoneUtils {
 
   public static final Charset ENCODING = StandardCharsets.UTF_8;
 
-  private OzoneUtils() {
-    // Never constructed
-  }
-
   /**
    * Date format that used in ozone. Here the format is thread safe to use.
    */
@@ -60,6 +56,10 @@ public final class OzoneUtils {
           return format;
         }
       };
+
+  private OzoneUtils() {
+    // Never constructed
+  }
 
   /**
    * Verifies that max key length is a valid value.
