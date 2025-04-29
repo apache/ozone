@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.FAILED;
-import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.values;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -104,7 +103,7 @@ public class TestStorageVolumeChecker {
    * Including "null" for 'throw exception'.
    */
   private static List<VolumeCheckResult> volumeCheckResults() {
-    List<VolumeCheckResult> list = new ArrayList<>(Arrays.asList(values()));
+    List<VolumeCheckResult> list = new ArrayList<>(Arrays.asList(VolumeCheckResult.values()));
     list.add(null);
     return list;
   }
