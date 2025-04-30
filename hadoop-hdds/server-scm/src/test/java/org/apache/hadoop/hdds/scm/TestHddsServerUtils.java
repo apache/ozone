@@ -40,12 +40,10 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Unit tests for {@link HddsServerUtil}.
  */
-@Timeout(300)
 public class TestHddsServerUtils {
 
   /**

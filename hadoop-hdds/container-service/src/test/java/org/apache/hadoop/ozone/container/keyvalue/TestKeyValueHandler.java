@@ -72,14 +72,12 @@ import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 /**
  * Unit tests for {@link KeyValueHandler}.
  */
-@Timeout(300)
 public class TestKeyValueHandler {
 
   @TempDir
