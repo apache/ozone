@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
 
 /**
@@ -32,7 +31,6 @@ import picocli.CommandLine;
 public abstract class TestRandomKeyGenerator implements NonHATests.TestCase {
 
   @Test
-  @Timeout(5)
   void singleFailedAttempt() {
     BaseFreonGenerator subject = new BaseFreonGenerator();
     subject.setThreadNo(2);

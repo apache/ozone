@@ -43,7 +43,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +50,6 @@ import org.slf4j.LoggerFactory;
  * This class tests container report with DN container state info.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestContainerReportWithKeys implements NonHATests.TestCase {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestContainerReportWithKeys.class);
@@ -71,9 +69,9 @@ public abstract class TestContainerReportWithKeys implements NonHATests.TestCase
 
   @Test
   public void testContainerReportKeyWrite() throws Exception {
-    final String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    final String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-    final String keyName = "key" + RandomStringUtils.randomNumeric(5);
+    final String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    final String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    final String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
     final int keySize = 100;
 
     ObjectStore objectStore = client.getObjectStore();
@@ -83,7 +81,7 @@ public abstract class TestContainerReportWithKeys implements NonHATests.TestCase
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey(keyName, keySize, ReplicationType.RATIS,
                 ReplicationFactor.ONE, new HashMap<>());
-    String dataString = RandomStringUtils.randomAlphabetic(keySize);
+    String dataString = RandomStringUtils.secure().nextAlphabetic(keySize);
     key.write(dataString.getBytes(UTF_8));
     key.close();
 

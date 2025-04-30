@@ -177,7 +177,7 @@ public final class StringToSignProducer {
 
     for (String header : StringUtils.split(signedHeaders, ';')) {
       canonicalHeaders.append(header.toLowerCase());
-      canonicalHeaders.append(":");
+      canonicalHeaders.append(':');
       if (headers.containsKey(header)) {
         String headerValue = headers.get(header);
         canonicalHeaders.append(headerValue);
@@ -291,7 +291,7 @@ public final class StringToSignProducer {
     for (String p : params) {
       if (!p.equals("X-Amz-Signature")) {
         if (result.length() > 0) {
-          result.append("&");
+          result.append('&');
         }
         result.append(urlEncode(p));
         result.append('=');

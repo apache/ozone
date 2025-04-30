@@ -25,17 +25,22 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
@@ -50,7 +55,7 @@ import org.slf4j.LoggerFactory;
 /**
  * HddsVolume represents volume in a datanode. {@link MutableVolumeSet}
  * maintains a list of HddsVolumes, one for each volume in the Datanode.
- * {@link VolumeInfo} in encompassed by this class.
+ * {@link VolumeUsage} in encompassed by this class.
  * <p>
  * The disk layout per volume is as follows:
  * <p>../hdds/VERSION
@@ -97,6 +102,11 @@ public class HddsVolume extends StorageVolume {
   private AtomicBoolean dbLoaded = new AtomicBoolean(false);
   private final AtomicBoolean dbLoadFailure = new AtomicBoolean(false);
 
+  private final int volumeTestCount;
+  private final int volumeTestFailureTolerance;
+  private AtomicInteger volumeTestFailureCount;
+  private Queue<Boolean> volumeTestResultQueue;
+
   /**
    * Builder for HddsVolume.
    */
@@ -120,7 +130,7 @@ public class HddsVolume extends StorageVolume {
   private HddsVolume(Builder b) throws IOException {
     super(b);
 
-    if (!b.getFailedVolume() && getVolumeInfo().isPresent()) {
+    if (!b.getFailedVolume()) {
       this.setState(VolumeState.NOT_INITIALIZED);
       ConfigurationSource conf = getConf();
       int[] intervals = conf.getInts(OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
@@ -129,10 +139,10 @@ public class HddsVolume extends StorageVolume {
       this.volumeInfoMetrics =
           new VolumeInfoMetrics(b.getVolumeRootStr(), this);
 
-      LOG.info("Creating HddsVolume: {} of storage type: {}, {}",
-          getStorageDir(),
-          b.getStorageType(),
-          getCurrentUsage());
+      this.volumeTestCount = getDatanodeConfig().getVolumeIOTestCount();
+      this.volumeTestFailureTolerance = getDatanodeConfig().getVolumeIOFailureTolerance();
+      this.volumeTestFailureCount = new AtomicInteger(0);
+      this.volumeTestResultQueue = new LinkedList<>();
 
       initialize();
     } else {
@@ -141,8 +151,11 @@ public class HddsVolume extends StorageVolume {
       this.setState(VolumeState.FAILED);
       volumeIOStats = null;
       volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
+      this.volumeTestCount = 0;
+      this.volumeTestFailureTolerance = 0;
     }
 
+    LOG.info("HddsVolume: {}", getReport());
   }
 
   @Override
@@ -179,6 +192,16 @@ public class HddsVolume extends StorageVolume {
 
   public VolumeInfoMetrics getVolumeInfoStats() {
     return volumeInfoMetrics;
+  }
+
+  @Override
+  protected StorageLocationReport.Builder reportBuilder() {
+    StorageLocationReport.Builder builder = super.reportBuilder();
+    if (!builder.isFailed()) {
+      builder.setCommitted(getCommittedBytes())
+          .setFreeSpaceToSpare(getFreeSpaceToSpare(builder.getCapacity()));
+    }
+    return builder;
   }
 
   @Override
@@ -264,14 +287,14 @@ public class HddsVolume extends StorageVolume {
       throws Exception {
     VolumeCheckResult result = super.check(unused);
 
-    DatanodeConfiguration df = getConf().getObject(DatanodeConfiguration.class);
     if (isDbLoadFailure()) {
       LOG.warn("Volume {} failed to access RocksDB: RocksDB parent directory is null, " +
           "the volume might not have been loaded properly.", getStorageDir());
       return VolumeCheckResult.FAILED;
     }
+
     if (result != VolumeCheckResult.HEALTHY ||
-        !df.getContainerSchemaV3Enabled() || !isDbLoaded()) {
+        !getDatanodeConfig().getContainerSchemaV3Enabled() || !isDbLoaded()) {
       return result;
     }
 
@@ -283,6 +306,43 @@ public class HddsVolume extends StorageVolume {
       return VolumeCheckResult.FAILED;
     }
 
+    return checkDbHealth(dbFile);
+  }
+
+  @VisibleForTesting
+  public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
+    if (volumeTestCount == 0) {
+      return VolumeCheckResult.HEALTHY;
+    }
+
+    final boolean isVolumeTestResultHealthy = true;
+    try (ManagedOptions managedOptions = new ManagedOptions();
+         ManagedRocksDB readOnlyDb = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
+      volumeTestResultQueue.add(isVolumeTestResultHealthy);
+    } catch (Exception e) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Check of database for volume " + this + " interrupted.");
+      }
+      LOG.warn("Could not open Volume DB located at {}", dbFile, e);
+      volumeTestResultQueue.add(!isVolumeTestResultHealthy);
+      volumeTestFailureCount.incrementAndGet();
+    }
+
+    if (volumeTestResultQueue.size() > volumeTestCount
+        && (Boolean.TRUE.equals(volumeTestResultQueue.poll()) != isVolumeTestResultHealthy)) {
+      volumeTestFailureCount.decrementAndGet();
+    }
+
+    if (volumeTestFailureCount.get() > volumeTestFailureTolerance) {
+      LOG.error("Failed to open the database at \"{}\" for HDDS volume {}: " +
+              "the last {} runs encountered {} out of {} tolerated failures.",
+          dbFile, this, volumeTestResultQueue.size(), volumeTestFailureCount.get(), volumeTestFailureTolerance);
+      return VolumeCheckResult.FAILED;
+    }
+
+    LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}: " +
+            "the last {} runs encountered {} out of {} tolerated failures",
+        dbFile, this, volumeTestResultQueue.size(), volumeTestFailureTolerance, volumeTestFailureTolerance);
     return VolumeCheckResult.HEALTHY;
   }
 
@@ -303,6 +363,10 @@ public class HddsVolume extends StorageVolume {
    */
   public long getCommittedBytes() {
     return committedBytes.get();
+  }
+
+  public long getFreeSpaceToSpare(long volumeCapacity) {
+    return getDatanodeConfig().getMinFreeSpace(volumeCapacity);
   }
 
   public void setDbVolume(DbVolume dbVolume) {

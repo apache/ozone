@@ -110,6 +110,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
     // cleanup
     getFs().delete(dest, true);
   }
+
   /**
    *  Cannot rename a directory to its own subdirectory.
    */

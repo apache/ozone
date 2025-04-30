@@ -18,7 +18,8 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.commons.io.filefilter.TrueFileFilter.TRUE;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeFile;
+import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
+import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
@@ -55,7 +56,7 @@ import java.util.stream.Stream;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOCase;
 import org.apache.commons.io.file.Counters;
@@ -160,12 +161,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    try (TarArchiveOutputStream archiveOutputStream =
-             new TarArchiveOutputStream(destination)) {
-      archiveOutputStream
-          .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-      archiveOutputStream
-          .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+    try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream = tar(destination)) {
       RocksDBCheckpointDiffer differ =
           getDbStore().getRocksDBCheckpointDiffer();
       DirectoryData sstBackupDir = new DirectoryData(tmpdir,
@@ -256,11 +252,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return dbCheckpoint;
   }
 
-
   // Convenience class for keeping track of the tmp dirs.
   static class DirectoryData {
     private final File originalDir;
     private final File tmpDir;
+
     DirectoryData(Path tmpdir, String dirStr) throws IOException {
       originalDir = new File(dirStr);
       tmpDir = new File(tmpdir.toString(), getOriginalDir().getName());
@@ -582,7 +578,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private void writeFilesToArchive(
       Map<Path, Path> copyFiles,
       Map<Path, Path> hardLinkFiles,
-      ArchiveOutputStream archiveOutputStream,
+      ArchiveOutputStream<TarArchiveEntry> archiveOutputStream,
       boolean completed,
       Path checkpointLocation)
       throws IOException {

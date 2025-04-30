@@ -31,7 +31,6 @@ public class SafeModeMetrics {
   private static final String SOURCE_NAME =
       SafeModeMetrics.class.getSimpleName();
 
-
   // These all values will be set to some values when safemode is enabled.
   private @Metric MutableGaugeLong
       numContainerWithOneReplicaReportedThreshold;
@@ -42,8 +41,7 @@ public class SafeModeMetrics {
   private @Metric MutableCounterLong
       currentContainersWithECDataReplicaReportedCount;
 
-  // When hdds.scm.safemode.pipeline-availability.check is set then only
-  // below metrics will have some values, otherwise they will be zero.
+  // Pipeline metrics for safemode
   private @Metric MutableGaugeLong numHealthyPipelinesThreshold;
   private @Metric MutableCounterLong currentHealthyPipelinesCount;
   private @Metric MutableGaugeLong
@@ -118,7 +116,6 @@ public class SafeModeMetrics {
   MutableCounterLong getCurrentContainersWithOneReplicaReportedCount() {
     return currentContainersWithOneReplicaReportedCount;
   }
-
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();

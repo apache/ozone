@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -55,7 +54,6 @@ import org.junit.jupiter.api.io.TempDir;
  * sortDatanodes tests for
  * {@link org.apache.hadoop.ozone.om.KeyManagerImpl#sortDatanodes(List, String)}.
  */
-@Timeout(300)
 public class TestOMSortDatanodes {
 
   @TempDir

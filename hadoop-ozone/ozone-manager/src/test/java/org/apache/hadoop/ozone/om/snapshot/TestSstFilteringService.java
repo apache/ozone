@@ -335,7 +335,7 @@ public class TestSstFilteringService {
                           int keyCount)
       throws IOException {
     for (int x = 0; x < keyCount; x++) {
-      String keyName = "key-" + RandomStringUtils.randomAlphanumeric(5);
+      String keyName = "key-" + RandomStringUtils.secure().nextAlphanumeric(5);
       createKey(writeClient, volumeName, bucketName, keyName);
     }
   }

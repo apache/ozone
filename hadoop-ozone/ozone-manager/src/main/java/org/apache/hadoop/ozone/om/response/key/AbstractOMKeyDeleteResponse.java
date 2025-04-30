@@ -130,7 +130,6 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
     }
   }
 
-
   @Override
   public abstract void addToDBBatch(OMMetadataManager omMetadataManager,
         BatchOperation batchOperation) throws IOException;

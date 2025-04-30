@@ -28,6 +28,7 @@ import java.util.Random;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -104,7 +105,7 @@ public class ReplicationSupervisorScheduling {
 
     ReplicationSupervisor rs = ReplicationSupervisor.newBuilder().build();
 
-    final long start = System.currentTimeMillis();
+    final long start = Time.monotonicNow();
 
     //schedule 100 container replication
     for (int i = 0; i < 100; i++) {
@@ -114,7 +115,7 @@ public class ReplicationSupervisorScheduling {
       rs.addTask(new ReplicationTask(fromSources(i, sources), replicator));
     }
     rs.shutdownAfterFinish();
-    final long executionTime = System.currentTimeMillis() - start;
+    final long executionTime = Time.monotonicNow() - start;
     System.out.println(executionTime);
     assertThat(executionTime)
         .withFailMessage("Execution was too slow : " + executionTime + " ms")

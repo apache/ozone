@@ -58,7 +58,6 @@ public abstract class Storage {
   private final StorageState state;
   private final StorageInfo storageInfo;
 
-
   /**
    * Determines the state of the Version file.
    */
@@ -191,7 +190,6 @@ public abstract class Storage {
   public File getVersionFile() {
     return new File(getCurrentDir(), STORAGE_FILE_VERSION);
   }
-
 
   /**
    * Check to see if current/ directory is empty. This method is used

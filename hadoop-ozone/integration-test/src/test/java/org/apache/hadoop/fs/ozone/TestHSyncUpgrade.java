@@ -72,13 +72,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 /**
  * Test HSync upgrade.
  */
-@Timeout(value = 300)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestHSyncUpgrade {
   private MiniOzoneCluster cluster;
@@ -141,13 +139,13 @@ public class TestHSyncUpgrade {
     bucket = TestDataUtil.createVolumeAndBucket(client, layout);
 
     // Enable DEBUG level logging for relevant classes
-    GenericTestUtils.setLogLevel(BlockManagerImpl.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(AbstractDatanodeStore.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(KeyValueHandler.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BlockManagerImpl.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(AbstractDatanodeStore.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BlockOutputStream.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BlockInputStream.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(KeyValueHandler.class, Level.DEBUG);
 
-    GenericTestUtils.setLogLevel(BufferPool.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BufferPool.class, Level.DEBUG);
 
     OpenKeyCleanupService openKeyCleanupService =
         (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager()

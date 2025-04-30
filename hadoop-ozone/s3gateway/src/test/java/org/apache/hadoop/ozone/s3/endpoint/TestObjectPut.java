@@ -151,7 +151,7 @@ class TestObjectPut {
   @MethodSource("argumentsForPutObject")
   void testPutObject(int length, ReplicationConfig replication) throws IOException, OS3Exception {
     //GIVEN
-    final String content = RandomStringUtils.randomAlphanumeric(length);
+    final String content = RandomStringUtils.secure().nextAlphanumeric(length);
     ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8));
     bucket.setReplicationConfig(replication);
 
@@ -312,7 +312,7 @@ class TestObjectPut {
     for (int i = 0; i < TAG_NUM_LIMIT + 1; i++) {
       sb.append(String.format("tag%d=value%d", i, i));
       if (i < TAG_NUM_LIMIT) {
-        sb.append("&");
+        sb.append('&');
       }
     }
     when(headersWithTooManyTags.getHeaderString(TAG_HEADER)).thenReturn(sb.toString());

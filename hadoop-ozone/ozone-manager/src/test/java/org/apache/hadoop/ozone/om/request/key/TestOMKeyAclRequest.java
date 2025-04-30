@@ -83,6 +83,10 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
+    // Verify result of adding acl.
+    OmKeyInfo newKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    assertEquals(1, newKeyInfo.getAcls().size());
+    assertEquals(omKeyInfo.getKeyName(), newKeyInfo.getKeyName());
   }
 
   @Test
@@ -141,10 +145,9 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         omRemoveAclResponse.getStatus());
 
     // Verify result of removing acl.
-    List<OzoneAcl> newAcls =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
-            .getAcls();
-    assertEquals(0, newAcls.size());
+    OmKeyInfo newKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    assertEquals(0, newKeyInfo.getAcls().size());
+    assertEquals(omKeyInfo.getKeyName(), newKeyInfo.getKeyName());
   }
 
   @Test
@@ -182,10 +185,9 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         omSetAclResponse.getStatus());
 
     // Verify result of setting acl.
-    List<OzoneAcl> newAcls =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
-            .getAcls();
-    assertEquals(newAcls.get(0), acl);
+    OmKeyInfo newKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    assertEquals(newKeyInfo.getAcls().get(0), acl);
+    assertEquals(omKeyInfo.getKeyName(), newKeyInfo.getKeyName());
   }
 
   /**

@@ -45,11 +45,13 @@ import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -200,6 +202,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
     MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
 
     if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
       MutableVolumeSet dbVolumeSet =
@@ -225,6 +228,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               fakeDatanodeUuid,
               containerSet,
               volumeSet,
+              volumeChoosingPolicy,
               metrics,
               containerReplicaProto -> {
               });
@@ -236,7 +240,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         new ContainerController(containerSet, handlers);
 
     ContainerImporter importer = new ContainerImporter(conf, containerSet,
-        controller, volumeSet);
+        controller, volumeSet, volumeChoosingPolicy);
     replicator = new DownloadAndImportReplicator(conf, containerSet, importer,
         new SimpleContainerDownloader(conf, null));
 
