@@ -2324,6 +2324,32 @@ message LifecycleRuleAndOperator {
   repeated LifecycleFilterTag tags = 2;
 }
 
+// TODO: proto 2.5 does not support oneof fields, once we start using protoc 3.x, consider to refactor these message using "oneof"
+/*
+message LifecycleFilter {
+  oneof Filter {
+      string prefix = 1;
+      LifecycleFilterTag tag = 2;
+      LifecycleRuleAndOperator andOperator = 3;
+   }
+}
+
+message LifecycleExpiration {
+  oneof Condition {
+     uint32 days = 1;
+     string date = 2;
+  }
+}
+
+message LifecycleRule {
+  //...
+  oneof Condition {
+    optional string prefix = 4;
+    optional LifecycleFilter filter = 5;
+  }
+  //...
+}
+ */
 message LifecycleFilter {
   optional string prefix = 1;
   optional LifecycleFilterTag tag = 2;
@@ -2336,10 +2362,10 @@ message LifecycleExpiration {
 }
 
 message LifecycleRule {
-  required  string id = 1;
-  optional string prefix = 2;
-  required bool enabled = 3;
-  repeated LifecycleAction action = 4;
+  required string id = 1;
+  required bool enabled = 2;
+  repeated LifecycleAction action = 3;
+  optional string prefix = 4;
   optional LifecycleFilter filter = 5;
 }
 
