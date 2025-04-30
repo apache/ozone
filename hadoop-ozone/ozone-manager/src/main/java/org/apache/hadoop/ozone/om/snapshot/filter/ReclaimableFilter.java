@@ -55,6 +55,7 @@ public abstract class ReclaimableFilter<V>
   private final SnapshotInfo currentSnapshotInfo;
   private final OmSnapshotManager omSnapshotManager;
   private final SnapshotChainManager snapshotChainManager;
+  // Used for tmp list to avoid lots of garbage collection of list.
   private final List<SnapshotInfo> tmpValidationSnapshotInfos;
   private final List<UUID> lockedSnapshotIds;
   private final List<SnapshotInfo> previousSnapshotInfos;
@@ -73,10 +74,10 @@ public abstract class ReclaimableFilter<V>
    * @param omSnapshotManager : OmSnapshot Manager of OM instance.
    * @param snapshotChainManager : snapshot chain manager of OM instance.
    * @param currentSnapshotInfo : If null the deleted keys in Active Metadata manager needs to be processed, hence the
-   *                             latest snapshot in the snapshot chain corresponding to bucket key needs to be
-   *                             processed.
+   *                             the reference for the key in the latest snapshot in the snapshot chain needs to be
+   *                             checked.
    * @param keyManager : KeyManager corresponding to snapshot or Active Metadata Manager.
-   * @param lock : Lock for Active OM.
+   * @param lock : Lock Manager for Active OM.
    * @param numberOfPreviousSnapshotsFromChain : number of previous snapshots to be initialized.
    */
   public ReclaimableFilter(
@@ -92,7 +93,6 @@ public abstract class ReclaimableFilter<V>
     this.numberOfPreviousSnapshotsFromChain = numberOfPreviousSnapshotsFromChain;
     this.previousOmSnapshots = new ArrayList<>(numberOfPreviousSnapshotsFromChain);
     this.previousSnapshotInfos = new ArrayList<>(numberOfPreviousSnapshotsFromChain);
-    // Used for tmp list to avoid lots of garbage collection of list.
     this.tmpValidationSnapshotInfos = new ArrayList<>(numberOfPreviousSnapshotsFromChain);
     this.lockedSnapshotIds = new ArrayList<>(numberOfPreviousSnapshotsFromChain + 1);
   }
@@ -104,15 +104,14 @@ public abstract class ReclaimableFilter<V>
           "against the volume: " + volume + " and bucket: " + bucket + " of the key.");
     }
     tmpValidationSnapshotInfos.clear();
-    SnapshotInfo expectedPreviousSnapshotInfo = currentSnapshotInfo == null
+    SnapshotInfo snapshotInfo = currentSnapshotInfo == null
         ? SnapshotUtils.getLatestSnapshotInfo(volume, bucket, ozoneManager, snapshotChainManager)
         : SnapshotUtils.getPreviousSnapshot(ozoneManager, snapshotChainManager, currentSnapshotInfo);
-    SnapshotInfo snapshotInfo = expectedPreviousSnapshotInfo;
     while (tmpValidationSnapshotInfos.size() < numberOfPreviousSnapshotsFromChain) {
-      // If changes made to the snapshot have not been flushed to disk, throw exception immediately, next run of
-      // garbage collection would process the snapshot.
+      // If changes made to the snapshot have not been flushed to disk, throw exception immediately.
+      // Next run of garbage collection would process the snapshot.
       if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(ozoneManager.getMetadataManager(), snapshotInfo)) {
-        throw new IOException("Changes made to the snapshot " + snapshotInfo + " have not been flushed to the disk ");
+        throw new IOException("Changes made to the snapshot: " + snapshotInfo + " have not been flushed to the disk.");
       }
       tmpValidationSnapshotInfos.add(snapshotInfo);
       snapshotInfo = snapshotInfo == null ? null
@@ -150,7 +149,7 @@ public abstract class ReclaimableFilter<V>
       for (SnapshotInfo snapshotInfo : expectedLastNSnapshotsInChain) {
         lockedSnapshotIds.add(snapshotInfo == null ? null : snapshotInfo.getSnapshotId());
       }
-      //currentSnapshotInfo for AOS will be null.
+      // currentSnapshotInfo will be null for AOS.
       lockedSnapshotIds.add(currentSnapshotInfo == null ? null : currentSnapshotInfo.getSnapshotId());
 
       if (!snapshotIdLocks.acquireLock(lockedSnapshotIds).isLockAcquired()) {
@@ -168,8 +167,8 @@ public abstract class ReclaimableFilter<V>
           previousSnapshotInfos.add(null);
         }
 
-        // NOTE: Getting volumeId and bucket from active OM. This would be wrong on volume & bucket renames
-        //  support.
+        // NOTE: Getting volumeId and bucket from active OM.
+        // This would be wrong on volume & bucket renames support.
         bucketInfo = ozoneManager.getBucketInfo(volume, bucket);
         volumeId = ozoneManager.getMetadataManager().getVolumeId(volume);
       }
