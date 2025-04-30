@@ -1917,7 +1917,6 @@ public class TestRocksDBCheckpointDiffer {
       throws Exception {
     rocksDBCheckpointDiffer.setIsNativeLibsLoaded(ManagedRawSSTFileReader.loadLibrary());
     // Create src files in backup directory.
-    //List<String> filesInBackupDir = Arrays.asList("000078", "000073");
     List<String> filesInBackupDir = Arrays.asList("000078.sst", "000078.sst.tmp", "000073.sst");
     for (String fileName : filesInBackupDir) {
       createSSTFileWithKeys(sstBackUpDir.toPath(), fileName, 1, 1);

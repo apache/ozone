@@ -1501,14 +1501,18 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                 sstFileWriter.put(keyValue.getKey(), new byte[0]);
               }
             }
-          } catch (Exception e) {
+          } catch (IOException | RocksDBException e) {
             shouldReprocess = true;
             try {
               Files.deleteIfExists(prunedSSTFilePath);
             } catch (IOException ex) { }
             continue;
           } finally {
-            sstFileWriter.finish();
+            try {
+              sstFileWriter.finish();
+            } catch (RocksDBException e) {
+              throw new RuntimeException("Failed to finish writing to " + prunedSSTFilePath, e);
+            }
           }
 
           // Move file.sst.tmp to file.sst and replace existing file atomically
@@ -1516,7 +1520,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
             Files.move(prunedSSTFilePath, sstFilePath,
                 StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-          } catch (Exception e) {
+          } catch (IOException | InterruptedException e) {
             shouldReprocess = true;
             continue;
           } finally {
@@ -1554,13 +1558,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             LOG.error("Could not prune source files or update the compaction log table. Reprocessing entry: {}",
                 compactionLogEntry);
             pruneQueue.put(compactionLogTableEntry);
-          } catch (Exception e) {
+          } catch (InterruptedException e) {
             LOG.error("Could not reprocess entry: {}", compactionLogEntry, e);
           }
         }
       }
-    } catch (Exception e) {
-      LOG.error("Could not prune OMKeyInfo from SST files.", e);
     }
   }
 
@@ -1589,7 +1591,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
-  void setIsNativeLibsLoaded(boolean isNativeLibsLoaded) {
+  synchronized void setIsNativeLibsLoaded(boolean isNativeLibsLoaded) {
     this.isNativeLibsLoaded = isNativeLibsLoaded;
   }
 
