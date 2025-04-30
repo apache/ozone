@@ -35,7 +35,6 @@ import org.junit.jupiter.api.Timeout;
 public class TestOmInit {
 
   private static MiniOzoneCluster cluster = null;
-  private static OMMetrics omMetrics;
   private static OzoneConfiguration conf;
 
   /**
@@ -51,7 +50,6 @@ public class TestOmInit {
     cluster =  MiniOzoneCluster.newBuilder(conf)
         .build();
     cluster.waitForClusterToBeReady();
-    omMetrics = cluster.getOzoneManager().getMetrics();
   }
 
   /**
