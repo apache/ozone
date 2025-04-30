@@ -93,7 +93,7 @@ public class DeletedBlockLogImpl
 
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
   private long lastProcessedTransactionId = -1;
-  final int logAppenderQueueByteLimit;
+  private final int logAppenderQueueByteLimit;
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
       StorageContainerManager scm,
