@@ -31,7 +31,6 @@ public class SafeModeMetrics {
   private static final String SOURCE_NAME =
       SafeModeMetrics.class.getSimpleName();
 
-
   // These all values will be set to some values when safemode is enabled.
   private @Metric MutableGaugeLong
       numContainerWithOneReplicaReportedThreshold;
@@ -117,7 +116,6 @@ public class SafeModeMetrics {
   MutableCounterLong getCurrentContainersWithOneReplicaReportedCount() {
     return currentContainersWithOneReplicaReportedCount;
   }
-
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();

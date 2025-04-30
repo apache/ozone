@@ -41,7 +41,7 @@ import picocli.CommandLine.Option;
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli implements ExtensibleParentCommand {
 
-  public static final Logger LOG = LoggerFactory.getLogger(Freon.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Freon.class);
 
   @Option(names = "--server",
       description = "Enable internal http server to provide metric "

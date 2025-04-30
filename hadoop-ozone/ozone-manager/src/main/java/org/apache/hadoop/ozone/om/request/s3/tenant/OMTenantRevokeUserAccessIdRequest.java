@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory;
  *     - Update DB tables
  */
 public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       OMTenantRevokeUserAccessIdRequest.class);
 
   public OMTenantRevokeUserAccessIdRequest(OMRequest omRequest) {

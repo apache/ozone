@@ -98,19 +98,12 @@ import org.slf4j.MDC;
 @InterfaceAudience.Private
 public class HttpFSServer {
 
-  enum AccessMode {
-    READWRITE, WRITEONLY, READONLY;
-  }
   private static final Logger AUDIT_LOG
       = LoggerFactory.getLogger("httpfsaudit");
   private static final Logger LOG = LoggerFactory.getLogger(HttpFSServer.class);
 
   private static final HttpFSParametersProvider PARAMETERS_PROVIDER =
       new HttpFSParametersProvider();
-
-  private Parameters getParams(HttpServletRequest request) {
-    return PARAMETERS_PROVIDER.get(request);
-  }
 
   private AccessMode accessMode = AccessMode.READWRITE;
 
@@ -126,6 +119,10 @@ public class HttpFSServer {
     } else {
       accessMode = AccessMode.READWRITE;
     }
+  }
+
+  private Parameters getParams(HttpServletRequest request) {
+    return PARAMETERS_PROVIDER.get(request);
   }
 
   /**
@@ -1243,5 +1240,9 @@ public class HttpFSServer {
       response = Response.temporaryRedirect(redirectURL).build();
     }
     return response;
+  }
+
+  enum AccessMode {
+    READWRITE, WRITEONLY, READONLY;
   }
 }

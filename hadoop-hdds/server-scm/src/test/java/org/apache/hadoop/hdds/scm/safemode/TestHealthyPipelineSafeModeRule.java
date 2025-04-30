@@ -48,9 +48,9 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class tests HealthyPipelineSafeMode rule.
@@ -200,7 +200,6 @@ public class TestHealthyPipelineSafeModeRule {
     }
   }
 
-
   @Test
   public void testHealthyPipelineSafeModeRuleWithMixedPipelines()
       throws Exception {
@@ -277,10 +276,7 @@ public class TestHealthyPipelineSafeModeRule {
       // No pipeline event have sent to SCMSafemodeManager
       assertFalse(healthyPipelineSafeModeRule.validate());
 
-
-      GenericTestUtils.LogCapturer logCapturer =
-          GenericTestUtils.LogCapturer.captureLogs(LoggerFactory.getLogger(
-              SCMSafeModeManager.class));
+      LogCapturer logCapturer = LogCapturer.captureLogs(SCMSafeModeManager.class);
 
       // fire event with pipeline create status with ratis type and factor 1
       // pipeline, validate() should return false

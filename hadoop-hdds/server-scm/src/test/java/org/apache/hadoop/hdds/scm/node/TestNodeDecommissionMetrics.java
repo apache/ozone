@@ -55,7 +55,6 @@ public class TestNodeDecommissionMetrics {
   private ReplicationManager repManager;
   private EventQueue eventQueue;
 
-
   @BeforeEach
   public void setup() {
     conf = new OzoneConfiguration();

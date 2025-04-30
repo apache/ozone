@@ -39,9 +39,6 @@ final class AWSV4AuthValidator {
       LoggerFactory.getLogger(AWSV4AuthValidator.class);
   private static final String HMAC_SHA256_ALGORITHM = "HmacSHA256";
 
-  private AWSV4AuthValidator() {
-  }
-
   /**
    * ThreadLocal cache of Mac instances.
    */
@@ -55,6 +52,9 @@ final class AWSV4AuthValidator {
                   HMAC_SHA256_ALGORITHM + " algorithm.", nsa);
         }
       });
+
+  private AWSV4AuthValidator() {
+  }
 
   public static String hash(String payload) throws NoSuchAlgorithmException {
     MessageDigest md = MessageDigest.getInstance("SHA-256");

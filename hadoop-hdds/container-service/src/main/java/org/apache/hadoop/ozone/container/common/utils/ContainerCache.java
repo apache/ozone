@@ -44,6 +44,7 @@ public final class ContainerCache extends LRUMap {
   private static final float LOAD_FACTOR = 0.75f;
   private final Striped<Lock> rocksDBLock;
   private static ContainerCacheMetrics metrics;
+
   /**
    * Constructs a cache that holds DBHandle references.
    */

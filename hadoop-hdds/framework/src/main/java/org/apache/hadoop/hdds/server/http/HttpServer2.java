@@ -89,6 +89,7 @@ import org.apache.hadoop.util.StringUtils;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.CustomRequestLog;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
@@ -96,6 +97,7 @@ import org.eclipse.jetty.server.RequestLog;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.Slf4jRequestLogWriter;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.HandlerCollection;
@@ -131,7 +133,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public final class HttpServer2 implements FilterContainer {
-  public static final Logger LOG = LoggerFactory.getLogger(HttpServer2.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HttpServer2.class);
 
   public static final String HTTP_SCHEME = "http";
   public static final String HTTPS_SCHEME = "https";
@@ -212,6 +214,7 @@ public final class HttpServer2 implements FilterContainer {
   private static final String X_FRAME_OPTIONS = "X-FRAME-OPTIONS";
   private static final Pattern PATTERN_HTTP_HEADER_REGEX =
       Pattern.compile(HTTP_HEADER_REGEX);
+
   /**
    * Class to construct instances of HTTP server with specific options.
    */
@@ -618,14 +621,13 @@ public final class HttpServer2 implements FilterContainer {
     handler.getSessionCookieConfig().setSecure(true);
 
     ContextHandlerCollection contexts = new ContextHandlerCollection();
-    RequestLog requestLog = HttpRequestLog.getRequestLog(builder.name);
-
     handlers.addHandler(contexts);
-    if (requestLog != null) {
-      RequestLogHandler requestLogHandler = new RequestLogHandler();
-      requestLogHandler.setRequestLog(requestLog);
-      handlers.addHandler(requestLogHandler);
-    }
+
+    RequestLog requestLog = getRequestLog(builder.name);
+    RequestLogHandler requestLogHandler = new RequestLogHandler();
+    requestLogHandler.setRequestLog(requestLog);
+    handlers.addHandler(requestLogHandler);
+
     handlers.addHandler(webAppContext);
     final String appDir = getWebAppsPath(builder.name);
     if (!builder.skipDefaultApps) {
@@ -1408,7 +1410,7 @@ public final class HttpServer2 implements FilterContainer {
             : STATE_DESCRIPTION_NOT_LIVE)
         .append("), listening at:");
     for (ServerConnector l : listeners) {
-      sb.append(l.getHost()).append(":").append(l.getPort()).append("/,");
+      sb.append(l.getHost()).append(':').append(l.getPort()).append("/,");
     }
     return sb.toString();
   }
@@ -1507,7 +1509,6 @@ public final class HttpServer2 implements FilterContainer {
         UserGroupInformation.createRemoteUser(remoteUser);
     return adminsAcl != null && adminsAcl.isUserAllowed(remoteUserUGI);
   }
-
 
   /**
    * A very simple servlet to serve up a text representation of the current
@@ -1702,11 +1703,11 @@ public final class HttpServer2 implements FilterContainer {
   public enum XFrameOption {
     DENY("DENY"), SAMEORIGIN("SAMEORIGIN"), ALLOWFROM("ALLOW-FROM");
 
+    private final String name;
+
     XFrameOption(String name) {
       this.name = name;
     }
-
-    private final String name;
 
     @Override
     public String toString() {
@@ -1793,5 +1794,12 @@ public final class HttpServer2 implements FilterContainer {
       ozoneConfiguration.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
               tmpMetaDir.getAbsolutePath());
     }
+  }
+
+  private static RequestLog getRequestLog(String name) {
+    String loggerName = "http.requests." + name;
+    Slf4jRequestLogWriter writer = new Slf4jRequestLogWriter();
+    writer.setLoggerName(loggerName);
+    return new CustomRequestLog(writer, CustomRequestLog.EXTENDED_NCSA_FORMAT);
   }
 }

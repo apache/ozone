@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.freon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.RandomStringUtils.randomAscii;
 
 import com.codahale.metrics.Timer;
 import java.io.UncheckedIOException;
@@ -28,6 +27,7 @@ import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -136,7 +136,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
       }
 
       blockSize = chunkSize * chunksPerBlock;
-      data = randomAscii(chunkSize).getBytes(UTF_8);
+      data = RandomStringUtils.secure().nextAscii(chunkSize).getBytes(UTF_8);
 
       chunkManager = ChunkManagerFactory.createChunkManager(ozoneConfiguration,
           null, null);

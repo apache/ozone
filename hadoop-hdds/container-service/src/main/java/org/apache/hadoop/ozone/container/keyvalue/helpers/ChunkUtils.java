@@ -365,7 +365,6 @@ public final class ChunkUtils {
     return false;
   }
 
-
   /**
    * Validates chunk data and returns a boolean value that indicates if the
    * chunk data should be overwritten.
