@@ -902,7 +902,8 @@ public class BlockOutputStream extends OutputStream {
    * @return
    */
   private CompletableFuture<PutBlockResult> writeChunkToContainer(
-      ChunkBuffer chunk, boolean putBlockPiggybacking, boolean close, boolean shouldCreateMissingContainer) throws IOException {
+      ChunkBuffer chunk, boolean putBlockPiggybacking, boolean close, boolean shouldCreateMissingContainer)
+      throws IOException {
     int effectiveChunkSize = chunk.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
