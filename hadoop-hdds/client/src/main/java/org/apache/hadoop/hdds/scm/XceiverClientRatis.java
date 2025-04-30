@@ -239,7 +239,6 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     return Objects.requireNonNull(client.get(), "client is null");
   }
 
-
   @VisibleForTesting
   public ConcurrentMap<UUID, Long> getCommitInfoMap() {
     return commitInfoMap;

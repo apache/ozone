@@ -85,14 +85,14 @@ public class GrpcOmTransport implements OmTransport {
   private final int maxSize;
   private SecurityConfig secConfig;
 
-  public static void setCaCerts(List<X509Certificate> x509Certificates) {
-    caCerts = x509Certificates;
-  }
-
   private RetryPolicy retryPolicy;
   private int failoverCount = 0;
   private GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>
       omFailoverProxyProvider;
+
+  public static void setCaCerts(List<X509Certificate> x509Certificates) {
+    caCerts = x509Certificates;
+  }
 
   public GrpcOmTransport(ConfigurationSource conf,
                           UserGroupInformation ugi, String omServiceId)

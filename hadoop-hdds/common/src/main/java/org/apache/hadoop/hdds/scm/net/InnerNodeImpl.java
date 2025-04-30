@@ -677,6 +677,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     }
     return nodeCounts;
   }
+
   protected static class Factory implements InnerNode.Factory<InnerNodeImpl> {
     protected Factory() { }
 

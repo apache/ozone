@@ -893,7 +893,6 @@ public class TestSCMContainerPlacementRackScatter {
     assertEquals(1, chosenNodes.size());
   }
 
-
   private int getRackSize(List<DatanodeDetails>... datanodeDetails) {
     Set<Node> racks = new HashSet<>();
     for (List<DatanodeDetails> list : datanodeDetails) {

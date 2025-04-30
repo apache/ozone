@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
@@ -182,8 +183,7 @@ public class TestOzoneShellHA {
 
     testFilePathString = path + OZONE_URI_DELIMITER + "testFile";
     testFile = new File(testFilePathString);
-    testFile.getParentFile().mkdirs();
-    testFile.createNewFile();
+    FileUtils.touch(testFile);
 
     // Init HA cluster
     omServiceId = "om-service-test1";
@@ -1263,7 +1263,6 @@ public class TestOzoneShellHA {
 
   }
 
-
   @Test
   @SuppressWarnings("methodlength")
   public void testShQuota() throws Exception {
@@ -1848,7 +1847,6 @@ public class TestOzoneShellHA {
           e.getCause().getMessage());
     }
   }
-
 
   @Test
   public void testKeyDeleteOrSkipTrashWhenTrashEnableFSO()

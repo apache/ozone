@@ -62,7 +62,6 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
 
   private final CacheStatsRecorder statsRecorder;
 
-
   public FullTableCache(String threadNamePrefix) {
     // As for full table cache only we need elements to be inserted in sorted
     // manner, so that list will be easy. But look ups have log(N) time

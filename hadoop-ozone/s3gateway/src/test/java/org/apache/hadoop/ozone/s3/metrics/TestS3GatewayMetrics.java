@@ -76,7 +76,6 @@ public class TestS3GatewayMetrics {
   private S3GatewayMetrics metrics;
   private ContainerRequestContext context;
 
-
   @BeforeEach
   public void setup() throws Exception {
     clientStub = new OzoneClientStub();
@@ -327,7 +326,6 @@ public class TestS3GatewayMetrics {
     assertEquals(1L, curMetric - oriMetric);
   }
 
-
   @Test
   public void testDeleteKeySuccess() throws Exception {
     long oriMetric = metrics.getDeleteKeySuccess();
@@ -423,7 +421,6 @@ public class TestS3GatewayMetrics {
     long curMetric = metrics.getAbortMultiPartUploadFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
-
 
   @Test
   public void testCompleteMultiPartUploadSuccess() throws Exception {

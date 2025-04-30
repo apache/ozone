@@ -42,11 +42,11 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -88,7 +88,6 @@ public abstract class TestOzoneManagerHA {
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
   private static OzoneClient client;
-
 
   public MiniOzoneHAClusterImpl getCluster() {
     return cluster;
@@ -378,7 +377,7 @@ public abstract class TestOzoneManagerHA {
 
     try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
       byte[] fileContent = new byte[data.getBytes(UTF_8).length];
-      ozoneInputStream.read(fileContent);
+      IOUtils.readFully(ozoneInputStream, fileContent);
       assertEquals(data, new String(fileContent, UTF_8));
     }
 
@@ -430,7 +429,7 @@ public abstract class TestOzoneManagerHA {
 
       try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
         byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-        ozoneInputStream.read(fileContent);
+        IOUtils.readFully(ozoneInputStream, fileContent);
         assertEquals(value, new String(fileContent, UTF_8));
       }
 

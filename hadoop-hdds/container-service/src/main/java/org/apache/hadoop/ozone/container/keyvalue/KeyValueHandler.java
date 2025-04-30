@@ -1427,7 +1427,7 @@ public class KeyValueHandler extends Handler {
       StringBuilder stringBuilder = new StringBuilder();
       for (Path block : dir) {
         if (notEmpty) {
-          stringBuilder.append(",");
+          stringBuilder.append(',');
         }
         stringBuilder.append(block);
         notEmpty = true;

@@ -279,7 +279,7 @@ public class BlockData {
     sb.append("[blockId=");
     blockID.appendTo(sb);
     sb.append(", size=").append(size);
-    sb.append("]");
+    sb.append(']');
   }
 
   public long getBlockGroupLength() {

@@ -148,7 +148,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
     }
   }
 
-
   @Override
   public List<Pipeline> getPipelines(
       ReplicationConfig replicationConfig) {

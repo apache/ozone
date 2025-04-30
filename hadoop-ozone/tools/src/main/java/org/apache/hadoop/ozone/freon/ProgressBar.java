@@ -177,7 +177,7 @@ public class ProgressBar {
     if (!realTimeMessage.isEmpty()) {
       shrinkTimes = 3;
     }
-    sb.append(" ").append(String.format("%.2f", percent)).append("% |");
+    sb.append(' ').append(String.format("%.2f", percent)).append("% |");
     for (int i = 0; i <= percent / shrinkTimes; i++) {
       sb.append('█');
     }
@@ -185,7 +185,7 @@ public class ProgressBar {
       sb.append(' ');
     }
     sb.append("|  ");
-    sb.append(value).append("/").append(maxValue);
+    sb.append(value).append('/').append(maxValue);
     long timeInSec = TimeUnit.SECONDS.convert(
         System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
     String timeToPrint = String.format("%d:%02d:%02d", timeInSec / 3600,

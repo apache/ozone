@@ -183,7 +183,6 @@ class TestOzoneManagerLock {
         () -> lock.releaseWriteLock(Resource.USER_LOCK, "user3"));
   }
 
-
   private String[] generateResourceName(Resource resource) {
     if (resource == Resource.BUCKET_LOCK) {
       return new String[]{UUID.randomUUID().toString(),
@@ -318,7 +317,6 @@ class TestOzoneManagerLock {
 
   }
 
-
   @Test
   void testMultiLockResourceParallel() throws Exception {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
@@ -397,7 +395,6 @@ class TestOzoneManagerLock {
     testWriteLockConcurrentStats(resource, resourceName, 5);
     testSyntheticReadWriteLockConcurrentStats(resource, resourceName, 10, 3);
   }
-
 
   private void testReadLockConcurrentStats(Resource resource,
                                           String[] resourceName,

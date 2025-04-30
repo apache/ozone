@@ -148,6 +148,7 @@ public class SCMNodeManager implements NodeManager {
   private static final String TOTALCAPACITY = "CAPACITY";
   private static final String DNUUID = "UUID";
   private static final String VERSION = "VERSION";
+
   /**
    * Constructs SCM machine Manager.
    */
@@ -1438,6 +1439,7 @@ public class SCMNodeManager implements NodeManager {
     public String getLabel() {
       return label;
     }
+
     UsageStatics(String label) {
       this.label = label;
     }
@@ -1450,9 +1452,11 @@ public class SCMNodeManager implements NodeManager {
     ENTERING_MAINTENANCE("EnteringMaintenance"),
     VOLUME_FAILURES("VolumeFailures");
     private String label;
+
     public String getLabel() {
       return label;
     }
+
     StateStatistics(String label) {
       this.label = label;
     }
@@ -1463,10 +1467,13 @@ public class SCMNodeManager implements NodeManager {
     SCM_USED("Scmused"),
     NON_SCM_USED("NonScmused"),
     REMAINING("Remaining");
+
     private String label;
+
     public String getLabel() {
       return label;
     }
+
     SpaceStatistics(String label) {
       this.label = label;
     }

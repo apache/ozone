@@ -61,7 +61,6 @@ public class RDBStore implements DBStore {
       LoggerFactory.getLogger(RDBStore.class);
   private final RocksDatabase db;
   private final File dbLocation;
-  private final CodecRegistry codecRegistry;
   private RocksDBStoreMetrics metrics;
   private final RDBCheckpointManager checkPointManager;
   private final String checkpointsParentDir;
@@ -90,7 +89,6 @@ public class RDBStore implements DBStore {
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
     this.maxDbUpdatesSizeThreshold = maxDbUpdatesSizeThreshold;
-    codecRegistry = registry;
     dbLocation = dbFile;
     this.dbOptions = dbOptions;
     this.statistics = statistics;
@@ -209,7 +207,6 @@ public class RDBStore implements DBStore {
     return rocksDBCheckpointDiffer;
   }
 
-
   /**
    * Returns the RocksDB's DBOptions.
    */
@@ -299,23 +296,9 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public <K, V> TypedTable<K, V> getTable(String name,
-      Class<K> keyType, Class<V> valueType) throws IOException {
-    return new TypedTable<>(getTable(name), codecRegistry, keyType,
-        valueType);
-  }
-
-  @Override
   public <K, V> TypedTable<K, V> getTable(
       String name, Codec<K> keyCodec, Codec<V> valueCodec, TableCache.CacheType cacheType) throws IOException {
     return new TypedTable<>(getTable(name), keyCodec, valueCodec, cacheType);
-  }
-
-  @Override
-  public <K, V> Table<K, V> getTable(String name,
-      Class<K> keyType, Class<V> valueType,
-      TableCache.CacheType cacheType) throws IOException {
-    return new TypedTable<>(getTable(name), codecRegistry, keyType, valueType, cacheType);
   }
 
   @Override

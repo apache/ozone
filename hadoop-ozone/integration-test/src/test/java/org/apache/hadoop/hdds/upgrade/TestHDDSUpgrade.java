@@ -210,7 +210,6 @@ public class TestHDDSUpgrade {
     scmVersionManager = scm.getLayoutVersionManager();
   }
 
-
   /*
    * helper function to create a Key.
    */

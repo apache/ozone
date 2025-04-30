@@ -1935,7 +1935,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     handleError(submitRequest(omRequest));
   }
 
-
   @Override
   public boolean triggerRangerBGSync(boolean noWait) throws IOException {
     RangerBGSyncRequest req = RangerBGSyncRequest.newBuilder()
@@ -2101,6 +2100,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       S3Auth s3Auth) {
     this.threadLocalS3Auth.set(s3Auth);
   }
+
   @Override
   public void clearThreadLocalS3Auth() {
     this.threadLocalS3Auth.remove();
@@ -2348,7 +2348,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return new OpenKeySession(resp.getID(),
         OmKeyInfo.getFromProtobuf(resp.getKeyInfo()), resp.getOpenVersion());
   }
-
 
   @Nonnull
   private OMResponse handleSubmitRequestAndSCMSafeModeRetry(OMRequest omRequest) throws IOException {

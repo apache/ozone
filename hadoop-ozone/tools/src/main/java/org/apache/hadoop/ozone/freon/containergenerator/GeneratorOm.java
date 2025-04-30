@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.freon.FreonSubcommand;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo.Builder;
@@ -111,9 +112,7 @@ public class GeneratorOm extends BaseGenerator implements
     // initialization: create one bucket and volume in OM.
     writeOmBucketVolume();
 
-    omKeyTable = omDb.getTable(OmMetadataManagerImpl.KEY_TABLE, String.class,
-        OmKeyInfo.class);
-
+    omKeyTable = OMDBDefinition.KEY_TABLE.getTable(omDb);
     timer = getMetrics().timer("om-generator");
     runTests(this::writeOmKeys);
 
@@ -142,9 +141,7 @@ public class GeneratorOm extends BaseGenerator implements
 
   private void writeOmBucketVolume() throws IOException {
 
-    Table<String, OmVolumeArgs> volTable =
-        omDb.getTable(OmMetadataManagerImpl.VOLUME_TABLE, String.class,
-            OmVolumeArgs.class);
+    final Table<String, OmVolumeArgs> volTable = OMDBDefinition.VOLUME_TABLE.getTable(omDb);
 
     String admin = getUserId();
     String owner = getUserId();
@@ -166,9 +163,7 @@ public class GeneratorOm extends BaseGenerator implements
 
     volTable.put("/" + volumeName, omVolumeArgs);
 
-    final Table<String, PersistedUserVolumeInfo> userTable =
-        omDb.getTable(OmMetadataManagerImpl.USER_TABLE, String.class,
-            PersistedUserVolumeInfo.class);
+    final Table<String, PersistedUserVolumeInfo> userTable = OMDBDefinition.USER_TABLE.getTable(omDb);
 
     PersistedUserVolumeInfo currentUserVolumeInfo =
         userTable.get(getUserId());
@@ -189,9 +184,7 @@ public class GeneratorOm extends BaseGenerator implements
 
     userTable.put(getUserId(), currentUserVolumeInfo);
 
-    Table<String, OmBucketInfo> bucketTable =
-        omDb.getTable(OmMetadataManagerImpl.BUCKET_TABLE, String.class,
-            OmBucketInfo.class);
+    final Table<String, OmBucketInfo> bucketTable = OMDBDefinition.BUCKET_TABLE.getTable(omDb);
 
     OmBucketInfo omBucketInfo = new OmBucketInfo.Builder()
         .setBucketName(bucketName)

@@ -195,6 +195,7 @@ public class ContainerBalancer extends StatefulService {
       lock.unlock();
     }
   }
+
   /**
    * Checks if ContainerBalancer is in valid state to call stop.
    *

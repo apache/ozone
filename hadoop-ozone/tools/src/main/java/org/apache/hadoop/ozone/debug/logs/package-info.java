@@ -16,7 +16,7 @@
  */
 
 /**
- * Provides functionality for managing container log operations, including parsing, processing, and storing log data.
+ * Provides commands for parsing and analyzing extracted logs.
  */
 
-package org.apache.hadoop.ozone.debug.container;
+package org.apache.hadoop.ozone.debug.logs;

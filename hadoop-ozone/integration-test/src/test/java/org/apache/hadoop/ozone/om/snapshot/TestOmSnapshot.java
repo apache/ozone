@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -80,6 +81,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -91,7 +93,6 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -1557,6 +1558,7 @@ public abstract class TestOmSnapshot {
 
     return response.getSnapshotDiffReport();
   }
+
   @Test
   public void testSnapDiffNoSnapshot() throws Exception {
     String volume = "vol-" + counter.incrementAndGet();
@@ -2095,7 +2097,6 @@ public abstract class TestOmSnapshot {
         bucketName, snapshot1, snapshot2, null, pageSize);
 
     List<DiffReportEntry> diffReportEntries = diffReport.getDiffList();
-    String nextToken = diffReport.getToken();
 
     // Restart the OM and no need to wait because snapDiff job finished before
     // the restart.
@@ -2104,11 +2105,10 @@ public abstract class TestOmSnapshot {
     await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS,
         () -> cluster.getOzoneManager().isRunning());
 
-    while (nextToken == null || !nextToken.isEmpty()) {
+    while (isNotEmpty(diffReport.getToken())) {
       diffReport = fetchReportPage(volumeName, bucketName, snapshot1,
-          snapshot2, nextToken, pageSize);
+          snapshot2, diffReport.getToken(), pageSize);
       diffReportEntries.addAll(diffReport.getDiffList());
-      nextToken = diffReport.getToken();
     }
     assertEquals(100, diffReportEntries.size());
   }
@@ -2310,7 +2310,7 @@ public abstract class TestOmSnapshot {
       try (OzoneInputStream ozoneInputStream =
                ozoneBucketClient.readKey(keyName)) {
         byte[] fileContent = new byte[keyName.length()];
-        ozoneInputStream.read(fileContent);
+        IOUtils.readFully(ozoneInputStream, fileContent);
         assertEquals(keyName, new String(fileContent, UTF_8));
       }
     }
@@ -2349,7 +2349,7 @@ public abstract class TestOmSnapshot {
           if (snapKeyNameMatcher.matches()) {
             String truncatedSnapshotKeyName = snapKeyNameMatcher.group(3);
             byte[] fileContent = new byte[truncatedSnapshotKeyName.length()];
-            ozoneInputStream.read(fileContent);
+            IOUtils.readFully(ozoneInputStream, fileContent);
             assertEquals(truncatedSnapshotKeyName,
                 new String(fileContent, UTF_8));
           }

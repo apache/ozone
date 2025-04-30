@@ -205,7 +205,6 @@ public class TestOmKeyInfo {
     assertNotEquals(key, cloneKey);
   }
 
-
   private OmKeyLocationInfoGroup createOmKeyLocationInfoGroup(boolean isMPU) {
     List<OmKeyLocationInfo> omKeyLocationInfos = new ArrayList<>();
     omKeyLocationInfos.add(getOmKeyLocationInfo(new BlockID(

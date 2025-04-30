@@ -72,7 +72,6 @@ public class TestContainerStateManagerIntegration {
   private ContainerStateManager containerStateManager;
   private int numContainerPerOwnerInPipeline;
 
-
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
@@ -314,7 +313,6 @@ public class TestContainerStateManagerIntegration {
             HddsProtos.LifeCycleEvent.CLOSE);
     assertContainerCount(LifeCycleState.CLOSED, 1);
   }
-
 
   @Test
   public void testReplicaMap() throws Exception {

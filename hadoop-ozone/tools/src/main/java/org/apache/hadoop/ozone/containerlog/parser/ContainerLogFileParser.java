@@ -62,7 +62,7 @@ public class ContainerLogFileParser {
    */
 
   public void processLogEntries(String logDirectoryPath, ContainerDatanodeDatabase dbstore, int threadCount)
-      throws SQLException {
+      throws SQLException, IOException, InterruptedException {
     try (Stream<Path> paths = Files.walk(Paths.get(logDirectoryPath))) {
 
       List<Path> files = paths.filter(Files::isRegularFile).collect(Collectors.toList());
@@ -116,10 +116,6 @@ public class ContainerLogFileParser {
         throw new SQLException("Log file processing failed.");
       }
 
-    } catch (IOException | InterruptedException e) {
-      e.printStackTrace();
-    } catch (NumberFormatException e) {
-      System.err.println("Invalid datanode ID");
     }
   }
 
@@ -133,7 +129,7 @@ public class ContainerLogFileParser {
    */
   
   private void processFile(String logFilePath, ContainerDatanodeDatabase dbstore, String datanodeId) 
-      throws SQLException {
+      throws SQLException, IOException {
     List<DatanodeContainerInfo> batchList = new ArrayList<>(MAX_OBJ_IN_LIST + 100);
 
     try (BufferedReader reader = Files.newBufferedReader(Paths.get(logFilePath), StandardCharsets.UTF_8)) {
@@ -199,11 +195,7 @@ public class ContainerLogFileParser {
               batchList.clear();
             }
           } catch (SQLException e) {
-            throw new SQLException(e.getMessage());
-          } catch (Exception e) {
-            System.err.println(
-                "Error processing the batch for container: " + id + " at datanode: " + datanodeId);
-            e.printStackTrace();
+            throw e;
           }
         } else {
           System.err.println("Log line does not have all required fields: " + line);
@@ -214,8 +206,6 @@ public class ContainerLogFileParser {
         batchList.clear();
       }
 
-    } catch (IOException e) {
-      e.printStackTrace();
     }
   }
 }
