@@ -200,7 +200,7 @@ public class TestStorageVolumeChecker {
   @ParameterizedTest
   @MethodSource("provideTestData")
   public void testVolumeDeletion(VolumeCheckResult checkResult,
-                                 ContainerLayoutVersion layout) throws Exception {
+      ContainerLayoutVersion layout) throws Exception {
     initTest(checkResult);
 
     DatanodeConfiguration dnConf =
