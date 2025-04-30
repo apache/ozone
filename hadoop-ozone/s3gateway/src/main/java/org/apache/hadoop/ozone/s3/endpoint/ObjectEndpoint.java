@@ -57,7 +57,11 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UN
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.hasMultiChunksPayload;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.hasUnsignedPayload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -126,6 +130,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
+import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.endpoint.S3Tagging.Tag;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -303,17 +308,29 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
       // Normal put object
-      Map<String, String> customMetadata =
-          getCustomMetadataFromHeaders(headers.getRequestHeaders());
-
-      if (S3Utils.hasSignedPayloadHeader(headers)) {
-        digestInputStream = new DigestInputStream(new SignedChunksInputStream(body),
-            getMessageDigestInstance());
+      final String amzContentSha256Header = validateSignatureHeader(headers, keyPath);
+      InputStream chunkInputStream;
+      if (hasMultiChunksPayload(amzContentSha256Header)) {
+        validateMultiChunksUpload(headers, amzDecodedLength, keyPath);
+        if (hasUnsignedPayload(amzContentSha256Header)) {
+          chunkInputStream = new UnsignedChunksInputStream(body);
+        } else {
+          chunkInputStream = new SignedChunksInputStream(body);
+        }
         length = Long.parseLong(amzDecodedLength);
       } else {
-        digestInputStream = new DigestInputStream(body, getMessageDigestInstance());
+        // Single chunk upload: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+        // Possible x-amz-content-sha256 values
+        // - Actual payload checksum value: For signed payload
+        // - UNSIGNED-PAYLOAD: For unsigned payload
+        chunkInputStream = body;
       }
 
+      // DigestInputStream is used for ETag calculation
+      digestInputStream = new DigestInputStream(chunkInputStream, getMessageDigestInstance());
+
+      Map<String, String> customMetadata =
+          getCustomMetadataFromHeaders(headers.getRequestHeaders());
       Map<String, String> tags = getTaggingFromHeaders(headers);
 
       long putLength;
@@ -957,15 +974,26 @@ public class ObjectEndpoint extends EndpointBase {
     String copyHeader = null;
     DigestInputStream digestInputStream = null;
     try {
-
-      if (S3Utils.hasSignedPayloadHeader(headers)) {
-        digestInputStream = new DigestInputStream(new SignedChunksInputStream(body),
-            getMessageDigestInstance());
-        length = Long.parseLong(
-            headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER));
+      final String amzContentSha256Header = validateSignatureHeader(headers, key);
+      InputStream chunkInputStream;
+      if (hasMultiChunksPayload(amzContentSha256Header)) {
+        String amzDecodedLength = headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER);
+        validateMultiChunksUpload(headers, amzDecodedLength, key);
+        if (hasUnsignedPayload(amzContentSha256Header)) {
+          chunkInputStream = new UnsignedChunksInputStream(body);
+        } else {
+          chunkInputStream = new SignedChunksInputStream(body);
+        }
+        length = Long.parseLong(amzDecodedLength);
       } else {
-        digestInputStream = new DigestInputStream(body, getMessageDigestInstance());
+        // Single chunk upload: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+        // Possible x-amz-content-sha256 values
+        // - Actual payload checksum value: For signed payload
+        // - UNSIGNED-PAYLOAD: For unsigned payload
+        chunkInputStream = body;
       }
+      // DigestInputStream is used for ETag calculation
+      digestInputStream = new DigestInputStream(chunkInputStream, getMessageDigestInstance());
 
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
