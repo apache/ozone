@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  * State represents persisted data of one specific datanode.
  */
 public class MockDatanodeStorage {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(MockDatanodeStorage.class);
   public static final String FULL_CHUNK = "full";
   public static final ContainerProtos.KeyValue FULL_CHUNK_KV =

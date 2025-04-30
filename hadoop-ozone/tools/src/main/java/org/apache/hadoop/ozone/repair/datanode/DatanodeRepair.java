@@ -15,26 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.server.http;
+package org.apache.hadoop.ozone.repair.datanode;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import org.junit.jupiter.api.Test;
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
+import org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeContainerSchema;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 
 /**
- * Test Http request log appender.
+ * Ozone Repair CLI for Datanode.
  */
-public class TestHttpRequestLogAppender {
+@CommandLine.Command(name = "datanode",
+    subcommands = {
+        UpgradeContainerSchema.class,
+    },
+    description = "Tools to repair Datanode")
+@MetaInfServices(RepairSubcommand.class)
+public class DatanodeRepair implements RepairSubcommand {
 
-  @Test
-  public void testParameterPropagation() {
-
-    HttpRequestLogAppender requestLogAppender = new HttpRequestLogAppender();
-    requestLogAppender.setFilename("jetty-namenode-yyyy_mm_dd.log");
-    requestLogAppender.setRetainDays(17);
-    assertEquals("jetty-namenode-yyyy_mm_dd.log",
-        requestLogAppender.getFilename(), "Filename mismatch");
-    assertEquals(17, requestLogAppender.getRetainDays(),
-        "Retain days mismatch");
-  }
 }

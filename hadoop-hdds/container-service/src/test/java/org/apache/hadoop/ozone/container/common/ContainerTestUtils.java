@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -132,7 +133,8 @@ public final class ContainerTestUtils {
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
     StateContext context = getMockContext(datanodeDetails, conf);
-    return new OzoneContainer(datanodeDetails, conf, context);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
+    return new OzoneContainer(datanodeDetails, conf, context, volumeChoosingPolicy);
   }
 
   public static StateContext getMockContext(DatanodeDetails datanodeDetails,
