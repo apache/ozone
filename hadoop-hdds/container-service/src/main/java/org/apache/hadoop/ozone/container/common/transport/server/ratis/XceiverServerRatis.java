@@ -754,16 +754,17 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setAction(PipelineAction.Action.CLOSE)
         .build();
     if (context != null) {
-      context.addPipelineActionIfAbsent(action);
+      if (context.addPipelineActionIfAbsent(action)) {
+        LOG.warn("pipeline Action {} on pipeline {}.Reason : {}",
+            action.getAction(), pipelineID,
+            action.getClosePipeline().getDetailedReason());
+      }
       if (!activePipelines.get(groupId).isPendingClose()) {
         // if pipeline close action has not been triggered before, we need trigger pipeline close immediately to
         // prevent SCM to allocate blocks on the failed pipeline
         context.getParent().triggerHeartbeat();
         activePipelines.computeIfPresent(groupId,
             (key, value) -> new ActivePipelineContext(value.isPipelineLeader(), true));
-        LOG.warn("pipeline Action {} on pipeline {}.Reason : {}",
-            action.getAction(), pipelineID,
-            action.getClosePipeline().getDetailedReason());
       }
     }
   }
