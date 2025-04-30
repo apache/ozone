@@ -85,16 +85,8 @@ import org.slf4j.LoggerFactory;
  */
 public class NodeStateManager implements Runnable, Closeable {
 
-  /**
-   * Node's life cycle events.
-   */
-  private enum NodeLifeCycleEvent {
-    TIMEOUT, RESTORE, RESURRECT, LAYOUT_MISMATCH, LAYOUT_MATCH
-  }
-
   private static final Logger LOG = LoggerFactory
       .getLogger(NodeStateManager.class);
-
 
   /**
    * StateMachine for node lifecycle.
@@ -1076,5 +1068,12 @@ public class NodeStateManager implements Runnable, Closeable {
 
   protected void removeNode(DatanodeID datanodeID) {
     nodeStateMap.removeNode(datanodeID);
+  }
+
+  /**
+   * Node's life cycle events.
+   */
+  private enum NodeLifeCycleEvent {
+    TIMEOUT, RESTORE, RESURRECT, LAYOUT_MISMATCH, LAYOUT_MATCH
   }
 }

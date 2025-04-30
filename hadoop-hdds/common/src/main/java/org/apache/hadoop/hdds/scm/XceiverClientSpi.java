@@ -149,6 +149,7 @@ public abstract class XceiverClientSpi implements Closeable {
     return new IOException("Failed to execute command "
         + HddsUtils.processForDebug(request), e);
   }
+
   /**
    * Sends a given command to server gets a waitable future back.
    *

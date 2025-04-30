@@ -160,7 +160,6 @@ public class TestQuasiClosedStuckOverReplicationHandler {
     assertEquals(1, commandsSent.size());
   }
 
-
   private ContainerHealthResult.OverReplicatedHealthResult getOverReplicatedHealthResult() {
     ContainerHealthResult.OverReplicatedHealthResult
         healthResult = mock(ContainerHealthResult.OverReplicatedHealthResult.class);

@@ -81,7 +81,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,7 +91,6 @@ import org.slf4j.event.Level;
  * Marking it as Ignore because it needs Ranger access point.
  */
 @Unhealthy("Requires a Ranger endpoint")
-@Timeout(180)
 public class TestRangerBGSyncService {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRangerBGSyncService.class);

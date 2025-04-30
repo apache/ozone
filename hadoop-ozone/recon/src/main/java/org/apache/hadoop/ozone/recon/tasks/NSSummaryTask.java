@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
  * Reprocess() will take a snapshots on OMDB, and iterate the keyTable,

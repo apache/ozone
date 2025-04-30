@@ -208,7 +208,7 @@ public class OpenKeyCleanupService extends BackgroundService {
                   .append(": ")
                   .append(openKey.getKeysList().stream().map(OzoneManagerProtocolProtos.OpenKey::getName)
                       .collect(Collectors.toList()))
-                  .append("\n");
+                  .append('\n');
             }
             LOG.debug("Non-hsync'ed openKeys being deleted in current iteration: \n" + sb);
           }

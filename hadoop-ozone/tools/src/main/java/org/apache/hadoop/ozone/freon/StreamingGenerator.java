@@ -76,7 +76,6 @@ public class StreamingGenerator extends BaseFreonGenerator
 
   private Timer timer;
 
-
   @Override
   public Void call() throws Exception {
     init();

@@ -60,5 +60,6 @@ public enum VersionExtractor {
   };
 
   public abstract Versioned extractVersion(OMRequest req, ValidationContext ctx);
+
   public abstract Class<? extends Annotation> getValidatorClass();
 }

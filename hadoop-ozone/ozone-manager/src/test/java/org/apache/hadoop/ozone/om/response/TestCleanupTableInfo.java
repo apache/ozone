@@ -154,7 +154,6 @@ public class TestCleanupTableInfo {
     reset(om);
   }
 
-
   private Set<Class<? extends OMClientResponse>> responseClasses() {
     Reflections reflections = new Reflections(OM_RESPONSE_PACKAGE);
     return reflections.getSubTypesOf(OMClientResponse.class);

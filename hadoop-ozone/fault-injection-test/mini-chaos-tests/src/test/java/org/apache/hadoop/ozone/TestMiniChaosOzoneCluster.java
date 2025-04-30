@@ -55,8 +55,6 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private final List<Class<? extends LoadGenerator>> loadClasses
       = new ArrayList<>();
 
-  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
-
   @Option(names = {"-d", "--num-datanodes", "--numDatanodes"},
       description = "num of datanodes. Full name --numDatanodes will be" +
           " removed in later versions.")
@@ -144,7 +142,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
 
     client = cluster.newClient();
     ObjectStore store = client.getObjectStore();
-    String volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    String volumeName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
 
@@ -219,4 +217,6 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     numMinutes = 2;
     startChaosCluster();
   }
+
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
 }

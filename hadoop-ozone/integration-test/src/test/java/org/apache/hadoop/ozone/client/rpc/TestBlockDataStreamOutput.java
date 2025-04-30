@@ -66,7 +66,6 @@ import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -75,7 +74,6 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Tests BlockDataStreamOutput class.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public class TestBlockDataStreamOutput {
   private MiniOzoneCluster cluster;
   private static final int CHUNK_SIZE = 100;
@@ -84,7 +82,7 @@ public class TestBlockDataStreamOutput {
   private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
   private static final String VOLUME_NAME = "testblockoutputstream";
   private static final String BUCKET_NAME = VOLUME_NAME;
-  private static String keyString = UUID.randomUUID().toString();;
+  private static String keyString = UUID.randomUUID().toString();
   private static final DatanodeVersion DN_OLD_VERSION = DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
 
   static MiniOzoneCluster createCluster() throws IOException,

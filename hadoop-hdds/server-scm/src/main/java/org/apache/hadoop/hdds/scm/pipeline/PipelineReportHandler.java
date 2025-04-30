@@ -141,7 +141,6 @@ public class PipelineReportHandler implements
     }
   }
 
-
   protected void setReportedDatanode(Pipeline pipeline, DatanodeDetails dn)
       throws IOException {
     pipeline.reportDatanode(dn);

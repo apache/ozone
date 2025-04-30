@@ -179,7 +179,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private final OzoneManager impl;
   private FaultInjector injector;
 
-
   public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
   }
@@ -488,6 +487,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       return Status.INTERNAL_ERROR;
     }
   }
+
   /**
    * Validates that the incoming OM request has required parameters.
    * TODO: Add more validation checks before writing the request to Ratis log.
@@ -1114,7 +1114,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
-
   @RequestFeatureValidator(
       conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
@@ -1436,19 +1435,31 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private ListSnapshotDiffJobResponse listSnapshotDiffJobs(
-      ListSnapshotDiffJobRequest listSnapshotDiffJobRequest)
-      throws IOException {
-    List<SnapshotDiffJob> snapshotDiffJobs =
-        impl.listSnapshotDiffJobs(
-            listSnapshotDiffJobRequest.getVolumeName(),
-            listSnapshotDiffJobRequest.getBucketName(),
-            listSnapshotDiffJobRequest.getJobStatus(),
-            listSnapshotDiffJobRequest.getListAll());
-    ListSnapshotDiffJobResponse.Builder builder =
-        ListSnapshotDiffJobResponse.newBuilder();
-    for (SnapshotDiffJob diffJob : snapshotDiffJobs) {
+      ListSnapshotDiffJobRequest listSnapshotDiffJobRequest
+  ) throws IOException {
+    String prevSnapshotDiffJob = listSnapshotDiffJobRequest.hasPrevSnapshotDiffJob() ?
+        listSnapshotDiffJobRequest.getPrevSnapshotDiffJob() : null;
+    int maxListResult = listSnapshotDiffJobRequest.hasMaxListResult() ?
+        listSnapshotDiffJobRequest.getMaxListResult() : impl.getOmSnapshotManager().getMaxPageSize();
+
+    org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse response = impl.listSnapshotDiffJobs(
+        listSnapshotDiffJobRequest.getVolumeName(),
+        listSnapshotDiffJobRequest.getBucketName(),
+        listSnapshotDiffJobRequest.getJobStatus(),
+        listSnapshotDiffJobRequest.getListAll(),
+        prevSnapshotDiffJob,
+        maxListResult);
+
+    ListSnapshotDiffJobResponse.Builder builder = ListSnapshotDiffJobResponse.newBuilder();
+
+    for (SnapshotDiffJob diffJob : response.getSnapshotDiffJobs()) {
       builder.addSnapshotDiffJob(diffJob.toProtoBuf());
     }
+
+    if (StringUtils.isNotEmpty(response.getLastSnapshotDiffJob())) {
+      builder.setLastSnapshotDiffJob(response.getLastSnapshotDiffJob());
+    }
+
     return builder.build();
   }
 
@@ -1561,6 +1572,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setStatus(impl.getQuotaRepairStatus())
         .build();
   }
+
   private OzoneManagerProtocolProtos.StartQuotaRepairResponse startQuotaRepair(
       OzoneManagerProtocolProtos.StartQuotaRepairRequest req) throws IOException {
     impl.startQuotaRepair(req.getBucketsList());

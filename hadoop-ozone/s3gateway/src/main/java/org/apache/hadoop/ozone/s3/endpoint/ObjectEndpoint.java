@@ -176,6 +176,9 @@ public class ObjectEndpoint extends EndpointBase {
   private boolean datastreamEnabled;
   private long datastreamMinLength;
 
+  @Inject
+  private OzoneConfiguration ozoneConfiguration;
+
   public ObjectEndpoint() {
     overrideQueryParameter = ImmutableMap.<String, String>builder()
         .put("Content-Type", "response-content-type")
@@ -186,9 +189,6 @@ public class ObjectEndpoint extends EndpointBase {
         .put("Content-Encoding", "response-content-encoding")
         .build();
   }
-
-  @Inject
-  private OzoneConfiguration ozoneConfiguration;
 
   @Override
   @PostConstruct
@@ -1489,7 +1489,6 @@ public class ObjectEndpoint extends EndpointBase {
     getMetrics().updateDeleteObjectTaggingSuccessStats(startNanos);
     return Response.noContent().build();
   }
-
 
   @VisibleForTesting
   public void setOzoneConfiguration(OzoneConfiguration config) {

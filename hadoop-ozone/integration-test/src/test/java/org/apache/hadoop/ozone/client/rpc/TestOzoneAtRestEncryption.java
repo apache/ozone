@@ -242,7 +242,6 @@ class TestOzoneAtRestEncryption {
     return lbkmscp.getProviders()[0];
   }
 
-
   @ParameterizedTest
   @EnumSource
   void testPutKeyWithEncryption(BucketLayout bucketLayout) throws Exception {

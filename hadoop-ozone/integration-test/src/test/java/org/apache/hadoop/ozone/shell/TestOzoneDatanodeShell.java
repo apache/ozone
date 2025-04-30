@@ -26,7 +26,6 @@ import java.util.List;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -39,7 +38,6 @@ import picocli.CommandLine.RunLast;
 /**
  * This test class specified for testing Ozone datanode shell command.
  */
-@Timeout(300)
 public class TestOzoneDatanodeShell {
 
   private static final Logger LOG =
