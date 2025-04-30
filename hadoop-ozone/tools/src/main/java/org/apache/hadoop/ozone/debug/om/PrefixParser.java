@@ -48,6 +48,9 @@ import picocli.CommandLine;
     description = "Parse prefix contents")
 public class PrefixParser implements Callable<Void> {
 
+  @CommandLine.ParentCommand
+  private OMDebug parent;
+
   /**
    * Types to represent the level or path component type.
    */
@@ -61,11 +64,6 @@ public class PrefixParser implements Callable<Void> {
   }
 
   private final int[] parserStats = new int[Types.values().length];
-
-  @CommandLine.Option(names = {"--db"},
-      required = true,
-      description = "Database File Path")
-  private String dbPath;
 
   @CommandLine.Option(names = {"--path"},
       required = true,
@@ -83,16 +81,16 @@ public class PrefixParser implements Callable<Void> {
   private String volume;
 
   public String getDbPath() {
-    return dbPath;
+    return parent.getDbPath();
   }
 
-  public void setDbPath(String dbPath) {
-    this.dbPath = dbPath;
+  public void setDbPath(String path) {
+    parent.setDbPath(path);
   }
 
   @Override
   public Void call() throws Exception {
-    parse(volume, bucket, dbPath, filePath);
+    parse(volume, bucket, getDbPath(), filePath);
     return null;
   }
 

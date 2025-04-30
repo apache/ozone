@@ -30,8 +30,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
-import org.apache.hadoop.ozone.graph.PrintableGraph;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
+import org.apache.ozone.graph.PrintableGraph;
 import org.apache.ozone.rocksdiff.CompactionDag;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -40,15 +40,18 @@ import picocli.CommandLine;
 
 /**
  * Handler to generate image for current compaction DAG.
- * ozone debug om print-compaction-dag.
+ * ozone debug om generate-compaction-dag.
  */
 @CommandLine.Command(
-    name = "print-compaction-dag",
-    aliases = "pcd",
+    name = "generate-compaction-dag",
+    aliases = "gcd",
     description = "Create an image of the current compaction log DAG. " +
         "This command is an offline command. i.e., it can run on any instance of om.db " +
         "and does not require OM to be up.")
 public class CompactionLogDagPrinter extends AbstractSubcommand implements Callable<Void> {
+
+  @CommandLine.ParentCommand
+  private OMDebug parent;
 
   @CommandLine.Option(names = {"-o", "--output-file"},
       required = true,
@@ -56,18 +59,12 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
           "Should include the image file name with \".png\" extension.")
   private String imageLocation;
 
-  @CommandLine.Option(names = {"--db"},
-      required = true,
-      scope = CommandLine.ScopeType.INHERIT,
-      description = "Path to OM RocksDB")
-  private String dbPath;
-
   @Override
   public Void call() throws Exception {
     try {
       final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-      List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
-      ManagedRocksDB activeRocksDB = ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList);
+      List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
+      ManagedRocksDB activeRocksDB = ManagedRocksDB.openReadOnly(parent.getDbPath(), cfDescList, cfHandleList);
       ColumnFamilyHandle compactionLogTableCFHandle =
           RocksDBUtils.getColumnFamilyHandle(COMPACTION_LOG_TABLE, cfHandleList);
 
@@ -78,7 +75,7 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
       out().println("Graph was generated at '" + imageLocation + "'.");
     } catch (RocksDBException ex) {
       err().println("Failed to open RocksDB: " + ex);
-      throw new IOException(ex);
+      throw ex;
     }
     return null;
   }
@@ -87,8 +84,7 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
    * Read a compactionLofTable and create entries in the dags.
    */
   private void loadCompactionDagFromDB(ManagedRocksDB activeRocksDB,
-                                      ColumnFamilyHandle compactionLogTableCFHandle,
-                                      CompactionDag compactionDag) {
+      ColumnFamilyHandle compactionLogTableCFHandle, CompactionDag compactionDag) {
     try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
         activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
       managedRocksIterator.get().seekToFirst();

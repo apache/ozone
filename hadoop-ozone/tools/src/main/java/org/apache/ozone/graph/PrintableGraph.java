@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.graph;
+package org.apache.ozone.graph;
 
 import com.google.common.graph.EndpointPair;
 import com.google.common.graph.MutableGraph;

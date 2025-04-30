@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.graph;
+package org.apache.ozone.graph;
 
 import org.jgrapht.graph.DefaultEdge;
 
