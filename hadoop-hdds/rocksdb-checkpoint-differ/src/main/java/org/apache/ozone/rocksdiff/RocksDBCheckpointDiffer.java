@@ -58,7 +58,6 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.Scheduler;
@@ -171,6 +170,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       ImmutableSet.of("keyTable", "directoryTable", "fileTable");
 
   private final CompactionDag compactionDag;
+
+  static {
+    RocksDB.loadLibrary();
+  }
 
   /**
    * This is a package private constructor and should not be used other than
@@ -299,10 +302,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         }
       }
     }
-  }
-
-  static {
-    RocksDB.loadLibrary();
   }
 
   public void setRocksDBForCompactionTracking(ManagedDBOptions rocksOptions) {
@@ -695,7 +694,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       while (managedRocksIterator.get().isValid()) {
         byte[] value = managedRocksIterator.get().value();
         CompactionLogEntry compactionLogEntry =
-            CompactionLogEntry.getFromProtobuf(HddsProtos.CompactionLogEntryProto.parseFrom(value));
+            CompactionLogEntry.getFromProtobuf(CompactionLogEntryProto.parseFrom(value));
         compactionDag.populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
             compactionLogEntry.getOutputFileInfoList(), compactionLogEntry.getDbSequenceNumber());
         managedRocksIterator.get().next();
@@ -714,6 +713,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     Preconditions.checkNotNull(activeRocksDB,
         "activeRocksDB must be set before calling loadAllCompactionLogs.");
   }
+
   /**
    * Helper function that prepends SST file name with SST backup directory path
    * (or DB checkpoint path if compaction hasn't happened yet as SST files won't
@@ -1038,7 +1038,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       throw new RuntimeException(e);
     }
   }
-
 
   /**
    * Returns the list of input files from the compaction entries which are

@@ -91,7 +91,6 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     this.connectionFactory = connectionFactory;
   }
 
-
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
     super(omRatisSnapshotDir, OM_DB_NAME);

@@ -33,7 +33,6 @@ import org.junit.jupiter.api.Test;
  * Test ContainerAttribute management.
  */
 public class TestContainerAttribute {
-  enum Key { K1, K2, K3 }
 
   private final Key key1 = Key.K1;
   private final Key key2 = Key.K2;
@@ -122,4 +121,6 @@ public class TestContainerAttribute {
     assertThrows(SCMException.class,
         () -> containerAttribute.update(key3, key1, id));
   }
+
+  enum Key { K1, K2, K3 }
 }

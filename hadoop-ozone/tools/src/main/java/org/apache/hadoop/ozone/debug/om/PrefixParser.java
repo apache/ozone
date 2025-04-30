@@ -51,18 +51,6 @@ public class PrefixParser implements Callable<Void> {
   @CommandLine.ParentCommand
   private OMDebug parent;
 
-  /**
-   * Types to represent the level or path component type.
-   */
-  public enum Types {
-    VOLUME,
-    BUCKET,
-    FILE,
-    DIRECTORY,
-    INTERMEDIATE_DIRECTORY,
-    NON_EXISTENT_DIRECTORY,
-  }
-
   private final int[] parserStats = new int[Types.values().length];
 
   @CommandLine.Option(names = {"--path"},
@@ -245,5 +233,17 @@ public class PrefixParser implements Callable<Void> {
 
   public int getParserStats(Types type) {
     return parserStats[type.ordinal()];
+  }
+
+  /**
+   * Types to represent the level or path component type.
+   */
+  public enum Types {
+    VOLUME,
+    BUCKET,
+    FILE,
+    DIRECTORY,
+    INTERMEDIATE_DIRECTORY,
+    NON_EXISTENT_DIRECTORY,
   }
 }

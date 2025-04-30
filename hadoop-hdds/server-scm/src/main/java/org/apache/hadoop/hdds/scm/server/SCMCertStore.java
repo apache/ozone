@@ -213,7 +213,6 @@ public final class SCMCertStore implements CertificateStore {
     private SCMMetadataStore metadataStore;
     private SCMRatisServer scmRatisServer;
 
-
     public Builder setMetadaStore(SCMMetadataStore scmMetadataStore) {
       this.metadataStore = scmMetadataStore;
       return this;

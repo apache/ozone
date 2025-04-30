@@ -65,6 +65,7 @@ public abstract class AbstractReplicationTask {
   public long getContainerId() {
     return containerId;
   }
+
   public Status getStatus() {
     return status;
   }
@@ -138,12 +139,12 @@ public abstract class AbstractReplicationTask {
    */
   protected Object getCommandForDebug() {
     return "";
-  };
+  }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder()
-        .append(getStatus()).append(" ")
+        .append(getStatus()).append(' ')
         .append(getCommandForDebug());
     if (getStatus() == Status.QUEUED) {
       sb.append(", queued at ").append(getQueued());

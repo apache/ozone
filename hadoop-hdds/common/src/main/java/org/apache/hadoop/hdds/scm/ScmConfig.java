@@ -151,7 +151,6 @@ public class ScmConfig extends ReconfigurableConfig {
     this.principal = kerberosPrincipal;
   }
 
-
   public void setKerberosKeytab(String kerberosKeytab) {
     this.keytab = kerberosKeytab;
   }

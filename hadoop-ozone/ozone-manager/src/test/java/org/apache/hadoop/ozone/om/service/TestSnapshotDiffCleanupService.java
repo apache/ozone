@@ -364,7 +364,6 @@ public class TestSnapshotDiffCleanupService {
     assertEquals(expectedEntriesCount, actualEntriesCount);
   }
 
-
   private void assertNumberOfEntriesInTable(ColumnFamilyHandle table,
                                             long expectedCount) {
     int count = 0;

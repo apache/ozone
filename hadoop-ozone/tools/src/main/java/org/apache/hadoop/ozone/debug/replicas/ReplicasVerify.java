@@ -57,14 +57,6 @@ public class ReplicasVerify extends Handler {
   @CommandLine.ArgGroup(exclusive = false, multiplicity = "1")
   private Verification verification;
 
-  static class Verification {
-    @CommandLine.Option(names = "--checksums",
-        description = "Do client side data checksum validation of all replicas.",
-        // value will be true only if the "--checksums" option was specified on the CLI
-        defaultValue = "false")
-    private boolean doExecuteChecksums;
-
-  }
   private List<ReplicaVerifier> replicaVerifiers;
 
   @Override
@@ -124,5 +116,14 @@ public class ReplicasVerify extends Handler {
 
   void processKey(OzoneKeyDetails keyDetails) {
     replicaVerifiers.forEach(verifier -> verifier.verifyKey(keyDetails));
+  }
+
+  static class Verification {
+    @CommandLine.Option(names = "--checksums",
+        description = "Do client side data checksum validation of all replicas.",
+        // value will be true only if the "--checksums" option was specified on the CLI
+        defaultValue = "false")
+    private boolean doExecuteChecksums;
+
   }
 }

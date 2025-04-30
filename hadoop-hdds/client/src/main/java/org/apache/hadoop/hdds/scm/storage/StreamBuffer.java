@@ -46,7 +46,6 @@ public class StreamBuffer {
     return buffer.position();
   }
 
-
   public void put(StreamBuffer sb) {
     buffer.put(sb.buffer);
   }

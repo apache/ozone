@@ -31,8 +31,23 @@ source "${_testlib_dir}/../smoketest/testlib.sh"
 : ${SECURITY_ENABLED:=false}
 : ${SCM:=scm}
 
-# version is used in bucket name, which does not allow uppercase
-export OZONE_CURRENT_VERSION="$(echo "${ozone.version}" | sed -e 's/-SNAPSHOT//' | tr '[:upper:]' '[:lower:]')"
+# Check if running from output of Maven build or from source
+_is_build() {
+  local file=""
+  # Variable is replaced by Maven at build time,
+  # so if it empty, we are running from source, if non-empty, then running in build output (target)
+  [[ -n "${file}" ]]
+}
+
+# Avoid `bad substitution` error
+if _is_build; then
+  # version is used in bucket name, which does not allow uppercase
+  # variable is replaced by Maven at build time
+  OZONE_CURRENT_VERSION="$(echo "${ozone.version}" | sed -e 's/-SNAPSHOT//' | tr '[:upper:]' '[:lower:]')"
+else
+  OZONE_CURRENT_VERSION=src
+fi
+export OZONE_CURRENT_VERSION
 
 # create temp directory for test data; only once, even if testlib.sh is sourced again
 if [[ -z "${TEST_DATA_DIR:-}" ]] && [[ "${KEEP_RUNNING:-false}" == "false" ]]; then

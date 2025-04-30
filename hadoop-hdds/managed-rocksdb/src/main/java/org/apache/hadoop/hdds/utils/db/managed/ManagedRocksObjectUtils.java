@@ -34,8 +34,6 @@ import org.slf4j.LoggerFactory;
  * Utilities to help assert RocksObject closures.
  */
 public final class ManagedRocksObjectUtils {
-  private ManagedRocksObjectUtils() {
-  }
 
   static final Logger LOG =
       LoggerFactory.getLogger(ManagedRocksObjectUtils.class);
@@ -43,6 +41,9 @@ public final class ManagedRocksObjectUtils {
   private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
 
   private static final LeakDetector LEAK_DETECTOR = new LeakDetector("ManagedRocksObject");
+
+  private ManagedRocksObjectUtils() {
+  }
 
   static UncheckedAutoCloseable track(AutoCloseable object) {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
