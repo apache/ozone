@@ -83,6 +83,8 @@ public class SstFilteringService extends BackgroundService
 
   private AtomicBoolean running;
 
+  private final BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock();
+
   public static boolean isSstFiltered(OzoneConfiguration ozoneConfiguration, SnapshotInfo snapshotInfo) {
     Path sstFilteredFile = Paths.get(OmSnapshotManager.getSnapshotPath(ozoneConfiguration,
         snapshotInfo), SST_FILTERED_FILE);
@@ -101,9 +103,6 @@ public class SstFilteringService extends BackgroundService
     running = new AtomicBoolean(false);
   }
 
-  private final BootstrapStateHandler.Lock lock =
-      new BootstrapStateHandler.Lock();
-
   @Override
   public void start() {
     running.set(true);
@@ -120,13 +119,11 @@ public class SstFilteringService extends BackgroundService
     running.set(true);
   }
 
-
   private class SstFilteringTask implements BackgroundTask {
 
     private boolean isSnapshotDeleted(SnapshotInfo snapshotInfo) {
       return snapshotInfo == null || snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
     }
-
 
     /**
      * Marks the snapshot as SSTFiltered by creating a file in snapshot directory.

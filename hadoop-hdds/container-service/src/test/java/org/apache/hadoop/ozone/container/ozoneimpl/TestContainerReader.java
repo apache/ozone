@@ -84,7 +84,6 @@ public class TestContainerReader {
   private ContainerSet containerSet;
   private OzoneConfiguration conf;
 
-
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private UUID datanodeId;
   private String clusterId = UUID.randomUUID().toString();
@@ -376,7 +375,7 @@ public class TestContainerReader {
     for (int i = 0; i < volumeNum; i++) {
       volumeDirs[i] =
           Files.createDirectory(tempDir.resolve("volumeDir" + i)).toFile();
-      datanodeDirs = datanodeDirs.append(volumeDirs[i]).append(",");
+      datanodeDirs = datanodeDirs.append(volumeDirs[i]).append(',');
     }
 
     BlockUtils.shutdownCache(conf);

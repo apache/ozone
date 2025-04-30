@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.server.events.TypedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * Class defining Safe mode exit criteria for Ratis Containers.
  */

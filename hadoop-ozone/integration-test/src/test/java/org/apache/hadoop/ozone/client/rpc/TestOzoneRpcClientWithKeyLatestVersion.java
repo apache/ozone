@@ -76,8 +76,8 @@ public abstract class TestOzoneRpcClientWithKeyLatestVersion implements NonHATes
 
         OzoneBucket bucket = volume.getBucket(bucketName);
         String keyName = UUID.randomUUID().toString();
-        byte[] content = RandomUtils.nextBytes(128);
-        int versions = RandomUtils.nextInt(2, 5);
+        byte[] content = RandomUtils.secure().randomBytes(128);
+        int versions = RandomUtils.secure().randomInt(2, 5);
 
         createAndOverwriteKey(bucket, keyName, versions, content);
 
@@ -96,7 +96,7 @@ public abstract class TestOzoneRpcClientWithKeyLatestVersion implements NonHATes
       int versions, byte[] content) throws IOException {
     ReplicationConfig replication = RatisReplicationConfig.getInstance(THREE);
     for (int i = 1; i < versions; i++) {
-      writeKey(bucket, key, RandomUtils.nextBytes(content.length), replication);
+      writeKey(bucket, key, RandomUtils.secure().randomBytes(content.length), replication);
     }
     // overwrite it
     writeKey(bucket, key, content, replication);

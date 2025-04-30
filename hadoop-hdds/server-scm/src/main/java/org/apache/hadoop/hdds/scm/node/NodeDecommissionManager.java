@@ -110,7 +110,7 @@ public class NodeDecommissionManager {
         }
       } catch (URISyntaxException e) {
         throw new InvalidHostStringException(
-            "Unable to parse the hoststring " + rawHostname, e);
+            "Unable to parse the host string " + rawHostname, e);
       }
     }
   }

@@ -31,6 +31,7 @@ public class KeyGeneratorUtil {
   public String generatePureIndexKeyName(int number) {
     return String.valueOf(number);
   }
+
   public Function<Integer, String> pureIndexKeyNameFunc() {
     return number -> String.valueOf(number);
   }

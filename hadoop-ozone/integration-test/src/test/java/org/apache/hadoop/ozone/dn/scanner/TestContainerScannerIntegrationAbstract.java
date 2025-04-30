@@ -72,12 +72,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * This class tests the data scanner functionality.
  */
-@Timeout(300)
 public abstract class TestContainerScannerIntegrationAbstract {
 
   private static MiniOzoneCluster cluster;
@@ -121,7 +119,6 @@ public abstract class TestContainerScannerIntegrationAbstract {
   void resumeScanner() {
     getOzoneContainer().resumeContainerScrub();
   }
-
 
   @AfterAll
   static void shutdown() throws IOException {

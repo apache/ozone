@@ -210,7 +210,6 @@ public class TestReservedVolumeSpace {
     assertEquals(10, conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(capacity));
   }
 
-
   private long getExpectedDefaultReserved(HddsVolume volume) {
     long totalCapacity = volume.getVolumeUsage().get().realUsage().getCapacity();
     return (long) Math.ceil(totalCapacity * HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);

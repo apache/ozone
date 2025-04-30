@@ -49,9 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
-@Timeout(300)
 class TestReadRetries {
 
   /**
@@ -79,7 +77,7 @@ class TestReadRetries {
         OzoneBucket bucket = volume.getBucket(bucketName);
 
         String keyName = "a/b/c/" + UUID.randomUUID();
-        byte[] content = RandomUtils.nextBytes(128);
+        byte[] content = RandomUtils.secure().randomBytes(128);
         TestDataUtil.createKey(bucket, keyName,
             RatisReplicationConfig.getInstance(THREE), content);
 

@@ -212,7 +212,7 @@ public class TestBlockDeletion {
     String bucketName = UUID.randomUUID().toString();
     LogCapturer logCapturer = LogCapturer.captureLogs(DeleteBlocksCommandHandler.class);
 
-    String value = RandomStringUtils.random(1024 * 1024);
+    String value = RandomStringUtils.secure().next(1024 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -346,7 +346,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(1024 * 1024);
+    String value = RandomStringUtils.secure().next(1024 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -457,7 +457,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(10 * 10);
+    String value = RandomStringUtils.secure().next(10 * 10);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -587,7 +587,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(1024 * 1024);
+    String value = RandomStringUtils.secure().next(1024 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -788,7 +788,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(64 * 1024);
+    String value = RandomStringUtils.secure().next(64 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);

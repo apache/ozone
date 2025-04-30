@@ -67,6 +67,7 @@ public final class OMMetadataManagerTestUtils {
 
   public static final String TEST_USER = "TestUser";
   private static OzoneConfiguration configuration;
+
   private OMMetadataManagerTestUtils() {
   }
 
@@ -381,7 +382,6 @@ public final class OMMetadataManagerTestUtils {
     omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY)
         .put(openKey, omKeyInfo);
   }
-
 
   /**
    * Writes deleted key information to the Ozone Manager metadata table.

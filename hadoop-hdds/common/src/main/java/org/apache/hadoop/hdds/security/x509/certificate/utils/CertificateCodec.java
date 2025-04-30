@@ -70,6 +70,7 @@ public class CertificateCodec {
   private final Set<PosixFilePermission> permissionSet =
       Stream.of(OWNER_READ, OWNER_WRITE, OWNER_EXECUTE)
           .collect(Collectors.toSet());
+
   /**
    * Creates a CertificateCodec with component name.
    *

@@ -98,7 +98,7 @@ public class DeletingContainerHandler extends AbstractCheck {
           } catch (NotLeaderException e) {
             LOG.warn("Failed to delete empty replica with index {} for " +
                     "container {} on datanode {}", rp.getReplicaIndex(),
-                cID, rp.getDatanodeDetails().getUuidString(), e);
+                cID, rp.getDatanodeDetails(), e);
           }
         });
     return true;

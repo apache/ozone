@@ -31,8 +31,23 @@ source "${_testlib_dir}/../smoketest/testlib.sh"
 : ${SECURITY_ENABLED:=false}
 : ${SCM:=scm}
 
-# version is used in bucket name, which does not allow uppercase
-export OZONE_CURRENT_VERSION="$(echo "${ozone.version}" | sed -e 's/-SNAPSHOT//' | tr '[:upper:]' '[:lower:]')"
+# Check if running from output of Maven build or from source
+_is_build() {
+  local file=""
+  # Variable is replaced by Maven at build time,
+  # so if it empty, we are running from source, if non-empty, then running in build output (target)
+  [[ -n "${file}" ]]
+}
+
+# Avoid `bad substitution` error
+if _is_build; then
+  # version is used in bucket name, which does not allow uppercase
+  # variable is replaced by Maven at build time
+  OZONE_CURRENT_VERSION="$(echo "${ozone.version}" | sed -e 's/-SNAPSHOT//' | tr '[:upper:]' '[:lower:]')"
+else
+  OZONE_CURRENT_VERSION=src
+fi
+export OZONE_CURRENT_VERSION
 
 # create temp directory for test data; only once, even if testlib.sh is sourced again
 if [[ -z "${TEST_DATA_DIR:-}" ]] && [[ "${KEEP_RUNNING:-false}" == "false" ]]; then
@@ -253,13 +268,16 @@ execute_robot_test(){
 
 ## @description Replace OM node order in config
 reorder_om_nodes() {
-  local c pid procname new_order
+  local c new_order
   local new_order="$1"
 
   if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
-    for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e recon -e s3g -e scm); do
-      docker exec "${c}" sed -i -e "s/om1,om2,om3/${new_order}/" /etc/hadoop/ozone-site.xml
-      echo "Replaced OM order with ${new_order} in ${c}"
+    for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om'); do
+      docker exec "${c}" sh -c \
+        "if [[ -f /etc/hadoop/ozone-site.xml ]]; then \
+          sed -i -e 's/om1,om2,om3/${new_order}/' /etc/hadoop/ozone-site.xml; \
+          echo 'Replaced OM order with ${new_order} in ${c}'; \
+        fi"
     done
   fi
 }

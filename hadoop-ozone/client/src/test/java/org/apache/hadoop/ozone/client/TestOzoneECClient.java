@@ -274,6 +274,7 @@ public class TestOzoneECClient {
           throws IOException {
     testMultipleChunksInSingleWriteOp(0, numChunks, numChunks);
   }
+
   private void testMultipleChunksInSingleWriteOp(int offset, int bufferChunks,
                                                  int numChunks)
       throws IOException {
@@ -1117,6 +1118,7 @@ public class TestOzoneECClient {
       DefaultReplicationConfig defaultReplicationConfig) throws IOException {
     return writeIntoECKey(0, data.length, data, key, defaultReplicationConfig);
   }
+
   private OzoneBucket writeIntoECKey(int offset, int length, byte[] data,
       String key, DefaultReplicationConfig defaultReplicationConfig)
       throws IOException {

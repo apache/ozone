@@ -218,7 +218,7 @@ public class TestMultipartObjectGet {
 
   private static String generateRandomContent(int sizeInMB) {
     int bytesToGenerate = sizeInMB * 1024 * 1024;
-    byte[] randomBytes = RandomUtils.nextBytes(bytesToGenerate);
+    byte[] randomBytes = RandomUtils.secure().randomBytes(bytesToGenerate);
     return Base64.getEncoder().encodeToString(randomBytes);
   }
 }

@@ -35,12 +35,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.freon.FreonSubcommand;
 import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo.Builder;
@@ -95,25 +94,13 @@ public class GeneratorOm extends BaseGenerator implements
 
     File metaDir = OMStorage.getOmDbDir(config);
 
-    RocksDBConfiguration rocksDBConfiguration =
-        config.getObject(RocksDBConfiguration.class);
+    omDb = DBStoreBuilder.newBuilder(config, OMDBDefinition.get(), OM_DB_NAME, metaDir.toPath()).build();
 
-    DBStoreBuilder dbStoreBuilder =
-        DBStoreBuilder.newBuilder(config,
-            rocksDBConfiguration)
-            .setName(OM_DB_NAME)
-            .setPath(metaDir.toPath());
-
-    OmMetadataManagerImpl.addOMTablesAndCodecs(dbStoreBuilder);
-
-    omDb = dbStoreBuilder.build();
 
     // initialization: create one bucket and volume in OM.
     writeOmBucketVolume();
 
-    omKeyTable = omDb.getTable(OmMetadataManagerImpl.KEY_TABLE, String.class,
-        OmKeyInfo.class);
-
+    omKeyTable = OMDBDefinition.KEY_TABLE_DEF.getTable(omDb);
     timer = getMetrics().timer("om-generator");
     runTests(this::writeOmKeys);
 
@@ -142,9 +129,7 @@ public class GeneratorOm extends BaseGenerator implements
 
   private void writeOmBucketVolume() throws IOException {
 
-    Table<String, OmVolumeArgs> volTable =
-        omDb.getTable(OmMetadataManagerImpl.VOLUME_TABLE, String.class,
-            OmVolumeArgs.class);
+    final Table<String, OmVolumeArgs> volTable = OMDBDefinition.VOLUME_TABLE_DEF.getTable(omDb);
 
     String admin = getUserId();
     String owner = getUserId();
@@ -166,9 +151,7 @@ public class GeneratorOm extends BaseGenerator implements
 
     volTable.put("/" + volumeName, omVolumeArgs);
 
-    final Table<String, PersistedUserVolumeInfo> userTable =
-        omDb.getTable(OmMetadataManagerImpl.USER_TABLE, String.class,
-            PersistedUserVolumeInfo.class);
+    final Table<String, PersistedUserVolumeInfo> userTable = OMDBDefinition.USER_TABLE_DEF.getTable(omDb);
 
     PersistedUserVolumeInfo currentUserVolumeInfo =
         userTable.get(getUserId());
@@ -189,9 +172,7 @@ public class GeneratorOm extends BaseGenerator implements
 
     userTable.put(getUserId(), currentUserVolumeInfo);
 
-    Table<String, OmBucketInfo> bucketTable =
-        omDb.getTable(OmMetadataManagerImpl.BUCKET_TABLE, String.class,
-            OmBucketInfo.class);
+    final Table<String, OmBucketInfo> bucketTable = OMDBDefinition.BUCKET_TABLE_DEF.getTable(omDb);
 
     OmBucketInfo omBucketInfo = new OmBucketInfo.Builder()
         .setBucketName(bucketName)

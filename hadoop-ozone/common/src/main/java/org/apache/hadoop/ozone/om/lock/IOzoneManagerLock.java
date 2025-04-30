@@ -30,7 +30,6 @@ public interface IOzoneManagerLock {
 
   OMLockDetails acquireReadLocks(OzoneManagerLock.Resource resource, Collection<String[]> resources);
 
-
   OMLockDetails acquireWriteLock(OzoneManagerLock.Resource resource,
                                  String... resources);
 

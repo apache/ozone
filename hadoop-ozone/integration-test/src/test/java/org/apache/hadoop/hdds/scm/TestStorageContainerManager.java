@@ -146,7 +146,6 @@ import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -154,7 +153,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Test class that exercises the StorageContainerManager.
  */
-@Timeout(900)
 public class TestStorageContainerManager {
   private static final int KEY_COUNT = 5;
   private static final String LOCALHOST_IP = "127.0.0.1";
@@ -288,8 +286,8 @@ public class TestStorageContainerManager {
       // Add 2 TXs per container.
       Map<Long, List<Long>> deletedBlocks = new HashMap<>();
       List<Long> blocks = new ArrayList<>();
-      blocks.add(RandomUtils.nextLong());
-      blocks.add(RandomUtils.nextLong());
+      blocks.add(RandomUtils.secure().randomLong());
+      blocks.add(RandomUtils.secure().randomLong());
       deletedBlocks.put(containerID, blocks);
       addTransactions(cluster.getStorageContainerManager(), delLog,
           deletedBlocks);
@@ -639,7 +637,7 @@ public class TestStorageContainerManager {
       DatanodeInfo datanodeInfo = assertInstanceOf(DatanodeInfo.class, nodeManager.getNode(node.getID()));
       assertNotNull(datanodeInfo);
       assertThat(datanodeInfo.getLastHeartbeatTime()).isPositive();
-      assertEquals(datanodeInfo.getUuidString(), datanodeInfo.getNetworkName());
+      assertEquals(datanodeInfo.getID().toString(), datanodeInfo.getNetworkName());
       assertEquals("/rack1", datanodeInfo.getNetworkLocation());
     }
   }
