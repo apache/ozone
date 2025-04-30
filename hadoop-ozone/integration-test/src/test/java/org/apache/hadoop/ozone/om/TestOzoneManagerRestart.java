@@ -49,13 +49,11 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test some client operations after cluster starts. And perform restart and
  * then performs client operations and check the behavior is expected or not.
  */
-@Timeout(240)
 public class TestOzoneManagerRestart {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;

@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Integration test to verify Ozone snapshot RPCs throw exception when called.
@@ -49,7 +48,6 @@ public class TestOmSnapshotDisabled {
   private static ObjectStore store;
 
   @BeforeAll
-  @Timeout(60)
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,

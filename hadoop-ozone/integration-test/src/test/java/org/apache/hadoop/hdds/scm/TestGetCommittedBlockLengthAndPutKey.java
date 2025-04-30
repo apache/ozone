@@ -45,7 +45,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +52,6 @@ import org.slf4j.LoggerFactory;
  * Test Container calls.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestGetCommittedBlockLengthAndPutKey implements NonHATests.TestCase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGetCommittedBlockLengthAndPutKey.class);

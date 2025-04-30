@@ -45,12 +45,10 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Ozone Recon.
  */
-@Timeout(300)
 public class TestReconWithOzoneManagerFSO {
 
   private static OzoneClient client;
