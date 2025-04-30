@@ -100,7 +100,7 @@ public class GeneratorOm extends BaseGenerator implements
     // initialization: create one bucket and volume in OM.
     writeOmBucketVolume();
 
-    omKeyTable = OMDBDefinition.KEY_TABLE.getTable(omDb);
+    omKeyTable = OMDBDefinition.KEY_TABLE_DEF.getTable(omDb);
     timer = getMetrics().timer("om-generator");
     runTests(this::writeOmKeys);
 
@@ -129,7 +129,7 @@ public class GeneratorOm extends BaseGenerator implements
 
   private void writeOmBucketVolume() throws IOException {
 
-    final Table<String, OmVolumeArgs> volTable = OMDBDefinition.VOLUME_TABLE.getTable(omDb);
+    final Table<String, OmVolumeArgs> volTable = OMDBDefinition.VOLUME_TABLE_DEF.getTable(omDb);
 
     String admin = getUserId();
     String owner = getUserId();
@@ -151,7 +151,7 @@ public class GeneratorOm extends BaseGenerator implements
 
     volTable.put("/" + volumeName, omVolumeArgs);
 
-    final Table<String, PersistedUserVolumeInfo> userTable = OMDBDefinition.USER_TABLE.getTable(omDb);
+    final Table<String, PersistedUserVolumeInfo> userTable = OMDBDefinition.USER_TABLE_DEF.getTable(omDb);
 
     PersistedUserVolumeInfo currentUserVolumeInfo =
         userTable.get(getUserId());
@@ -172,7 +172,7 @@ public class GeneratorOm extends BaseGenerator implements
 
     userTable.put(getUserId(), currentUserVolumeInfo);
 
-    final Table<String, OmBucketInfo> bucketTable = OMDBDefinition.BUCKET_TABLE.getTable(omDb);
+    final Table<String, OmBucketInfo> bucketTable = OMDBDefinition.BUCKET_TABLE_DEF.getTable(omDb);
 
     OmBucketInfo omBucketInfo = new OmBucketInfo.Builder()
         .setBucketName(bucketName)
