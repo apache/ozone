@@ -27,7 +27,6 @@ import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
@@ -165,7 +164,7 @@ public class ReplicasVerify extends Handler {
     AtomicBoolean allKeysPassed = new AtomicBoolean(true);
     File outputFile = new File(outputDir, "replicas-verify-result.json");
 
-    try (OutputStream outputStream = new FileOutputStream(outputFile);
+    try (OutputStream outputStream = Files.newOutputStream(outputFile.toPath());
          JsonGenerator jsonGenerator = JSON_FACTORY.createGenerator(outputStream, JsonEncoding.UTF8)) {
       // open json
       jsonGenerator.useDefaultPrettyPrinter();
