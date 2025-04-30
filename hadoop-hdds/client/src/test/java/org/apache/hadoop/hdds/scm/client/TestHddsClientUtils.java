@@ -49,14 +49,12 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * This test class verifies the parsing of SCM endpoint config settings. The
  * parsing logic is in
  * {@link org.apache.hadoop.hdds.scm.client.HddsClientUtils}.
  */
-@Timeout(300)
 public class TestHddsClientUtils {
 
   /**

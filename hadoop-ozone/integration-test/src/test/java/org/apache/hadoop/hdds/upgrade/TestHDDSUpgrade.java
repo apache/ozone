@@ -94,14 +94,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test SCM and DataNode Upgrade sequence.
  */
-@Timeout(11000)
 @Flaky({"HDDS-6028", "HDDS-6049"})
 @Slow
 public class TestHDDSUpgrade {

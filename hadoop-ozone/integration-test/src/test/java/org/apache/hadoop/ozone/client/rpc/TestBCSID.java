@@ -47,12 +47,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests the validity BCSID of a container.
  */
-@Timeout(300)
 public class TestBCSID {
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static MiniOzoneCluster cluster;

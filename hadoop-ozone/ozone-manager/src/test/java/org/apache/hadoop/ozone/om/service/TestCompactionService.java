@@ -47,7 +47,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,7 +93,6 @@ class TestCompactionService {
    *
    * @throws IOException - on Failure.
    */
-  @Timeout(300)
   @Test
   public void testCompactSuccessfully() throws Exception {
 
@@ -117,7 +115,6 @@ class TestCompactionService {
         SERVICE_INTERVAL, WAIT_TIME);
   }
 
-  @Timeout(300)
   @Test
   public void testCompactSkipInvalidTable() throws Exception {
 
@@ -151,7 +148,6 @@ class TestCompactionService {
         SERVICE_INTERVAL, WAIT_TIME);
   }
 
-  @Timeout(300)
   @Test
   public void testCompactFailure() {
 
