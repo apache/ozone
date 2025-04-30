@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
@@ -467,6 +468,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, String> getSnapshotRenamedTable();
 
   Table<String, CompactionLogEntry> getCompactionLogTable();
+
+  Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable();
   /**
    * Gets the OM Meta table.
    * @return meta table reference.

@@ -98,6 +98,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
@@ -165,6 +166,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * | multipartInfoTable | /volumeName/bucketName/keyName/uploadId ->...   |
    * |----------------------------------------------------------------------|
    * | transactionInfoTable| #TRANSACTIONINFO -> OMTransactionInfo          |
+   * |----------------------------------------------------------------------|
+   * | lifecycleConfigurationTable| /volumeName/bucketName -> ...           |
    * |----------------------------------------------------------------------|
    * }
    * </pre>
@@ -237,8 +240,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static final String DELETED_TABLE = "deletedTable";
   public static final String OPEN_KEY_TABLE = "openKeyTable";
   public static final String MULTIPARTINFO_TABLE = "multipartInfoTable";
-  public static final String LIFECYCLE_CONFIGURATION_TABLE =
-      "lifecycleConfigurationTable";
   public static final String S3_SECRET_TABLE = "s3SecretTable";
   public static final String DELEGATION_TOKEN_TABLE = "dTokenTable";
   public static final String PREFIX_TABLE = "prefixTable";
@@ -260,6 +261,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       "snapshotRenamedTable";
   public static final String COMPACTION_LOG_TABLE =
       "compactionLogTable";
+  public static final String LIFECYCLE_CONFIGURATION_TABLE =
+      "lifecycleConfigurationTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -283,7 +286,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
       SNAPSHOT_RENAMED_TABLE,
-      COMPACTION_LOG_TABLE
+      COMPACTION_LOG_TABLE,
+      LIFECYCLE_CONFIGURATION_TABLE
   };
 
   private DBStore store;
@@ -316,6 +320,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table compactionLogTable;
 
   private Table deletedDirTable;
+  private Table lifecycleConfigurationTable;
 
   private OzoneManager ozoneManager;
 
@@ -630,6 +635,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addTable(SNAPSHOT_INFO_TABLE)
         .addTable(SNAPSHOT_RENAMED_TABLE)
         .addTable(COMPACTION_LOG_TABLE)
+        .addTable(LIFECYCLE_CONFIGURATION_TABLE)
         .addCodec(OzoneTokenIdentifier.class, TokenIdentifierCodec.get())
         .addCodec(OmKeyInfo.class, OmKeyInfo.getCodec(true))
         .addCodec(RepeatedOmKeyInfo.class, RepeatedOmKeyInfo.getCodec(true))
@@ -645,7 +651,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(OmDBAccessIdInfo.class, OmDBAccessIdInfo.getCodec())
         .addCodec(OmDBUserPrincipalInfo.class, OmDBUserPrincipalInfo.getCodec())
         .addCodec(SnapshotInfo.class, SnapshotInfo.getCodec())
-        .addCodec(CompactionLogEntry.class, CompactionLogEntry.getCodec());
+        .addCodec(CompactionLogEntry.class, CompactionLogEntry.getCodec())
+        .addCodec(OmLifecycleConfiguration.class, OmLifecycleConfiguration.getCodec());
   }
 
   /**
@@ -759,6 +766,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     compactionLogTable = this.store.getTable(COMPACTION_LOG_TABLE,
         String.class, CompactionLogEntry.class);
     checkTableStatus(compactionLogTable, COMPACTION_LOG_TABLE,
+        addCacheMetrics);
+
+    lifecycleConfigurationTable = this.store.getTable(LIFECYCLE_CONFIGURATION_TABLE,
+        String.class, OmLifecycleConfiguration.class);
+    checkTableStatus(lifecycleConfigurationTable, LIFECYCLE_CONFIGURATION_TABLE,
         addCacheMetrics);
   }
 
@@ -2067,6 +2079,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, CompactionLogEntry> getCompactionLogTable() {
     return compactionLogTable;
+  }
+
+  @Override
+  public Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable() {
+    return lifecycleConfigurationTable;
   }
 
   /**
