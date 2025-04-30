@@ -71,6 +71,7 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.create
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -109,7 +110,7 @@ public class TestKeyValueHandlerContainerReconciliation {
   public static final Logger LOG = LoggerFactory.getLogger(TestKeyValueHandlerContainerReconciliation.class);
 
   // All container replicas will be placed in this directory, and the same replicas will be re-used for each test run.
-  @TempDir
+//  @TempDir
   private static Path containerDir;
   private static DNContainerOperationClient dnClient;
   private static MockedStatic<ContainerProtocolCalls> containerProtocolMock;
@@ -128,7 +129,8 @@ public class TestKeyValueHandlerContainerReconciliation {
    */
   @BeforeAll
   public static void setup() throws Exception {
-//    containerDir = Files.createTempDirectory("reconcile");
+    containerDir = Files.createTempDirectory("reconcile");
+    LOG.info("Data written to {}", containerDir);
     dnClient = new DNContainerOperationClient(new OzoneConfiguration(), null, null);
     datanodes = new ArrayList<>();
 
@@ -233,11 +235,14 @@ public class TestKeyValueHandlerContainerReconciliation {
           XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
           ContainerProtos.ChunkInfo chunkInfo = inv.getArgument(1);
           ContainerProtos.DatanodeBlockID blockId = inv.getArgument(2);
+          List<XceiverClientSpi.Validator> checksumValidators = inv.getArgument(3);
           Pipeline pipeline = xceiverClientSpi.getPipeline();
           assertEquals(1, pipeline.size());
           DatanodeDetails dn = pipeline.getFirstNode();
-          return dnMap.get(dn).readChunk(blockId, chunkInfo);
+          return dnMap.get(dn).readChunk(blockId, chunkInfo, checksumValidators);
         });
+
+    containerProtocolMock.when(() -> ContainerProtocolCalls.toValidatorList(any())).thenCallRealMethod();
   }
 
   /**
@@ -321,14 +326,42 @@ public class TestKeyValueHandlerContainerReconciliation {
     }
 
     public ContainerProtos.ReadChunkResponseProto readChunk(ContainerProtos.DatanodeBlockID blockId,
-        ContainerProtos.ChunkInfo chunkInfo) throws IOException {
+        ContainerProtos.ChunkInfo chunkInfo, List<XceiverClientSpi.Validator> validators) throws IOException {
       KeyValueContainer container = getContainer(blockId.getContainerID());
-      return ContainerProtos.ReadChunkResponseProto.newBuilder()
-          .setBlockID(blockId)
-          .setChunkData(chunkInfo)
-          .setData(handler.getChunkManager().readChunk(container, BlockID.getFromProtobuf(blockId),
-              ChunkInfo.getFromProtoBuf(chunkInfo), null).toByteString())
-          .build();
+      ContainerProtos.ReadChunkResponseProto readChunkResponseProto =
+          ContainerProtos.ReadChunkResponseProto.newBuilder()
+              .setBlockID(blockId)
+              .setChunkData(chunkInfo)
+              .setData(handler.getChunkManager().readChunk(container, BlockID.getFromProtobuf(blockId),
+                  ChunkInfo.getFromProtoBuf(chunkInfo), null).toByteString())
+              .build();
+      verifyChecksums(readChunkResponseProto, blockId, chunkInfo, validators);
+      return readChunkResponseProto;
+    }
+
+    public void verifyChecksums(ContainerProtos.ReadChunkResponseProto readChunkResponseProto,
+        ContainerProtos.DatanodeBlockID blockId, ContainerProtos.ChunkInfo chunkInfo,
+        List<XceiverClientSpi.Validator> validators) throws IOException {
+      assertFalse(validators.isEmpty());
+      ContainerProtos.ContainerCommandRequestProto requestProto =
+          ContainerProtos.ContainerCommandRequestProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.ReadChunk)
+              .setContainerID(blockId.getContainerID())
+              .setDatanodeUuid(dnDetails.getUuidString())
+              .setReadChunk(
+                  ContainerProtos.ReadChunkRequestProto.newBuilder()
+                      .setBlockID(blockId)
+                      .setChunkData(chunkInfo)
+                      .build())
+              .build();
+      ContainerProtos.ContainerCommandResponseProto responseProto =
+          ContainerProtos.ContainerCommandResponseProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.ReadChunk)
+              .setResult(ContainerProtos.Result.SUCCESS)
+              .setReadChunk(readChunkResponseProto).build();
+      for (XceiverClientSpi.Validator function : validators) {
+        function.accept(requestProto, responseProto);
+      }
     }
 
     public KeyValueContainer getContainer(long containerID) {
@@ -347,28 +380,6 @@ public class TestKeyValueHandlerContainerReconciliation {
       } catch (InterruptedException | ExecutionException e) {
         fail("On demand container scan failed", e);
       }
-
-      // TODO: On-demand scanner (HDDS-10374) should detect this corruption and generate container merkle tree.
-//      ContainerProtos.ContainerChecksumInfo.Builder builder = kvHandler.getChecksumManager()
-//          .read(containerData).get().toBuilder();
-//      List<ContainerProtos.BlockMerkleTree> blockMerkleTreeList = builder.getContainerMerkleTree()
-//          .getBlockMerkleTreeList();
-//      assertEquals(size, blockMerkleTreeList.size());
-//
-//      builder.getContainerMerkleTreeBuilder().clearBlockMerkleTree();
-//      for (int j = 0; j < blockMerkleTreeList.size(); j++) {
-//        ContainerProtos.BlockMerkleTree.Builder blockMerkleTreeBuilder = blockMerkleTreeList.get(j).toBuilder();
-//        if (j == blockIndex) {
-//          List<ContainerProtos.ChunkMerkleTree.Builder> chunkMerkleTreeBuilderList =
-//              blockMerkleTreeBuilder.getChunkMerkleTreeBuilderList();
-//          chunkMerkleTreeBuilderList.get(chunkIndex).setIsHealthy(false).setDataChecksum(random.nextLong());
-//          blockMerkleTreeBuilder.setDataChecksum(random.nextLong());
-//        }
-//        builder.getContainerMerkleTreeBuilder().addBlockMerkleTree(blockMerkleTreeBuilder.build());
-//      }
-//      builder.getContainerMerkleTreeBuilder().setDataChecksum(random.nextLong());
-//      Files.deleteIfExists(getContainerChecksumFile(keyValueContainer.getContainerData()).toPath());
-//      writeContainerDataTreeProto(keyValueContainer.getContainerData(), builder.getContainerMerkleTree());
     }
 
     public void reconcileContainer(DNContainerOperationClient dnClient, Collection<DatanodeDetails> peers,
@@ -424,9 +435,15 @@ public class TestKeyValueHandlerContainerReconciliation {
           String chunkName = "chunk" + chunkCount;
           long offset = chunkCount * chunkData.length;
           ChunkInfo info = new ChunkInfo(chunkName, offset, chunkData.length);
+
           // Generate data for the chunk and compute its checksum.
-          byteGenerator.nextBytes(chunkData);
-          Checksum checksum = new Checksum(ContainerProtos.ChecksumType.SHA256, bytesPerChecksum);
+//          byteGenerator.nextBytes(chunkData);
+          for (int c = 0; c < chunkData.length; c += 2) {
+            chunkData[c] = (byte) (byteGenerator.nextInt(95) + 32);
+            chunkData[c+1] = (byte)'\n';
+          }
+
+          Checksum checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, bytesPerChecksum);
           ChecksumData checksumData = checksum.computeChecksum(chunkData);
           info.setChecksumData(checksumData);
           // Write chunk and checksum into the container.
