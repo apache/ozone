@@ -542,7 +542,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     snapshotChainManager = new SnapshotChainManager(this);
   }
 
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles) throws IOException {
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles, IOzoneManagerLock lock)
+      throws IOException {
     return newDBStoreBuilder(configuration, null, metaDir)
         .setOpenReadOnly(false)
         .setEnableCompactionDag(true)

@@ -1915,15 +1915,16 @@ public class TestRocksDBCheckpointDiffer {
   @Test
   public void testPruneSSTFileValues()
       throws Exception {
-    ManagedRawSSTFileReader.setIsLibraryLoaded(ManagedRawSSTFileReader.loadLibrary());
+    rocksDBCheckpointDiffer.setIsNativeLibsLoaded(ManagedRawSSTFileReader.loadLibrary());
     // Create src files in backup directory.
-    List<String> filesInBackupDir = Arrays.asList("000078", "000073");
+    //List<String> filesInBackupDir = Arrays.asList("000078", "000073");
+    List<String> filesInBackupDir = Arrays.asList("000078.sst", "000078.sst.tmp", "000073.sst");
     for (String fileName : filesInBackupDir) {
       createSSTFileWithKeys(sstBackUpDir.toPath(), fileName, 1, 1);
     }
 
     // Create compacted files in active DB directory.
-    createSSTFileWithKeys(activeDbDir.toPath(), "000081", 1, 1);
+    createSSTFileWithKeys(activeDbDir.toPath(), "000081.sst", 1, 1);
 
     // Load dummy previous compaction logs.
     CompactionLogEntry dummyEntry = new CompactionLogEntry(178, System.currentTimeMillis(),
@@ -1962,7 +1963,7 @@ public class TestRocksDBCheckpointDiffer {
               String fileName = f.getFileName();
               File file = sstBackUpDir.toPath().resolve(fileName + SST_FILE_EXTENSION).toFile();
               if (COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(f.getColumnFamily())
-                  && filesInBackupDir.contains(fileName)) {
+                  && filesInBackupDir.contains(fileName + SST_FILE_EXTENSION)) {
                 assertTrue(f.isPruned());
                 try (ManagedRawSSTFileReader<byte[]> sstFileReader = new ManagedRawSSTFileReader<>(
                     new ManagedOptions(), file.getAbsolutePath(), 2 * 1024 * 1024);
@@ -1983,8 +1984,7 @@ public class TestRocksDBCheckpointDiffer {
 
   private void createSSTFileWithKeys(Path dir, String fileName, int nKeys, int nTombstones)
       throws Exception {
-    File file = Files.createFile(
-        dir.resolve(fileName + SST_FILE_EXTENSION)).toFile();
+    File file = Files.createFile(dir.resolve(fileName)).toFile();
     try (ManagedEnvOptions envOptions = new ManagedEnvOptions();
          ManagedOptions managedOptions = new ManagedOptions();
          ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions)) {
@@ -2226,7 +2226,7 @@ public class TestRocksDBCheckpointDiffer {
         .shouldSkipCompaction(columnFamilyBytes, inputFiles, outputFiles));
   }
 
-  private class StripedLock implements StripedLockProvider {
+  static class StripedLock implements StripedLockProvider {
 
     @Override
     public Striped<ReadWriteLock> getStripedLock(String key) {

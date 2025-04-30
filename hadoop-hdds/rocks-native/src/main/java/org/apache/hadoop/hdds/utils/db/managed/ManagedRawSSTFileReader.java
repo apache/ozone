@@ -49,20 +49,15 @@ public class ManagedRawSSTFileReader<T> implements Closeable {
   }
 
   public static boolean loadLibrary() throws NativeLibraryNotLoadedException {
-    ManagedRocksObjectUtils.loadRocksDBLibrary();
-    if (!NativeLibraryLoader.getInstance().loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME, Arrays.asList(
-        ManagedRocksObjectUtils.getRocksDBLibFileName()))) {
-      throw new NativeLibraryNotLoadedException(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
+    if (!isLibraryLoaded) {
+      ManagedRocksObjectUtils.loadRocksDBLibrary();
+      if (!NativeLibraryLoader.getInstance().loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME, Arrays.asList(
+          ManagedRocksObjectUtils.getRocksDBLibFileName()))) {
+        throw new NativeLibraryNotLoadedException(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
+      }
+      isLibraryLoaded = true;
     }
     return true;
-  }
-
-  public static void setIsLibraryLoaded(boolean isLibraryLoaded) {
-    ManagedRawSSTFileReader.isLibraryLoaded = isLibraryLoaded;
-  }
-
-  public static boolean isLibraryLoaded() {
-    return isLibraryLoaded;
   }
 
   public ManagedRawSSTFileReader(final ManagedOptions options, final String fileName, final int readAheadSize) {

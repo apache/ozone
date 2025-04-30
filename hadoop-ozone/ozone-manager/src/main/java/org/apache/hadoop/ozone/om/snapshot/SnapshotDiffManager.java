@@ -285,11 +285,9 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   private boolean initNativeLibraryForEfficientDiff(final OzoneConfiguration conf) {
-    if (conf.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB, OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)
-        && !ManagedRawSSTFileReader.isLibraryLoaded()) {
+    if (conf.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB, OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)) {
       try {
-        ManagedRawSSTFileReader.setIsLibraryLoaded(ManagedRawSSTFileReader.loadLibrary());
-        return ManagedRawSSTFileReader.isLibraryLoaded();
+        return ManagedRawSSTFileReader.loadLibrary();
       } catch (NativeLibraryNotLoadedException e) {
         LOG.warn("Native Library for raw sst file reading loading failed." +
             " Fallback to performing a full diff instead. {}", e.getMessage());
