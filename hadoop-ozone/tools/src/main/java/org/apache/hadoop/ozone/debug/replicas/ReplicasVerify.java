@@ -143,6 +143,7 @@ public class ReplicasVerify extends Handler {
         // Wait for all tasks to complete
         verificationExecutor.awaitTermination(1, TimeUnit.DAYS);
         writerExecutor.awaitTermination(1, TimeUnit.DAYS);
+        threadLocalVerifiers.remove();
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         LOG.error("Interrupted while waiting for verification to complete", e);
@@ -331,8 +332,7 @@ public class ReplicasVerify extends Handler {
         Files.createDirectories(path);
         System.out.println("Successfully created directory: " + path.toAbsolutePath());
       } catch (IOException e) {
-        throw new IOException(String.format(
-            "Failed to create directory %s: %s", path, e.getMessage()));
+        throw new IOException(String.format("Failed to create directory %s: %s", path, e.getMessage()));
       }
     }
   }
