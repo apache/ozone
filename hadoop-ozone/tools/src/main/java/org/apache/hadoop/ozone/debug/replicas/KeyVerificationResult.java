@@ -17,103 +17,149 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-
 import java.util.List;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
 /**
  * Class to hold the verification results for a key.
  */
 public class KeyVerificationResult {
-    private final boolean keyPass;
-    private final String volumeName;
-    private final String bucketName;
-    private final String keyName;
-    private final List<BlockVerificationData> blockResults;
+  private final boolean keyPass;
+  private final String volumeName;
+  private final String bucketName;
+  private final String keyName;
+  private final List<BlockVerificationData> blockResults;
 
-    public KeyVerificationResult(String volumeName, String bucketName, String keyName, 
-                                List<BlockVerificationData> blockResults, boolean keyPass) {
-        this.volumeName = volumeName;
-        this.bucketName = bucketName;
-        this.keyName = keyName;
-        this.blockResults = blockResults;
-        this.keyPass = keyPass;
+  public KeyVerificationResult(String volumeName, String bucketName, String keyName,
+      List<BlockVerificationData> blockResults, boolean keyPass) {
+    this.volumeName = volumeName;
+    this.bucketName = bucketName;
+    this.keyName = keyName;
+    this.blockResults = blockResults;
+    this.keyPass = keyPass;
+  }
+
+  public String getVolumeName() {
+    return volumeName;
+  }
+
+  public String getBucketName() {
+    return bucketName;
+  }
+
+  public String getKeyName() {
+    return keyName;
+  }
+
+  public List<BlockVerificationData> getBlockResults() {
+    return blockResults;
+  }
+
+  public boolean isKeyPass() {
+    return keyPass;
+  }
+
+  /**
+   * Class to hold the verification results for a block.
+   */
+  public static class BlockVerificationData {
+    private final long containerID;
+    private final long blockID;
+    private final List<ReplicaVerificationData> replicaResults;
+    private final boolean blockPass;
+
+    public BlockVerificationData(long containerID, long blockID,
+        List<ReplicaVerificationData> replicaResults,
+        boolean blockPass) {
+      this.containerID = containerID;
+      this.blockID = blockID;
+      this.replicaResults = replicaResults;
+      this.blockPass = blockPass;
     }
 
-    public String getVolumeName() { return volumeName; }
-    public String getBucketName() { return bucketName; }
-    public String getKeyName() { return keyName; }
-    public List<BlockVerificationData> getBlockResults() { return blockResults; }
-    public boolean isKeyPass() { return keyPass; }
-
-    /**
-     * Class to hold the verification results for a block.
-     */
-    public static class BlockVerificationData {
-        private final long containerID;
-        private final long blockID;
-        private final List<ReplicaVerificationData> replicaResults;
-        private final boolean blockPass;
-
-        public BlockVerificationData(long containerID, long blockID, 
-                                   List<ReplicaVerificationData> replicaResults, 
-                                   boolean blockPass) {
-            this.containerID = containerID;
-            this.blockID = blockID;
-            this.replicaResults = replicaResults;
-            this.blockPass = blockPass;
-        }
-
-        public long getContainerID() { return containerID; }
-        public long getBlockID() { return blockID; }
-        public List<ReplicaVerificationData> getReplicaResults() { return replicaResults; }
-        public boolean isBlockPass() { return blockPass; }
+    public long getContainerID() {
+      return containerID;
     }
 
-    /**
-     * Class to hold the verification results for a replica.
-     */
-    public static class ReplicaVerificationData {
-        private final DatanodeDetails datanode;
-        private final int replicaIndex;
-        private final List<CheckData> checkResults;
-        private final boolean replicaPass;
-
-        public ReplicaVerificationData(DatanodeDetails datanode, int replicaIndex, 
-                                     List<CheckData> checkResults, 
-                                     boolean replicaPass) {
-            this.datanode = datanode;
-            this.replicaIndex = replicaIndex;
-            this.checkResults = checkResults;
-            this.replicaPass = replicaPass;
-        }
-
-        public DatanodeDetails getDatanode() { return datanode; }
-        public int getReplicaIndex() { return replicaIndex; }
-        public List<CheckData> getCheckResults() { return checkResults; }
-        public boolean isReplicaPass() { return replicaPass; }
+    public long getBlockID() {
+      return blockID;
     }
 
-    /**
-     * Class to hold the results of a single check.
-     */
-    public static class CheckData {
-        private final String type;
-        private final boolean completed;
-        private final boolean pass;
-        private final List<String> failures;
-
-        public CheckData(String type, boolean completed, boolean pass, 
-                       List<String> failures) {
-            this.type = type;
-            this.completed = completed;
-            this.pass = pass;
-            this.failures = failures;
-        }
-
-        public String getType() { return type; }
-        public boolean isCompleted() { return completed; }
-        public boolean isPass() { return pass; }
-        public List<String> getFailures() { return failures; }
+    public List<ReplicaVerificationData> getReplicaResults() {
+      return replicaResults;
     }
+
+    public boolean isBlockPass() {
+      return blockPass;
+    }
+  }
+
+  /**
+   * Class to hold the verification results for a replica.
+   */
+  public static class ReplicaVerificationData {
+    private final DatanodeDetails datanode;
+    private final int replicaIndex;
+    private final List<CheckData> checkResults;
+    private final boolean replicaPass;
+
+    public ReplicaVerificationData(DatanodeDetails datanode, int replicaIndex,
+        List<CheckData> checkResults,
+        boolean replicaPass) {
+      this.datanode = datanode;
+      this.replicaIndex = replicaIndex;
+      this.checkResults = checkResults;
+      this.replicaPass = replicaPass;
+    }
+
+    public DatanodeDetails getDatanode() {
+      return datanode;
+    }
+
+    public int getReplicaIndex() {
+      return replicaIndex;
+    }
+
+    public List<CheckData> getCheckResults() {
+      return checkResults;
+    }
+
+    public boolean isReplicaPass() {
+      return replicaPass;
+    }
+  }
+
+  /**
+   * Class to hold the results of a single check.
+   */
+  public static class CheckData {
+    private final String type;
+    private final boolean completed;
+    private final boolean pass;
+    private final List<String> failures;
+
+    public CheckData(String type, boolean completed, boolean pass,
+        List<String> failures) {
+      this.type = type;
+      this.completed = completed;
+      this.pass = pass;
+      this.failures = failures;
+    }
+
+    public String getType() {
+      return type;
+    }
+
+    public boolean isCompleted() {
+      return completed;
+    }
+
+    public boolean isPass() {
+      return pass;
+    }
+
+    public List<String> getFailures() {
+      return failures;
+    }
+  }
 }

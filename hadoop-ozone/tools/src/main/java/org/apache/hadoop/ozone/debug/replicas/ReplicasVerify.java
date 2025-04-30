@@ -119,13 +119,13 @@ public class ReplicasVerify extends Handler {
     threadLocalVerifiers = ThreadLocal.withInitial(() -> {
       List<ReplicaVerifier> verifiers = new ArrayList<>();
       try {
-    if (verification.doExecuteChecksums) {
+        if (verification.doExecuteChecksums) {
           verifiers.add(new ChecksumVerifier(getConf()));
-    }
+        }
 
-    if (verification.doExecuteBlockExistence) {
+        if (verification.doExecuteBlockExistence) {
           verifiers.add(new BlockExistenceVerifier(getConf()));
-    }
+        }
       } catch (IOException e) {
         LOG.error("Error initializing verifiers", e);
         throw new RuntimeException("Error initializing verifiers", e);
@@ -135,7 +135,7 @@ public class ReplicasVerify extends Handler {
 
     try {
       createOutputDirectory();
-    findCandidateKeys(client, address);
+      findCandidateKeys(client, address);
     } finally {
       verificationExecutor.shutdown();
       writerExecutor.shutdown();
@@ -186,7 +186,7 @@ public class ReplicasVerify extends Handler {
           OzoneVolume volume = objectStore.getVolume(volumeName);
           checkVolume(ozoneClient, volume, sequenceWriter, allKeysPassed);
         } else {
-          for (Iterator<? extends OzoneVolume> it = objectStore.listVolumes(null); it.hasNext(); ) {
+          for (Iterator<? extends OzoneVolume> it = objectStore.listVolumes(null); it.hasNext();) {
             checkVolume(ozoneClient, it.next(), sequenceWriter, allKeysPassed);
           }
         }
@@ -237,11 +237,11 @@ public class ReplicasVerify extends Handler {
         CompletableFuture.supplyAsync(() ->
                 verifyKey(ozoneClient, volumeName, bucketName, keyName), verificationExecutor)
             .handleAsync((keyResult, throwable) -> {
-               if (throwable != null) {
-                 LOG.error("Error verifying key: {}/{}/{}", volumeName, bucketName, keyName, throwable);
-                 return new KeyVerificationResult(volumeName, bucketName, keyName, new ArrayList<>(), false);
-               }
-               return keyResult;
+              if (throwable != null) {
+                LOG.error("Error verifying key: {}/{}/{}", volumeName, bucketName, keyName, throwable);
+                return new KeyVerificationResult(volumeName, bucketName, keyName, new ArrayList<>(), false);
+              }
+              return keyResult;
             }, verificationExecutor)
             .thenAcceptAsync(keyResult ->
                 writeVerificationResult(sequenceWriter, allKeysPassed, keyResult), writerExecutor);
@@ -251,11 +251,11 @@ public class ReplicasVerify extends Handler {
   private void writeVerificationResult(SequenceWriter sequenceWriter,
       AtomicBoolean allKeysPassed, KeyVerificationResult keyResult) {
     try {
-    allKeysPassed.compareAndSet(true, keyResult.isKeyPass());
-    if (!keyResult.isKeyPass() || allResults) {
+      allKeysPassed.compareAndSet(true, keyResult.isKeyPass());
+      if (!keyResult.isKeyPass() || allResults) {
         ObjectNode keyNode = OBJECT_MAPPER.convertValue(keyResult, ObjectNode.class);
-      sequenceWriter.write(keyNode);
-    }
+        sequenceWriter.write(keyNode);
+      }
     } catch (IOException e) {
       LOG.error("Error writing verification result", e);
       throw new CompletionException(e);
@@ -266,54 +266,54 @@ public class ReplicasVerify extends Handler {
       String bucketName, String keyName) {
     try {
       boolean keyPass = true;
-    OmKeyInfo keyInfo =
-        ozoneClient.getProxy().getKeyInfo(volumeName, bucketName, keyName, false);
+      OmKeyInfo keyInfo =
+          ozoneClient.getProxy().getKeyInfo(volumeName, bucketName, keyName, false);
 
-    List<KeyVerificationResult.BlockVerificationData> blockResults = new ArrayList<>();
+      List<KeyVerificationResult.BlockVerificationData> blockResults = new ArrayList<>();
       List<ReplicaVerifier> localVerifiers = threadLocalVerifiers.get();
 
-    for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
-      long containerID = keyLocation.getContainerID();
-      long localID = keyLocation.getLocalID();
+      for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
+        long containerID = keyLocation.getContainerID();
+        long localID = keyLocation.getLocalID();
 
-      List<KeyVerificationResult.ReplicaVerificationData> replicaResults = new ArrayList<>();
-      boolean blockPass = true;
+        List<KeyVerificationResult.ReplicaVerificationData> replicaResults = new ArrayList<>();
+        boolean blockPass = true;
 
-      for (DatanodeDetails datanode : keyLocation.getPipeline().getNodes()) {
-        List<KeyVerificationResult.CheckData> checkResults = new ArrayList<>();
-        boolean replicaPass = true;
-        int replicaIndex = keyLocation.getPipeline().getReplicaIndex(datanode);
+        for (DatanodeDetails datanode : keyLocation.getPipeline().getNodes()) {
+          List<KeyVerificationResult.CheckData> checkResults = new ArrayList<>();
+          boolean replicaPass = true;
+          int replicaIndex = keyLocation.getPipeline().getReplicaIndex(datanode);
 
           for (ReplicaVerifier verifier : localVerifiers) {
-          BlockVerificationResult result = verifier.verifyBlock(datanode, keyLocation, replicaIndex);
-          KeyVerificationResult.CheckData checkResult = new KeyVerificationResult.CheckData(verifier.getType(),
-              result.isCompleted(), result.passed(), result.getFailures());
-          checkResults.add(checkResult);
+            BlockVerificationResult result = verifier.verifyBlock(datanode, keyLocation, replicaIndex);
+            KeyVerificationResult.CheckData checkResult = new KeyVerificationResult.CheckData(verifier.getType(),
+                result.isCompleted(), result.passed(), result.getFailures());
+            checkResults.add(checkResult);
 
-          if (!result.passed()) {
-            replicaPass = false;
+            if (!result.passed()) {
+              replicaPass = false;
+            }
+          }
+
+          KeyVerificationResult.ReplicaVerificationData replicaResult =
+              new KeyVerificationResult.ReplicaVerificationData(datanode, replicaIndex, checkResults, replicaPass);
+          replicaResults.add(replicaResult);
+
+          if (!replicaPass) {
+            blockPass = false;
           }
         }
 
-        KeyVerificationResult.ReplicaVerificationData replicaResult =
-            new KeyVerificationResult.ReplicaVerificationData(datanode, replicaIndex, checkResults, replicaPass);
-        replicaResults.add(replicaResult);
+        KeyVerificationResult.BlockVerificationData blockResult =
+            new KeyVerificationResult.BlockVerificationData(containerID, localID, replicaResults, blockPass);
+        blockResults.add(blockResult);
 
-        if (!replicaPass) {
-          blockPass = false;
+        if (!blockPass) {
+          keyPass = false;
         }
       }
 
-      KeyVerificationResult.BlockVerificationData blockResult =
-          new KeyVerificationResult.BlockVerificationData(containerID, localID, replicaResults, blockPass);
-      blockResults.add(blockResult);
-
-      if (!blockPass) {
-        keyPass = false;
-      }
-    }
-
-    return new KeyVerificationResult(volumeName, bucketName, keyName, blockResults, keyPass);
+      return new KeyVerificationResult(volumeName, bucketName, keyName, blockResults, keyPass);
     } catch (IOException e) {
       throw new CompletionException(e);
     }
