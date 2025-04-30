@@ -15,4 +15,4 @@
 # limitations under the License.
 
 OZONE-SITE.XML_ozone.client.read.short-circuit=true
-OZONE-SITE.XML_ozone.domain.socket.path=/opt/hadoop/ozone_dn2_socket
+OZONE-SITE.XML_ozone.domain.socket.path=/opt/ozone_dn3_socket

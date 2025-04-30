@@ -62,3 +62,10 @@ Run 50 % of read-key tasks, 40 % list-key tasks and 10 % of write-key tasks for 
     ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 --percentage-read 50 --percentage-list 40 -r 100 -v voltest -b buckettest -p performanceTest
                        Should contain   ${result}   Successful executions: ${keysCount}
 
+Run rk with key validation through short-circuit channel
+    Pass Execution If   '${SHORT_CIRCUIT_READ_ENABLED}' == 'false'    Skip when short-circuit read is disabled
+
+    ${keysCount} =     BuiltIn.Set Variable   10
+    ${result} =        Execute          ozone freon rk --numOfVolumes 1 --numOfBuckets 1 --numOfKeys ${keysCount} --keySize 1MB --replication-type=RATIS --factor=THREE --validate-writes --validate-channel=short-circuit
+                       Should contain   ${result}   Status: Success
+                       Should contain   ${result}   XceiverClientShortCircuit is created for pipeline
