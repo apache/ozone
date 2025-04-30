@@ -688,10 +688,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_OM_PREFETCH_MAX_BLOCKS = "ozone.om.prefetch.max.blocks";
   public static final int OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT = 10000;
 
-  // Defines how many extra blocks should be prefetched by multiplying the client requested size by this factor.
-  public static final String OZONE_OM_PREFETCH_BLOCKS_FACTOR = "ozone.om.prefetch.blocks.factor";
-  public static final int OZONE_OM_PREFETCH_BLOCKS_FACTOR_DEFAULT = 2;
-
   // Specifies how often prefetched blocks should be expired in OM.
   public static final String
       OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL =
