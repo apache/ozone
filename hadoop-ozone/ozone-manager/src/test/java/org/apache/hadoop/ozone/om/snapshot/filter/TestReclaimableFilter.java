@@ -284,7 +284,7 @@ public class TestReclaimableFilter extends AbstractReclaimableFilterTest {
       IOException ex = assertThrows(IOException.class, () ->
           testSnapshotInitAndLocking(volume.get(), bucket.get(), numberOfPreviousSnapshotsFromChain, index,
               currentSnapshotInfo, true, true));
-      assertEquals(String.format("Changes made to the snapshot %s have not been flushed to the disk ",
+      assertEquals(String.format("Changes made to the snapshot: %s have not been flushed to the disk.",
           getSnapshotInfos().get(getKey(volume.get(), bucket.get())).get(snapIndex)), ex.getMessage());
     }
   }
