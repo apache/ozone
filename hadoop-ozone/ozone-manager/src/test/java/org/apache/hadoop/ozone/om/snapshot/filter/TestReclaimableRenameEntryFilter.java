@@ -53,7 +53,7 @@ import org.rocksdb.RocksDBException;
 /**
  * Test class for ReclaimableRenameEntryFilter.
  */
-public class TestReclaimableRenameEntryFilter extends TestAbstractReclaimableFilter {
+public class TestReclaimableRenameEntryFilter extends AbstractReclaimableFilterTest {
   @Override
   protected ReclaimableFilter initializeFilter(OzoneManager om, OmSnapshotManager snapshotManager,
                                                SnapshotChainManager chainManager, SnapshotInfo currentSnapshotInfo,
