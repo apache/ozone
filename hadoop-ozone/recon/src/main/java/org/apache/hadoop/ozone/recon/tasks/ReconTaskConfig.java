@@ -38,14 +38,6 @@ public class ReconTaskConfig {
   )
   private Duration pipelineSyncTaskInterval = Duration.ofMinutes(5);
 
-  public Duration getPipelineSyncTaskInterval() {
-    return pipelineSyncTaskInterval;
-  }
-
-  public void setPipelineSyncTaskInterval(Duration interval) {
-    this.pipelineSyncTaskInterval = interval;
-  }
-
   @Config(key = "missingcontainer.interval",
       type = ConfigType.TIME,
       defaultValue = "300s",
@@ -55,14 +47,6 @@ public class ReconTaskConfig {
           "by Datanodes."
   )
   private Duration missingContainerTaskInterval = Duration.ofMinutes(5);
-
-  public Duration getMissingContainerTaskInterval() {
-    return missingContainerTaskInterval;
-  }
-
-  public void setMissingContainerTaskInterval(Duration interval) {
-    this.missingContainerTaskInterval = interval;
-  }
 
   @Config(key = "safemode.wait.threshold",
       type = ConfigType.TIME,
@@ -74,14 +58,6 @@ public class ReconTaskConfig {
   )
   private Duration safeModeWaitThreshold = Duration.ofMinutes(5);
 
-  public Duration getSafeModeWaitThreshold() {
-    return safeModeWaitThreshold;
-  }
-
-  public void setSafeModeWaitThreshold(Duration safeModeWaitThreshold) {
-    this.safeModeWaitThreshold = safeModeWaitThreshold;
-  }
-
   @Config(key = "containercounttask.interval",
       type = ConfigType.TIME,
       defaultValue = "60s",
@@ -90,6 +66,30 @@ public class ReconTaskConfig {
           "container count task."
   )
   private Duration containerSizeCountTaskInterval = Duration.ofMinutes(1);
+
+  public Duration getPipelineSyncTaskInterval() {
+    return pipelineSyncTaskInterval;
+  }
+
+  public void setPipelineSyncTaskInterval(Duration interval) {
+    this.pipelineSyncTaskInterval = interval;
+  }
+
+  public Duration getMissingContainerTaskInterval() {
+    return missingContainerTaskInterval;
+  }
+
+  public void setMissingContainerTaskInterval(Duration interval) {
+    this.missingContainerTaskInterval = interval;
+  }
+
+  public Duration getSafeModeWaitThreshold() {
+    return safeModeWaitThreshold;
+  }
+
+  public void setSafeModeWaitThreshold(Duration safeModeWaitThreshold) {
+    this.safeModeWaitThreshold = safeModeWaitThreshold;
+  }
 
   public Duration getContainerSizeCountTaskInterval() {
     return containerSizeCountTaskInterval;

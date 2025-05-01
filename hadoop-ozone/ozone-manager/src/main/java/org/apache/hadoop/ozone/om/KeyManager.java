@@ -43,7 +43,7 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
-import org.apache.hadoop.ozone.util.CheckedFunction;
+import org.apache.ratis.util.function.CheckedFunction;
 
 /**
  * Handles key level commands.
@@ -215,7 +215,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return Background service.
    */
   KeyDeletingService getDeletingService();
-
 
   OmMultipartUploadList listMultipartUploads(String volumeName,
           String bucketName, String prefix,

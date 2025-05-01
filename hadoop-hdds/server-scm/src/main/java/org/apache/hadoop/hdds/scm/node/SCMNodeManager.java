@@ -148,6 +148,7 @@ public class SCMNodeManager implements NodeManager {
   private static final String TOTALCAPACITY = "CAPACITY";
   private static final String DNUUID = "UUID";
   private static final String VERSION = "VERSION";
+
   /**
    * Constructs SCM machine Manager.
    */
@@ -439,10 +440,7 @@ public class SCMNodeManager implements NodeManager {
         final DatanodeInfo oldNode = nodeStateManager.getNode(datanodeDetails);
         if (updateDnsToDnIdMap(oldNode.getHostName(), oldNode.getIpAddress(),
             hostName, ipAddress, dnId)) {
-          LOG.info("Updating datanode {} from {} to {}",
-                  datanodeDetails.getUuidString(),
-                  oldNode,
-                  datanodeDetails);
+          LOG.info("Updating datanode from {} to {}", oldNode, datanodeDetails);
           clusterMap.update(oldNode, datanodeDetails);
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
           DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
@@ -1069,8 +1067,7 @@ public class SCMNodeManager implements NodeManager {
       return new SCMNodeStat(capacity, used, remaining, committed,
           freeSpaceToSpare);
     } catch (NodeNotFoundException e) {
-      LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-          datanodeDetails.getUuidString());
+      LOG.warn("Cannot generate NodeStat, datanode {} not found.", datanodeDetails);
       return null;
     }
   }
@@ -1442,6 +1439,7 @@ public class SCMNodeManager implements NodeManager {
     public String getLabel() {
       return label;
     }
+
     UsageStatics(String label) {
       this.label = label;
     }
@@ -1454,9 +1452,11 @@ public class SCMNodeManager implements NodeManager {
     ENTERING_MAINTENANCE("EnteringMaintenance"),
     VOLUME_FAILURES("VolumeFailures");
     private String label;
+
     public String getLabel() {
       return label;
     }
+
     StateStatistics(String label) {
       this.label = label;
     }
@@ -1467,10 +1467,13 @@ public class SCMNodeManager implements NodeManager {
     SCM_USED("Scmused"),
     NON_SCM_USED("NonScmused"),
     REMAINING("Remaining");
+
     private String label;
+
     public String getLabel() {
       return label;
     }
+
     SpaceStatistics(String label) {
       this.label = label;
     }

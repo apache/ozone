@@ -22,6 +22,7 @@ package org.apache.hadoop.hdds.server.events;
  */
 public interface IEventInfo {
   long getCreateTime();
+
   default String getEventId() {
     return "";
   }

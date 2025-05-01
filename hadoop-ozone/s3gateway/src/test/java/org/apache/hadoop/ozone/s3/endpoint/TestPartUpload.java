@@ -78,7 +78,6 @@ public class TestPartUpload {
         .build();
   }
 
-
   @Test
   public void testPartUpload() throws Exception {
 
@@ -131,7 +130,6 @@ public class TestPartUpload {
     assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
 
   }
-
 
   @Test
   public void testPartUploadWithIncorrectUploadID() throws Exception {

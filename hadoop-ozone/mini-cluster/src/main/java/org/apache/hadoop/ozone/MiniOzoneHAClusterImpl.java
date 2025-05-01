@@ -589,7 +589,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
                   scm.getClientRpcAddress());
             } else {
               inactiveSCMs.add(scm);
-              LOG.info("Intialized SCM at {}. This SCM is currently "
+              LOG.info("Initialized SCM at {}. This SCM is currently "
                   + "inactive (not running).", scm.getClientRpcAddress());
             }
           }
@@ -634,7 +634,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         if (i == 1) {
           conf.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY, scmNodeId);
         }
-        scmNodesKeyValue.append(",").append(scmNodeId);
+        scmNodesKeyValue.append(',').append(scmNodeId);
 
         String scmAddrKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);

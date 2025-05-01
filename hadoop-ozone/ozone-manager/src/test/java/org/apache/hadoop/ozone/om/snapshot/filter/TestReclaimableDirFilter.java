@@ -46,7 +46,7 @@ import org.rocksdb.RocksDBException;
 /**
  * Test class for ReclaimableDirFilter.
  */
-public class TestReclaimableDirFilter extends TestAbstractReclaimableFilter {
+public class TestReclaimableDirFilter extends AbstractReclaimableFilterTest {
   @Override
   protected ReclaimableFilter initializeFilter(OzoneManager om, OmSnapshotManager snapshotManager,
                                                SnapshotChainManager chainManager, SnapshotInfo currentSnapshotInfo,

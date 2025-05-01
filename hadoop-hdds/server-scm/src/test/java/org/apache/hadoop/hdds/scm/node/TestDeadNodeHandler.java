@@ -140,9 +140,9 @@ public class TestDeadNodeHandler {
     DatanodeDetails datanode3 = MockDatanodeDetails.randomDatanodeDetails();
 
     String storagePath = tempDir.getPath()
-        .concat("/data-" + datanode1.getUuidString());
+        .concat("/data-" + datanode1.getID());
     String metaStoragePath = tempDir.getPath()
-        .concat("/metadata-" + datanode1.getUuidString());
+        .concat("/metadata-" + datanode1.getID());
 
     StorageReportProto storageOne = HddsTestUtils.createStorageReport(
         datanode1.getID(), storagePath, 100 * OzoneConsts.TB,

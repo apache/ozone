@@ -109,7 +109,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
 
   @Option(names = {"-i", "--next-index"},
       description = "The next index in the term 2 to continue a test. (If "
-          + "zero, a new ratis ring will be intialized with configureGroup "
+          + "zero, a new ratis ring will be initialized with configureGroup "
           + "call and vote)",
       defaultValue = "0")
   private long nextIndex;
@@ -133,7 +133,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
 
     OzoneConfiguration conf = createOzoneConfiguration();
 
-    byte[] data = RandomStringUtils.randomAscii(chunkSize)
+    byte[] data = RandomStringUtils.secure().nextAscii(chunkSize)
         .getBytes(StandardCharsets.UTF_8);
     dataToWrite = ByteString.copyFrom(data);
 

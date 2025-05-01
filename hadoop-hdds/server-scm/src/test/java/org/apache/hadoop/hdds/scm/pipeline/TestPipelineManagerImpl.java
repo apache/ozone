@@ -350,7 +350,7 @@ public class TestPipelineManagerImpl {
       Pipeline pipeline = assertAllocate(pipelineManager);
       changeToFollower(pipelineManager);
       assertFailsNotLeader(
-          () -> pipelineManager.closePipeline(pipeline, false));
+          () -> pipelineManager.closePipeline(pipeline.getId()));
     }
   }
 
@@ -521,7 +521,7 @@ public class TestPipelineManagerImpl {
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE));
     pipelineManager.openPipeline(closedPipeline.getId());
-    pipelineManager.closePipeline(closedPipeline, true);
+    pipelineManager.closePipeline(closedPipeline.getId());
 
     // pipeline should be seen in pipelineManager as CLOSED.
     assertTrue(pipelineManager

@@ -94,7 +94,6 @@ abstract class AbstractContainerReportHandler {
     };
   }
 
-
   /**
    * Process the given ContainerReplica received from specified datanode.
    *

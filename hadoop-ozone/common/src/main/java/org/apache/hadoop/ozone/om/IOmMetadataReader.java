@@ -99,6 +99,7 @@ public interface IOmMetadataReader {
    *                     invalid arguments
    */
   OzoneFileStatus getFileStatus(OmKeyArgs keyArgs) throws IOException;
+
   /**
    * OzoneFS api to lookup for a file.
    *

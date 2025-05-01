@@ -50,15 +50,6 @@ import org.slf4j.LoggerFactory;
  * Helper class for fetching List Status for a path.
  */
 public class OzoneListStatusHelper {
-  /**
-   * Interface to get the File Status for a path.
-   */
-  @FunctionalInterface
-  public interface GetFileStatusHelper {
-    OzoneFileStatus apply(OmKeyArgs args, String clientAddress,
-                          boolean skipFileNotFoundError) throws IOException;
-  }
-
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneListStatusHelper.class);
 
@@ -77,6 +68,15 @@ public class OzoneListStatusHelper {
     this.scmBlockSize = scmBlockSize;
     this.getStatusHelper = func;
     this.omDefaultReplication = omDefaultReplication;
+  }
+
+  /**
+   * Interface to get the File Status for a path.
+   */
+  @FunctionalInterface
+  public interface GetFileStatusHelper {
+    OzoneFileStatus apply(OmKeyArgs args, String clientAddress,
+                          boolean skipFileNotFoundError) throws IOException;
   }
 
   public Collection<OzoneFileStatus> listStatusFSO(OmKeyArgs args,

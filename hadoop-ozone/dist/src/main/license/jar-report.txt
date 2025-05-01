@@ -81,7 +81,6 @@ share/ozone/lib/hdds-rocks-native.jar
 share/ozone/lib/hdds-managed-rocksdb.jar
 share/ozone/lib/hdds-server-framework.jar
 share/ozone/lib/hdds-server-scm.jar
-share/ozone/lib/hdds-tools.jar
 share/ozone/lib/hk2-api.jar
 share/ozone/lib/hk2-locator.jar
 share/ozone/lib/hk2-utils.jar
@@ -219,6 +218,7 @@ share/ozone/lib/orc-core.jar
 share/ozone/lib/orc-shims.jar
 share/ozone/lib/osgi-resource-locator.jar
 share/ozone/lib/ozone-client.jar
+share/ozone/lib/ozone-cli-admin.jar
 share/ozone/lib/ozone-cli-shell.jar
 share/ozone/lib/ozone-common.jar
 share/ozone/lib/ozone-csi.jar

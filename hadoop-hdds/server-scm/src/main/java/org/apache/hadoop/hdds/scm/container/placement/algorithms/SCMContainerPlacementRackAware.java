@@ -514,7 +514,7 @@ public final class SCMContainerPlacementRackAware
       if (maxRetry == 0) {
         // avoid the infinite loop
         String errMsg = "No satisfied datanode to meet the space constrains. "
-            + "metadatadata size required: " + metadataSizeRequired +
+            + "metadata size required: " + metadataSizeRequired +
             " data size required: " + dataSizeRequired;
         LOG.info(errMsg);
         throw new SCMException(errMsg, null);
