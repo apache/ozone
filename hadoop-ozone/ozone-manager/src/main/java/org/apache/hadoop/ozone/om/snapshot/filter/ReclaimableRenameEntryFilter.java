@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
  */
 public class ReclaimableRenameEntryFilter extends ReclaimableFilter<String> {
 
-
   public ReclaimableRenameEntryFilter(OzoneManager ozoneManager,
                                       OmSnapshotManager omSnapshotManager, SnapshotChainManager snapshotChainManager,
                                       SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
