@@ -32,6 +32,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FU
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_JOB_TABLE_NAME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_REPORT_TABLE_NAME;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_CANCELLED_JOB;
@@ -122,7 +125,6 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -631,7 +633,7 @@ public class TestSnapshotDiffManager {
                                         int parentObjectId,
                                         String snapshotTableName) {
     String name = "key" + objectId;
-    if (snapshotTableName.equals(OmMetadataManagerImpl.DIRECTORY_TABLE)) {
+    if (snapshotTableName.equals(DIRECTORY_TABLE)) {
       return OmDirectoryInfo.newBuilder()
           .setObjectID(objectId).setName(name).build();
     }
@@ -653,12 +655,12 @@ public class TestSnapshotDiffManager {
    * object Ids in the range 50-100 & should be empty otherwise
    */
   @ParameterizedTest
-  @CsvSource({"false," + OmMetadataManagerImpl.DIRECTORY_TABLE,
-      "true," + OmMetadataManagerImpl.DIRECTORY_TABLE,
-      "false," + OmMetadataManagerImpl.FILE_TABLE,
-      "true," + OmMetadataManagerImpl.FILE_TABLE,
-      "false," + OmMetadataManagerImpl.KEY_TABLE,
-      "true," + OmMetadataManagerImpl.KEY_TABLE})
+  @CsvSource({"false," + DIRECTORY_TABLE,
+      "true," + DIRECTORY_TABLE,
+      "false," + FILE_TABLE,
+      "true," + FILE_TABLE,
+      "false," + KEY_TABLE,
+      "true," + KEY_TABLE})
   public void testObjectIdMapWithTombstoneEntries(boolean nativeLibraryLoaded,
                                                   String snapshotTableName)
       throws IOException, RocksDBException {
@@ -719,8 +721,7 @@ public class TestSnapshotDiffManager {
           nativeLibraryLoaded, oldObjectIdKeyMap, newObjectIdKeyMap,
           objectIdsToCheck, Optional.of(oldParentIds),
           Optional.of(newParentIds),
-          ImmutableMap.of(OmMetadataManagerImpl.DIRECTORY_TABLE, "", OmMetadataManagerImpl.KEY_TABLE, "",
-              OmMetadataManagerImpl.FILE_TABLE, ""), "");
+          ImmutableMap.of(DIRECTORY_TABLE, "", KEY_TABLE, "", FILE_TABLE, ""), "");
 
       try (ClosableIterator<Map.Entry<byte[], byte[]>> oldObjectIdIter =
                oldObjectIdKeyMap.iterator()) {
@@ -1513,12 +1514,9 @@ public class TestSnapshotDiffManager {
       String volumeName, String bucketName)
       throws IOException {
     Map<BucketLayout, String> keyTableMap = new HashMap<>();
-    keyTableMap.put(BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        OmMetadataManagerImpl.FILE_TABLE);
-    keyTableMap.put(BucketLayout.OBJECT_STORE,
-        OmMetadataManagerImpl.KEY_TABLE);
-    keyTableMap.put(BucketLayout.LEGACY,
-        OmMetadataManagerImpl.KEY_TABLE);
+    keyTableMap.put(BucketLayout.FILE_SYSTEM_OPTIMIZED, FILE_TABLE);
+    keyTableMap.put(BucketLayout.OBJECT_STORE, KEY_TABLE);
+    keyTableMap.put(BucketLayout.LEGACY, KEY_TABLE);
 
     for (Map.Entry<BucketLayout, String> entry : keyTableMap.entrySet()) {
       when(omMetadataManager.getKeyTable(entry.getKey()))

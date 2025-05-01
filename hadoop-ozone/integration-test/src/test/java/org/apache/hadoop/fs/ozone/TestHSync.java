@@ -133,7 +133,6 @@ import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -144,7 +143,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Test HSync.
  */
-@Timeout(value = 300)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestHSync {
   private static final Logger LOG =

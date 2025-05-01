@@ -60,7 +60,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -82,6 +81,7 @@ public class TestRatisPipelineProvider {
   @TempDir
   private File testDir;
   private DBStore dbStore;
+  private int nodeCount = 10;
 
   public void init(int maxPipelinePerNode) throws Exception {
     init(maxPipelinePerNode, new OzoneConfiguration());
@@ -95,7 +95,7 @@ public class TestRatisPipelineProvider {
   public void init(int maxPipelinePerNode, OzoneConfiguration conf, File dir) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
-    nodeManager = new MockNodeManager(true, 10);
+    nodeManager = new MockNodeManager(true, nodeCount);
     nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
@@ -112,6 +112,7 @@ public class TestRatisPipelineProvider {
 
   @AfterEach
   void cleanup() throws Exception {
+    nodeCount = 10;
     if (dbStore != null) {
       dbStore.close();
     }
@@ -167,9 +168,9 @@ public class TestRatisPipelineProvider {
     createPipelineAndAssertions(HddsProtos.ReplicationFactor.ONE);
   }
 
-  private List<DatanodeDetails> createListOfNodes(int nodeCount) {
+  private List<DatanodeDetails> createListOfNodes(int count) {
     List<DatanodeDetails> nodes = new ArrayList<>();
-    for (int i = 0; i < nodeCount; i++) {
+    for (int i = 0; i < count; i++) {
       nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
     return nodes;
@@ -365,12 +366,13 @@ public class TestRatisPipelineProvider {
   }
 
   @ParameterizedTest
-  @CsvSource({ "1, 2", "2, 5" })
-  @Flaky("HDDS-12915")
+  @CsvSource({ "1, 3", "2, 6"})
   public void testCreatePipelineThrowErrorWithDataNodeLimit(int limit, int pipelineCount) throws Exception {
-    init(limit);
+    // increasing node count to avoid intermittent failures due to unhealthy nodes.
+    nodeCount = 13;
+    init(limit, new OzoneConfiguration(), testDir);
 
-    // Create pipelines up to the limit (2 for limit=1, 5 for limit=2).
+    // Create pipelines up to the limit (3 for limit=1, 6 for limit=2).
     for (int i = 0; i < pipelineCount; i++) {
       stateManager.addPipeline(
           provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),

@@ -141,13 +141,13 @@ public class FSORepairTool extends RepairTool {
       this.unreferencedStats = new ReportStatistics(0, 0, 0);
 
       this.store = getStoreFromPath(omDBPath);
-      this.volumeTable = OMDBDefinition.VOLUME_TABLE.getTable(store);
-      this.bucketTable = OMDBDefinition.BUCKET_TABLE.getTable(store);
-      this.directoryTable = OMDBDefinition.DIRECTORY_TABLE.getTable(store);
-      this.fileTable = OMDBDefinition.FILE_TABLE.getTable(store);
-      this.deletedDirectoryTable = OMDBDefinition.DELETED_DIR_TABLE.getTable(store);
-      this.deletedTable = OMDBDefinition.DELETED_TABLE.getTable(store);
-      this.snapshotInfoTable = OMDBDefinition.SNAPSHOT_INFO_TABLE.getTable(store);
+      this.volumeTable = OMDBDefinition.VOLUME_TABLE_DEF.getTable(store);
+      this.bucketTable = OMDBDefinition.BUCKET_TABLE_DEF.getTable(store);
+      this.directoryTable = OMDBDefinition.DIRECTORY_TABLE_DEF.getTable(store);
+      this.fileTable = OMDBDefinition.FILE_TABLE_DEF.getTable(store);
+      this.deletedDirectoryTable = OMDBDefinition.DELETED_DIR_TABLE_DEF.getTable(store);
+      this.deletedTable = OMDBDefinition.DELETED_TABLE_DEF.getTable(store);
+      this.snapshotInfoTable = OMDBDefinition.SNAPSHOT_INFO_TABLE_DEF.getTable(store);
     }
 
     public Report run() throws Exception {

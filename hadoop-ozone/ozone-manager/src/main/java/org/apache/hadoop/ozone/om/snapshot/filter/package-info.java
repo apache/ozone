@@ -16,6 +16,6 @@
  */
 
 /**
- * Utility classes to encode/decode DTO objects to/from byte array.
+ * Package containing filter to perform reclaimable check on snapshots.
  */
-package org.apache.hadoop.ozone.om.codec;
+package org.apache.hadoop.ozone.om.snapshot.filter;

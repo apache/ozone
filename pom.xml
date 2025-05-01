@@ -1915,7 +1915,8 @@
           </systemPropertyVariables>
           <properties>
             <configurationParameters>junit.platform.output.capture.stdout = true
-              junit.platform.output.capture.stderr = true</configurationParameters>
+              junit.platform.output.capture.stderr = true
+              junit.jupiter.execution.timeout.default = 5m</configurationParameters>
           </properties>
           <includes>
             <include>**/Test*.java</include>

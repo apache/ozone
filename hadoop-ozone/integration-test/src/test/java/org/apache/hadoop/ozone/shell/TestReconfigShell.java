@@ -39,13 +39,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Integration test for {@code ozone admin reconfig} command.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestReconfigShell implements NonHATests.TestCase {
 
   private OzoneAdmin ozoneAdmin;

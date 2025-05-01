@@ -67,12 +67,10 @@ import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Class to test CommitWatcher functionality.
  */
-@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestCommitWatcher {
 
   private MiniOzoneCluster cluster;
