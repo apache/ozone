@@ -288,7 +288,7 @@ public final class DBStoreBuilder {
     this.enableRocksDbMetrics = enableRocksDbMetrics;
     return this;
   }
-  
+
   /**
    * Set the {@link ManagedDBOptions} and default
    * {@link ManagedColumnFamilyOptions} based on {@code prof}.

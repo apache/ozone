@@ -2524,6 +2524,7 @@ public abstract class TestOmSnapshot {
                   assertFalse(f.isPruned());
                 }
               });
+          managedRocksIterator.get().next();
         }
       }
     }
