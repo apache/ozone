@@ -28,15 +28,15 @@ public final class HddsConfigKeys {
   public static final String HDDS_HEARTBEAT_INTERVAL_DEFAULT =
       "30s";
   public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL =
-      "hdds.heartbeat.interval.initial";
+      "hdds.heartbeat.initial-interval";
   public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
       "2s";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL =
-      "hdds.heartbeat.interval.recon";
+      "hdds.heartbeat.recon.interval";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT =
       "60s";
   public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL =
-      "hdds.heartbeat.interval.recon.initial";
+      "hdds.heartbeat.recon.initial-interval";
   public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
       "2s";
   public static final String HDDS_NODE_REPORT_INTERVAL =
