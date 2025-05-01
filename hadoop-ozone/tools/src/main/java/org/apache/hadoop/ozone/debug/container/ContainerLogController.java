@@ -15,17 +15,24 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.util;
+package org.apache.hadoop.ozone.debug.container;
+
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 
 /**
- *
- * Represents a function that accepts one argument and produces a result.
- * This is a functional interface whose functional method is apply(Object).
- * Type parameters:
- * <T> – the type of the input to the function
- * <R> – the type of the result of the function
- * <E> - the type of exception thrown.
+ * A controller for managing container log operations like parsing and listing containers.
  */
-public interface CheckedFunction<T, R, E extends Exception> {
-  R apply(T t) throws E;
+
+@CommandLine.Command(
+    name = "container",
+    subcommands = {
+        ContainerLogParser.class
+    },
+    description = "Parse, Store, Retrieve"
+)
+@MetaInfServices(DebugSubcommand.class)
+public class ContainerLogController implements DebugSubcommand  {
+
 }

@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
 public final class SCMContainerPlacementRackScatter
     extends SCMCommonPlacementPolicy {
   @VisibleForTesting
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRackScatter.class);
   private final NetworkTopology networkTopology;
   private static final int RACK_LEVEL = 1;

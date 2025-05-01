@@ -19,30 +19,29 @@ package org.apache.hadoop.ozone.container;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyMap;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType.KeyValueContainer;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.TestHelper.isContainerClosed;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.any;
 
 import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +66,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -118,9 +118,9 @@ class TestContainerReplication {
 
   @BeforeAll
   static void setUp() {
-    setLogLevel(SCMContainerPlacementCapacity.LOG, Level.DEBUG);
-    setLogLevel(SCMContainerPlacementRackAware.LOG, Level.DEBUG);
-    setLogLevel(SCMContainerPlacementRandom.LOG, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementCapacity.class, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementRackAware.class, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementRandom.class, Level.DEBUG);
   }
 
   @ParameterizedTest
@@ -191,10 +191,9 @@ class TestContainerReplication {
 
     OzoneBucket bucket = volume.getBucket(BUCKET);
 
-    try (OutputStream out = bucket.createKey(KEY, 0,
-        RatisReplicationConfig.getInstance(THREE), emptyMap())) {
-      out.write("Hello".getBytes(UTF_8));
-    }
+    TestDataUtil.createKey(bucket, KEY,
+        RatisReplicationConfig.getInstance(THREE),
+        "Hello".getBytes(UTF_8));
   }
 
   private byte[] createTestData(OzoneClient client, int size) throws IOException {
@@ -203,13 +202,12 @@ class TestContainerReplication {
     OzoneVolume volume = objectStore.getVolume(VOLUME);
     volume.createBucket(BUCKET);
     OzoneBucket bucket = volume.getBucket(BUCKET);
-    try (OutputStream out = bucket.createKey(KEY, 0, new ECReplicationConfig("RS-3-2-1k"),
-        new HashMap<>())) {
-      byte[] b = new byte[size];
-      b = RandomUtils.secure().randomBytes(b.length);
-      out.write(b);
-      return b;
-    }
+
+    byte[] b = new byte[size];
+    b = RandomUtils.secure().randomBytes(b.length);
+    TestDataUtil.createKey(bucket, KEY,
+        new ECReplicationConfig("RS-3-2-1k"), b);
+    return b;
   }
 
   private static List<OmKeyLocationInfo> lookupKey(MiniOzoneCluster cluster)
@@ -279,6 +277,43 @@ class TestContainerReplication {
       container.getDispatcher().getHandler(KeyValueContainer).deleteContainer(containerData, true);
     }
     cluster.getHddsDatanode(dn).getDatanodeStateMachine().triggerHeartbeat();
+  }
+
+  @Flaky("HDDS-12760")
+  @Test
+  public void testImportedContainerIsClosed() throws Exception {
+    OzoneConfiguration conf = createConfiguration(false);
+    // create a 4 node cluster
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(4).build()) {
+      cluster.waitForClusterToBeReady();
+
+      try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+        List<DatanodeDetails> allNodes =
+            cluster.getHddsDatanodes().stream()
+                .map(HddsDatanodeService::getDatanodeDetails)
+                .collect(Collectors.toList());
+        // shutdown 4th node (node 3 is down now)
+        cluster.shutdownHddsDatanode(allNodes.get(allNodes.size() - 1));
+
+        createTestData(client);
+        final OmKeyLocationInfo keyLocation = lookupKeyFirstLocation(cluster);
+        long containerID = keyLocation.getContainerID();
+        waitForContainerClose(cluster, containerID);
+
+        // shutdown nodes 0 and 1. only node 2 is up now
+        for (int i = 0; i < 2; i++) {
+          cluster.shutdownHddsDatanode(allNodes.get(i));
+        }
+        waitForReplicaCount(containerID, 1, cluster);
+
+        // bring back up the 4th node
+        cluster.restartHddsDatanode(allNodes.get(allNodes.size() - 1), false);
+
+        // the container should have been imported on the 4th node
+        waitForReplicaCount(containerID, 2, cluster);
+        assertTrue(isContainerClosed(cluster, containerID, allNodes.get(allNodes.size() - 1)));
+      }
+    }
   }
 
 

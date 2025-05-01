@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -195,9 +196,8 @@ public class TestRootCARotationManager {
 
     rootCARotationManager = new RootCARotationManager(scm);
     rootCARotationManager.setRootCARotationHandler(handler);
-    GenericTestUtils.LogCapturer logs =
-        GenericTestUtils.LogCapturer.captureLogs(RootCARotationManager.LOG);
-    GenericTestUtils.setLogLevel(RootCARotationManager.LOG, INFO);
+    LogCapturer logs = LogCapturer.captureLogs(RootCARotationManager.class);
+    GenericTestUtils.setLogLevel(RootCARotationManager.class, INFO);
     rootCARotationManager.start();
     rootCARotationManager.notifyStatusChanged();
 
@@ -228,9 +228,8 @@ public class TestRootCARotationManager {
 
     rootCARotationManager = new RootCARotationManager(scm);
     rootCARotationManager.setRootCARotationHandler(handler);
-    GenericTestUtils.LogCapturer logs =
-        GenericTestUtils.LogCapturer.captureLogs(RootCARotationManager.LOG);
-    GenericTestUtils.setLogLevel(RootCARotationManager.LOG, INFO);
+    LogCapturer logs = LogCapturer.captureLogs(RootCARotationManager.class);
+    GenericTestUtils.setLogLevel(RootCARotationManager.class, INFO);
     rootCARotationManager.start();
     rootCARotationManager.notifyStatusChanged();
 
@@ -262,9 +261,8 @@ public class TestRootCARotationManager {
     certCodec.writeCertificate(cert);
     rootCARotationManager = new RootCARotationManager(scm);
     rootCARotationManager.setRootCARotationHandler(handler);
-    GenericTestUtils.LogCapturer logs =
-        GenericTestUtils.LogCapturer.captureLogs(RootCARotationManager.LOG);
-    GenericTestUtils.setLogLevel(RootCARotationManager.LOG, INFO);
+    LogCapturer logs = LogCapturer.captureLogs(RootCARotationManager.class);
+    GenericTestUtils.setLogLevel(RootCARotationManager.class, INFO);
     rootCARotationManager.start();
     rootCARotationManager.notifyStatusChanged();
 

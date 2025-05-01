@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -159,10 +160,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
       String keyName = UUID.randomUUID().toString();
 
       long committedBytes = ozoneManager.getMetrics().getDataCommittedBytes();
-      try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, replication, new HashMap<>())) {
-        out.write(value.getBytes(UTF_8));
-      }
+      TestDataUtil.createKey(bucket, keyName, replication, value.getBytes(UTF_8));
 
       assertEquals(committedBytes + value.getBytes(UTF_8).length,
           ozoneManager.getMetrics().getDataCommittedBytes());

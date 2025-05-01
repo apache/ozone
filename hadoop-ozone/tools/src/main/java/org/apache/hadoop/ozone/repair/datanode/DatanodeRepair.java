@@ -15,32 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.ozone.repair.datanode;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
+import org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeContainerSchema;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 
 /**
- * Interface for write data into a dump file.
+ * Ozone Repair CLI for Datanode.
  */
-public interface DumpFileWriter extends Closeable {
-  /**
-   * Open an external file for dump.
-   * @param externalFile
-   */
-  void open(File externalFile) throws IOException;
+@CommandLine.Command(name = "datanode",
+    subcommands = {
+        UpgradeContainerSchema.class,
+    },
+    description = "Tools to repair Datanode")
+@MetaInfServices(RepairSubcommand.class)
+public class DatanodeRepair implements RepairSubcommand {
 
-  /**
-   * Put a key value pair into the file.
-   * @param key
-   * @param value
-   */
-  void put(byte[] key, byte[] value) throws IOException;
-
-  /**
-   * Finish dumping.
-   */
-  @Override
-  void close() throws IOException;
 }
