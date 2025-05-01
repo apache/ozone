@@ -534,7 +534,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       int maxOpenFiles = configuration.getInt(OZONE_OM_DB_MAX_OPEN_FILES,
           OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT);
 
-      this.store = loadDB(configuration, metaDir, maxOpenFiles, getLock());
+      this.store = loadDB(configuration, metaDir, maxOpenFiles);
 
       initializeOmTables(CacheType.FULL_CACHE, true);
     }
@@ -542,15 +542,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     snapshotChainManager = new SnapshotChainManager(this);
   }
 
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles, IOzoneManagerLock lock)
-      throws IOException {
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles) throws IOException {
     return newDBStoreBuilder(configuration, null, metaDir)
         .setOpenReadOnly(false)
         .setEnableCompactionDag(true)
         .setCreateCheckpointDirs(true)
         .setEnableRocksDbMetrics(true)
         .setMaxNumberOfOpenFiles(maxOpenFiles)
-        .setLock(lock)
         .build();
   }
 

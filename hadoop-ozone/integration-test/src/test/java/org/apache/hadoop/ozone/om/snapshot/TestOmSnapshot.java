@@ -147,6 +147,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.CompactionNode;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Slow;
 import org.junit.jupiter.api.AfterAll;
@@ -226,7 +227,7 @@ public abstract class TestOmSnapshot {
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, KeyManagerImpl.DISABLE_VALUE);
     if (!disableNativeDiff) {
-      conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 1, TimeUnit.SECONDS);
+      conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 0, TimeUnit.SECONDS);
     }
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -2491,30 +2492,28 @@ public abstract class TestOmSnapshot {
             null, 0).getDiffList().size());
 
     if (!disableNativeDiff) {
-      // Verify backup SST files are pruned on DB compactions.
-      Thread.sleep(1000);
-
+      // Prune SST files in compaction backup directory.
       RocksDatabase db = getRdbStore().getDb();
-      java.nio.file.Path sstBackUpDir = java.nio.file.Paths.get(getRdbStore()
-            .getRocksDBCheckpointDiffer().getSSTBackupDir());
+      RocksDBCheckpointDiffer differ = getRdbStore().getRocksDBCheckpointDiffer();
+      differ.pruneSstFileValues();
 
-      try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
-          db.getManagedRocksDb().get().newIterator(db.getColumnFamily(COMPACTION_LOG_TABLE).getHandle()))) {
+      // Verify backup SST files are pruned on DB compactions.
+      java.nio.file.Path sstBackUpDir = java.nio.file.Paths.get(differ.getSSTBackupDir());
+      try (ManagedOptions managedOptions = new ManagedOptions();
+           ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
+               db.getManagedRocksDb().get().newIterator(db.getColumnFamily(COMPACTION_LOG_TABLE).getHandle()))) {
         managedRocksIterator.get().seekToFirst();
         while (managedRocksIterator.get().isValid()) {
           byte[] value = managedRocksIterator.get().value();
-          CompactionLogEntry compactionLogEntry =
-              CompactionLogEntry.getFromProtobuf(
-                  CompactionLogEntryProto.parseFrom(value));
-
+          CompactionLogEntry compactionLogEntry = CompactionLogEntry.getFromProtobuf(
+              CompactionLogEntryProto.parseFrom(value));
           compactionLogEntry.getInputFileInfoList().forEach(
               f -> {
                 java.nio.file.Path file = sstBackUpDir.resolve(f.getFileName() + ".sst");
-                if (COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(f.getColumnFamily()) &&
-                    java.nio.file.Files.exists(file)) {
+                if (COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(f.getColumnFamily()) && java.nio.file.Files.exists(file)) {
                   assertTrue(f.isPruned());
                   try (ManagedRawSSTFileReader<byte[]> sstFileReader = new ManagedRawSSTFileReader<>(
-                           new ManagedOptions(), file.toFile().getAbsolutePath(), 2 * 1024 * 1024);
+                          managedOptions, file.toFile().getAbsolutePath(), 2 * 1024 * 1024);
                        ManagedRawSSTFileIterator<byte[]> itr = sstFileReader.newIterator(
                            keyValue -> keyValue.getValue(), null, null)) {
                     while (itr.hasNext()) {

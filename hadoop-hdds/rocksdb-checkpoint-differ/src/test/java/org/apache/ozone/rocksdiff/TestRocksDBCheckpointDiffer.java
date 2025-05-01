@@ -25,6 +25,8 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PR
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
@@ -49,7 +51,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
-import com.google.common.util.concurrent.Striped;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -76,7 +77,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -87,7 +87,6 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
@@ -101,7 +100,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
-import org.apache.hadoop.ozone.lock.StripedLockProvider;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -359,11 +357,15 @@ public class TestRocksDBCheckpointDiffer {
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE,
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT)).thenReturn(2000);
 
+    when(config.getBoolean(
+        OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB,
+        OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)).thenReturn(true);
+
     rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
         SST_BACK_UP_DIR_NAME,
         COMPACTION_LOG_DIR_NAME,
         ACTIVE_DB_DIR_NAME,
-        config, new StripedLock());
+        config);
 
     ManagedColumnFamilyOptions cfOpts = new ManagedColumnFamilyOptions();
     cfOpts.optimizeUniversalStyleCompaction();
@@ -1915,7 +1917,6 @@ public class TestRocksDBCheckpointDiffer {
   @Test
   public void testPruneSSTFileValues()
       throws Exception {
-    rocksDBCheckpointDiffer.setIsNativeLibsLoaded(ManagedRawSSTFileReader.loadLibrary());
     // Create src files in backup directory.
     List<String> filesInBackupDir = Arrays.asList("000078.sst", "000078.sst.tmp", "000073.sst");
     for (String fileName : filesInBackupDir) {
@@ -1953,10 +1954,8 @@ public class TestRocksDBCheckpointDiffer {
       managedRocksIterator.get().seekToFirst();
       while (managedRocksIterator.get().isValid()) {
         byte[] value = managedRocksIterator.get().value();
-        CompactionLogEntry compactionLogEntry =
-            CompactionLogEntry.getFromProtobuf(
-                CompactionLogEntryProto.parseFrom(value));
-
+        CompactionLogEntry compactionLogEntry = CompactionLogEntry.getFromProtobuf(
+            CompactionLogEntryProto.parseFrom(value));
         compactionLogEntry.getInputFileInfoList().forEach(
             f -> {
               String fileName = f.getFileName();
@@ -1965,7 +1964,7 @@ public class TestRocksDBCheckpointDiffer {
                   && filesInBackupDir.contains(fileName + SST_FILE_EXTENSION)) {
                 assertTrue(f.isPruned());
                 try (ManagedRawSSTFileReader<byte[]> sstFileReader = new ManagedRawSSTFileReader<>(
-                    new ManagedOptions(), file.getAbsolutePath(), 2 * 1024 * 1024);
+                         new ManagedOptions(), file.getAbsolutePath(), 2 * 1024 * 1024);
                      ManagedRawSSTFileIterator<byte[]> itr = sstFileReader.newIterator(
                          keyValue -> keyValue.getValue(), null, null)) {
                   while (itr.hasNext()) {
@@ -1984,10 +1983,7 @@ public class TestRocksDBCheckpointDiffer {
   private void createSSTFileWithKeys(Path dir, String fileName, int nKeys, int nTombstones)
       throws Exception {
     File file = Files.createFile(dir.resolve(fileName)).toFile();
-    try (ManagedEnvOptions envOptions = new ManagedEnvOptions();
-         ManagedOptions managedOptions = new ManagedOptions();
-         ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions)) {
-
+    try (ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(new ManagedEnvOptions(), new ManagedOptions())) {
       sstFileWriter.open(file.getAbsolutePath());
       String generatedString = RandomStringUtils.randomAlphabetic(7);
       for (int n = 0; n < nKeys; n++) {
@@ -2223,14 +2219,5 @@ public class TestRocksDBCheckpointDiffer {
                                  boolean expectedResult) {
     assertEquals(expectedResult, rocksDBCheckpointDiffer
         .shouldSkipCompaction(columnFamilyBytes, inputFiles, outputFiles));
-  }
-
-  static class StripedLock implements StripedLockProvider {
-
-    @Override
-    public Striped<ReadWriteLock> getStripedLock(String key) {
-      return SimpleStriped.readWriteLock(512, false);
-    }
-
   }
 }

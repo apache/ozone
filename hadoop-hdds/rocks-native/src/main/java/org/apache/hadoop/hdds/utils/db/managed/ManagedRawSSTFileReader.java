@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
  */
 public class ManagedRawSSTFileReader<T> implements Closeable {
 
-  private static boolean isLibraryLoaded = false;
   private static final Logger LOG = LoggerFactory.getLogger(ManagedRawSSTFileReader.class);
 
   private final String fileName;
@@ -49,13 +48,10 @@ public class ManagedRawSSTFileReader<T> implements Closeable {
   }
 
   public static boolean loadLibrary() throws NativeLibraryNotLoadedException {
-    if (!isLibraryLoaded) {
-      ManagedRocksObjectUtils.loadRocksDBLibrary();
-      if (!NativeLibraryLoader.getInstance().loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME, Arrays.asList(
-          ManagedRocksObjectUtils.getRocksDBLibFileName()))) {
-        throw new NativeLibraryNotLoadedException(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
-      }
-      isLibraryLoaded = true;
+    ManagedRocksObjectUtils.loadRocksDBLibrary();
+    if (!NativeLibraryLoader.getInstance().loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME, Arrays.asList(
+        ManagedRocksObjectUtils.getRocksDBLibFileName()))) {
+      throw new NativeLibraryNotLoadedException(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
     }
     return true;
   }

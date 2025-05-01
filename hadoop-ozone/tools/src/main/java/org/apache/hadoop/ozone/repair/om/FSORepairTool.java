@@ -48,7 +48,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.ratis.util.Preconditions;
@@ -503,9 +502,7 @@ public class FSORepairTool extends RepairTool {
           "not exist or is not a RocksDB directory.", dbPath));
     }
     // Load RocksDB and tables needed.
-    OzoneConfiguration conf = new OzoneConfiguration();
-    return OmMetadataManagerImpl.loadDB(conf, new File(dbPath).getParentFile(), -1,
-        new OzoneManagerLock(conf));
+    return OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), new File(dbPath).getParentFile(), -1);
   }
 
   /**

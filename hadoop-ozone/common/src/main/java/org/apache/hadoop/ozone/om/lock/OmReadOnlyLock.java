@@ -20,9 +20,7 @@ package org.apache.hadoop.ozone.om.lock;
 import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
 import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
 
-import com.google.common.util.concurrent.Striped;
 import java.util.Collection;
-import java.util.concurrent.locks.ReadWriteLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
 
 /**
@@ -107,12 +105,6 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
 
   @Override
   public OMLockMetrics getOMLockMetrics() {
-    throw new UnsupportedOperationException(
-        "OmReadOnlyLock does not support this operation.");
-  }
-
-  @Override
-  public Striped<ReadWriteLock> getStripedLock(String key) {
     throw new UnsupportedOperationException(
         "OmReadOnlyLock does not support this operation.");
   }
