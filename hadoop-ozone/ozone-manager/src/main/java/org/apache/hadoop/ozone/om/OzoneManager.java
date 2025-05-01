@@ -54,6 +54,12 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
@@ -69,8 +75,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_D
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
@@ -97,6 +101,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.Time.monotonicNow;
 import static org.apache.ozone.graph.PrintableGraph.GraphType.FILE_NAME;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -105,6 +110,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.io.BufferedWriter;
@@ -137,6 +143,8 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -226,6 +234,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
@@ -251,7 +260,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
@@ -272,6 +280,7 @@ import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
+import org.apache.hadoop.ozone.om.service.CompactDBService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
@@ -305,6 +314,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -355,7 +365,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                   "persists, the service may be down. Possible cause: only one OM is up, or " +
                   "other OMs are unable to respond to Ratis leader vote messages";
 
-
   // This is set for read requests when OMRequest has S3Authentication set,
   // and it is reset when read request is processed.
   private static final ThreadLocal<S3Authentication> S3_AUTH =
@@ -386,6 +395,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private KeyManager keyManager;
   private PrefixManagerImpl prefixManager;
   private final UpgradeFinalizer<OzoneManager> upgradeFinalizer;
+  private ExecutorService edekCacheLoader = null;
 
   /**
    * OM super user / admin list.
@@ -422,6 +432,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneManagerProtocolServerSideTranslatorPB omServerProtocol;
 
   private OzoneManagerRatisServer omRatisServer;
+  private OMExecutionFlow omExecutionFlow;
   private OmRatisSnapshotProvider omRatisSnapshotProvider;
   private OMNodeDetails omNodeDetails;
   private final Map<String, OMNodeDetails> peerNodesMap;
@@ -438,9 +449,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final ReplicationConfigValidator replicationConfigValidator;
 
   private boolean allowListAllVolumes;
-  // Adding parameters needed for VolumeRequests here, so that during request
-  // execution, we can get from ozoneManager.
-  private final long maxUserVolumeCount;
 
   private int minMultipartUploadPartSize = OzoneConsts.OM_MULTIPART_MIN_SIZE;
 
@@ -472,22 +480,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private boolean fsSnapshotEnabled;
 
   private String omHostName;
-
-  /**
-   * OM Startup mode.
-   */
-  public enum StartupOption {
-    REGUALR,
-    BOOTSTRAP,
-    FORCE_BOOTSTRAP
-  }
-
-  private enum State {
-    INITIALIZED,
-    BOOTSTRAPPING,
-    RUNNING,
-    STOPPED
-  }
 
   // Used in MiniOzoneCluster testing
   private State omState;
@@ -549,10 +541,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.threadPrefix = omNodeDetails.threadNamePrefix();
     loginOMUserIfSecurityEnabled(conf);
     setInstanceVariablesFromConf();
-    this.maxUserVolumeCount = conf.getInt(OZONE_OM_USER_MAX_VOLUME,
-        OZONE_OM_USER_MAX_VOLUME_DEFAULT);
-    Preconditions.checkArgument(this.maxUserVolumeCount > 0,
-        OZONE_OM_USER_MAX_VOLUME + " value should be greater than zero");
 
     if (omStorage.getState() != StorageState.INITIALIZED) {
       throw new OMException("OM not initialized, current OM storage state: "
@@ -714,6 +702,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isOmGrpcServerEnabled) {
       omS3gGrpcServer = getOmS3gGrpcServer(configuration);
     }
+
+    // init om execution flow for request
+    omExecutionFlow = new OMExecutionFlow(this);
+
     ShutdownHookManager.get().addShutdownHook(this::saveOmMetrics,
         SHUTDOWN_HOOK_PRIORITY);
 
@@ -725,6 +717,110 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     bucketUtilizationMetrics = BucketUtilizationMetrics.create(metadataManager);
     omHostName = HddsUtils.getHostName(conf);
+  }
+
+  public void initializeEdekCache(OzoneConfiguration conf) {
+    int edekCacheLoaderDelay =
+        conf.getInt(OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT);
+    int edekCacheLoaderInterval =
+        conf.getInt(OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_KEY, OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT);
+    int edekCacheLoaderMaxRetries =
+        conf.getInt(OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_KEY, OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT);
+    if (kmsProvider != null) {
+      edekCacheLoader = Executors.newSingleThreadExecutor(
+          new ThreadFactoryBuilder().setDaemon(true)
+              .setNameFormat("Warm Up EDEK Cache Thread #%d")
+              .build());
+      warmUpEdekCache(edekCacheLoader, edekCacheLoaderDelay, edekCacheLoaderInterval, edekCacheLoaderMaxRetries);
+    }
+  }
+
+  static class EDEKCacheLoader implements Runnable {
+    private final String[] keyNames;
+    private final KeyProviderCryptoExtension kp;
+    private int initialDelay;
+    private int retryInterval;
+    private int maxRetries;
+
+    EDEKCacheLoader(final String[] names, final KeyProviderCryptoExtension kp,
+        final int delay, final int interval, final int maxRetries) {
+      this.keyNames = names;
+      this.kp = kp;
+      this.initialDelay = delay;
+      this.retryInterval = interval;
+      this.maxRetries = maxRetries;
+    }
+
+    @Override
+    public void run() {
+      LOG.info("Warming up {} EDEKs... (initialDelay={}, "
+              + "retryInterval={}, maxRetries={})", keyNames.length, initialDelay, retryInterval,
+          maxRetries);
+      try {
+        Thread.sleep(initialDelay);
+      } catch (InterruptedException ie) {
+        LOG.info("EDEKCacheLoader interrupted before warming up.");
+        return;
+      }
+
+      boolean success = false;
+      int retryCount = 0;
+      IOException lastSeenIOE = null;
+      long warmUpEDEKStartTime = monotonicNow();
+
+      while (!success && retryCount < maxRetries) {
+        try {
+          kp.warmUpEncryptedKeys(keyNames);
+          LOG.info("Successfully warmed up {} EDEKs.", keyNames.length);
+          success = true;
+        } catch (IOException ioe) {
+          lastSeenIOE = ioe;
+          LOG.info("Failed to warm up EDEKs.", ioe);
+        } catch (Exception e) {
+          LOG.error("Cannot warm up EDEKs.", e);
+          throw e;
+        }
+
+        if (!success) {
+          try {
+            Thread.sleep(retryInterval);
+          } catch (InterruptedException ie) {
+            LOG.info("EDEKCacheLoader interrupted during retry.");
+            break;
+          }
+          retryCount++;
+        }
+      }
+
+      long warmUpEDEKTime = monotonicNow() - warmUpEDEKStartTime;
+      LOG.debug("Time taken to load EDEK keys to the cache: {}", warmUpEDEKTime);
+      if (!success) {
+        LOG.warn("Max retry {} reached, unable to warm up EDEKs.", maxRetries);
+        if (lastSeenIOE != null) {
+          LOG.warn("Last seen exception:", lastSeenIOE);
+        }
+      }
+    }
+  }
+
+  public void warmUpEdekCache(final ExecutorService executor, final int delay, final int interval, int maxRetries) {
+    Set<String> keys = new HashSet<>();
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> iterator =
+            metadataManager.getBucketTable().iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmBucketInfo> entry = iterator.next();
+        if (entry.getValue().getEncryptionKeyInfo() != null) {
+          String encKey = entry.getValue().getEncryptionKeyInfo().getKeyName();
+          keys.add(encKey);
+        }
+      }
+    } catch (IOException ex) {
+      LOG.error("Error while retrieving encryption keys for warming up EDEK cache", ex);
+    }
+    String[] edeks = new String[keys.size()];
+    edeks = keys.toArray(edeks);
+    executor.execute(new EDEKCacheLoader(edeks, getKmsProvider(), delay, interval, maxRetries));
   }
 
   public boolean isStopped() {
@@ -793,7 +889,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     StringBuilder scmBlockAddressBuilder = new StringBuilder();
     for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
       scmBlockAddressBuilder.append(scmNodeInfo.getBlockClientAddress())
-          .append(",");
+          .append(',');
     }
     String scmBlockAddress = scmBlockAddressBuilder.toString();
     if (!StringUtils.isBlank(scmBlockAddress)) {
@@ -998,7 +1094,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Class which schedule saving metrics to a file.
    */
-  private class ScheduleOMMetricsWriteTask extends TimerTask {
+  private final class ScheduleOMMetricsWriteTask extends TimerTask {
     @Override
     public void run() {
       saveOmMetrics();
@@ -1477,7 +1573,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new IOException(
           "Path of " + OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR + " and "
               + ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR
-              + " should not be co located. Please change atleast one path.");
+              + " should not be co located. Please change at least one path.");
     }
 
     // Create Ratis snapshot dir
@@ -1646,6 +1742,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OMPerformanceMetrics getPerfMetrics() {
     return perfMetrics;
   }
+
   public DeletingServiceMetrics getDeletionMetrics() {
     return omDeletionMetrics;
   }
@@ -2299,6 +2396,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (versionManager != null) {
         versionManager.close();
       }
+
+      if (edekCacheLoader != null) {
+        edekCacheLoader.shutdown();
+      }
       return true;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
@@ -2602,8 +2703,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     return omMetadataReader.checkAcls(obj, context, throwIfPermissionDenied);
   }
-
-
 
   /**
    * Return true if Ozone acl's are enabled, else false.
@@ -3040,7 +3139,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public String getRpcPort() {
-    return "" + omRpcAddress.getPort();
+    return String.valueOf(omRpcAddress.getPort());
   }
 
   private static List<List<String>> getRatisRolesException(String exceptionString) {
@@ -3053,7 +3152,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (null == omRatisServer) {
       return getRatisRolesException("Server is shutting down");
     }
-    String leaderReadiness = omRatisServer.checkLeaderStatus().name();
+    String leaderReadiness = omRatisServer.getLeaderStatus().name();
     final RaftPeerId leaderId = omRatisServer.getLeaderId();
     if (leaderId == null) {
       LOG.error(NO_LEADER_ERROR_MESSAGE);
@@ -4206,8 +4305,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return maxUserVolumeCount
    */
   public long getMaxUserVolumeCount() {
-    return maxUserVolumeCount;
+    return config.getMaxUserVolumeCount();
   }
+
   /**
    * Return true, if the current OM node is leader and in ready state to
    * process the requests.
@@ -4216,7 +4316,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isLeaderReady() {
     final OzoneManagerRatisServer ratisServer = omRatisServer;
-    return ratisServer != null && ratisServer.checkLeaderStatus() == LEADER_AND_READY;
+    return ratisServer != null && ratisServer.getLeaderStatus() == LEADER_AND_READY;
   }
 
   /**
@@ -4227,7 +4327,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void checkLeaderStatus() throws OMNotLeaderException,
       OMLeaderNotReadyException {
     OzoneManagerRatisServer.RaftServerStatus raftServerStatus =
-        omRatisServer.checkLeaderStatus();
+        omRatisServer.getLeaderStatus();
     RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
 
     switch (raftServerStatus) {
@@ -4578,14 +4678,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Provide ACLType of ALL which is default acl rights for user and group.
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
-    listOfAcls.add(new OzoneAcl(ACLIdentityType.USER,
+    listOfAcls.add(OzoneAcl.of(ACLIdentityType.USER,
         userName, ACCESS, ACLType.ALL));
     //Group ACLs of the User
     List<String> userGroups = Arrays.asList(UserGroupInformation
         .createRemoteUser(userName).getGroupNames());
 
     userGroups.forEach((group) -> listOfAcls.add(
-        new OzoneAcl(ACLIdentityType.GROUP, group, ACCESS, ACLType.ALL)));
+        OzoneAcl.of(ACLIdentityType.GROUP, group, ACCESS, ACLType.ALL)));
 
     // Add ACLs
     for (OzoneAcl ozoneAcl : listOfAcls) {
@@ -4764,7 +4864,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager
@@ -4915,18 +5014,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,
-                                                    String bucket,
-                                                    String jobStatus,
-                                                    boolean listAll)
-      throws IOException {
+  public ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      String volume,
+      String bucket,
+      String jobStatus,
+      boolean listAllStatus,
+      String prevSnapshotDiffJob,
+      int maxListResult) throws IOException {
     ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
     if (isAclEnabled) {
       omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, volume, bucket, null);
     }
 
     return omSnapshotManager.getSnapshotDiffList(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
-        jobStatus, listAll);
+        jobStatus, listAllStatus, prevSnapshotDiffJob, maxListResult);
   }
 
   @Override
@@ -5030,5 +5131,30 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (disabledFeatures.contains(feature.name())) {
       throw new OMException("Feature disabled: " + feature, OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
     }
+  }
+
+  public void compactOMDB(String columnFamily) throws IOException {
+    checkAdminUserPrivilege("compact column family " + columnFamily);
+    new CompactDBService(this).compact(columnFamily);
+  }
+
+  public OMExecutionFlow getOmExecutionFlow() {
+    return omExecutionFlow;
+  }
+
+  /**
+   * OM Startup mode.
+   */
+  public enum StartupOption {
+    REGUALR,
+    BOOTSTRAP,
+    FORCE_BOOTSTRAP
+  }
+
+  private enum State {
+    INITIALIZED,
+    BOOTSTRAPPING,
+    RUNNING,
+    STOPPED
   }
 }

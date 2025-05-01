@@ -31,11 +31,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -137,7 +137,7 @@ public class TestReconIncrementalContainerReportHandler
       DatanodeDetails datanodeDetails =
           containerWithPipeline.getPipeline().getFirstNode();
       NodeManager nodeManagerMock = mock(NodeManager.class);
-      when(nodeManagerMock.getNodeByUuid(any(UUID.class)))
+      when(nodeManagerMock.getNode(any(DatanodeID.class)))
           .thenReturn(datanodeDetails);
       IncrementalContainerReportFromDatanode reportMock =
           mock(IncrementalContainerReportFromDatanode.class);

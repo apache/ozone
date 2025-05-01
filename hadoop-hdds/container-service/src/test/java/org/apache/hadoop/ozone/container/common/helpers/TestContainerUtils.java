@@ -25,10 +25,14 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyCommandRequestProto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -45,6 +49,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * Test for {@link ContainerUtils}.
@@ -91,34 +96,50 @@ public class TestContainerUtils {
   public void testDatanodeIDPersistent(@TempDir File tempDir) throws Exception {
     // Generate IDs for testing
     DatanodeDetails id1 = randomDatanodeDetails();
-    id1.setPort(DatanodeDetails.newStandalonePort(1));
-    assertWriteRead(tempDir, id1);
+    try (MockedStatic<InetAddress> mockedStaticInetAddress = mockStatic(InetAddress.class)) {
+      InetAddress mockedInetAddress = mock(InetAddress.class);
+      mockedStaticInetAddress.when(() -> InetAddress.getByName(id1.getHostName()))
+          .thenReturn(mockedInetAddress);
 
-    // Add certificate serial  id.
-    id1.setCertSerialId("" + RandomUtils.nextLong());
-    assertWriteRead(tempDir, id1);
+      // If persisted ip address is different from resolved ip address,
+      // DatanodeDetails should return the persisted ip address.
+      // Upon validation of the ip address, DatanodeDetails should return the resolved ip address.
+      when(mockedInetAddress.getHostAddress())
+          .thenReturn("127.0.0.1");
+      assertWriteReadWithChangedIpAddress(tempDir, id1);
 
-    // Read should return an empty value if file doesn't exist
-    File nonExistFile = new File(tempDir, "non_exist.id");
-    assertThrows(IOException.class,
-        () -> ContainerUtils.readDatanodeDetailsFrom(nonExistFile));
+      when(mockedInetAddress.getHostAddress())
+          .thenReturn(id1.getIpAddress());
 
-    // Read should fail if the file is malformed
-    File malformedFile = new File(tempDir, "malformed.id");
-    createMalformedIDFile(malformedFile);
-    assertThrows(IOException.class,
-        () -> ContainerUtils.readDatanodeDetailsFrom(malformedFile));
+      id1.setPort(DatanodeDetails.newStandalonePort(1));
+      assertWriteRead(tempDir, id1);
 
-    // Test upgrade scenario - protobuf file instead of yaml
-    File protoFile = new File(tempDir, "valid-proto.id");
-    try (OutputStream out = Files.newOutputStream(protoFile.toPath())) {
-      HddsProtos.DatanodeDetailsProto proto = id1.getProtoBufMessage();
-      proto.writeTo(out);
+      // Add certificate serial  id.
+      id1.setCertSerialId(String.valueOf(RandomUtils.secure().randomLong()));
+      assertWriteRead(tempDir, id1);
+
+      // Read should return an empty value if file doesn't exist
+      File nonExistFile = new File(tempDir, "non_exist.id");
+      assertThrows(IOException.class,
+          () -> ContainerUtils.readDatanodeDetailsFrom(nonExistFile));
+
+      // Read should fail if the file is malformed
+      File malformedFile = new File(tempDir, "malformed.id");
+      createMalformedIDFile(malformedFile);
+      assertThrows(IOException.class,
+          () -> ContainerUtils.readDatanodeDetailsFrom(malformedFile));
+
+      // Test upgrade scenario - protobuf file instead of yaml
+      File protoFile = new File(tempDir, "valid-proto.id");
+      try (OutputStream out = Files.newOutputStream(protoFile.toPath())) {
+        HddsProtos.DatanodeDetailsProto proto = id1.getProtoBufMessage();
+        proto.writeTo(out);
+      }
+      assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile));
+
+      id1.setInitialVersion(1);
+      assertWriteRead(tempDir, id1);
     }
-    assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile));
-
-    id1.setInitialVersion(1);
-    assertWriteRead(tempDir, id1);
   }
 
   private void assertWriteRead(@TempDir File tempDir,
@@ -131,6 +152,17 @@ public class TestContainerUtils {
 
     assertDetailsEquals(details, read);
     assertEquals(details.getCurrentVersion(), read.getCurrentVersion());
+  }
+
+  private void assertWriteReadWithChangedIpAddress(@TempDir File tempDir,
+      DatanodeDetails details) throws IOException {
+    // Write a single ID to the file and read it out
+    File file = new File(tempDir, "valid-values.id");
+    ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
+    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
+    assertEquals(details.getIpAddress(), read.getIpAddress());
+    read.validateDatanodeIpAddress();
+    assertEquals("127.0.0.1", read.getIpAddress());
   }
 
   private void createMalformedIDFile(File malformedFile)
@@ -149,5 +181,6 @@ public class TestContainerUtils {
     assertEquals(expected.getCertSerialId(), actual.getCertSerialId());
     assertEquals(expected.getProtoBufMessage(), actual.getProtoBufMessage());
     assertEquals(expected.getInitialVersion(), actual.getInitialVersion());
+    assertEquals(expected.getIpAddress(), actual.getIpAddress());
   }
 }

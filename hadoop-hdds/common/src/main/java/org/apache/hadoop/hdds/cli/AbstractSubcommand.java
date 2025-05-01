@@ -76,6 +76,11 @@ public abstract class AbstractSubcommand {
     public OzoneConfiguration getOzoneConf() {
       return conf;
     }
+
+    @Override
+    public void printError(Throwable t) {
+      t.printStackTrace();
+    }
   }
 
   protected PrintWriter out() {

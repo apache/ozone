@@ -74,7 +74,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
   @BeforeAll
   public static void setup() {
-    GenericTestUtils.setLogLevel(ContainerBalancerTask.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ContainerBalancerTask.class, Level.DEBUG);
   }
 
   private static Stream<Arguments> createMockedSCMs() {
@@ -426,7 +426,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
       assertTrue(status.isHealthy());
     }
   }
-
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")

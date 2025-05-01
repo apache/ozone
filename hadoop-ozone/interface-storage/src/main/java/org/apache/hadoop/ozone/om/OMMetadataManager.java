@@ -121,6 +121,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @param volume - Volume name
    * @param bucket - Bucket name
+   * @return /volume/bucket/
    */
   String getBucketKeyPrefix(String volume, String bucket);
 
@@ -129,6 +130,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @param volume - Volume name
    * @param bucket - Bucket name
+   * @return /volumeId/bucketId/
+   *    e.g. /-9223372036854772480/-9223372036854771968/
    */
   String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException;
 
@@ -161,7 +164,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return DB directory key as String.
    */
   String getOzoneDirKey(String volume, String bucket, String key);
-
 
   /**
    * Returns the DB key name of a open key in OM metadata store. Should be
@@ -464,6 +466,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, String> getSnapshotRenamedTable();
 
   Table<String, CompactionLogEntry> getCompactionLogTable();
+
   /**
    * Gets the OM Meta table.
    * @return meta table reference.

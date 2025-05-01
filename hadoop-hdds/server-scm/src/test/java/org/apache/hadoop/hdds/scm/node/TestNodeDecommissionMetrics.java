@@ -55,7 +55,6 @@ public class TestNodeDecommissionMetrics {
   private ReplicationManager repManager;
   private EventQueue eventQueue;
 
-
   @BeforeEach
   public void setup() {
     conf = new OzoneConfiguration();
@@ -85,7 +84,7 @@ public class TestNodeDecommissionMetrics {
   public void testDecommMonitorCollectTrackedNodes() {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(ENTERING_MAINTENANCE,
+        NodeStatus.valueOf(ENTERING_MAINTENANCE,
             HddsProtos.NodeState.HEALTHY));
     monitor.startMonitoring(dn1);
     monitor.run();
@@ -100,7 +99,7 @@ public class TestNodeDecommissionMetrics {
   public void testDecommMonitorCollectRecommissionNodes() {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(DECOMMISSIONING,
+        NodeStatus.valueOf(DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
     monitor.startMonitoring(dn1);
     monitor.run();
@@ -122,7 +121,7 @@ public class TestNodeDecommissionMetrics {
         "datanode_host1",
         "/r1/ng1");
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
     // Ensure the node has some pipelines
     nodeManager.setPipelines(dn1, 2);
@@ -155,7 +154,7 @@ public class TestNodeDecommissionMetrics {
         "datanode_host1",
         "/r1/ng1");
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     Set<ContainerID> containers = new HashSet<>();
@@ -195,7 +194,7 @@ public class TestNodeDecommissionMetrics {
         "datanode_host1",
         "/r1/ng1");
     nodeManager.register(dn1,
-        new NodeStatus(DECOMMISSIONING,
+        NodeStatus.valueOf(DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
     Set<ContainerID> containers = new HashSet<>();
     containers.add(ContainerID.valueOf(1));
@@ -233,7 +232,7 @@ public class TestNodeDecommissionMetrics {
         "datanode_host1",
         "/r1/ng1");
     nodeManager.register(dn1,
-        new NodeStatus(DECOMMISSIONING,
+        NodeStatus.valueOf(DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
     Set<ContainerID> containers = new HashSet<>();
     containers.add(ContainerID.valueOf(1));
@@ -269,10 +268,10 @@ public class TestNodeDecommissionMetrics {
     DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
 
     nodeManager.register(dn1,
-        new NodeStatus(DECOMMISSIONING,
+        NodeStatus.valueOf(DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
     nodeManager.register(dn2,
-        new NodeStatus(DECOMMISSIONING,
+        NodeStatus.valueOf(DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     Set<ContainerID> containersDn1 = new HashSet<>();
@@ -312,10 +311,10 @@ public class TestNodeDecommissionMetrics {
     DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
 
     nodeManager.register(dn1,
-        new NodeStatus(DECOMMISSIONING,
+        NodeStatus.valueOf(DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
     nodeManager.register(dn2,
-        new NodeStatus(DECOMMISSIONING,
+        NodeStatus.valueOf(DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     nodeManager.setPipelines(dn1, 2);
@@ -334,7 +333,7 @@ public class TestNodeDecommissionMetrics {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
 
     nodeManager.register(dn1,
-        new NodeStatus(DECOMMISSIONING,
+        NodeStatus.valueOf(DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     nodeManager.setPipelines(dn1, 2);

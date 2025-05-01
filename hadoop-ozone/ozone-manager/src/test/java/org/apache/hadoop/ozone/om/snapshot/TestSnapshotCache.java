@@ -72,7 +72,7 @@ class TestSnapshotCache {
     );
 
     // Set SnapshotCache log level. Set to DEBUG for verbose output
-    GenericTestUtils.setLogLevel(SnapshotCache.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(SnapshotCache.class, Level.DEBUG);
   }
 
   @BeforeEach

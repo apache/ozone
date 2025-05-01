@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -48,10 +47,11 @@ public class MultiSnapshotLocks {
     this.lockDetails = OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
-  public OMLockDetails acquireLock(Collection<UUID> ids) throws OMException {
-    if (!objectLocks.isEmpty()) {
-      throw new OMException("More locks cannot be acquired when locks have been already acquired. Locks acquired : "
-          + objectLocks.stream().map(Arrays::toString).collect(Collectors.toList()),
+  public synchronized OMLockDetails acquireLock(Collection<UUID> ids) throws OMException {
+    if (this.lockDetails.isLockAcquired()) {
+      throw new OMException(
+          objectLocks.stream().map(Arrays::toString).collect(Collectors.joining(",",
+              "More locks cannot be acquired when locks have been already acquired. Locks acquired : [", "]")),
           OMException.ResultCodes.INTERNAL_ERROR);
     }
     List<String[]> keys =
@@ -66,7 +66,7 @@ public class MultiSnapshotLocks {
     return omLockDetails;
   }
 
-  public void releaseLock() {
+  public synchronized void releaseLock() {
     if (this.writeLock) {
       lockDetails = lock.releaseWriteLocks(resource, this.objectLocks);
     } else {
@@ -75,8 +75,7 @@ public class MultiSnapshotLocks {
     this.objectLocks.clear();
   }
 
-  @VisibleForTesting
-  public List<String[]> getObjectLocks() {
+  List<String[]> getObjectLocks() {
     return objectLocks;
   }
 

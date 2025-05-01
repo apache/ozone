@@ -42,7 +42,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -94,6 +93,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
@@ -109,7 +109,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class OmSnapshotManager implements AutoCloseable {
   public static final String OM_HARDLINK_FILE = "hardLinkFile";
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshotManager.class);
 
   // Threshold for the table iterator loop in nanoseconds.
@@ -413,6 +413,10 @@ public final class OmSnapshotManager implements AutoCloseable {
     return registry.build();
   }
 
+  public int getMaxPageSize() {
+    return maxPageSize;
+  }
+
   /**
    * Get snapshot instance LRU cache size.
    * @return cache size.
@@ -499,8 +503,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
-    final String keyPrefix = getOzonePathKeyForFso(omMetadataManager,
-        volumeName, bucketName);
+    final String keyPrefix = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
          iter = omMetadataManager.getDeletedDirTable().iterator(keyPrefix)) {
@@ -566,7 +569,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     // Range delete start key (inclusive)
     final String keyPrefix =
-        omMetadataManager.getOzoneKey(volumeName, bucketName, "");
+        omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
 
     try (TableIterator<String,
         ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
@@ -692,7 +695,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     return true;
   }
 
-
   /**
    * Returns OmSnapshot object and skips active check.
    * This should only be used for API calls initiated by background service e.g. purgeKeys, purgeSnapshot,
@@ -804,18 +806,20 @@ public final class OmSnapshotManager implements AutoCloseable {
     return snapshotDiffReport;
   }
 
-  public List<SnapshotDiffJob> getSnapshotDiffList(final String volumeName,
-                                                   final String bucketName,
-                                                   final String jobStatus,
-                                                   final boolean listAll)
-      throws IOException {
+  public ListSnapshotDiffJobResponse getSnapshotDiffList(
+      final String volumeName,
+      final String bucketName,
+      final String jobStatus,
+      final boolean listAllStatus,
+      final String prevSnapshotDiffJob,
+      int maxListResult) throws IOException {
     String volumeKey = ozoneManager.getMetadataManager()
         .getVolumeKey(volumeName);
     String bucketKey = ozoneManager.getMetadataManager()
         .getBucketKey(volumeName, bucketName);
 
     if (!ozoneManager.getMetadataManager()
-            .getVolumeTable().isExist(volumeKey) ||
+        .getVolumeTable().isExist(volumeKey) ||
         !ozoneManager.getMetadataManager()
             .getBucketTable().isExist(bucketKey)) {
       throw new IOException("Provided volume name " + volumeName +
@@ -829,11 +833,15 @@ public final class OmSnapshotManager implements AutoCloseable {
     if (snapshotChainManager.getSnapshotChainPath(snapshotPath) == null) {
       // Return an empty ArrayList here to avoid
       // unnecessarily iterating the SnapshotDiffJob table.
-      return new ArrayList<>();
+      return new ListSnapshotDiffJobResponse(Collections.emptyList(), null);
     }
 
-    return snapshotDiffManager.getSnapshotDiffJobList(
-        volumeName, bucketName, jobStatus, listAll);
+    if (maxListResult <= 0 || maxListResult > maxPageSize) {
+      maxListResult = maxPageSize;
+    }
+
+    return snapshotDiffManager.getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAllStatus,
+        prevSnapshotDiffJob, maxListResult);
   }
 
   private void validateSnapshotsExistAndActive(final String volumeName,

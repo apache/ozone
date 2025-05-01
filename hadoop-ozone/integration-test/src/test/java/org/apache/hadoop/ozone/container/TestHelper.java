@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.security.MessageDigest;
@@ -34,6 +35,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -185,7 +187,7 @@ public final class TestHelper {
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .readKey(keyName)) {
       byte[] readData = new byte[data.length];
-      is.read(readData);
+      IOUtils.readFully(is, readData);
       MessageDigest sha1 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
       sha1.update(data);
       MessageDigest sha2 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
@@ -210,7 +212,6 @@ public final class TestHelper {
     assertThat(containerIdList).isNotEmpty();
     waitForContainerClose(cluster, containerIdList.toArray(new Long[0]));
   }
-
 
   public static void waitForContainerClose(OzoneDataStreamOutput outputStream,
       MiniOzoneCluster cluster) throws Exception {
@@ -288,7 +289,7 @@ public final class TestHelper {
     for (Pipeline pipeline1 : pipelineList) {
       // issue pipeline destroy command
       cluster.getStorageContainerManager()
-          .getPipelineManager().closePipeline(pipeline1, false);
+          .getPipelineManager().closePipeline(pipeline1.getId());
     }
 
     // wait for the pipeline to get destroyed in the datanodes
@@ -454,5 +455,21 @@ public final class TestHelper {
     } else {
       conf.set(key, value);
     }
+  }
+
+  public static void waitForContainerStateInSCM(StorageContainerManager scm,
+      ContainerID containerID, HddsProtos.LifeCycleState expectedState)
+      throws TimeoutException, InterruptedException {
+    ContainerManager containerManager = scm.getContainerManager();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return containerManager.getContainer(containerID).getState() == expectedState;
+      } catch (ContainerNotFoundException e) {
+        LOG.error("Container {} not found while waiting for state {}", 
+            containerID, expectedState, e);
+        fail("Container " + containerID + " not found while waiting for state " + expectedState + ": " + e);
+        return false;
+      }
+    }, 2000, 20000);
   }
 }

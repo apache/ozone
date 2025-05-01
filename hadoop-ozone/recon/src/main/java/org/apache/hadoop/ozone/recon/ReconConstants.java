@@ -24,10 +24,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class ReconConstants {
 
-  private ReconConstants() {
-    // Never Constructed
-  }
-
   public static final String RECON_CONTAINER_KEY_DB = "recon-container-key.db";
 
   public static final String CONTAINER_COUNT_KEY = "containerCount";
@@ -71,6 +67,7 @@ public final class ReconConstants {
   public static final String CONTAINER_COUNT = "CONTAINER_COUNT";
   public static final String TOTAL_KEYS = "TOTAL_KEYS";
   public static final String TOTAL_USED_BYTES = "TOTAL_USED_BYTES";
+  public static final String STAGING = ".staging_";
 
   // 1125899906842624L = 1PB
   public static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
@@ -80,7 +77,6 @@ public final class ReconConstants {
   public static final int NUM_OF_FILE_SIZE_BINS = (int) Math.ceil(Math.log(
       (double) MAX_FILE_SIZE_UPPER_BOUND / MIN_FILE_SIZE_UPPER_BOUND) /
       Math.log(2)) + 1;
-
 
   // 1125899906842624L = 1PB
   public static final long MAX_CONTAINER_SIZE_UPPER_BOUND = 1125899906842624L;
@@ -95,11 +91,18 @@ public final class ReconConstants {
   // For file-size count reprocessing: ensure only one task truncates the table.
   public static final AtomicBoolean FILE_SIZE_COUNT_TABLE_TRUNCATED = new AtomicBoolean(false);
 
+  public static final AtomicBoolean CONTAINER_KEY_TABLES_TRUNCATED = new AtomicBoolean(false);
+
+  private ReconConstants() {
+    // Never Constructed
+  }
+
   /**
-   * Resets the table-truncated flag for the given tables. This should be called once per reprocess cycle,
+   * Resets the table truncated flag for the given tables. This should be called once per reprocess cycle,
    * for example by the OM task controller, before the tasks run.
    */
   public static void resetTableTruncatedFlags() {
     FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
+    CONTAINER_KEY_TABLES_TRUNCATED.set(false);
   }
 }

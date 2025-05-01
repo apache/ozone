@@ -49,12 +49,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test to behaviour of the datanode when receive close container command.
  */
-@Timeout(300)
 public class TestCloseContainerHandler {
 
   private MiniOzoneCluster cluster;

@@ -44,60 +44,43 @@ Create EC key
 *** Test Cases ***
 0 data block
     Create EC key     1000    0
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
     Should Be Equal As Integers         ${count_files}     1
 
 1 data block
     Create EC key     1048576    1
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     6
-    ${sum_size} =                       Evaluate     1048576 * 3
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size}
+    Should Be Equal As Integers         ${count_files}     1
 
 2 data blocks
     Create EC key     1048576    2
-    ${directory} =                      Execute read-replicas CLI tool
-    ${sum_size} =                       Evaluate     1048576 * 4
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     6
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size}
+    Should Be Equal As Integers         ${count_files}     1
 
 3 data blocks
     Create EC key     1048576    3
-    ${directory} =                      Execute read-replicas CLI tool
-    ${sum_size} =                       Evaluate     1048576 * 5
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     6
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size} 
-    
+    Should Be Equal As Integers         ${count_files}     1
+
 3 data blocks and partial stripe
     Create EC key     1000000    4
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    ${sum_size} =                       Evaluate     1048576 * 5
     ${sum_size_last_stripe} =           Evaluate     ((1000000 * 4) % 1048576) * 3
-    Should Be Equal As Integers         ${count_files}     11
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size}
-    Verify Healthy EC Replica           ${directory}    2    ${sum_size_last_stripe}
+    Should Be Equal As Integers         ${count_files}     1
 
 4 data blocks and partial stripe
     Create EC key     1000000    5
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    ${sum_size} =                       Evaluate     1048576 * 5
-    ${sum_size_last_stripe} =           Evaluate     1048576 * 3 + ((1000000 * 5) % 1048576)
-    Should Be Equal As Integers         ${count_files}     11
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size}
-    Verify Healthy EC Replica           ${directory}    2    ${sum_size_last_stripe}
+    Should Be Equal As Integers         ${count_files}     1
 
 6 data blocks
     Create EC key     1048576    6
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    ${sum_size} =                       Evaluate     1048576 * 5
-    Should Be Equal As Integers         ${count_files}     11
-    FOR    ${block}    IN RANGE    1    3
-        Verify Healthy EC Replica       ${directory}    ${block}    ${sum_size}
-    END
+    Should Be Equal As Integers         ${count_files}     1
