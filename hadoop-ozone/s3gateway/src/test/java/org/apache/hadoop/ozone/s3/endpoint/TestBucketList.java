@@ -49,6 +49,7 @@ public class TestBucketList {
   private BucketEndpoint bucketEndpoint;
 
   public void setup(String... keys) throws Exception {
+    client = new OzoneClientStub();
     client = createClientWithKeys(keys);
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
   }
