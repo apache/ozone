@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
@@ -48,6 +46,8 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
  *                                         SSL certificate if one exists.
  */
 public class OMStorage extends Storage {
+
+  public static final String TESTING_INIT_LAYOUT_VERSION_KEY = "testing.ozone.om.init.layout.version";
 
   static final String ERROR_OM_IS_ALREADY_INITIALIZED =
       "OM is already initialized.";
@@ -91,7 +91,7 @@ public class OMStorage extends Storage {
    */
   public OMStorage(OzoneConfiguration conf) throws IOException {
     super(NodeType.OM, getOmDbDir(conf), STORAGE_DIR,
-        getInitLayoutVersion(conf, OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION,
+        getInitLayoutVersion(conf, TESTING_INIT_LAYOUT_VERSION_KEY,
             OMLayoutVersionManager::maxLayoutVersion));
   }
 
