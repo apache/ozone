@@ -54,7 +54,7 @@ public class ContainerDatanodeDatabase {
     this.out = new PrintWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8), true);
   }
 
-  public ContainerDatanodeDatabase(PrintWriter out, PrintWriter err) {
+  public ContainerDatanodeDatabase(PrintWriter out) {
     this.out = out;
   }
   
