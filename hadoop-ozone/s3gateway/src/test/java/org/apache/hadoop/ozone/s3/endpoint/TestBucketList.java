@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -250,7 +249,7 @@ public class TestBucketList {
   @Test
   public void listWithContinuationTokenDirBreak()
       throws Exception {
-    setup( "test/dir1/file1",
+    setup("test/dir1/file1",
         "test/dir1/file2",
         "test/dir1/file3",
         "test/dir2/file4",
@@ -454,7 +453,6 @@ public class TestBucketList {
   }
 
   private OzoneClient createClientWithKeys(String... keys) throws IOException {
-    OzoneClient client = new OzoneClientStub();
 
     client.getObjectStore().createS3Bucket(bucketName);
     OzoneBucket bucket = client.getObjectStore().getS3Bucket(bucketName);
