@@ -137,7 +137,7 @@ public class WritableECContainerProvider
           if (containerInfo == null
               || !containerHasSpace(containerInfo, size)) {
             existingPipelines.remove(pipelineIndex);
-            pipelineManager.closePipeline(pipeline, true);
+            pipelineManager.closePipeline(pipeline.getId());
             openPipelineCount--;
           } else {
             if (pipelineIsExcluded(pipeline, containerInfo, excludeList)) {
@@ -151,7 +151,7 @@ public class WritableECContainerProvider
           LOG.warn("Pipeline or container not found when selecting a writable "
               + "container", e);
           existingPipelines.remove(pipelineIndex);
-          pipelineManager.closePipeline(pipeline, true);
+          pipelineManager.closePipeline(pipeline.getId());
           openPipelineCount--;
         }
       }

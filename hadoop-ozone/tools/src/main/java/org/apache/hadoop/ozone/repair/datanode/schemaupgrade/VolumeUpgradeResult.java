@@ -94,7 +94,7 @@ class VolumeUpgradeResult {
     if (resultMap != null) {
       resultMap.forEach((k, r) -> {
         stringBuilder.append(r.toString());
-        stringBuilder.append("\n");
+        stringBuilder.append('\n');
         total.addAndGet(r.getTotalRow());
       });
     }

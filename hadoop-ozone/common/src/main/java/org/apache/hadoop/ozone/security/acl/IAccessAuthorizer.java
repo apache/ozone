@@ -174,11 +174,6 @@ public interface IAccessAuthorizer {
 
     // TODO: Add support for acl checks based on CLIENT_IP.
 
-    @Override
-    public String toString() {
-      return value;
-    }
-
     /**
      * String value for this Enum.
      */
@@ -191,6 +186,11 @@ public interface IAccessAuthorizer {
      */
     ACLIdentityType(String val) {
       value = val;
+    }
+
+    @Override
+    public String toString() {
+      return value;
     }
   }
 

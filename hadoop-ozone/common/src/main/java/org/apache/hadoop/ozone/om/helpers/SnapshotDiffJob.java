@@ -36,10 +36,6 @@ public class SnapshotDiffJob {
   private static final Codec<SnapshotDiffJob> CODEC =
       new SnapshotDiffJobCodec();
 
-  public static Codec<SnapshotDiffJob> getCodec() {
-    return CODEC;
-  }
-
   private long creationTime;
   private String jobId;
   private JobStatus status;
@@ -93,6 +89,10 @@ public class SnapshotDiffJob {
     this.reason = StringUtils.EMPTY;
     this.subStatus = subStatus;
     this.keysProcessedPct = keysProcessedPct;
+  }
+
+  public static Codec<SnapshotDiffJob> getCodec() {
+    return CODEC;
   }
 
   public String getJobId() {

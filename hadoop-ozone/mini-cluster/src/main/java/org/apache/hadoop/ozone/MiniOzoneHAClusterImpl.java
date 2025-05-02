@@ -634,7 +634,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         if (i == 1) {
           conf.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY, scmNodeId);
         }
-        scmNodesKeyValue.append(",").append(scmNodeId);
+        scmNodesKeyValue.append(',').append(scmNodeId);
 
         String scmAddrKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);

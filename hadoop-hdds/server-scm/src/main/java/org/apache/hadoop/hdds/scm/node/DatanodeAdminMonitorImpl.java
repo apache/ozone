@@ -499,7 +499,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     sb.append(replicas.stream()
         .map(Object::toString)
         .collect(Collectors.joining(",")));
-    sb.append("}");
+    sb.append('}');
     return sb.toString();
   }
 

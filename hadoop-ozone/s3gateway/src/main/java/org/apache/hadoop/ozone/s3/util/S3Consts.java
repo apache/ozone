@@ -26,11 +26,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 @InterfaceAudience.Private
 public final class S3Consts {
 
-  //Never Constructed
-  private S3Consts() {
-
-  }
-
   public static final String COPY_SOURCE_HEADER = "x-amz-copy-source";
   public static final String COPY_SOURCE_HEADER_RANGE =
       "x-amz-copy-source-range";
@@ -91,6 +86,11 @@ public final class S3Consts {
   // Also see https://docs.aws.amazon.com/directoryservice/latest/devguide/API_Tag.html for Java regex equivalent
   public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
   public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
+
+  //Never Constructed
+  private S3Consts() {
+
+  }
 
   /**
    * Copy directive for metadata and tags.

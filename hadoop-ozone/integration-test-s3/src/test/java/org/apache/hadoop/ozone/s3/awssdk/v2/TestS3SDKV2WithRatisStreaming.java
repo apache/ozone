@@ -23,12 +23,10 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests the AWS S3 SDK basic operations with OM Ratis enabled and Streaming Write Pipeline.
  */
-@Timeout(300)
 public class TestS3SDKV2WithRatisStreaming extends AbstractS3SDKV2Tests {
 
   @BeforeAll

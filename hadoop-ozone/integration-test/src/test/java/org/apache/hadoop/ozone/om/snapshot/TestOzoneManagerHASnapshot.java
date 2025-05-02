@@ -61,12 +61,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests snapshot in OM HA setup.
  */
-@Timeout(300)
 public class TestOzoneManagerHASnapshot {
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
