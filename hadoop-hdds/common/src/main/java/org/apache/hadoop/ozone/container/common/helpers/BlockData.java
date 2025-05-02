@@ -24,9 +24,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto3Codec;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -92,15 +94,13 @@ public class BlockData {
    *
    * @param data - Protobuf data.
    * @return - BlockData
-   * @throws IOException
    */
-  public static BlockData getFromProtoBuf(ContainerProtos.BlockData data) throws
-      IOException {
+  public static BlockData getFromProtoBuf(ContainerProtos.BlockData data) throws CodecException {
     BlockData blockData = new BlockData(
         BlockID.getFromProtobuf(data.getBlockID()));
     for (int x = 0; x < data.getMetadataCount(); x++) {
-      blockData.addMetadata(data.getMetadata(x).getKey(),
-          data.getMetadata(x).getValue());
+      final ContainerProtos.KeyValue meta = data.getMetadata(x);
+      blockData.addMetadata(meta.getKey(), meta.getValue(), CodecException::new);
     }
     blockData.setChunks(data.getChunksList());
     if (data.hasSize()) {
@@ -135,10 +135,14 @@ public class BlockData {
    * @param value - Value
    * @throws IOException
    */
-  public synchronized void addMetadata(String key, String value) throws
-      IOException {
+  public void addMetadata(String key, String value) throws IOException {
+    addMetadata(key, value, IOException::new);
+  }
+
+  private synchronized <E extends IOException> void addMetadata(String key, String value,
+      Function<String, E> constructor) throws E {
     if (this.metadata.containsKey(key)) {
-      throw new IOException("This key already exists. Key " + key);
+      throw constructor.apply("Key already exists: " + key + " (value: " + value + ")");
     }
     metadata.put(key, value);
   }
