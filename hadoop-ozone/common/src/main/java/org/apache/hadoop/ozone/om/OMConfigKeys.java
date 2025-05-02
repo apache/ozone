@@ -282,7 +282,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";
-  public static final int OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT = 1000;
+  public static final int OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT = 65000;
 
   public static final String OZONE_OM_KERBEROS_KEYTAB_FILE_KEY = "ozone.om."
       + "kerberos.keytab.file";
