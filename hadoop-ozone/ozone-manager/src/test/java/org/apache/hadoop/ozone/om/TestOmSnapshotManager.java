@@ -32,7 +32,6 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -55,7 +54,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -78,7 +76,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -93,9 +90,6 @@ import org.slf4j.event.Level;
 class TestOmSnapshotManager {
 
   private OzoneManager om;
-  private SnapshotChainManager snapshotChainManager;
-  private OmMetadataManagerImpl omMetadataManager;
-  private OmSnapshotManager omSnapshotManager;
   private static final String CANDIDATE_DIR_NAME = OM_DB_NAME +
       SNAPSHOT_CANDIDATE_DIR;
   private File leaderDir;
@@ -120,35 +114,14 @@ class TestOmSnapshotManager {
         OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE, 1);
     configuration.setBoolean(
         OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED, false);
-    // Allow 2 fs snapshots
-    configuration.setInt(
-        OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT, 2);
 
     OmTestManagers omTestManagers = new OmTestManagers(configuration);
     om = omTestManagers.getOzoneManager();
-    omMetadataManager = (OmMetadataManagerImpl) om.getMetadataManager();
-    omSnapshotManager = om.getOmSnapshotManager();
-    snapshotChainManager = omMetadataManager.getSnapshotChainManager();
   }
 
   @AfterAll
   void stop() {
     om.stop();
-  }
-
-  @AfterEach
-  void cleanup() throws IOException {
-    Table<String, SnapshotInfo> snapshotInfoTable = omMetadataManager.getSnapshotInfoTable();
-
-    Iterator<UUID> iter = snapshotChainManager.iterator(true);
-    while (iter.hasNext()) {
-      UUID snapshotId = iter.next();
-      String snapshotInfoKey = snapshotChainManager.getTableKey(snapshotId);
-      SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotInfoKey);
-      snapshotChainManager.deleteSnapshot(snapshotInfo);
-      snapshotInfoTable.delete(snapshotInfoKey);
-    }
-    omSnapshotManager.invalidateCache();
   }
 
   @Test
@@ -177,11 +150,11 @@ class TestOmSnapshotManager {
     final TypedTable<String, OmBucketInfo> bucketTable = mock(TypedTable.class);
     final TypedTable<String, SnapshotInfo> snapshotInfoTable = mock(TypedTable.class);
     HddsWhiteboxTestUtils.setInternalState(
-        omMetadataManager, VOLUME_TABLE, volumeTable);
+        om.getMetadataManager(), VOLUME_TABLE, volumeTable);
     HddsWhiteboxTestUtils.setInternalState(
-        omMetadataManager, BUCKET_TABLE, bucketTable);
+        om.getMetadataManager(), BUCKET_TABLE, bucketTable);
     HddsWhiteboxTestUtils.setInternalState(
-        omMetadataManager, SNAPSHOT_INFO_TABLE, snapshotInfoTable);
+        om.getMetadataManager(), SNAPSHOT_INFO_TABLE, snapshotInfoTable);
 
     final String volumeName = UUID.randomUUID().toString();
     final String dbVolumeKey = om.getMetadataManager().getVolumeKey(volumeName);
@@ -211,8 +184,8 @@ class TestOmSnapshotManager {
     when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
     when(snapshotInfoTable.get(second.getTableKey())).thenReturn(second);
 
-    snapshotChainManager.addSnapshot(first);
-    snapshotChainManager.addSnapshot(second);
+    ((OmMetadataManagerImpl) om.getMetadataManager()).getSnapshotChainManager().addSnapshot(first);
+    ((OmMetadataManagerImpl) om.getMetadataManager()).getSnapshotChainManager().addSnapshot(second);
     RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
     // create the first snapshot checkpoint
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
@@ -220,6 +193,7 @@ class TestOmSnapshotManager {
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);
 
     // retrieve it and setup store mock
+    OmSnapshotManager omSnapshotManager = om.getOmSnapshotManager();
     OmSnapshot firstSnapshot = omSnapshotManager
         .getActiveSnapshot(first.getVolumeName(), first.getBucketName(), first.getName())
         .get();
@@ -253,37 +227,6 @@ class TestOmSnapshotManager {
     GenericTestUtils.waitFor(() -> {
       return logCapture.getOutput().contains(msg);
     }, 100, 30_000);
-  }
-
-  @Test
-  public void testValidateSnapshotLimit() throws IOException {
-    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
-    HddsWhiteboxTestUtils.setInternalState(
-        omMetadataManager, SNAPSHOT_INFO_TABLE, snapshotInfoTable);
-
-    SnapshotInfo first = createSnapshotInfo("vol1", "buck1");
-    SnapshotInfo second = createSnapshotInfo("vol1", "buck1");
-
-    first.setGlobalPreviousSnapshotId(null);
-    first.setPathPreviousSnapshotId(null);
-    second.setGlobalPreviousSnapshotId(first.getSnapshotId());
-    second.setPathPreviousSnapshotId(first.getSnapshotId());
-
-    when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
-    when(snapshotInfoTable.get(second.getTableKey())).thenReturn(second);
-
-    snapshotChainManager.addSnapshot(first);
-    assertDoesNotThrow(() -> omSnapshotManager.snapshotLimitCheck());
-    omSnapshotManager.decrementInFlightSnapshotCount();
-
-    snapshotChainManager.addSnapshot(second);
-
-    OMException exception = assertThrows(OMException.class, () -> omSnapshotManager.snapshotLimitCheck());
-    assertEquals(OMException.ResultCodes.TOO_MANY_SNAPSHOTS, exception.getResult());
-
-    snapshotChainManager.deleteSnapshot(second);
-
-    assertDoesNotThrow(() -> omSnapshotManager.snapshotLimitCheck());
   }
 
   @BeforeEach
@@ -389,12 +332,16 @@ class TestOmSnapshotManager {
   @Test
   public void testGetSnapshotInfo() throws IOException {
     SnapshotInfo s1 = createSnapshotInfo("vol", "buck");
-    UUID latestGlobalSnapId = snapshotChainManager.getLatestGlobalSnapshotId();
+    UUID latestGlobalSnapId =
+        ((OmMetadataManagerImpl) om.getMetadataManager()).getSnapshotChainManager()
+            .getLatestGlobalSnapshotId();
     UUID latestPathSnapId =
-        snapshotChainManager.getLatestPathSnapshotId(String.join("/", "vol", "buck"));
+        ((OmMetadataManagerImpl) om.getMetadataManager()).getSnapshotChainManager()
+            .getLatestPathSnapshotId(String.join("/", "vol", "buck"));
     s1.setPathPreviousSnapshotId(latestPathSnapId);
     s1.setGlobalPreviousSnapshotId(latestGlobalSnapId);
-    snapshotChainManager.addSnapshot(s1);
+    ((OmMetadataManagerImpl) om.getMetadataManager()).getSnapshotChainManager()
+        .addSnapshot(s1);
     OMException ome = assertThrows(OMException.class,
         () -> om.getOmSnapshotManager().getSnapshot(s1.getSnapshotId()));
     assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ome.getResult());
@@ -403,12 +350,6 @@ class TestOmSnapshotManager {
     ome = assertThrows(OMException.class,
         () -> om.getOmSnapshotManager().getSnapshot(s2.getSnapshotId()));
     assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ome.getResult());
-
-    // add to make cleanup work
-    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
-    HddsWhiteboxTestUtils.setInternalState(
-        omMetadataManager, SNAPSHOT_INFO_TABLE, snapshotInfoTable);
-    when(snapshotInfoTable.get(s1.getTableKey())).thenReturn(s1);
   }
 
   /*

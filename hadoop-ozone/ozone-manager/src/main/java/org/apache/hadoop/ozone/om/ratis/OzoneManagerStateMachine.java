@@ -157,11 +157,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void notifyLeaderReady() {
-    ozoneManager.getOmSnapshotManager().resetInFlightSnapshotCount();
-  }
-
-  @Override
   public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
                                   RaftPeerId newLeaderId) {
     RaftPeerId currentPeerId = groupMemberId.getPeerId();
