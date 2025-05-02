@@ -26,9 +26,9 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "container",
     subcommands = {
+        ContainerInfoCommand.class,    
         ContainerLogParser.class,
-        ListContainers.class,
-        ContainerInfoCommand.class
+        ListContainers.class
     },
     description = "Tool to parse and store container logs from datanodes into a temporary SQLite database." +
             " Supports querying state transitions of container replicas using various subcommands."

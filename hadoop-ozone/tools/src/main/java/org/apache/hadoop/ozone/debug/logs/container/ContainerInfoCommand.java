@@ -32,7 +32,7 @@ import picocli.CommandLine;
 
 @CommandLine.Command(
     name = "info",
-    description = "provides complete state transition history of each replica for a single container along with " +
+    description = "Provides complete state transition history of each replica for a single container along with " +
         "analysis over the container"
 )
 public class ContainerInfoCommand extends AbstractSubcommand implements Callable<Void> {
@@ -75,12 +75,9 @@ public class ContainerInfoCommand extends AbstractSubcommand implements Callable
     ContainerDatanodeDatabase.setDatabasePath(providedDbPath.toString());
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
-    try {
-      cdd.showContainerDetails(containerId);
-    } catch (Exception e) {
-      throw e;
-    }
-
+ 
+    cdd.showContainerDetails(containerId);
+    
     return null;
   }
 

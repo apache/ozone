@@ -76,11 +76,8 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
     ContainerDatanodeDatabase.setDatabasePath(providedDbPath.toString());
     
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
-    try {
-      cdd.listContainersByState(state.name(), listOptions.getLimit());
-    } catch (Exception e) {
-      throw e;
-    }
+
+    cdd.listContainersByState(state.name(), listOptions.getLimit());
     
     return null;
   }
