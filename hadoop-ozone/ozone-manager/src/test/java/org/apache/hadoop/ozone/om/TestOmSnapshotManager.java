@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -257,7 +258,7 @@ class TestOmSnapshotManager {
 
   @Test
   public void testValidateSnapshotLimit() throws IOException {
-    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    TypedTable<String, SnapshotInfo> snapshotInfoTable = mock(TypedTable.class);
     HddsWhiteboxTestUtils.setInternalState(
         omMetadataManager, SNAPSHOT_INFO_TABLE, snapshotInfoTable);
 
@@ -405,7 +406,7 @@ class TestOmSnapshotManager {
     assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ome.getResult());
 
     // add to make cleanup work
-    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    TypedTable<String, SnapshotInfo> snapshotInfoTable = mock(TypedTable.class);
     HddsWhiteboxTestUtils.setInternalState(
         omMetadataManager, SNAPSHOT_INFO_TABLE, snapshotInfoTable);
     when(snapshotInfoTable.get(s1.getTableKey())).thenReturn(s1);
