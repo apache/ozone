@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -34,6 +35,7 @@ import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -43,17 +45,22 @@ import org.junit.jupiter.api.Test;
  */
 public class TestBucketList {
 
+  private final String bucketName = OzoneConsts.BUCKET;
+  private OzoneClient client;
+  private BucketEndpoint bucketEndpoint;
+
+  public void setup(String... keys) throws Exception {
+    client = createClientWithKeys(keys);
+    bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
+  }
+
   @Test
-  public void listRoot() throws OS3Exception, IOException {
+  public void listRoot() throws Exception {
 
-    OzoneClient client = createClientWithKeys("file1", "dir1/file2");
-
-    BucketEndpoint getBucket = EndpointBuilder.newBucketEndpointBuilder()
-        .setClient(client)
-        .build();
+    setup("file1", "dir1/file2");
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100, "",
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "/", null, null, 100, "",
                 null, null, null, null, null, null, 0, null)
             .getEntity();
 
@@ -68,17 +75,12 @@ public class TestBucketList {
   }
 
   @Test
-  public void listDir() throws OS3Exception, IOException {
+  public void listDir() throws Exception {
 
-    BucketEndpoint getBucket = new BucketEndpoint();
-
-    OzoneClient client = createClientWithKeys("dir1/file2", "dir1/dir2/file2");
-
-    getBucket.setClient(client);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+    setup("dir1/file2", "dir1/dir2/file2");
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "/", null, null, 100,
             "dir1", null, null, null, null, null, null, 0, null).getEntity();
 
     assertEquals(1, getBucketResponse.getCommonPrefixes().size());
@@ -90,19 +92,14 @@ public class TestBucketList {
   }
 
   @Test
-  public void listSubDir() throws OS3Exception, IOException {
+  public void listSubDir() throws Exception {
 
-    BucketEndpoint getBucket = new BucketEndpoint();
+    setup("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
+        "dir1bha/file2");
 
-    OzoneClient ozoneClient =
-        createClientWithKeys("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
-            "dir1bha/file2");
-
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket
-            .get("b1", "/", null, null, 100, "dir1/", null,
+        (ListObjectResponse) bucketEndpoint
+            .get(bucketName, "/", null, null, 100, "dir1/", null,
                 null, null, null, null, null, 0, null)
             .getEntity();
 
@@ -117,27 +114,25 @@ public class TestBucketList {
   }
 
   @Test
-  public void listObjectOwner() throws OS3Exception, IOException {
+  public void listObjectOwner() throws Exception {
 
     UserGroupInformation user1 = UserGroupInformation
         .createUserForTesting("user1", new String[] {"user1"});
     UserGroupInformation user2 = UserGroupInformation
         .createUserForTesting("user2", new String[] {"user2"});
 
-    BucketEndpoint getBucket = new BucketEndpoint();
-    OzoneClient client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket("b1");
-    OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
+    setup();
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(bucketName);
 
     UserGroupInformation.setLoginUser(user1);
     bucket.createKey("key1", 0).close();
     UserGroupInformation.setLoginUser(user2);
     bucket.createKey("key2", 0).close();
 
-    getBucket.setClient(client);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+    bucketEndpoint.setClient(client);
+    bucketEndpoint.setRequestIdentifier(new RequestIdentifier());
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "/", null, null, 100,
             "key", null, null, null, null, null, null, 0, null).getEntity();
 
     assertEquals(2, getBucketResponse.getContents().size());
@@ -149,19 +144,13 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithPrefixAndDelimiter() throws OS3Exception, IOException {
+  public void listWithPrefixAndDelimiter() throws Exception {
 
-    BucketEndpoint getBucket = new BucketEndpoint();
-
-    OzoneClient ozoneClient =
-        createClientWithKeys("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
-            "dir1bha/file2", "file2");
-
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+    setup("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
+        "dir1bha/file2", "file2");
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "/", null, null, 100,
             "dir1", null, null, null, null, null, null, 0, null).getEntity();
 
     assertEquals(3, getBucketResponse.getCommonPrefixes().size());
@@ -169,19 +158,13 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithPrefixAndDelimiter1() throws OS3Exception, IOException {
+  public void listWithPrefixAndDelimiter1() throws Exception {
 
-    BucketEndpoint getBucket = new BucketEndpoint();
-
-    OzoneClient ozoneClient =
-        createClientWithKeys("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
-            "dir1bha/file2", "file2");
-
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+    setup("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
+        "dir1bha/file2", "file2");
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "/", null, null, 100,
             "", null, null, null, null, null, null, 0, null).getEntity();
 
     assertEquals(3, getBucketResponse.getCommonPrefixes().size());
@@ -191,18 +174,12 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithPrefixAndDelimiter2() throws OS3Exception, IOException {
+  public void listWithPrefixAndDelimiter2() throws Exception {
+    setup("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
+        "dir1bha/file2", "file2");
 
-    BucketEndpoint getBucket = new BucketEndpoint();
-
-    OzoneClient ozoneClient =
-        createClientWithKeys("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
-            "dir1bha/file2", "file2");
-
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100, "dir1bh",
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "/", null, null, 100, "dir1bh",
             null, "dir1/dir2/file2", null, null, null, null, 0, null).getEntity();
 
     assertEquals(2, getBucketResponse.getCommonPrefixes().size());
@@ -211,18 +188,13 @@ public class TestBucketList {
 
   @Test
   public void listWithPrefixAndEmptyStrDelimiter()
-      throws OS3Exception, IOException {
-    BucketEndpoint getBucket = new BucketEndpoint();
+      throws Exception {
+    setup("dir1/", "dir1/dir2/", "dir1/dir2/file1",
+        "dir1/dir2/file2");
 
-    OzoneClient ozoneClient =
-        createClientWithKeys("dir1/", "dir1/dir2/", "dir1/dir2/file1",
-          "dir1/dir2/file2");
-
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
     // Should behave the same if delimiter is null
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "", null, null, 100, "dir1/",
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "", null, null, 100, "dir1/",
           null, null, null, null, null, null, 0, null).getEntity();
 
     assertEquals(0, getBucketResponse.getCommonPrefixes().size());
@@ -239,22 +211,16 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithContinuationToken() throws OS3Exception, IOException {
+  public void listWithContinuationToken() throws Exception {
+    setup("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
+        "dir1bha/file2", "file2");
 
-    BucketEndpoint getBucket = new BucketEndpoint();
-
-    OzoneClient ozoneClient =
-        createClientWithKeys("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
-            "dir1bha/file2", "file2");
-
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
     int maxKeys = 2;
     // As we have 5 keys, with max keys 2 we should call list 3 times.
 
     // First time
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", null, null, null, maxKeys,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, null, null, null, maxKeys,
             "", null, null, null, null, null, null, 0, null).getEntity();
 
     assertTrue(getBucketResponse.isTruncated());
@@ -263,7 +229,7 @@ public class TestBucketList {
     // 2nd time
     String continueToken = getBucketResponse.getNextToken();
     getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", null, null, null, maxKeys,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, null, null, null, maxKeys,
             "", continueToken, null, null, null, null, null, 0, null).getEntity();
     assertTrue(getBucketResponse.isTruncated());
     assertEquals(2, getBucketResponse.getContents().size());
@@ -273,7 +239,7 @@ public class TestBucketList {
 
     //3rd time
     getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", null, null, null, maxKeys,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, null, null, null, maxKeys,
             "", continueToken, null, null, null, null, null, 0, null).getEntity();
 
     assertFalse(getBucketResponse.isTruncated());
@@ -283,30 +249,20 @@ public class TestBucketList {
 
   @Test
   public void listWithContinuationTokenDirBreak()
-      throws OS3Exception, IOException {
-
-    BucketEndpoint getBucket = new BucketEndpoint();
-
-    OzoneClient ozoneClient =
-        createClientWithKeys(
-            "test/dir1/file1",
-            "test/dir1/file2",
-            "test/dir1/file3",
-            "test/dir2/file4",
-            "test/dir2/file5",
-            "test/dir2/file6",
-            "test/dir3/file7",
-            "test/file8");
-
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+      throws Exception {
+    setup( "test/dir1/file1",
+        "test/dir1/file2",
+        "test/dir1/file3",
+        "test/dir2/file4",
+        "test/dir2/file5",
+        "test/dir2/file6",
+        "test/dir3/file7",
+        "test/file8");
 
     int maxKeys = 2;
 
-    ListObjectResponse getBucketResponse;
-
-    getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "/", null, null, maxKeys,
+    ListObjectResponse getBucketResponse =
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "/", null, null, maxKeys,
             "test/", null, null, null, null, null, null, 0, null).getEntity();
 
     assertEquals(0, getBucketResponse.getContents().size());
@@ -317,7 +273,7 @@ public class TestBucketList {
         getBucketResponse.getCommonPrefixes().get(1).getPrefix().getName());
 
     getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "/", null, null, maxKeys,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "/", null, null, maxKeys,
             "test/", getBucketResponse.getNextToken(), null, null, null,
             null, null, 0, null).getEntity();
     assertEquals(1, getBucketResponse.getContents().size());
@@ -334,23 +290,17 @@ public class TestBucketList {
    * behavior.
    */
   @Test
-  public void listWithContinuationToken1() throws OS3Exception, IOException {
+  public void listWithContinuationToken1() throws Exception {
 
-    BucketEndpoint getBucket = new BucketEndpoint();
-
-    OzoneClient ozoneClient =
-        createClientWithKeys("dir1/file1", "dir1bh/file1",
-            "dir1bha/file1", "dir0/file1", "dir2/file1");
-
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+    setup("dir1/file1", "dir1bh/file1",
+        "dir1bha/file1", "dir0/file1", "dir2/file1");
 
     int maxKeys = 2;
     // As we have 5 keys, with max keys 2 we should call list 3 times.
 
     // First time
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "/", null, null, maxKeys,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "/", null, null, maxKeys,
             "dir", null, null, null, null, null, null, 0, null).getEntity();
 
     assertTrue(getBucketResponse.isTruncated());
@@ -359,7 +309,7 @@ public class TestBucketList {
     // 2nd time
     String continueToken = getBucketResponse.getNextToken();
     getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "/", null, null, maxKeys,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "/", null, null, maxKeys,
             "dir", continueToken, null, null, null, null, null, 0, null).getEntity();
     assertTrue(getBucketResponse.isTruncated());
     assertEquals(2, getBucketResponse.getCommonPrefixes().size());
@@ -367,27 +317,19 @@ public class TestBucketList {
     //3rd time
     continueToken = getBucketResponse.getNextToken();
     getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", "/", null, null, maxKeys,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, "/", null, null, maxKeys,
             "dir", continueToken, null, null, null, null, null, 0, null).getEntity();
 
     assertFalse(getBucketResponse.isTruncated());
     assertEquals(1, getBucketResponse.getCommonPrefixes().size());
-
   }
 
   @Test
-  public void listWithContinuationTokenFail() throws IOException {
-
-    BucketEndpoint getBucket = new BucketEndpoint();
-
-    OzoneClient ozoneClient =
-        createClientWithKeys("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
+  public void listWithContinuationTokenFail() throws Exception {
+    setup("dir1/file2", "dir1/dir2/file2", "dir1bh/file",
             "dir1bha/file2", "dir1", "dir2", "dir3");
 
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
-
-    OS3Exception e = assertThrows(OS3Exception.class, () -> getBucket.get("b1",
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(bucketName,
             "/", null, null, 2, "dir", "random", null, null, null, null, null, 1000, null)
         .getEntity(), "listWithContinuationTokenFail");
     assertEquals("random", e.getResource());
@@ -395,18 +337,12 @@ public class TestBucketList {
   }
 
   @Test
-  public void testStartAfter() throws IOException, OS3Exception {
-    BucketEndpoint getBucket = new BucketEndpoint();
-
-    OzoneClient ozoneClient =
-        createClientWithKeys("dir1/file1", "dir1bh/file1",
-            "dir1bha/file1", "dir0/file1", "dir2/file1");
-
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+  public void testStartAfter() throws Exception {
+    setup("dir1/file1", "dir1bh/file1",
+        "dir1bha/file1", "dir0/file1", "dir2/file1");
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", null, null, null, 1000,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, null, null, null, 1000,
             null, null, null, null, null, null, null, 0, null).getEntity();
 
     assertFalse(getBucketResponse.isTruncated());
@@ -417,14 +353,14 @@ public class TestBucketList {
     String startAfter = "dir0/file1";
 
     getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", null, null, null,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, null, null, null,
             1000, null, null, startAfter, null, null, null, null, 0, null).getEntity();
 
     assertFalse(getBucketResponse.isTruncated());
     assertEquals(4, getBucketResponse.getContents().size());
 
     getBucketResponse =
-        (ListObjectResponse) getBucket.get("b1", null, null, null,
+        (ListObjectResponse) bucketEndpoint.get(bucketName, null, null, null,
             1000, null, null, "random", null, null, null, null, 0, null).getEntity();
 
     assertFalse(getBucketResponse.isTruncated());
@@ -434,7 +370,7 @@ public class TestBucketList {
   }
 
   @Test
-  public void testEncodingType() throws IOException, OS3Exception {
+  public void testEncodingType() throws Exception {
     /*
     * OP1 -> Create key "data=1970" and "data==1970" in a bucket
     * OP2 -> List Object, if encodingType == url the result will be like blow:
@@ -459,19 +395,15 @@ public class TestBucketList {
       if encodingType == null , the = will not be encoded to "%3D"
     * */
 
-    BucketEndpoint getBucket = new BucketEndpoint();
-    OzoneClient ozoneClient =
-        createClientWithKeys("data=1970", "data==1970");
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+    setup("data=1970", "data==1970");
 
     String delimiter = "=";
     String prefix = "data=";
     String startAfter = "data=";
     String encodingType = ENCODING_TYPE;
 
-    ListObjectResponse response = (ListObjectResponse) getBucket.get(
-        "b1", delimiter, encodingType, null, 1000, prefix,
+    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get(
+        bucketName, delimiter, encodingType, null, 1000, prefix,
         null, startAfter, null, null, null, null, 0, null).getEntity();
 
     // Assert encodingType == url.
@@ -488,8 +420,8 @@ public class TestBucketList {
     assertEquals(encodingType,
         response.getContents().get(0).getKey().getEncodingType());
 
-    response = (ListObjectResponse) getBucket.get(
-        "b1", delimiter, null, null, 1000, prefix,
+    response = (ListObjectResponse) bucketEndpoint.get(
+        bucketName, delimiter, null, null, 1000, prefix,
         null, startAfter, null, null, null, null, 0, null).getEntity();
 
     // Assert encodingType == null.
@@ -507,14 +439,10 @@ public class TestBucketList {
   }
 
   @Test
-  public void testEncodingTypeException() throws IOException {
-    BucketEndpoint getBucket = new BucketEndpoint();
-    OzoneClient client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket("b1");
-    getBucket.setClient(client);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
-    OS3Exception e = assertThrows(OS3Exception.class, () -> getBucket.get(
-        "b1", null, "unSupportType", null, 1000, null,
+  public void testEncodingTypeException() throws Exception {
+    setup();
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
+        bucketName, null, "unSupportType", null, 1000, null,
         null, null, null, null, null, null, 0, null).getEntity());
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e.getCode());
   }
@@ -528,8 +456,8 @@ public class TestBucketList {
   private OzoneClient createClientWithKeys(String... keys) throws IOException {
     OzoneClient client = new OzoneClientStub();
 
-    client.getObjectStore().createS3Bucket("b1");
-    OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
+    client.getObjectStore().createS3Bucket(bucketName);
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(bucketName);
     for (String key : keys) {
       bucket.createKey(key, 0).close();
     }
