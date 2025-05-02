@@ -2,6 +2,7 @@ share/ozone/lib/aircompressor.jar
 share/ozone/lib/animal-sniffer-annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/annotations.jar
+share/ozone/lib/apache-log4j-extras.jar
 share/ozone/lib/aopalliance.jar
 share/ozone/lib/aopalliance-repackaged.jar
 share/ozone/lib/asm-analysis.jar
