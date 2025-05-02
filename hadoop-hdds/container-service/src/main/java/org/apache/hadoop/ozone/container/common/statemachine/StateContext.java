@@ -537,7 +537,7 @@ public class StateContext {
     final PipelineKey key = new PipelineKey(pipelineAction);
     boolean added = false;
     for (InetSocketAddress endpoint : endpoints) {
-      added = added || pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction);
+      added = pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction) || added;
     }
     return added;
   }
