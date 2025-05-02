@@ -120,8 +120,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           "Only bucket owners and Ozone admins can create snapshots",
           OMException.ResultCodes.PERMISSION_DENIED);
     }
-    // verify snapshot limit
-    ozoneManager.getOmSnapshotManager().snapshotLimitCheck();
     CreateSnapshotRequest.Builder createSnapshotRequest = omRequest.getCreateSnapshotRequest().toBuilder()
         .setSnapshotId(toProtobuf(UUID.randomUUID()))
         .setVolumeName(volumeName)
@@ -190,7 +188,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       //  pre-replicated key size counter in OmBucketInfo.
       snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo));
 
-      addSnapshotInfoToSnapshotChainAndCache(ozoneManager, omMetadataManager, context.getIndex());
+      addSnapshotInfoToSnapshotChainAndCache(omMetadataManager, context.getIndex());
 
       omResponse.setCreateSnapshotResponse(
           CreateSnapshotResponse.newBuilder()
@@ -252,7 +250,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
    * it was removed at T-5.
    */
   private void addSnapshotInfoToSnapshotChainAndCache(
-      OzoneManager ozoneManager,
       OmMetadataManagerImpl omMetadataManager,
       long transactionLogIndex
   ) throws IOException {
@@ -291,8 +288,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         removeSnapshotInfoFromSnapshotChainManager(snapshotChainManager,
             snapshotInfo);
         throw new IOException(exception.getMessage(), exception);
-      } finally {
-        ozoneManager.getOmSnapshotManager().decrementInFlightSnapshotCount();
       }
     }
   }
