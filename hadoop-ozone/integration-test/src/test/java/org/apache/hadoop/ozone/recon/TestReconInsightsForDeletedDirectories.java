@@ -486,7 +486,6 @@ public class TestReconInsightsForDeletedDirectories {
     impl.syncDataFromOM();
   }
 
-
   private static BucketLayout getFSOBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }

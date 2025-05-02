@@ -137,6 +137,7 @@ import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotTestUtils.StubbedPersistentMap;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -426,7 +427,7 @@ public class TestSnapshotDiffManager {
     String diffDir = snapDiffDir.getAbsolutePath();
     String diffJobKey = snap1 + DELIMITER + snap2;
     Set<String> randomStrings = IntStream.range(0, numberOfFiles)
-        .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
+        .mapToObj(i -> RandomStringUtils.secure().nextAlphabetic(10))
         .collect(Collectors.toSet());
 
     when(differ.getSSTDiffListWithFullPath(
@@ -449,7 +450,7 @@ public class TestSnapshotDiffManager {
          MockedStatic<RocksDiffUtils> mockedRocksDiffUtils = Mockito.mockStatic(RocksDiffUtils.class,
              Mockito.CALLS_REAL_METHODS)) {
       mockedRdbUtil.when(() -> RdbUtil.getSSTFilesForComparison(any(), any()))
-          .thenReturn(Collections.singleton(RandomStringUtils.randomAlphabetic(10)));
+          .thenReturn(Collections.singleton(RandomStringUtils.secure().nextAlphabetic(10)));
       mockedRocksDiffUtils.when(() -> RocksDiffUtils.filterRelevantSstFiles(any(), any())).thenAnswer(i -> null);
       SnapshotDiffManager spy = spy(snapshotDiffManager);
       doNothing().when(spy).recordActivity(any(), any());
@@ -482,7 +483,7 @@ public class TestSnapshotDiffManager {
               () -> RdbUtil.getSSTFilesForComparison(any(), anyList()))
           .thenAnswer((Answer<Set<String>>) invocation -> {
             Set<String> retVal = IntStream.range(0, numberOfFiles)
-                .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
+                .mapToObj(i -> RandomStringUtils.secure().nextAlphabetic(10))
                 .collect(Collectors.toSet());
             deltaStrings.addAll(retVal);
             return retVal;
@@ -554,7 +555,7 @@ public class TestSnapshotDiffManager {
               () -> RdbUtil.getSSTFilesForComparison(any(), anyList()))
           .thenAnswer((Answer<Set<String>>) invocation -> {
             Set<String> retVal = IntStream.range(0, numberOfFiles)
-                .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
+                .mapToObj(i -> RandomStringUtils.secure().nextAlphabetic(10))
                 .collect(Collectors.toSet());
             deltaStrings.addAll(retVal);
             return retVal;
@@ -975,11 +976,11 @@ public class TestSnapshotDiffManager {
   @Test
   public void testGetSnapshotDiffReportForCancelledJob() throws IOException {
 
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
 
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     UUID fromSnapshotUUID = UUID.randomUUID();
     UUID toSnapshotUUID = UUID.randomUUID();
@@ -1059,11 +1060,11 @@ public class TestSnapshotDiffManager {
                                             CancelMessage cancelMessage)
       throws IOException {
 
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
 
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     UUID fromSnapshotUUID = UUID.randomUUID();
     UUID toSnapshotUUID = UUID.randomUUID();
@@ -1094,11 +1095,11 @@ public class TestSnapshotDiffManager {
 
   @Test
   public void testCancelNewSnapshotDiff() throws IOException {
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
 
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     UUID fromSnapshotUUID = UUID.randomUUID();
     UUID toSnapshotUUID = UUID.randomUUID();
@@ -1134,13 +1135,13 @@ public class TestSnapshotDiffManager {
   @ParameterizedTest
   @MethodSource("listSnapshotDiffJobsScenarios")
   public void testListSnapshotDiffJobs(String jobStatus,
-                                       boolean listAll,
+                                       boolean listAllStatus,
                                        boolean containsJob)
       throws IOException {
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     UUID fromSnapshotUUID = UUID.randomUUID();
     UUID toSnapshotUUID = UUID.randomUUID();
@@ -1155,11 +1156,13 @@ public class TestSnapshotDiffManager {
     SnapshotDiffJob diffJob = snapDiffJobMap.get(diffJobKey);
     assertNull(diffJob);
 
+    ListSnapshotDiffJobResponse snapshotDiffJobList = snapshotDiffManager
+        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAllStatus, null, 1000);
     // There are no jobs in the table, therefore
     // the response list should be empty.
-    List<SnapshotDiffJob> jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll);
+    List<SnapshotDiffJob> jobList = snapshotDiffJobList.getSnapshotDiffJobs();
     assertThat(jobList).isEmpty();
+    assertNull(snapshotDiffJobList.getLastSnapshotDiffJob());
 
     SnapshotDiffManager spy = spy(snapshotDiffManager);
     doNothing().when(spy).generateSnapshotDiffReport(eq(diffJobKey),
@@ -1179,11 +1182,12 @@ public class TestSnapshotDiffManager {
     assertEquals(SnapshotDiffResponse.JobStatus.IN_PROGRESS,
         diffJob.getStatus());
 
-    jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll);
+    snapshotDiffJobList = snapshotDiffManager
+        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAllStatus, null, 1000);
+    jobList = snapshotDiffJobList.getSnapshotDiffJobs();
 
-    // When listAll is true, jobStatus is ignored.
-    // If the job is IN_PROGRESS or listAll is used,
+    // When listAllStatus is true, jobStatus is ignored.
+    // If the job is IN_PROGRESS or listAllStatus is used,
     // there should be a response.
     // Otherwise, response list should be empty.
     if (containsJob) {
@@ -1191,14 +1195,15 @@ public class TestSnapshotDiffManager {
     } else {
       assertThat(jobList).isEmpty();
     }
+    assertNull(snapshotDiffJobList.getLastSnapshotDiffJob());
   }
 
   @Test
   public void testListSnapDiffWithInvalidStatus() throws IOException {
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     UUID fromSnapshotUUID = UUID.randomUUID();
     UUID toSnapshotUUID = UUID.randomUUID();
@@ -1216,9 +1221,9 @@ public class TestSnapshotDiffManager {
     spy.getSnapshotDiffReport(volumeName, bucketName, fromSnapshotName,
             toSnapshotName, 0, 0, false, false);
 
-    // Invalid status, without listAll true, results in an exception.
+    // Invalid status, without listAllStatus true, results in an exception.
     assertThrows(IOException.class, () -> snapshotDiffManager
-        .getSnapshotDiffJobList(volumeName, bucketName, "invalid", false));
+        .getSnapshotDiffJobList(volumeName, bucketName, "invalid", false, null, 1000));
   }
 
   @Test
@@ -1251,10 +1256,10 @@ public class TestSnapshotDiffManager {
 
   @Test
   public void testGenerateDiffReportFailure() throws IOException {
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     PersistentMap<byte[], Boolean> objectIdToIsDirectoryMap =
         new SnapshotTestUtils.StubbedPersistentMap<>();

@@ -50,13 +50,6 @@ public final class SCMContext {
   private final String threadNamePrefix;
 
   /**
-   * Used by non-HA mode SCM, Recon and Unit Tests.
-   */
-  public static SCMContext emptyContext() {
-    return new SCMContext.Builder().buildMaybeInvalid();
-  }
-
-  /**
    * Raft related info.
    */
   private boolean isLeader;
@@ -83,6 +76,13 @@ public final class SCMContext {
     finalizationCheckpoint = b.finalizationCheckpoint;
     scm = b.scm;
     threadNamePrefix = b.threadNamePrefix;
+  }
+
+  /**
+   * Used by non-HA mode SCM, Recon and Unit Tests.
+   */
+  public static SCMContext emptyContext() {
+    return new SCMContext.Builder().buildMaybeInvalid();
   }
 
   /**

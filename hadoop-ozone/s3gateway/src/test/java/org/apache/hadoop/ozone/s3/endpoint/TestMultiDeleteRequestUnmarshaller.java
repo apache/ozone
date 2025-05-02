@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -34,8 +35,7 @@ public class TestMultiDeleteRequestUnmarshaller {
     //GIVEN
     ByteArrayInputStream inputBody =
         new ByteArrayInputStream(
-            ("<Delete xmlns=\"http://s3.amazonaws"
-                + ".com/doc/2006-03-01/\"><Object>key1</Object><Object>key2"
+            ("<Delete xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\"><Object>key1</Object><Object>key2"
                 + "</Object><Object>key3"
                 + "</Object></Delete>")
                 .getBytes(UTF_8));

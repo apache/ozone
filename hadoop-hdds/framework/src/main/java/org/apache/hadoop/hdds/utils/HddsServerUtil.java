@@ -112,16 +112,15 @@ import org.slf4j.LoggerFactory;
  */
 public final class HddsServerUtil {
 
-  private HddsServerUtil() {
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(HddsServerUtil.class);
 
   private static final int SHUTDOWN_HOOK_PRIORITY = 0;
 
   public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
       "OZONE_RATIS_SNAPSHOT_COMPLETE";
 
-  private static final Logger LOG = LoggerFactory.getLogger(
-      HddsServerUtil.class);
+  private HddsServerUtil() {
+  }
 
   /**
    * Add protobuf-based protocol to the {@link org.apache.hadoop.ipc.RPC.Server}.
@@ -223,7 +222,6 @@ public final class HddsServerUtil {
                 ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT)));
   }
 
-
   /**
    * Retrieve the socket address that should be used by DataNodes to connect
    * to Recon.
@@ -268,7 +266,6 @@ public final class HddsServerUtil {
     return conf.getTimeDuration(HDDS_HEARTBEAT_INTERVAL,
         HDDS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
-
 
   /**
    * Heartbeat Interval - Defines the initial heartbeat frequency from a datanode to
@@ -710,7 +707,7 @@ public final class HddsServerUtil {
     StringBuilder b = new StringBuilder(prefix);
     b.append("\n/************************************************************");
     for (String s : msg) {
-      b.append("\n").append(prefix).append(s);
+      b.append('\n').append(prefix).append(s);
     }
     b.append("\n************************************************************/");
     return b.toString();

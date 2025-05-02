@@ -75,7 +75,7 @@ public class PipelineActionHandler
     final PipelineID pid = PipelineID.getFromProtobuf(info.getPipelineID());
 
     final String logMsg = "Received pipeline action " + action + " for " + pid +
-        " from datanode " + datanode.getUuidString() + "." +
+        " from datanode " + datanode + "." +
         " Reason : " + info.getDetailedReason();
 
     // We can skip processing Pipeline Action if the current SCM is not leader.

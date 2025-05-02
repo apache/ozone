@@ -102,7 +102,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   private static final String DIR_TWO = "dir2";
   private static final String DIR_THREE = "dir3";
 
-
   private static final long VOL_OBJECT_ID = 0L;
   private static final long BUCKET_ONE_OBJECT_ID = 1L;
   private static final long BUCKET_TWO_OBJECT_ID = 2L;

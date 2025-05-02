@@ -86,7 +86,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.Timeout;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,7 +94,6 @@ import org.slf4j.LoggerFactory;
  * Test Snapshot Deleting Service.
  */
 
-@Timeout(300)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestSnapshotDeletingServiceIntegrationTest {
@@ -773,7 +771,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         bucket.getName()));
   }
 
-
   /*
       Flow
       ----
@@ -843,7 +840,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         bucket.getName() + "snap2");
     assertTableRowCount(snapshotInfoTable, countMap.get(snapshotInfoTable.getName()) +  2);
   }
-
 
   private void verifySnapshotChain(SnapshotInfo deletedSnapshot,
                                    String nextSnapshot)

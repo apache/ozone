@@ -31,6 +31,11 @@ import org.apache.hadoop.ozone.OzoneConsts;
  */
 public class RadixTree<T> {
 
+  private static final String PATH_DELIMITER = OzoneConsts.OZONE_URI_DELIMITER;
+
+  // root of a radix tree has a name of "/" and may optionally has it value.
+  private RadixNode root;
+
   /**
    * create a empty radix tree with root only.
    */
@@ -211,9 +216,4 @@ public class RadixTree<T> {
       return root.getName();
     }
   }
-
-  // root of a radix tree has a name of "/" and may optionally has it value.
-  private RadixNode root;
-
-  private static final String PATH_DELIMITER = OzoneConsts.OZONE_URI_DELIMITER;
 }

@@ -82,6 +82,10 @@ public class KeyValueContainerCheck {
     this.container = container;
   }
 
+  KeyValueContainerCheck(KeyValueContainerData data, KeyValueContainer container, ConfigurationSource conf) {
+    this(data.getMetadataPath(), conf, data.getContainerID(), data.getVolume(), container);
+  }
+
   /**
    * Run basic integrity checks on container metadata.
    * These checks do not look inside the metadata files.

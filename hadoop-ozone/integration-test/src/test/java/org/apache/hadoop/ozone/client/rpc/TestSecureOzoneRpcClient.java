@@ -39,6 +39,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -170,7 +171,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
       byte[] fileContent;
       try (OzoneInputStream is = bucket.readKey(keyName)) {
         fileContent = new byte[value.getBytes(UTF_8).length];
-        is.read(fileContent);
+        IOUtils.readFully(is, fileContent);
       }
 
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);

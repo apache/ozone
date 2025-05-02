@@ -82,6 +82,7 @@ public class TestKeyValueStreamDataChannel {
       .setVersion(ClientVersion.CURRENT.toProtoValue())
       .build();
   static final int PUT_BLOCK_PROTO_SIZE = PUT_BLOCK_PROTO.toByteString().size();
+
   static {
     LOG.info("PUT_BLOCK_PROTO_SIZE = {}", PUT_BLOCK_PROTO_SIZE);
   }

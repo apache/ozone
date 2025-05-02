@@ -303,7 +303,6 @@ public class TestContainerReportHandler {
         datanodeOne, datanodeTwo, datanodeThree)
         .forEach(containerStateManager::updateContainerReplica);
 
-
     // SCM expects both containerOne and containerTwo to be in all the three
     // datanodes datanodeOne, datanodeTwo and datanodeThree
 
@@ -360,7 +359,6 @@ public class TestContainerReportHandler {
         datanodeOne, datanodeTwo, datanodeThree)
         .forEach(containerStateManager::updateContainerReplica);
 
-
     // SCM expects both containerOne and containerTwo to be in all the three
     // datanodes datanodeOne, datanodeTwo and datanodeThree
 
@@ -378,7 +376,6 @@ public class TestContainerReportHandler {
     assertEquals(4, containerManager.getContainerReplicas(
         containerOne.containerID()).size());
   }
-
 
   @Test
   public void testClosingToClosed() throws NodeNotFoundException, IOException,
@@ -1230,7 +1227,6 @@ public class TestContainerReportHandler {
     return getContainerReportsProto(containerId, state, originNodeId,
         2000000000L, 100000000L, bcsId, replicaIndex);
   }
-
 
   protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,

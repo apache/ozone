@@ -45,14 +45,12 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * This class tests OzoneManagerDoubleBuffer implementation with
  * dummy response class.
  */
-@Timeout(300)
 public class TestOzoneManagerDoubleBufferWithDummyResponse {
 
   private OMMetadataManager omMetadataManager;

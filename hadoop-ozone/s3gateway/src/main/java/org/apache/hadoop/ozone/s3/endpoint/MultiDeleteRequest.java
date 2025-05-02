@@ -23,14 +23,14 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
  * Request for multi object delete request.
  */
 
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "Delete", namespace = "http://s3.amazonaws"
-    + ".com/doc/2006-03-01/")
+@XmlRootElement(name = "Delete", namespace = S3Consts.S3_XML_NAMESPACE)
 public class MultiDeleteRequest {
 
   @XmlElement(name = "Quiet")
@@ -60,8 +60,7 @@ public class MultiDeleteRequest {
    * JAXB entity for child element.
    */
   @XmlAccessorType(XmlAccessType.FIELD)
-  @XmlRootElement(name = "Object", namespace = "http://s3.amazonaws"
-      + ".com/doc/2006-03-01/")
+  @XmlRootElement(name = "Object", namespace = S3Consts.S3_XML_NAMESPACE)
   public static class DeleteObject {
 
     @XmlElement(name = "Key")

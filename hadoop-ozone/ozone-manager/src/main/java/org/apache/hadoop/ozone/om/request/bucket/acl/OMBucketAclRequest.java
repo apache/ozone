@@ -170,7 +170,6 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
    */
   abstract String getPath();
 
-
   /**
    * Get the Bucket object Info from the request.
    * @return OzoneObjInfo
