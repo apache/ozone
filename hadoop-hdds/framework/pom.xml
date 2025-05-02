@@ -260,6 +260,11 @@
       <artifactId>disruptor</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <dependency>
+      <groupId>log4j</groupId>
+      <artifactId>apache-log4j-extras</artifactId>
+      <scope>runtime</scope>
+    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
