@@ -49,16 +49,13 @@ public class ContainerDatanodeDatabase {
   private static final int DEFAULT_REPLICATION_FACTOR;
 
   private final PrintWriter out;
-  private final PrintWriter err;
 
   public ContainerDatanodeDatabase() {
     this.out = new PrintWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8), true);
-    this.err = new PrintWriter(new OutputStreamWriter(System.err, StandardCharsets.UTF_8), true);
   }
 
   public ContainerDatanodeDatabase(PrintWriter out, PrintWriter err) {
     this.out = out;
-    this.err = err;
   }
   
   static {
