@@ -54,8 +54,8 @@ public class CompactionDag {
    * @param seqNum      DB transaction sequence number.
    */
   public void populateCompactionDAG(List<CompactionFileInfo> inputFiles,
-                                    List<CompactionFileInfo> outputFiles,
-                                    long seqNum) {
+      List<CompactionFileInfo> outputFiles,
+      long seqNum) {
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Input files: {} -> Output files: {}", inputFiles, outputFiles);
@@ -90,8 +90,7 @@ public class CompactionDag {
   /**
    * Prunes backward DAG's upstream from the level, that needs to be removed.
    */
-  Set<String> pruneBackwardDag(MutableGraph<CompactionNode> backwardDag,
-                               Set<CompactionNode> startNodes) {
+  Set<String> pruneBackwardDag(MutableGraph<CompactionNode> backwardDag, Set<CompactionNode> startNodes) {
     Set<String> removedFiles = new HashSet<>();
     Set<CompactionNode> currentLevel = startNodes;
 
@@ -115,8 +114,7 @@ public class CompactionDag {
   /**
    * Prunes forward DAG's downstream from the level that needs to be removed.
    */
-  Set<String> pruneForwardDag(MutableGraph<CompactionNode> forwardDag,
-                              Set<CompactionNode> startNodes) {
+  Set<String> pruneForwardDag(MutableGraph<CompactionNode> forwardDag, Set<CompactionNode> startNodes) {
     Set<String> removedFiles = new HashSet<>();
     Set<CompactionNode> currentLevel = new HashSet<>(startNodes);
 

@@ -44,8 +44,4 @@ public class OMDebug implements DebugSubcommand {
   public String getDbPath() {
     return dbPath;
   }
-
-  public void setDbPath(String dbPath) {
-    this.dbPath = dbPath;
-  }
 }

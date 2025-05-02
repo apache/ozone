@@ -72,10 +72,6 @@ public class PrefixParser implements Callable<Void> {
     return parent.getDbPath();
   }
 
-  public void setDbPath(String path) {
-    parent.setDbPath(path);
-  }
-
   @Override
   public Void call() throws Exception {
     parse(volume, bucket, getDbPath(), filePath);

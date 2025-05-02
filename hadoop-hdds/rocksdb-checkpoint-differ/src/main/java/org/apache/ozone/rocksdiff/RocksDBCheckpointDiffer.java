@@ -241,7 +241,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   private String createCompactionLogDir(String metadataDirName,
-                                        String compactionLogDirName) {
+      String compactionLogDirName) {
 
     final File parentDir = new File(metadataDirName);
     if (!parentDir.exists()) {
@@ -760,8 +760,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *               "/path/to/sstBackupDir/000060.sst"]
    */
   public synchronized Optional<List<String>> getSSTDiffListWithFullPath(DifferSnapshotInfo src,
-                                                                        DifferSnapshotInfo dest,
-                                                                        String sstFilesDirForSnapDiffJob) {
+      DifferSnapshotInfo dest,
+      String sstFilesDirForSnapDiffJob) {
 
     Optional<List<String>> sstDiffList = getSSTDiffList(src, dest);
 
@@ -790,7 +790,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
   public synchronized Optional<List<String>> getSSTDiffList(DifferSnapshotInfo src,
-                                                            DifferSnapshotInfo dest) {
+      DifferSnapshotInfo dest) {
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
