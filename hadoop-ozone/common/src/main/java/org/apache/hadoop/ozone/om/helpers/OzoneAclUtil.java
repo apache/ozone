@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -59,12 +58,11 @@ public final class OzoneAclUtil {
    * @param conf current configuration
    * @return list of OzoneAcls
    * */
-  public static List<OzoneAcl> getDefaultAclList(UserGroupInformation ugi, OzoneConfiguration conf) {
+  public static List<OzoneAcl> getDefaultAclList(UserGroupInformation ugi, OmConfig conf) {
     // Get default acl rights for user and group.
     if (userRights == null || groupRights == null) {
-      OmConfig aclConfig = conf.getObject(OmConfig.class);
-      userRights = aclConfig.getUserDefaultRights();
-      groupRights = aclConfig.getGroupDefaultRights();
+      userRights = conf.getUserDefaultRights();
+      groupRights = conf.getGroupDefaultRights();
     }
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     // User ACL.

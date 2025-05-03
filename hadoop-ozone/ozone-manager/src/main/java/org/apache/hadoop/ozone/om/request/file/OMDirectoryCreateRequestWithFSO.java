@@ -152,7 +152,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
             omPathInfo.getLeafNodeName(),
             keyArgs, omPathInfo.getLeafNodeObjectId(),
             omPathInfo.getLastKnownParentId(), trxnLogIndex,
-            omBucketInfo, omPathInfo, ozoneManager.getConfiguration());
+            omBucketInfo, omPathInfo, ozoneManager.getConfig());
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
             volumeId, bucketId, trxnLogIndex,
             missingParentInfos, dirInfo);
