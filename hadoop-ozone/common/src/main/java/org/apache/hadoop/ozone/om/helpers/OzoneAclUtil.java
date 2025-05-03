@@ -45,9 +45,6 @@ import org.slf4j.LoggerFactory;
 public final class OzoneAclUtil {
   static final Logger LOG = LoggerFactory.getLogger(OzoneAclUtil.class);
 
-  private static ACLType[] userRights;
-  private static ACLType[] groupRights;
-
   private OzoneAclUtil() {
   }
 
@@ -60,10 +57,8 @@ public final class OzoneAclUtil {
    * */
   public static List<OzoneAcl> getDefaultAclList(UserGroupInformation ugi, OmConfig conf) {
     // Get default acl rights for user and group.
-    if (userRights == null || groupRights == null) {
-      userRights = conf.getUserDefaultRights();
-      groupRights = conf.getGroupDefaultRights();
-    }
+    ACLType[] userRights = conf.getUserDefaultRights();
+    ACLType[] groupRights = conf.getGroupDefaultRights();
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     // User ACL.
     listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, userRights));
