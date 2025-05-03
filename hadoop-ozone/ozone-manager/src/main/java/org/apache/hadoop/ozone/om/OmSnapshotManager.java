@@ -872,10 +872,16 @@ public final class OmSnapshotManager implements AutoCloseable {
   public void snapshotLimitCheck() throws IOException, OMException {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager = omMetadataManager.getSnapshotChainManager();
-    int currentSnapshotNum = snapshotChainManager.getGlobalSnapshotChain().size();
 
-    AtomicReference<OMException> exceptionRef = new AtomicReference<>(null);
+    AtomicReference<IOException> exceptionRef = new AtomicReference<>(null);
     inFlightSnapshotCount.updateAndGet(count -> {
+      int currentSnapshotNum = 0;
+      try {
+        currentSnapshotNum = snapshotChainManager.getGlobalSnapshotChain().size();
+      } catch (IOException e) {
+        exceptionRef.set(e);
+        return count;
+      }
       if (currentSnapshotNum + count >= fsSnapshotMaxLimit) {
         exceptionRef.set(new OMException(
             String.format("Snapshot limit of %d reached. Cannot create more snapshots. " +
