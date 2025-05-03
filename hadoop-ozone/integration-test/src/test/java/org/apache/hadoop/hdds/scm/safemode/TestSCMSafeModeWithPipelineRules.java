@@ -116,14 +116,15 @@ public class TestSCMSafeModeWithPipelineRules {
     // Ceil(0.1 * 2) is 1, as one pipeline is healthy pipeline rule is
     // satisfied
 
-    GenericTestUtils.waitFor(() ->
-        scmSafeModeManager.getHealthyPipelineSafeModeRule()
+    GenericTestUtils.waitFor(() -> SafeModeRuleFactory.getInstance()
+            .getSafeModeRule(HealthyPipelineSafeModeRule.class)
             .validate(), 1000, 60000);
 
     // As Ceil(0.9 * 2) is 2, and from second pipeline no datanodes's are
     // reported this rule is not met yet.
     GenericTestUtils.waitFor(() ->
-        !scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
+        !SafeModeRuleFactory.getInstance()
+            .getSafeModeRule(OneReplicaPipelineSafeModeRule.class)
             .validate(), 1000, 60000);
 
     assertTrue(cluster.getStorageContainerManager().isInSafeMode());
@@ -133,7 +134,8 @@ public class TestSCMSafeModeWithPipelineRules {
     cluster.restartHddsDatanode(restartedDatanode, false);
 
     GenericTestUtils.waitFor(() ->
-        scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
+        SafeModeRuleFactory.getInstance()
+            .getSafeModeRule(OneReplicaPipelineSafeModeRule.class)
             .validate(), 1000, 60000);
 
     // All safeMode preChecks are now satisfied, SCM should be out of safe mode.
