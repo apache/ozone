@@ -47,12 +47,20 @@ List objects with zero max-keys should fail
 
 List objects with max-keys exceeding config limit should not return more than limit
     Prepare Many Objects In Bucket    1100
-    ${result}=    Run    aws s3api list-objects-v2 --bucket ${BUCKET} --max-keys 9999 --endpoint-url=${ENDPOINT_URL}
-    ${count}=     Evaluate    len([obj for obj in json.loads('''${result}''').get('Contents', [])])    json
+    ${result}=    Execute AWSS3APICli and checkrc    list-objects-v2 --bucket ${BUCKET} --max-keys 9999 --endpoint-url=${ENDPOINT_URL} --output json    0
+    ${tmpfile}=   Generate Random String    8
+    ${tmpfile}=   Set Variable    /tmp/result_${tmpfile}.json
+    Create File   ${tmpfile}    ${result}
+    ${count}=     Execute and checkrc    jq -r '.Contents | length' ${tmpfile}    0
     Should Be True    ${count} <= 1000
+    Remove File   ${tmpfile}
 
 List objects with max-keys less than config limit should return correct count
     Prepare Many Objects In Bucket    1100
-    ${result}=    Run    aws s3api list-objects-v2 --bucket ${BUCKET} --max-keys 500 --endpoint-url=${ENDPOINT_URL}
-    ${count}=     Evaluate    len([obj for obj in json.loads('''${result}''').get('Contents', [])])    json
+    ${result}=    Execute AWSS3APICli and checkrc    list-objects-v2 --bucket ${BUCKET} --max-keys 500 --endpoint-url=${ENDPOINT_URL} --output json    0
+    ${tmpfile}=   Generate Random String    8
+    ${tmpfile}=   Set Variable    /tmp/result_${tmpfile}.json
+    Create File   ${tmpfile}    ${result}
+    ${count}=     Execute and checkrc    jq -r '.Contents | length' ${tmpfile}    0
     Should Be True    ${count} == 500
+    Remove File   ${tmpfile}
