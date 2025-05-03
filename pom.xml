@@ -824,7 +824,7 @@
           </exclusion>
           <exclusion>
             <groupId>org.apache.commons</groupId>
-            <artifactId>*</artifactId>
+            <artifactId>commons-math3</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.apache.curator</groupId>
