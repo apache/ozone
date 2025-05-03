@@ -60,7 +60,7 @@ Introduce four new configuration strings:
 
 ### Create Compactor For Each Table
 
-Create new compactor instances for each table, including `KEY_TABLE`, `DELETED_TABLE`, `DELETED_DIR_TABLE`, `DIRECTORY_TABLE`, and `FILE_TABLE`. Run these background workers using a scheduled executor with configured interval and a random start time to spread out the workload.
+Create new compactor instances for each table, including `KEY_TABLE`, `DELETED_TABLE`, `DELETED_DIR_TABLE`, `DIRECTORY_TABLE`, `FILE_TABLE`, and `MULTIPARTINFO_TABLE`. Run these background workers using a scheduled executor with configured interval and a random start time to spread out the workload.
 
 ### (Optional) CacheIterator Support for Seek with Prefix
 
@@ -197,6 +197,10 @@ class FSOBucketCompactor {
     // **But don't merge different key ranges from different buckets**
 }
 ```
+
+## Prevent overloading of RocksDB
+
+Compactors should send the compaction request(including the range and column family) to one thread-safe queue first, and the compaction worker will pick up the request from the queue sequentially.
 
 ## Test Plan
 
