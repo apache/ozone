@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
@@ -183,7 +182,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
           RequestBody.fromString(RandomStringUtils.secure().nextAlphanumeric(5)));
       keyToEtag.put(keyName, putObjectResponse.eTag());
     }
-    try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(cluster.getConf())) {
+    try (OzoneClient ozoneClient = cluster.newClient()) {
       ObjectStore store = ozoneClient.getObjectStore();
 
       OzoneVolume volume = store.getS3Volume();
@@ -326,7 +325,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
   }
 
   private String getBucketName() {
-    return getBucketName(null);
+    return getBucketName("");
   }
 
   private String getBucketName(String suffix) {
@@ -334,7 +333,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
   }
 
   private String getKeyName() {
-    return getKeyName(null);
+    return getKeyName("");
   }
 
   private String getKeyName(String suffix) {

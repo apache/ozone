@@ -98,7 +98,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -373,9 +372,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     final String bucketName = getBucketName();
     final String keyName = "//dir1";
     final String content = "bar";
-    OzoneConfiguration conf = cluster.getConf();
     // Create a FSO bucket for test
-    try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf)) {
+    try (OzoneClient ozoneClient = cluster.newClient()) {
       ObjectStore store = ozoneClient.getObjectStore();
       OzoneVolume volume = store.getS3Volume();
       OmBucketInfo.Builder bucketInfo = new OmBucketInfo.Builder()
@@ -502,8 +500,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     String value = "sample value";
     byte[] valueBytes = value.getBytes(StandardCharsets.UTF_8);
 
-    OzoneConfiguration conf = cluster.getConf();
-    try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf)) {
+    try (OzoneClient ozoneClient = cluster.newClient()) {
       ObjectStore store = ozoneClient.getObjectStore();
 
       OzoneVolume volume = store.getS3Volume();
@@ -560,7 +557,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
           RandomStringUtils.secure().nextAlphanumeric(5));
       keyToEtag.put(keyName, putObjectResult.getETag());
     }
-    try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(cluster.getConf())) {
+    try (OzoneClient ozoneClient = cluster.newClient()) {
       ObjectStore store = ozoneClient.getObjectStore();
 
       OzoneVolume volume = store.getS3Volume();
@@ -996,7 +993,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   private String getKeyName() {
-    return getKeyName(null);
+    return getKeyName("");
   }
 
   private String getKeyName(String suffix) {
