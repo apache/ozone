@@ -32,9 +32,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
@@ -181,7 +181,7 @@ public class TestOzoneAclUtil {
       ugi = UserGroupInformation.createRemoteUser("user0");
     }
 
-    OzoneAclConfig aclConfig = newInstanceOf(OzoneAclConfig.class);
+    OmConfig aclConfig = newInstanceOf(OmConfig.class);
     IAccessAuthorizer.ACLType[] userRights = aclConfig.getUserDefaultRights();
     IAccessAuthorizer.ACLType[] groupRights = aclConfig.getGroupDefaultRights();
 

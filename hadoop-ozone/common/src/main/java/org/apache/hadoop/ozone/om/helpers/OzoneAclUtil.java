@@ -30,11 +30,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -62,7 +62,7 @@ public final class OzoneAclUtil {
   public static List<OzoneAcl> getDefaultAclList(UserGroupInformation ugi, OzoneConfiguration conf) {
     // Get default acl rights for user and group.
     if (userRights == null || groupRights == null) {
-      OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
+      OmConfig aclConfig = conf.getObject(OmConfig.class);
       userRights = aclConfig.getUserDefaultRights();
       groupRights = aclConfig.getGroupDefaultRights();
     }
