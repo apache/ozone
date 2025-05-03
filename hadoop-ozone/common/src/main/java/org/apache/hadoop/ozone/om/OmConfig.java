@@ -177,6 +177,8 @@ public class OmConfig extends ReconfigurableConfig {
     fileSystemPathEnabled = other.fileSystemPathEnabled;
     maxListSize = other.maxListSize;
     maxUserVolumeCount = other.maxUserVolumeCount;
+    userDefaultRights = other.userDefaultRights;
+    groupDefaultRights = other.groupDefaultRights;
   }
 
   /**
