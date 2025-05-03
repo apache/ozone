@@ -181,9 +181,9 @@ public class TestOzoneAclUtil {
       ugi = UserGroupInformation.createRemoteUser("user0");
     }
 
-    OmConfig aclConfig = newInstanceOf(OmConfig.class);
-    IAccessAuthorizer.ACLType[] userRights = aclConfig.getUserDefaultRights();
-    IAccessAuthorizer.ACLType[] groupRights = aclConfig.getGroupDefaultRights();
+    OmConfig omConfig = newInstanceOf(OmConfig.class);
+    IAccessAuthorizer.ACLType[] userRights = omConfig.getUserDefaultRights();
+    IAccessAuthorizer.ACLType[] groupRights = omConfig.getGroupDefaultRights();
 
     OzoneAclUtil.addAcl(ozoneAcls, OzoneAcl.of(USER,
         ugi.getUserName(), ACCESS, userRights));

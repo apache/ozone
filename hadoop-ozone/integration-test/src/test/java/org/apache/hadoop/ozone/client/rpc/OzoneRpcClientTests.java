@@ -4108,9 +4108,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    OmConfig aclConfig = conf.getObject(OmConfig.class);
-    ACLType[] userRights = aclConfig.getUserDefaultRights();
-    ACLType[] groupRights = aclConfig.getGroupDefaultRights();
+    OmConfig omConfig = conf.getObject(OmConfig.class);
+    ACLType[] userRights = omConfig.getUserDefaultRights();
+    ACLType[] groupRights = omConfig.getGroupDefaultRights();
 
     listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, userRights));
     //Group ACL of the User
