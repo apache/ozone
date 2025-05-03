@@ -212,7 +212,7 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       List<OzoneAcl> acls = objectStore.getAcl(obj);
       assertEquals(3, acls.size());
       assertEquals(AclTests.ADMIN_UGI.getShortUserName(), acls.get(0).getName());
-      OmConfig aclConfig = cluster().getConf().getObject(OmConfig.class);
+      OmConfig aclConfig = cluster().getOzoneManager().getConfig();
       assertArrayEquals(aclConfig.getUserDefaultRights(), acls.get(0).getAclList().toArray());
       assertEquals(AclTests.ADMIN_UGI.getPrimaryGroupName(), acls.get(1).getName());
       assertArrayEquals(aclConfig.getGroupDefaultRights(), acls.get(1).getAclList().toArray());
@@ -238,7 +238,7 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       List<OzoneAcl> acls = objectStore.getAcl(obj);
       assertEquals(2, acls.size());
       assertEquals(user3.getShortUserName(), acls.get(0).getName());
-      OmConfig aclConfig = cluster().getConf().getObject(OmConfig.class);
+      OmConfig aclConfig = cluster().getOzoneManager().getConfig();
       assertArrayEquals(aclConfig.getUserDefaultRights(), acls.get(0).getAclList().toArray());
       assertEquals(user3.getPrimaryGroupName(), acls.get(1).getName());
       assertArrayEquals(aclConfig.getGroupDefaultRights(), acls.get(1).getAclList().toArray());

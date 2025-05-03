@@ -1190,7 +1190,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // Use ClientProtocol to pass in volume ACL, ObjectStore won't do it
     ClientProtocol proxy = objectStore.getClientProxy();
     // Get default acl rights for user
-    OmConfig aclConfig = conf.getObject(OmConfig.class);
+    OmConfig aclConfig = cluster.getOzoneManager().getConfig();
     ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     // ACL admin owner, world read+write
@@ -1293,7 +1293,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // Use ClientProtocol to pass in volume ACL, ObjectStore won't do it
     ClientProtocol proxy = objectStore.getClientProxy();
     // Get default acl rights for user
-    OmConfig aclConfig = conf.getObject(OmConfig.class);
+    OmConfig aclConfig = cluster.getOzoneManager().getConfig();
     ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = OzoneAcl.of(ACLIdentityType.WORLD, "",
@@ -2273,7 +2273,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ClientProtocol proxy = objectStore.getClientProxy();
 
     // Get default acl rights for user
-    OmConfig aclConfig = conf.getObject(OmConfig.class);
+    OmConfig aclConfig = cluster.getOzoneManager().getConfig();
     ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = OzoneAcl.of(ACLIdentityType.WORLD, "",
