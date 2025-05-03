@@ -17,7 +17,13 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
+import static java.util.stream.Collectors.toList;
+
+import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -119,7 +125,6 @@ public interface IAccessAuthorizer {
         throw new IllegalArgumentException("[" + type + "] ACL right is not " +
             "recognized");
       }
-
     }
 
     /**
@@ -159,6 +164,15 @@ public interface IAccessAuthorizer {
       default:
         throw new IllegalArgumentException("ACL right is not recognized");
       }
+    }
+
+    public static List<ACLType> parseList(String conf) {
+      String[] array = Objects.requireNonNull(conf, "conf == null")
+          .trim()
+          .split(",");
+      return Collections.unmodifiableList(Arrays.stream(array)
+          .map(each -> ACLType.valueOf(each.trim()))
+          .collect(toList()));
     }
   }
 

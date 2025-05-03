@@ -19,16 +19,18 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.ratis.util.MemoizedSupplier;
 
 /**
  * Ozone Manager configuration.
@@ -94,6 +96,8 @@ public class OmConfig extends ReconfigurableConfig {
           "OzoneManager."
   )
   private String userDefaultRights;
+  private final Supplier<List<ACLType>> userDefaultRightList =
+      MemoizedSupplier.valueOf(this::getUserDefaultRightList);
 
   @Config(key = "group.rights",
       defaultValue = "READ, LIST",
@@ -103,6 +107,8 @@ public class OmConfig extends ReconfigurableConfig {
           "OzoneManager."
   )
   private String groupDefaultRights;
+  private final Supplier<List<ACLType>> groupDefaultRightList =
+      MemoizedSupplier.valueOf(this::getGroupDefaultRightList);
 
   public long getRatisBasedFinalizationTimeout() {
     return ratisBasedFinalizationTimeout;
@@ -134,27 +140,24 @@ public class OmConfig extends ReconfigurableConfig {
     validate();
   }
 
-  public IAccessAuthorizer.ACLType[] getUserDefaultRights() {
-    List<IAccessAuthorizer.ACLType> types = new ArrayList<>();
-    if (userDefaultRights == null) {
-      types.add(IAccessAuthorizer.ACLType.ALL);
-    } else {
-      String[] array = userDefaultRights.trim().split(",");
-      Arrays.stream(array).forEach(t -> types.add(IAccessAuthorizer.ACLType.valueOf(t.trim())));
-    }
-    return types.toArray(new IAccessAuthorizer.ACLType[0]);
+  public ACLType[] getUserDefaultRights() {
+    return userDefaultRightList.get().toArray(new ACLType[0]);
   }
 
-  public IAccessAuthorizer.ACLType[] getGroupDefaultRights() {
-    List<IAccessAuthorizer.ACLType> types = new ArrayList<>();
-    if (groupDefaultRights == null) {
-      types.add(IAccessAuthorizer.ACLType.READ);
-      types.add(IAccessAuthorizer.ACLType.LIST);
-    } else {
-      String[] array = groupDefaultRights.trim().split(",");
-      Arrays.stream(array).forEach(t -> types.add(IAccessAuthorizer.ACLType.valueOf(t.trim())));
-    }
-    return types.toArray(new IAccessAuthorizer.ACLType[0]);
+  private List<ACLType> getUserDefaultRightList() {
+    return userDefaultRights == null
+        ? Collections.singletonList(ACLType.ALL)
+        : ACLType.parseList(userDefaultRights);
+  }
+
+  public ACLType[] getGroupDefaultRights() {
+    return groupDefaultRightList.get().toArray(new ACLType[0]);
+  }
+
+  private List<ACLType> getGroupDefaultRightList() {
+    return groupDefaultRights == null
+        ? Collections.unmodifiableList(Arrays.asList(ACLType.READ, ACLType.LIST))
+        : ACLType.parseList(groupDefaultRights);
   }
 
   @PostConstruct
