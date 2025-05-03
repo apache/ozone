@@ -117,11 +117,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-hadoop-dependency-server</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-interface-admin</artifactId>
         <version>${hdds.version}</version>
       </dependency>
