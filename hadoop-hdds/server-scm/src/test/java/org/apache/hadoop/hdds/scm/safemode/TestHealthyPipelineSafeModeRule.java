@@ -283,7 +283,7 @@ public class TestHealthyPipelineSafeModeRule {
       firePipelineEvent(pipeline1, eventQueue);
 
       GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
-          "reported count is 1"),
+          "replication factor isn't 3"),
           1000, 5000);
       assertFalse(healthyPipelineSafeModeRule.validate());
 

@@ -20,14 +20,18 @@ package org.apache.hadoop.hdds.scm.safemode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -59,13 +63,15 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final int minHealthyPipelines;
   private final SCMContext scmContext;
   private final Set<PipelineID> unProcessedPipelineSet = new HashSet<>();
+  private final NodeManager nodeManager;
 
   HealthyPipelineSafeModeRule(EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
-      ConfigurationSource configuration, SCMContext scmContext) {
+      ConfigurationSource configuration, SCMContext scmContext, NodeManager nodeManager) {
     super(manager, NAME, eventQueue);
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
+    this.nodeManager = nodeManager;
     healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT,
@@ -122,19 +128,49 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   protected synchronized void process(Pipeline pipeline) {
+    Preconditions.checkNotNull(pipeline);
 
     // When SCM is in safe mode for long time, already registered
     // datanode can send pipeline report again, or SCMPipelineManager will
     // create new pipelines.
-    Preconditions.checkNotNull(pipeline);
-    if (pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-        ((RatisReplicationConfig) pipeline.getReplicationConfig())
-            .getReplicationFactor() == HddsProtos.ReplicationFactor.THREE &&
-        !processedPipelineIDs.contains(pipeline.getId())) {
+
+    // Only handle RATIS + 3-replica pipelines.
+    if (pipeline.getType() != HddsProtos.ReplicationType.RATIS ||
+        ((RatisReplicationConfig) pipeline.getReplicationConfig()).getReplicationFactor() !=
+            HddsProtos.ReplicationFactor.THREE) {
+      SCMSafeModeManager.getLogger().warn(
+          "Skipping HealthyPipelineSafeModeRule check as Replication type isn't RATIS or replication factor isn't 3.");
+      return;
+    }
+
+    // Skip already processed ones.
+    if (processedPipelineIDs.contains(pipeline.getId())) {
+      LOG.info("Skipping HealthyPipelineSafeModeRule check as pipeline: {} is already recorded.", pipeline.getId());
+      return;
+    }
+
+    List<DatanodeDetails> dnsWithSCM = nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    List<DatanodeDetails> pipelineDns = pipeline.getNodes();
+
+    if (pipelineDns.size() == 3 && new HashSet<>(dnsWithSCM).containsAll(pipelineDns)) {
       getSafeModeMetrics().incCurrentHealthyPipelinesCount();
       currentHealthyPipelineCount++;
       processedPipelineIDs.add(pipeline.getId());
       unProcessedPipelineSet.remove(pipeline.getId());
+    } else {
+      List<DatanodeDetails> unregisteredDns = pipelineDns.stream()
+          .filter(dn -> !dnsWithSCM.contains(dn))
+          .collect(Collectors.toList());
+
+      if (!unregisteredDns.isEmpty()) {
+        LOG.warn("DNs: {} reported by pipeline: {} aren't registered with SCM.",
+            unregisteredDns, pipeline.getId());
+      }
+    }
+
+    if (pipelineDns.size() != 3) {
+      LOG.warn("Only {} DNs reported this pipeline: {}, all 3 DNs should report the pipeline", pipelineDns.size(),
+          pipeline.getId());
     }
 
     if (scmInSafeMode()) {
