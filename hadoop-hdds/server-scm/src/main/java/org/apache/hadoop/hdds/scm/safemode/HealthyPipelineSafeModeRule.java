@@ -20,7 +20,9 @@ package org.apache.hadoop.hdds.scm.safemode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -32,6 +34,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -139,39 +142,53 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
         ((RatisReplicationConfig) pipeline.getReplicationConfig()).getReplicationFactor() !=
             HddsProtos.ReplicationFactor.THREE) {
       SCMSafeModeManager.getLogger().warn(
-          "Skipping HealthyPipelineSafeModeRule check as Replication type isn't RATIS or replication factor isn't 3.");
+          "Skipping pipeline safemode report processing as Replication type isn't RATIS " +
+              "or replication factor isn't 3.");
       return;
     }
 
     // Skip already processed ones.
     if (processedPipelineIDs.contains(pipeline.getId())) {
-      LOG.info("Skipping HealthyPipelineSafeModeRule check as pipeline: {} is already recorded.", pipeline.getId());
+      LOG.info("Skipping pipeline safemode report processing check as pipeline: {} is already recorded.",
+          pipeline.getId());
       return;
     }
 
-    List<DatanodeDetails> dnsWithSCM = nodeManager.getNodes(NodeStatus.inServiceHealthy());
     List<DatanodeDetails> pipelineDns = pipeline.getNodes();
-
-    if (pipelineDns.size() == 3 && new HashSet<>(dnsWithSCM).containsAll(pipelineDns)) {
-      getSafeModeMetrics().incCurrentHealthyPipelinesCount();
-      currentHealthyPipelineCount++;
-      processedPipelineIDs.add(pipeline.getId());
-      unProcessedPipelineSet.remove(pipeline.getId());
-    } else {
-      List<DatanodeDetails> unregisteredDns = pipelineDns.stream()
-          .filter(dn -> !dnsWithSCM.contains(dn))
-          .collect(Collectors.toList());
-
-      if (!unregisteredDns.isEmpty()) {
-        LOG.warn("DNs: {} reported by pipeline: {} aren't registered with SCM.",
-            unregisteredDns, pipeline.getId());
-      }
-    }
-
     if (pipelineDns.size() != 3) {
       LOG.warn("Only {} DNs reported this pipeline: {}, all 3 DNs should report the pipeline", pipelineDns.size(),
           pipeline.getId());
+      return;
     }
+
+    Map<DatanodeDetails, String> badDnsWithReasons = new LinkedHashMap<>();
+
+    for (DatanodeDetails dn : pipelineDns) {
+      try {
+        NodeStatus status = nodeManager.getNodeStatus(dn);
+        if (!status.equals(NodeStatus.inServiceHealthy())) {
+          String reason = String.format("Health: %s, Operational State: %s",
+              status.getHealth(), status.getOperationalState());
+          badDnsWithReasons.put(dn, reason);
+        }
+      } catch (NodeNotFoundException e) {
+        badDnsWithReasons.put(dn, "DN not registered with SCM");
+      }
+    }
+
+    if (!badDnsWithReasons.isEmpty()) {
+      LOG.warn("Below DNs reported by Pipeline: {} are either in bad health or un-registered with SCMs",
+          pipeline.getId());
+      for (Map.Entry<DatanodeDetails, String> entry : badDnsWithReasons.entrySet()) {
+        LOG.warn("DN {}: {}", entry.getKey().getID(), entry.getValue());
+      }
+      return;
+    }
+
+    getSafeModeMetrics().incCurrentHealthyPipelinesCount();
+    currentHealthyPipelineCount++;
+    processedPipelineIDs.add(pipeline.getId());
+    unProcessedPipelineSet.remove(pipeline.getId());
 
     if (scmInSafeMode()) {
       SCMSafeModeManager.getLogger().info(
