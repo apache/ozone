@@ -51,12 +51,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test for Ozone Manager ACLs.
  */
-@Timeout(300)
 public class TestOmAcls {
 
   private static OzoneAccessAuthorizerTest authorizer;

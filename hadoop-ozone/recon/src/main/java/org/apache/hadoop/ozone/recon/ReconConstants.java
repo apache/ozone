@@ -24,10 +24,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class ReconConstants {
 
-  private ReconConstants() {
-    // Never Constructed
-  }
-
   public static final String RECON_CONTAINER_KEY_DB = "recon-container-key.db";
 
   public static final String CONTAINER_COUNT_KEY = "containerCount";
@@ -96,6 +92,10 @@ public final class ReconConstants {
   public static final AtomicBoolean FILE_SIZE_COUNT_TABLE_TRUNCATED = new AtomicBoolean(false);
 
   public static final AtomicBoolean CONTAINER_KEY_TABLES_TRUNCATED = new AtomicBoolean(false);
+
+  private ReconConstants() {
+    // Never Constructed
+  }
 
   /**
    * Resets the table truncated flag for the given tables. This should be called once per reprocess cycle,

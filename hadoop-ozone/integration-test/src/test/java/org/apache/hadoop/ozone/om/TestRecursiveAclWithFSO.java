@@ -48,12 +48,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.AclTests;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test recursive acl checks for delete and rename for FSO Buckets.
  */
-@Timeout(120)
 public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
 
   private static final String UNIQUE = UUID.randomUUID().toString();

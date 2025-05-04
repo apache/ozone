@@ -209,10 +209,6 @@ public class ScmConfig extends ReconfigurableConfig {
     return blockDeletionLimit;
   }
 
-  public int getScmDefaultLayoutVersionOnInit() {
-    return defaultLayoutVersionOnInit;
-  }
-
   /**
    * Configuration strings class.
    * required for SCMSecurityProtocol where the KerberosInfo references
@@ -223,6 +219,5 @@ public class ScmConfig extends ReconfigurableConfig {
   public static class ConfigStrings {
     public static final String HDDS_SCM_KERBEROS_PRINCIPAL_KEY = "hdds.scm.kerberos.principal";
     public static final String HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY = "hdds.scm.kerberos.keytab.file";
-    public static final String HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION = "hdds.scm.init.default.layout.version";
   }
 }
