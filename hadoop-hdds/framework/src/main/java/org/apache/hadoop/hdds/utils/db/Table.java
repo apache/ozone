@@ -420,4 +420,8 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   interface KeyValueIterator<KEY, VALUE>
       extends TableIterator<KEY, KeyValue<KEY, VALUE>> {
   }
+
+  /** A {@link org.apache.hadoop.hdds.utils.db.TableSpliterator} to split iterate {@link KeyValue}s. */
+  interface KeyValueSpliterator<KEY, VALUE> extends TableSpliterator<KEY, KeyValue<KEY, VALUE>> {
+  }
 }
