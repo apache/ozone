@@ -1883,6 +1883,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public String[] splitRenameKey(String renameKey) {
+    String[] splitVals = renameKey.split(OM_KEY_PREFIX);
+    return new String[]{splitVals[1], splitVals[2], splitVals[3]};
+  }
+
+  @Override
   public String getMultipartKey(long volumeId, long bucketId,
                                 long parentID, String fileName,
                                 String uploadId) {
