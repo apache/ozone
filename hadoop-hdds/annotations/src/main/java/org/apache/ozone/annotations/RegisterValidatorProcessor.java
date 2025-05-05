@@ -140,7 +140,6 @@ public class RegisterValidatorProcessor extends AbstractProcessor {
     }
   }
 
-
   private void emitErrorMsg(String s) {
     processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, s);
   }

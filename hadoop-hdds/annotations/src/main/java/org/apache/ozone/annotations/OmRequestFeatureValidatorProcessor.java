@@ -223,7 +223,6 @@ public class OmRequestFeatureValidatorProcessor extends AbstractProcessor {
     return isPropertyNamedAs(entry, ANNOTATION_PROCESSING_PHASE_PROPERTY_NAME);
   }
 
-
   private boolean isPropertyNamedAs(
       Entry<? extends ExecutableElement, ? extends AnnotationValue> entry,
       String simpleName) {
