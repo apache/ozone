@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -59,6 +60,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -168,9 +170,14 @@ public class TestKeyValueHandlerContainerReconciliation {
     dnsToCorrupt.get(0).introduceCorruption(CONTAINER_ID, numBlocksToDelete, numChunksToCorrupt, false);
     dnsToCorrupt.get(1).introduceCorruption(CONTAINER_ID, numBlocksToDelete, numChunksToCorrupt, true);
     // Use synchronous on-demand scans to re-build the merkle trees after corruption.
-    dnsToCorrupt.forEach(d -> d.scanContainer(CONTAINER_ID));
+    datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
     // Without reconciliation, checksums should be different because of the corruption.
     assertUniqueChecksumCount(CONTAINER_ID, datanodes, 3);
+
+    // Each datanode should have had one on-demand scan during test setup, and a second one after corruption was
+    // introduced.
+    final int originalScanCount = 2;
+    waitForExpectedScanCount(originalScanCount);
 
     // Reconcile each datanode with its peers.
     // In a real cluster, SCM will not send a command to reconcile a datanode with itself.
@@ -181,11 +188,29 @@ public class TestKeyValueHandlerContainerReconciliation {
           .collect(Collectors.toList());
       current.reconcileContainer(dnClient, peers, CONTAINER_ID);
     }
+    // Reconciliation should have triggered a second on-demand scan for each replica. Wait for them to finish before
+    // checking the results.
+    waitForExpectedScanCount(originalScanCount + 1);
     // After reconciliation, checksums should be the same for all containers.
-    // Reconciliation should have updated the tree based on the updated metadata that was obtained for the
-    // previously corrupted data. We do not need to wait for the full data scan to complete.
     long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
     assertEquals(healthyDataChecksum, repairedDataChecksum);
+  }
+
+  /**
+   * Uses the on-demand container scanner metrics to wait for the expected number of on demand scans to complete.
+   * Since the metrics are static and shared across all datanodes in this test, this count should be the total number
+   * of scans across all nodes.
+   */
+  private void waitForExpectedScanCount(int expectedCount) throws Exception {
+    for (MockDatanode datanode: datanodes) {
+      try {
+        GenericTestUtils.waitFor(() -> datanode.getOnDemandScanCount() == expectedCount, 100, 5_000);
+      } catch (TimeoutException ex) {
+        LOG.error("Timed out waiting for on-demand scan count {} to reach expected count {} on datanode {}",
+            datanode.getOnDemandScanCount(), expectedCount, datanode);
+        throw ex;
+      }
+    }
   }
 
   /**
@@ -381,6 +406,10 @@ public class TestKeyValueHandlerContainerReconciliation {
       }
     }
 
+    public int getOnDemandScanCount() {
+      return onDemandScanner.getMetrics().getNumContainersScanned();
+    }
+
     public void reconcileContainer(DNContainerOperationClient dnClient, Collection<DatanodeDetails> peers,
         long containerID) {
       log.info("Beginning reconciliation on this mock datanode");
@@ -458,6 +487,11 @@ public class TestKeyValueHandlerContainerReconciliation {
       ContainerLayoutTestInfo.FILE_PER_BLOCK.validateFileCount(chunksPath, blocks, (long) blocks * CHUNKS_PER_BLOCK);
       container.markContainerForClose();
       handler.closeContainer(container);
+    }
+
+    @Override
+    public String toString() {
+      return dnDetails.toString();
     }
 
     /**
