@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.sql.DataSource;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -146,6 +147,21 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       reconSchemaManager.createReconSchema();
       LOG.debug("Recon schema creation done.");
 
+      LOG.info("Finalizing Layout Features.");
+      // Handle Recon Schema Versioning
+      ReconSchemaVersionTableManager versionTableManager =
+          injector.getInstance(ReconSchemaVersionTableManager.class);
+      DataSource dataSource = injector.getInstance(DataSource.class);
+
+      ReconLayoutVersionManager layoutVersionManager =
+          new ReconLayoutVersionManager(versionTableManager, reconContext, dataSource);
+      // Run the upgrade framework to finalize layout features if needed
+      ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
+          (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
+      layoutVersionManager.finalizeLayoutFeatures();
+
+      LOG.debug("Recon schema versioning completed.");
+
       this.reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
       this.reconSafeModeMgr.setInSafeMode(true);
       httpServer = injector.getInstance(ReconHttpServer.class);
@@ -156,17 +172,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
 
       this.reconTaskStatusMetrics =
           injector.getInstance(ReconTaskStatusMetrics.class);
-
-      // Handle Recon Schema Versioning
-      ReconSchemaVersionTableManager versionTableManager =
-          injector.getInstance(ReconSchemaVersionTableManager.class);
-
-      ReconLayoutVersionManager layoutVersionManager =
-          new ReconLayoutVersionManager(versionTableManager, reconContext);
-      // Run the upgrade framework to finalize layout features if needed
-      ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
-          (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
-      layoutVersionManager.finalizeLayoutFeatures(reconStorageContainerManagerFacade);
 
       LOG.info("Initializing support of Recon Features...");
       FeatureProvider.initFeatureSupport(configuration);
