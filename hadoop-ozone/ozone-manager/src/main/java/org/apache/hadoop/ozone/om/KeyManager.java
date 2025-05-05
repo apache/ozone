@@ -138,13 +138,13 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
 
 
   /**
-   * Returns the previous snapshot's ozone keyInfo corresponding for the object.
+   * Returns the previous snapshot's ozone directorInfo corresponding for the object.
    */
   CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
       long volumeId, OmBucketInfo bucketInfo, OmDirectoryInfo directoryInfo) throws IOException;
 
   /**
-   * Returns the previous snapshot's ozone keyInfo corresponding for the object.
+   * Returns the previous snapshot's ozone directoryInfo corresponding for the object.
    */
   CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
       long volumeId, OmBucketInfo bucketInfo, OmKeyInfo directoryInfo) throws IOException;
