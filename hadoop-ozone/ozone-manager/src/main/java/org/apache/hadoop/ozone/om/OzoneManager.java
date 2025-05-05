@@ -523,6 +523,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
                 this::reconfOzoneKeyDeletingLimitPerTask);
 
+    reconfigurationHandler.setReconfigurationCompleteCallback(status -> {
+      if (status.getStatus() != null && !status.getStatus().isEmpty()) {
+        LOG.info("Reconfiguration completed. Properties are updated.");
+      } else {
+        LOG.info("Reconfiguration complete. No properties were changed.");
+      }
+    });
+
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
     replicationConfigValidator =

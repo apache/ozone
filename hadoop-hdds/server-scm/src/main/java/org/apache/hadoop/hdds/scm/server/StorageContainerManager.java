@@ -403,6 +403,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins);
 
+    reconfigurationHandler.setReconfigurationCompleteCallback(status -> {
+      if (status.getStatus() != null && !status.getStatus().isEmpty()) {
+        LOG.info("Reconfiguration completed. Properties are updated.");
+      } else {
+        LOG.info("Reconfiguration complete. No properties were changed.");
+      }
+    });
+
     initializeSystemManagers(conf, configurator);
 
     if (isSecretKeyEnable(securityConfig)) {

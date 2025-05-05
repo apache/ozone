@@ -29,7 +29,6 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurableBase;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
