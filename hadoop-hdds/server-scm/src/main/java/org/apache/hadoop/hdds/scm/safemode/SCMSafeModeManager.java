@@ -100,7 +100,6 @@ public class SCMSafeModeManager implements SafeModeManager {
     factory.getPreCheckRules().forEach(rule -> preCheckRules.add(rule.getRuleName()));
 
     final boolean isSafeModeEnabled = conf.getBoolean(HDDS_SCM_SAFEMODE_ENABLED, HDDS_SCM_SAFEMODE_ENABLED_DEFAULT);
-    safeModeMetrics.setSafemodeEnabled(isSafeModeEnabled);
     if (!isSafeModeEnabled) {
       LOG.info("Safemode is disabled, skipping Safemode rule validation and force exiting Safemode.");
       exitSafeMode(true);

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -34,7 +33,6 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 public class SafeModeMetrics {
   private static final String SOURCE_NAME = SafeModeMetrics.class.getSimpleName();
 
-  private @Metric MutableBoolean safemodeEnabled;
   // These all values will be set to some values when safemode is enabled.
   private @Metric MutableGaugeLong
       numContainerWithOneReplicaReportedThreshold;
@@ -56,14 +54,6 @@ public class SafeModeMetrics {
   public static SafeModeMetrics create() {
     final MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(SOURCE_NAME, "SCM Safemode Metrics", new SafeModeMetrics());
-  }
-
-  public void setSafemodeEnabled(boolean isSafemodeEnabled) {
-    this.safemodeEnabled = new MutableBoolean(isSafemodeEnabled);
-  }
-
-  public MutableBoolean getSafemodeEnabled() {
-    return safemodeEnabled;
   }
 
   public void setNumHealthyPipelinesThreshold(long val) {
