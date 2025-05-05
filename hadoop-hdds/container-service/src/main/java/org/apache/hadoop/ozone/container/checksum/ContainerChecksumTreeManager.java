@@ -37,6 +37,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -306,7 +307,7 @@ public class ContainerChecksumTreeManager {
     // chunks from us when they reconcile.
   }
 
-  public static long getDatachecksum(ContainerProtos.ContainerChecksumInfo checksumInfo) {
+  public static long getDataChecksum(ContainerProtos.ContainerChecksumInfo checksumInfo) {
     return checksumInfo.getContainerMerkleTree().getDataChecksum();
   }
 

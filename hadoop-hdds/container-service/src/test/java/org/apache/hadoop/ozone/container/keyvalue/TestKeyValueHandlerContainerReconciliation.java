@@ -91,19 +91,18 @@ public class TestKeyValueHandlerContainerReconciliation {
    */
   public static Stream<Arguments> corruptionValues() {
     return Stream.of(
-//        Arguments.of(5, 0),
-//        Arguments.of(0, 5),
-//        Arguments.of(0, 10),
-//        Arguments.of(10, 0),
-//        Arguments.of(5, 10),
-        // TODO
-        Arguments.of(10, 5)
-//        Arguments.of(2, 3),
-//        Arguments.of(3, 2),
-//        Arguments.of(4, 6),
-//        Arguments.of(6, 4),
-//        Arguments.of(6, 9),
-//        Arguments.of(9, 6)
+        Arguments.of(5, 0),
+        Arguments.of(0, 5),
+        Arguments.of(0, 10),
+        Arguments.of(10, 0),
+        Arguments.of(5, 10),
+        Arguments.of(10, 5),
+        Arguments.of(2, 3),
+        Arguments.of(3, 2),
+        Arguments.of(4, 6),
+        Arguments.of(6, 4),
+        Arguments.of(6, 9),
+        Arguments.of(9, 6)
     );
   }
 
@@ -312,7 +311,7 @@ public class TestKeyValueHandlerContainerReconciliation {
       } catch (IOException ex) {
         fail("Failed to read container checksum from disk", ex);
       }
-      log.info("Retrieved data checksum {} from container {}", HddsUtils.checksumToString(healthyDataChecksum),
+      log.info("Retrieved data checksum {} from container {}", HddsUtils.checksumToString(dataChecksum),
           containerID);
       return dataChecksum;
     }
