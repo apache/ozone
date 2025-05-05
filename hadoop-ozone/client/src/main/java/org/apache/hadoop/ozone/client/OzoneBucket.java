@@ -1454,7 +1454,7 @@ public class OzoneBucket extends WithMetadata {
         keyInfo.getModificationTime(),
         keyInfo.getReplicationConfig(),
         metadata,
-        keyInfo.isFile(),
+        status.isFile(),
         keyInfo.getOwnerName(),
         Collections.emptyMap());
   }
