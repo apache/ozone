@@ -32,15 +32,11 @@ import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 
 /**
- * Filter to return deleted directories which are reclaimable based on their presence in previous snapshot in
+ * Class to filter out deleted directories which are reclaimable based on their presence in previous snapshot in
  * the snapshot chain.
  */
 public class ReclaimableDirFilter extends ReclaimableFilter<OmKeyInfo> {
 
-  /**
-   * Filter to return deleted directories which are reclaimable based on their presence in previous snapshot in
-   * the snapshot chain.
-   */
   public ReclaimableDirFilter(OzoneManager ozoneManager,
                               OmSnapshotManager omSnapshotManager, SnapshotChainManager snapshotChainManager,
                               SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
