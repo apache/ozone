@@ -156,8 +156,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       ReconLayoutVersionManager layoutVersionManager =
           new ReconLayoutVersionManager(versionTableManager, reconContext, dataSource);
       // Run the upgrade framework to finalize layout features if needed
-      ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
-          (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
       layoutVersionManager.finalizeLayoutFeatures();
 
       LOG.debug("Recon schema versioning completed.");
