@@ -91,7 +91,7 @@ public class VolumeSubCommand extends ScmSubcommand {
   private String uuid;
 
   // The HostName identifier of the DataNode.
-  @Option(names = { "--hostName" },
+  @Option(names = { "--hostname" },
       defaultValue = "",
       description = "failed is used to display failed disks, " +
       "normal is used to display normal disks.")
