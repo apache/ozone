@@ -1,6 +1,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.text.RandomStringGenerator;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -28,6 +29,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
@@ -111,7 +113,7 @@ public class TestKeyValueHandlerContainerReconciliation {
   public static final Logger LOG = LoggerFactory.getLogger(TestKeyValueHandlerContainerReconciliation.class);
 
   // All container replicas will be placed in this directory, and the same replicas will be re-used for each test run.
-//  @TempDir
+  @TempDir
   private static Path containerDir;
   private static DNContainerOperationClient dnClient;
   private static MockedStatic<ContainerProtocolCalls> containerProtocolMock;
@@ -130,7 +132,6 @@ public class TestKeyValueHandlerContainerReconciliation {
    */
   @BeforeAll
   public static void setup() throws Exception {
-    containerDir = Files.createTempDirectory("reconcile");
     LOG.info("Data written to {}", containerDir);
     dnClient = new DNContainerOperationClient(new OzoneConfiguration(), null, null);
     datanodes = new ArrayList<>();
@@ -147,9 +148,17 @@ public class TestKeyValueHandlerContainerReconciliation {
 
     datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
     healthyDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
+    // Do not count the initial synchronous scan to build the merkle tree towards the scan count in the tests.
+    // This lets each test run start counting the number of scans from zero.
+    datanodes.forEach(MockDatanode::resetOnDemandScanCount);
 
     containerProtocolMock = Mockito.mockStatic(ContainerProtocolCalls.class);
     mockContainerProtocolCalls();
+  }
+
+  @AfterEach
+  public void reset() {
+    datanodes.forEach(MockDatanode::resetOnDemandScanCount);
   }
 
   @AfterAll
@@ -176,8 +185,7 @@ public class TestKeyValueHandlerContainerReconciliation {
 
     // Each datanode should have had one on-demand scan during test setup, and a second one after corruption was
     // introduced.
-    final int originalScanCount = 2;
-    waitForExpectedScanCount(originalScanCount);
+    waitForExpectedScanCount(1);
 
     // Reconcile each datanode with its peers.
     // In a real cluster, SCM will not send a command to reconcile a datanode with itself.
@@ -190,21 +198,20 @@ public class TestKeyValueHandlerContainerReconciliation {
     }
     // Reconciliation should have triggered a second on-demand scan for each replica. Wait for them to finish before
     // checking the results.
-    waitForExpectedScanCount(originalScanCount + 1);
+    waitForExpectedScanCount(2);
     // After reconciliation, checksums should be the same for all containers.
     long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
     assertEquals(healthyDataChecksum, repairedDataChecksum);
   }
 
   /**
-   * Uses the on-demand container scanner metrics to wait for the expected number of on demand scans to complete.
-   * Since the metrics are static and shared across all datanodes in this test, this count should be the total number
-   * of scans across all nodes.
+   * Uses the on-demand container scanner metrics to wait for the expected number of on-demand scans to complete on
+   * every datanode.
    */
   private void waitForExpectedScanCount(int expectedCount) throws Exception {
     for (MockDatanode datanode: datanodes) {
       try {
-        GenericTestUtils.waitFor(() -> datanode.getOnDemandScanCount() == expectedCount, 100, 5_000);
+        GenericTestUtils.waitFor(() -> datanode.getOnDemandScanCount() == expectedCount, 100, 10_000);
       } catch (TimeoutException ex) {
         LOG.error("Timed out waiting for on-demand scan count {} to reach expected count {} on datanode {}",
             datanode.getOnDemandScanCount(), expectedCount, datanode);
@@ -410,6 +417,10 @@ public class TestKeyValueHandlerContainerReconciliation {
       return onDemandScanner.getMetrics().getNumContainersScanned();
     }
 
+    public void resetOnDemandScanCount() {
+      onDemandScanner.getMetrics().resetNumContainersScanned();
+    }
+
     public void reconcileContainer(DNContainerOperationClient dnClient, Collection<DatanodeDetails> peers,
         long containerID) {
       log.info("Beginning reconciliation on this mock datanode");
@@ -421,9 +432,8 @@ public class TestKeyValueHandlerContainerReconciliation {
     }
 
     /**
-     * Creates a container with normal and deleted blocks.
-     * First it will insert normal blocks, and then it will insert
-     * deleted blocks.
+     * Create a container with the specified number of blocks. Block data is human-readable so the block files can be
+     * inspected when debugging the test.
      */
     public void addContainerWithBlocks(long containerId, int blocks) throws Exception {
       ContainerProtos.CreateContainerRequestProto createRequest =
@@ -447,7 +457,11 @@ public class TestKeyValueHandlerContainerReconciliation {
 
       // Create data to put in the container.
       // Seed using the container ID so that all replicas are identical.
-      Random byteGenerator = new Random(containerId);
+      RandomStringGenerator generator = new RandomStringGenerator.Builder()
+          .withinRange('a', 'z')
+          .usingRandom(new Random(containerId)::nextInt)
+          .get();
+
       // This array will keep getting populated with new bytes for each chunk.
       byte[] chunkData = new byte[CHUNK_LEN];
       int bytesPerChecksum = 2 * (int) OzoneConsts.KB;
@@ -465,9 +479,10 @@ public class TestKeyValueHandlerContainerReconciliation {
           ChunkInfo info = new ChunkInfo(chunkName, offset, chunkData.length);
 
           // Generate data for the chunk and compute its checksum.
-//          byteGenerator.nextBytes(chunkData);
+          // Data is generated as one ascii character per line, so block files are human-readable if further
+          // debugging is needed.
           for (int c = 0; c < chunkData.length; c += 2) {
-            chunkData[c] = (byte) (byteGenerator.nextInt(95) + 32);
+            chunkData[c] = (byte)generator.generate(1).charAt(0);
             chunkData[c+1] = (byte)'\n';
           }
 
