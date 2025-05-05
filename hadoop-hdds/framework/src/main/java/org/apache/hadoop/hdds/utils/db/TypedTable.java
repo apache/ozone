@@ -30,12 +30,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Spliterator;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
@@ -48,7 +42,6 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
 import org.apache.ratis.util.Preconditions;
-import org.apache.ratis.util.ReferenceCountedObject;
 import org.apache.ratis.util.function.CheckedBiFunction;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
@@ -592,9 +585,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     };
   }
 
-  private RawSpliterator<CodecBuffer> newCodecBufferSpliterator(KEY prefix, KEY startKey, int maxParallelism)
-      throws IOException {
-    return new RawSpliterator<CodecBuffer>(prefix, startKey, maxParallelism) {
+  private RawSpliterator<CodecBuffer, KEY, VALUE> newCodecBufferSpliterator(
+      KEY prefix, KEY startKey, int maxParallelism) throws IOException {
+    return new RawSpliterator<CodecBuffer, KEY, VALUE>(prefix, startKey, maxParallelism) {
 
       @Override
       KeyValue<KEY, VALUE> convert(RawKeyValue<CodecBuffer> kv) throws IOException {
@@ -626,9 +619,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     };
   }
 
-  private RawSpliterator<byte[]> newByteArraySpliterator(KEY prefix, KEY startKey, int maxParallelism)
+  private RawSpliterator<byte[], KEY, VALUE> newByteArraySpliterator(KEY prefix, KEY startKey, int maxParallelism)
       throws IOException {
-    return new RawSpliterator<byte[]>(prefix, startKey, maxParallelism) {
+    return new RawSpliterator<byte[], KEY, VALUE>(prefix, startKey, maxParallelism) {
 
       @Override
       KeyValue<KEY, VALUE> convert(RawKeyValue<byte[]> kv) throws IOException {
@@ -737,107 +730,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     @Override
     public void removeFromDB() throws IOException {
       rawIterator.removeFromDB();
-    }
-  }
-
-  /**
-   * A {@link Table.KeyValueIterator} backed by a raw iterator.
-   *
-   * @param <RAW> The raw type.
-   */
-
-  abstract class RawSpliterator<RAW> implements KeyValueSpliterator<KEY, VALUE> {
-
-    private final ReferenceCountedObject<TableIterator<RAW,
-        UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>>> rawIterator;
-    private final AtomicInteger maxNumberOfAdditionalSplits;
-    private final Lock lock;
-    private final AtomicReference<IOException> closeException = new AtomicReference<>();
-
-    abstract KeyValue<KEY, VALUE> convert(RawKeyValue<RAW> kv) throws IOException;
-
-    abstract TableIterator<RAW, UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>> getRawIterator(
-        KEY prefix, KEY startKey, int maxParallelism) throws IOException;
-
-    private RawSpliterator(KEY prefix, KEY startKey, int maxParallelism) throws IOException {
-      TableIterator<RAW, UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>> itr = getRawIterator(prefix,
-          startKey, maxParallelism);
-      this.lock = new ReentrantLock();
-      this.maxNumberOfAdditionalSplits = new AtomicInteger(maxParallelism - 1);
-      this.rawIterator = ReferenceCountedObject.wrap(itr, () -> { },
-          (completelyReleased) -> {
-            if (completelyReleased) {
-              lock.lock();
-              try {
-                itr.close();
-              } catch (IOException e) {
-                closeException.set(e);
-              } finally {
-                lock.unlock();
-              }
-            }
-            this.maxNumberOfAdditionalSplits.incrementAndGet();
-          });
-      this.rawIterator.retain();
-    }
-
-    @Override
-    public boolean tryAdvance(Consumer<? super KeyValue<KEY, VALUE>> action) {
-      lock.lock();
-      UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> kv = null;
-      try {
-        if (this.rawIterator.get().hasNext()) {
-          kv = rawIterator.get().next();
-        }
-      } finally {
-        lock.unlock();
-      }
-      try {
-        if (kv != null) {
-          action.accept(convert(kv.get()));
-          return true;
-        }
-      } catch (IOException e) {
-        throw new IllegalStateException("Failed next()", e);
-      } finally {
-        if (kv != null) {
-          kv.close();
-        }
-      }
-      return false;
-    }
-
-    @Override
-    public int characteristics() {
-      return Spliterator.DISTINCT;
-    }
-
-    @Override
-    public Spliterator<KeyValue<KEY, VALUE>> trySplit() {
-      int val = maxNumberOfAdditionalSplits.decrementAndGet();
-      if (val >= 1) {
-        try {
-          this.rawIterator.retain();
-        } catch (Exception e) {
-          maxNumberOfAdditionalSplits.incrementAndGet();
-          return null;
-        }
-        return this;
-      }
-      return null;
-    }
-
-    @Override
-    public void close() throws IOException {
-      this.rawIterator.release();
-      if (closeException.get() != null) {
-        throw closeException.get();
-      }
-    }
-
-    @Override
-    public long estimateSize() {
-      return Long.MAX_VALUE;
     }
   }
 }
