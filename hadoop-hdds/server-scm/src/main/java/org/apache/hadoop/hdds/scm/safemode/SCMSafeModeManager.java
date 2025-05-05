@@ -235,9 +235,10 @@ public class SCMSafeModeManager implements SafeModeManager {
     setInSafeMode(false);
 
     // Manual flag will reset only if we exit from commandline.
-    if (force) {
+    if (force && inManualSafeMode.get()) {
       inManualSafeMode.set(false);
-    }
+      LOG.info("Manual safe mode cleared due to force exit.");
+}
     setForceExitSafeMode(force);
 
     // TODO: Remove handler registration as there is no need to listen to
