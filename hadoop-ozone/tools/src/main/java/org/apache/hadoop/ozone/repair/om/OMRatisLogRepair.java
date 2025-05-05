@@ -47,10 +47,10 @@ import picocli.CommandLine;
     description = "CLI to omit a raft log in a ratis segment file. The raft log at the index specified " +
         "is replaced with an EchoOM command (which is a dummy command). It is an offline command " +
         "i.e., doesn't require OM to be running. " +
-        "The command should be run for the same transaction on all 3 OMs only when they all OMs are crashing " +
-        "while applying the same transaction. If there is only one OM that is crashing and " +
-        "other OMs have executed the log successfully, then the DB should manually copied from one of the good OMs " +
-        "to the crashing OM instead.",
+        "The command should be run for the same transaction on all 3 OMs only when all the OMs are crashing " +
+        "while applying the same transaction. If only one OM is crashing and the " +
+        "other OMs have executed the log successfully, then the DB should be manually copied " +
+        "from one of the good OMs to the crashing OM instead.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
@@ -114,7 +114,7 @@ public class OMRatisLogRepair extends RepairTool {
       outputFile = File.createTempFile("srt-output", null, backupDir);
       outputFile.deleteOnExit();
     }
-    info("Created temporary output file: " + (outputFile == null ? null : outputFile.toPath()));
+    info("Created temporary output file: " + (outputFile == null ? "<None>" : outputFile.toPath()));
 
     info("Processing Raft Log file: " + this.exclusiveArguments.segmentFile.getAbsolutePath() + " size:" +
         this.exclusiveArguments.segmentFile.length());
@@ -135,59 +135,34 @@ public class OMRatisLogRepair extends RepairTool {
     info("Finished processing all the entries (" + entryCount + " logs) from the segment file.");
     info("Moved temporary output file to correct raft log location : " + exclusiveArguments.segmentFile.toPath());
 
-    if (outputStream != null) {
-      outputStream.flush();
-      outputStream.close();
-    }
   }
 
-  public void processLogEntry(RaftProtos.LogEntryProto proto) {
+  private void processLogEntry(RaftProtos.LogEntryProto proto) {
     try {
-      if (proto.getIndex() != index) {
-        // all other logs will be written as it is
-        if (!isDryRun()) {
-          outputStream.write(proto);
-          outputStream.flush();
-        }
-        info("Copied raft log for index (" + proto.getIndex() + ").");
-      } else {
-        // replace the transaction with a dummy OmEcho operation
-        RaftProtos.StateMachineLogEntryProto oldEntry = proto.getStateMachineLogEntry();
-        OzoneManagerProtocolProtos.OMRequest.Builder newRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-            .setCmdType(EchoRPC)
-            .setClientId("skip-ratis-transaction-repair-tool")
-            .setEchoRPCRequest(OzoneManagerProtocolProtos.EchoRPCRequest.newBuilder().build());
-
-        info("Retaining the same { callid: " + oldEntry.getCallId() + ", clientID: " +
-            oldEntry.getClientId().toString() + ", type: " + oldEntry.getType() +
-            " } for EchoRPC as the old request");
-
-        RaftProtos.StateMachineLogEntryProto.Builder newEntry =
-            RaftProtos.StateMachineLogEntryProto.newBuilder()
-              .setCallId(oldEntry.getCallId())
-              .setClientId(oldEntry.getClientId())
-              .setType(oldEntry.getType())
-                .setLogData(OMRatisHelper.convertRequestToByteString(newRequest.build()));
-
-        RaftProtos.LogEntryProto newLogEntry = RaftProtos.LogEntryProto.newBuilder()
-            .setTerm(proto.getTerm())
-            .setIndex(proto.getIndex())
-            .setStateMachineLogEntry(newEntry)
-            .build();
-
-        if (!isDryRun()) {
-          outputStream.write(newLogEntry);
-          outputStream.flush();
-        }
-
-        OzoneManagerProtocolProtos.OMRequest oldRequest = OMRatisHelper
-            .convertByteStringToOMRequest(oldEntry.getLogData());
-        info("Replaced {" + oldRequest.toString().replace("\n", "  ")
-            + "} with EchoRPC command at index " + proto.getIndex());
+      RaftProtos.LogEntryProto newLogEntry = proto.getIndex() != index ? proto : getOmEchoLogEntry(proto);
+      if (!isDryRun()) {
+        outputStream.write(newLogEntry);
+        outputStream.flush();
       }
     } catch (IOException ex) {
       throw new RuntimeException("Error while processing logEntry: (" + proto.getIndex() + "). Exception: " + ex);
     }
+  }
+
+  private RaftProtos.LogEntryProto getOmEchoLogEntry(RaftProtos.LogEntryProto proto) throws IOException {
+    OzoneManagerProtocolProtos.OMRequest.Builder newRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(EchoRPC)
+        .setClientId("skip-ratis-transaction-repair-tool")
+        .setEchoRPCRequest(OzoneManagerProtocolProtos.EchoRPCRequest.newBuilder().build());
+    RaftProtos.StateMachineLogEntryProto.Builder entry =  proto.getStateMachineLogEntry().toBuilder()
+        .setLogData(OMRatisHelper.convertRequestToByteString(newRequest.build()));
+    OzoneManagerProtocolProtos.OMRequest oldRequest = OMRatisHelper
+        .convertByteStringToOMRequest(proto.getStateMachineLogEntry().getLogData());
+    info("Replacing {" + oldRequest.toString().replace("\n", "  ")
+        + "} with EchoRPC command at index " + proto.getIndex());
+    return proto.toBuilder()
+        .setStateMachineLogEntry(entry)
+        .build();
   }
 
   private File findSegmentFileContainingIndex() {
