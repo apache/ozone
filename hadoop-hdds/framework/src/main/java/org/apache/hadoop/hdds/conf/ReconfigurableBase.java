@@ -109,6 +109,7 @@ public abstract class ReconfigurableBase extends Configured implements Reconfigu
 
   }
 
+  @Override
   public final void reconfigureProperty(String property, String newVal) throws ReconfigurationException {
     if (this.isPropertyReconfigurable(property)) {
       LOG.info("changing property " + property + " to " + newVal);
@@ -127,8 +128,10 @@ public abstract class ReconfigurableBase extends Configured implements Reconfigu
     }
   }
 
+  @Override
   public abstract Collection<String> getReconfigurableProperties();
 
+  @Override
   public boolean isPropertyReconfigurable(String property) {
     return this.getReconfigurableProperties().contains(property);
   }
@@ -142,6 +145,7 @@ public abstract class ReconfigurableBase extends Configured implements Reconfigu
       this.parent = base;
     }
 
+    @Override
     public void run() {
       LOG.info("Starting reconfiguration task.");
       Configuration oldConf = this.parent.getConf();
