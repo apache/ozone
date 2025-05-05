@@ -15,31 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.pipeline;
-
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-
 /**
- * Signals that a pipeline state is not recognized.
+ * Package containing filter to perform reclaimable check on snapshots.
  */
-public class UnknownPipelineStateException extends SCMException {
-  /**
-   * Constructs an {@code UnknownPipelineStateException} with {@code null}
-   * as its error detail message.
-   */
-  public UnknownPipelineStateException() {
-    super(ResultCodes.UNKNOWN_PIPELINE_STATE);
-  }
-
-  /**
-   * Constructs an {@code UnknownPipelineStateException} with the specified
-   * detail message.
-   *
-   * @param message
-   *        The detail message (which is saved for later retrieval
-   *        by the {@link #getMessage()} method)
-   */
-  public UnknownPipelineStateException(String message) {
-    super(message, ResultCodes.UNKNOWN_PIPELINE_STATE);
-  }
-}
+package org.apache.hadoop.ozone.om.snapshot.filter;

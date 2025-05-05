@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
+import java.time.Duration;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 
@@ -66,6 +68,22 @@ public class OmConfig extends ReconfigurableConfig {
       tags = { ConfigTag.OM, ConfigTag.MANAGEMENT }
   )
   private int maxUserVolumeCount;
+
+  @Config(key = "upgrade.finalization.ratis.based.timeout",
+      defaultValue = "30s",
+      type = ConfigType.TIME,
+      tags = {ConfigTag.OM, ConfigTag.UPGRADE},
+      description = "Maximum time to wait for a slow follower to be finalized" +
+          " through a Ratis snapshot. This is an advanced config, and needs " +
+          "to be changed only under a special circumstance when the leader OM" +
+          " has purged the finalize request from its logs, and a follower OM " +
+          "was down during upgrade finalization. Default is 30s."
+  )
+  private long ratisBasedFinalizationTimeout = Duration.ofSeconds(30).getSeconds();
+
+  public long getRatisBasedFinalizationTimeout() {
+    return ratisBasedFinalizationTimeout;
+  }
 
   public boolean isFileSystemPathEnabled() {
     return fileSystemPathEnabled;
