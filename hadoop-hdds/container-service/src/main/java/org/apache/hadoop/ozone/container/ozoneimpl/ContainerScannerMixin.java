@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
+
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
-
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -32,8 +32,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
-
-import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 
 /**
  * Mixin to handle common data and metadata scan operations among background and on-demand scanners.
