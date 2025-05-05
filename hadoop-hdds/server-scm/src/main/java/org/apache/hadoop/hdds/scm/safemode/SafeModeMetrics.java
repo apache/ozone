@@ -26,7 +26,10 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
  * This class is used for maintaining SafeMode metric information, which can
- * be used for monitoring during SCM startup when SCM is still in SafeMode.
+ * be used for monitoring during SCM startup when SCM is still in SafeMode.<p>
+ * The metrics from this class are valid iff
+ * {@link org.apache.hadoop.hdds.HddsConfigKeys#HDDS_SCM_SAFEMODE_ENABLED} is
+ * set to true and the SCM is still in SafeMode.
  */
 public class SafeModeMetrics {
   private static final String SOURCE_NAME = SafeModeMetrics.class.getSimpleName();
