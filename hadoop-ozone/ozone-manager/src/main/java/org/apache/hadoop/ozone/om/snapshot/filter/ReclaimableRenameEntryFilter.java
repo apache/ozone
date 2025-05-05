@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
  */
 public class ReclaimableRenameEntryFilter extends ReclaimableFilter<String> {
 
-
   public ReclaimableRenameEntryFilter(OzoneManager ozoneManager,
                                       OmSnapshotManager omSnapshotManager, SnapshotChainManager snapshotChainManager,
                                       SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
@@ -45,6 +44,13 @@ public class ReclaimableRenameEntryFilter extends ReclaimableFilter<String> {
     super(ozoneManager, omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock, 1);
   }
 
+  /**
+   * Function which checks whether the objectId corresponding to the rename entry exists in the previous snapshot. If
+   * the entry doesn't exist in the previous keyTable/directoryTable then the rename entry can be deleted since there
+   * is no reference for this rename entry.
+   * @return true if there is no reference for the objectId based on the rename entry otherwise false.
+   * @throws IOException
+   */
   @Override
   protected Boolean isReclaimable(Table.KeyValue<String, String> renameEntry) throws IOException {
     ReferenceCounted<OmSnapshot> previousSnapshot = getPreviousOmSnapshot(0);
