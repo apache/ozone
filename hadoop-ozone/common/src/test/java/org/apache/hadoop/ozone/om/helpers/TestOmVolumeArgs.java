@@ -43,7 +43,7 @@ public class TestOmVolumeArgs {
         .setObjectID(1L).setUpdateID(1L).setQuotaInBytes(Long.MAX_VALUE)
         .addMetadata("key1", "value1").addMetadata("key2", "value2")
         .addOzoneAcls(
-            new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "user1",
+            OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER, "user1",
                 ACCESS, IAccessAuthorizer.ACLType.READ)).build();
 
     OmVolumeArgs cloneVolumeArgs = omVolumeArgs.copyObject();
@@ -51,7 +51,7 @@ public class TestOmVolumeArgs {
     assertEquals(omVolumeArgs, cloneVolumeArgs);
 
     // add user acl to write.
-    omVolumeArgs.addAcl(new OzoneAcl(
+    omVolumeArgs.addAcl(OzoneAcl.of(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
         ACCESS, IAccessAuthorizer.ACLType.WRITE));
 
@@ -60,7 +60,7 @@ public class TestOmVolumeArgs {
         omVolumeArgs.getAcls().get(0));
 
     // Set user acl to Write_ACL.
-    omVolumeArgs.setAcls(Collections.singletonList(new OzoneAcl(
+    omVolumeArgs.setAcls(Collections.singletonList(OzoneAcl.of(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
         ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL)));
 
@@ -74,7 +74,7 @@ public class TestOmVolumeArgs {
     assertEquals(cloneVolumeArgs.getAcls().get(0),
         omVolumeArgs.getAcls().get(0));
 
-    omVolumeArgs.removeAcl(new OzoneAcl(
+    omVolumeArgs.removeAcl(OzoneAcl.of(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
         ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL));
 

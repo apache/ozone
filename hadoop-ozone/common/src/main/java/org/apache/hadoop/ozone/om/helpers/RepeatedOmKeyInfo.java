@@ -41,6 +41,8 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   private static final Codec<RepeatedOmKeyInfo> CODEC_TRUE = newCodec(true);
   private static final Codec<RepeatedOmKeyInfo> CODEC_FALSE = newCodec(false);
 
+  private final List<OmKeyInfo> omKeyInfoList;
+
   private static Codec<RepeatedOmKeyInfo> newCodec(boolean ignorePipeline) {
     return new DelegatedCodec<>(
         Proto2Codec.get(RepeatedKeyInfo.getDefaultInstance()),
@@ -52,8 +54,6 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   public static Codec<RepeatedOmKeyInfo> getCodec(boolean ignorePipeline) {
     return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
   }
-
-  private final List<OmKeyInfo> omKeyInfoList;
 
   public RepeatedOmKeyInfo() {
     this.omKeyInfoList = new ArrayList<>();
@@ -92,7 +92,6 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     }
     return new ImmutablePair<Long, Long>(unreplicatedSize, replicatedSize);
   }
-
 
   // HDDS-7041. Return a new ArrayList to avoid ConcurrentModifyException
   public List<OmKeyInfo> cloneOmKeyInfoList() {

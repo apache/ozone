@@ -359,7 +359,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     return numKeys.value();
   }
 
-
   public void incNumVolumeCreates() {
     numVolumeOps.incr();
     numVolumeCreates.incr();
@@ -555,6 +554,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   public int getNumSnapshotCacheSize() {
     return numSnapshotCacheSize.value();
   }
+
   public void incNumSnapshotCacheSize() {
     numSnapshotCacheSize.incr();
   }
@@ -584,6 +584,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   public void incNumAbortMultipartUploadFails() {
     numAbortMultipartUploadFails.incr();
   }
+
   public void incNumListMultipartUploadParts() {
     numKeyOps.incr();
     numListMultipartUploadParts.incr();

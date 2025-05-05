@@ -360,7 +360,6 @@ public abstract class AbstractContractCreateTest extends
         child);
   }
 
-
   @Test
   public void testMkdirUnderFile() throws Throwable {
     describe("Verify that it is forbidden to create file/dir");

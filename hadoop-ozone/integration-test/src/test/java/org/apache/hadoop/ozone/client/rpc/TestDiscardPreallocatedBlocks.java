@@ -49,13 +49,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests that unused block pre-allocated for write is discarded when container is closed.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestDiscardPreallocatedBlocks implements NonHATests.TestCase {
   private MiniOzoneCluster cluster;
   private OzoneClient client;

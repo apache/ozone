@@ -25,6 +25,10 @@ import org.apache.hadoop.ozone.om.S3SecretCache;
  * Provider of {@link S3SecretCache}.
  */
 public interface S3SecretCacheProvider {
+  /**
+   * In-memory cache implementation.
+   */
+  S3SecretCacheProvider IN_MEMORY = conf -> new S3InMemoryCache();
 
   /**
    * Returns S3 secret cache instance constructed by provided configuration.
@@ -33,11 +37,4 @@ public interface S3SecretCacheProvider {
    * @return S3 secret cache instance.
    */
   S3SecretCache get(Configuration conf);
-
-  /**
-   * In-memory cache implementation.
-   */
-  S3SecretCacheProvider IN_MEMORY = conf -> {
-    return new S3InMemoryCache();
-  };
 }

@@ -63,7 +63,6 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Sets;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -98,6 +97,9 @@ import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -115,13 +117,11 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class used for testing the OM DB Checkpoint provider servlet.
  */
-@Timeout(240)
 public class TestOMDbCheckpointServlet {
   public static final String JAVA_IO_TMPDIR = "java.io.tmpdir";
   private OzoneConfiguration conf;
@@ -526,7 +526,7 @@ public class TestOMDbCheckpointServlet {
 
     // Get the tarball.
     Path tmpdir = folder.resolve("bootstrapData");
-    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+    try (OutputStream fileOutputStream = Files.newOutputStream(tempFile.toPath())) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream, new ArrayList<>(), new ArrayList<>(), tmpdir);
     }
@@ -558,7 +558,7 @@ public class TestOMDbCheckpointServlet {
     File dummyFile = new File(dbCheckpoint.getCheckpointLocation().toString(),
         "dummy.sst");
     try (OutputStreamWriter writer = new OutputStreamWriter(
-        new FileOutputStream(dummyFile), StandardCharsets.UTF_8)) {
+        Files.newOutputStream(dummyFile.toPath()), StandardCharsets.UTF_8)) {
       writer.write("Dummy data.");
     }
     assertTrue(dummyFile.exists());
@@ -572,7 +572,7 @@ public class TestOMDbCheckpointServlet {
 
     // Get the tarball.
     Path tmpdir = folder.resolve("bootstrapData");
-    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+    try (OutputStream fileOutputStream = Files.newOutputStream(tempFile.toPath())) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream, toExcludeList, excludedList, tmpdir);
     }
@@ -676,10 +676,12 @@ public class TestOMDbCheckpointServlet {
         .createVolumeAndBucket(client);
 
     // Create dummy keys for snapshotting.
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
-        "content");
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
-        "content");
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
+            .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+        "content".getBytes(StandardCharsets.UTF_8));
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
+            .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+        "content".getBytes(StandardCharsets.UTF_8));
 
     snapshotDirName =
         createSnapshot(bucket.getVolumeName(), bucket.getName());
@@ -690,7 +692,7 @@ public class TestOMDbCheckpointServlet {
     Path fabricatedSnapshot  = Paths.get(
         new File(snapshotDirName).getParent(),
         "fabricatedSnapshot");
-    fabricatedSnapshot.toFile().mkdirs();
+    assertTrue(fabricatedSnapshot.toFile().mkdirs());
     assertTrue(Paths.get(fabricatedSnapshot.toString(),
         FABRICATED_FILE_NAME).toFile().createNewFile());
 

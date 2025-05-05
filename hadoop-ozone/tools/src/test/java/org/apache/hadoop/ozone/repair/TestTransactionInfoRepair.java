@@ -142,7 +142,7 @@ public class TestTransactionInfoRepair {
 
   private String getColumnFamilyName(String component) {
     switch (component) {
-    case "om": return OMDBDefinition.TRANSACTION_INFO_TABLE.getName();
+    case "om": return OMDBDefinition.TRANSACTION_INFO_TABLE_DEF.getName();
     case "scm": return SCMDBDefinition.TRANSACTIONINFO.getName();
     default: return "";
     }

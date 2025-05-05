@@ -346,7 +346,6 @@ public abstract class AbstractFSContractTestBase implements ContractOptions {
     ContractTestUtils.assertIsDirectory(fileSystem, path);
   }
 
-
   /**
    * Assert that a file exists and whose {@link FileStatus} entry
    * declares that this is a file and not a symlink or directory.

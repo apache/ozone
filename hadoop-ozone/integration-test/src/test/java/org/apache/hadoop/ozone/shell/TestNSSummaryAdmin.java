@@ -36,12 +36,10 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test for Namespace CLI.
  */
-@Timeout(60)
 public class TestNSSummaryAdmin extends StandardOutputTestBase {
   private static ObjectStore store;
 

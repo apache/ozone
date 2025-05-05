@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
@@ -121,8 +120,8 @@ public class TestDeletedBlocksTxnShell {
   //<containerID,  List<blockID>>
   private Map<Long, List<Long>> generateData(int dataSize) throws Exception {
     Map<Long, List<Long>> blockMap = new HashMap<>();
-    int continerIDBase = RandomUtils.nextInt(0, 100);
-    int localIDBase = RandomUtils.nextInt(0, 1000);
+    int continerIDBase = RandomUtils.secure().randomInt(0, 100);
+    int localIDBase = RandomUtils.secure().randomInt(0, 1000);
     for (int i = 0; i < dataSize; i++) {
       long containerID = continerIDBase + i;
       updateContainerMetadata(containerID);
@@ -158,8 +157,7 @@ public class TestDeletedBlocksTxnShell {
         getContainerManager().getContainerStateManager();
     containerStateManager.addContainer(container.getProtobuf());
     for (ContainerReplica replica: replicaSet) {
-      containerStateManager.updateContainerReplica(
-          ContainerID.valueOf(cid), replica);
+      containerStateManager.updateContainerReplica(replica);
     }
   }
 

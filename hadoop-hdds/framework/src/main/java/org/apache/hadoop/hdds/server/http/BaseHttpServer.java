@@ -244,7 +244,6 @@ public abstract class BaseHttpServer {
     return builder;
   }
 
-
   /**
    * Add a servlet to BaseHttpServer.
    *
@@ -368,7 +367,6 @@ public abstract class BaseHttpServer {
     }
   }
 
-
   public static HttpServer2.Builder loadSslConfToHttpServerBuilder(
       HttpServer2.Builder builder, ConfigurationSource sslConf) {
     return builder
@@ -412,6 +410,7 @@ public abstract class BaseHttpServer {
     }
     return password;
   }
+
   /**
    * Load HTTPS-related configuration.
    */

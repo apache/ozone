@@ -37,12 +37,10 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test for the Node2Pipeline map.
  */
-@Timeout(300)
 public abstract class TestNode2PipelineMap implements NonHATests.TestCase {
 
   private StorageContainerManager scm;

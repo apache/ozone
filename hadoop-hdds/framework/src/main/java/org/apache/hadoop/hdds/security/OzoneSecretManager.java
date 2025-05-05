@@ -86,7 +86,6 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
     this.currentKey = new AtomicReference<>();
   }
 
-
   /**
    * Compute HMAC of the identifier using the private key and return the output
    * as password.
@@ -139,6 +138,7 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
    */
   public abstract long renewToken(Token<T> token, String renewer)
       throws IOException;
+
   /**
    * Cancel a token by removing it from store and cache.
    *

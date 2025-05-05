@@ -165,21 +165,20 @@ public class FindSourceGreedy implements FindSourceStrategy {
       //3 after subtracting sizeLeavingAfterMove, the usage is bigger
       // than or equal to lowerLimit
       if (size <= 0) {
-        LOG.debug("{} bytes container cannot leave datanode {}", size, source.getUuidString());
+        LOG.debug("{} bytes container cannot leave datanode {}", size, source);
         return false;
       }
       if (sizeLeavingAfterMove > config.getMaxSizeLeavingSource()) {
         LOG.debug("{} bytes cannot leave datanode {} because 'size.leaving" +
                 ".source.max' limit is {} and {} bytes have already left.",
-            size, source.getUuidString(), config.getMaxSizeLeavingSource(),
+            size, source, config.getMaxSizeLeavingSource(),
             sizeLeavingNode.get(source));
         return false;
       }
       if (Double.compare(nodeManager.getUsageInfo(source)
           .calculateUtilization(-sizeLeavingAfterMove), lowerLimit) < 0) {
         LOG.debug("{} bytes cannot leave datanode {} because its utilization " +
-                "will drop below the lower limit of {}.", size,
-            source.getUuidString(), lowerLimit);
+                "will drop below the lower limit of {}.", size, source, lowerLimit);
         return false;
       }
       return true;

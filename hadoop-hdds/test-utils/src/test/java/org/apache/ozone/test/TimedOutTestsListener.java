@@ -96,7 +96,7 @@ public class TimedOutTestsListener implements TestExecutionListener {
         dump.append("\n        at ");
         dump.append(stackTraceElement);
       }
-      dump.append("\n");
+      dump.append('\n');
     }
     return dump.toString();
   }

@@ -70,6 +70,7 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -379,9 +380,8 @@ public class TestOzoneDelegationTokenSecretManager {
 
   @Test
   public void testVerifyAsymmetricSignatureSuccess() throws Exception {
-    GenericTestUtils.setLogLevel(OzoneDelegationTokenSecretManager.LOG, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(OzoneDelegationTokenSecretManager.LOG);
+    GenericTestUtils.setLogLevel(OzoneDelegationTokenSecretManager.class, Level.DEBUG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(OzoneDelegationTokenSecretManager.class);
     secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);

@@ -64,12 +64,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests Exception handling by Ozone Client by set flush delay.
  */
-@Timeout(300)
 public class TestFailureHandlingByClientFlushDelay {
 
   private MiniOzoneCluster cluster;

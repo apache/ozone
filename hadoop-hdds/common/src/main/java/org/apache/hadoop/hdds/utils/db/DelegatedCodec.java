@@ -28,21 +28,6 @@ import org.apache.ratis.util.function.CheckedFunction;
  * @param <DELEGATE> The object type of the {@link #delegate}.
  */
 public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
-  /** How to {@link #copyObject(Object)}? */
-  public enum CopyType {
-    /** Deep copy -- duplicate the underlying fields of the object. */
-    DEEP,
-    /** Shallow copy -- only duplicate the reference of the object. */
-    SHALLOW,
-    /**
-     * Copy is unsupported
-     * due to some reason such as the codec being inconsistent.
-     * <p>
-     * Consistency: deserialize(serialize(original)) equals to original.
-     */
-    UNSUPPORTED
-  }
-
   private final Codec<DELEGATE> delegate;
   private final CheckedFunction<DELEGATE, T, IOException> forward;
   private final CheckedFunction<T, DELEGATE, IOException> backward;
@@ -127,5 +112,20 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
     } catch (IOException e) {
       throw new IllegalStateException("Failed to copyObject", e);
     }
+  }
+
+  /** How to {@link #copyObject(Object)}? */
+  public enum CopyType {
+    /** Deep copy -- duplicate the underlying fields of the object. */
+    DEEP,
+    /** Shallow copy -- only duplicate the reference of the object. */
+    SHALLOW,
+    /**
+     * Copy is unsupported
+     * due to some reason such as the codec being inconsistent.
+     * <p>
+     * Consistency: deserialize(serialize(original)) equals to original.
+     */
+    UNSUPPORTED
   }
 }

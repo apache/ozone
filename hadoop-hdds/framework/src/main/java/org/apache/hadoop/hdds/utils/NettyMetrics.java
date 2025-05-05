@@ -31,6 +31,29 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
  * This class emits Netty metrics.
  */
 public final class NettyMetrics implements MetricsSource {
+
+  public static final String SOURCE_NAME = NettyMetrics.class.getSimpleName();
+
+  public static NettyMetrics create() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    NettyMetrics metrics = new NettyMetrics();
+    return ms.register(SOURCE_NAME, "Netty metrics", metrics);
+  }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME)
+        .setContext("Netty metrics");
+    recordBuilder
+        .addGauge(MetricsInfos.USED_DIRECT_MEM, usedDirectMemory())
+        .addGauge(MetricsInfos.MAX_DIRECT_MEM, maxDirectMemory());
+  }
+
+  public void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(SOURCE_NAME);
+  }
+
   private enum MetricsInfos implements MetricsInfo {
     USED_DIRECT_MEM("Used direct memory."),
     MAX_DIRECT_MEM("Max direct memory.");
@@ -45,30 +68,5 @@ public final class NettyMetrics implements MetricsSource {
     public String description() {
       return desc;
     }
-  }
-
-  public static final String SOURCE_NAME =
-      NettyMetrics.class.getSimpleName();
-
-
-  public static NettyMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    NettyMetrics metrics = new NettyMetrics();
-    return ms.register(SOURCE_NAME, "Netty metrics", metrics);
-  }
-
-
-  @Override
-  public void getMetrics(MetricsCollector collector, boolean all) {
-    MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME)
-        .setContext("Netty metrics");
-    recordBuilder
-        .addGauge(MetricsInfos.USED_DIRECT_MEM, usedDirectMemory())
-        .addGauge(MetricsInfos.MAX_DIRECT_MEM, maxDirectMemory());
-  }
-
-  public void unregister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
   }
 }

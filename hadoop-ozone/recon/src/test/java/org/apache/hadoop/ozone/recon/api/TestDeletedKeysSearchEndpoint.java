@@ -108,7 +108,6 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     populateOMDB();
   }
 
-
   private static OMMetadataManager initializeNewOmMetadataManager(File omDbDir) throws IOException {
     OzoneConfiguration omConfiguration = new OzoneConfiguration();
     omConfiguration.set(OZONE_OM_DB_DIRS, omDbDir.getAbsolutePath());
@@ -441,7 +440,6 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(3, result.getRepeatedOmKeyInfoList().size());
     assertEquals("fileb3", result.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0).getKeyName());
   }
-
 
   /**
    * Populates the OMDB with a set of deleted keys for testing purposes.

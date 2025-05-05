@@ -22,10 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
@@ -105,7 +105,7 @@ public class TestOzoneTokenIdentifier {
         new Text("rm"), new Text("client"));
     tokenId.setOmCertSerialId("123");
     LOG.info("Unsigned token {} is {}", tokenId,
-        verifyTokenAsymmetric(tokenId, RandomUtils.nextBytes(128), cert));
+        verifyTokenAsymmetric(tokenId, RandomUtils.secure().randomBytes(128), cert));
 
   }
 
@@ -142,9 +142,9 @@ public class TestOzoneTokenIdentifier {
 
   OzoneTokenIdentifier generateTestToken() {
     OzoneTokenIdentifier tokenIdentifier = new OzoneTokenIdentifier(
-        new Text(RandomStringUtils.randomAlphabetic(6)),
-        new Text(RandomStringUtils.randomAlphabetic(5)),
-        new Text(RandomStringUtils.randomAlphabetic(4)));
+        new Text(RandomStringUtils.secure().nextAlphabetic(6)),
+        new Text(RandomStringUtils.secure().nextAlphabetic(5)),
+        new Text(RandomStringUtils.secure().nextAlphabetic(4)));
     tokenIdentifier.setOmCertSerialId("123");
     return tokenIdentifier;
   }
@@ -194,7 +194,6 @@ public class TestOzoneTokenIdentifier {
     testSymmetricTokenPerfHelper(hmacSHA256, 1024);
   }
 
-
   public void testSymmetricTokenPerfHelper(String hmacAlgorithm, int keyLen) {
     final int testTokenCount = 1000;
     List<OzoneTokenIdentifier> tokenIds = new ArrayList<>();
@@ -236,21 +235,21 @@ public class TestOzoneTokenIdentifier {
   @Test
   public void testReadWriteInProtobuf(@TempDir Path baseDir) throws IOException {
     OzoneTokenIdentifier id = getIdentifierInst();
-    File idFile = baseDir.resolve("tokenFile").toFile();
+    Path idFile = baseDir.resolve("tokenFile");
 
-    FileOutputStream fop = new FileOutputStream(idFile);
-    DataOutputStream dataOutputStream = new DataOutputStream(fop);
-    id.write(dataOutputStream);
-    fop.close();
+    try (OutputStream fop = Files.newOutputStream(idFile)) {
+      DataOutputStream dataOutputStream = new DataOutputStream(fop);
+      id.write(dataOutputStream);
+    }
 
-    FileInputStream fis = new FileInputStream(idFile);
-    DataInputStream dis = new DataInputStream(fis);
-    OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
+    try (InputStream fis = Files.newInputStream(idFile)) {
+      DataInputStream dis = new DataInputStream(fis);
+      OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
 
-    id2.readFields(dis);
-    assertEquals(id, id2);
+      id2.readFields(dis);
+      assertEquals(id, id2);
+    }
   }
-
 
   public OzoneTokenIdentifier getIdentifierInst() {
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();

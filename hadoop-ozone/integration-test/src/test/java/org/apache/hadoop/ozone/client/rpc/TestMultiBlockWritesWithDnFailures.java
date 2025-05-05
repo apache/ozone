@@ -56,12 +56,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests MultiBlock Writes with Dn failures by Ozone Client.
  */
-@Timeout(300)
 public class TestMultiBlockWritesWithDnFailures {
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;

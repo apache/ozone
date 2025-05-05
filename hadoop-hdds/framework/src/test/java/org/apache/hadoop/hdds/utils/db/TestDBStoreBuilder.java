@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -99,9 +98,9 @@ public class TestDBStoreBuilder {
 
     try (Table<byte[], byte[]> firstTable = dbStore.getTable("FIRST")) {
       byte[] key =
-          RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
       byte[] value =
-          RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
       firstTable.put(key, value);
       byte[] temp = firstTable.get(key);
       assertArrayEquals(value, temp);
@@ -121,9 +120,9 @@ public class TestDBStoreBuilder {
         .build()) {
       try (Table<byte[], byte[]> firstTable = dbStore.getTable("First")) {
         byte[] key =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
         byte[] value =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
         byte[] temp = firstTable.get(key);
         assertArrayEquals(value, temp);
@@ -148,9 +147,9 @@ public class TestDBStoreBuilder {
         .build()) {
       try (Table<byte[], byte[]> firstTable = dbStore.getTable("First")) {
         byte[] key =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
         byte[] value =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
         byte[] temp = firstTable.get(key);
         assertArrayEquals(value, temp);
@@ -203,11 +202,7 @@ public class TestDBStoreBuilder {
       }
     };
 
-    try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
-        .setName("SampleStore").setPath(newFolder.toPath()).build()) {
-      assertInstanceOf(RDBStore.class, dbStore);
-
-      RDBStore rdbStore = (RDBStore) dbStore;
+    try (RDBStore rdbStore = DBStoreBuilder.newBuilder(conf, sampleDB, "SampleStore", newFolder.toPath()).build()) {
       Collection<RocksDatabase.ColumnFamily> cfFamilies =
           rdbStore.getColumnFamilies();
 
@@ -267,13 +262,9 @@ public class TestDBStoreBuilder {
       }
     };
 
-    try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
-            .setName("SampleStore")
-            .disableDefaultCFAutoCompaction(disableAutoCompaction)
-            .setPath(newFolder.toPath()).build()) {
-      assertInstanceOf(RDBStore.class, dbStore);
-
-      RDBStore rdbStore = (RDBStore) dbStore;
+    try (RDBStore rdbStore = DBStoreBuilder.newBuilder(conf, sampleDB, "SampleStore", newFolder.toPath())
+        .disableDefaultCFAutoCompaction(disableAutoCompaction)
+        .build()) {
       Collection<RocksDatabase.ColumnFamily> cfFamilies =
               rdbStore.getColumnFamilies();
 

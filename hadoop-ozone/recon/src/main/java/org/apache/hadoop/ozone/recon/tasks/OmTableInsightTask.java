@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -63,7 +64,6 @@ public class OmTableInsightTask implements ReconOmTask {
   private Map<String, Long> objectCountMap;
   private Map<String, Long> unReplicatedSizeMap;
   private Map<String, Long> replicatedSizeMap;
-
 
   @Inject
   public OmTableInsightTask(GlobalStatsDao globalStatsDao,
@@ -172,7 +172,7 @@ public class OmTableInsightTask implements ReconOmTask {
     String tableName;
     OMDBUpdateEvent<String, Object> omdbUpdateEvent;
     // Process each update event
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     while (eventIterator.hasNext()) {
       omdbUpdateEvent = eventIterator.next();
       tableName = omdbUpdateEvent.getTable();
@@ -215,7 +215,7 @@ public class OmTableInsightTask implements ReconOmTask {
       writeDataToDB(replicatedSizeMap);
     }
     LOG.debug("{} successfully processed in {} milliseconds",
-        getTaskName(), (System.currentTimeMillis() - startTime));
+        getTaskName(), (Time.monotonicNow() - startTime));
     return buildTaskResult(true);
   }
 
@@ -233,7 +233,6 @@ public class OmTableInsightTask implements ReconOmTask {
     }
   }
 
-
   private void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                  String tableName) {
     OmTableHandler tableHandler = tableHandlers.get(tableName);
@@ -247,7 +246,6 @@ public class OmTableInsightTask implements ReconOmTask {
       }
     }
   }
-
 
   private void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                                  String tableName) {

@@ -42,7 +42,6 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -75,7 +74,7 @@ public class TestRatisPipelineLeader {
     }
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 120000)
+  @Test
   public void testLeaderIdUsedOnFirstCall() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines(RatisReplicationConfig.getInstance(
@@ -100,8 +99,7 @@ public class TestRatisPipelineLeader {
     final Logger log = LoggerFactory.getLogger(
         "org.apache.ratis.grpc.server.GrpcClientProtocolService");
     GenericTestUtils.setLogLevel(log, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(log);
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(log);
     try (XceiverClientRatis xceiverClientRatis =
         XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf)) {
       xceiverClientRatis.connect();
@@ -112,7 +110,7 @@ public class TestRatisPipelineLeader {
         .doesNotContain("org.apache.ratis.protocol.NotLeaderException");
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 120000)
+  @Test
   public void testLeaderIdAfterLeaderChange() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines(RatisReplicationConfig.getInstance(

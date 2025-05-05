@@ -54,13 +54,11 @@ import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests failure detection and handling in BlockOutputStream Class by set
  * flush delay.
  */
-@Timeout(300)
 public class TestOzoneClientRetriesOnExceptionFlushDelay {
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();

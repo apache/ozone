@@ -21,6 +21,7 @@ import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler.DeleteBlockTransactionExecutionResult;
@@ -55,6 +56,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
@@ -75,7 +77,6 @@ import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -83,7 +84,6 @@ import org.mockito.stubbing.Answer;
 /**
  * Test cases for TestDeleteBlocksCommandHandler.
  */
-@Timeout(300)
 public class TestDeleteBlocksCommandHandler {
   @TempDir
   private Path folder;
@@ -109,7 +109,7 @@ public class TestDeleteBlocksCommandHandler {
     conf = new OzoneConfiguration();
     layout = ContainerLayoutVersion.FILE_PER_BLOCK;
     ozoneContainer = mock(OzoneContainer.class);
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
     volume1 = mock(HddsVolume.class);
     when(volume1.getStorageID()).thenReturn("uuid-1");
     for (int i = 0; i <= 10; i++) {
@@ -301,6 +301,7 @@ public class TestDeleteBlocksCommandHandler {
     // Setting up the test environment
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, folder.toString());
+    configuration.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
     DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeConfiguration dnConf =
         configuration.getObject(DatanodeConfiguration.class);

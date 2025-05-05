@@ -21,7 +21,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -56,9 +55,7 @@ import org.slf4j.LoggerFactory;
  * Provides some very generic helpers which might be used across the tests.
  */
 public abstract class GenericTestUtils {
-  public static final String SYSPROP_TEST_DATA_DIR = "test.build.data";
-  public static final String DEFAULT_TEST_DATA_DIR;
-  public static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
+
   /**
    * Error string used in
    * {@link GenericTestUtils#waitFor(BooleanSupplier, int, int)}.
@@ -68,15 +65,7 @@ public abstract class GenericTestUtils {
   public static final String ERROR_INVALID_ARGUMENT =
       "Total wait time should be greater than check interval time";
 
-  public static final boolean WINDOWS =
-      System.getProperty("os.name").startsWith("Windows");
-
   private static final long NANOSECONDS_PER_MILLISECOND = 1_000_000;
-
-  static {
-    DEFAULT_TEST_DATA_DIR =
-        "target" + File.separator + "test" + File.separator + "data";
-  }
 
   /**
    * Return current time in millis as an {@code Instant}.  This may be
@@ -88,31 +77,6 @@ public abstract class GenericTestUtils {
    */
   public static Instant getTestStartTime() {
     return Instant.ofEpochMilli(System.currentTimeMillis());
-  }
-
-  /**
-   * Get a temp path. This may or may not be relative; it depends on what the
-   * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
-   * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
-   *
-   * @param subpath sub path, with no leading "/" character
-   * @return a string to use in paths
-   *
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   */
-  @Deprecated
-  public static String getTempPath(String subpath) {
-    String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
-        : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
-
-    if (prop.isEmpty()) {
-      // corner case: property is there but empty
-      prop = DEFAULT_TEST_DATA_PATH;
-    }
-    if (!prop.endsWith("/")) {
-      prop = prop + "/";
-    }
-    return prop + subpath;
   }
 
   /**
@@ -178,6 +142,10 @@ public abstract class GenericTestUtils {
   public static void setLogLevel(org.slf4j.Logger logger,
       org.slf4j.event.Level level) {
     setLogLevel(toLog4j(logger), Level.toLevel(level.toString()));
+  }
+
+  public static void setLogLevel(Class<?> clazz, org.slf4j.event.Level level) {
+    setLogLevel(LoggerFactory.getLogger(clazz), level);
   }
 
   public static void withLogDisabled(Class<?> clazz, Runnable task) {
@@ -250,6 +218,10 @@ public abstract class GenericTestUtils {
       return new Log4j1Capturer(logger, layout);
     }
 
+    public static LogCapturer captureLogs(Class<?> clazz) {
+      return captureLogs(LoggerFactory.getLogger(clazz));
+    }
+
     public static LogCapturer captureLogs(org.slf4j.Logger logger) {
       return new Log4j1Capturer(toLog4j(logger));
     }
@@ -273,6 +245,7 @@ public abstract class GenericTestUtils {
       writer().getBuffer().setLength(0);
     }
   }
+
   @Deprecated
   public static Logger toLog4j(org.slf4j.Logger logger) {
     return LogManager.getLogger(logger.getName());

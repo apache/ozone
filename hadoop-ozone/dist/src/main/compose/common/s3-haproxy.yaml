@@ -34,13 +34,7 @@ services:
     command: ["haproxy", "-f", "/usr/local/etc/haproxy/haproxy.cfg"]
   s3g1:
     <<: *s3-worker
-    ports:
-      - 9879:9878
   s3g2:
     <<: *s3-worker
-    ports:
-      - 9880:9878
   s3g3:
     <<: *s3-worker
-    ports:
-      - 9881:9878

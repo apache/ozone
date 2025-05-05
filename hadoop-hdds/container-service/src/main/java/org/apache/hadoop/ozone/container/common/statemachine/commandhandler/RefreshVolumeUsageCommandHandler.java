@@ -48,7 +48,7 @@ public class RefreshVolumeUsageCommandHandler implements CommandHandler {
   }
 
   @Override
-  public void handle(SCMCommand command, OzoneContainer container,
+  public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
     LOG.info("receive command to refresh usage info of all volumes");
     invocationCount.incrementAndGet();

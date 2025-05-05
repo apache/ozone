@@ -346,8 +346,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     assertNull(omKeyInfo);
   }
 
-
-
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithVolumeNotFound(
@@ -387,7 +385,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     assertNull(omKeyInfo);
 
   }
-
 
   @ParameterizedTest
   @MethodSource("data")
@@ -430,7 +427,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     assertNull(omKeyInfo);
 
   }
-
 
   @ParameterizedTest
   @MethodSource("data")
@@ -566,7 +562,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // Verify the new metadata is correctly applied in the response
     verifyMetadataInResponse(overwriteResponse, overwriteMetadata);
   }
-
 
   private void verifyMetadataInResponse(OMClientResponse response,
                                         Map<String, String> expectedMetadata) {
@@ -1049,7 +1044,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         keyName.substring(1), 0L, RatisReplicationConfig.getInstance(THREE), omMetadataManager);
   }
-
 
   private void checkNotAValidPath(String keyName) throws IOException {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);

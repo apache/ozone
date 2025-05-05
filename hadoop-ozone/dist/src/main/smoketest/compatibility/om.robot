@@ -19,12 +19,16 @@ Library             BuiltIn
 Resource            ../lib/os.robot
 Test Timeout        5 minutes
 
-*** Test Cases ***
-Picks up command line options
-    Pass Execution If    '%{HDFS_OM_OPTS}' == ''    Command-line option required for process check
+*** Keywords ***
+Check command-line options
     ${processes} =    List All Processes
     Should Contain    ${processes}   %{HDFS_OM_OPTS}
     Should Contain    ${processes}   %{HADOOP_OPTS}
+
+*** Test Cases ***
+Picks up command line options
+    Pass Execution If    '%{HDFS_OM_OPTS}' == ''    Command-line option required for process check
+    Wait Until Keyword Succeeds    3min    2sec    Check command-line options
 
 Rejects Atomic Key Rewrite
     Execute           ozone freon ockg -n1 -t1 -p rewrite

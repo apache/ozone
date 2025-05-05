@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.multitenant;
 
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,7 +30,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.ratis.util.ReflectionUtils;
 
 /**
  * Defines the operations needed for multi-tenant access control.
@@ -503,5 +507,19 @@ public interface MultiTenantAccessController {
         return new Policy(this);
       }
     }
+  }
+
+  /** Create {@code MultiTenantAccessController} implementation. */
+  static MultiTenantAccessController create(ConfigurationSource conf) {
+    if (conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, false)) {
+      return new InMemoryMultiTenantAccessController();
+    }
+
+    final String className = "org.apache.hadoop.ozone.om.multitenant.RangerClientMultiTenantAccessController";
+    return ReflectionUtils.newInstance(
+        ReflectionUtils.getClass(className, MultiTenantAccessController.class),
+        new Class<?>[] {ConfigurationSource.class},
+        conf
+    );
   }
 }

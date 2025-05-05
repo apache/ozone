@@ -44,11 +44,15 @@ import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test for {@link DatanodeConfiguration}.
  */
 public class TestDatanodeConfiguration {
+
+  private static final long[] CAPACITIES = {100_000, 1_000_000, 10_000_000};
 
   @Test
   public void acceptsValidValues() {
@@ -149,6 +153,7 @@ public class TestDatanodeConfiguration {
   public void isCreatedWitDefaultValues() {
     // GIVEN
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.unset(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE); // set in ozone-site.xml
 
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
@@ -170,6 +175,66 @@ public class TestDatanodeConfiguration {
         subject.getDiskCheckTimeout());
     assertEquals(BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT,
         subject.getBlockDeleteCommandWorkerInterval());
+    assertEquals(DatanodeConfiguration.getDefaultFreeSpace(), subject.getMinFreeSpace());
+    assertEquals(DatanodeConfiguration.MIN_FREE_SPACE_UNSET, subject.getMinFreeSpaceRatio());
+  }
+
+  @Test
+  void rejectsInvalidMinFreeSpaceRatio() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, 1.5f);
+
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    assertEquals(DatanodeConfiguration.MIN_FREE_SPACE_UNSET, subject.getMinFreeSpaceRatio());
+  }
+
+  @Test
+  void useMinFreeSpaceIfBothMinFreeSpacePropertiesSet() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    int minFreeSpace = 10000;
+    conf.setLong(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, minFreeSpace);
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, .5f);
+
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    assertEquals(minFreeSpace, subject.getMinFreeSpace());
+    assertEquals(DatanodeConfiguration.MIN_FREE_SPACE_UNSET, subject.getMinFreeSpaceRatio());
+
+    for (long capacity : CAPACITIES) {
+      assertEquals(minFreeSpace, subject.getMinFreeSpace(capacity));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(longs = {1_000, 10_000, 100_000})
+  void usesFixedMinFreeSpace(long bytes) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setLong(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, bytes);
+
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    assertEquals(bytes, subject.getMinFreeSpace());
+    assertEquals(DatanodeConfiguration.MIN_FREE_SPACE_UNSET, subject.getMinFreeSpaceRatio());
+
+    for (long capacity : CAPACITIES) {
+      assertEquals(bytes, subject.getMinFreeSpace(capacity));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {1, 10, 100})
+  void calculatesMinFreeSpaceRatio(int percent) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.unset(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE); // set in ozone-site.xml
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, percent / 100.0f);
+
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    assertEquals(percent / 100.0f, subject.getMinFreeSpaceRatio());
+    for (long capacity : CAPACITIES) {
+      assertEquals(capacity * percent / 100, subject.getMinFreeSpace(capacity));
+    }
   }
 
   @Test

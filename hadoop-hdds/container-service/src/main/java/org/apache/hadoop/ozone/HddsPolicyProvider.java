@@ -39,6 +39,13 @@ public final class HddsPolicyProvider extends PolicyProvider {
   private static final Supplier<HddsPolicyProvider> SUPPLIER =
       MemoizedSupplier.valueOf(HddsPolicyProvider::new);
 
+  private static final List<Service> DN_SERVICES =
+      Collections.singletonList(
+          new Service(
+              OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
+              ReconfigureProtocol.class)
+      );
+
   private HddsPolicyProvider() {
   }
 
@@ -47,13 +54,6 @@ public final class HddsPolicyProvider extends PolicyProvider {
   public static HddsPolicyProvider getInstance() {
     return SUPPLIER.get();
   }
-
-  private static final List<Service> DN_SERVICES =
-      Collections.singletonList(
-          new Service(
-              OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
-              ReconfigureProtocol.class)
-      );
 
   @Override
   public Service[] getServices() {

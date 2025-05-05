@@ -62,7 +62,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -71,7 +70,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Class used for testing the SCM DB Checkpoint provider servlet.
  */
-@Timeout(240)
 public class TestSCMDbCheckpointServlet {
   private MiniOzoneCluster cluster = null;
   private StorageContainerManager scm;

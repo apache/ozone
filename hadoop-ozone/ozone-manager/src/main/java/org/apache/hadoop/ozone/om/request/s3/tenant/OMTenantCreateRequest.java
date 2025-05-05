@@ -95,7 +95,7 @@ import org.slf4j.LoggerFactory;
  *       OMMultiTenantManager#createTenant
  */
 public class OMTenantCreateRequest extends OMVolumeRequest {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMTenantCreateRequest.class);
 
   public OMTenantCreateRequest(OMRequest omRequest) {

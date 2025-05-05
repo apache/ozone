@@ -19,12 +19,9 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
-import org.junit.jupiter.api.Timeout;
-
 /**
  * Test OmSnapshot for FSO bucket type when native lib is disabled.
  */
-@Timeout(300)
 public class TestOmSnapshotFsoWithoutNativeLib extends TestOmSnapshot {
 
   public TestOmSnapshotFsoWithoutNativeLib() throws Exception {

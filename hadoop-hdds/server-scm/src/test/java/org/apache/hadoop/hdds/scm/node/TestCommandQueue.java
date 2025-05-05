@@ -101,7 +101,7 @@ public class TestCommandQueue {
         datanode2UUID, SCMCommandProto.Type.createPipelineCommand));
 
     // Ensure the counts are cleared when the commands are retrieved
-    List<SCMCommand> cmds = commandQueue.getCommand(datanode1UUID);
+    List<SCMCommand<?>> cmds = commandQueue.getCommand(datanode1UUID);
     assertEquals(5, cmds.size());
 
     assertEquals(0, commandQueue.getDatanodeCommandCount(

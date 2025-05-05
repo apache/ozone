@@ -49,6 +49,7 @@ import org.junit.jupiter.api.Test;
 public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
   private OmKeyInfo fromKeyParentInfo;
   private OmKeyInfo toKeyParentInfo;
+
   @Override
   @BeforeEach
   public void createParentKey() throws Exception {

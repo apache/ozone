@@ -78,6 +78,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -86,7 +87,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -489,12 +489,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setQuotaInBytes(OzoneConsts.GB)
             .setQuotaInNamespace(1000)
             .setUsedNamespace(500)
-            .addOzoneAcls(new OzoneAcl(
+            .addOzoneAcls(OzoneAcl.of(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
                 OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
             ))
-            .addOzoneAcls(new OzoneAcl(
+            .addOzoneAcls(OzoneAcl.of(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
                 OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
@@ -505,7 +505,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol2")
         .setBucketName("bucketOne")
-        .addAcl(new OzoneAcl(
+        .addAcl(OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
             OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
@@ -528,7 +528,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     OmBucketInfo bucketInfo2 = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol2")
         .setBucketName("bucketTwo")
-        .addAcl(new OzoneAcl(
+        .addAcl(OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
             OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
@@ -670,7 +670,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // Change Node OperationalState with NodeManager
     final NodeManager nodeManager = reconScm.getScmNodeManager();
     final DatanodeDetails dnDetailsInternal =
-        nodeManager.getNodeByUuid(datanodeDetails.getUuidString());
+        nodeManager.getNode(datanodeDetails.getID());
     // Backup existing state and sanity check
     final NodeStatus nStatus = nodeManager.getNodeStatus(dnDetailsInternal);
     final NodeOperationalState backupOpState =
@@ -954,12 +954,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   public void testGetContainerCounts() throws Exception {
     // Mock container info objects with different sizes
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
-    given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
+    given(omContainerInfo1.containerID()).willReturn(ContainerID.valueOf(1));
     given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
     given(omContainerInfo1.getState()).willReturn(LifeCycleState.OPEN);
 
     ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
-    given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
+    given(omContainerInfo2.containerID()).willReturn(ContainerID.valueOf(2));
     given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
     given(omContainerInfo2.getState()).willReturn(LifeCycleState.OPEN);
 
@@ -1280,7 +1280,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // Change Node3 OperationalState with NodeManager to NodeOperationalState.DECOMMISSIONED
     final NodeManager nodeManager = reconScm.getScmNodeManager();
     final DatanodeDetails dnDetailsInternal =
-        nodeManager.getNodeByUuid(datanodeDetails3.getUuidString());
+        nodeManager.getNode(datanodeDetails3.getID());
     // Backup existing state and sanity check
     final NodeStatus nStatus = nodeManager.getNodeStatus(dnDetailsInternal);
     final NodeOperationalState backupOpState =
@@ -1437,14 +1437,14 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private Map<String, List<ContainerID>> getContainersOnDecomNodes() {
     Map<String, List<ContainerID>> containerMap = new HashMap<>();
     List<ContainerID> underReplicated = new ArrayList<>();
-    underReplicated.add(new ContainerID(1L));
-    underReplicated.add(new ContainerID(2L));
-    underReplicated.add(new ContainerID(3L));
+    underReplicated.add(ContainerID.valueOf(1L));
+    underReplicated.add(ContainerID.valueOf(2L));
+    underReplicated.add(ContainerID.valueOf(3L));
     containerMap.put("UnderReplicated", underReplicated);
     List<ContainerID> unclosed = new ArrayList<>();
-    unclosed.add(new ContainerID(10L));
-    unclosed.add(new ContainerID(11L));
-    unclosed.add(new ContainerID(12L));
+    unclosed.add(ContainerID.valueOf(10L));
+    unclosed.add(ContainerID.valueOf(11L));
+    unclosed.add(ContainerID.valueOf(12L));
     containerMap.put("UnClosed", unclosed);
     return containerMap;
   }

@@ -1459,7 +1459,6 @@ public class OzoneBucket extends WithMetadata {
         Collections.emptyMap());
   }
 
-
   /**
    * An Iterator to iterate over {@link OzoneKey} list.
    *

@@ -60,16 +60,12 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test that KeyValueHandler fails certain operations when the
  * container is unhealthy.
  */
 public class TestKeyValueHandlerWithUnhealthyContainer {
-  public static final Logger LOG = LoggerFactory.getLogger(
-      TestKeyValueHandlerWithUnhealthyContainer.class);
 
   @TempDir
   private File tempDir;
@@ -109,7 +105,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     return Arrays.stream(ClientVersion.values()).flatMap(client -> IntStream.range(0, 6)
         .mapToObj(rid -> Arguments.of(client, rid)));
   }
-
 
   @ParameterizedTest
   @MethodSource("getAllClientVersions")

@@ -37,6 +37,13 @@ public final class ReconPolicyProvider extends PolicyProvider {
   private static final Supplier<ReconPolicyProvider> SUPPLIER =
       MemoizedSupplier.valueOf(ReconPolicyProvider::new);
 
+  private static final List<Service> RECON_SERVICES =
+      Collections.singletonList(
+          new Service(
+              OZONE_RECON_SECURITY_CLIENT_DATANODE_CONTAINER_PROTOCOL_ACL,
+              ReconDatanodeProtocol.class)
+      );
+
   private ReconPolicyProvider() {
   }
 
@@ -45,13 +52,6 @@ public final class ReconPolicyProvider extends PolicyProvider {
   public static ReconPolicyProvider getInstance() {
     return SUPPLIER.get();
   }
-
-  private static final List<Service> RECON_SERVICES =
-      Collections.singletonList(
-          new Service(
-              OZONE_RECON_SECURITY_CLIENT_DATANODE_CONTAINER_PROTOCOL_ACL,
-              ReconDatanodeProtocol.class)
-      );
 
   @Override
   public Service[] getServices() {

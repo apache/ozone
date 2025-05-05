@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.key.acl.prefix;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.PREFIX_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;

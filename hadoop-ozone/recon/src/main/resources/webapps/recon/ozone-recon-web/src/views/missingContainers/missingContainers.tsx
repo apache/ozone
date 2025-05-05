@@ -73,6 +73,7 @@ interface IKeyResponse {
   Volume: string;
   Bucket: string;
   Key: string;
+  CompletePath: string;
   DataSize: number;
   Versions: number[];
   Blocks: object;
@@ -100,6 +101,12 @@ const KEY_TABLE_COLUMNS = [
     title: 'Key',
     dataIndex: 'Key',
     key: 'Key'
+  },
+  {
+    title: 'Path',
+    dataIndex: 'CompletePath',
+    key: 'CompletePath',
+    width: '270px'
   },
   {
     title: 'Size',
@@ -130,7 +137,7 @@ const CONTAINER_TAB_COLUMNS = [
     sorter: (a: IContainerResponse, b: IContainerResponse) => a.containerID - b.containerID
   },
   {
-    title: 'No. of Keys',
+    title: 'No. of Blocks',
     dataIndex: 'keys',
     key: 'keys',
     sorter: (a: IContainerResponse, b: IContainerResponse) => a.keys - b.keys

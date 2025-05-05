@@ -75,8 +75,9 @@ public class DeleteContainerCommandHandler implements CommandHandler {
         DeleteContainerCommandHandler.class.getSimpleName());
     this.opsLatencyMs = registry.newRate(SCMCommandProto.Type.deleteContainerCommand + "Ms");
   }
+
   @Override
-  public void handle(final SCMCommand command,
+  public void handle(final SCMCommand<?> command,
                      final OzoneContainer ozoneContainer,
                      final StateContext context,
                      final SCMConnectionManager connectionManager) {
@@ -93,7 +94,7 @@ public class DeleteContainerCommandHandler implements CommandHandler {
     }
   }
 
-  private void handleInternal(SCMCommand command, StateContext context,
+  private void handleInternal(SCMCommand<?> command, StateContext context,
       DeleteContainerCommand deleteContainerCommand,
       ContainerController controller) {
     final long startTime = Time.monotonicNow();

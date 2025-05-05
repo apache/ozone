@@ -31,14 +31,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
  */
 public final class KeyEntityInfoProtoWrapper {
 
-  public static Codec<KeyEntityInfoProtoWrapper> getCodec() {
-    return new DelegatedCodec<>(
-        Proto2Codec.get(OzoneManagerProtocolProtos.KeyInfo.getDefaultInstance()),
-        KeyEntityInfoProtoWrapper::getFromProtobuf,
-        KeyEntityInfoProtoWrapper::toProtobuf,
-        KeyEntityInfoProtoWrapper.class);
-  }
-
   private final OzoneManagerProtocolProtos.KeyInfo keyInfoProto;
 
   /** This is key table key of rocksDB and will help UI to implement pagination
@@ -61,6 +53,14 @@ public final class KeyEntityInfoProtoWrapper {
     replicationConfig = ReplicationConfig.fromProto(proto.getType(), proto.getFactor(),
         proto.getEcReplicationConfig());
     this.replicatedSize = QuotaUtil.getReplicatedSize(getSize(), getReplicationConfig());
+  }
+
+  public static Codec<KeyEntityInfoProtoWrapper> getCodec() {
+    return new DelegatedCodec<>(
+        Proto2Codec.get(OzoneManagerProtocolProtos.KeyInfo.getDefaultInstance()),
+        KeyEntityInfoProtoWrapper::getFromProtobuf,
+        KeyEntityInfoProtoWrapper::toProtobuf,
+        KeyEntityInfoProtoWrapper.class);
   }
 
   public static KeyEntityInfoProtoWrapper getFromProtobuf(OzoneManagerProtocolProtos.KeyInfo keyInfo) {

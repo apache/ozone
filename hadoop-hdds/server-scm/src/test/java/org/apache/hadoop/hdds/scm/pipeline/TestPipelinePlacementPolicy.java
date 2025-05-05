@@ -81,6 +81,24 @@ import org.junit.jupiter.api.io.TempDir;
  * Test for PipelinePlacementPolicy.
  */
 public class TestPipelinePlacementPolicy {
+  private static final Node[] NODES = new NodeImpl[] {
+      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h2", "/r1", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h3", "/r2", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h4", "/r2", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h5", "/r3", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h6", "/r3", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h7", "/r4", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h8", "/r4", NetConstants.NODE_COST_DEFAULT),
+  };
+
+  // 3 racks with single node.
+  private static final Node[] SINGLE_NODE_RACK = new NodeImpl[] {
+      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h2", "/r2", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h3", "/r3", NetConstants.NODE_COST_DEFAULT)
+  };
+
   private MockNodeManager nodeManager;
   private PipelineStateManager stateManager;
   private OzoneConfiguration conf;
@@ -358,24 +376,6 @@ public class TestPipelinePlacementPolicy {
     assertEquals(results.get(0).getNetworkLocation(), results.get(1).getNetworkLocation());
     assertEquals(results.get(0).getNetworkLocation(), results.get(2).getNetworkLocation());
   }
-
-  private static final Node[] NODES = new NodeImpl[] {
-      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h2", "/r1", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h3", "/r2", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h4", "/r2", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h5", "/r3", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h6", "/r3", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h7", "/r4", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h8", "/r4", NetConstants.NODE_COST_DEFAULT),
-  };
-
-  // 3 racks with single node.
-  private static final Node[] SINGLE_NODE_RACK = new NodeImpl[] {
-      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h2", "/r2", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h3", "/r3", NetConstants.NODE_COST_DEFAULT)
-  };
 
   private NetworkTopology createNetworkTopologyOnDifRacks() {
     NetworkTopology topology =

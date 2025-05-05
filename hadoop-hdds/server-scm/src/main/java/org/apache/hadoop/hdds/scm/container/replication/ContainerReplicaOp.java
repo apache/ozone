@@ -25,13 +25,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  */
 public class ContainerReplicaOp {
 
-  /**
-   * Enum representing different types of pending Ops.
-   */
-  public enum PendingOpType {
-    ADD, DELETE
-  }
-
   private final PendingOpType opType;
   private final DatanodeDetails target;
   private final int replicaIndex;
@@ -72,4 +65,10 @@ public class ContainerReplicaOp {
     return deadlineEpochMillis;
   }
 
+  /**
+   * Enum representing different types of pending Ops.
+   */
+  public enum PendingOpType {
+    ADD, DELETE
+  }
 }

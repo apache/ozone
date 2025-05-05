@@ -33,6 +33,7 @@ public class BadRequestExceptionMapper implements
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BadRequestExceptionMapper.class);
+
   @Override
   public Response toResponse(BadRequestException exception) {
     if (LOG.isDebugEnabled()) {

@@ -31,13 +31,11 @@ public class DefaultSecretKeyClient implements SecretKeyClient {
   private final SecretKeySignerClient signerClientDelegate;
   private final SecretKeyVerifierClient verifierClientDelegate;
 
-
   DefaultSecretKeyClient(SecretKeySignerClient signerClientDelegate,
                          SecretKeyVerifierClient verifierClientDelegate) {
     this.signerClientDelegate = signerClientDelegate;
     this.verifierClientDelegate = verifierClientDelegate;
   }
-
 
   @Override
   public ManagedSecretKey getCurrentSecretKey() {

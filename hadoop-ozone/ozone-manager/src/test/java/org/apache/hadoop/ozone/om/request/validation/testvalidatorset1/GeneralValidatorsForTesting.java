@@ -52,6 +52,8 @@ public final class GeneralValidatorsForTesting {
    */
   private static boolean validatorTestsRunning = false;
 
+  private static List<ValidationListener> listeners = new ArrayList<>();
+
   public static void startValidatorTest() {
     validatorTestsRunning = true;
   }
@@ -73,8 +75,6 @@ public final class GeneralValidatorsForTesting {
   public interface ValidationListener {
     void validationCalled(String calledMethodName);
   }
-
-  private static List<ValidationListener> listeners = new ArrayList<>();
 
   public static void addListener(ValidationListener listener) {
     listeners.add(listener);

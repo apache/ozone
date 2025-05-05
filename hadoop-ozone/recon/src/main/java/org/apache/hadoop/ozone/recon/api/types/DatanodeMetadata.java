@@ -279,6 +279,7 @@ public final class DatanodeMetadata {
       this.networkLocation = networkLocation;
       return this;
     }
+
     /**
      * Constructs DatanodeMetadata.
      *

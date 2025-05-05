@@ -115,7 +115,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -132,7 +131,6 @@ import org.mockito.ArgumentMatcher;
  * This integration verifies clients and OM using mocked Datanode and SCM
  * protocols.
  */
-@Timeout(300)
 public class TestOmContainerLocationCache {
   @TempDir
   private static File dir;
@@ -241,7 +239,6 @@ public class TestOmContainerLocationCache {
     return argument -> argument != null
         && argument.getNodes().isEmpty();
   }
-
 
   private static ArgumentMatcher<Pipeline> matchPipeline(DatanodeDetails dn) {
     return argument -> argument != null && !argument.getNodes().isEmpty()

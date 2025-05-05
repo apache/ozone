@@ -73,7 +73,7 @@ public class TestHddsVolumeUtil {
     for (int i = 0; i < VOLUMNE_NUM; i++) {
       hddsVolumeDirs[i] =
           Files.createDirectory(tempDir.resolve("volumeDir" + i)).toFile();
-      hddsDirs.append(hddsVolumeDirs[i]).append(",");
+      hddsDirs.append(hddsVolumeDirs[i]).append(',');
     }
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsDirs.toString());
     hddsVolumeSet = new MutableVolumeSet(datanodeId, clusterId, conf, null,
@@ -85,7 +85,7 @@ public class TestHddsVolumeUtil {
     for (int i = 0; i < VOLUMNE_NUM; i++) {
       dbVolumeDirs[i] =
           Files.createDirectory(tempDir.resolve("dbVolumeDir" + i)).toFile();
-      dbDirs.append(dbVolumeDirs[i]).append(",");
+      dbDirs.append(dbVolumeDirs[i]).append(',');
     }
     conf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
         dbDirs.toString());

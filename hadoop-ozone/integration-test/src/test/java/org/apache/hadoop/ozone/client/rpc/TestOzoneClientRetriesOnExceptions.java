@@ -61,12 +61,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
  */
-@Timeout(300)
 public class TestOzoneClientRetriesOnExceptions {
 
   private static final int MAX_RETRIES = 3;

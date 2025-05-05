@@ -194,7 +194,7 @@ class TestCachingSpaceUsageSource {
   }
 
   private static long validInitialValue() {
-    return RandomUtils.nextLong(1, 100);
+    return RandomUtils.secure().randomLong(1, 100);
   }
 
   private static Builder paramsBuilder(AtomicLong savedValue) {

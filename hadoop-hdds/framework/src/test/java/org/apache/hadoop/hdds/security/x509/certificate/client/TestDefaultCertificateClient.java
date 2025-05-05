@@ -66,7 +66,7 @@ import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -191,7 +191,7 @@ public class TestDefaultCertificateClient {
 
   @Test
   public void testSignDataStream() throws Exception {
-    String data = RandomStringUtils.random(100);
+    String data = RandomStringUtils.secure().next(100);
     FileUtils.deleteQuietly(Paths.get(
         dnSecurityConfig.getKeyLocation(DN_COMPONENT).toString(),
         dnSecurityConfig.getPrivateKeyFileName()).toFile());
@@ -228,7 +228,7 @@ public class TestDefaultCertificateClient {
    */
   @Test
   public void verifySignatureStream() throws Exception {
-    String data = RandomStringUtils.random(500);
+    String data = RandomStringUtils.secure().next(500);
     byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
 
     // Positive tests.
@@ -246,7 +246,7 @@ public class TestDefaultCertificateClient {
    */
   @Test
   public void verifySignatureDataArray() throws Exception {
-    String data = RandomStringUtils.random(500);
+    String data = RandomStringUtils.secure().next(500);
     byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
 
     // Positive tests.
@@ -370,8 +370,7 @@ public class TestDefaultCertificateClient {
 
   @Test
   public void testInitCertAndKeypairValidationFailures() throws Exception {
-    GenericTestUtils.LogCapturer dnClientLog = GenericTestUtils.LogCapturer
-        .captureLogs(dnCertClient.getLogger());
+    LogCapturer dnClientLog = LogCapturer.captureLogs(DNCertificateClient.class);
     KeyPair keyPair = keyGenerator.generateKey();
     KeyPair keyPair1 = keyGenerator.generateKey();
     dnClientLog.clearOutput();

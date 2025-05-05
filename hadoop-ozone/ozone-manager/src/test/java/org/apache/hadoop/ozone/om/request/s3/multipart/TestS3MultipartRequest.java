@@ -112,7 +112,6 @@ public class TestS3MultipartRequest {
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
   }
 
-
   @AfterEach
   public void stop() {
     omMetrics.unRegister();
@@ -282,7 +281,6 @@ public class TestS3MultipartRequest {
     return modifiedRequest;
 
   }
-
 
   /**
    * Perform preExecute of Initiate Multipart upload request for given

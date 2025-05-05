@@ -46,6 +46,7 @@ public abstract class SCMCommand<T extends Message> implements
   SCMCommand(long id) {
     this.id = id;
   }
+
   /**
    * Returns the type of this command.
    * @return Type

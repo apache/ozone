@@ -31,14 +31,12 @@ import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test {@link SelectorOutputStream}.
  */
-@Timeout(30)
 class TestSelectorOutputStream {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestSelectorOutputStream.class);

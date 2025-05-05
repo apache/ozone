@@ -51,7 +51,6 @@ public class ListKeysResponse {
   @JsonProperty("keys")
   private List<KeyEntityInfoProtoWrapper> keys;
 
-
   public ListKeysResponse() {
     this.status = ResponseStatus.OK;
     this.path = "";

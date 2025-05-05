@@ -127,7 +127,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
       }
     }
     logger.debug("Container Balancer could not find a target for " +
-        "source datanode {}", source.getUuidString());
+        "source datanode {}", source);
     return null;
   }
 
@@ -164,8 +164,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
     boolean isPolicySatisfied = placementStatus.isPolicySatisfied();
     if (!isPolicySatisfied) {
       logger.debug("Moving container {} from source {} to target {} will not " +
-              "satisfy placement policy.", containerID, source.getUuidString(),
-          target.getUuidString());
+              "satisfy placement policy.", containerID, source, target);
     }
     return isPolicySatisfied;
   }
@@ -191,7 +190,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
       if (sizeEnteringAfterMove > config.getMaxSizeEnteringTarget()) {
         logger.debug("{} bytes cannot enter datanode {} because 'size" +
                 ".entering.target.max' limit is {} and {} bytes have already " +
-                "entered.", size, target.getUuidString(),
+                "entered.", size, target,
             config.getMaxSizeEnteringTarget(),
             sizeEnteringNode.get(target));
         return false;
@@ -200,14 +199,13 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
           .calculateUtilization(sizeEnteringAfterMove), upperLimit) > 0) {
         logger.debug("{} bytes cannot enter datanode {} because its " +
                 "utilization will exceed the upper limit of {}.", size,
-            target.getUuidString(), upperLimit);
+            target, upperLimit);
         return false;
       }
       return true;
     }
 
-    logger.warn("No record of how much size has entered datanode {}",
-        target.getUuidString());
+    logger.warn("No record of how much size has entered datanode {}", target);
     return false;
   }
 

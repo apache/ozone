@@ -93,6 +93,7 @@ public class CommandStatus {
         .setMsg(cmdStatusProto.getMsg())
         .build();
   }
+
   /**
    * Returns a CommandStatus from the protocol buffers.
    *

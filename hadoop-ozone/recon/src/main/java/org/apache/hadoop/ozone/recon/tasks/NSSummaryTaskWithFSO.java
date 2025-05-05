@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -230,6 +230,4 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     LOG.debug("Completed a reprocess run of NSSummaryTaskWithFSO");
     return true;
   }
-
-
 }

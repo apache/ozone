@@ -43,7 +43,6 @@ import org.mockito.Mockito;
  */
 public class TestOzoneManagerRequestHandler {
 
-
   private OzoneManagerRequestHandler getRequestHandler(int limitListKeySize) {
     OmConfig config = OzoneConfiguration.newInstanceOf(OmConfig.class);
     config.setMaxListSize(limitListKeySize);

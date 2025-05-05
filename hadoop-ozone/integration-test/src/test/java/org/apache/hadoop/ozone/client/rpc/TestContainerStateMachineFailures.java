@@ -52,7 +52,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -72,7 +72,6 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -261,7 +260,6 @@ public class TestContainerStateMachineFailures {
     }
     key.close();
   }
-
 
   @Test
   @Flaky("HDDS-12215")
@@ -726,7 +724,7 @@ public class TestContainerStateMachineFailures {
       Thread closeContainerThread = new Thread(r1);
       closeContainerThread.start();
       threadList.add(closeContainerThread);
-      latch.await(600, TimeUnit.SECONDS);
+      assertTrue(latch.await(600, TimeUnit.SECONDS));
       for (int i = 0; i < 101; i++) {
         threadList.get(i).join();
       }
@@ -858,13 +856,12 @@ public class TestContainerStateMachineFailures {
 
     assertEquals(locationCount,
         keyInfo.getLatestVersionLocations().getLocationListCount());
-    byte[] buffer = new byte[1024];
+    byte[] buffer = new byte[Math.toIntExact(keyInfo.getDataSize())];
     try (OzoneInputStream o = objectStore.getVolume(volumeName)
         .getBucket(bucketName).readKey(key)) {
-      o.read(buffer, 0, 1024);
+      IOUtils.readFully(o, buffer);
     }
-    int end = ArrayUtils.indexOf(buffer, (byte) 0);
-    String response = new String(buffer, 0, end, StandardCharsets.UTF_8);
+    String response = new String(buffer, StandardCharsets.UTF_8);
     assertEquals(payload, response);
   }
 

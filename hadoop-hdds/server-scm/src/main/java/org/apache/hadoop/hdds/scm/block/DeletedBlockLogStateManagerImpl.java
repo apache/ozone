@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
 public class DeletedBlockLogStateManagerImpl
     implements DeletedBlockLogStateManager {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeletedBlockLogStateManagerImpl.class);
 
   private Table<Long, DeletedBlocksTransaction> deletedTable;

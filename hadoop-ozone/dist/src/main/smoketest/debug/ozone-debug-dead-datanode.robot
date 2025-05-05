@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test read-replicas in case of one datanode is dead
+Documentation       Test checksums in case of one datanode is dead
 Library             OperatingSystem
 Resource            ../lib/os.robot
 Resource            ozone-debug.robot
@@ -26,16 +26,9 @@ ${BUCKET}           cli-debug-bucket
 ${TESTFILE}         testfile
 
 *** Test Cases ***
-Test ozone debug read-replicas with one datanode DEAD
-    ${directory} =                 Execute read-replicas CLI tool
+Test ozone debug checksums with one datanode DEAD
+    ${directory} =                 Execute replicas verify checksums CLI tool
     Set Test Variable    ${DIR}         ${directory}
 
     ${count_files} =               Count Files In Directory    ${directory}
-    Should Be Equal As Integers    ${count_files}     5
-
-    ${json} =                      Read Replicas Manifest
-    ${md5sum} =                    Execute     md5sum ${TEMP_DIR}/${TESTFILE} | awk '{print $1}'
-
-    FOR    ${replica}    IN RANGE    2
-        Verify Healthy Replica   ${json}    ${replica}    ${md5sum}
-    END
+    Should Be Equal As Integers    ${count_files}     1

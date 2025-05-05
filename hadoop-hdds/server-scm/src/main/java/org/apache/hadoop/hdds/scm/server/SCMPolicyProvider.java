@@ -55,15 +55,6 @@ public final class SCMPolicyProvider extends PolicyProvider {
   private static final Supplier<SCMPolicyProvider> SUPPLIER =
       MemoizedSupplier.valueOf(SCMPolicyProvider::new);
 
-  private SCMPolicyProvider() {
-  }
-
-  @Private
-  @Unstable
-  public static SCMPolicyProvider getInstance() {
-    return SUPPLIER.get();
-  }
-
   private static final List<Service> SCM_SERVICES =
       Arrays.asList(
           new Service(
@@ -91,6 +82,15 @@ public final class SCMPolicyProvider extends PolicyProvider {
               OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
               ReconfigureProtocol.class)
       );
+
+  private SCMPolicyProvider() {
+  }
+
+  @Private
+  @Unstable
+  public static SCMPolicyProvider getInstance() {
+    return SUPPLIER.get();
+  }
 
   @Override
   public Service[] getServices() {

@@ -85,7 +85,7 @@ public final class CommandDispatcher {
    *
    * @param command - SCM Command.
    */
-  public void handle(SCMCommand command) {
+  public void handle(SCMCommand<?> command) {
     Preconditions.checkNotNull(command);
     CommandHandler handler = handlerMap.get(command.getType());
     if (handler != null) {

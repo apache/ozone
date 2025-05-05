@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
 public final class SCMContainerPlacementRackScatter
     extends SCMCommonPlacementPolicy {
   @VisibleForTesting
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRackScatter.class);
   private final NetworkTopology networkTopology;
   private static final int RACK_LEVEL = 1;
@@ -473,7 +473,7 @@ public final class SCMContainerPlacementRackScatter
       if (maxRetry == 0) {
         // avoid the infinite loop
         LOG.info("No satisfied datanode to meet the constraints. "
-            + "Metadatadata size required: {} Data size required: {}, scope "
+            + "Metadata size required: {} Data size required: {}, scope "
             + "{}, excluded nodes {}",
             metadataSizeRequired, dataSizeRequired, scope, excludedNodes);
         return null;

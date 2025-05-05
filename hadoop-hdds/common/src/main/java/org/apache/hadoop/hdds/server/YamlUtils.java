@@ -17,8 +17,15 @@
 
 package org.apache.hadoop.hdds.server;
 
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import org.apache.ratis.util.AtomicFileOutputStream;
+import org.slf4j.Logger;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.inspector.TagInspector;
@@ -45,5 +52,15 @@ public final class YamlUtils {
     LoaderOptions loaderOptions = new LoaderOptions();
     loaderOptions.setTagInspector(tags);
     return new Yaml(loaderOptions);
+  }
+
+  public static void dump(Yaml yaml, Object data, File file, Logger log) throws IOException {
+    try (OutputStream out = new AtomicFileOutputStream(file);
+         OutputStreamWriter writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
+      yaml.dump(data, writer);
+    } catch (IOException e) {
+      log.warn("Failed to dump {}", data, e);
+      throw e;
+    }
   }
 }

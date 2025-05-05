@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * under and over replication etc.
  */
 public class QuasiClosedContainerHandler extends AbstractCheck {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(QuasiClosedContainerHandler.class);
 
   private final ReplicationManager replicationManager;
@@ -86,6 +86,17 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
   }
 
   /**
+   * Returns true if the container is stuck in QUASI_CLOSED state, otherwise false.
+   * @param container The container to check
+   * @param replicas Set of ContainerReplicas
+   * @return true if the container is stuck in QUASI_CLOSED state, otherwise false
+   */
+  public static boolean isQuasiClosedStuck(final ContainerInfo container,
+      final Set<ContainerReplica> replicas) {
+    return !canForceCloseContainer(container, replicas);
+  }
+
+  /**
    * Returns true if more than 50% of the container replicas with unique
    * originNodeId are in QUASI_CLOSED state.
    *
@@ -93,7 +104,7 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
    * @param replicas Set of ContainerReplicas
    * @return true if we can force close the container, false otherwise
    */
-  private boolean canForceCloseContainer(final ContainerInfo container,
+  private static boolean canForceCloseContainer(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
     final int replicationFactor =
         container.getReplicationConfig().getRequiredNodes();

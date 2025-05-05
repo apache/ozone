@@ -83,6 +83,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   public OMBucketCreateRequest(OMRequest omRequest) {
     super(omRequest);
   }
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
@@ -310,7 +311,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
     return bucketInfo.hasDefaultReplicationConfig() && bucketInfo
         .getDefaultReplicationConfig().hasEcReplicationConfig();
   }
-
 
   /**
    * Add default acls for bucket. These acls are inherited from volume

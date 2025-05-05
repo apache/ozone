@@ -136,8 +136,6 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             omMetadataManager.getDeletedTable()));
   }
 
-
-
   @Test
   // similar to testAddDBToBatch(), but omBucketInfo is null
   public void testAddDBToBatchWithNullBucketInfo() throws Exception {

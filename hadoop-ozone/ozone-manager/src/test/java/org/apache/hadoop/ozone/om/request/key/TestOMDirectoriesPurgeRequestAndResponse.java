@@ -143,6 +143,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
             .build();
     return omRequest;
   }
+
   private OzoneManagerProtocolProtos.PurgePathRequest wrapPurgeRequest(
       final long volumeId, final long bucketId, final String purgeDeletedDir,
       final List<OmKeyInfo> purgeDeletedFiles, final List<OmKeyInfo> markDirsAsDeleted) {

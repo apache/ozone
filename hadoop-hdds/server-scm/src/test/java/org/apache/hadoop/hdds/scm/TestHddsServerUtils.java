@@ -40,17 +40,11 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Unit tests for {@link HddsServerUtil}.
  */
-@Timeout(300)
 public class TestHddsServerUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(
-      TestHddsServerUtils.class);
 
   /**
    * Test getting OZONE_SCM_DATANODE_ADDRESS_KEY with port.

@@ -52,10 +52,10 @@ public interface ContainerManager extends Closeable {
   ContainerInfo getContainer(ContainerID containerID)
       throws ContainerNotFoundException;
 
-
   default List<ContainerInfo> getContainers() {
     return getContainers(ContainerID.valueOf(0), Integer.MAX_VALUE);
   }
+
   /**
    * Returns containers under certain conditions.
    * Search container IDs from start ID(exclusive),
@@ -71,7 +71,6 @@ public interface ContainerManager extends Closeable {
    * @return a list of container.
    */
   List<ContainerInfo> getContainers(ContainerID startID, int count);
-
 
   List<ContainerInfo> getContainers(ReplicationType type);
 
@@ -135,14 +134,14 @@ public interface ContainerManager extends Closeable {
       throws IOException, InvalidStateTransitionException;
 
   /**
-   * Bypasses the container state machine to change a container's state from DELETING to CLOSED. This API was
+   * Bypasses the container state machine to change a container's state from DELETING or DELETED to CLOSED. This API was
    * introduced to fix a bug (HDDS-11136), and should be used with care otherwise.
    *
    * @see <a href="https://issues.apache.org/jira/browse/HDDS-11136">HDDS-11136</a>
    * @param containerID id of the container to transition
    * @throws IOException
    */
-  void transitionDeletingToClosedState(ContainerID containerID) throws IOException;
+  void transitionDeletingOrDeletedToClosedState(ContainerID containerID) throws IOException;
 
   /**
    * Returns the latest list of replicas for given containerId.

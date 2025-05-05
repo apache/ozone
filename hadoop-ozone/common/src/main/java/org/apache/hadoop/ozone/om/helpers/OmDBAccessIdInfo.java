@@ -36,10 +36,6 @@ public final class OmDBAccessIdInfo {
       OmDBAccessIdInfo.class,
       DelegatedCodec.CopyType.SHALLOW);
 
-  public static Codec<OmDBAccessIdInfo> getCodec() {
-    return CODEC;
-  }
-
   /**
    * Name of the tenant.
    */
@@ -64,6 +60,10 @@ public final class OmDBAccessIdInfo {
     this.userPrincipal = userPrincipal;
     this.isAdmin = isAdmin;
     this.isDelegatedAdmin = isDelegatedAdmin;
+  }
+
+  public static Codec<OmDBAccessIdInfo> getCodec() {
+    return CODEC;
   }
 
   public String getTenantId() {

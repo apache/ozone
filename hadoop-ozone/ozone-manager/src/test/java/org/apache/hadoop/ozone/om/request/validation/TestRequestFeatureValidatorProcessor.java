@@ -487,9 +487,9 @@ public class TestRequestFeatureValidatorProcessor {
     StringBuilder signature = new StringBuilder();
     signature.append("  ");
     for (String modifier : modifiers) {
-      signature.append(modifier).append(" ");
+      signature.append(modifier).append(' ');
     }
-    signature.append(returnType).append(" ");
+    signature.append(returnType).append(' ');
     signature.append("validatorMethod(");
     signature.append(createParameterList(paramspecs));
     signature.append(") ");

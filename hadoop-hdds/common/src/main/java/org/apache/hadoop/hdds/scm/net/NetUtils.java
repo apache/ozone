@@ -36,6 +36,7 @@ public final class NetUtils {
   private NetUtils() {
     // Prevent instantiation
   }
+
   /**
    * Normalize a path by stripping off any trailing.
    * {@link NetConstants#PATH_SEPARATOR}
@@ -73,7 +74,6 @@ public final class NetUtils {
     return newLocation.equals(NetConstants.PATH_SEPARATOR_STR) ? 1 :
         newLocation.split(NetConstants.PATH_SEPARATOR_STR).length;
   }
-
 
   /**
    *  Remove node from mutableExcludedNodes if it's covered by excludedScope.

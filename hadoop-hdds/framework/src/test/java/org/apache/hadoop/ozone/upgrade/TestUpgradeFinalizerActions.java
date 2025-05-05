@@ -189,7 +189,6 @@ public class TestUpgradeFinalizerActions {
     }
   }
 
-
   /**
    * Mock DN Upgrade Action that fails.
    */

@@ -69,7 +69,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class TestBlockOutputStreamCorrectness {
 
   private static final int DATA_SIZE = 256 * (int) OzoneConsts.MB;
-  private static final byte[] DATA = RandomUtils.nextBytes(DATA_SIZE);
+  private static final byte[] DATA = RandomUtils.secure().randomBytes(DATA_SIZE);
 
   @ParameterizedTest
   @ValueSource(ints = { 1, 1024, 1024 * 1024 })

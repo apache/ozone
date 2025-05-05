@@ -472,7 +472,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
             uploadID)),
-        CacheValue.get(RandomUtils.nextInt(), multipartKeyInfo));
+        CacheValue.get(RandomUtils.secure().randomInt(), multipartKeyInfo));
     return new OmMultipartInfo(volume, bucket, key, uploadID);
   }
 
@@ -480,7 +480,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
       String volume, String bucket, String key, String uploadID) {
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
-            uploadID)), CacheValue.get(RandomUtils.nextInt()));
+            uploadID)), CacheValue.get(RandomUtils.secure().randomInt()));
   }
 
   @Test

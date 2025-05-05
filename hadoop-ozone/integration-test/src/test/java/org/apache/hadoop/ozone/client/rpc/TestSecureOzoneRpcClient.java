@@ -39,6 +39,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -59,6 +60,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -159,10 +161,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
       String keyName = UUID.randomUUID().toString();
 
       long committedBytes = ozoneManager.getMetrics().getDataCommittedBytes();
-      try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, replication, new HashMap<>())) {
-        out.write(value.getBytes(UTF_8));
-      }
+      TestDataUtil.createKey(bucket, keyName, replication, value.getBytes(UTF_8));
 
       assertEquals(committedBytes + value.getBytes(UTF_8).length,
           ozoneManager.getMetrics().getDataCommittedBytes());
@@ -172,7 +171,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
       byte[] fileContent;
       try (OzoneInputStream is = bucket.readKey(keyName)) {
         fileContent = new byte[value.getBytes(UTF_8).length];
-        is.read(fileContent);
+        IOUtils.readFully(is, fileContent);
       }
 
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);

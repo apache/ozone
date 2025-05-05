@@ -34,7 +34,6 @@ import org.apache.hadoop.util.FakeTimer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,10 +41,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Test periodic volume checker in StorageVolumeChecker.
  */
-@Timeout(150)
 public class TestPeriodicVolumeChecker {
 
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestPeriodicVolumeChecker.class);
 
   @TempDir

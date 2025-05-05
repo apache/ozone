@@ -40,10 +40,6 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
       CertInfo::getProtobuf,
       CertInfo.class);
 
-  public static Codec<CertInfo> getCodec() {
-    return CODEC;
-  }
-
   static final Comparator<CertInfo> COMPARATOR
       = Comparator.comparingLong(CertInfo::getTimestamp);
 
@@ -54,6 +50,10 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
   private CertInfo(X509Certificate x509Certificate, long timestamp) {
     this.x509Certificate = x509Certificate;
     this.timestamp = timestamp;
+  }
+
+  public static Codec<CertInfo> getCodec() {
+    return CODEC;
   }
 
   public static CertInfo fromProtobuf(CertInfoProto info) throws IOException {

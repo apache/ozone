@@ -113,7 +113,6 @@ public class BlockDeletingTask implements BackgroundTask {
     }
   }
 
-
   @Override
   public BackgroundTaskResult call() throws Exception {
     ContainerBackgroundTaskResult result =

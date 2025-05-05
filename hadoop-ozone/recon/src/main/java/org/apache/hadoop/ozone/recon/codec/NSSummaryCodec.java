@@ -39,10 +39,6 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
 
   private static final Codec<NSSummary> INSTANCE = new NSSummaryCodec();
 
-  public static Codec<NSSummary> get() {
-    return INSTANCE;
-  }
-
   private final Codec<Integer> integerCodec = IntegerCodec.get();
   private final Codec<Short> shortCodec = ShortCodec.get();
   private final Codec<Long> longCodec = LongCodec.get();
@@ -54,6 +50,10 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
 
   private NSSummaryCodec() {
     // singleton
+  }
+
+  public static Codec<NSSummary> get() {
+    return INSTANCE;
   }
 
   @Override

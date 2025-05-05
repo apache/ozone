@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.function.Predicate;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 
 /**
  * Filter for selecting volumes with enough space for a new container.
@@ -29,8 +29,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 public class AvailableSpaceFilter implements Predicate<HddsVolume> {
 
   private final long requiredSpace;
-  private final Map<HddsVolume, AvailableSpace> fullVolumes =
-      new HashMap<>();
+  private final List<StorageLocationReport> fullVolumes = new LinkedList<>();
   private long mostAvailableSpace = Long.MIN_VALUE;
 
   AvailableSpaceFilter(long requiredSpace) {
@@ -39,20 +38,14 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
 
   @Override
   public boolean test(HddsVolume vol) {
-    SpaceUsageSource usage = vol.getCurrentUsage();
-    long volumeCapacity = usage.getCapacity();
-    long free = usage.getAvailable();
-    long committed = vol.getCommittedBytes();
-    long available = free - committed;
-    long volumeFreeSpaceToSpare =
-        new VolumeUsage.MinFreeSpaceCalculator(vol.getConf()).get(volumeCapacity);
-    boolean hasEnoughSpace = VolumeUsage.hasVolumeEnoughSpace(free, committed,
-        requiredSpace, volumeFreeSpaceToSpare);
+    StorageLocationReport report = vol.getReport();
+    long available = report.getUsableSpace();
+    boolean hasEnoughSpace = available > requiredSpace;
 
     mostAvailableSpace = Math.max(available, mostAvailableSpace);
 
     if (!hasEnoughSpace) {
-      fullVolumes.put(vol, new AvailableSpace(free, committed));
+      fullVolumes.add(report);
     }
 
     return hasEnoughSpace;
@@ -70,21 +63,5 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   public String toString() {
     return "required space: " + requiredSpace +
         ", volumes: " + fullVolumes;
-  }
-
-  private static class AvailableSpace {
-    private final long free;
-    private final long committed;
-
-    AvailableSpace(long free, long committed) {
-      this.free = free;
-      this.committed = committed;
-    }
-
-    @Override
-    public String toString() {
-      return "free: " + free +
-          ", committed: " + committed;
-    }
   }
 }

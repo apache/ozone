@@ -23,22 +23,18 @@ import static org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData.K
 import com.google.common.base.Preconditions;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.server.YamlUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
@@ -73,44 +69,15 @@ public final class ContainerDataYaml {
 
   /**
    * Creates a .container file in yaml format.
-   *
-   * @param containerFile
-   * @param containerData
-   * @throws IOException
    */
-  public static void createContainerFile(ContainerType containerType,
-      ContainerData containerData, File containerFile) throws IOException {
-    Writer writer = null;
-    FileOutputStream out = null;
-    try {
-      boolean withReplicaIndex =
-          containerData instanceof KeyValueContainerData &&
-          ((KeyValueContainerData) containerData).getReplicaIndex() > 0;
+  public static void createContainerFile(ContainerData containerData, File containerFile) throws IOException {
+    // Create Yaml for given container type
+    final Yaml yaml = getYamlForContainerType(containerData.getContainerType(), containerData.getReplicaIndex() > 0);
+    // Compute Checksum and update ContainerData
+    containerData.computeAndSetChecksum(yaml);
 
-      // Create Yaml for given container type
-      Yaml yaml = getYamlForContainerType(containerType, withReplicaIndex);
-      // Compute Checksum and update ContainerData
-      containerData.computeAndSetChecksum(yaml);
-
-      // Write the ContainerData with checksum to Yaml file.
-      out = new FileOutputStream(
-          containerFile);
-      writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
-      yaml.dump(containerData, writer);
-    } finally {
-      try {
-        if (writer != null) {
-          writer.flush();
-          // make sure the container metadata is synced to disk.
-          out.getFD().sync();
-          writer.close();
-        }
-      } catch (IOException ex) {
-        LOG.warn("Error occurred during closing the writer. ContainerID: " +
-            containerData.getContainerID());
-      }
-      IOUtils.closeQuietly(out);
-    }
+    // Write the ContainerData with checksum to Yaml file.
+    YamlUtils.dump(yaml, containerData, containerFile, LOG);
   }
 
   /**
@@ -121,7 +88,7 @@ public final class ContainerDataYaml {
   public static ContainerData readContainerFile(File containerFile)
       throws IOException {
     Preconditions.checkNotNull(containerFile, "containerFile cannot be null");
-    try (FileInputStream inputFileStream = new FileInputStream(containerFile)) {
+    try (InputStream inputFileStream = Files.newInputStream(containerFile.toPath())) {
       return readContainer(inputFileStream);
     }
 

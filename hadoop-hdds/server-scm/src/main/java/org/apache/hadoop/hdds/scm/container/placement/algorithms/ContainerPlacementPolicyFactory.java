@@ -46,7 +46,6 @@ public final class ContainerPlacementPolicyFactory {
   private ContainerPlacementPolicyFactory() {
   }
 
-
   public static PlacementPolicy getPolicy(
       ConfigurationSource conf, final NodeManager nodeManager,
       NetworkTopology clusterMap, final boolean fallback,

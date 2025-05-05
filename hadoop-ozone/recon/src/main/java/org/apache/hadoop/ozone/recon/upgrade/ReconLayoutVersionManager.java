@@ -116,7 +116,6 @@ public class ReconLayoutVersionManager {
     }
   }
 
-
   /**
    * Returns a list of ReconLayoutFeature objects that are registered for finalization.
    */

@@ -50,6 +50,10 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
   private static final VolumeAclOp VOLUME_SET_ACL_OP =
       (acls, volArgs) -> volArgs.setAcls(acls);
 
+  private final List<OzoneAcl> ozoneAcls;
+  private final String volumeName;
+  private final OzoneObj obj;
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     long modificationTime = Time.now();
@@ -62,10 +66,6 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
         .setUserInfo(getUserInfo())
         .build();
   }
-
-  private final List<OzoneAcl> ozoneAcls;
-  private final String volumeName;
-  private final OzoneObj obj;
 
   public OMVolumeSetAclRequest(OMRequest omRequest) {
     super(omRequest, VOLUME_SET_ACL_OP);

@@ -116,7 +116,6 @@ public class TestBucketList {
 
   }
 
-
   @Test
   public void listObjectOwner() throws OS3Exception, IOException {
 
@@ -394,7 +393,6 @@ public class TestBucketList {
     assertEquals("random", e.getResource());
     assertEquals("Invalid Argument", e.getErrorMessage());
   }
-
 
   @Test
   public void testStartAfter() throws IOException, OS3Exception {

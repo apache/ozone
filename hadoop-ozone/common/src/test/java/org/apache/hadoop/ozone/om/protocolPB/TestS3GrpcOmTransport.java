@@ -75,18 +75,6 @@ public class TestS3GrpcOmTransport {
 
   private String serverName;
 
-
-  private ServiceException createNotLeaderException() {
-    RaftPeerId raftPeerId = RaftPeerId.getRaftPeerId("testNodeId");
-
-    // TODO: Set suggest leaderID. Right now, client is not using suggest
-    // leaderID. Need to fix this.
-    OMNotLeaderException notLeaderException =
-        new OMNotLeaderException(raftPeerId);
-    LOG.debug(notLeaderException.getMessage());
-    return new ServiceException(notLeaderException);
-  }
-
   private final OzoneManagerServiceGrpc.OzoneManagerServiceImplBase
       serviceImpl =
       mock(OzoneManagerServiceGrpc.OzoneManagerServiceImplBase.class,
@@ -120,6 +108,17 @@ public class TestS3GrpcOmTransport {
               }));
 
   private GrpcOmTransport client;
+
+  private ServiceException createNotLeaderException() {
+    RaftPeerId raftPeerId = RaftPeerId.getRaftPeerId("testNodeId");
+
+    // TODO: Set suggest leaderID. Right now, client is not using suggest
+    // leaderID. Need to fix this.
+    OMNotLeaderException notLeaderException =
+        new OMNotLeaderException(raftPeerId);
+    LOG.debug(notLeaderException.getMessage());
+    return new ServiceException(notLeaderException);
+  }
 
   @BeforeEach
   public void setUp() throws Exception {

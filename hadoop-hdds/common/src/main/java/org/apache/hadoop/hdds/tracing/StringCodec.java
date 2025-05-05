@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  */
 public class StringCodec implements Codec<StringBuilder> {
 
-  public static final Logger LOG  = LoggerFactory.getLogger(StringCodec.class);
+  private static final Logger LOG  = LoggerFactory.getLogger(StringCodec.class);
   public static final StringFormat FORMAT = new StringFormat();
 
   @Override
@@ -70,9 +70,9 @@ public class StringCodec implements Codec<StringBuilder> {
   public void inject(JaegerSpanContext context, StringBuilder string) {
     int intFlag = context.getFlags() & 255;
     string.append(context.getTraceId())
-        .append(":").append(Long.toHexString(context.getSpanId()))
-        .append(":").append(Long.toHexString(context.getParentId()))
-        .append(":").append(Integer.toHexString(intFlag));
+        .append(':').append(Long.toHexString(context.getSpanId()))
+        .append(':').append(Long.toHexString(context.getParentId()))
+        .append(':').append(Integer.toHexString(intFlag));
   }
 
   private static long high(String hexString) {

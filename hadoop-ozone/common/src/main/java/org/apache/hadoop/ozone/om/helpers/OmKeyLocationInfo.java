@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.UnknownPipelineStateException;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
@@ -101,42 +100,33 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
         .setCreateVersion(getCreateVersion())
         .setPartNumber(getPartNumber());
     if (!ignorePipeline) {
-      try {
-        Token<OzoneBlockTokenIdentifier> token = getToken();
-        if (token != null) {
-          builder.setToken(OMPBHelper.protoFromToken(token));
-        }
+      Token<OzoneBlockTokenIdentifier> token = getToken();
+      if (token != null) {
+        builder.setToken(OMPBHelper.protoFromToken(token));
+      }
 
-        // Pipeline can be null when key create with override and
-        // on a versioning enabled bucket. for older versions of blocks
-        // We do not need to return pipeline as part of createKey,
-        // so we do not refresh pipeline in createKey, because of this reason
-        // for older version of blocks pipeline can be null.
-        // And also for key create we never need to return pipeline info
-        // for older version of blocks irrespective of versioning.
+      // Pipeline can be null when key create with override and
+      // on a versioning enabled bucket. for older versions of blocks
+      // We do not need to return pipeline as part of createKey,
+      // so we do not refresh pipeline in createKey, because of this reason
+      // for older version of blocks pipeline can be null.
+      // And also for key create we never need to return pipeline info
+      // for older version of blocks irrespective of versioning.
 
-        // Currently, we do not completely support bucket versioning.
-        // TODO: this needs to be revisited when bucket versioning
-        //  implementation is handled.
+      // Currently, we do not completely support bucket versioning.
+      // TODO: this needs to be revisited when bucket versioning
+      //  implementation is handled.
 
-        Pipeline pipeline = getPipeline();
-        if (pipeline != null) {
-          builder.setPipeline(pipeline.getProtobufMessage(clientVersion));
-        }
-      } catch (UnknownPipelineStateException e) {
-        //TODO: fix me: we should not return KeyLocation without pipeline.
+      Pipeline pipeline = getPipeline();
+      if (pipeline != null) {
+        builder.setPipeline(pipeline.getProtobufMessage(clientVersion));
       }
     }
     return builder.build();
   }
 
   private static Pipeline getPipeline(KeyLocation keyLocation) {
-    try {
-      return keyLocation.hasPipeline() ?
-          Pipeline.getFromProtobuf(keyLocation.getPipeline()) : null;
-    } catch (UnknownPipelineStateException e) {
-      return null;
-    }
+    return keyLocation.hasPipeline() ? Pipeline.getFromProtobuf(keyLocation.getPipeline()) : null;
   }
 
   public static OmKeyLocationInfo getFromProtobuf(KeyLocation keyLocation) {

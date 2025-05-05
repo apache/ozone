@@ -27,13 +27,13 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.commontypes.IsoDateAdapter;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
  * Request for list parts of a multipart upload request.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "ListPartsResult", namespace = "http://s3.amazonaws"
-    + ".com/doc/2006-03-01/")
+@XmlRootElement(name = "ListPartsResult", namespace = S3Consts.S3_XML_NAMESPACE)
 public class ListPartsResponse {
 
   @XmlElement(name = "Bucket")
@@ -155,7 +155,6 @@ public class ListPartsResponse {
 
     @XmlElement(name = OzoneConsts.ETAG)
     private String eTag;
-
 
     @XmlElement(name = "Size")
     private long size;

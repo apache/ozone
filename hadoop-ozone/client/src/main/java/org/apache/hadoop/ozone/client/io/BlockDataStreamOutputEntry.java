@@ -234,7 +234,6 @@ public final class BlockDataStreamOutputEntry
       return this;
     }
 
-
     public Builder setLength(long len) {
       this.length = len;
       return this;

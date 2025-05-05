@@ -62,7 +62,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Stable
 public class ReconfigureProtocolClientSideTranslatorPB implements
     ProtocolMetaInterface, ReconfigureProtocol, ProtocolTranslator {
-  public static final Logger LOG = LoggerFactory
+  private static final Logger LOG = LoggerFactory
       .getLogger(ReconfigureProtocolClientSideTranslatorPB.class);
 
   private static final RpcController NULL_CONTROLLER = null;

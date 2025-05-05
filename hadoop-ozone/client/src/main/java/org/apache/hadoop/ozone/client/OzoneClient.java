@@ -96,6 +96,7 @@ public class OzoneClient implements Closeable {
     // For the unit test
     this.conf = new OzoneConfiguration();
   }
+
   /**
    * Returns the object store associated with the Ozone Cluster.
    * @return ObjectStore

@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.scm.ha;
 import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.NodeDetails;
 import org.apache.hadoop.net.NetUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Construct SCM node details.
@@ -34,9 +32,6 @@ public final class SCMNodeDetails extends NodeDetails {
   private final InetSocketAddress datanodeProtocolServerAddress;
   private final String datanodeAddressKey;
   private final int grpcPort;
-
-  public static final Logger LOG =
-      LoggerFactory.getLogger(SCMNodeDetails.class);
 
   private SCMNodeDetails(Builder b) {
     super(b.scmServiceId, b.scmNodeId, b.rpcAddress, b.ratisPort, b.httpAddr, b.httpsAddr);

@@ -157,7 +157,6 @@ public class TestECBlockReconstructedInputStream {
     }
   }
 
-
   @Test
   public void testReadDataWithUnbuffer() throws IOException {
     // Read buffer is 16kb + 5 bytes so it does not align with stripes exactly
@@ -348,8 +347,6 @@ public class TestECBlockReconstructedInputStream {
       dataGenerator.nextInt(255);
     }
   }
-
-
 
   /**
    * Return a list of num ByteBuffers of the given size.

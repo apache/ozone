@@ -33,6 +33,7 @@ import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -47,12 +48,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.AclTests;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test recursive acl checks for delete and rename for FSO Buckets.
  */
-@Timeout(120)
 public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
 
   private static final String UNIQUE = UUID.randomUUID().toString();
@@ -126,8 +125,8 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       String keyf4 = "a/b2/d2/d21/f4";
       String keyf5 = "/a/b3/e1/f5";
       String keyf6 = "/a/b3/e2/f6";
-      String file1 = "a/" + "file" + RandomStringUtils.randomNumeric(5);
-      String file2 = "a/b2/d2/" + "file" + RandomStringUtils.randomNumeric(5);
+      String file1 = "a/" + "file" + RandomStringUtils.secure().nextNumeric(5);
+      String file2 = "a/b2/d2/" + "file" + RandomStringUtils.secure().nextNumeric(5);
 
       keys.add(keyf1);
       keys.add(keyf2);
@@ -329,12 +328,11 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
 
   private void createKeys(ObjectStore objectStore, OzoneBucket ozoneBucket,
       List<String> keys) throws Exception {
-    int length = 10;
+
     String aclWorldAll = "world::a";
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
+
     for (String key : keys) {
-      createKey(ozoneBucket, key, input);
+      TestDataUtil.createStringKey(ozoneBucket, key, 10);
       setKeyAcl(objectStore, ozoneBucket.getVolumeName(), ozoneBucket.getName(),
           key, aclWorldAll);
     }

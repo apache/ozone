@@ -94,15 +94,14 @@ public class TestRatisOverReplicationHandler {
     when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
-          return new NodeStatus(dd.getPersistedOpState(),
-              HddsProtos.NodeState.HEALTHY, 0);
+          return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
         });
 
     commandsSent = new HashSet<>();
     ReplicationTestUtil.mockRMSendThrottledDeleteCommand(replicationManager,
         commandsSent);
 
-    GenericTestUtils.setLogLevel(RatisOverReplicationHandler.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(RatisOverReplicationHandler.class, Level.DEBUG);
   }
 
   /**
@@ -208,8 +207,7 @@ public class TestRatisOverReplicationHandler {
     when(replicationManager.getNodeStatus(eq(staleNode)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
-          return new NodeStatus(dd.getPersistedOpState(),
-              HddsProtos.NodeState.STALE, 0);
+          return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.STALE);
         });
 
     testProcessing(replicas, Collections.emptyList(),
@@ -416,6 +414,7 @@ public class TestRatisOverReplicationHandler {
 
     testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(), 0);
   }
+
   @Test
   public void testOverReplicationOfQuasiClosedReplicaWithWrongSequenceID()
       throws IOException {

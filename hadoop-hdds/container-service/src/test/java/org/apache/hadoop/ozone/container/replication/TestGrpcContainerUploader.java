@@ -89,7 +89,7 @@ class TestGrpcContainerUploader {
 
     // WHEN
     OutputStream out = startUpload(subject, callback);
-    out.write(RandomUtils.nextBytes(4));
+    out.write(RandomUtils.secure().randomBytes(4));
     out.close();
 
     // THEN

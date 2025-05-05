@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.LambdaTestUtils;
 
 /**
@@ -71,7 +71,7 @@ public final class OMUpgradeTestUtils {
       throws TimeoutException, InterruptedException {
     waitFor(() -> {
       try {
-        UpgradeFinalizer.StatusAndMessages statusAndMessages =
+        UpgradeFinalization.StatusAndMessages statusAndMessages =
             omClient.queryUpgradeFinalizationProgress("finalize-test", false,
                 false);
         System.out.println("Finalization Messages : " +

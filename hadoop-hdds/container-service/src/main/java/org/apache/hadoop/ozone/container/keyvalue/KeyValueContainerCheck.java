@@ -26,6 +26,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.NoSuchFileException;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -81,6 +82,10 @@ public class KeyValueContainerCheck {
     this.container = container;
   }
 
+  KeyValueContainerCheck(KeyValueContainerData data, KeyValueContainer container, ConfigurationSource conf) {
+    this(data.getMetadataPath(), conf, data.getContainerID(), data.getVolume(), container);
+  }
+
   /**
    * Run basic integrity checks on container metadata.
    * These checks do not look inside the metadata files.
@@ -114,7 +119,7 @@ public class KeyValueContainerCheck {
           .getContainerFile(metadataPath, containerID);
       try {
         loadContainerData(containerFile);
-      } catch (FileNotFoundException ex) {
+      } catch (FileNotFoundException | NoSuchFileException ex) {
         return ScanResult.unhealthy(
             ScanResult.FailureType.MISSING_CONTAINER_FILE, containerFile, ex);
       } catch (IOException ex) {

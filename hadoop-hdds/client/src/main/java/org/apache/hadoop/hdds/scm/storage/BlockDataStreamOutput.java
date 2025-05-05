@@ -79,7 +79,7 @@ import org.slf4j.LoggerFactory;
  * through to the container.
  */
 public class BlockDataStreamOutput implements ByteBufferStreamOutput {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutput.class);
 
   public static final int PUT_BLOCK_REQUEST_LENGTH_MAX = 1 << 20;  // 1MB
@@ -139,6 +139,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   // buffers for which putBlock is yet to be executed
   private List<StreamBuffer> buffersForPutBlock;
   private boolean isDatastreamPipelineMode;
+
   /**
    * Creates a new BlockDataStreamOutput.
    *
@@ -603,7 +604,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       throw sce;
     }
   }
-
 
   private void setIoException(Throwable e) {
     IOException ioe = getIoException();

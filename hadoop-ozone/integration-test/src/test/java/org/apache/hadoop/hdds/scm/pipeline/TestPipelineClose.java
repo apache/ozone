@@ -65,14 +65,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
 
 /**
  * Tests for Pipeline Closing.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public class TestPipelineClose {
 
   private MiniOzoneCluster cluster;
@@ -83,6 +81,7 @@ public class TestPipelineClose {
   private PipelineManager pipelineManager;
 
   private long pipelineDestroyTimeoutInMillis;
+
   /**
    * Create a MiniDFSCluster for testing.
    *
@@ -166,7 +165,7 @@ public class TestPipelineClose {
     assertEquals(1, setOpen.size());
 
     pipelineManager
-        .closePipeline(ratisContainer.getPipeline(), false);
+        .closePipeline(ratisContainer.getPipeline().getId());
     GenericTestUtils.waitFor(() -> {
       try {
         return containerManager

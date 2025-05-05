@@ -76,7 +76,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
    * @param connectionManager - The SCMs that we are talking to.
    */
   @Override
-  public void handle(SCMCommand command, OzoneContainer container,
+  public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
     long startTime = Time.monotonicNow();
     invocationCount.incrementAndGet();

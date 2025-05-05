@@ -38,25 +38,25 @@ UNIQUE(datetime,level,logger,user,ip,op,params,result))
 
 用法：
 {{< highlight bash >}}
-ozone auditparser <数据库文件的路径> [命令] [参数]
+ozone debug auditparser <数据库文件的路径> [命令] [参数]
 {{< /highlight >}}
 
 将审计日志加载到数据库：
 {{< highlight bash >}}
-ozone auditparser <数据库文件的路径> load <审计日志的路径>
+ozone debug auditparser <数据库文件的路径> load <审计日志的路径>
 {{< /highlight >}}
 Load 命令会创建如上所述的审计表。
 
 运行一个自定义的只读查询：
 {{< highlight bash >}}
-ozone auditparser <数据库文件的路径> query <双引号括起来的 select 查询>
+ozone debug auditparser <数据库文件的路径> query <双引号括起来的 select 查询>
 {{< /highlight >}}
 
 审计解析起自带了一些模板（最常用的查询）
 
 运行模板查询：
 {{< highlight bash >}}
-ozone auditparser <数据库文件的路径 template <模板名称>
+ozone debug auditparser <数据库文件的路径 template <模板名称>
 {{< /highlight >}}
 
 Ozone 提供了以下模板：

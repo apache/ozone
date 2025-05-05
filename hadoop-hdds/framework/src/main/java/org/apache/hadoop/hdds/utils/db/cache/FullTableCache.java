@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
 @Evolving
 public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(FullTableCache.class);
 
   private final Map<CacheKey<KEY>, CacheValue<VALUE>> cache;
@@ -61,7 +61,6 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   private final ReadWriteLock lock;
 
   private final CacheStatsRecorder statsRecorder;
-
 
   public FullTableCache(String threadNamePrefix) {
     // As for full table cache only we need elements to be inserted in sorted

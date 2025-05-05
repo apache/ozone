@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Stack;
 import java.util.UUID;
@@ -34,14 +35,12 @@ import org.apache.hadoop.metrics2.MetricsRecord;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Class tests OzoneManagerLock.
  */
-@Timeout(300)
 class TestOzoneManagerLock {
 
   @ParameterizedTest
@@ -182,7 +181,6 @@ class TestOzoneManagerLock {
         () -> lock.releaseWriteLock(Resource.USER_LOCK, "user3"));
   }
 
-
   private String[] generateResourceName(Resource resource) {
     if (resource == Resource.BUCKET_LOCK) {
       return new String[]{UUID.randomUUID().toString(),
@@ -288,6 +286,36 @@ class TestOzoneManagerLock {
   }
 
   @Test
+  void testMultiLocksResourceParallel() throws Exception {
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+
+    for (Resource resource : Resource.values()) {
+      final List<String[]> resourceName = Arrays.asList(generateResourceName(resource),
+          generateResourceName(resource), generateResourceName(resource));
+      lock.acquireWriteLocks(resource, resourceName.subList(1, resourceName.size()));
+
+      AtomicBoolean gotLock = new AtomicBoolean(false);
+      new Thread(() -> {
+        lock.acquireWriteLocks(resource, resourceName.subList(0, 2));
+        gotLock.set(true);
+        lock.releaseWriteLocks(resource, resourceName.subList(0, 2));
+      }).start();
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
+      // Since the new thread is trying to get lock on same resource,
+      // it will wait.
+      assertFalse(gotLock.get());
+      lock.releaseWriteLocks(resource, resourceName.subList(1, resourceName.size()));
+      // Since we have released the lock, the new thread should have the lock
+      // now.
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
+      assertTrue(gotLock.get());
+    }
+
+  }
+
+  @Test
   void testMultiLockResourceParallel() throws Exception {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
     lock.acquireMultiUserLock("user2", "user1");
@@ -365,7 +393,6 @@ class TestOzoneManagerLock {
     testWriteLockConcurrentStats(resource, resourceName, 5);
     testSyntheticReadWriteLockConcurrentStats(resource, resourceName, 10, 3);
   }
-
 
   private void testReadLockConcurrentStats(Resource resource,
                                           String[] resourceName,

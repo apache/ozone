@@ -92,8 +92,8 @@ public final class OmSnapshotUtils {
           fixedFile = f.toString();
         }
       }
-      sb.append(truncateFileName(truncateLength, entry.getKey())).append("\t")
-          .append(fixedFile).append("\n");
+      sb.append(truncateFileName(truncateLength, entry.getKey())).append('\t')
+          .append(fixedFile).append('\n');
     }
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8));
     return data;

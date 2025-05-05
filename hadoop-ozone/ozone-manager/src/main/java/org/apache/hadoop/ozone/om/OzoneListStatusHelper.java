@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 import com.google.common.base.Preconditions;
@@ -50,15 +51,6 @@ import org.slf4j.LoggerFactory;
  * Helper class for fetching List Status for a path.
  */
 public class OzoneListStatusHelper {
-  /**
-   * Interface to get the File Status for a path.
-   */
-  @FunctionalInterface
-  public interface GetFileStatusHelper {
-    OzoneFileStatus apply(OmKeyArgs args, String clientAddress,
-                          boolean skipFileNotFoundError) throws IOException;
-  }
-
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneListStatusHelper.class);
 
@@ -77,6 +69,15 @@ public class OzoneListStatusHelper {
     this.scmBlockSize = scmBlockSize;
     this.getStatusHelper = func;
     this.omDefaultReplication = omDefaultReplication;
+  }
+
+  /**
+   * Interface to get the File Status for a path.
+   */
+  @FunctionalInterface
+  public interface GetFileStatusHelper {
+    OzoneFileStatus apply(OmKeyArgs args, String clientAddress,
+                          boolean skipFileNotFoundError) throws IOException;
   }
 
   public Collection<OzoneFileStatus> listStatusFSO(OmKeyArgs args,
@@ -263,8 +264,7 @@ public class OzoneListStatusHelper {
       return null;
     }
     Object value = entry.getValue();
-    boolean isDir =
-        OmMetadataManagerImpl.DIRECTORY_TABLE.equals(entry.getTableName());
+    final boolean isDir = DIRECTORY_TABLE.equals(entry.getTableName());
     OmKeyInfo keyInfo;
     if (isDir) {
       Preconditions.checkArgument(value instanceof OmDirectoryInfo);

@@ -112,7 +112,6 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     return resolvedArgs;
   }
 
-
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {

@@ -29,6 +29,8 @@ import javax.sql.DataSource;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class used to create tables that are required for tracking containers.
@@ -38,20 +40,8 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
 
   public static final String UNHEALTHY_CONTAINERS_TABLE_NAME =
       "UNHEALTHY_CONTAINERS";
-
-  /**
-   * ENUM describing the allowed container states which can be stored in the
-   * unhealthy containers table.
-   */
-  public enum UnHealthyContainerStates {
-    MISSING,
-    EMPTY_MISSING,
-    UNDER_REPLICATED,
-    OVER_REPLICATED,
-    MIS_REPLICATED,
-    ALL_REPLICAS_BAD,
-    NEGATIVE_SIZE // Added new state to track containers with negative sizes
-  }
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerSchemaDefinition.class);
 
   private static final String CONTAINER_ID = "container_id";
   private static final String CONTAINER_STATE = "container_state";
@@ -68,6 +58,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
     if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+      LOG.info("UNHEALTHY_CONTAINERS is missing creating new one.");
       createUnhealthyContainersTable();
     }
   }
@@ -98,5 +89,19 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
 
   public DataSource getDataSource() {
     return dataSource;
+  }
+
+  /**
+   * ENUM describing the allowed container states which can be stored in the
+   * unhealthy containers table.
+   */
+  public enum UnHealthyContainerStates {
+    MISSING,
+    EMPTY_MISSING,
+    UNDER_REPLICATED,
+    OVER_REPLICATED,
+    MIS_REPLICATED,
+    ALL_REPLICAS_BAD,
+    NEGATIVE_SIZE // Added new state to track containers with negative sizes
   }
 }

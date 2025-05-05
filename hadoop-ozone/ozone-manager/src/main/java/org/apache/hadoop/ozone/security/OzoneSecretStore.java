@@ -36,6 +36,7 @@ public class OzoneSecretStore implements Closeable {
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneSecretStore.class);
   private OMMetadataManager omMetadataManager;
+
   @Override
   public void close() throws IOException {
     if (omMetadataManager != null) {
@@ -47,12 +48,12 @@ public class OzoneSecretStore implements Closeable {
     }
   }
 
-
   /**
    * Support class to maintain state of OzoneSecretStore.
    */
   public static class OzoneManagerSecretState<T> {
     private Map<T, Long> tokenState = new HashMap<>();
+
     public Map<T, Long> getTokenState() {
       return tokenState;
     }

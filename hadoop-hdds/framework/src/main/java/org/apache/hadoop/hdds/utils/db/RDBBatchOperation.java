@@ -43,6 +43,14 @@ import org.slf4j.LoggerFactory;
 public class RDBBatchOperation implements BatchOperation {
   static final Logger LOG = LoggerFactory.getLogger(RDBBatchOperation.class);
 
+  private static final AtomicInteger BATCH_COUNT = new AtomicInteger();
+
+  private final String name = "Batch-" + BATCH_COUNT.getAndIncrement();
+
+  private final ManagedWriteBatch writeBatch;
+
+  private final OpCache opCache = new OpCache();
+
   private enum Op { DELETE }
 
   private static void debug(Supplier<String> message) {
@@ -122,6 +130,9 @@ public class RDBBatchOperation implements BatchOperation {
 
   /** Cache and deduplicate db ops (put/delete). */
   private class OpCache {
+    /** A (family name -> {@link FamilyCache}) map. */
+    private final Map<String, FamilyCache> name2cache = new HashMap<>();
+
     /** A cache for a {@link ColumnFamily}. */
     private class FamilyCache {
       private final ColumnFamily family;
@@ -262,9 +273,6 @@ public class RDBBatchOperation implements BatchOperation {
       }
     }
 
-    /** A (family name -> {@link FamilyCache}) map. */
-    private final Map<String, FamilyCache> name2cache = new HashMap<>();
-
     void put(ColumnFamily f, CodecBuffer key, CodecBuffer value) {
       name2cache.computeIfAbsent(f.getName(), k -> new FamilyCache(f))
           .put(key, value);
@@ -319,12 +327,6 @@ public class RDBBatchOperation implements BatchOperation {
           countSize2String(opCount - discardedCount, opSize - discardedSize));
     }
   }
-
-  private static final AtomicInteger BATCH_COUNT = new AtomicInteger();
-
-  private final String name = "Batch-" + BATCH_COUNT.getAndIncrement();
-  private final ManagedWriteBatch writeBatch;
-  private final OpCache opCache = new OpCache();
 
   public RDBBatchOperation() {
     writeBatch = new ManagedWriteBatch();

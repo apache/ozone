@@ -46,18 +46,18 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
  */
 public final class DBDefinitionFactory {
 
-  private DBDefinitionFactory() {
-  }
-
   private static final AtomicReference<String> DATANODE_DB_SCHEMA_VERSION = new AtomicReference<>();
   private static final Map<String, DBDefinition> DB_MAP;
 
   static {
     final Map<String, DBDefinition> map = new HashMap<>();
     Arrays.asList(SCMDBDefinition.get(), OMDBDefinition.get(), ReconSCMDBDefinition.get(),
-                  WitnessedContainerDBDefinition.get())
+            WitnessedContainerDBDefinition.get())
         .forEach(dbDefinition -> map.put(dbDefinition.getName(), dbDefinition));
     DB_MAP = Collections.unmodifiableMap(map);
+  }
+
+  private DBDefinitionFactory() {
   }
 
   public static DBDefinition getDefinition(String dbName) {

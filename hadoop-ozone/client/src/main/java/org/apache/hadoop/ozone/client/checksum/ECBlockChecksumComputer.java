@@ -45,7 +45,6 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
   private final OmKeyInfo keyInfo;
   private final long blockLength;
 
-
   public ECBlockChecksumComputer(
       List<ContainerProtos.ChunkInfo> chunkInfoList, OmKeyInfo keyInfo, long blockLength) {
     this.chunkInfoList = chunkInfoList;

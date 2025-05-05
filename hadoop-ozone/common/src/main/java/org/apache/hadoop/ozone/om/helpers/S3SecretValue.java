@@ -33,15 +33,15 @@ public final class S3SecretValue {
       S3SecretValue::getProtobuf,
       S3SecretValue.class);
 
-  public static Codec<S3SecretValue> getCodec() {
-    return CODEC;
-  }
-
   // TODO: This field should be renamed to accessId for generalization.
   private final String kerberosID;
   private final String awsSecret;
   private final boolean isDeleted;
   private final long transactionLogIndex;
+
+  public static Codec<S3SecretValue> getCodec() {
+    return CODEC;
+  }
 
   public static S3SecretValue of(String kerberosID, String awsSecret) {
     return of(kerberosID, awsSecret, 0);

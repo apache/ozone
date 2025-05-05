@@ -82,9 +82,6 @@ public class SCMStateMachine extends BaseStateMachine {
   private final boolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
-  // The atomic variable RaftServerImpl#inProgressInstallSnapshotRequest
-  // ensures serializable between notifyInstallSnapshotFromLeader()
-  // and reinitialize().
   private DBCheckpoint installingDBCheckpoint = null;
   private List<ManagedSecretKey> installingSecretKeys = null;
 

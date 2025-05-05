@@ -114,7 +114,7 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     init(incrementalChunkList);
 
     int size = 1024;
-    String s = RandomStringUtils.randomAlphabetic(1024);
+    String s = RandomStringUtils.secure().nextAlphabetic(1024);
     ByteBuffer byteBuffer = ByteBuffer.wrap(s.getBytes(StandardCharsets.UTF_8));
 
     try (OzoneOutputStream out = bucket.createKey(keyName, size,

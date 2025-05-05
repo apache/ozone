@@ -33,7 +33,7 @@ public class AgedDirLoadGenerator extends LoadGenerator {
 
   @Override
   public void generateLoad() throws Exception {
-    int index = RandomUtils.nextInt(0, maxDirIndex);
+    int index = RandomUtils.secure().randomInt(0, maxDirIndex);
     String keyName = getKeyName(index);
     fsBucket.readDirectory(keyName);
   }

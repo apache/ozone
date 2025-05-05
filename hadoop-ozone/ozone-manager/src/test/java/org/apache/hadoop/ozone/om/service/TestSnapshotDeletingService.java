@@ -54,10 +54,9 @@ public class TestSnapshotDeletingService {
   private SnapshotChainManager chainManager;
   @Mock
   private OmMetadataManagerImpl omMetadataManager;
-  private final OzoneConfiguration conf = new OzoneConfiguration();;
+  private final OzoneConfiguration conf = new OzoneConfiguration();
   private final long sdsRunInterval = Duration.ofMillis(1000).toMillis();
   private final  long sdsServiceTimeout = Duration.ofSeconds(10).toMillis();
-
 
   private static Stream<Arguments> testCasesForIgnoreSnapshotGc() throws IOException {
     SnapshotInfo flushedSnapshot = SnapshotInfo.newBuilder().setSstFiltered(true)

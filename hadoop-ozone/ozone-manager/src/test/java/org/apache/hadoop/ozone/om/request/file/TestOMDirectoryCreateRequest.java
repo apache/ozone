@@ -537,9 +537,9 @@ public class TestOMDirectoryCreateRequest {
 
   private String genRandomKeyName() {
     StringBuilder keyNameBuilder = new StringBuilder();
-    keyNameBuilder.append(RandomStringUtils.randomAlphabetic(5));
+    keyNameBuilder.append(RandomStringUtils.secure().nextAlphabetic(5));
     for (int i = 0; i < 3; i++) {
-      keyNameBuilder.append("/").append(RandomStringUtils.randomAlphabetic(5));
+      keyNameBuilder.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     return keyNameBuilder.toString();
   }

@@ -105,12 +105,12 @@ public class TestReplicationManagerUtil {
           final DatanodeDetails dn = invocation.getArgument(0);
           for (ContainerReplica r : replicas) {
             if (r.getDatanodeDetails().equals(dn)) {
-              return new NodeStatus(
+              return NodeStatus.valueOf(
                   r.getDatanodeDetails().getPersistedOpState(),
                   HddsProtos.NodeState.HEALTHY);
             }
           }
-          throw new NodeNotFoundException(dn.getUuidString());
+          throw new NodeNotFoundException(dn.getID());
         });
 
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =
@@ -189,12 +189,12 @@ public class TestReplicationManagerUtil {
           final DatanodeDetails dn = invocation.getArgument(0);
           for (ContainerReplica r : replicas) {
             if (r.getDatanodeDetails().equals(dn)) {
-              return new NodeStatus(
+              return NodeStatus.valueOf(
                   r.getDatanodeDetails().getPersistedOpState(),
                   HddsProtos.NodeState.HEALTHY);
             }
           }
-          throw new NodeNotFoundException(dn.getUuidString());
+          throw new NodeNotFoundException(dn.getID());
         });
 
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =

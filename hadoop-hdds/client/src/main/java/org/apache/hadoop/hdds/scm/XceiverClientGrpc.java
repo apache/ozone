@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -326,9 +327,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       ContainerCommandRequestProto request, DatanodeDetails dn) {
     boolean isEcRequest = pipeline.getReplicationConfig()
         .getReplicationType() == HddsProtos.ReplicationType.EC;
+    if (request.hasReadContainer() && isEcRequest) {
+      request = request.toBuilder().setDatanodeUuid(dn.getUuidString()).build();
+    }
     if (request.hasGetBlock() && isEcRequest) {
       ContainerProtos.GetBlockRequestProto gbr = request.getGetBlock();
-      request = request.toBuilder().setGetBlock(gbr.toBuilder().setBlockID(
+      request = request.toBuilder().setDatanodeUuid(dn.getUuidString()).setGetBlock(gbr.toBuilder().setBlockID(
           gbr.getBlockID().toBuilder().setReplicaIndex(
               pipeline.getReplicaIndex(dn)).build()).build()).build();
     }
@@ -571,7 +575,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
     semaphore.acquire();
-    long requestTime = System.currentTimeMillis();
+    long requestTime = Time.monotonicNow();
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
 
     // create a new grpc message stream pair for each call.
@@ -601,7 +605,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
               private void decreasePendingMetricsAndReleaseSemaphore() {
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
-                long cost = System.currentTimeMillis() - requestTime;
+                long cost = Time.monotonicNow() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(), cost);
                 if (LOG.isDebugEnabled()) {
                   LOG.debug("Executed command {} on datanode {}, cost = {}, cmdType = {}",
@@ -657,11 +661,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   public ConfigurationSource getConfig() {
     return config;
-  }
-
-  @VisibleForTesting
-  public static Logger getLogger() {
-    return LOG;
   }
 
   public void setTimeout(long timeout) {

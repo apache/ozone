@@ -57,7 +57,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -68,7 +67,6 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test client-side CRUD snapshot operations with Ozone Manager.
  * Setting a timeout for every test method to 300 seconds.
  */
-@Timeout(value = 300)
 class TestOzoneFsSnapshot {
 
   private static MiniOzoneCluster cluster;

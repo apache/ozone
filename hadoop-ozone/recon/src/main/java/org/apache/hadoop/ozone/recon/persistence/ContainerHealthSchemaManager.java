@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_BAD;
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED;
 import static org.apache.ozone.recon.schema.generated.tables.UnhealthyContainersTable.UNHEALTHY_CONTAINERS;
@@ -24,6 +25,7 @@ import static org.jooq.impl.DSL.count;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import java.sql.Connection;
 import java.util.List;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
@@ -35,6 +37,7 @@ import org.jooq.Cursor;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.SelectQuery;
+import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,12 +121,34 @@ public class ContainerHealthSchemaManager {
 
   public void insertUnhealthyContainerRecords(List<UnhealthyContainers> recs) {
     if (LOG.isDebugEnabled()) {
-      recs.forEach(rec -> {
-        LOG.debug("rec.getContainerId() : {}, rec.getContainerState(): {} ", rec.getContainerId(),
-            rec.getContainerState());
-      });
+      recs.forEach(rec -> LOG.debug("rec.getContainerId() : {}, rec.getContainerState(): {}",
+          rec.getContainerId(), rec.getContainerState()));
     }
-    unhealthyContainersDao.insert(recs);
+
+    try (Connection connection = containerSchemaDefinition.getDataSource().getConnection()) {
+      connection.setAutoCommit(false); // Turn off auto-commit for transactional control
+      try {
+        for (UnhealthyContainers rec : recs) {
+          try {
+            unhealthyContainersDao.insert(rec);
+          } catch (DataAccessException dataAccessException) {
+            // Log the error and update the existing record if ConstraintViolationException occurs
+            unhealthyContainersDao.update(rec);
+            LOG.debug("Error while inserting unhealthy container record: {}", rec, dataAccessException);
+          }
+        }
+        connection.commit(); // Commit all inserted/updated records
+      } catch (Exception innerException) {
+        connection.rollback(); // Rollback transaction if an error occurs inside processing
+        LOG.error("Transaction rolled back due to error", innerException);
+        throw innerException;
+      } finally {
+        connection.setAutoCommit(true); // Reset auto-commit before the connection is auto-closed
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to insert records into {} ", UNHEALTHY_CONTAINERS_TABLE_NAME, e);
+      throw new RuntimeException("Recon failed to insert " + recs.size() + " unhealthy container records.", e);
+    }
   }
 
 }

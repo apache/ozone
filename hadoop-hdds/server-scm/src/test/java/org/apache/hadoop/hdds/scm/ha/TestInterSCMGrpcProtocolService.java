@@ -53,9 +53,10 @@ import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
 import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ozone.test.GenericTestUtils.PortAllocator;
 import org.junit.jupiter.api.Test;
@@ -172,7 +173,7 @@ class TestInterSCMGrpcProtocolService {
 
   private DBStore dbStore() throws IOException {
     DBStore dbStoreMock = mock(DBStore.class);
-    doReturn(trInfoTable()).when(dbStoreMock).getTable(any(), any(), any());
+    doReturn(trInfoTable()).when(dbStoreMock).getTable(any(), (Codec<?>) any(), any());
     doReturn(checkPoint()).when(dbStoreMock).getCheckpoint(anyBoolean());
     return dbStoreMock;
   }
@@ -186,9 +187,9 @@ class TestInterSCMGrpcProtocolService {
     return checkpoint;
   }
 
-  private Table<String, TransactionInfo> trInfoTable()
+  private TypedTable<String, TransactionInfo> trInfoTable()
       throws IOException {
-    Table<String, TransactionInfo> tableMock = mock(Table.class);
+    final TypedTable<String, TransactionInfo> tableMock = mock(TypedTable.class);
     doReturn(mock(TransactionInfo.class)).when(tableMock).get(any());
     return tableMock;
   }

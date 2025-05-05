@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.ClassUtils;
 
 /**
@@ -30,6 +31,9 @@ import org.apache.commons.lang3.ClassUtils;
  * This class is immutable.
  */
 public final class CodecRegistry {
+
+  private final CodecMap valueCodecs;
+
   /** To build {@link CodecRegistry}. */
   public static class Builder {
     private final Map<Class<?>, Codec<?>> codecs = new HashMap<>();
@@ -61,6 +65,7 @@ public final class CodecRegistry {
     }
 
     <T> Codec<T> get(Class<T> clazz) {
+      Objects.requireNonNull(clazz, "clazz == null");
       final Codec<?> codec = map.get(clazz);
       return (Codec<T>) codec;
     }
@@ -75,8 +80,6 @@ public final class CodecRegistry {
       return null;
     }
   }
-
-  private final CodecMap valueCodecs;
 
   private CodecRegistry(Map<Class<?>, Codec<?>> valueCodecs) {
     this.valueCodecs = new CodecMap(valueCodecs);

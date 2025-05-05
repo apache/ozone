@@ -38,26 +38,6 @@ import org.jgrapht.graph.DefaultDirectedGraph;
  */
 public class PrintableGraph {
 
-  /**
-   * Enum to print different type of node's name in the graph image.
-   */
-  public enum GraphType {
-    /**
-     * To use SST file name as node name.
-     */
-    FILE_NAME,
-
-    /**
-     * To use SST file name and total key in the file as node name.
-     */
-    KEY_SIZE,
-
-    /**
-     * To use SST file name and cumulative key as node name.
-     */
-    CUMULATIVE_SIZE
-  }
-
   private final Graph<String, Edge> graph;
 
   public PrintableGraph(MutableGraph<CompactionNode> guavaGraph,
@@ -118,5 +98,25 @@ public class PrintableGraph {
     default:
       return node.getFileName();
     }
+  }
+
+  /**
+   * Enum to print different type of node's name in the graph image.
+   */
+  public enum GraphType {
+    /**
+     * To use SST file name as node name.
+     */
+    FILE_NAME,
+
+    /**
+     * To use SST file name and total key in the file as node name.
+     */
+    KEY_SIZE,
+
+    /**
+     * To use SST file name and cumulative key as node name.
+     */
+    CUMULATIVE_SIZE
   }
 }

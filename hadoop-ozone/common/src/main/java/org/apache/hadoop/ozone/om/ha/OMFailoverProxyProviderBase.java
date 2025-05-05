@@ -62,7 +62,7 @@ import org.slf4j.LoggerFactory;
 public abstract class OMFailoverProxyProviderBase<T> implements
     FailoverProxyProvider<T>, Closeable {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMFailoverProxyProviderBase.class);
 
   private final ConfigurationSource conf;
@@ -147,7 +147,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         connectionRetryPolicy
     ).getProxy();
   }
-
 
   protected synchronized boolean shouldFailover(Exception ex) {
     Throwable unwrappedException = HddsUtils.getUnwrappedException(ex);
@@ -391,11 +390,9 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return waitBetweenRetries;
   }
 
-
   public List<ProxyInfo> getOMProxies() {
     return new ArrayList<ProxyInfo>(omProxies.values());
   }
-
 
   public Map<String, ProxyInfo<T>> getOMProxyMap() {
     return omProxies;

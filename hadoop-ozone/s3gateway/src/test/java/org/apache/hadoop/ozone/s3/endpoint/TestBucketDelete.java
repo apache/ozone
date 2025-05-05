@@ -79,7 +79,6 @@ public class TestBucketDelete {
     fail("testDeleteWithNoSuchBucket failed");
   }
 
-
   @Test
   public void testDeleteWithBucketNotEmpty() throws Exception {
     try {

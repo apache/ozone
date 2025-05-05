@@ -14,24 +14,40 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-set -e -o pipefail
+
+set -e -u -o pipefail
 
 _testlib_this="${BASH_SOURCE[0]}"
 _testlib_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+: "${COMPOSE_DIR:=$_testlib_dir}"
 COMPOSE_ENV_NAME=$(basename "$COMPOSE_DIR")
 RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
-RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
-
-OM_HA_PARAM=""
-if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
-  OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
-fi
 
 source ${_testlib_dir}/compose_v2_compatibility.sh
 source "${_testlib_dir}/../smoketest/testlib.sh"
 
 : ${OZONE_COMPOSE_RUNNING:=false}
+: ${SECURITY_ENABLED:=false}
 : ${SCM:=scm}
+
+# Check if running from output of Maven build or from source
+_is_build() {
+  local file=""
+  # Variable is replaced by Maven at build time,
+  # so if it empty, we are running from source, if non-empty, then running in build output (target)
+  [[ -n "${file}" ]]
+}
+
+# Avoid `bad substitution` error
+if _is_build; then
+  # version is used in bucket name, which does not allow uppercase
+  # variable is replaced by Maven at build time
+  OZONE_CURRENT_VERSION="$(echo "${ozone.version}" | sed -e 's/-SNAPSHOT//' | tr '[:upper:]' '[:lower:]')"
+else
+  OZONE_CURRENT_VERSION=src
+fi
+export OZONE_CURRENT_VERSION
 
 # create temp directory for test data; only once, even if testlib.sh is sourced again
 if [[ -z "${TEST_DATA_DIR:-}" ]] && [[ "${KEEP_RUNNING:-false}" == "false" ]]; then
@@ -68,7 +84,7 @@ all_tests_in_immediate_child_dirs() {
 ## @description Find all test*.sh scripts in immediate child dirs,
 ## @description applying OZONE_ACCEPTANCE_SUITE or OZONE_TEST_SELECTOR filter.
 find_tests(){
-  if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
+  if [[ -n "${OZONE_ACCEPTANCE_SUITE:-}" ]]; then
     tests=$(all_tests_in_immediate_child_dirs | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" || echo "")
 
      # 'misc' is default suite, add untagged tests, too
@@ -83,7 +99,7 @@ find_tests(){
       echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
       exit 1
     fi
-  elif [[ -n "${OZONE_TEST_SELECTOR}" ]]; then
+  elif [[ -n "${OZONE_TEST_SELECTOR:-}" ]]; then
     tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}" || echo "")
 
     if [[ -z "${tests}" ]]; then
@@ -212,22 +228,29 @@ execute_robot_test(){
     fi
   done
 
-  SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
+  : ${OZONE_DIR:=/opt/hadoop}
+  SMOKETEST_DIR_INSIDE="$OZONE_DIR/smoketest"
 
+  RESULT_DIR_INSIDE="/tmp/smoketest/$COMPOSE_ENV_NAME/result"
   OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
+
+  OM_HA_PARAM=""
+  if [[ -n "${OM_SERVICE_ID:-}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
+    OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
+  fi
 
   set +e
 
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
     && docker-compose exec -T "$CONTAINER" robot \
-      -v ENCRYPTION_KEY:"${OZONE_BUCKET_KEY_NAME}" \
+      -v ENCRYPTION_KEY:"${OZONE_BUCKET_KEY_NAME:-}" \
       -v OM_HA_PARAM:"${OM_HA_PARAM}" \
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
       -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
       -v SCM:"${SCM}" \
-      ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
+      ${ARGUMENTS[@]} --log NONE --report NONE --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
@@ -245,13 +268,16 @@ execute_robot_test(){
 
 ## @description Replace OM node order in config
 reorder_om_nodes() {
-  local c pid procname new_order
+  local c new_order
   local new_order="$1"
 
   if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
-    for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e recon -e s3g -e scm); do
-      docker exec "${c}" sed -i -e "s/om1,om2,om3/${new_order}/" /etc/hadoop/ozone-site.xml
-      echo "Replaced OM order with ${new_order} in ${c}"
+    for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om'); do
+      docker exec "${c}" sh -c \
+        "if [[ -f /etc/hadoop/ozone-site.xml ]]; then \
+          sed -i -e 's/om1,om2,om3/${new_order}/' /etc/hadoop/ozone-site.xml; \
+          echo 'Replaced OM order with ${new_order} in ${c}'; \
+        fi"
     done
   fi
 }
@@ -316,7 +342,7 @@ create_containers() {
 }
 
 get_output_name() {
-  if [[ -n "${OUTPUT_NAME}" ]]; then
+  if [[ -n "${OUTPUT_NAME:-}" ]]; then
     echo "${OUTPUT_NAME}-"
   fi
 }

@@ -78,6 +78,7 @@ public class TestMultipartUploadWithCopy {
   private static final String UNPARSABLE_TIME_STR = "Unparsable time string";
   private static final String ERROR_CODE =
       S3ErrorTable.PRECOND_FAILED.getCode();
+
   @BeforeAll
   public static void setUp() throws Exception {
     CLIENT.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
@@ -290,6 +291,7 @@ public class TestMultipartUploadWithCopy {
           + " ErrorCode:" + this.errorCode;
     }
   }
+
   @Test
   public void testMultipartTSHeaders() throws Exception {
     for (CopyIfTimestampTestCase t : CopyIfTimestampTestCase.values()) {

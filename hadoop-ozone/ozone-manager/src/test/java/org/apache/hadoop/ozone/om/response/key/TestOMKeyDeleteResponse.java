@@ -128,7 +128,6 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
     assertThat(rangeKVs.size()).isGreaterThan(0);
   }
 
-
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
     OmKeyInfo omKeyInfo = getOmKeyInfo();

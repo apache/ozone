@@ -37,8 +37,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BackgroundService {
 
-  @VisibleForTesting
-  public static final Logger LOG =
+  protected static final Logger LOG =
       LoggerFactory.getLogger(BackgroundService.class);
 
   // Executor to launch child tasks
@@ -102,7 +101,6 @@ public abstract class BackgroundService {
       tasks.poll().call();
     }
   }
-
 
   // start service
   public void start() {

@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RatisUnderReplicationHandler
     implements UnhealthyReplicationHandler {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(RatisUnderReplicationHandler.class);
   private final PlacementPolicy placementPolicy;
   private final long currentContainerSize;

@@ -33,7 +33,6 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestRatisNameRewrite {
 
-
   private static Stream<Arguments> parameters() {
     return Stream.of(
         arguments(

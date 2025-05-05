@@ -52,7 +52,7 @@ public class TestChecksum {
   public void testVerifyChecksum(boolean useChecksumCache) throws Exception {
     Checksum checksum = getChecksum(null, useChecksumCache);
     int dataLen = 55;
-    byte[] data = RandomStringUtils.randomAlphabetic(dataLen).getBytes(UTF_8);
+    byte[] data = RandomStringUtils.secure().nextAlphabetic(dataLen).getBytes(UTF_8);
     ByteBuffer byteBuffer = ByteBuffer.wrap(data);
 
     ChecksumData checksumData = checksum.computeChecksum(byteBuffer, useChecksumCache);
@@ -73,7 +73,7 @@ public class TestChecksum {
   @ValueSource(booleans = {true, false})
   public void testIncorrectChecksum(boolean useChecksumCache) throws Exception {
     Checksum checksum = getChecksum(null, useChecksumCache);
-    byte[] data = RandomStringUtils.randomAlphabetic(55).getBytes(UTF_8);
+    byte[] data = RandomStringUtils.secure().nextAlphabetic(55).getBytes(UTF_8);
     ByteBuffer byteBuffer = ByteBuffer.wrap(data);
     ChecksumData originalChecksumData = checksum.computeChecksum(byteBuffer, useChecksumCache);
 

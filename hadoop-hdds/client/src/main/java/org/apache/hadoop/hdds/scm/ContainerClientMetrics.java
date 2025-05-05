@@ -66,7 +66,6 @@ public final class ContainerClientMetrics {
   @Metric
   private MutableCounterLong flushesDuringWrite;
 
-
   private MutableQuantiles[] listBlockLatency;
   private MutableQuantiles[] getBlockLatency;
   private MutableQuantiles[] getCommittedBlockLengthLatency;

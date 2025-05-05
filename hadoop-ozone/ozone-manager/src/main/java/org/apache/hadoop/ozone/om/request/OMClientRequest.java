@@ -98,6 +98,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     this.omRequest = omRequest;
     this.omLockDetails.clear();
   }
+
   /**
    * Perform pre-execute steps on a OMRequest.
    *
@@ -510,7 +511,6 @@ public abstract class OMClientRequest implements RequestAuditor {
     auditMap.put(OzoneConsts.VOLUME, volume);
     return auditMap;
   }
-
 
   public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
       String keyName) throws OMException {

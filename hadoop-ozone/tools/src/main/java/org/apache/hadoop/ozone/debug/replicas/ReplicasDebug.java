@@ -30,7 +30,8 @@ import picocli.CommandLine;
     description = "Debug commands for replica-related issues, retrieving replica information from the OM and " +
             "performing checks over the network against a running cluster.",
     subcommands = {
-        ChunkKeyHandler.class
+        ChunkKeyHandler.class,
+        ReplicasVerify.class
     }
 )
 @MetaInfServices(DebugSubcommand.class)

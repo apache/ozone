@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.upgrade;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TRANSACTION_INFO_TABLE;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;

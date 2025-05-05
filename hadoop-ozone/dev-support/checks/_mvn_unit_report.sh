@@ -38,7 +38,7 @@ cat ${failures} > "${tempfile}"
 
 leaks=${REPORT_DIR}/leaks.txt
 if [[ "${CHECK:-unit}" == "integration" ]]; then
-  find hadoop-ozone/integration-test -not -path '*/iteration*' -name '*-output.txt' -print0 \
+  find hadoop-ozone/integration-test* -not -path '*/iteration*' -name '*-output.txt' -print0 \
       | xargs -n1 -0 "grep" -l -E "not closed properly|was not shutdown properly" \
       | awk -F/ '{sub("-output.txt",""); print $NF}' \
       > "${leaks}"
@@ -47,7 +47,7 @@ fi
 
 cluster=${REPORT_DIR}/cluster-startup-errors.txt
 if [[ "${CHECK:-unit}" == "integration" ]]; then
-  find hadoop-ozone/integration-test -not -path '*/iteration*' -name '*-output.txt' -print0 \
+  find hadoop-ozone/integration-test* -not -path '*/iteration*' -name '*-output.txt' -print0 \
       | xargs -n1 -0 "grep" -l -E "Unable to build MiniOzoneCluster" \
       | awk -F/ '{sub("-output.txt",""); print $NF}' \
       > "${cluster}"

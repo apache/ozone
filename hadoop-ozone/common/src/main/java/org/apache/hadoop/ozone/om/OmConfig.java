@@ -17,9 +17,12 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.base.Preconditions;
+import java.time.Duration;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 
@@ -54,6 +57,34 @@ public class OmConfig extends ReconfigurableConfig {
   )
   private long maxListSize;
 
+  @Config(
+      key = "user.max.volume",
+      defaultValue = "1024",
+      description = "The maximum number of volumes a user can have on a cluster.Increasing or " +
+          "decreasing this number has no real impact on ozone cluster. This is " +
+          "defined only for operational purposes. Only an administrator can create a " +
+          "volume, once a volume is created there are no restrictions on the number " +
+          "of buckets or keys inside each bucket a user can create.",
+      tags = { ConfigTag.OM, ConfigTag.MANAGEMENT }
+  )
+  private int maxUserVolumeCount;
+
+  @Config(key = "upgrade.finalization.ratis.based.timeout",
+      defaultValue = "30s",
+      type = ConfigType.TIME,
+      tags = {ConfigTag.OM, ConfigTag.UPGRADE},
+      description = "Maximum time to wait for a slow follower to be finalized" +
+          " through a Ratis snapshot. This is an advanced config, and needs " +
+          "to be changed only under a special circumstance when the leader OM" +
+          " has purged the finalize request from its logs, and a follower OM " +
+          "was down during upgrade finalization. Default is 30s."
+  )
+  private long ratisBasedFinalizationTimeout = Duration.ofSeconds(30).getSeconds();
+
+  public long getRatisBasedFinalizationTimeout() {
+    return ratisBasedFinalizationTimeout;
+  }
+
   public boolean isFileSystemPathEnabled() {
     return fileSystemPathEnabled;
   }
@@ -71,11 +102,23 @@ public class OmConfig extends ReconfigurableConfig {
     validate();
   }
 
+  public int getMaxUserVolumeCount() {
+    return maxUserVolumeCount;
+  }
+
+  public void setMaxUserVolumeCount(int newValue) {
+    maxUserVolumeCount = newValue;
+    validate();
+  }
+
   @PostConstruct
   public void validate() {
     if (maxListSize <= 0) {
       maxListSize = Defaults.SERVER_LIST_MAX_SIZE;
     }
+
+    Preconditions.checkArgument(this.maxUserVolumeCount > 0,
+        Keys.USER_MAX_VOLUME + " value should be greater than zero");
   }
 
   public OmConfig copy() {
@@ -87,6 +130,7 @@ public class OmConfig extends ReconfigurableConfig {
   public void setFrom(OmConfig other) {
     fileSystemPathEnabled = other.fileSystemPathEnabled;
     maxListSize = other.maxListSize;
+    maxUserVolumeCount = other.maxUserVolumeCount;
   }
 
   /**
@@ -95,6 +139,7 @@ public class OmConfig extends ReconfigurableConfig {
   public static final class Keys {
     public static final String ENABLE_FILESYSTEM_PATHS = "ozone.om.enable.filesystem.paths";
     public static final String SERVER_LIST_MAX_SIZE = "ozone.om.server.list.max.size";
+    public static final String USER_MAX_VOLUME = "ozone.om.user.max.volume";
   }
 
   /**

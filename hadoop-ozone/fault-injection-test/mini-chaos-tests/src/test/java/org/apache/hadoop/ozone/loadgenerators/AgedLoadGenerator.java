@@ -45,7 +45,7 @@ public class AgedLoadGenerator extends LoadGenerator {
 
   @Override
   public void generateLoad() throws Exception {
-    if (RandomUtils.nextInt(0, 100) <= 10) {
+    if (RandomUtils.secure().randomInt(0, 100) <= 10) {
       synchronized (agedFileAllocationIndex) {
         int index = agedFileAllocationIndex.getAndIncrement();
         ByteBuffer buffer = dataBuffer.getBuffer(index);
@@ -66,7 +66,7 @@ public class AgedLoadGenerator extends LoadGenerator {
   private Optional<Integer> randomKeyToRead() {
     int currentIndex = agedFileWrittenIndex.get();
     return currentIndex != 0
-        ? Optional.of(RandomUtils.nextInt(0, currentIndex))
+        ? Optional.of(RandomUtils.secure().randomInt(0, currentIndex))
         : Optional.empty();
   }
 

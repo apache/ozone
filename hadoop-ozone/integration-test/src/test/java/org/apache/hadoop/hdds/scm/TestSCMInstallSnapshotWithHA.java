@@ -50,20 +50,19 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
 /**
  * Tests the Ratis snapshot feature in SCM.
  */
-@Timeout(500)
 @Flaky("HDDS-5631")
 public class TestSCMInstallSnapshotWithHA {
 
@@ -180,9 +179,8 @@ public class TestSCMInstallSnapshotWithHA {
     followerSM.notifyTermIndexUpdated(lastTermIndex.getTerm(),
         lastTermIndex.getIndex() + 100);
 
-    GenericTestUtils.setLogLevel(SCMHAManagerImpl.getLogger(), Level.INFO);
-    GenericTestUtils.LogCapturer logCapture =
-        GenericTestUtils.LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
+    GenericTestUtils.setLogLevel(SCMHAManagerImpl.class, Level.INFO);
+    LogCapturer logCapture = LogCapturer.captureLogs(SCMHAManagerImpl.class);
 
     // Install the old checkpoint on the follower . This should fail as the
     // follower is already ahead of that transactionLogIndex and the
@@ -240,11 +238,12 @@ public class TestSCMInstallSnapshotWithHA {
     // Corrupt the leader checkpoint and install that on the follower. The
     // operation should fail and  should shutdown.
     boolean delete = true;
-    for (File file : leaderCheckpointLocation.toFile()
-        .listFiles()) {
+    File[] files = leaderCheckpointLocation.toFile().listFiles();
+    assertNotNull(files);
+    for (File file : files) {
       if (file.getName().contains(".sst")) {
         if (delete) {
-          file.delete();
+          FileUtils.deleteQuietly(file);
           delete = false;
         } else {
           delete = true;
@@ -254,9 +253,8 @@ public class TestSCMInstallSnapshotWithHA {
 
     SCMHAManagerImpl scmhaManager =
         (SCMHAManagerImpl) (followerSCM.getScmHAManager());
-    GenericTestUtils.setLogLevel(SCMHAManagerImpl.getLogger(), Level.ERROR);
-    GenericTestUtils.LogCapturer logCapture =
-        GenericTestUtils.LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
+    GenericTestUtils.setLogLevel(SCMHAManagerImpl.class, Level.ERROR);
+    LogCapturer logCapture = LogCapturer.captureLogs(SCMHAManagerImpl.class);
     scmhaManager.setExitManagerForTesting(new DummyExitManager());
 
     followerSM.pause();
@@ -302,7 +300,6 @@ public class TestSCMInstallSnapshotWithHA {
       log.error("System Exit: " + message, throwable);
     }
   }
-
 
   static StorageContainerManager getLeader(MiniOzoneHAClusterImpl impl) {
     for (StorageContainerManager scm : impl.getStorageContainerManagers()) {

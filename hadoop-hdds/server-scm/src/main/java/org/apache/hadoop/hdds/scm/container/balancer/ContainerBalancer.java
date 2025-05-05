@@ -41,7 +41,7 @@ public class ContainerBalancer extends StatefulService {
 
   private static final AtomicInteger ID = new AtomicInteger();
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancer.class);
 
   private StorageContainerManager scm;
@@ -195,6 +195,7 @@ public class ContainerBalancer extends StatefulService {
       lock.unlock();
     }
   }
+
   /**
    * Checks if ContainerBalancer is in valid state to call stop.
    *

@@ -19,8 +19,8 @@ Library             Collections
 Resource            ../lib/os.robot
 
 *** Keywords ***
-Execute read-replicas CLI tool
-    Execute                         ozone debug -Dozone.network.topology.aware.read=true read-replicas --output-dir ${TEMP_DIR} o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
+Execute replicas verify checksums CLI tool
+    Execute                         ozone debug -Dozone.network.topology.aware.read=true replicas verify --checksums --output-dir ${TEMP_DIR} o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
     ${directory} =                  Execute     ls -d ${TEMP_DIR}/${VOLUME}_${BUCKET}_${TESTFILE}_*/ | tail -n 1
     Directory Should Exist          ${directory}
     File Should Exist               ${directory}/${TESTFILE}_manifest
@@ -87,15 +87,9 @@ Verify Stale Replica
     [arguments]              ${json}    ${replica}
 
     FOR    ${block}    IN RANGE    2
-        ${n} =           Evaluate        ${block} + 1
         ${datanode} =    Set Variable    ${json}[blocks][${block}][replicas][${replica}][hostname]
-        ${filename} =    Set Variable    ${DIR}/${TESTFILE}_block${n}_${datanode}
 
         IF    '${datanode}' == '${STALE_DATANODE}'
-            File Should Be Empty    ${filename}
             Should Contain          ${json}[blocks][${block}][replicas][${replica}][exception]    UNAVAILABLE
-        ELSE
-            ${filesize} =                   Get File Size    ${filename}
-            Should Be Equal As Integers     ${json}[blocks][${block}][length]          ${filesize}
         END
     END

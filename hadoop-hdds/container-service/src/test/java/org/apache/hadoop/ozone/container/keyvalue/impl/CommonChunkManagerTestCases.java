@@ -68,7 +68,7 @@ public abstract class CommonChunkManagerTestCases extends AbstractTestChunkManag
     ChunkManager chunkManager = createTestSubject();
     KeyValueContainer container = getKeyValueContainer();
     int tooLarge = OZONE_SCM_CHUNK_MAX_SIZE + 1;
-    byte[] array = RandomStringUtils.randomAscii(tooLarge).getBytes(UTF_8);
+    byte[] array = RandomStringUtils.secure().nextAscii(tooLarge).getBytes(UTF_8);
     assertThat(array.length).isGreaterThanOrEqualTo(tooLarge);
 
     BlockID blockID = getBlockID();

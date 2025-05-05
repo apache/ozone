@@ -124,7 +124,7 @@ public final class NodeSchemaManager {
     int i, j;
     for (i = 1, j = 1; i < subPath.length && j < (allSchema.size() - 1);) {
       if (allSchema.get(j).matchPrefix(subPath[i])) {
-        newPath.append(NetConstants.PATH_SEPARATOR_STR + subPath[i]);
+        newPath.append(NetConstants.PATH_SEPARATOR_STR).append(subPath[i]);
         i++;
         j++;
       } else {
@@ -133,7 +133,7 @@ public final class NodeSchemaManager {
       }
     }
     if (i == (subPath.length - 1)) {
-      newPath.append(NetConstants.PATH_SEPARATOR_STR + subPath[i]);
+      newPath.append(NetConstants.PATH_SEPARATOR_STR).append(subPath[i]);
       return newPath.toString();
     }
     return null;

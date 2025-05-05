@@ -41,13 +41,11 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test the behaviour of the datanode and scm when communicating
  * with refresh volume usage command.
  */
-@Timeout(300)
 public class TestRefreshVolumeUsageHandler {
 
   private MiniOzoneCluster cluster;

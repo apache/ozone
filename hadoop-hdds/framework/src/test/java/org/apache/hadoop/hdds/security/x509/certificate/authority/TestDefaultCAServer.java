@@ -93,8 +93,8 @@ public class TestDefaultCAServer {
   @Test
   public void testInit() throws Exception {
     CertificateServer testCA = new DefaultCAServer("testCA",
-        RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore,
+        RandomStringUtils.secure().nextAlphabetic(4),
+        RandomStringUtils.secure().nextAlphabetic(4), caStore,
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(securityConfig, CAType.ROOT);
@@ -109,8 +109,8 @@ public class TestDefaultCAServer {
   @Test
   public void testMissingCertificate() throws Exception {
     CertificateServer testCA = new DefaultCAServer("testCA",
-        RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore,
+        RandomStringUtils.secure().nextAlphabetic(4),
+        RandomStringUtils.secure().nextAlphabetic(4), caStore,
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(securityConfig, CAType.ROOT);
@@ -128,8 +128,8 @@ public class TestDefaultCAServer {
   @Test
   public void testMissingKey() {
     DefaultCAServer testCA = new DefaultCAServer("testCA",
-        RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore,
+        RandomStringUtils.secure().nextAlphabetic(4),
+        RandomStringUtils.secure().nextAlphabetic(4), caStore,
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     Consumer<SecurityConfig> caInitializer =
@@ -152,8 +152,8 @@ public class TestDefaultCAServer {
    */
   @Test
   public void testRequestCertificate() throws Exception {
-    String scmId = RandomStringUtils.randomAlphabetic(4);
-    String clusterId = RandomStringUtils.randomAlphabetic(4);
+    String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+    String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
     KeyPair keyPair =
         new HDDSKeyGenerator(securityConfig).generateKey();
     //TODO: generateCSR!
@@ -221,8 +221,8 @@ public class TestDefaultCAServer {
         .generateCSR();
 
     CertificateServer testCA = new DefaultCAServer("testCA",
-        RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore,
+        RandomStringUtils.secure().nextAlphabetic(4),
+        RandomStringUtils.secure().nextAlphabetic(4), caStore,
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(securityConfig, CAType.ROOT);
@@ -253,8 +253,8 @@ public class TestDefaultCAServer {
         .generateCSR();
 
     CertificateServer testCA = new DefaultCAServer("testCA",
-        RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore,
+        RandomStringUtils.secure().nextAlphabetic(4),
+        RandomStringUtils.secure().nextAlphabetic(4), caStore,
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(securityConfig, CAType.ROOT);
@@ -275,8 +275,8 @@ public class TestDefaultCAServer {
   public void testIntermediaryCAWithEmpty() {
 
     CertificateServer scmCA = new DefaultCAServer("testCA",
-        RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore,
+        RandomStringUtils.secure().nextAlphabetic(4),
+        RandomStringUtils.secure().nextAlphabetic(4), caStore,
         new DefaultProfile(), Paths.get("scm").toString());
 
     assertThrows(IllegalStateException.class,
@@ -305,8 +305,8 @@ public class TestDefaultCAServer {
           CertificateCodec.getPEMEncodedString(externalCert));
 
       CertificateServer testCA = new DefaultCAServer("testCA",
-          RandomStringUtils.randomAlphabetic(4),
-          RandomStringUtils.randomAlphabetic(4), caStore,
+          RandomStringUtils.secure().nextAlphabetic(4),
+          RandomStringUtils.secure().nextAlphabetic(4), caStore,
           new DefaultProfile(),
           Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
       //When initializing a CA server with external cert
@@ -335,8 +335,8 @@ public class TestDefaultCAServer {
         securityConfig);
     try (SCMCertificateClient scmCertificateClient =
         new SCMCertificateClient(securityConfig, null, null)) {
-      String scmId = RandomStringUtils.randomAlphabetic(4);
-      String clusterId = RandomStringUtils.randomAlphabetic(4);
+      String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+      String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
       KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
       KeyStorage keyStorage = new KeyStorage(securityConfig, "");
       keyStorage.storeKeyPair(keyPair);
@@ -370,8 +370,8 @@ public class TestDefaultCAServer {
           CertificateCodec.getPEMEncodedString(certPath));
 
       CertificateServer testCA = new DefaultCAServer("testCA",
-          RandomStringUtils.randomAlphabetic(4),
-          RandomStringUtils.randomAlphabetic(4), caStore,
+          RandomStringUtils.secure().nextAlphabetic(4),
+          RandomStringUtils.secure().nextAlphabetic(4), caStore,
           new DefaultProfile(),
           Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
       //When initializing a CA server with external cert
@@ -387,8 +387,8 @@ public class TestDefaultCAServer {
     conf.set(HddsConfigKeys.HDDS_X509_MAX_DURATION, "P3650D");
     securityConfig = new SecurityConfig(conf);
 
-    String clusterId = RandomStringUtils.randomAlphanumeric(4);
-    String scmId = RandomStringUtils.randomAlphanumeric(4);
+    String clusterId = RandomStringUtils.secure().nextAlphanumeric(4);
+    String scmId = RandomStringUtils.secure().nextAlphanumeric(4);
 
     CertificateServer rootCA = new DefaultCAServer("rootCA",
         clusterId, scmId, caStore, new DefaultProfile(),

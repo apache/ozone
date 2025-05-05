@@ -40,10 +40,6 @@ public final class S3ErrorTable {
   private static final Logger LOG = LoggerFactory.getLogger(
       S3ErrorTable.class);
 
-  private S3ErrorTable() {
-    //No one should construct this object.
-  }
-
   public static final OS3Exception INVALID_URI = new OS3Exception("InvalidURI",
       "Couldn't parse the specified URI.", HTTP_BAD_REQUEST);
 
@@ -154,6 +150,13 @@ public final class S3ErrorTable {
       HTTP_FORBIDDEN
   );
 
+  private static Function<Exception, OS3Exception> generateInternalError =
+      e -> new OS3Exception("InternalError", e.getMessage(), HTTP_INTERNAL_ERROR);
+
+  private S3ErrorTable() {
+    //No one should construct this object.
+  }
+
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);
   }
@@ -177,9 +180,6 @@ public final class S3ErrorTable {
     }
     return err;
   }
-
-  private static Function<Exception, OS3Exception> generateInternalError = e ->
-      new OS3Exception("InternalError", e.getMessage(), HTTP_INTERNAL_ERROR);
 
   public static OS3Exception getInternalError(Exception e) {
     return generateInternalError.apply(e);

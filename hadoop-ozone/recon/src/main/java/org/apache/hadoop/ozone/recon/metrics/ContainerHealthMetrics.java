@@ -35,21 +35,6 @@ public final class ContainerHealthMetrics {
   private static final String SOURCE_NAME =
       ContainerHealthMetrics.class.getSimpleName();
 
-  private ContainerHealthMetrics() {
-  }
-
-  public static ContainerHealthMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-        "Recon Container Health Task Metrics",
-        new ContainerHealthMetrics());
-  }
-
-  public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
-  }
-
   @Metric(about = "Number of missing containers detected in Recon.")
   private MutableGaugeLong missingContainerCount;
 
@@ -58,6 +43,21 @@ public final class ContainerHealthMetrics {
 
   @Metric(about = "Number of replica mismatch containers detected in Recon.")
   private MutableGaugeLong replicaMisMatchContainerCount;
+
+  private ContainerHealthMetrics() {
+  }
+
+  public void unRegister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(SOURCE_NAME);
+  }
+
+  public static ContainerHealthMetrics create() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    return ms.register(SOURCE_NAME,
+        "Recon Container Health Task Metrics",
+        new ContainerHealthMetrics());
+  }
 
   public void setMissingContainerCount(long missingContainerCount) {
     this.missingContainerCount.set(missingContainerCount);

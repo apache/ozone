@@ -59,12 +59,11 @@ import org.slf4j.LoggerFactory;
  */
 public final class SCMDatanodeHeartbeatDispatcher {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMDatanodeHeartbeatDispatcher.class);
 
   private final NodeManager nodeManager;
   private final EventPublisher eventPublisher;
-
 
   public SCMDatanodeHeartbeatDispatcher(NodeManager nodeManager,
                                         EventPublisher eventPublisher) {
@@ -74,7 +73,6 @@ public final class SCMDatanodeHeartbeatDispatcher {
     this.eventPublisher = eventPublisher;
   }
 
-
   /**
    * Dispatches heartbeat to registered event handlers.
    *
@@ -82,10 +80,10 @@ public final class SCMDatanodeHeartbeatDispatcher {
    *
    * @return list of SCMCommand
    */
-  public List<SCMCommand> dispatch(SCMHeartbeatRequestProto heartbeat) {
+  public List<SCMCommand<?>> dispatch(SCMHeartbeatRequestProto heartbeat) {
     DatanodeDetails datanodeDetails =
         DatanodeDetails.getFromProtoBuf(heartbeat.getDatanodeDetails());
-    List<SCMCommand> commands;
+    List<SCMCommand<?>> commands;
 
     // If node is not registered, ask the node to re-register. Do not process
     // Heartbeat for unregistered nodes.
@@ -242,6 +240,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
       extends ReportFromDatanode<CommandQueueReportProto> {
 
     private final Map<SCMCommandProto.Type, Integer> commandsToBeSent;
+
     public CommandQueueReportFromDatanode(DatanodeDetails datanodeDetails,
         CommandQueueReportProto report,
         Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
@@ -271,7 +270,9 @@ public final class SCMDatanodeHeartbeatDispatcher {
    */
   public interface ContainerReport {
     DatanodeDetails getDatanodeDetails();
+
     ContainerReportType getType();
+
     void mergeReport(ContainerReport val);
   }
 

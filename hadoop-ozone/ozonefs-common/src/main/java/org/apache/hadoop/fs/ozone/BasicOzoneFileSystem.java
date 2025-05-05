@@ -993,6 +993,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     String key = pathToKey(qualifiedPath);
     adapter.setTimes(key, mtime, atime);
   }
+
   /**
    * A private class implementation for iterating list of file status.
    *

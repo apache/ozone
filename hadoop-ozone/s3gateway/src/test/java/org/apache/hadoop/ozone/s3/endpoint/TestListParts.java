@@ -42,7 +42,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestListParts {
 
-
   private ObjectEndpoint rest;
   private String uploadID;
 
@@ -132,6 +131,4 @@ public class TestListParts {
           ex.getErrorMessage());
     }
   }
-
-
 }

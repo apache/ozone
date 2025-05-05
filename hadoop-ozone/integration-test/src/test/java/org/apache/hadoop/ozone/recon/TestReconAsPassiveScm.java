@@ -46,17 +46,16 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 /**
  * Recon's passive SCM integration tests.
  */
-@Timeout(180)
 public class TestReconAsPassiveScm {
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -69,7 +68,7 @@ public class TestReconAsPassiveScm {
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
-    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ReconNodeManager.class, Level.DEBUG);
   }
 
   @AfterEach
@@ -132,9 +131,8 @@ public class TestReconAsPassiveScm {
     assertEquals(scmContainerManager.getContainers(),
         reconContainerManager.getContainers());
 
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(ReconNodeManager.LOG);
-    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(ReconNodeManager.class);
+    GenericTestUtils.setLogLevel(ReconNodeManager.class, Level.DEBUG);
     reconScm.getEventQueue().fireEvent(CLOSE_CONTAINER,
         containerInfo.containerID());
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()

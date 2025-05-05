@@ -56,10 +56,10 @@ public class TestHttpServer2Metrics {
   @Test
   public void testMetrics() {
     // crate mock metrics
-    int threadCount = RandomUtils.nextInt();
-    int maxThreadCount = RandomUtils.nextInt();
-    int idleThreadCount = RandomUtils.nextInt();
-    int threadQueueWaitingTaskCount = RandomUtils.nextInt();
+    int threadCount = RandomUtils.secure().randomInt();
+    int maxThreadCount = RandomUtils.secure().randomInt();
+    int idleThreadCount = RandomUtils.secure().randomInt();
+    int threadQueueWaitingTaskCount = RandomUtils.secure().randomInt();
     String name = "s3g";
 
     when(threadPool.getThreads()).thenReturn(threadCount);

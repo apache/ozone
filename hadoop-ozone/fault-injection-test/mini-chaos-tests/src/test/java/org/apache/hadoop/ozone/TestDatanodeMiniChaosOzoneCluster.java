@@ -22,6 +22,8 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.loadgenerators.AgedLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.RandomLoadGenerator;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
 import picocli.CommandLine;
 
 /**
@@ -32,19 +34,23 @@ import picocli.CommandLine;
     description = "run chaos cluster across Ozone Datanodes",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestDatanodeMiniChaosOzoneCluster extends
     TestMiniChaosOzoneCluster implements Callable<Void> {
 
-  @Override
-  public Void call() throws Exception {
+  @BeforeAll
+  void setup() {
     addLoadClasses(RandomLoadGenerator.class);
     addLoadClasses(AgedLoadGenerator.class);
 
     addFailureClasses(Failures.DatanodeStartStopFailure.class);
     addFailureClasses(Failures.DatanodeRestartFailure.class);
+  }
 
+  @Override
+  public Void call() throws Exception {
+    setup();
     startChaosCluster();
-
     return null;
   }
 

@@ -54,6 +54,10 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     sequenceId = b.sequenceId;
   }
 
+  public ContainerID getContainerID() {
+    return containerID;
+  }
+
   /**
    * Returns the DatanodeDetails to which this replica belongs.
    *

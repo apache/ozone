@@ -96,44 +96,6 @@ public class Server {
   public static final String CONF_STARTUP_STATUS = "startup.status";
 
   /**
-   * Enumeration that defines the server status.
-   */
-  @InterfaceAudience.Private
-  public enum Status {
-    UNDEF(false, false),
-    BOOTING(false, true),
-    HALTED(true, true),
-    ADMIN(true, true),
-    NORMAL(true, true),
-    SHUTTING_DOWN(false, true),
-    SHUTDOWN(false, false);
-
-    private boolean settable;
-    private boolean operational;
-
-    /**
-     * Status constructor.
-     *
-     * @param settable indicates if the status is settable.
-     * @param operational indicates if the server is operational
-     * when in this status.
-     */
-    Status(boolean settable, boolean operational) {
-      this.settable = settable;
-      this.operational = operational;
-    }
-
-    /**
-     * Returns if this server status is operational.
-     *
-     * @return if this server status is operational.
-     */
-    public boolean isOperational() {
-      return operational;
-    }
-  }
-
-  /**
    * Name of the log4j configuration file the Server will load from the
    * classpath if the <code>#SERVER#-log4j.properties</code> is not defined
    * in the server configuration directory.
@@ -836,4 +798,41 @@ public class Server {
     }
   }
 
+  /**
+   * Enumeration that defines the server status.
+   */
+  @InterfaceAudience.Private
+  public enum Status {
+    UNDEF(false, false),
+    BOOTING(false, true),
+    HALTED(true, true),
+    ADMIN(true, true),
+    NORMAL(true, true),
+    SHUTTING_DOWN(false, true),
+    SHUTDOWN(false, false);
+
+    private boolean settable;
+    private boolean operational;
+
+    /**
+     * Status constructor.
+     *
+     * @param settable indicates if the status is settable.
+     * @param operational indicates if the server is operational
+     * when in this status.
+     */
+    Status(boolean settable, boolean operational) {
+      this.settable = settable;
+      this.operational = operational;
+    }
+
+    /**
+     * Returns if this server status is operational.
+     *
+     * @return if this server status is operational.
+     */
+    public boolean isOperational() {
+      return operational;
+    }
+  }
 }

@@ -185,6 +185,7 @@ public class TestStringToSignProducer {
         arguments(headersMap6, S3_AUTHINFO_CREATION_ERROR.getCode())
     );
   }
+
   @ParameterizedTest
   @MethodSource("testValidateRequestHeadersInput")
   public void testValidateRequestHeaders(

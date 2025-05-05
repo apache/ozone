@@ -34,6 +34,13 @@ import org.apache.hadoop.ozone.OzoneConsts;
 @Metrics(about = "OzoneManager HA Metrics", context = OzoneConsts.OZONE)
 public final class OMHAMetrics implements MetricsSource {
 
+  public static final String SOURCE_NAME = OMHAMetrics.class.getSimpleName();
+  private final OMHAMetricsInfo omhaMetricsInfo = new OMHAMetricsInfo();
+  private MetricsRegistry metricsRegistry;
+
+  private String currNodeId;
+  private String leaderId;
+
   /**
    * Private nested class to hold the values
    * of MetricsInfo for OMHAMetrics.
@@ -71,14 +78,6 @@ public final class OMHAMetrics implements MetricsSource {
       this.nodeId = nodeId;
     }
   }
-
-  public static final String SOURCE_NAME =
-      OMHAMetrics.class.getSimpleName();
-  private final OMHAMetricsInfo omhaMetricsInfo = new OMHAMetricsInfo();
-  private MetricsRegistry metricsRegistry;
-
-  private String currNodeId;
-  private String leaderId;
 
   private OMHAMetrics(String currNodeId, String leaderId) {
     this.currNodeId = currNodeId;

@@ -70,7 +70,7 @@ public class TestRocksObjectLeakDetector {
     testLeakDetector(() -> new ManagedLRUCache(1L));
     testLeakDetector(ManagedOptions::new);
     testLeakDetector(ManagedReadOptions::new);
-    testLeakDetector(() -> new ManagedSlice(RandomUtils.nextBytes(10)));
+    testLeakDetector(() -> new ManagedSlice(RandomUtils.secure().randomBytes(10)));
     testLeakDetector(ManagedStatistics::new);
     testLeakDetector(ManagedWriteBatch::new);
     testLeakDetector(ManagedWriteOptions::new);

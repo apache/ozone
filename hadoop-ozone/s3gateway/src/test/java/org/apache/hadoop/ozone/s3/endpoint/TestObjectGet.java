@@ -117,7 +117,7 @@ public class TestObjectGet {
         IOUtils.toString(ozoneInputStream, UTF_8);
 
     assertEquals(CONTENT, keyContent);
-    assertEquals("" + keyContent.length(),
+    assertEquals(String.valueOf(keyContent.length()),
         response.getHeaderString("Content-Length"));
 
     DateTimeFormatter.RFC_1123_DATE_TIME
@@ -139,7 +139,7 @@ public class TestObjectGet {
         IOUtils.toString(ozoneInputStream, UTF_8);
 
     assertEquals(CONTENT, keyContent);
-    assertEquals("" + keyContent.length(),
+    assertEquals(String.valueOf(keyContent.length()),
         response.getHeaderString("Content-Length"));
 
     DateTimeFormatter.RFC_1123_DATE_TIME

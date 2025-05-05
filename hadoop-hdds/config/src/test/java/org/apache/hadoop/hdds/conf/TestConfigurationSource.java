@@ -42,6 +42,7 @@ class TestConfigurationSource {
     assertEquals(ImmutableMap.of("somePrefix.key", "value"),
         c.getPropsMatchPrefix("somePrefix."));
   }
+
   @Test
   void reconfigurableProperties() {
     String prefix = "ozone.test.config";

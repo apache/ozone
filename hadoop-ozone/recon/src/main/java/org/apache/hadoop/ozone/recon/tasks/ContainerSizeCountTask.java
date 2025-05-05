@@ -200,7 +200,6 @@ public class ContainerSizeCountTask extends ReconScmTask {
     }
   }
 
-
   /**
    * Populate DB with the counts of container sizes calculated
    * using the dao.
@@ -353,7 +352,6 @@ public class ContainerSizeCountTask extends ReconScmTask {
     return new ContainerSizeCountKey(
         ReconUtils.getContainerSizeUpperBound(containerSize));
   }
-
 
   /**
    *  The ContainerSizeCountKey class is a simple key class that has a single

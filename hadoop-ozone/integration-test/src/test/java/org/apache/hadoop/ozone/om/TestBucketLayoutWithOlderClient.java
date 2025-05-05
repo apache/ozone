@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.UUID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -36,13 +37,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests to verify bucket ops with older version client.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(1200)
 public abstract class TestBucketLayoutWithOlderClient implements NonHATests.TestCase {
 
   private MiniOzoneCluster cluster;
@@ -88,7 +87,7 @@ public abstract class TestBucketLayoutWithOlderClient implements NonHATests.Test
                         OzoneManagerProtocolProtos.BucketInfo.newBuilder()
                             .setVolumeName(volumeName).setBucketName(buckName)
                             .setIsVersionEnabled(false).setStorageType(
-                            OzoneManagerProtocolProtos.StorageTypeProto.DISK)
+                            StorageTypeProto.DISK)
                             .build())
                     .build()).build();
     createBucketReq = createBucketReq.toBuilder()

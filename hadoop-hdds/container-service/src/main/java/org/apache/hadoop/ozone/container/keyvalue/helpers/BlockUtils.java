@@ -143,6 +143,7 @@ public final class BlockUtils {
       throw new StorageContainerException(message, UNABLE_TO_READ_METADATA_DB);
     }
   }
+
   /**
    * Remove a DB handler from cache.
    *

@@ -35,6 +35,7 @@ The user needs to `kinit` first and once they have authenticated via kerberos
  both of these are secrets that needs to be protected by the client since it
  gives full access to the S3 buckets.
 
+## Obtain Secrets
 
 * S3 clients can get the secret access id and user secret from OzoneManager.
 
@@ -69,3 +70,47 @@ aws configure set region us-west-1
 ```
 Please refer to AWS S3 documentation on how to use S3 via command line or via
 S3 API.
+
+## Revoking Secrets via REST API
+
+To invalidate/revoke the secret, use `ozone s3 revokesecret` command.
+Alternatively, you can use the REST API endpoint to revoke the secret.
+Ozone now provides a REST API endpoint that allows administrators to revoke S3 access secrets. This operation invalidates a secret, ensuring it can no longer be used for authentication.
+
+### Endpoint Details
+
+- **URL:** `http://localhost:9879/secret`
+- **HTTP Method:** `DELETE`
+
+### Authentication
+
+The API leverages SPNEGO (Kerberos) authentication. The following curl options are used:
+- `--negotiate` enables SPNEGO.
+- `-u :` uses the current Kerberos ticket (an empty username is provided).
+
+### Example 1: Revoke Secret for the Current User
+
+This command revokes the secret for the currently authenticated user:
+
+```bash
+curl -X DELETE --negotiate -u : -v http://localhost:9879/secret
+```
+
+### Example 2: Revoke Secret by Username
+
+This command revokes the secret for a specific user by appending the username as a query parameter. Replace `testuser` with the desired username:
+
+```bash
+curl -X DELETE --negotiate -u : -v "http://localhost:9879/secret?username=testuser"
+```
+
+### Response
+
+- **Success:** Returns HTTP `200 OK` along with a confirmation message in JSON format.
+- **Failure:** Returns an appropriate HTTP error status and message if there are issues (e.g., authentication failures).
+
+### Testing and Verification
+
+For a working example of these operations, refer to the [Secret Revoke Robot Test](https://raw.githubusercontent.com/apache/ozone/refs/heads/master/hadoop-ozone/dist/src/main/smoketest/s3/secretrevoke.robot). This test demonstrates both the default secret revocation and the revocation by username.
+
+> **Note:** Ensure your Kerberos authentication is correctly configured, as secret revocation is a privileged operation.

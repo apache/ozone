@@ -75,6 +75,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private boolean closed = false;
   private boolean seeked = false;
   private OzoneClientConfig config;
+
   protected ECReplicationConfig getRepConfig() {
     return repConfig;
   }

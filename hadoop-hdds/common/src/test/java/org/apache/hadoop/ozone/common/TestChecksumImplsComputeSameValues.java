@@ -42,7 +42,7 @@ public class TestChecksumImplsComputeSameValues {
   @Test
   public void testCRC32ImplsMatch() {
     data.clear();
-    data.put(RandomUtils.nextBytes(data.remaining()));
+    data.put(RandomUtils.secure().randomBytes(data.remaining()));
     for (int bpc : bytesPerChecksum) {
       List<ChecksumByteBuffer> impls = new ArrayList<>();
       impls.add(new PureJavaCrc32ByteBuffer());
@@ -58,7 +58,7 @@ public class TestChecksumImplsComputeSameValues {
   @Test
   public void testCRC32CImplsMatch() {
     data.clear();
-    data.put(RandomUtils.nextBytes(data.remaining()));
+    data.put(RandomUtils.secure().randomBytes(data.remaining()));
     for (int bpc : bytesPerChecksum) {
       List<ChecksumByteBuffer> impls = new ArrayList<>();
       impls.add(new PureJavaCrc32CByteBuffer());

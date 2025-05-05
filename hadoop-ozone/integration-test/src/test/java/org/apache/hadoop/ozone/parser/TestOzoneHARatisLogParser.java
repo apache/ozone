@@ -46,13 +46,11 @@ import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Ozone OM and SCM HA Ratis log parser.
  */
 @Flaky("HDDS-7008")
-@Timeout(300)
 class TestOzoneHARatisLogParser {
 
   private MiniOzoneHAClusterImpl cluster = null;

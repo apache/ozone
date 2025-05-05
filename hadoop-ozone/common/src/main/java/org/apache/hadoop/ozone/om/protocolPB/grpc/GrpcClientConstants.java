@@ -24,10 +24,6 @@ import io.grpc.Metadata;
  * Constants to store grpc-client specific header values.
  */
 public final class GrpcClientConstants {
-
-  private GrpcClientConstants() {
-  }
-
   public static final Context.Key<String> CLIENT_HOSTNAME_CTX_KEY =
       Context.key("CLIENT_HOSTNAME");
 
@@ -40,4 +36,6 @@ public final class GrpcClientConstants {
   public static final Metadata.Key<String> CLIENT_IP_ADDRESS_METADATA_KEY =
       Metadata.Key.of("CLIENT_IP_ADDRESS", Metadata.ASCII_STRING_MARSHALLER);
 
+  private GrpcClientConstants() {
+  }
 }

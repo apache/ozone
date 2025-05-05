@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.file;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 @CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE})
 public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateResponseWithFSO.class);
 
   private OmDirectoryInfo dirInfo;

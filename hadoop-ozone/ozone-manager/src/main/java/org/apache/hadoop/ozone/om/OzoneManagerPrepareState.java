@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -181,7 +181,7 @@ public final class OzoneManagerPrepareState {
     File prepareMarkerFile = getPrepareMarkerFile();
     if (prepareMarkerFile.exists()) {
       byte[] data = new byte[(int) prepareMarkerFile.length()];
-      try (FileInputStream stream = new FileInputStream(prepareMarkerFile)) {
+      try (InputStream stream = Files.newInputStream(prepareMarkerFile.toPath())) {
         stream.read(data);
       } catch (IOException e) {
         throwPrepareException(e, "Failed to read prepare marker " +
@@ -254,7 +254,7 @@ public final class OzoneManagerPrepareState {
     File parentDir = markerFile.getParentFile();
     Files.createDirectories(parentDir.toPath());
 
-    try (FileOutputStream stream = new FileOutputStream(markerFile)) {
+    try (OutputStream stream = Files.newOutputStream(markerFile.toPath())) {
       stream.write(Long.toString(index).getBytes(StandardCharsets.UTF_8));
     }
 

@@ -30,6 +30,7 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 final class LeakTracker extends WeakReference<Object> implements UncheckedAutoCloseable {
   private final Set<LeakTracker> allLeaks;
   private final Runnable leakReporter;
+
   LeakTracker(Object referent, ReferenceQueue<Object> referenceQueue,
       Set<LeakTracker> allLeaks, Runnable leakReporter) {
     super(referent, referenceQueue);

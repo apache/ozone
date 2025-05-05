@@ -52,6 +52,7 @@ public class KeysResponse {
   public Collection<KeyMetadata> getKeys() {
     return keys;
   }
+
   public String getLastKey() {
     return lastKey;
   }

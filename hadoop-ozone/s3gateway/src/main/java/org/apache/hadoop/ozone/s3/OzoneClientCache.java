@@ -160,7 +160,6 @@ public final class OzoneClientCache {
     }
   }
 
-
   @PreDestroy
   public void destroy() throws IOException {
     OzoneClientCache.closeClient();

@@ -485,7 +485,6 @@ public abstract class EndpointBase implements Auditor {
     return builder.build();
   }
 
-
   @VisibleForTesting
   public void setClient(OzoneClient ozoneClient) {
     this.client = ozoneClient;

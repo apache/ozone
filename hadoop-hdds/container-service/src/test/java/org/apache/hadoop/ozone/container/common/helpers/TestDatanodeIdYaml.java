@@ -79,6 +79,8 @@ class TestDatanodeIdYaml {
   void testWriteReadAfterRatisDatastreamPortLayoutVersion(@TempDir File dir)
       throws IOException {
     DatanodeDetails original = MockDatanodeDetails.randomDatanodeDetails();
+    assertEquals(original.getUuid().toString(), original.getUuidString());
+
     File file = new File(dir, "datanode.yaml");
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());

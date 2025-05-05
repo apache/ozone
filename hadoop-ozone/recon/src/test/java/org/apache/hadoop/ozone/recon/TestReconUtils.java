@@ -171,7 +171,7 @@ public class TestReconUtils {
     }
 
     for (int i = 0; i < 10; i++) {
-      assertNextClosestPowerIndexOfTwo(RandomUtils.nextLong());
+      assertNextClosestPowerIndexOfTwo(RandomUtils.secure().randomLong());
     }
   }
 
@@ -202,7 +202,7 @@ public class TestReconUtils {
   private static ContainerInfo.Builder getDefaultContainerInfoBuilder(
       final HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
-        .setContainerID(RandomUtils.nextLong())
+        .setContainerID(RandomUtils.secure().randomLong())
         .setReplicationConfig(
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
@@ -210,7 +210,6 @@ public class TestReconUtils {
         .setSequenceId(10000L)
         .setOwner("TEST");
   }
-
 
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state) {

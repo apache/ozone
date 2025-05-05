@@ -52,7 +52,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -60,7 +59,6 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test OzoneManager list volume operation under combinations of configs.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(120)
 public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase {
 
   private static final String UNIQUE = UUID.randomUUID().toString();

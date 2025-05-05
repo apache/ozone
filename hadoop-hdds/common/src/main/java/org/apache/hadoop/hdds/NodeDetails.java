@@ -105,7 +105,7 @@ public abstract class NodeDetails {
   public String getRatisHostPortStr() {
     StringBuilder hostPort = new StringBuilder();
     hostPort.append(getHostName())
-        .append(":")
+        .append(':')
         .append(ratisPort);
     return hostPort.toString();
   }

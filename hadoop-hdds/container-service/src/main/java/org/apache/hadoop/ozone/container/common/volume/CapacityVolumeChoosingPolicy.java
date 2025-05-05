@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
  */
 public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       CapacityVolumeChoosingPolicy.class);
 
   // Stores the index of the next volume to be returned.
