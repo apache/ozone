@@ -87,7 +87,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
  * replica that is stored in a local directory. The reconciliation client is mocked to return the corresponding local
  * container for each datanode peer.
  */
-public class TestKeyValueHandlerContainerReconciliation {
+public class TestContainerReconciliationWithMockDatanodes {
   /**
    * Number of corrupt blocks and chunks.
    *
@@ -110,7 +110,7 @@ public class TestKeyValueHandlerContainerReconciliation {
     );
   }
 
-  public static final Logger LOG = LoggerFactory.getLogger(TestKeyValueHandlerContainerReconciliation.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TestContainerReconciliationWithMockDatanodes.class);
 
   // All container replicas will be placed in this directory, and the same replicas will be re-used for each test run.
   @TempDir
