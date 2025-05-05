@@ -159,6 +159,7 @@ public class SCMSafeModeManager implements SafeModeManager {
         new SafeModeStatus(getInSafeMode(), getPreCheckComplete());
 
     safeModeStatus.setForceExitSafeMode(isForceExitSafeMode());
+    safeModeStatus.setManualSafeMode(isManualSafeModeEnabled());
 
     // update SCMContext
     scmContext.updateSafeModeStatus(safeModeStatus);
@@ -238,9 +239,8 @@ public class SCMSafeModeManager implements SafeModeManager {
     if (force && inManualSafeMode.get()) {
       inManualSafeMode.set(false);
       LOG.info("Manual safe mode cleared due to force exit.");
-}
+    }
     setForceExitSafeMode(force);
-
     // TODO: Remove handler registration as there is no need to listen to
     // register events anymore.
 
@@ -392,6 +392,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     private final boolean preCheckPassed;
 
     private boolean forceExitSafeMode;
+    private boolean manualSafeMode;
 
     public SafeModeStatus(boolean safeModeState, boolean preCheckPassed) {
       this.safeModeStatus = safeModeState;
@@ -412,6 +413,14 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     public boolean isForceExitSafeMode() {
       return forceExitSafeMode;
+    }
+
+    public boolean isManualSafeMode() {
+      return manualSafeMode;
+    }
+
+    public void setManualSafeMode(boolean manualSafeMode) {
+      this.manualSafeMode = manualSafeMode;
     }
 
     @Override
