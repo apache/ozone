@@ -29,7 +29,6 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -45,14 +44,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
 
 /**
  * Test cases for LeaseRecoverer.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(value = 120000, unit = TimeUnit.MILLISECONDS)
 public abstract class TestLeaseRecoverer implements NonHATests.TestCase {
   private OzoneBucket fsoOzoneBucket;
   private OzoneClient client;

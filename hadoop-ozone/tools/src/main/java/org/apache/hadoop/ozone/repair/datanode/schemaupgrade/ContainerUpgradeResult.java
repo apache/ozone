@@ -113,7 +113,7 @@ class ContainerUpgradeResult {
     stringBuilder.append(getCostMs());
     stringBuilder.append(", status=");
     stringBuilder.append(status);
-    stringBuilder.append("}");
+    stringBuilder.append('}');
     return stringBuilder.toString();
   }
 

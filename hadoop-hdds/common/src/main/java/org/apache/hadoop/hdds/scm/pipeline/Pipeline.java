@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -31,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -360,14 +360,11 @@ public final class Pipeline {
     return replicationConfig;
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion)
-      throws UnknownPipelineStateException {
+  public HddsProtos.Pipeline getProtobufMessage(int clientVersion) {
     return getProtobufMessage(clientVersion, Collections.emptySet());
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts)
-      throws UnknownPipelineStateException {
-
+  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts) {
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     List<Integer> memberReplicaIndexes = new ArrayList<>();
 
@@ -426,8 +423,7 @@ public final class Pipeline {
     return builder.build();
   }
 
-  private static Pipeline getFromProtobufSetCreationTimestamp(
-      HddsProtos.Pipeline proto) throws UnknownPipelineStateException {
+  private static Pipeline getFromProtobufSetCreationTimestamp(HddsProtos.Pipeline proto) {
     return toBuilder(proto)
         .setCreateTimestamp(Instant.now())
         .build();
@@ -441,9 +437,8 @@ public final class Pipeline {
     return newBuilder(this);
   }
 
-  public static Builder toBuilder(HddsProtos.Pipeline pipeline)
-      throws UnknownPipelineStateException {
-    Preconditions.checkNotNull(pipeline, "Pipeline is null");
+  public static Builder toBuilder(HddsProtos.Pipeline pipeline) {
+    Objects.requireNonNull(pipeline, "pipeline == null");
 
     Map<DatanodeDetails, Integer> nodes = new LinkedHashMap<>();
     int index = 0;
@@ -486,8 +481,7 @@ public final class Pipeline {
         .setCreateTimestamp(pipeline.getCreationTimeStamp());
   }
 
-  public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline)
-      throws UnknownPipelineStateException {
+  public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline) {
     return toBuilder(pipeline).build();
   }
 
@@ -521,20 +515,20 @@ public final class Pipeline {
   @Override
   public String toString() {
     final StringBuilder b =
-        new StringBuilder(getClass().getSimpleName()).append("{");
+        new StringBuilder(getClass().getSimpleName()).append('{');
     b.append(" Id: ").append(id.getId());
     b.append(", Nodes: [");
     for (DatanodeDetails datanodeDetails : nodeStatus.keySet()) {
       b.append(" {").append(datanodeDetails);
       b.append(", ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails)).append("},");
     }
-    b.append("]");
+    b.append(']');
     b.append(", ReplicationConfig: ").append(replicationConfig);
     b.append(", State:").append(getPipelineState());
     b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");
     b.append(", CreationTimestamp").append(getCreationTimestamp()
         .atZone(ZoneId.systemDefault()));
-    b.append("}");
+    b.append('}');
     return b.toString();
   }
 
@@ -648,10 +642,10 @@ public final class Pipeline {
     }
 
     public Pipeline build() {
-      Preconditions.checkNotNull(id);
-      Preconditions.checkNotNull(replicationConfig);
-      Preconditions.checkNotNull(state);
-      Preconditions.checkNotNull(nodeStatus);
+      Objects.requireNonNull(id, "id == null");
+      Objects.requireNonNull(replicationConfig, "replicationConfig == null");
+      Objects.requireNonNull(state, "state == null");
+      Objects.requireNonNull(nodeStatus, "nodeStatus == null");
 
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         List<DatanodeDetails> nodesWithOrder = new ArrayList<>();
@@ -683,31 +677,29 @@ public final class Pipeline {
   public enum PipelineState {
     ALLOCATED, OPEN, DORMANT, CLOSED;
 
-    public static PipelineState fromProtobuf(HddsProtos.PipelineState state)
-        throws UnknownPipelineStateException {
-      Preconditions.checkNotNull(state, "Pipeline state is null");
+    public static PipelineState fromProtobuf(HddsProtos.PipelineState state) {
+      Objects.requireNonNull(state, "state == null");
       switch (state) {
       case PIPELINE_ALLOCATED: return ALLOCATED;
       case PIPELINE_OPEN: return OPEN;
       case PIPELINE_DORMANT: return DORMANT;
       case PIPELINE_CLOSED: return CLOSED;
       default:
-        throw new UnknownPipelineStateException(
-            "Pipeline state: " + state + " is not recognized.");
+        throw new IllegalArgumentException("Unexpected value " + state
+            + " from " + state.getClass());
       }
     }
 
-    public static HddsProtos.PipelineState getProtobuf(PipelineState state)
-        throws UnknownPipelineStateException {
-      Preconditions.checkNotNull(state, "Pipeline state is null");
+    public static HddsProtos.PipelineState getProtobuf(PipelineState state) {
+      Objects.requireNonNull(state, "state == null");
       switch (state) {
       case ALLOCATED: return HddsProtos.PipelineState.PIPELINE_ALLOCATED;
       case OPEN: return HddsProtos.PipelineState.PIPELINE_OPEN;
       case DORMANT: return HddsProtos.PipelineState.PIPELINE_DORMANT;
       case CLOSED: return HddsProtos.PipelineState.PIPELINE_CLOSED;
       default:
-        throw new UnknownPipelineStateException(
-            "Pipeline state: " + state + " is not recognized.");
+        throw new IllegalArgumentException("Unexpected value " + state
+            + " from " + state.getClass());
       }
     }
   }

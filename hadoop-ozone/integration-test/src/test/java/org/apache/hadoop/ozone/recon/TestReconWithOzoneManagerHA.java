@@ -48,12 +48,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * This class sets up a MiniOzoneOMHACluster to test with Recon.
  */
-@Timeout(300)
 public class TestReconWithOzoneManagerHA {
 
   private MiniOzoneHAClusterImpl cluster;

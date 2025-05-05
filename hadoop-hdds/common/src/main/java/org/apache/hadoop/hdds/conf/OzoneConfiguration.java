@@ -409,6 +409,8 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
             HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
         new DeprecationDelta("dfs.metrics.percentiles.intervals",
             HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY),
+        new DeprecationDelta("hdds.recon.heartbeat.interval",
+            HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL),
     });
   }
 

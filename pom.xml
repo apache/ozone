@@ -657,6 +657,17 @@
         <version>${joda.time.version}</version>
       </dependency>
       <dependency>
+        <groupId>log4j</groupId>
+        <artifactId>apache-log4j-extras</artifactId>
+        <version>1.2.17</version>
+        <exclusions>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna</artifactId>
         <version>${java.dev.jna.version}</version>
@@ -1545,7 +1556,6 @@
                       <!-- Allow non-RocksObject classes. -->
                       <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
                       <allowedImport>org.rocksdb.CompactionStyle</allowedImport>
-                      <allowedImport>org.rocksdb.CompactionPriority</allowedImport>
                       <allowedImport>org.rocksdb.KeyMayExist</allowedImport>
                       <allowedImport>org.rocksdb.HistogramData</allowedImport>
                       <allowedImport>org.rocksdb.HistogramType</allowedImport>
@@ -1916,7 +1926,8 @@
           </systemPropertyVariables>
           <properties>
             <configurationParameters>junit.platform.output.capture.stdout = true
-              junit.platform.output.capture.stderr = true</configurationParameters>
+              junit.platform.output.capture.stderr = true
+              junit.jupiter.execution.timeout.default = 5m</configurationParameters>
           </properties>
           <includes>
             <include>**/Test*.java</include>

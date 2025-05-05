@@ -137,7 +137,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -147,7 +146,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Test class for @{@link KeyManagerImpl}.
  */
-@Timeout(300)
 public class TestKeyManagerImpl {
   @TempDir
   private static File dir;
@@ -363,7 +361,7 @@ public class TestKeyManagerImpl {
         .setKeyName(keyNameBuf.toString())
         .build();
     for (int i = 0; i < 5; i++) {
-      keyNameBuf.append("/").append(RandomStringUtils.secure().nextAlphabetic(5));
+      keyNameBuf.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     String keyName = keyNameBuf.toString();
     writeClient.createDirectory(keyArgs);
@@ -430,7 +428,7 @@ public class TestKeyManagerImpl {
     StringBuffer keyNameBuf = new StringBuffer();
     keyNameBuf.append(RandomStringUtils.secure().nextAlphabetic(5));
     for (int i = 0; i < 5; i++) {
-      keyNameBuf.append("/").append(RandomStringUtils.secure().nextAlphabetic(5));
+      keyNameBuf.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     keyName = keyNameBuf.toString();
     keyArgs = createBuilder()
