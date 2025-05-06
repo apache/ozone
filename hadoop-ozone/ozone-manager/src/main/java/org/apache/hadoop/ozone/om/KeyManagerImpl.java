@@ -171,10 +171,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKey
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
-import org.apache.hadoop.ozone.util.CheckedFunction;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -803,7 +803,6 @@ public class KeyManagerImpl implements KeyManager {
     return getPreviousSnapshotOzonePathInfo(bucketInfo, keyInfo.getObjectID(), currentKeyPath,
         (previousSnapshotKM) -> previousSnapshotKM.getMetadataManager().getKeyTable(bucketInfo.getBucketLayout()));
   }
-
 
   private <T> CheckedFunction<KeyManager, T, IOException> getPreviousSnapshotOzonePathInfo(
       OmBucketInfo bucketInfo, long objectId, String currentKeyPath,

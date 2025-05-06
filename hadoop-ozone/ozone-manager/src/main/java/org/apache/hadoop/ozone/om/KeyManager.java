@@ -43,7 +43,7 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
-import org.apache.hadoop.ozone.util.CheckedFunction;
+import org.apache.ratis.util.function.CheckedFunction;
 
 /**
  * Handles key level commands.
@@ -138,13 +138,13 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
 
 
   /**
-   * Returns the previous snapshot's ozone keyInfo corresponding for the object.
+   * Returns the previous snapshot's ozone directorInfo corresponding for the object.
    */
   CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
       long volumeId, OmBucketInfo bucketInfo, OmDirectoryInfo directoryInfo) throws IOException;
 
   /**
-   * Returns the previous snapshot's ozone keyInfo corresponding for the object.
+   * Returns the previous snapshot's ozone directoryInfo corresponding for the object.
    */
   CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
       long volumeId, OmBucketInfo bucketInfo, OmKeyInfo directoryInfo) throws IOException;

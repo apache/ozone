@@ -46,7 +46,7 @@ import org.rocksdb.RocksDBException;
 /**
  * Test class for ReclaimableDirFilter.
  */
-public class TestReclaimableDirFilter extends TestAbstractReclaimableFilter {
+public class TestReclaimableDirFilter extends AbstractReclaimableFilterTest {
   @Override
   protected ReclaimableFilter initializeFilter(OzoneManager om, OmSnapshotManager snapshotManager,
                                                SnapshotChainManager chainManager, SnapshotInfo currentSnapshotInfo,
@@ -70,6 +70,7 @@ public class TestReclaimableDirFilter extends TestAbstractReclaimableFilter {
                                         Boolean expectedValue)
       throws IOException {
     List<SnapshotInfo> snapshotInfos = getLastSnapshotInfos(volume, bucket, 1, index);
+    assertEquals(snapshotInfos.size(), 1);
     SnapshotInfo prevSnapshotInfo = snapshotInfos.get(0);
     OmBucketInfo bucketInfo = getOzoneManager().getBucketInfo(volume, bucket);
     long volumeId = getOzoneManager().getMetadataManager().getVolumeId(volume);
@@ -129,7 +130,7 @@ public class TestReclaimableDirFilter extends TestAbstractReclaimableFilter {
 
   @ParameterizedTest
   @MethodSource("testReclaimableFilterArguments")
-  public void testReclaimableKeyWithDifferentObjId(int actualNumberOfSnapshots, int index)
+  public void testReclaimableDirectoryWithDifferentObjId(int actualNumberOfSnapshots, int index)
       throws IOException, RocksDBException {
     setup(1, actualNumberOfSnapshots, index, 4, 2);
     String volume = getVolumes().get(3);
