@@ -18,18 +18,20 @@
 package org.apache.hadoop.fs.ozone;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Iterator;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OFSPath;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -226,4 +228,21 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
     }
   }
 
+  @Test
+  void testIsFileFalseForDir() throws IOException {
+    Path dirPath = new Path(getBucketPath(), "dir1");
+    OFSPath ofsPath = new OFSPath(dirPath, new OzoneConfiguration());
+    getFs().mkdirs(dirPath);
+
+    RootedOzoneFileSystem ofs = (RootedOzoneFileSystem) getFs();
+    BasicRootedOzoneClientAdapterImpl adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
+    OzoneBucket bucket = adapter.getBucket(ofsPath, false);
+
+    Iterator<? extends OzoneKey> key = bucket.listKeys("");
+    OzoneKey ozoneKey = key.next();
+
+    assertFalse(ozoneKey.isFile());
+
+    getFs().delete(dirPath, true);
+  }
 }
