@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 
 /**
- * Filter to return rename table entries which are reclaimable based on the key presence in previous snapshot's
+ * Class to filter out rename table entries which are reclaimable based on the key presence in previous snapshot's
  * keyTable/DirectoryTable in the snapshot chain.
  */
 public class ReclaimableRenameEntryFilter extends ReclaimableFilter<String> {
