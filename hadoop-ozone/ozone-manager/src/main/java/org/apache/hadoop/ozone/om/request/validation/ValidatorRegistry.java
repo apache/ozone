@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.request.validation;
+package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
@@ -37,6 +37,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.Versioned;
+import org.apache.hadoop.ozone.request.validation.RegisterValidator;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.reflections.Reflections;
 import org.reflections.scanners.Scanners;
 import org.reflections.util.ClasspathHelper;

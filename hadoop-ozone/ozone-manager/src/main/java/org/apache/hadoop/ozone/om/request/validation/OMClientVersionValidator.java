@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.request.validation.RegisterValidator;
 import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
-import org.apache.hadoop.ozone.request.validation.ValidatorRegistry;
 
 /**
  * An annotation to mark methods that do certain request validations based on the

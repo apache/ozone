@@ -287,10 +287,6 @@ public class TestRequestValidations {
         .load();
   }
 
-  private int olderClientVersion() {
-    return ClientVersion.CURRENT_VERSION - 1;
-  }
-
   private int currentClientVersion() {
     return ClientVersion.CURRENT_VERSION;
   }
