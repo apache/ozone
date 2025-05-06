@@ -104,7 +104,6 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
     return false;
   }
 
-
   public Map<UUID, Long> getExclusiveSizeMap() {
     return exclusiveSizeMap;
   }
