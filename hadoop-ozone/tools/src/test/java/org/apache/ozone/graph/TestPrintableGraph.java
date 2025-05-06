@@ -63,14 +63,10 @@ public class TestPrintableGraph {
   @EnumSource(PrintableGraph.GraphType.class)
   void testPrintActualGraph(PrintableGraph.GraphType graphType) throws IOException {
     Set<CompactionNode> nodes = Stream.of(
-        new CompactionNode("fileName1",
-            100, 100, "startKey1", "endKey1", "columnFamily1"),
-        new CompactionNode("fileName2",
-        200, 200, "startKey2", "endKey2", null),
-        new CompactionNode("fileName3",
-        300, 300, null, "endKey3", "columnFamily3"),
-        new CompactionNode("fileName4",
-        400, 400, "startKey4", null, "columnFamily4")
+        new CompactionNode("fileName1", 100, "startKey1", "endKey1", "columnFamily1"),
+        new CompactionNode("fileName2", 200, "startKey2", "endKey2", null),
+        new CompactionNode("fileName3", 300, null, "endKey3", "columnFamily3"),
+        new CompactionNode("fileName4", 400, "startKey4", null, "columnFamily4")
     ).collect(Collectors.toSet());
     when(mutableGraph.nodes()).thenReturn(nodes);
 
