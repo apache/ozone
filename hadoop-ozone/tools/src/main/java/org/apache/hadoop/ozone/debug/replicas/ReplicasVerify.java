@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -97,7 +98,7 @@ public class ReplicasVerify extends Handler {
     ObjectNode root = JsonUtils.createObjectNode(null);
     ArrayNode keysArray = root.putArray("keys");
 
-    boolean[] allKeysPassed = {true};
+    AtomicBoolean allKeysPassed = new AtomicBoolean(true);
 
     if (!keyName.isEmpty()) {
       processKey(ozoneClient, volumeName, bucketName, keyName, keysArray, allKeysPassed);
@@ -113,11 +114,11 @@ public class ReplicasVerify extends Handler {
         checkVolume(ozoneClient, it.next(), keysArray, allKeysPassed);
       }
     }
-    root.put("pass", allKeysPassed[0]);
+    root.put("pass", allKeysPassed.get());
     System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(root));
   }
 
-  void checkVolume(OzoneClient ozoneClient, OzoneVolume volume, ArrayNode keysArray, boolean[] allKeysPassed)
+  void checkVolume(OzoneClient ozoneClient, OzoneVolume volume, ArrayNode keysArray, AtomicBoolean allKeysPassed)
       throws IOException {
     for (Iterator<? extends OzoneBucket> it = volume.listBuckets(null); it.hasNext();) {
       OzoneBucket bucket = it.next();
@@ -125,7 +126,7 @@ public class ReplicasVerify extends Handler {
     }
   }
 
-  void checkBucket(OzoneClient ozoneClient, OzoneBucket bucket, ArrayNode keysArray, boolean[] allKeysPassed)
+  void checkBucket(OzoneClient ozoneClient, OzoneBucket bucket, ArrayNode keysArray, AtomicBoolean allKeysPassed)
       throws IOException {
     for (Iterator<? extends OzoneKey> it = bucket.listKeys(null); it.hasNext();) {
       OzoneKey key = it.next();
@@ -137,7 +138,7 @@ public class ReplicasVerify extends Handler {
   }
 
   void processKey(OzoneClient ozoneClient, String volumeName, String bucketName, String keyName,
-      ArrayNode keysArray, boolean[] allKeysPassed) throws IOException {
+      ArrayNode keysArray, AtomicBoolean allKeysPassed) throws IOException {
     OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
         volumeName, bucketName, keyName, false);
 
@@ -201,7 +202,7 @@ public class ReplicasVerify extends Handler {
 
     keyNode.put("pass", keyPass);
     if (!keyPass) {
-      allKeysPassed[0] = false;
+      allKeysPassed.set(false);
     }
 
     if (!keyPass || allResults) {
