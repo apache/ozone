@@ -78,8 +78,7 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
       }
     } catch (IOException e) {
       return BlockVerificationResult.failIncomplete(e.getMessage());
-    }
-    finally {
+    } finally {
       xceiverClientManager.releaseClient(client, false);
     }
   }

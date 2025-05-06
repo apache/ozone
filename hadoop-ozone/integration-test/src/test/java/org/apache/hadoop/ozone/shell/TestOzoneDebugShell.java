@@ -109,7 +109,6 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     assertEquals(0, exitCode);
   }
 
-
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testChunkInfoCmdBeforeAfterCloseContainer(boolean isEcKey) throws Exception {
