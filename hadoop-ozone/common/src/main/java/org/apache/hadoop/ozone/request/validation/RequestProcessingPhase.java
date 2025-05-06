@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.request.validation;
+package org.apache.hadoop.ozone.request.validation;
 
 /**
  * Processing phase defines when a request validator should run.
