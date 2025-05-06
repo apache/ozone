@@ -20,35 +20,33 @@ package org.apache.hadoop.ozone.debug.logs.container;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
-import org.apache.hadoop.ozone.shell.ListOptions;
 import picocli.CommandLine;
 
-
 /**
- * List containers based on the parameter given.
+ * Command to display detailed information of a single container by ID.
  */
 
 @CommandLine.Command(
-    name = "list",
-    description = "Finds containers from the database based on the option provided."
+    name = "info",
+    description = "Provides complete state transition history of each replica for a single container along with " +
+        "analysis over the container"
 )
-public class ListContainers extends AbstractSubcommand implements Callable<Void> {
-  
-  @CommandLine.Option(names = {"--state"},
-      description = "Life cycle state of the container.",
-      required = true)
-  private HddsProtos.LifeCycleState state;
+public class ContainerInfoCommand extends AbstractSubcommand implements Callable<Void> {
 
-  @CommandLine.Mixin
-  private ListOptions listOptions;
+  @CommandLine.Parameters(index = "0", description = "Container ID")
+  private Long containerId;
 
   @CommandLine.ParentCommand
   private ContainerLogController parent;
 
   @Override
   public Void call() throws Exception {
+
+    if (containerId < 0) {
+      err().println("Invalid container ID: " + containerId);
+      return null;
+    }
     
     Path dbPath = parent.resolveDbPath();
     if (dbPath == null) {
@@ -56,9 +54,10 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
     }
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(dbPath.toString());
-
-    cdd.listContainersByState(state.name(), listOptions.getLimit());
+ 
+    cdd.showContainerDetails(containerId);
     
     return null;
   }
+
 }
