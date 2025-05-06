@@ -158,7 +158,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       // Run the upgrade framework to finalize layout features if needed
       layoutVersionManager.finalizeLayoutFeatures();
 
-      LOG.debug("Recon schema versioning completed.");
+      LOG.info("Recon schema versioning completed.");
 
       this.reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
       this.reconSafeModeMgr.setInSafeMode(true);
