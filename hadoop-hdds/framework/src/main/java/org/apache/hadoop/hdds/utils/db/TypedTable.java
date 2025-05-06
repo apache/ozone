@@ -400,6 +400,18 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return iterator(null);
   }
 
+  public Table.KeyValueSpliterator<KEY, VALUE> spliterator(int maxParallelism) throws IOException {
+    return spliterator(null, null, maxParallelism);
+  }
+
+  public Table.KeyValueSpliterator<KEY, VALUE> spliterator(KEY startKey, KEY prefix, int maxParallelism)
+      throws IOException {
+    if (supportCodecBuffer) {
+      return newCodecBufferSpliterator(prefix, startKey, maxParallelism);
+    }
+    return newByteArraySpliterator(prefix, startKey, maxParallelism);
+  }
+
   @Override
   public Table.KeyValueIterator<KEY, VALUE> iterator(KEY prefix)
       throws IOException {
@@ -610,6 +622,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
             itr.seek(startKeyBuffer);
           }
           return itr;
+        } catch(Throwable t) {
+          if (prefixBuffer != null) {
+            prefixBuffer.release();
+          }
         } finally {
           if (startKeyBuffer != null) {
             startKeyBuffer.release();
