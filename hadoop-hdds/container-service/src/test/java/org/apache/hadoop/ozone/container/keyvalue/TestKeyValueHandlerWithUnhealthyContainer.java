@@ -31,8 +31,10 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 
+import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -58,6 +60,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyComm
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getPutBlockRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestBlockID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atMostOnce;
@@ -78,6 +81,8 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   private File tempDir;
 
   private IncrementalReportSender<Container> mockIcrSender;
+  private final GenericTestUtils.LogCapturer logCapturer =
+          GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
 
   @BeforeEach
   public void init() {
@@ -240,6 +245,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     handler.markContainerUnhealthy(container,
         ContainerTestUtils.getUnhealthyScanResult());
     verify(mockIcrSender, atMostOnce()).send(any());
+    assertThat(logCapturer.getOutput()).contains("CORRUPT_CHUNK");
   }
 
   // -- Helper methods below.
