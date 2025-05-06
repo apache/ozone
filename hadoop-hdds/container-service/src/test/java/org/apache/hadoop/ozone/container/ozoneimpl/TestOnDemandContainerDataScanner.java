@@ -68,7 +68,6 @@ public class TestOnDemandContainerDataScanner extends
     TestContainerScannersAbstract {
   
   private OnDemandContainerDataScanner onDemandScanner;
-
   private ContainerChecksumTreeManager mockChecksumManager;
 
   @BeforeEach
@@ -113,8 +112,7 @@ public class TestOnDemandContainerDataScanner extends
 
   @Test
   public void testScanTimestampUpdated() throws Exception {
-    Optional<Future<?>> scanFuture =
-        onDemandScanner.scanContainer(healthy);
+    Optional<Future<?>> scanFuture = onDemandScanner.scanContainer(healthy);
     assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
     verify(controller, atLeastOnce())
@@ -122,8 +120,7 @@ public class TestOnDemandContainerDataScanner extends
             eq(healthy.getContainerData().getContainerID()), any());
 
     // Metrics for deleted container should not be updated.
-    scanFuture =
-        onDemandScanner.scanContainer(healthy);
+    scanFuture = onDemandScanner.scanContainer(healthy);
     assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
     verify(controller, never())
@@ -166,12 +163,9 @@ public class TestOnDemandContainerDataScanner extends
   @Override
   public void testScannerMetrics() throws Exception {
     ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
-    resultFutureList.add(onDemandScanner.scanContainer(
-        corruptData));
-    resultFutureList.add(
-        onDemandScanner.scanContainer(openContainer));
-    resultFutureList.add(
-        onDemandScanner.scanContainer(openCorruptMetadata));
+    resultFutureList.add(onDemandScanner.scanContainer(corruptData));
+    resultFutureList.add(onDemandScanner.scanContainer(openContainer));
+    resultFutureList.add(onDemandScanner.scanContainer(openCorruptMetadata));
     resultFutureList.add(onDemandScanner.scanContainer(healthy));
     // Deleted containers will not count towards the scan count metric.
     resultFutureList.add(onDemandScanner.scanContainer(deletedContainer));
@@ -312,8 +306,7 @@ public class TestOnDemandContainerDataScanner extends
   }
 
   private void scanContainer(Container<?> container) throws Exception {
-    Optional<Future<?>> scanFuture =
-        onDemandScanner.scanContainer(container);
+    Optional<Future<?>> scanFuture = onDemandScanner.scanContainer(container);
     if (scanFuture.isPresent()) {
       scanFuture.get().get();
     }

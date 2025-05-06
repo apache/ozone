@@ -158,6 +158,9 @@ public class TestCloseContainer {
     // Ensure 3 replicas are reported successfully as expected.
     GenericTestUtils.waitFor(() ->
             getContainerReplicas(newContainer).size() == 3, 200, 30000);
+    for (ContainerReplica replica : getContainerReplicas(newContainer)) {
+      assertNotEquals(0, replica.getDataChecksum());
+    }
   }
 
   /**
@@ -196,6 +199,10 @@ public class TestCloseContainer {
     for (HddsDatanodeService hddsDatanode: hddsDatanodes) {
       GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, container), 100, 5000);
       assertTrue(containerChecksumFileExists(hddsDatanode, container.getContainerID()));
+    }
+
+    for (ContainerReplica replica : getContainerReplicas(container)) {
+      assertNotEquals(0, replica.getDataChecksum());
     }
 
     assertThrows(IOException.class,
@@ -269,6 +276,12 @@ public class TestCloseContainer {
     assertNotEquals(prevExpectedChecksumInfo1.getContainerID(), prevExpectedChecksumInfo2.getContainerID());
     assertNotEquals(prevExpectedChecksumInfo1.getContainerMerkleTree().getDataChecksum(),
         prevExpectedChecksumInfo2.getContainerMerkleTree().getDataChecksum());
+    for (ContainerReplica replica : getContainerReplicas(containerInfo1)) {
+      assertNotEquals(0, replica.getDataChecksum());
+    }
+    for (ContainerReplica replica : getContainerReplicas(containerInfo2)) {
+      assertNotEquals(0, replica.getDataChecksum());
+    }
   }
 
   private boolean checkContainerCloseInDatanode(HddsDatanodeService hddsDatanode,

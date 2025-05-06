@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.ozone.container.ozoneimpl.AbstractBackgroundContainerScanner.logUnhealthyScanResult;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
@@ -177,16 +176,6 @@ public final class OnDemandContainerDataScanner {
 
   public OnDemandScannerMetrics getMetrics() {
     return metrics;
-  }
-
-  @VisibleForTesting
-  public DataTransferThrottler getThrottler() {
-    return throttler;
-  }
-
-  @VisibleForTesting
-  public Canceler getCanceler() {
-    return canceler;
   }
 
   public synchronized void shutdown() {
