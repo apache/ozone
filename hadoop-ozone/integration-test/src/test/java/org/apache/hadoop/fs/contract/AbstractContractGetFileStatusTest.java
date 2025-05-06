@@ -1,41 +1,23 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- *  or more contributor license agreements.  See the NOTICE file
- *  distributed with this work for additional information
- *  regarding copyright ownership.  The ASF licenses this file
- *  to you under the Apache License, Version 2.0 (the
- *  "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.fs.contract;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
-
-import org.assertj.core.api.Assertions;
-
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FilterFileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.fs.RemoteIterator;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
+import static org.apache.hadoop.fs.contract.ContractTestUtils.TreeScanResults;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.createSubdirs;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.iteratorToList;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.iteratorToListThroughNextCallsAlone;
@@ -44,14 +26,31 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.toListThroughNextC
 import static org.apache.hadoop.fs.contract.ContractTestUtils.touch;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.treeWalk;
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
-import static org.apache.hadoop.fs.contract.ContractTestUtils.TreeScanResults;
 import static org.assertj.core.api.Assertions.fail;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FilterFileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test getFileStatus and related listing operations.
  */
-public abstract class AbstractContractGetFileStatusTest extends
-    AbstractFSContractTestBase {
+public abstract class AbstractContractGetFileStatusTest extends AbstractFSContractTestBase {
+
+  private static final PathFilter ALL_PATHS = new AllPathsFilter();
+  private static final PathFilter NO_PATHS = new NoPathsFilter();
 
   private Path testPath;
   private Path target;
@@ -555,7 +554,6 @@ public abstract class AbstractContractGetFileStatusTest extends
     return count;
   }
 
-
   @Test
   public void testListStatusFiltering() throws Throwable {
     describe("Call listStatus() against paths and directories with filtering");
@@ -694,9 +692,6 @@ public abstract class AbstractContractGetFileStatusTest extends
         .hasSize(expected);
     return result;
   }
-
-  private static final PathFilter ALL_PATHS = new AllPathsFilter();
-  private static final PathFilter NO_PATHS = new NoPathsFilter();
 
   /**
    * Accept everything.

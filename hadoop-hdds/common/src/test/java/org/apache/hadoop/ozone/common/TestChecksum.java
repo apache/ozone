@@ -1,33 +1,32 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.common;
-
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
-import java.nio.ByteBuffer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.ByteBuffer;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for {@link Checksum} class.
@@ -53,7 +52,7 @@ public class TestChecksum {
   public void testVerifyChecksum(boolean useChecksumCache) throws Exception {
     Checksum checksum = getChecksum(null, useChecksumCache);
     int dataLen = 55;
-    byte[] data = RandomStringUtils.randomAlphabetic(dataLen).getBytes(UTF_8);
+    byte[] data = RandomStringUtils.secure().nextAlphabetic(dataLen).getBytes(UTF_8);
     ByteBuffer byteBuffer = ByteBuffer.wrap(data);
 
     ChecksumData checksumData = checksum.computeChecksum(byteBuffer, useChecksumCache);
@@ -74,7 +73,7 @@ public class TestChecksum {
   @ValueSource(booleans = {true, false})
   public void testIncorrectChecksum(boolean useChecksumCache) throws Exception {
     Checksum checksum = getChecksum(null, useChecksumCache);
-    byte[] data = RandomStringUtils.randomAlphabetic(55).getBytes(UTF_8);
+    byte[] data = RandomStringUtils.secure().nextAlphabetic(55).getBytes(UTF_8);
     ByteBuffer byteBuffer = ByteBuffer.wrap(data);
     ChecksumData originalChecksumData = checksum.computeChecksum(byteBuffer, useChecksumCache);
 

@@ -1,31 +1,28 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.shell;
 
+import java.util.List;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-
 import picocli.CommandLine;
 import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
-
-import java.util.List;
 
 /**
  * Ozone user interface commands.
@@ -71,6 +68,7 @@ public abstract class Shell extends GenericCli {
 
   public Shell() {
     super(new PicocliCommandsFactory());
+    getCmd().setExecutionStrategy(this::execute);
   }
 
   public String name() {
@@ -82,26 +80,19 @@ public abstract class Shell extends GenericCli {
     return name();
   }
 
-  @Override
-  public void run(String[] argv) {
+  private int execute(CommandLine.ParseResult parseResult) {
     name = spec.name();
 
-    try {
-      // parse args to check if interactive mode is requested
-      getCmd().parseArgs(argv);
-    } catch (Exception ignored) {
-      // failure will be reported by regular, non-interactive run
-    }
-
-    if (executionMode != null && (executionMode.interactive || !executionMode.command.isEmpty())) {
+    if (parseResult.hasMatchedOption("--interactive") || parseResult.hasMatchedOption("--execute")) {
       spec.name(""); // use short name (e.g. "token get" instead of "ozone sh token get")
       installBatchExceptionHandler();
       new REPL(this, getCmd(), (PicocliCommandsFactory) getCmd().getFactory(), executionMode.command);
-    } else {
-      TracingUtil.initTracing("shell", getOzoneConf());
-      String spanName = spec.name() + " " + String.join(" ", argv);
-      TracingUtil.executeInNewSpan(spanName, () -> super.run(argv));
+      return 0;
     }
+
+    TracingUtil.initTracing("shell", getOzoneConf());
+    String spanName = spec.name() + " " + String.join(" ", parseResult.originalArgs());
+    return TracingUtil.executeInNewSpan(spanName, () -> new CommandLine.RunLast().execute(parseResult));
   }
 
   private void installBatchExceptionHandler() {

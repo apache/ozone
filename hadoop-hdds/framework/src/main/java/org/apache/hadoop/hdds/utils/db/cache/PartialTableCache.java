@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,11 +13,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.utils.db.cache;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -30,9 +30,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
 import org.apache.hadoop.hdds.annotation.InterfaceStability.Evolving;
 import org.slf4j.Logger;
@@ -49,14 +46,13 @@ import org.slf4j.LoggerFactory;
 @Evolving
 public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(PartialTableCache.class);
 
   private final Map<CacheKey<KEY>, CacheValue<VALUE>> cache;
   private final NavigableMap<Long, Set<CacheKey<KEY>>> epochEntries;
   private final ExecutorService executorService;
   private final CacheStatsRecorder statsRecorder;
-
 
   public PartialTableCache(String threadNamePrefix) {
     // We use concurrent Hash map for O(1) lookup for get API.
@@ -125,7 +121,7 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   @Override
   public void evictCache(List<Long> epochs) {
     Set<CacheKey<KEY>> currentCacheKeys;
-    CacheKey<KEY> cachekey;
+
     long lastEpoch = epochs.get(epochs.size() - 1);
     for (long currentEpoch : epochEntries.keySet()) {
       currentCacheKeys = epochEntries.get(currentEpoch);
@@ -138,10 +134,8 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
       // As ConcurrentHashMap computeIfPresent is atomic, there is no race
       // condition between cache cleanup and requests updating same cache entry.
       if (epochs.contains(currentEpoch)) {
-        for (Iterator<CacheKey<KEY>> iterator = currentCacheKeys.iterator();
-             iterator.hasNext();) {
-          cachekey = iterator.next();
-          cache.computeIfPresent(cachekey, ((k, v) -> {
+        for (CacheKey<KEY> currentCacheKey : currentCacheKeys) {
+          cache.computeIfPresent(currentCacheKey, ((k, v) -> {
             // If cache epoch entry matches with current Epoch, remove entry
             // from cache.
             if (v.getEpoch() == currentEpoch) {
@@ -166,8 +160,7 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
     CacheValue<VALUE> cachevalue = cache.get(cachekey);
     statsRecorder.recordValue(cachevalue);
     if (cachevalue == null) {
-      return new CacheResult<>(CacheResult.CacheStatus.MAY_EXIST,
-            null);
+      return (CacheResult<VALUE>) MAY_EXIST;
     } else {
       if (cachevalue.getCacheValue() != null) {
         return new CacheResult<>(CacheResult.CacheStatus.EXISTS, cachevalue);

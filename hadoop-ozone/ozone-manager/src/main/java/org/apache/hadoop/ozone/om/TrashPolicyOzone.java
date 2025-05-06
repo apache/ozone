@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.DateFormat;
@@ -27,22 +31,17 @@ import java.util.Date;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.ozone.OzoneTrashPolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT;
 
 /**
  * TrashPolicy for Ozone Specific Trash Operations.Through this implementation
@@ -81,7 +80,7 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
         * MSECS_PER_MINUTE);
     if (deletionInterval < 0) {
       LOG.warn("Invalid value {} for deletion interval,"
-          + " deletion interaval can not be negative."
+          + " deletion interval can not be negative."
           + "Changing to default value 0", deletionInterval);
       this.deletionInterval = 0;
     }
@@ -103,7 +102,6 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
     private Configuration conf;
     // same as checkpoint interval
     private long emptierInterval;
-
 
     private ThreadPoolExecutor executor;
 
@@ -216,6 +214,7 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
     private long ceiling(long time, long interval) {
       return floor(time, interval) + interval;
     }
+
     private long floor(long time, long interval) {
       return (time / interval) * interval;
     }
@@ -265,8 +264,8 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
     }
 
     long now = Time.now();
-    for (int i = 0; i < dirs.length; i++) {
-      Path path = dirs[i].getPath();
+    for (FileStatus fileStatus : dirs) {
+      Path path = fileStatus.getPath();
       String dir = path.toUri().getPath();
       String name = path.getName();
       if (name.equals(CURRENT.getName())) {         // skip current

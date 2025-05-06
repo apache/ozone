@@ -1,22 +1,35 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common;
 
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -34,11 +47,12 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -54,6 +68,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -64,26 +79,10 @@ import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.mockito.Mockito;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
-
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 /**
  * Helper utility to test containers.
  */
 public final class ContainerTestUtils {
-
-  private ContainerTestUtils() {
-  }
 
   public static final DispatcherContext WRITE_STAGE = DispatcherContext
       .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
@@ -98,6 +97,14 @@ public final class ContainerTestUtils {
 
   public static final DispatcherContext COMBINED_STAGE
       = DispatcherContext.getHandleWriteChunk();
+
+  private static final ContainerDispatcher NOOP_CONTAINER_DISPATCHER = new NoopContainerDispatcher();
+
+  private static final ContainerController EMPTY_CONTAINER_CONTROLLER
+      = new ContainerController(ContainerImplTestUtils.newContainerSet(), Collections.emptyMap());
+
+  private ContainerTestUtils() {
+  }
 
   /**
    * Creates an Endpoint class for testing purpose.
@@ -131,7 +138,8 @@ public final class ContainerTestUtils {
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
     StateContext context = getMockContext(datanodeDetails, conf);
-    return new OzoneContainer(datanodeDetails, conf, context);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
+    return new OzoneContainer(datanodeDetails, conf, context, volumeChoosingPolicy);
   }
 
   public static StateContext getMockContext(DatanodeDetails datanodeDetails,
@@ -328,15 +336,9 @@ public final class ContainerTestUtils {
     }
   }
 
-  private static final ContainerDispatcher NOOP_CONTAINER_DISPATCHER
-      = new NoopContainerDispatcher();
-
   public static ContainerDispatcher getNoopContainerDispatcher() {
     return NOOP_CONTAINER_DISPATCHER;
   }
-
-  private static final ContainerController EMPTY_CONTAINER_CONTROLLER
-      = new ContainerController(new ContainerSet(1000), Collections.emptyMap());
 
   public static ContainerController getEmptyContainerController() {
     return EMPTY_CONTAINER_CONTROLLER;
@@ -350,5 +352,14 @@ public final class ContainerTestUtils {
     return XceiverServerRatis.newXceiverServerRatis(null, dn, conf,
         getNoopContainerDispatcher(), getEmptyContainerController(),
         null, null);
+  }
+
+  /** Initialize {@link DatanodeLayoutStorage}.  Normally this is done during {@link HddsDatanodeService} start,
+   * have to do the same for tests that create {@link OzoneContainer} manually. */
+  public static void initializeDatanodeLayout(ConfigurationSource conf, DatanodeDetails dn) throws IOException {
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf, dn.getUuidString());
+    if (layoutStorage.getState() != INITIALIZED) {
+      layoutStorage.initialize();
+    }
   }
 }

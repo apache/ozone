@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +14,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import java.time.Clock;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -38,15 +46,6 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Clock;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-
 /**
  * A class which schedules, tracks and completes moves scheduled by the
  * balancer.
@@ -54,56 +53,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class MoveManager implements
     ContainerReplicaPendingOpsSubscriber {
 
-  /**
-   * Various move return results.
-   */
-  public enum MoveResult {
-    // both replication and deletion are completed
-    COMPLETED,
-    // RM is not ratis leader
-    FAIL_LEADER_NOT_READY,
-    // replication fail because the container does not exist in src
-    REPLICATION_FAIL_NOT_EXIST_IN_SOURCE,
-    // replication fail because the container exists in target
-    REPLICATION_FAIL_EXIST_IN_TARGET,
-    // replication fail because the container is not cloesed
-    REPLICATION_FAIL_CONTAINER_NOT_CLOSED,
-    // replication fail because the container is in inflightDeletion
-    REPLICATION_FAIL_INFLIGHT_DELETION,
-    // replication fail because the container is in inflightReplication
-    REPLICATION_FAIL_INFLIGHT_REPLICATION,
-    // replication fail because of timeout
-    REPLICATION_FAIL_TIME_OUT,
-    // replication fail because of node is not in service
-    REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
-    // replication fail because node is unhealthy
-    REPLICATION_FAIL_NODE_UNHEALTHY,
-    // replication succeed, but deletion fail because of timeout
-    DELETION_FAIL_TIME_OUT,
-    // deletion fail because of node is not in service
-    DELETION_FAIL_NODE_NOT_IN_SERVICE,
-    // replication succeed, but deletion fail because because
-    // node is unhealthy
-    DELETION_FAIL_NODE_UNHEALTHY,
-    // replication succeed, but if we delete the container from
-    // the source datanode , the policy(eg, replica num or
-    // rack location) will not be satisfied, so we should not delete
-    // the container
-    DELETE_FAIL_POLICY,
-    /*
-    Container is not healthy if it has issues such as under, over, or mis
-    replication. We don't try to move replicas of such containers.
-     */
-    REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
-    //  replicas + target - src does not satisfy placement policy
-    REPLICATION_NOT_HEALTHY_AFTER_MOVE,
-    // A move is already scheduled for this container
-    FAIL_CONTAINER_ALREADY_BEING_MOVED,
-    // Unexpected error
-    FAIL_UNEXPECTED_ERROR
-  }
-
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(MoveManager.class);
 
   // TODO - Should pending ops notify under lock to allow MM to schedule a
@@ -301,7 +251,7 @@ public final class MoveManager implements
       }
       startMove(containerInfo, src, tgt, ret);
       LOG.debug("Processed a move request for container {}, from {} to {}",
-          cid, src.getUuidString(), tgt.getUuidString());
+          cid, src, tgt);
       return ret;
     }
   }
@@ -502,5 +452,54 @@ public final class MoveManager implements
 
   void setReplicationTimeout(long replicationTimeout) {
     this.replicationTimeout = replicationTimeout;
+  }
+
+  /**
+   * Various move return results.
+   */
+  public enum MoveResult {
+    // both replication and deletion are completed
+    COMPLETED,
+    // RM is not ratis leader
+    FAIL_LEADER_NOT_READY,
+    // replication fail because the container does not exist in src
+    REPLICATION_FAIL_NOT_EXIST_IN_SOURCE,
+    // replication fail because the container exists in target
+    REPLICATION_FAIL_EXIST_IN_TARGET,
+    // replication fail because the container is not cloesed
+    REPLICATION_FAIL_CONTAINER_NOT_CLOSED,
+    // replication fail because the container is in inflightDeletion
+    REPLICATION_FAIL_INFLIGHT_DELETION,
+    // replication fail because the container is in inflightReplication
+    REPLICATION_FAIL_INFLIGHT_REPLICATION,
+    // replication fail because of timeout
+    REPLICATION_FAIL_TIME_OUT,
+    // replication fail because of node is not in service
+    REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
+    // replication fail because node is unhealthy
+    REPLICATION_FAIL_NODE_UNHEALTHY,
+    // replication succeed, but deletion fail because of timeout
+    DELETION_FAIL_TIME_OUT,
+    // deletion fail because of node is not in service
+    DELETION_FAIL_NODE_NOT_IN_SERVICE,
+    // replication succeed, but deletion fail because because
+    // node is unhealthy
+    DELETION_FAIL_NODE_UNHEALTHY,
+    // replication succeed, but if we delete the container from
+    // the source datanode , the policy(eg, replica num or
+    // rack location) will not be satisfied, so we should not delete
+    // the container
+    DELETE_FAIL_POLICY,
+    /*
+    Container is not healthy if it has issues such as under, over, or mis
+    replication. We don't try to move replicas of such containers.
+     */
+    REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
+    //  replicas + target - src does not satisfy placement policy
+    REPLICATION_NOT_HEALTHY_AFTER_MOVE,
+    // A move is already scheduled for this container
+    FAIL_CONTAINER_ALREADY_BEING_MOVED,
+    // Unexpected error
+    FAIL_UNEXPECTED_ERROR
   }
 }

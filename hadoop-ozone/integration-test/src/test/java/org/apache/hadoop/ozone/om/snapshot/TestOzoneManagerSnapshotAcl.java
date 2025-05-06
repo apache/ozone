@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,19 +13,30 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConsts.ADMIN;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.stream.Stream;
-
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -51,29 +61,14 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConsts.ADMIN;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.params.provider.Arguments.arguments;
-
 /**
  * Test for Snapshot feature with ACL.
  */
-@Timeout(value = 300)
 public class TestOzoneManagerSnapshotAcl {
 
   private static final String ADMIN_USER = "om";
@@ -109,7 +104,7 @@ public class TestOzoneManagerSnapshotAcl {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     final String omServiceId = "om-service-test-1"
-        + RandomStringUtils.randomNumeric(32);
+        + RandomStringUtils.secure().nextNumeric(32);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
@@ -222,7 +217,7 @@ public class TestOzoneManagerSnapshotAcl {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
-    final long numEntries = Long.parseLong(RandomStringUtils.randomNumeric(1));
+    final long numEntries = Long.parseLong(RandomStringUtils.secure().nextNumeric(1));
 
     // WHEN-THEN
     assertDoesNotThrow(
@@ -240,7 +235,7 @@ public class TestOzoneManagerSnapshotAcl {
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
     final OmKeyArgs keyArgs = getOmKeyArgs(false);
-    final long numEntries = Long.parseLong(RandomStringUtils.randomNumeric(1));
+    final long numEntries = Long.parseLong(RandomStringUtils.secure().nextNumeric(1));
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
@@ -299,7 +294,7 @@ public class TestOzoneManagerSnapshotAcl {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
-    final int maxKeys = Integer.parseInt(RandomStringUtils.randomNumeric(1));
+    final int maxKeys = Integer.parseInt(RandomStringUtils.secure().nextNumeric(1));
 
     // WHEN-THEN
     assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
@@ -313,7 +308,7 @@ public class TestOzoneManagerSnapshotAcl {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
-    final int maxKeys = Integer.parseInt(RandomStringUtils.randomNumeric(1));
+    final int maxKeys = Integer.parseInt(RandomStringUtils.secure().nextNumeric(1));
 
     // WHEN
     UserGroupInformation.setLoginUser(UGI2);
@@ -441,7 +436,6 @@ public class TestOzoneManagerSnapshotAcl {
     assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
   }
 
-
   private void setup(BucketLayout bucketLayout)
       throws IOException {
     UserGroupInformation.setLoginUser(UGI1);
@@ -565,8 +559,8 @@ public class TestOzoneManagerSnapshotAcl {
   }
 
   private void createKey(OzoneBucket bucket) throws IOException {
-    keyName = KEY_PREFIX + RandomStringUtils.randomNumeric(32);
-    byte[] data = RandomStringUtils.randomAscii(1).getBytes(UTF_8);
+    keyName = KEY_PREFIX + RandomStringUtils.secure().nextNumeric(32);
+    byte[] data = RandomStringUtils.secure().nextAscii(1).getBytes(UTF_8);
     final OzoneOutputStream fileKey = bucket.createKey(keyName, data.length);
     fileKey.write(data);
     fileKey.close();
@@ -576,7 +570,7 @@ public class TestOzoneManagerSnapshotAcl {
       throws IOException {
     final String snapshotPrefix = "snapshot-";
     final String snapshotName =
-        snapshotPrefix + RandomStringUtils.randomNumeric(32);
+        snapshotPrefix + RandomStringUtils.secure().nextNumeric(32);
     objectStore.createSnapshot(volumeName, bucketName, snapshotName);
     snapshotKeyPrefix = OmSnapshotManager
         .getSnapshotPrefix(snapshotName);
@@ -619,7 +613,7 @@ public class TestOzoneManagerSnapshotAcl {
   private void createBucket(BucketLayout bucketLayout,
       OzoneVolume volume) throws IOException {
     final String bucketPrefix = "bucket-";
-    bucketName = bucketPrefix + RandomStringUtils.randomNumeric(32);
+    bucketName = bucketPrefix + RandomStringUtils.secure().nextNumeric(32);
     final BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setOwner(ADMIN)
         .setBucketLayout(bucketLayout).build();
@@ -628,7 +622,7 @@ public class TestOzoneManagerSnapshotAcl {
 
   private void createVolume() throws IOException {
     final String volumePrefix = "volume-";
-    volumeName = volumePrefix + RandomStringUtils.randomNumeric(32);
+    volumeName = volumePrefix + RandomStringUtils.secure().nextNumeric(32);
     final VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin(ADMIN)
         .setOwner(ADMIN)

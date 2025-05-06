@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,9 +17,11 @@
 
 package org.apache.hadoop.ozone.container.common.helpers;
 
+import java.io.Closeable;
+import java.util.EnumMap;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -31,9 +32,6 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.util.MetricUtil;
-
-import java.io.Closeable;
-import java.util.EnumMap;
 
 /**
  *
@@ -58,7 +56,6 @@ public class ContainerMetrics implements Closeable {
   @Metric private MutableCounterLong containerForceDelete;
   @Metric private MutableCounterLong numReadStateMachine;
   @Metric private MutableCounterLong bytesReadStateMachine;
-
 
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
@@ -96,7 +93,7 @@ public class ContainerMetrics implements Closeable {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     // Percentile measurement is off by default, by watching no intervals
     int[] intervals =
-        conf.getInts(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY);
+        conf.getInts(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY);
     return ms.register(STORAGE_CONTAINER_METRICS,
                        "Storage Container Node Metrics",
                        new ContainerMetrics(intervals));
@@ -131,6 +128,7 @@ public class ContainerMetrics implements Closeable {
   public void incContainerDeleteFailedBlockCountNotZero() {
     containerDeleteFailedBlockCountNotZero.incr();
   }
+
   public void incContainerDeleteFailedNonEmpty() {
     containerDeleteFailedNonEmpty.incr();
   }

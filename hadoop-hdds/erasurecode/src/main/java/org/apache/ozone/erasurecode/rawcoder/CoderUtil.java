@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,23 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.ozone.erasurecode.rawcoder;
 
-import org.apache.ozone.erasurecode.ECChunk;
+package org.apache.ozone.erasurecode.rawcoder;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import org.apache.ozone.erasurecode.ECChunk;
 
 /**
  * Helpful utilities for implementing some raw erasure coders.
  */
 public final class CoderUtil {
 
-  private CoderUtil() {
-    // No called
-  }
-
   private static byte[] emptyChunk = new byte[4096];
+
+  private CoderUtil() {
+    // Not called
+  }
 
   /**
    * Make sure to return an empty chunk buffer for the desired length.
@@ -97,7 +96,6 @@ public final class CoderUtil {
     }
   }
 
-
   /**
    * Convert an array of this chunks to an array of ByteBuffers.
    *
@@ -136,8 +134,6 @@ public final class CoderUtil {
     directBuffer.flip();
     return directBuffer;
   }
-
-
 
   /**
    * Find the valid input from all the inputs.

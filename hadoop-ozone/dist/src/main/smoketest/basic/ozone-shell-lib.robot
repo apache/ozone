@@ -131,41 +131,48 @@ Test ozone shell errors
     ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1                    255
                     Should contain      ${result}       QUOTA_ERROR
                     Execute and checkrc    ozone sh volume delete ${protocol}${server}/${volume}                            0
-    ${result} =     Execute and checkrc    ozone sh key put ${protocol}${server}/${volume}/bucket1/key1 sample.txt          255
-                    Should Match Regexp                    ${result}       Error: File not found: .*
 
 Test Volume Acls
     [arguments]     ${protocol}         ${server}       ${volume}
     Execute         ozone sh volume create ${protocol}${server}/${volume}
     ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \".*\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
+    Should Not Be Empty    ${acl_check}
     ${result} =     Execute             ozone sh volume addacl ${protocol}${server}/${volume} -a user:superuser1:rwxy[DEFAULT]
     ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1*\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh volume removeacl ${protocol}${server}/${volume} -a user:superuser1:xy
     ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh volume setacl ${protocol}${server}/${volume} -al user:superuser1:rwxy[DEFAULT],group:superuser1:a,user:testuser:rwxyc,group:superuser1:a[DEFAULT]
     ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1*\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\" .
-    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["ALL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
 
 Test Bucket Acls
     [arguments]     ${protocol}         ${server}       ${volume}
-    Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1
+    Execute         ozone sh bucket create ${protocol}${server}/${volume}/bb1
     ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \".*\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
+    Should Not Be Empty    ${acl_check}
     ${result} =     Execute             ozone sh bucket addacl ${protocol}${server}/${volume}/bb1 -a user:superuser1:rwxy
     ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1*\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh bucket removeacl ${protocol}${server}/${volume}/bb1 -a user:superuser1:xy
     ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh bucket setacl ${protocol}${server}/${volume}/bb1 -al user:superuser1:rwxy,group:superuser1:a,user:testuser:rwxyc,group:superuser1:a[DEFAULT]
     ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1*\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
-    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"ALL\" .
-
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["ALL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
 
 Test key handling
     [arguments]     ${protocol}         ${server}       ${volume}
@@ -188,6 +195,8 @@ Test key handling
                     Should Contain      ${result}       NOTICE.txt.1 exists
     ${result} =     Execute             ozone sh key get --force ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Should Not Contain  ${result}       NOTICE.txt.1 exists
+    ${result} =     Execute and checkrc    ozone sh key put ${protocol}${server}/${volume}/bb1/key1 sample.txt          255
+                    Should Contain         ${result}       File not found: sample.txt
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1 | jq -r '. | select(.name=="key1")'
                     Should contain      ${result}       creationTime
                     Should not contain  ${result}       ETag
@@ -204,34 +213,45 @@ Test key Acls
     [arguments]     ${protocol}         ${server}       ${volume}
     Execute         ozone sh key put ${protocol}${server}/${volume}/bb1/key2 /opt/hadoop/NOTICE.txt
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \".*\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
+    Should Not Be Empty    ${acl_check}
     ${result} =     Execute             ozone sh key addacl ${protocol}${server}/${volume}/bb1/key2 -a user:superuser1:rwxy
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh key removeacl ${protocol}${server}/${volume}/bb1/key2 -a user:superuser1:xy
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh key setacl ${protocol}${server}/${volume}/bb1/key2 -al user:superuser1:rwxy,group:superuser1:a,user:testuser:rwxyc
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
-    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
 
 Test prefix Acls
     [arguments]     ${protocol}         ${server}       ${volume}
     Execute         ozone sh prefix addacl ${protocol}${server}/${volume}/bb1/prefix1/ -a user:superuser1:rwxy[DEFAULT]
     ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh prefix removeacl ${protocol}${server}/${volume}/bb1/prefix1/ -a user:superuser1:xy
     ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh prefix setacl ${protocol}${server}/${volume}/bb1/prefix1/ -al user:superuser1:rwxy[DEFAULT],group:superuser1:a[DEFAULT],user:testuser:rwxyc
     ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
-    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["ALL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     Execute         ozone sh key put ${protocol}${server}/${volume}/bb1/prefix1/key1 /opt/hadoop/NOTICE.txt
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/prefix1/key1
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
-    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
 
 Test native authorizer
     [arguments]     ${protocol}         ${server}       ${volume}

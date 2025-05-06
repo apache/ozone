@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,86 +16,6 @@
  */
 
 package org.apache.hadoop.ozone.om;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.UUID;
-import java.util.stream.Stream;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
-import org.apache.hadoop.hdds.scm.net.NodeSchema;
-import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.ozone.security.acl.RequestContext;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
-
-import com.google.common.collect.Sets;
-import org.apache.commons.lang3.RandomStringUtils;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
@@ -112,21 +31,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-
-import org.apache.ratis.util.ExitUtils;
-import jakarta.annotation.Nonnull;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
-
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -149,10 +53,99 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.Sets;
+import jakarta.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.UUID;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.net.NodeSchema;
+import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.security.acl.RequestContext;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.ExitUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
 /**
  * Test class for @{@link KeyManagerImpl}.
  */
-@Timeout(300)
 public class TestKeyManagerImpl {
   @TempDir
   private static File dir;
@@ -269,6 +262,7 @@ public class TestKeyManagerImpl {
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
   }
+
   private static void mockBlockClient() {
     ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null,
         conf);
@@ -277,6 +271,7 @@ public class TestKeyManagerImpl {
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
   }
+
   private static void createBucket(String volumeName, String bucketName,
                                    boolean isVersionEnabled)
       throws IOException {
@@ -361,12 +356,12 @@ public class TestKeyManagerImpl {
   public void testCreateDirectory() throws IOException {
     // Create directory where the parent directory does not exist
     StringBuffer keyNameBuf = new StringBuffer();
-    keyNameBuf.append(RandomStringUtils.randomAlphabetic(5));
+    keyNameBuf.append(RandomStringUtils.secure().nextAlphabetic(5));
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyNameBuf.toString())
         .build();
     for (int i = 0; i < 5; i++) {
-      keyNameBuf.append("/").append(RandomStringUtils.randomAlphabetic(5));
+      keyNameBuf.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     String keyName = keyNameBuf.toString();
     writeClient.createDirectory(keyArgs);
@@ -378,7 +373,7 @@ public class TestKeyManagerImpl {
     }
 
     // make sure create directory fails where parent is a file
-    keyName = RandomStringUtils.randomAlphabetic(5);
+    keyName = RandomStringUtils.secure().nextAlphabetic(5);
     keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
@@ -393,7 +388,7 @@ public class TestKeyManagerImpl {
     assertEquals(e.getResult(), OMException.ResultCodes.FILE_ALREADY_EXISTS);
 
     // create directory where parent is root
-    keyName = RandomStringUtils.randomAlphabetic(5);
+    keyName = RandomStringUtils.secure().nextAlphabetic(5);
     keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
@@ -407,7 +402,7 @@ public class TestKeyManagerImpl {
   @Test
   public void testOpenFile() throws IOException {
     // create key
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
@@ -431,9 +426,9 @@ public class TestKeyManagerImpl {
     // try to create a file where parent directories do not exist and
     // recursive flag is set to false
     StringBuffer keyNameBuf = new StringBuffer();
-    keyNameBuf.append(RandomStringUtils.randomAlphabetic(5));
+    keyNameBuf.append(RandomStringUtils.secure().nextAlphabetic(5));
     for (int i = 0; i < 5; i++) {
-      keyNameBuf.append("/").append(RandomStringUtils.randomAlphabetic(5));
+      keyNameBuf.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     keyName = keyNameBuf.toString();
     keyArgs = createBuilder()
@@ -532,7 +527,7 @@ public class TestKeyManagerImpl {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-    OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
+    OzoneAcl ozAcl1 = OzoneAcl.of(ACLIdentityType.USER, "user1",
         ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
@@ -541,13 +536,13 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, ozAclGet.get(0));
 
     List<OzoneAcl> acls = new ArrayList<>();
-    OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, ACLType.ALL);
+    OzoneAcl ozAcl2 = OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, ACLType.ALL);
 
-    OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ, WRITE);
+    OzoneAcl ozAcl3 = OzoneAcl.of(ACLIdentityType.GROUP, "dev", ACCESS, READ, WRITE);
 
-    OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, WRITE);
+    OzoneAcl ozAcl4 = OzoneAcl.of(ACLIdentityType.GROUP, "dev", ACCESS, WRITE);
 
-    OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ);
+    OzoneAcl ozAcl5 = OzoneAcl.of(ACLIdentityType.GROUP, "dev", ACCESS, READ);
 
     acls.add(ozAcl2);
     acls.add(ozAcl3);
@@ -618,7 +613,7 @@ public class TestKeyManagerImpl {
 
     // Invalid prefix not ending with "/"
     String invalidPrefix = "invalid/pf";
-    OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
+    OzoneAcl ozAcl1 = OzoneAcl.of(ACLIdentityType.USER, "user1",
         ACCESS, ACLType.READ);
 
     OzoneObj ozInvalidPrefix = new OzoneObjInfo.Builder()
@@ -682,7 +677,7 @@ public class TestKeyManagerImpl {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-    OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
+    OzoneAcl ozAcl1 = OzoneAcl.of(ACLIdentityType.USER, "user1",
         ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
@@ -721,7 +716,7 @@ public class TestKeyManagerImpl {
 
   @Test
   public void testLookupFile() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
@@ -761,7 +756,7 @@ public class TestKeyManagerImpl {
 
   @Test
   public void testLookupKeyWithLocation() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
         .setSortDatanodesInPipeline(true)
@@ -853,7 +848,7 @@ public class TestKeyManagerImpl {
 
   @Test
   public void testLatestLocationVersion() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder(VERSIONED_BUCKET_NAME)
         .setKeyName(keyName)
         .setLatestVersionLocation(true)
@@ -1197,7 +1192,7 @@ public class TestKeyManagerImpl {
   @ValueSource(booleans = {true, false})
   public void testListStatus(boolean enablePath) throws IOException {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
-    String superDir = RandomStringUtils.randomAlphabetic(5);
+    String superDir = RandomStringUtils.secure().nextAlphabetic(5);
 
     int numDirectories = 5;
     int numFiles = 5;
@@ -1279,7 +1274,7 @@ public class TestKeyManagerImpl {
   @Test
   public void testGetFileStatus() throws IOException {
     // create a key
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
         .setLatestVersionLocation(true)
@@ -1479,7 +1474,6 @@ public class TestKeyManagerImpl {
 
   }
 
-
   @Test
   public void testRefreshPipelineException() throws Exception {
 
@@ -1520,7 +1514,7 @@ public class TestKeyManagerImpl {
 
   @Test
   void testGetAllPartsWhenZeroPartNumber() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
 
     String volume = VOLUME_NAME;
 
@@ -1546,7 +1540,7 @@ public class TestKeyManagerImpl {
 
   @Test
   void testGetParticularPart() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
 
     String volume = VOLUME_NAME;
 
@@ -1570,7 +1564,7 @@ public class TestKeyManagerImpl {
 
   @Test
   void testGetNotExistedPart() throws IOException {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
 
     String volume = VOLUME_NAME;
 
@@ -1631,6 +1625,7 @@ public class TestKeyManagerImpl {
         .setNodes(new ArrayList<>())
         .build();
   }
+
   /**
    * Creates a depth two directory.
    *
@@ -1669,13 +1664,12 @@ public class TestKeyManagerImpl {
 
     for (OzoneFileStatus fileStatus : fileStatuses) {
       String normalizedKeyName = fileStatus.getTrimmedName();
-      String parent =
-          Paths.get(fileStatus.getKeyInfo().getKeyName()).getParent()
-              .toString();
       if (!recursive) {
+        Path parent = Paths.get(fileStatus.getKeyInfo().getKeyName()).getParent();
         // if recursive is false, verify all the statuses have the input
         // directory as parent
-        assertEquals(parent, directory);
+        assertNotNull(parent);
+        assertEquals(directory, parent.toString());
       }
       // verify filestatus is present in directory or file set accordingly
       if (fileStatus.isDirectory()) {
@@ -1711,7 +1705,7 @@ public class TestKeyManagerImpl {
       throws IOException {
     Set<String> keyNames = new TreeSet<>();
     for (int i = 0; i < numDirectories; i++) {
-      String keyName = parent + "/" + RandomStringUtils.randomAlphabetic(5);
+      String keyName = parent + "/" + RandomStringUtils.secure().nextAlphabetic(5);
       OmKeyArgs keyArgs = createBuilder().setKeyName(keyName).build();
       writeClient.createDirectory(keyArgs);
       keyNames.add(keyName);
@@ -1724,7 +1718,7 @@ public class TestKeyManagerImpl {
       Map<String, List<String>> fileMap, int numFiles) throws IOException {
     List<String> keyNames = new ArrayList<>();
     for (int i = 0; i < numFiles; i++) {
-      String keyName = parent + "/" + RandomStringUtils.randomAlphabetic(5);
+      String keyName = parent + "/" + RandomStringUtils.secure().nextAlphabetic(5);
       OmKeyArgs keyArgs = createBuilder().setKeyName(keyName).build();
       OpenKeySession keySession = writeClient.createFile(keyArgs, false, false);
       keyArgs.setLocationInfoList(

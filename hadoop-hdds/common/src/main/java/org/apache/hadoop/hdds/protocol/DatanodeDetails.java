@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +17,18 @@
 
 package org.apache.hadoop.hdds.protocol;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS;
+import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.ByteString;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -25,36 +36,25 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.collect.ImmutableSet;
-import com.google.protobuf.ByteString;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.scm.net.NetUtils;
-import org.apache.hadoop.ozone.util.StringWithByteString;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
+import org.apache.hadoop.hdds.scm.net.NetUtils;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.upgrade.BelongsToHDDSLayoutVersion;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.util.StringWithByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS;
-import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
 /**
  * DatanodeDetails class contains details about DataNode like:
@@ -67,21 +67,15 @@ import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_P
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class DatanodeDetails extends NodeImpl implements
-    Comparable<DatanodeDetails> {
+public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDetails> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeDetails.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DatanodeDetails.class);
 
   private static final Codec<DatanodeDetails> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(ExtendedDatanodeDetailsProto.getDefaultInstance()),
       DatanodeDetails::getFromProtoBuf,
       DatanodeDetails::getExtendedProtoBufMessage,
       DatanodeDetails.class);
-
-  public static Codec<DatanodeDetails> getCodec() {
-    return CODEC;
-  }
 
   /**
    * DataNode's unique identifier in the cluster.
@@ -145,6 +139,10 @@ public class DatanodeDetails extends NodeImpl implements
     this.currentVersion = datanodeDetails.getCurrentVersion();
   }
 
+  public static Codec<DatanodeDetails> getCodec() {
+    return CODEC;
+  }
+
   public DatanodeID getID() {
     return id;
   }
@@ -179,12 +177,40 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
+   * Resolves and validates the IP address of the datanode based on its hostname.
+   * If the resolved IP address differs from the current IP address,
+   * it updates the IP address to the newly resolved value.
+   */
+  public void validateDatanodeIpAddress() {
+    final String oldIP = getIpAddress();
+    final String hostname = getHostName();
+    if (StringUtils.isBlank(hostname)) {
+      LOG.warn("Could not resolve IP address of datanode '{}'", this);
+      return;
+    }
+
+    try {
+      final String newIP = InetAddress.getByName(hostname).getHostAddress();
+      if (StringUtils.isBlank(newIP)) {
+        throw new UnknownHostException("New IP address is invalid: " + newIP);
+      }
+
+      if (!newIP.equals(oldIP)) {
+        LOG.info("Updating IP address of datanode {} to {}", this, newIP);
+        setIpAddress(newIP);
+      }
+    } catch (UnknownHostException e) {
+      LOG.warn("Could not resolve IP address of datanode '{}'", this, e);
+    }
+  }
+
+  /**
    * Returns IP address of DataNode.
    *
    * @return IP address
    */
   public String getIpAddress() {
-    return ipAddress.getString();
+    return ipAddress == null ? null : ipAddress.getString();
   }
 
   /**
@@ -211,7 +237,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return Hostname
    */
   public String getHostName() {
-    return hostName.getString();
+    return hostName == null ? null : hostName.getString();
   }
 
   /**
@@ -385,7 +411,6 @@ public class DatanodeDetails extends NodeImpl implements
   public Port getStandalonePort() {
     return getPort(Name.STANDALONE);
   }
-
 
   /**
    * Starts building a new DatanodeDetails from the protobuf input.
@@ -652,7 +677,6 @@ public class DatanodeDetails extends NodeImpl implements
     return obj instanceof DatanodeDetails &&
         id.equals(((DatanodeDetails) obj).id);
   }
-
 
   /**
    * Checks hostname, ipAddress and port of the 2 nodes are the same.
@@ -990,6 +1014,8 @@ public class DatanodeDetails extends NodeImpl implements
    * Container to hold DataNode Port details.
    */
   public static final class Port {
+    private final Name name;
+    private final Integer value;
 
     /**
      * Ports that are supported in DataNode.
@@ -1013,9 +1039,6 @@ public class DatanodeDetails extends NodeImpl implements
       public static final Set<Name> IO_PORTS = ImmutableSet.copyOf(
           EnumSet.of(STANDALONE, RATIS, RATIS_DATASTREAM));
     }
-
-    private final Name name;
-    private final Integer value;
 
     /**
      * Private constructor for constructing Port object. Use

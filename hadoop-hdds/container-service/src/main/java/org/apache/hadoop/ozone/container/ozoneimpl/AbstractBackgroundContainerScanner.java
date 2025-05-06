@@ -1,43 +1,40 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base class for scheduled scanners on a Datanode.
  */
-public abstract class AbstractBackgroundContainerScanner extends Thread {
-  public static final Logger LOG =
+public abstract class AbstractBackgroundContainerScanner implements Runnable {
+  private static final Logger LOG =
       LoggerFactory.getLogger(AbstractBackgroundContainerScanner.class);
 
   private final long dataScanInterval;
-
+  private final Thread scannerThread;
   private final AtomicBoolean stopping;
   private final AtomicBoolean pausing = new AtomicBoolean();
 
@@ -45,8 +42,13 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
       long dataScanInterval) {
     this.dataScanInterval = dataScanInterval;
     this.stopping = new AtomicBoolean(false);
-    setName(name);
-    setDaemon(true);
+
+    this.scannerThread = new Thread(this, name);
+    this.scannerThread.setDaemon(true);
+  }
+
+  public void start() {
+    scannerThread.start();
   }
 
   @Override
@@ -144,14 +146,18 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
    */
   public synchronized void shutdown() {
     if (stopping.compareAndSet(false, true)) {
-      this.interrupt();
+      scannerThread.interrupt();
       try {
-        this.join();
+        scannerThread.join();
       } catch (InterruptedException ex) {
         LOG.warn("Unexpected exception while stopping data scanner.", ex);
         Thread.currentThread().interrupt();
       }
     }
+  }
+
+  public boolean isAlive() {
+    return scannerThread.isAlive();
   }
 
   public void pause() {

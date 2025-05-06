@@ -1,36 +1,21 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.XceiverClientRatis;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
-import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.io.KeyOutputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+package org.apache.hadoop.ozone.client.rpc;
 
 import static org.apache.hadoop.hdds.scm.client.HddsClientUtils.checkForException;
 import static org.apache.hadoop.ozone.client.rpc.TestBlockOutputStream.BLOCK_SIZE;
@@ -50,25 +35,37 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientRatis;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
+import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.io.KeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-
-import java.io.IOException;
-import java.util.stream.Stream;
 
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 @Flaky("HDDS-11849")
 class TestBlockOutputStreamWithFailures {
 
@@ -112,7 +109,7 @@ class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(client, keyName);
     int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -197,7 +194,7 @@ class TestBlockOutputStreamWithFailures {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes at least putBlock for first flushSize worth of data
@@ -281,7 +278,7 @@ class TestBlockOutputStreamWithFailures {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes atleast putBlock for first flushSize worth of data
@@ -377,7 +374,7 @@ class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(client, keyName);
     int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -434,7 +431,7 @@ class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(client, keyName);
     int dataLength = 167;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -499,7 +496,7 @@ class TestBlockOutputStreamWithFailures {
     OzoneOutputStream key =
         createKey(client, keyName, 0, ReplicationFactor.ONE);
     int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -588,7 +585,7 @@ class TestBlockOutputStreamWithFailures {
       OzoneOutputStream key =
           createKey(client, keyName, 0, ReplicationFactor.ONE);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes at least putBlock for first flushSize worth of data
@@ -679,7 +676,7 @@ class TestBlockOutputStreamWithFailures {
           createKey(client, keyName, 3 * BLOCK_SIZE,
               ReplicationFactor.ONE);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes at least putBlock for first flushSize worth of data

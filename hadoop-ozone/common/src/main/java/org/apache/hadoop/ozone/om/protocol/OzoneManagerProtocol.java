@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,13 +17,12 @@
 
 package org.apache.hadoop.ozone.om.protocol;
 
+import jakarta.annotation.Nonnull;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
-import jakarta.annotation.Nonnull;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -59,23 +57,23 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.TokenInfo;
 
@@ -104,7 +102,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Changes the owner of a volume.
    * @param volume  - Name of the volume.
@@ -117,7 +114,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Changes the Quota on a volume.
@@ -132,7 +128,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Checks if the specified user can access this volume.
    * @param volume - volume
@@ -145,7 +140,6 @@ public interface OzoneManagerProtocol
       throws IOException {
     throw new UnsupportedOperationException("This operation is not supported.");
   }
-
 
   /**
    * Gets the volume information.
@@ -164,7 +158,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Lists volumes accessible by a specific user.
@@ -199,7 +192,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Gets the bucket information.
    * @param volumeName - Volume name.
@@ -231,7 +223,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Open the given key and return an open key session.
@@ -312,6 +303,7 @@ public interface OzoneManagerProtocol
    * @throws IOException
    * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
    */
+  @Override
   @Deprecated
   OmKeyInfo lookupKey(OmKeyArgs args) throws IOException;
 
@@ -324,6 +316,7 @@ public interface OzoneManagerProtocol
    * @return KeyInfoWithVolumeContext includes info that client uses to talk
    *         to containers and S3 volume context info if assumeS3Context is set.
    */
+  @Override
   KeyInfoWithVolumeContext getKeyInfo(OmKeyArgs args, boolean assumeS3Context)
       throws IOException;
 
@@ -338,7 +331,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Rename existing keys within a bucket.
    * @param omRenameKeys Includes volume, bucket, and fromKey toKey name map
@@ -350,7 +342,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Deletes an existing key.
    *
@@ -361,7 +352,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Deletes existing key/keys. This interface supports delete
@@ -391,7 +381,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Deletes an existing empty bucket from volume.
    * @param volume - Name of the volume.
@@ -402,7 +391,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Returns a list of buckets represented by {@link OmBucketInfo}
@@ -500,7 +488,7 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            when finalization is already in progress.
    */
-  StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException;
+  UpgradeFinalization.StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException;
 
   /**
    * Queries the current status of finalization.
@@ -530,7 +518,7 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            if finalization is needed but not yet started
    */
-  StatusAndMessages queryUpgradeFinalizationProgress(
+  UpgradeFinalization.StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException;
 
@@ -550,8 +538,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
-
   /**
    * Commit Multipart upload part file.
    * @param omKeyArgs
@@ -564,7 +550,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Complete Multipart upload Request.
@@ -580,7 +565,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Abort multipart upload.
    * @param omKeyArgs
@@ -590,7 +574,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Returns list of parts of a multipart upload key.
@@ -608,9 +591,12 @@ public interface OzoneManagerProtocol
 
   /**
    * List in-flight uploads.
+   * withPagination is for backward compatible as older listMultipartUploads does
+   * not support pagination.
    */
   OmMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix) throws IOException;
+      String bucketName, String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination) throws IOException;
 
   /**
    * Gets s3Secret for given kerberos user.
@@ -635,7 +621,7 @@ public interface OzoneManagerProtocol
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach");
-  };
+  }
 
   /**
    * Set secret key for accessId.
@@ -774,10 +760,10 @@ public interface OzoneManagerProtocol
    * @return message which tells the image name, parent dir and OM leader
    * node information.
    */
+  @Deprecated
   default String printCompactionLogDag(String fileNamePrefix, String graphType)
       throws IOException {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented");
+    throw new UnsupportedOperationException("This API has been deprecated.");
   }
 
   /**
@@ -846,14 +832,19 @@ public interface OzoneManagerProtocol
    * @param volumeName Name of the volume to which the snapshotted bucket belong
    * @param bucketName Name of the bucket to which the snapshots belong
    * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
+   * @param listAllStatus Option to specify whether to list all jobs regardless of status
+   * @param prevSnapshotDiffJob list snapshot diff jobs after this snapshot diff job.
+   * @param maxListResult maximum entries to be returned from the startSnapshotDiffJob.
    * @return a list of SnapshotDiffJob objects
    * @throws IOException in case there is a failure while getting a response.
    */
-  default List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
-                                                     String bucketName,
-                                                     String jobStatus,
-                                                     boolean listAll)
-      throws IOException {
+  default ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAllStatus,
+      String prevSnapshotDiffJob,
+      int maxListResult) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");
   }
@@ -919,7 +910,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * OzoneFS api to creates an output stream for a file.
    *
@@ -940,7 +930,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * OzoneFS api to lookup for a file.
    *
@@ -951,6 +940,7 @@ public interface OzoneManagerProtocol
    *                     invalid arguments
    * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
    */
+  @Override
   @Deprecated
   OmKeyInfo lookupFile(OmKeyArgs keyArgs) throws IOException;
 
@@ -965,6 +955,7 @@ public interface OzoneManagerProtocol
    * @param numEntries Number of entries to list from the start key
    * @return list of file status
    */
+  @Override
   List<OzoneFileStatus> listStatus(OmKeyArgs keyArgs, boolean recursive,
       String startKey, long numEntries) throws IOException;
 
@@ -981,6 +972,7 @@ public interface OzoneManagerProtocol
    *                             this is needed in context of ListKeys
    * @return list of file status
    */
+  @Override
   List<OzoneFileStatus> listStatus(OmKeyArgs keyArgs, boolean recursive,
                                    String startKey, long numEntries,
                                    boolean allowPartialPrefixes)
@@ -999,6 +991,7 @@ public interface OzoneManagerProtocol
    *                             this is needed in context of ListKeys
    * @return list of file status
    */
+  @Override
   List<OzoneFileStatusLight> listStatusLight(OmKeyArgs keyArgs,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException;
@@ -1016,7 +1009,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Remove acl for Ozone object. Return true if acl is removed successfully
    * else false.
@@ -1029,7 +1021,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Acls to be set for given Ozone object. This operations reset ACL for
@@ -1130,6 +1121,7 @@ public interface OzoneManagerProtocol
       throws IOException;
 
   UUID refetchSecretKey() throws IOException;
+
   /**
    * Enter, leave, or get safe mode.
    *
@@ -1150,6 +1142,7 @@ public interface OzoneManagerProtocol
    * @param args Key args
    * @return Tags associated with the key.
    */
+  @Override
   Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException;
 
   /**

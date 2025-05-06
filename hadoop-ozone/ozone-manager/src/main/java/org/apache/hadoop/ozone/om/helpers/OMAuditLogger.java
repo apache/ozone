@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,9 +13,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.ozone.om.helpers;
+
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -32,20 +33,20 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-
 /**
  * This class is used for OM Audit logs.
  */
 public final class OMAuditLogger {
-  private OMAuditLogger() {
-  }
+
+  private static final Logger LOG = LoggerFactory.getLogger(OMAuditLogger.class);
 
   private static final Map<Type, OMAction> CMD_AUDIT_ACTION_MAP = new HashMap<>();
-  private static final Logger LOG = LoggerFactory.getLogger(OMAuditLogger.class);
 
   static {
     init();
+  }
+
+  private OMAuditLogger() {
   }
 
   private static void init() {
@@ -121,7 +122,7 @@ public final class OMAuditLogger {
       if (null == builder.getAuditMap()) {
         builder.setAuditMap(new HashMap<>());
       }
-      builder.getAuditMap().put("Transaction", "" + termIndex.getIndex());
+      builder.getAuditMap().put("Transaction", String.valueOf(termIndex.getIndex()));
       builder.getMessageBuilder().withParams(builder.getAuditMap());
       builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
     }
@@ -151,7 +152,7 @@ public final class OMAuditLogger {
     }
     try {
       builder.getAuditMap().put("Command", request.getOmRequest().getCmdType().name());
-      builder.getAuditMap().put("Transaction", "" + termIndex.getIndex());
+      builder.getAuditMap().put("Transaction", String.valueOf(termIndex.getIndex()));
       request.buildAuditMessage(action, builder.getAuditMap(),
           th, request.getUserInfo());
       builder.setLog(true);

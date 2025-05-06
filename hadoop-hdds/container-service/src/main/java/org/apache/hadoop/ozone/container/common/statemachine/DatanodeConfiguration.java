@@ -1,36 +1,40 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.statemachine;
 
-import org.apache.hadoop.hdds.conf.Config;
-import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.conf.PostConstruct;
-import org.apache.hadoop.hdds.conf.ConfigTag;
-
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static org.apache.hadoop.hdds.conf.ConfigTag.CONTAINER;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.MANAGEMENT;
+import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.STORAGE;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
 
+import java.time.Duration;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.Duration;
 
 /**
  * Configuration class used for high level datanode configuration parameters.
@@ -39,41 +43,39 @@ import java.time.Duration;
 public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String CONFIG_PREFIX = "hdds.datanode";
 
-  private static final String BLOCK_DELETE_THREAD_MAX
-      = "block.delete.threads.max";
+  private static final String BLOCK_DELETE_THREAD_MAX = "block.delete.threads.max";
+
   public static final String HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX =
       CONFIG_PREFIX + "." + BLOCK_DELETE_THREAD_MAX;
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeConfiguration.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DatanodeConfiguration.class);
 
-  static final String CONTAINER_DELETE_THREADS_MAX_KEY =
-      "hdds.datanode.container.delete.threads.max";
-  static final String CONTAINER_CLOSE_THREADS_MAX_KEY =
-      "hdds.datanode.container.close.threads.max";
-  static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
-      "hdds.datanode.periodic.disk.check.interval.minutes";
-  public static final String DISK_CHECK_FILE_SIZE_KEY =
-      "hdds.datanode.disk.check.io.file.size";
-  public static final String DISK_CHECK_IO_TEST_COUNT_KEY =
-      "hdds.datanode.disk.check.io.test.count";
-  public static final String DISK_CHECK_IO_FAILURES_TOLERATED_KEY =
-      "hdds.datanode.disk.check.io.failures.tolerated";
-  public static final String FAILED_DATA_VOLUMES_TOLERATED_KEY =
-      "hdds.datanode.failed.data.volumes.tolerated";
-  public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY =
-      "hdds.datanode.failed.metadata.volumes.tolerated";
-  public static final String FAILED_DB_VOLUMES_TOLERATED_KEY =
-      "hdds.datanode.failed.db.volumes.tolerated";
-  public static final String DISK_CHECK_MIN_GAP_KEY =
-      "hdds.datanode.disk.check.min.gap";
-  public static final String DISK_CHECK_TIMEOUT_KEY =
-      "hdds.datanode.disk.check.timeout";
+  static final String CONTAINER_DELETE_THREADS_MAX_KEY = "hdds.datanode.container.delete.threads.max";
+  static final String CONTAINER_CLOSE_THREADS_MAX_KEY = "hdds.datanode.container.close.threads.max";
+  static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY = "hdds.datanode.periodic.disk.check.interval.minutes";
+  public static final String DISK_CHECK_FILE_SIZE_KEY = "hdds.datanode.disk.check.io.file.size";
+  public static final String DISK_CHECK_IO_TEST_COUNT_KEY = "hdds.datanode.disk.check.io.test.count";
+  public static final String DISK_CHECK_IO_FAILURES_TOLERATED_KEY = "hdds.datanode.disk.check.io.failures.tolerated";
+  public static final String FAILED_DATA_VOLUMES_TOLERATED_KEY = "hdds.datanode.failed.data.volumes.tolerated";
+  public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY = "hdds.datanode.failed.metadata.volumes.tolerated";
+  public static final String FAILED_DB_VOLUMES_TOLERATED_KEY = "hdds.datanode.failed.db.volumes.tolerated";
+  public static final String DISK_CHECK_MIN_GAP_KEY = "hdds.datanode.disk.check.min.gap";
+  public static final String DISK_CHECK_TIMEOUT_KEY = "hdds.datanode.disk.check.timeout";
 
-  public static final String WAIT_ON_ALL_FOLLOWERS =
-      "hdds.datanode.wait.on.all.followers";
-  public static final String CONTAINER_SCHEMA_V3_ENABLED =
-      "hdds.datanode.container.schema.v3.enabled";
+  // Minimum space should be left on volume.
+  // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
+  // In this case when availableSpace is 10GB or below, volume is assumed as full
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE = "hdds.datanode.volume.min.free.space";
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT = "5GB";
+  // Minimum percent of space should be left on volume.
+  // Ex: If volume has 1000GB and minFreeSpacePercent is configured as 2%,
+  // In this case when availableSpace is 20GB(2% of 1000) or below, volume is assumed as full
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
+      "hdds.datanode.volume.min.free.space.percent";
+  static final byte MIN_FREE_SPACE_UNSET = -1;
+
+  public static final String WAIT_ON_ALL_FOLLOWERS = "hdds.datanode.wait.on.all.followers";
+  public static final String CONTAINER_SCHEMA_V3_ENABLED = "hdds.datanode.container.schema.v3.enabled";
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
@@ -97,23 +99,24 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
   static final int ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT = 64;
   // one hour
-  static final long ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT =
-      1L * 60 * 60 * 1000 * 1000;
+  static final long ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT = 1L * 60 * 60 * 1000 * 1000;
   static final int ROCKSDB_MAX_OPEN_FILES_DEFAULT = 1024;
-  public static final String ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY =
-      "hdds.datanode.rocksdb.log.max-file-size";
-  public static final String ROCKSDB_LOG_MAX_FILE_NUM_KEY =
-      "hdds.datanode.rocksdb.log.max-file-num";
-  public static final String
-      ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
+  public static final String ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY = "hdds.datanode.rocksdb.log.max-file-size";
+  public static final String ROCKSDB_LOG_MAX_FILE_NUM_KEY = "hdds.datanode.rocksdb.log.max-file-num";
+  public static final String ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
       "hdds.datanode.rocksdb.delete_obsolete_files_period";
-  public static final Boolean
-      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
+  public static final Boolean OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
 
-  private static final long
-      AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT = 120;
-  private static final int
-      AUTO_COMPACTION_SMALL_SST_FILE_THREADS_DEFAULT = 1;
+  private static final long AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT = 120;
+  private static final int AUTO_COMPACTION_SMALL_SST_FILE_THREADS_DEFAULT = 1;
+
+  static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
+  static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
+  static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
+
+  public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
+      "hdds.datanode.block.delete.command.worker.interval";
+  public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT = Duration.ofSeconds(2);
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -122,19 +125,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.INT,
       defaultValue = "10",
       tags = {DATANODE},
-      description = "Number of threads per volume that Datanode will use for " +
-          "reading replicated chunks."
+      description = "Number of threads per volume that Datanode will use for reading replicated chunks."
   )
   private int numReadThreadPerVolume = 10;
-
-  static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
-  static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
-  static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
-
-  public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
-      "hdds.datanode.block.delete.command.worker.interval";
-  public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT =
-      Duration.ofSeconds(2);
 
   /**
    * The maximum number of threads used to delete containers on a datanode
@@ -144,8 +137,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.INT,
       defaultValue = "2",
       tags = {DATANODE},
-      description = "The maximum number of threads used to delete containers " +
-          "on a datanode"
+      description = "The maximum number of threads used to delete containers on a datanode"
   )
   private int containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
 
@@ -157,8 +149,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.INT,
       defaultValue = "3",
       tags = {DATANODE},
-      description = "The maximum number of threads used to close containers " +
-          "on a datanode"
+      description = "The maximum number of threads used to close containers on a datanode"
   )
   private int containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
 
@@ -173,8 +164,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.INT,
       defaultValue = "5",
       tags = {DATANODE},
-      description = "The maximum number of threads used to handle delete " +
-          " blocks on a datanode"
+      description = "The maximum number of threads used to handle delete blocks on a datanode"
   )
   private int blockDeleteThreads = BLOCK_DELETE_THREADS_DEFAULT;
 
@@ -201,8 +191,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.TIME,
       defaultValue = "2s",
       tags = {DATANODE},
-      description = "The interval between DeleteCmdWorker execution of " +
-          "delete commands."
+      description = "The interval between DeleteCmdWorker execution of delete commands."
   )
   private Duration blockDeleteCommandWorkerInterval =
       BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
@@ -215,8 +204,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.INT,
       defaultValue = "5000",
       tags = {DATANODE},
-      description = "The default maximum number of commands in the queue " +
-          "and command type's sub-queue on a datanode"
+      description = "The default maximum number of commands in the queue and command type's sub-queue on a datanode"
   )
   private int cmdQueueLimit = 5000;
 
@@ -256,41 +244,18 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "100ms",
       type = ConfigType.TIME,
       tags = { DATANODE, ConfigTag.DELETION},
-      description = "Timeout for the thread used to process the delete" +
-          " block command to wait for the container lock."
+      description = "Timeout for the thread used to process the delete block command to wait for the container lock."
   )
-  private long blockDeleteMaxLockWaitTimeoutMs =
-      Duration.ofMillis(100).toMillis();
-
-  public Duration getBlockDeletionInterval() {
-    return blockDeletionInterval;
-  }
-
-  public void setRecoveringContainerScrubInterval(Duration duration) {
-    recoveringContainerScrubInterval = duration;
-  }
-
-  public Duration getRecoveringContainerScrubInterval() {
-    return recoveringContainerScrubInterval;
-  }
-
-  public void setBlockDeletionInterval(Duration duration) {
-    blockDeletionInterval = duration;
-  }
+  private long blockDeleteMaxLockWaitTimeoutMs = Duration.ofMillis(100).toMillis();
 
   @Config(key = "block.deleting.limit.per.interval",
       defaultValue = "5000",
       reconfigurable = true,
       type = ConfigType.INT,
       tags = { ConfigTag.SCM, ConfigTag.DELETION },
-      description =
-          "Number of blocks to be deleted in an interval."
+      description = "Number of blocks to be deleted in an interval."
   )
   private int blockLimitPerInterval = 5000;
-
-  public int getBlockDeletionLimit() {
-    return blockLimitPerInterval;
-  }
 
   @Config(key = "block.deleting.max.lock.holding.time",
       defaultValue = "1s",
@@ -305,20 +270,33 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           + "which means the actual execution time may exceed this limit. "
           + "Unit could be defined with postfix (ns,ms,s,m,h,d). "
   )
-  private long blockDeletingMaxLockHoldingTime =
-      Duration.ofSeconds(1).toMillis();
+  private long blockDeletingMaxLockHoldingTime = Duration.ofSeconds(1).toMillis();
 
-  public Duration getBlockDeletingMaxLockHoldingTime() {
-    return Duration.ofMillis(blockDeletingMaxLockHoldingTime);
-  }
+  @Config(key = "hdds.datanode.volume.min.free.space",
+      defaultValue = "-1",
+      type = ConfigType.SIZE,
+      tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
+      description = "This determines the free space to be used for closing containers" +
+          " When the difference between volume capacity and used reaches this number," +
+          " containers that reside on this volume will be closed and no new containers" +
+          " would be allocated on this volume." +
+          " Either of min.free.space or min.free.space.percent should be configured, when both are set then" +
+          " min.free.space will be used."
+  )
+  private long minFreeSpace = MIN_FREE_SPACE_UNSET;
 
-  public void setBlockDeletingMaxLockHoldingTime(Duration maxLockHoldingTime) {
-    blockDeletingMaxLockHoldingTime = maxLockHoldingTime.toMillis();
-  }
-
-  public void setBlockDeletionLimit(int limit) {
-    this.blockLimitPerInterval = limit;
-  }
+  @Config(key = "hdds.datanode.volume.min.free.space.percent",
+      defaultValue = "-1",
+      type = ConfigType.FLOAT,
+      tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
+      description = "This determines the free space percent to be used for closing containers" +
+          " When the difference between volume capacity and used reaches (free.space.percent of volume capacity)," +
+          " containers that reside on this volume will be closed and no new containers" +
+          " would be allocated on this volume." +
+          " Either of min.free.space or min.free.space.percent should be configured, when both are set then" +
+          " min.free.space will be used."
+  )
+  private float minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
 
   @Config(key = "periodic.disk.check.interval.minutes",
       defaultValue = "60",
@@ -423,8 +401,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
-      description = "Enable safety checks such as checksum validation"
-          + " for Ratis calls."
+      description = "Enable safety checks such as checksum validation for Ratis calls."
   )
   private boolean isChunkDataValidationCheck =
       CHUNK_DATA_VALIDATION_CHECK_DEFAULT;
@@ -440,14 +417,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   private boolean waitOnAllFollowers = WAIT_ON_ALL_FOLLOWERS_DEFAULT;
 
-  public boolean waitOnAllFollowers() {
-    return waitOnAllFollowers;
-  }
-
-  public void setWaitOnAllFollowers(boolean val) {
-    this.waitOnAllFollowers = val;
-  }
-
   @Config(key = "container.schema.v3.enabled",
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
@@ -461,8 +430,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "|",
       type = ConfigType.STRING,
       tags = { DATANODE },
-      description = "The default separator between Container ID and container" +
-           " meta key name."
+      description = "The default separator between Container ID and container meta key name."
   )
   private String containerSchemaV3KeySeparator = "|";
 
@@ -470,8 +438,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "INFO",
       type = ConfigType.STRING,
       tags = { DATANODE },
-      description =
-          "The user log level of RocksDB(DEBUG/INFO/WARN/ERROR/FATAL))"
+      description = "The user log level of RocksDB(DEBUG/INFO/WARN/ERROR/FATAL))"
   )
   private String rocksdbLogLevel = "INFO";
 
@@ -479,8 +446,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "32MB",
       type = ConfigType.SIZE,
       tags = { DATANODE },
-      description = "The max size of each user log file of RocksDB. " +
-          "O means no size limit."
+      description = "The max size of each user log file of RocksDB. O means no size limit."
   )
   private long rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
 
@@ -499,8 +465,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "1h", timeUnit = MICROSECONDS,
       type = ConfigType.TIME,
       tags = { DATANODE },
-      description = "Periodicity when obsolete files get deleted. " +
-          "Default is 1h."
+      description = "Periodicity when obsolete files get deleted. Default is 1h."
   )
   private long rocksdbDeleteObsoleteFilesPeriod =
       ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
@@ -527,8 +492,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "1MB",
       type = ConfigType.SIZE,
       tags = { DATANODE },
-      description = "SST files smaller than this configuration will be " +
-          "auto compacted."
+      description = "SST files smaller than this configuration will be auto compacted."
   )
   private long autoCompactionSmallSstFileSize = 1024 * 1024;
 
@@ -536,8 +500,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "512",
       type = ConfigType.INT,
       tags = { DATANODE },
-      description = "Auto compaction will happen if the number of small SST " +
-          " files exceeds this threshold."
+      description = "Auto compaction will happen if the number of small SST files exceeds this threshold."
   )
   private int autoCompactionSmallSstFileNum = 512;
 
@@ -567,8 +530,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
       tags = { DATANODE },
-      description = "Boolean Flag to decide whether to check container " +
-          "directory or not to determine container is empty"
+      description = "Boolean Flag to decide whether to check container directory or not to determine container is empty"
   )
   private boolean bCheckEmptyContainerDir =
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT;
@@ -582,10 +544,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           "commands running for a very long time without SCM being informed of the progress."
   )
   private long deleteContainerTimeoutMs = Duration.ofSeconds(60).toMillis();
-
-  public long getDeleteContainerTimeoutMs() {
-    return deleteContainerTimeoutMs;
-  }
 
   @PostConstruct
   public void validate() {
@@ -720,30 +678,127 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       rocksdbDeleteObsoleteFilesPeriod =
           ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
     }
+
+    validateMinFreeSpace();
   }
 
-  public void setContainerDeleteThreads(int containerDeleteThreads) {
-    this.containerDeleteThreads = containerDeleteThreads;
+  /**
+   * If 'hdds.datanode.volume.min.free.space' is defined,
+   * it will be honored first. If it is not defined and
+   * 'hdds.datanode.volume.min.free.space.percent' is defined, it will honor this
+   * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
+   */
+  private void validateMinFreeSpace() {
+    if (minFreeSpaceRatio > 1) {
+      LOG.warn("{} = {} is invalid, should be between 0 and 1",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+          minFreeSpaceRatio);
+
+      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+    }
+
+    final boolean minFreeSpaceConfigured = minFreeSpace >= 0;
+    final boolean minFreeSpaceRatioConfigured = minFreeSpaceRatio >= 0;
+
+    if (minFreeSpaceConfigured && minFreeSpaceRatioConfigured) {
+      // Only one property should be configured.
+      // Since both properties are configured, HDDS_DATANODE_VOLUME_MIN_FREE_SPACE is used to determine minFreeSpace
+      LOG.warn("Only one of {}={} and {}={} should be set. With both set, {} value will be used.",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+          minFreeSpace,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+          minFreeSpaceRatio,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
+
+      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+    }
+
+    if (!minFreeSpaceConfigured && !minFreeSpaceRatioConfigured) {
+      // If both are not configured use defaultFreeSpace
+      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+      minFreeSpace = getDefaultFreeSpace();
+    }
+  }
+
+  public Duration getBlockDeletionInterval() {
+    return blockDeletionInterval;
+  }
+
+  public void setBlockDeletionInterval(Duration duration) {
+    blockDeletionInterval = duration;
+  }
+
+  public Duration getRecoveringContainerScrubInterval() {
+    return recoveringContainerScrubInterval;
+  }
+
+  public void setRecoveringContainerScrubInterval(Duration duration) {
+    recoveringContainerScrubInterval = duration;
+  }
+
+  public int getBlockDeletionLimit() {
+    return blockLimitPerInterval;
+  }
+
+  public void setBlockDeletionLimit(int limit) {
+    this.blockLimitPerInterval = limit;
+  }
+
+  public long getDeleteContainerTimeoutMs() {
+    return deleteContainerTimeoutMs;
+  }
+
+  public Duration getBlockDeletingMaxLockHoldingTime() {
+    return Duration.ofMillis(blockDeletingMaxLockHoldingTime);
+  }
+
+  public void setBlockDeletingMaxLockHoldingTime(Duration maxLockHoldingTime) {
+    blockDeletingMaxLockHoldingTime = maxLockHoldingTime.toMillis();
+  }
+
+  public boolean waitOnAllFollowers() {
+    return waitOnAllFollowers;
+  }
+
+  public void setWaitOnAllFollowers(boolean val) {
+    this.waitOnAllFollowers = val;
   }
 
   public int getContainerDeleteThreads() {
     return containerDeleteThreads;
   }
 
-  public void setContainerCloseThreads(int containerCloseThreads) {
-    this.containerCloseThreads = containerCloseThreads;
+  public void setContainerDeleteThreads(int containerDeleteThreads) {
+    this.containerDeleteThreads = containerDeleteThreads;
   }
 
   public int getContainerCloseThreads() {
     return containerCloseThreads;
   }
 
+  public void setContainerCloseThreads(int containerCloseThreads) {
+    this.containerCloseThreads = containerCloseThreads;
+  }
+
+  public long getMinFreeSpace(long capacity) {
+    return minFreeSpaceRatio >= 0
+        ? ((long) (capacity * minFreeSpaceRatio))
+        : minFreeSpace;
+  }
+
+  public long getMinFreeSpace() {
+    return minFreeSpace;
+  }
+
+  public float getMinFreeSpaceRatio() {
+    return minFreeSpaceRatio;
+  }
+
   public long getPeriodicDiskCheckIntervalMinutes() {
     return periodicDiskCheckIntervalMinutes;
   }
 
-  public void setPeriodicDiskCheckIntervalMinutes(
-      long periodicDiskCheckIntervalMinutes) {
+  public void setPeriodicDiskCheckIntervalMinutes(long periodicDiskCheckIntervalMinutes) {
     this.periodicDiskCheckIntervalMinutes = periodicDiskCheckIntervalMinutes;
   }
 
@@ -827,12 +882,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     return blockDeleteQueueLimit;
   }
 
-  public long getBlockDeleteMaxLockWaitTimeoutMs() {
-    return blockDeleteMaxLockWaitTimeoutMs;
-  }
-
   public void setBlockDeleteQueueLimit(int queueLimit) {
     this.blockDeleteQueueLimit = queueLimit;
+  }
+
+  public long getBlockDeleteMaxLockWaitTimeoutMs() {
+    return blockDeleteMaxLockWaitTimeoutMs;
   }
 
   public Duration getBlockDeleteCommandWorkerInterval() {
@@ -860,12 +915,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     isChunkDataValidationCheck = writeChunkValidationCheck;
   }
 
-  public void setNumReadThreadPerVolume(int threads) {
-    this.numReadThreadPerVolume = threads;
-  }
-
   public int getNumReadThreadPerVolume() {
     return numReadThreadPerVolume;
+  }
+
+  public void setNumReadThreadPerVolume(int threads) {
+    this.numReadThreadPerVolume = threads;
   }
 
   public boolean getContainerSchemaV3Enabled() {
@@ -952,8 +1007,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     return autoCompactionSmallSstFileIntervalMinutes;
   }
 
-  public void setAutoCompactionSmallSstFileIntervalMinutes(
-      long autoCompactionSmallSstFileIntervalMinutes) {
+  public void setAutoCompactionSmallSstFileIntervalMinutes(long autoCompactionSmallSstFileIntervalMinutes) {
     this.autoCompactionSmallSstFileIntervalMinutes =
         autoCompactionSmallSstFileIntervalMinutes;
   }
@@ -962,9 +1016,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     return autoCompactionSmallSstFileThreads;
   }
 
-  public void setAutoCompactionSmallSstFileThreads(
-      int autoCompactionSmallSstFileThreads) {
+  public void setAutoCompactionSmallSstFileThreads(int autoCompactionSmallSstFileThreads) {
     this.autoCompactionSmallSstFileThreads =
         autoCompactionSmallSstFileThreads;
+  }
+
+  static long getDefaultFreeSpace() {
+    final StorageSize measure = StorageSize.parse(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
+    return Math.round(measure.getUnit().toBytes(measure.getValue()));
   }
 }

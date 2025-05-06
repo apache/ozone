@@ -1,29 +1,27 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,12 +32,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 /**
  * This class provides a set of methods to test for over / under replication of
@@ -331,6 +330,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     distinct.addAll(maintenanceIndexes.keySet());
     return distinct;
   }
+
   /**
    * Returns an unsorted list of indexes which need additional copies to
    * ensure the container is sufficiently replicated. These missing indexes will
@@ -546,32 +546,30 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     return isSufficientlyReplicated(false);
   }
 
-
-
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("Container State: ").append(containerInfo.getState())
         .append(", Replicas: (Count: ").append(replicas.size());
-    if (healthyIndexes.size() > 0) {
+    if (!healthyIndexes.isEmpty()) {
       sb.append(", Healthy: ").append(healthyIndexes.size());
     }
-    if (unhealthyReplicaDNs.size() > 0) {
+    if (!unhealthyReplicaDNs.isEmpty()) {
       sb.append(", Unhealthy: ").append(unhealthyReplicaDNs.size());
     }
-    if (decommissionIndexes.size() > 0) {
+    if (!decommissionIndexes.isEmpty()) {
       sb.append(", Decommission: ").append(decommissionIndexes.size());
     }
-    if (maintenanceIndexes.size() > 0) {
+    if (!maintenanceIndexes.isEmpty()) {
       sb.append(", Maintenance: ").append(maintenanceIndexes.size());
     }
-    if (pendingAdd.size() > 0) {
+    if (!pendingAdd.isEmpty()) {
       sb.append(", PendingAdd: ").append(pendingAdd.size());
     }
-    if (pendingDelete.size() > 0) {
+    if (!pendingDelete.isEmpty()) {
       sb.append(", PendingDelete: ").append(pendingDelete.size());
     }
-    sb.append(")")
+    sb.append(')')
         .append(", ReplicationConfig: ").append(repConfig)
         .append(", RemainingMaintenanceRedundancy: ")
         .append(remainingMaintenanceRedundancy);

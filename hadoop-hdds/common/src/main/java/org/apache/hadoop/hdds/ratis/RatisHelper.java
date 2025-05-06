@@ -1,23 +1,26 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.ratis;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.ratis.util.Preconditions.assertTrue;
+
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
@@ -27,12 +30,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
-
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import javax.net.ssl.TrustManager;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -43,7 +46,6 @@ import org.apache.hadoop.hdds.ratis.retrypolicy.RetryPolicyCreator;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
@@ -65,6 +67,7 @@ import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.util.JavaUtils;
@@ -72,11 +75,6 @@ import org.apache.ratis.util.JvmPauseMonitor;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.net.ssl.TrustManager;
-
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.apache.ratis.util.Preconditions.assertTrue;
 
 /**
  * Ratis helper methods.
@@ -415,7 +413,6 @@ public final class RatisHelper {
     });
   }
 
-
   private static Map<String, String> getDatanodeRatisPrefixProps(
       ConfigurationSource configuration) {
     return configuration.getPropsMatchPrefixAndTrimPrefix(
@@ -454,8 +451,8 @@ public final class RatisHelper {
 
   private static boolean datanodeUseHostName() {
     return CONF.getBoolean(
-            DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-            DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+            HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+            HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
   }
 
   private static <U> Class<? extends U> getClass(String name,
@@ -532,7 +529,6 @@ public final class RatisHelper {
         HIGHER_PRIORITY : NEUTRAL_PRIORITY;
     return RaftPeer.newBuilder(peer).setPriority(priority).build();
   }
-
 
   /**
    * Use raft client to send admin request, transfer the leadership.
@@ -647,6 +643,17 @@ public final class RatisHelper {
     final long interval = pollInterval.toMillis();
     assertTrue(max >= interval, () -> "max: " + maxDuration + " < interval:" + pollInterval);
     return (int) (max / interval);
+  }
+
+  public static void setFirstElectionTimeoutDuration(
+      ConfigurationSource conf, RaftProperties properties, String configKey) {
+    long firstElectionTimeout = conf.getTimeDuration(configKey, -1, TimeUnit.MILLISECONDS);
+    if (firstElectionTimeout > 0) {
+      RaftServerConfigKeys.Rpc.setFirstElectionTimeoutMin(
+          properties,  TimeDuration.valueOf(firstElectionTimeout, TimeUnit.MILLISECONDS));
+      RaftServerConfigKeys.Rpc.setFirstElectionTimeoutMax(
+          properties,  TimeDuration.valueOf(firstElectionTimeout + 200, TimeUnit.MILLISECONDS));
+    }
   }
 
 }

@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.net;
 
+import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
+
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -25,38 +29,23 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR;
 
 /**
  * A thread safe class that implements InnerNode interface.
  */
 public class InnerNodeImpl extends NodeImpl implements InnerNode {
-  protected static class Factory implements InnerNode.Factory<InnerNodeImpl> {
-    protected Factory() { }
-
-    @Override
-    public InnerNodeImpl newInnerNode(String name, String location,
-        InnerNode parent, int level, int cost) {
-      return new InnerNodeImpl(name, location, parent, level, cost);
-    }
-  }
+  // LOGGER
+  private static final Logger LOG = LoggerFactory.getLogger(InnerNodeImpl.class);
 
   public static final Factory FACTORY = new Factory();
   // a map of node's network name to Node for quick search and keep
   // the insert order
-  private HashMap<String, Node> childrenMap =
-      new LinkedHashMap<String, Node>();
+  private HashMap<String, Node> childrenMap = new LinkedHashMap<String, Node>();
   // number of descendant leaves under this node
   private int numOfLeaves;
-  // LOGGER
-  public static final Logger LOG = LoggerFactory.getLogger(InnerNodeImpl.class);
 
   /**
    * Construct an InnerNode from its name, network location, parent, level and
@@ -575,7 +564,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     Preconditions.checkState(genToExclude >= 0);
     Preconditions.checkState(genToReturn >= 0);
 
-    if (nodes == null || nodes.size() == 0) {
+    if (nodes == null || nodes.isEmpty()) {
       return Collections.emptyMap();
     }
     // with the recursive call, genToReturn can be smaller than genToExclude
@@ -620,7 +609,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       if (excludedNodes != null && excludedNodes.contains(node)) {
         continue;
       }
-      if (excludedScopes != null && excludedScopes.size() > 0) {
+      if (excludedScopes != null && !excludedScopes.isEmpty()) {
         if (excludedScopes.stream().anyMatch(node::isDescendant)) {
           continue;
         }
@@ -687,5 +676,15 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
           excludedScopeNode.getNumOfLeaves());
     }
     return nodeCounts;
+  }
+
+  protected static class Factory implements InnerNode.Factory<InnerNodeImpl> {
+    protected Factory() { }
+
+    @Override
+    public InnerNodeImpl newInnerNode(String name, String location,
+        InnerNode parent, int level, int cost) {
+      return new InnerNodeImpl(name, location, parent, level, cost);
+    }
   }
 }

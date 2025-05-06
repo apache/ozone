@@ -1,38 +1,34 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone;
-
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.regex.Pattern;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
  * Set of constants used in Ozone implementation.
  */
 @InterfaceAudience.Private
 public final class OzoneConsts {
-
-
   public static final String STORAGE_DIR = "scm";
   public static final String SCM_ID = "scmUuid";
   public static final String SCM_HA = "scmHA";
@@ -70,7 +66,6 @@ public final class OzoneConsts {
   public static final String OZONE_ACL_READ_ACL = "x";
   public static final String OZONE_ACL_WRITE_ACL = "y";
 
-
   public static final String OZONE_DATE_FORMAT =
       "EEE, dd MMM yyyy HH:mm:ss zzz";
   public static final String OZONE_TIME_ZONE = "GMT";
@@ -91,7 +86,6 @@ public final class OzoneConsts {
   public static final String OZONE_URI_DELIMITER = "/";
   public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
   public static final Path ROOT_PATH = Paths.get(OZONE_ROOT);
-
 
   public static final String CONTAINER_EXTENSION = ".container";
   public static final String CONTAINER_META_PATH = "metadata";
@@ -172,6 +166,7 @@ public final class OzoneConsts {
    */
 
   public static final String OM_KEY_PREFIX = "/";
+  public static final String DOUBLE_SLASH_OM_KEY_PREFIX  = "//";
   public static final String OM_USER_PREFIX = "$";
   public static final String OM_S3_PREFIX = "S3:";
   public static final String OM_S3_CALLER_CONTEXT_PREFIX = "S3Auth:S3G|";
@@ -183,17 +178,11 @@ public final class OzoneConsts {
    */
   public static final int OZONE_SCM_CHUNK_MAX_SIZE = 32 * 1024 * 1024;
 
-
   /**
    * Quota RESET default is -1, which means quota is not set.
    */
   public static final long QUOTA_RESET = -1;
   public static final long OLD_QUOTA_DEFAULT = -2;
-
-  /**
-   * Quota Units.
-   */
-  public enum Units { TB, GB, MB, KB, B }
 
   /**
    * Object ID to identify reclaimable uncommitted blocks.
@@ -212,10 +201,6 @@ public final class OzoneConsts {
   public static final String OM_CONTEXT_ATTRIBUTE = "ozone.om";
 
   public static final String SCM_CONTEXT_ATTRIBUTE = "ozone.scm";
-
-  private OzoneConsts() {
-    // Never Constructed
-  }
 
   // YAML fields for .container files
   public static final String CONTAINER_ID = "containerID";
@@ -540,4 +525,13 @@ public final class OzoneConsts {
    * S3G multipart upload request's ETag header key.
    */
   public static final String ETAG = "ETag";
+
+  private OzoneConsts() {
+    // Never Constructed
+  }
+
+  /**
+   * Quota Units.
+   */
+  public enum Units { TB, GB, MB, KB, B }
 }

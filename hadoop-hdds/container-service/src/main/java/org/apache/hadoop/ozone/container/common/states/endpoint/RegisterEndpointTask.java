@@ -1,50 +1,43 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.UUID;
+import java.util.concurrent.Callable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .EndpointStateMachine;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.NodeReportProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
 
 /**
  * Register a datanode with SCM.
@@ -54,8 +47,6 @@ public final class RegisterEndpointTask implements
   static final Logger LOG = LoggerFactory.getLogger(RegisterEndpointTask.class);
 
   private final EndpointStateMachine rpcEndPoint;
-  private final ConfigurationSource conf;
-  private Future<EndpointStateMachine.EndPointStates> result;
   private DatanodeDetails datanodeDetails;
   private final OzoneContainer datanodeContainerManager;
   private StateContext stateContext;
@@ -65,34 +56,15 @@ public final class RegisterEndpointTask implements
    * Creates a register endpoint task.
    *
    * @param rpcEndPoint - endpoint
-   * @param conf - conf
-   * @param ozoneContainer - container
-   * @param context - State context
-   */
-  @VisibleForTesting
-  public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
-                              ConfigurationSource conf,
-                              OzoneContainer ozoneContainer,
-                              StateContext context) {
-    this(rpcEndPoint, conf, ozoneContainer, context,
-        context.getParent().getLayoutVersionManager());
-  }
-
-  /**
-   * Creates a register endpoint task.
-   *
-   * @param rpcEndPoint - endpoint
-   * @param conf - conf
    * @param ozoneContainer - container
    * @param context - State context
    * @param versionManager - layout version Manager
    */
   @VisibleForTesting
   public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
-      ConfigurationSource conf, OzoneContainer ozoneContainer,
+      OzoneContainer ozoneContainer,
       StateContext context, HDDSLayoutVersionManager versionManager) {
     this.rpcEndPoint = rpcEndPoint;
-    this.conf = conf;
     this.datanodeContainerManager = ozoneContainer;
     this.stateContext = context;
     if (versionManager != null) {
@@ -311,7 +283,7 @@ public final class RegisterEndpointTask implements
       }
 
       RegisterEndpointTask task = new RegisterEndpointTask(this
-          .endPointStateMachine, this.conf, this.container, this.context,
+          .endPointStateMachine, this.container, this.context,
           this.versionManager);
       task.setDatanodeDetails(datanodeDetails);
       return task;

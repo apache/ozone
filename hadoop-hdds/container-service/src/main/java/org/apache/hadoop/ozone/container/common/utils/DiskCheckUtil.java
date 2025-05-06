@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,30 +17,37 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.nio.file.StandardOpenOption.WRITE;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.SyncFailedException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
+import org.apache.ratis.util.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class that supports checking disk health when provided a directory
  * where the disk is mounted.
  */
 public final class DiskCheckUtil {
-  private DiskCheckUtil() { }
-
   // For testing purposes, an alternate check implementation can be provided
   // to inject failures.
   private static DiskChecks impl = new DiskChecksImpl();
+
+  private DiskCheckUtil() {
+  }
 
   @VisibleForTesting
   public static void setTestImpl(DiskChecks diskChecks) {
@@ -75,9 +81,11 @@ public final class DiskCheckUtil {
     default boolean checkExistence(File storageDir) {
       return true;
     }
+
     default boolean checkPermissions(File storageDir) {
       return true;
     }
+
     default boolean checkReadWrite(File storageDir, File testFileDir,
                             int numBytesToWrite) {
       return true;
@@ -134,10 +142,9 @@ public final class DiskCheckUtil {
       File testFile = new File(testFileDir, "disk-check-" + UUID.randomUUID());
       byte[] writtenBytes = new byte[numBytesToWrite];
       RANDOM.nextBytes(writtenBytes);
-      try (FileOutputStream fos = new FileOutputStream(testFile)) {
+      try (OutputStream fos = FileUtils.newOutputStreamForceAtClose(testFile, CREATE, TRUNCATE_EXISTING, WRITE)) {
         fos.write(writtenBytes);
-        fos.getFD().sync();
-      } catch (FileNotFoundException notFoundEx) {
+      } catch (FileNotFoundException | NoSuchFileException notFoundEx) {
         logError(storageDir, String.format("Could not find file %s for " +
             "volume check.", testFile.getAbsolutePath()), notFoundEx);
         return false;
@@ -153,7 +160,7 @@ public final class DiskCheckUtil {
 
       // Read data back from the test file.
       byte[] readBytes = new byte[numBytesToWrite];
-      try (FileInputStream fis = new FileInputStream(testFile)) {
+      try (InputStream fis = Files.newInputStream(testFile.toPath())) {
         int numBytesRead = fis.read(readBytes);
         if (numBytesRead != numBytesToWrite) {
           logError(storageDir, String.format("%d bytes written to file %s " +
@@ -161,7 +168,7 @@ public final class DiskCheckUtil {
               testFile.getAbsolutePath(), numBytesRead));
           return false;
         }
-      } catch (FileNotFoundException notFoundEx) {
+      } catch (FileNotFoundException | NoSuchFileException notFoundEx) {
         logError(storageDir, String.format("Could not find file %s " +
             "for volume check.", testFile.getAbsolutePath()), notFoundEx);
         return false;

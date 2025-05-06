@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,9 +17,30 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.FAILED;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-
+import java.io.File;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -36,11 +56,9 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.FakeTimer;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -48,35 +66,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.nio.file.Path;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-
-import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.FAILED;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.isNull;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-
 /**
  * Tests for {@link StorageVolumeChecker}.
  */
-@Timeout(300)
 public class TestStorageVolumeChecker {
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestStorageVolumeChecker.class);
 
   private static final int NUM_VOLUMES = 2;
@@ -91,12 +85,8 @@ public class TestStorageVolumeChecker {
    */
   private VolumeCheckResult expectedVolumeHealth;
 
-  private ContainerLayoutVersion layoutVersion;
-
-  private void initTest(VolumeCheckResult result,
-      ContainerLayoutVersion layout) {
+  private void initTest(VolumeCheckResult result) {
     this.expectedVolumeHealth = result;
-    this.layoutVersion = layout;
     setup();
   }
 
@@ -110,13 +100,19 @@ public class TestStorageVolumeChecker {
    * Run each test case for each possible value of {@link VolumeCheckResult}.
    * Including "null" for 'throw exception'.
    */
+  private static List<VolumeCheckResult> volumeCheckResults() {
+    List<VolumeCheckResult> list = new ArrayList<>(Arrays.asList(VolumeCheckResult.values()));
+    list.add(null);
+    return list;
+  }
+
   private static List<Arguments> provideTestData() {
+    List<VolumeCheckResult> volumeCheckResults = volumeCheckResults();
     List<Arguments> values = new ArrayList<>();
     for (ContainerLayoutVersion layout : ContainerLayoutVersion.values()) {
-      for (VolumeCheckResult result : VolumeCheckResult.values()) {
+      for (VolumeCheckResult result : volumeCheckResults) {
         values.add(Arguments.of(result, layout));
       }
-      values.add(Arguments.of(null, layout));
     }
     return values;
   }
@@ -125,23 +121,18 @@ public class TestStorageVolumeChecker {
   /**
    * Test {@link StorageVolumeChecker#checkVolume} propagates the
    * check to the delegate checker.
-   *
-   * @throws Exception
    */
   @ParameterizedTest
-  @MethodSource("provideTestData")
-  public void testCheckOneVolume(
-      VolumeCheckResult checkResult, ContainerLayoutVersion layout,
-      TestInfo testInfo) throws Exception {
-    initTest(checkResult, layout);
-    LOG.info("Executing {}", testInfo.getTestMethod());
+  @MethodSource("volumeCheckResults")
+  public void testCheckOneVolume(VolumeCheckResult checkResult) throws Exception {
+    initTest(checkResult);
     final HddsVolume volume = makeVolumes(1, expectedVolumeHealth).get(0);
     final StorageVolumeChecker checker =
         new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer(), "");
     checker.setDelegateChecker(new DummyChecker());
     final AtomicLong numCallbackInvocations = new AtomicLong(0);
 
-    /**
+    /*
      * Request a check and ensure it triggered {@link HddsVolume#check}.
      */
     boolean result =
@@ -171,15 +162,11 @@ public class TestStorageVolumeChecker {
   /**
    * Test {@link StorageVolumeChecker#checkAllVolumes} propagates
    * checks for all volumes to the delegate checker.
-   *
-   * @throws Exception
    */
   @ParameterizedTest
-  @MethodSource("provideTestData")
-  public void testCheckAllVolumes(VolumeCheckResult checkResult,
-      ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
-    initTest(checkResult, layout);
-    LOG.info("Executing {}", testInfo.getTestMethod());
+  @MethodSource("volumeCheckResults")
+  public void testCheckAllVolumes(VolumeCheckResult checkResult) throws Exception {
+    initTest(checkResult);
 
     final List<HddsVolume> volumes = makeVolumes(
         NUM_VOLUMES, expectedVolumeHealth);
@@ -209,15 +196,12 @@ public class TestStorageVolumeChecker {
   /**
    * Test {@link StorageVolumeChecker#checkAllVolumes} propagates
    * checks for all volumes to the delegate checker.
-   *
-   * @throws Exception
    */
   @ParameterizedTest
   @MethodSource("provideTestData")
   public void testVolumeDeletion(VolumeCheckResult checkResult,
-      ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
-    initTest(checkResult, layout);
-    LOG.info("Executing {}", testInfo.getTestMethod());
+      ContainerLayoutVersion layout) throws Exception {
+    initTest(checkResult);
 
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
@@ -284,7 +268,7 @@ public class TestStorageVolumeChecker {
         return Optional.of(
             Futures.immediateFuture(target.check(context)));
       } catch (Exception e) {
-        LOG.info("check routine threw exception {}", e);
+        LOG.info("check routine threw exception", e);
         return Optional.of(Futures.immediateFailedFuture(e));
       }
     }

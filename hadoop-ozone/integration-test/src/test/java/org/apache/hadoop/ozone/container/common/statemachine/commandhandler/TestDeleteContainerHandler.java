@@ -1,22 +1,39 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -56,35 +73,14 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-
-import java.io.File;
-import java.io.IOException;
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
-import org.slf4j.LoggerFactory;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests DeleteContainerCommand Handler.
  */
-@Timeout(300)
 public class TestDeleteContainerHandler {
 
   private static OzoneClient client;
@@ -217,7 +213,7 @@ public class TestDeleteContainerHandler {
     File lingeringBlock =
         new File(containerInternalObj.
             getContainerData().getChunksPath() + "/1.block");
-    lingeringBlock.createNewFile();
+    FileUtils.touch(lingeringBlock);
 
     // Check container exists before sending delete container command
     assertFalse(isContainerDeleted(hddsDatanodeService, containerId.getId()));
@@ -237,15 +233,14 @@ public class TestDeleteContainerHandler {
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     // Check the log for the error message when deleting non-empty containers
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(KeyValueHandler.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(KeyValueHandler.class);
     GenericTestUtils.waitFor(() ->
             logCapturer.getOutput().
                 contains("Files still part of the container on delete"),
         500,
         5 * 2000);
-    assertTrue(!isContainerDeleted(hddsDatanodeService, containerId.getId()));
+
+    assertFalse(isContainerDeleted(hddsDatanodeService, containerId.getId()));
     assertThat(beforeDeleteFailedCount).isLessThan(metrics.getContainerDeleteFailedNonEmpty());
     // Send the delete command. It should pass with force flag.
     // Deleting a non-empty container should pass on the DN when the force flag
@@ -336,7 +331,7 @@ public class TestDeleteContainerHandler {
     File lingeringBlock =
         new File(containerInternalObj.
             getContainerData().getChunksPath() + "/1.block");
-    lingeringBlock.createNewFile();
+    FileUtils.touch(lingeringBlock);
 
     // Check container exists before sending delete container command
     assertFalse(isContainerDeleted(hddsDatanodeService, containerId.getId()));
@@ -404,7 +399,7 @@ public class TestDeleteContainerHandler {
     File lingeringBlock =
         new File(containerInternalObj.
             getContainerData().getChunksPath() + "/1.block");
-    lingeringBlock.createNewFile();
+    FileUtils.touch(lingeringBlock);
     ContainerMetrics metrics =
         hddsDatanodeService
             .getDatanodeStateMachine().getContainer().getMetrics();
@@ -433,16 +428,14 @@ public class TestDeleteContainerHandler {
 
 
     // Check the log for the error message when deleting non-empty containers
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(KeyValueHandler.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(KeyValueHandler.class);
     GenericTestUtils.waitFor(() ->
             logCapturer.getOutput().
                 contains("the container is not empty with blockCount"),
         500,
         5 * 2000);
-    assertTrue(!isContainerDeleted(hddsDatanodeService,
-        containerId.getId()));
+
+    assertFalse(isContainerDeleted(hddsDatanodeService, containerId.getId()));
     assertThat(containerDeleteFailedNonEmptyBlockDB)
         .isLessThan(metrics.getContainerDeleteFailedNonEmpty());
 
@@ -555,7 +548,6 @@ public class TestDeleteContainerHandler {
 
   }
 
-
   private void clearBlocksTable(Container container) throws IOException {
     try (DBHandle dbHandle
              = BlockUtils.getDB(
@@ -642,9 +634,7 @@ public class TestDeleteContainerHandler {
     // Deleting a non-empty container should fail on DN when the force flag
     // is false.
     // Check the log for the error message when deleting non-empty containers
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(DeleteContainerCommandHandler.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(DeleteContainerCommandHandler.class);
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains("Non" +
             "-force deletion of non-empty container is not allowed"), 500,
         5 * 1000);

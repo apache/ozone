@@ -1,29 +1,28 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.repair;
 
 import jakarta.annotation.Nullable;
-import org.apache.hadoop.hdds.cli.AbstractSubcommand;
-import picocli.CommandLine;
-
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
+import picocli.CommandLine;
 
 /** Parent class for all actionable repair commands. */
 @CommandLine.Command
@@ -54,7 +53,8 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
 
   @Override
   public final Void call() throws Exception {
-    if (!dryRun) {
+    final Component service = serviceToBeOffline();
+    if (!dryRun && service != null) { // offline tool
       confirmUser();
     }
     if (isServiceStateOK()) {
@@ -101,12 +101,27 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
     return dryRun;
   }
 
+  /** Print to stdout the formatted from {@code msg} and {@code args}. */
   protected void info(String msg, Object... args) {
     out().println(formatMessage(msg, args));
   }
 
+  /** Print to stderr the formatted from {@code msg} and {@code args}. */
   protected void error(String msg, Object... args) {
     err().println(formatMessage(msg, args));
+  }
+
+  /** Print to stderr the message formatted from {@code msg} and {@code args},
+   * and also print the exception {@code t}. */
+  protected void error(Throwable t, String msg, Object... args) {
+    error(msg, args);
+    rootCommand().printError(t);
+  }
+
+  /** Fail with {@link IllegalStateException} using the message formatted from {@code msg} and {@code args}. */
+  protected void fatal(String msg, Object... args) {
+    String formatted = formatMessage(msg, args);
+    throw new IllegalStateException(formatted);
   }
 
   private String formatMessage(String msg, Object[] args) {

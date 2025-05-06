@@ -1,21 +1,48 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -51,49 +78,21 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
-import static org.apache.ozone.test.MetricsAsserts.getMetrics;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.spy;
 
 /**
  * Test for OM metrics.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public class TestOmMetrics {
   private MiniOzoneCluster cluster;
   private MiniOzoneCluster.Builder clusterBuilder;
@@ -199,7 +198,7 @@ public class TestOmMetrics {
         "volumeManager", mockVm);
 
     // inject exception to test for Failure Metrics on the write path
-    OMMetadataManager metadataManager = mockWritePathExceptions(OmVolumeArgs.class);
+    OMMetadataManager metadataManager = mockWritePathExceptions(TestOmMetrics::mockVolumeTable);
     volumeArgs = createVolumeArgs();
     doVolumeOps(volumeArgs);
 
@@ -291,7 +290,7 @@ public class TestOmMetrics {
         ozoneManager, "bucketManager", mockBm);
 
     // inject exception to test for Failure Metrics on the write path
-    OMMetadataManager metadataManager = mockWritePathExceptions(OmBucketInfo.class);
+    OMMetadataManager metadataManager = mockWritePathExceptions(TestOmMetrics::mockBucketTable);
     doBucketOps(bucketInfo);
 
     ecBucketInfo = createBucketInfo(true);
@@ -425,7 +424,7 @@ public class TestOmMetrics {
         omMetadataReader, "keyManager", mockKm);
 
     // inject exception to test for Failure Metrics on the write path
-    OMMetadataManager metadataManager = mockWritePathExceptions(OmBucketInfo.class);
+    OMMetadataManager metadataManager = mockWritePathExceptions(TestOmMetrics::mockBucketTable);
     keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     doKeyOps(keyArgs);
@@ -646,31 +645,32 @@ public class TestOmMetrics {
     assertEquals(initialNumSnapshotListFails + 1, getLongCounter("NumSnapshotListFails", omMetrics));
   }
 
-  private <T> OMMetadataManager mockWritePathExceptions(Class<T>klass) throws Exception {
-    String tableName;
-    if (klass == OmBucketInfo.class) {
-      tableName = "bucketTable";
-    } else {
-      tableName = "volumeTable";
-    }
-    OMMetadataManager metadataManager = (OMMetadataManager)
-        HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
-    OMMetadataManager mockMm = spy(metadataManager);
-    @SuppressWarnings("unchecked")
-    Table<String, T> table = (Table<String, T>)
-        HddsWhiteboxTestUtils.getInternalState(metadataManager, tableName);
-    Table<String, T> mockTable = spy(table);
-    doThrow(exception).when(mockTable).isExist(any());
-    if (klass == OmBucketInfo.class) {
-      doReturn(mockTable).when(mockMm).getBucketTable();
-    } else {
-      doReturn(mockTable).when(mockMm).getVolumeTable();
-    }
+  private OMMetadataManager mockWritePathExceptions(
+      Function<OMMetadataManager, Table<String, ?>> getTable
+  ) throws Exception {
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    OMMetadataManager spy = spy(metadataManager);
+    Table<String, ?> table = getTable.apply(spy);
+    doThrow(exception).when(table).isExist(any());
     HddsWhiteboxTestUtils.setInternalState(
-        ozoneManager, "metadataManager", mockMm);
+        ozoneManager, "metadataManager", spy);
 
     // Return the original metadataManager so it can be restored later
     return metadataManager;
+  }
+
+  private static Table<String, OmVolumeArgs> mockVolumeTable(OMMetadataManager spy) {
+    Table<String, OmVolumeArgs> table = spy(spy.getVolumeTable());
+    when(spy.getVolumeTable())
+        .thenReturn(table);
+    return table;
+  }
+
+  private static Table<String, OmBucketInfo> mockBucketTable(OMMetadataManager spy) {
+    Table<String, OmBucketInfo> table = spy(spy.getBucketTable());
+    when(spy.getBucketTable())
+        .thenReturn(table);
+    return table;
   }
 
   @Test
@@ -690,7 +690,7 @@ public class TestOmMetrics {
     // Test getAcl, addAcl, setAcl, removeAcl
     List<OzoneAcl> acls = ozoneManager.getAcl(volObj);
     writeClient.addAcl(volObj,
-        new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
+        OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
             ACCESS, IAccessAuthorizer.ACLType.ALL));
     writeClient.setAcl(volObj, acls);
     writeClient.removeAcl(volObj, acls.get(0));
@@ -745,7 +745,7 @@ public class TestOmMetrics {
     OMMetrics metrics = ozoneManager.getMetrics();
     long initialValue = metrics.getNumAddAcl();
     objectStore.addAcl(volObj,
-        new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
+        OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
             ACCESS, IAccessAuthorizer.ACLType.ALL));
 
     assertEquals(initialValue + 1, metrics.getNumAddAcl());
@@ -908,12 +908,14 @@ public class TestOmMetrics {
         .setAdminName("dummyAdmin")
         .build();
   }
+
   private OmBucketArgs getBucketArgs(OmBucketInfo info) {
     return new OmBucketArgs.Builder()
         .setVolumeName(info.getVolumeName())
         .setBucketName(info.getBucketName())
         .build();
   }
+
   private OmBucketInfo createBucketInfo(boolean isEcBucket) throws IOException {
     OmVolumeArgs volumeArgs = createVolumeArgs();
     writeClient.createVolume(volumeArgs);

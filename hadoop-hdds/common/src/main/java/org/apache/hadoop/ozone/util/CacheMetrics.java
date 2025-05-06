@@ -1,20 +1,20 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.util;
 
 import com.google.common.cache.Cache;
@@ -32,33 +32,7 @@ import org.apache.ratis.util.JavaUtils;
  */
 public final class CacheMetrics implements MetricsSource {
 
-  enum CacheMetricsInfo implements MetricsInfo {
-    CacheName("Cache Metrics."),
-    Size("Size of the cache."),
-    HitCount("Number of time the lookup methods return a cached value."),
-    HitRate("Ratio of cache requests which were hit."),
-    MissCount("Number of times the requested value is not in the cache."),
-    MissRate("Ratio of cache requests which were missed."),
-    LoadSuccessCount("Number of times the cache successfully " +
-        "load new values"),
-    LoadExceptionCount("Number of times the cache encounters exception " +
-        "loading new values."),
-    EvictionCount("Number of values which were evicted.");
-
-    private final String desc;
-
-    CacheMetricsInfo(String desc) {
-      this.desc = desc;
-    }
-
-    @Override
-    public String description() {
-      return desc;
-    }
-  }
-
-  public static final String SOURCE_NAME =
-      CacheMetrics.class.getSimpleName();
+  public static final String SOURCE_NAME = CacheMetrics.class.getSimpleName();
 
   private final Cache<?, ?> cache;
   private final String name;
@@ -107,5 +81,30 @@ public final class CacheMetrics implements MetricsSource {
   public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(sourceName);
+  }
+
+  enum CacheMetricsInfo implements MetricsInfo {
+    CacheName("Cache Metrics."),
+    Size("Size of the cache."),
+    HitCount("Number of time the lookup methods return a cached value."),
+    HitRate("Ratio of cache requests which were hit."),
+    MissCount("Number of times the requested value is not in the cache."),
+    MissRate("Ratio of cache requests which were missed."),
+    LoadSuccessCount("Number of times the cache successfully " +
+        "load new values"),
+    LoadExceptionCount("Number of times the cache encounters exception " +
+        "loading new values."),
+    EvictionCount("Number of values which were evicted.");
+
+    private final String desc;
+
+    CacheMetricsInfo(String desc) {
+      this.desc = desc;
+    }
+
+    @Override
+    public String description() {
+      return desc;
+    }
   }
 }

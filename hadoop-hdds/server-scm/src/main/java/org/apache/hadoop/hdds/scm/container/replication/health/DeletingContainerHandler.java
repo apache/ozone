@@ -1,36 +1,35 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Class used in Replication Manager to handle the
@@ -39,7 +38,7 @@ import java.util.stream.Collectors;
 public class DeletingContainerHandler extends AbstractCheck {
   private final ReplicationManager replicationManager;
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeletingContainerHandler.class);
 
   public DeletingContainerHandler(ReplicationManager replicationManager) {
@@ -76,7 +75,7 @@ public class DeletingContainerHandler extends AbstractCheck {
       return true;
     }
 
-    if (request.getContainerReplicas().size() == 0) {
+    if (request.getContainerReplicas().isEmpty()) {
       LOG.debug("Deleting Container {} has no replicas so marking for cleanup" +
           " and returning true", containerInfo);
       replicationManager.updateContainerState(
@@ -90,6 +89,7 @@ public class DeletingContainerHandler extends AbstractCheck {
     //resend deleteCommand if needed
     request.getContainerReplicas().stream()
         .filter(r -> !pendingDelete.contains(r.getDatanodeDetails()))
+        .filter(ContainerReplica::isEmpty)
         .forEach(rp -> {
           try {
             replicationManager.sendDeleteCommand(
@@ -98,7 +98,7 @@ public class DeletingContainerHandler extends AbstractCheck {
           } catch (NotLeaderException e) {
             LOG.warn("Failed to delete empty replica with index {} for " +
                     "container {} on datanode {}", rp.getReplicaIndex(),
-                cID, rp.getDatanodeDetails().getUuidString(), e);
+                cID, rp.getDatanodeDetails(), e);
           }
         });
     return true;

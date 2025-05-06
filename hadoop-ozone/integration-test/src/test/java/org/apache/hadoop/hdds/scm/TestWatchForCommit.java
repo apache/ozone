@@ -1,33 +1,40 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.RandomUtils;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -55,17 +62,8 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
@@ -253,8 +251,7 @@ public class TestWatchForCommit {
   @ParameterizedTest
   @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
   public void testWatchForCommitForRetryfailure(RaftProtos.ReplicationLevel watchType) throws Exception {
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(XceiverClientRatis.class);
     RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
     ratisClientConfig.setWatchType(watchType.toString());
     conf.setFromObject(ratisClientConfig);
@@ -279,13 +276,14 @@ public class TestWatchForCommit {
         cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
         // emulate closing pipeline when SCM detects DEAD datanodes
         cluster.getStorageContainerManager()
-            .getPipelineManager().closePipeline(pipeline, false);
+            .getPipelineManager().closePipeline(pipeline.getId());
         // again write data with more than max buffer limit. This wi
         // just watch for a log index which in not updated in the commitInfo Map
         // as well as there is no logIndex generate in Ratis.
         // The basic idea here is just to test if its throws an exception.
         ExecutionException e = assertThrows(ExecutionException.class,
-            () -> xceiverClient.watchForCommit(index + RandomUtils.nextInt(0, 100) + 10).get());
+            () -> xceiverClient.watchForCommit(index + RandomUtils.secure().randomInt(0, 100) + 10)
+                .get());
         // since the timeout value is quite long, the watch request will either
         // fail with NotReplicated exceptio, RetryFailureException or
         // RuntimeException
@@ -305,8 +303,7 @@ public class TestWatchForCommit {
   @ParameterizedTest
   @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
   public void test2WayCommitForTimeoutException(RaftProtos.ReplicationLevel watchType) throws Exception {
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(XceiverClientRatis.class);
     RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
     ratisClientConfig.setWatchType(watchType.toString());
     conf.setFromObject(ratisClientConfig);
@@ -349,7 +346,6 @@ public class TestWatchForCommit {
           assertEquals(2, ratisClient.getCommitInfoMap().size());
           String output = logCapturer.getOutput();
           assertThat(output).contains("ALL_COMMITTED way commit failed");
-          assertThat(output).contains("TimeoutException");
           assertThat(output).contains("Committed by majority");
         } else {
           assertEquals(3, ratisClient.getCommitInfoMap().size());
@@ -387,7 +383,8 @@ public class TestWatchForCommit {
         // as well as there is no logIndex generate in Ratis.
         // The basic idea here is just to test if its throws an exception.
         final Exception e = assertThrows(Exception.class,
-            () -> xceiverClient.watchForCommit(reply.getLogIndex() + RandomUtils.nextInt(0, 100) + 10).get());
+            () -> xceiverClient.watchForCommit(reply.getLogIndex() + RandomUtils.secure().randomInt(0, 100) + 10)
+                .get());
         assertInstanceOf(GroupMismatchException.class, HddsClientUtils.checkForException(e));
       } finally {
         clientManager.releaseClient(xceiverClient, false);

@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,7 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.utils.db;
@@ -25,13 +23,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+
 /**
  * Interface for key-value store that stores ozone metadata. Ozone metadata is
  * stored as key value pairs, both key and value are arbitrary byte arrays. Each
@@ -85,7 +83,6 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   VALUE get(KEY key) throws IOException;
 
-
   /**
    * Skip checking cache and get the value mapped to the given key in byte
    * array or returns null if the key is not found.
@@ -97,7 +94,6 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   default VALUE getSkipCache(KEY key) throws IOException {
     throw new NotImplementedException("getSkipCache is not implemented");
   }
-
 
   /**
    * Returns the value mapped to the given key in byte array or returns null
@@ -113,7 +109,6 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   default VALUE getReadCopy(KEY key) throws IOException {
     throw new NotImplementedException("getReadCopy is not implemented");
   }
-
 
   /**
    * Returns the value mapped to the given key in byte array or returns null
@@ -420,7 +415,6 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       }
     };
   }
-
 
   /** A {@link TableIterator} to iterate {@link KeyValue}s. */
   interface KeyValueIterator<KEY, VALUE>

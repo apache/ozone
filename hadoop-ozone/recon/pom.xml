@@ -17,7 +17,7 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>2.0.0-SNAPSHOT</version>
+    <version>2.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-recon</artifactId>
   <name>Apache Ozone Recon</name>
@@ -149,7 +149,7 @@
     <!-- visible only for ContainerOperationClient -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-tools</artifactId>
+      <artifactId>ozone-cli-admin</artifactId>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
@@ -293,12 +293,8 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -356,7 +352,7 @@
         <configuration>
           <executable>java</executable>
           <classpathScope>compile</classpathScope>
-          <mainClass>org.hadoop.ozone.recon.codegen.JooqCodeGenerator</mainClass>
+          <mainClass>org.apache.ozone.recon.codegen.JooqCodeGenerator</mainClass>
           <cleanupDaemonThreads>false</cleanupDaemonThreads>
           <arguments>
             <argument>${project.build.directory}/generated-sources/java</argument>

@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,10 +17,17 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import org.slf4j.Logger;
-
+import jakarta.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Properties;
+import org.apache.ratis.util.AtomicFileOutputStream;
+import org.slf4j.Logger;
 
 /**
  * Static helper utilities for IO / Closable classes.
@@ -96,5 +102,21 @@ public final class IOUtils {
    */
   public static void closeQuietly(Collection<? extends AutoCloseable> closeables) {
     close(null, closeables);
+  }
+
+  /** Write {@code properties} to the file at {@code path}, truncating any existing content. */
+  public static void writePropertiesToFile(File file, Properties properties) throws IOException {
+    try (OutputStream out = new AtomicFileOutputStream(file)) {
+      properties.store(out, null);
+    }
+  }
+
+  /** Read {@link Properties} from the file at {@code path}. */
+  public static @Nonnull Properties readPropertiesFromFile(File file) throws IOException {
+    Properties props = new Properties();
+    try (InputStream in = Files.newInputStream(file.toPath())) {
+      props.load(in);
+    }
+    return props;
   }
 }
