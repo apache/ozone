@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.commons.lang3.exception.UncheckedInterruptedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.util.Sets;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.ReferenceCountedObject;
 
@@ -49,7 +50,7 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
     maxNumberOfBuffersInMemory = Math.max(2, maxNumberOfBuffersInMemory);
     final String name = table != null ? table.getName() : null;
     this.availableBufferStack = new LinkedBlockingDeque<>(maxNumberOfBuffersInMemory);
-    this.inUseBuffers = new HashSet<>();
+    this.inUseBuffers = Sets.newConcurrentHashSet();
     for (int i = 0; i < maxNumberOfBuffersInMemory; i++) {
       Buffer keyBuffer = new Buffer(
           new CodecBuffer.Capacity(name + "-iterator-key-" + i, 1 << 10),
