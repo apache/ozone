@@ -48,7 +48,7 @@ import org.rocksdb.RocksDBException;
 /**
  * Test class for ReclaimableKeyFilter.
  */
-public class TestReclaimableKeyFilter extends TestAbstractReclaimableFilter {
+public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
   @Override
   protected ReclaimableFilter initializeFilter(OzoneManager om, OmSnapshotManager snapshotManager,
                                                SnapshotChainManager chainManager, SnapshotInfo currentSnapshotInfo,
