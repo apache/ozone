@@ -170,6 +170,7 @@
     <!-- Use netty version known to work with grpc-netty. See table: -->
     <!-- https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty -->
     <netty.version>4.1.109.Final</netty.version>
+    <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>16.14.2</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
