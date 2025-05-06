@@ -622,10 +622,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
             itr.seek(startKeyBuffer);
           }
           return itr;
-        } catch(Throwable t) {
+        } catch (Throwable t) {
           if (prefixBuffer != null) {
             prefixBuffer.release();
           }
+          throw t;
         } finally {
           if (startKeyBuffer != null) {
             startKeyBuffer.release();
