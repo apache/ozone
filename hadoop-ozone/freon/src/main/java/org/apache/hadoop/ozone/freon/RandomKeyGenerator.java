@@ -162,10 +162,10 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
       defaultValue = "1")
   private int numOfValidateThreads = 1;
 
-  @Option(names = {"--validate-channel"},
+  @Option(names = {"--validation-channel"},
       description = "grpc or short-circuit.",
       defaultValue = "grpc")
-  private String validateChannel = "grpc";
+  private String validationChannel = "grpc";
 
   @Option(
       names = {"--buffer-size", "--bufferSize"},
@@ -297,17 +297,17 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
       validateWrites = false;
     }
     OzoneClientConfig clientConfig = ozoneConfiguration.getObject(OzoneClientConfig.class);
-    if (validateChannel.equalsIgnoreCase("grpc")) {
+    if (validationChannel.equalsIgnoreCase("grpc")) {
       clientConfig.setShortCircuit(false);
       ozoneConfiguration.setFromObject(clientConfig);
-    } else if (validateChannel.equalsIgnoreCase("short-circuit")) {
+    } else if (validationChannel.equalsIgnoreCase("short-circuit")) {
       boolean shortCircuit = clientConfig.isShortCircuitEnabled();
       if (!shortCircuit) {
         LOG.error("Short-circuit read is not enabled");
         return null;
       }
     } else {
-      LOG.error("'--validate-channel={}' is not supported", validateChannel);
+      LOG.error("'--validate-channel={}' is not supported", validationChannel);
       return null;
     }
 
