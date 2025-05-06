@@ -27,6 +27,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.ValidationListener;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -159,7 +162,7 @@ public class TestRequestValidations {
     ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
     assertThrows(Exception.class,
-        () -> validations.validateRequest(aDeleteKeysRequest(olderClientVersion())));
+        () -> validations.validateRequest(aDeleteKeysRequest(ClientVersion.ERASURE_CODING_SUPPORT)));
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertExactListOfValidatorsCalled(
@@ -171,7 +174,8 @@ public class TestRequestValidations {
     ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
     assertThrows(Exception.class,
-        () -> validations.validateResponse(aDeleteKeysRequest(olderClientVersion()), aDeleteKeysResponse()));
+        () -> validations.validateResponse(aDeleteKeysRequest(ClientVersion.ERASURE_CODING_SUPPORT),
+            aDeleteKeysResponse()));
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertExactListOfValidatorsCalled(
@@ -184,11 +188,11 @@ public class TestRequestValidations {
     ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
-    validations.validateRequest(aCreateKeyRequest(olderClientVersion()));
+    validations.validateRequest(aCreateKeyRequest(ClientVersion.ERASURE_CODING_SUPPORT));
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertExactListOfValidatorsCalled(
-        "oldClientPreProcessCreateKeyValidator");
+        "preProcessCreateKeyBucketLayoutClientValidator");
   }
 
   @Test
@@ -198,12 +202,12 @@ public class TestRequestValidations {
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateResponse(
-        aCreateKeyRequest(olderClientVersion()), aCreateKeyResponse());
+        aCreateKeyRequest(ClientVersion.ERASURE_CODING_SUPPORT), aCreateKeyResponse());
 
     validationListener.assertNumOfEvents(2);
     validationListener.assertExactListOfValidatorsCalled(
-        "oldClientPostProcessCreateKeyValidator",
-        "oldClientPostProcessCreateKeyValidator2");
+        "postProcessCreateKeyBucketLayoutClientValidator",
+        "postProcessCreateKeyECReplicaIndexRequiredClientValidator");
   }
 
   @Test
@@ -212,12 +216,12 @@ public class TestRequestValidations {
     ValidationContext ctx = of(anUnfinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
-    validations.validateRequest(aCreateKeyRequest(olderClientVersion()));
+    validations.validateRequest(aCreateKeyRequest(ClientVersion.ERASURE_CODING_SUPPORT));
 
     validationListener.assertNumOfEvents(2);
     validationListener.assertExactListOfValidatorsCalled(
-        "preFinalizePreProcessCreateKeyValidator",
-        "oldClientPreProcessCreateKeyValidator");
+        "preProcessCreateKeyQuotaLayoutValidator",
+        "preProcessCreateKeyBucketLayoutClientValidator");
   }
 
   @Test
@@ -227,13 +231,13 @@ public class TestRequestValidations {
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateResponse(
-        aCreateKeyRequest(olderClientVersion()), aCreateKeyResponse());
+        aCreateKeyRequest(ClientVersion.ERASURE_CODING_SUPPORT), aCreateKeyResponse());
 
     validationListener.assertNumOfEvents(3);
     validationListener.assertExactListOfValidatorsCalled(
-        "preFinalizePostProcessCreateKeyValidator",
-        "oldClientPostProcessCreateKeyValidator",
-        "oldClientPostProcessCreateKeyValidator2");
+        "postProcessCreateKeyQuotaLayoutValidator",
+        "postProcessCreateKeyBucketLayoutClientValidator",
+        "postProcessCreateKeyECReplicaIndexRequiredClientValidator");
   }
 
   /**
@@ -295,6 +299,14 @@ public class TestRequestValidations {
     return aRequest(CreateKey, clientVersion);
   }
 
+  private OMRequest aCreateKeyRequest(ClientVersion clientVersion) {
+    return aRequest(CreateKey, clientVersion.toProtoValue());
+  }
+
+  private OMRequest aDeleteKeysRequest(ClientVersion clientVersion) {
+    return aDeleteKeysRequest(clientVersion.toProtoValue());
+  }
+
   private OMRequest aDeleteKeysRequest(int clientVersion) {
     return aRequest(DeleteKeys, clientVersion);
   }
@@ -333,12 +345,16 @@ public class TestRequestValidations {
   private LayoutVersionManager aFinalizedVersionManager() {
     LayoutVersionManager vm = mock(LayoutVersionManager.class);
     when(vm.needsFinalization()).thenReturn(false);
+    when(vm.getFeature(anyString())).thenReturn(OMLayoutFeature.QUOTA);
+    when(vm.getFeature(anyInt())).thenReturn(OMLayoutFeature.QUOTA);
     return vm;
   }
 
   private LayoutVersionManager anUnfinalizedVersionManager() {
     LayoutVersionManager vm = mock(LayoutVersionManager.class);
     when(vm.needsFinalization()).thenReturn(true);
+    when(vm.getFeature(anyString())).thenReturn(OMLayoutFeature.HSYNC);
+    when(vm.getFeature(anyInt())).thenReturn(OMLayoutFeature.HSYNC);
     return vm;
   }
 
