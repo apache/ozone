@@ -28,8 +28,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_CO
 import static org.apache.hadoop.util.Time.now;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -65,6 +63,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -138,7 +137,6 @@ public class TestRocksDBCheckpointDiffer {
                   .map(
                       sstFile -> new CompactionNode(sstFile,
                           1000L,
-                          Long.parseLong(sstFile.substring(0, 6)),
                           null, null, null
                       ))
                   .collect(Collectors.toList()))
@@ -309,6 +307,18 @@ public class TestRocksDBCheckpointDiffer {
   private ColumnFamilyHandle directoryTableCFHandle;
   private ColumnFamilyHandle fileTableCFHandle;
   private ColumnFamilyHandle compactionLogTableCFHandle;
+
+  public static final Integer DEBUG_DAG_BUILD_UP = 2;
+  public static final Integer DEBUG_DAG_TRAVERSAL = 3;
+  public static final Integer DEBUG_DAG_LIVE_NODES = 4;
+  public static final Integer DEBUG_READ_ALL_DB_KEYS = 5;
+  private static final HashSet<Integer> DEBUG_LEVEL = new HashSet<>();
+
+  static {
+    DEBUG_LEVEL.add(DEBUG_DAG_BUILD_UP);
+    DEBUG_LEVEL.add(DEBUG_DAG_TRAVERSAL);
+    DEBUG_LEVEL.add(DEBUG_DAG_LIVE_NODES);
+  }
 
   @BeforeEach
   public void init() throws RocksDBException {
@@ -1035,7 +1045,7 @@ public class TestRocksDBCheckpointDiffer {
         LOG.debug("\tLevel: {}", m.level());
         LOG.debug("\tTable: {}", bytes2String(m.columnFamilyName()));
         LOG.debug("\tKey Range: {}", bytes2String(m.smallestKey()) + " <-> " + bytes2String(m.largestKey()));
-        if (differ.debugEnabled(DEBUG_DAG_LIVE_NODES)) {
+        if (debugEnabled(DEBUG_DAG_LIVE_NODES)) {
           printMutableGraphFromAGivenNode(
               differ.getCompactionNodeMap(),
               m.fileName(), m.level(),
@@ -1043,7 +1053,7 @@ public class TestRocksDBCheckpointDiffer {
         }
       }
 
-      if (differ.debugEnabled(DEBUG_READ_ALL_DB_KEYS)) {
+      if (debugEnabled(DEBUG_READ_ALL_DB_KEYS)) {
         try (ManagedRocksIterator iter = new ManagedRocksIterator(rocksDB.get().newIterator())) {
           for (iter.get().seekToFirst(); iter.get().isValid(); iter.get().next()) {
             LOG.debug(
@@ -1065,6 +1075,10 @@ public class TestRocksDBCheckpointDiffer {
     }
   }
 
+  public boolean debugEnabled(Integer level) {
+    return DEBUG_LEVEL.contains(level);
+  }
+
   /**
    * Helper that traverses the graphs for testing.
    * @param compactionNodeMap
@@ -1072,7 +1086,7 @@ public class TestRocksDBCheckpointDiffer {
    * @param fwdMutableGraph
    */
   private void traverseGraph(
-      ConcurrentHashMap<String, CompactionNode> compactionNodeMap,
+      ConcurrentMap<String, CompactionNode> compactionNodeMap,
       MutableGraph<CompactionNode> reverseMutableGraph,
       MutableGraph<CompactionNode> fwdMutableGraph) {
 
@@ -1968,14 +1982,10 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   private static Stream<Arguments> shouldSkipNodeEdgeCases() {
-    CompactionNode node = new CompactionNode("fileName",
-        100, 100, "startKey", "endKey", "columnFamily");
-    CompactionNode nullColumnFamilyNode = new CompactionNode("fileName",
-        100, 100, "startKey", "endKey", null);
-    CompactionNode nullStartKeyNode = new CompactionNode("fileName",
-        100, 100, null, "endKey", "columnFamily");
-    CompactionNode nullEndKeyNode = new CompactionNode("fileName",
-        100, 100, "startKey", null, "columnFamily");
+    CompactionNode node = new CompactionNode("fileName", 100, "startKey", "endKey", "columnFamily");
+    CompactionNode nullColumnFamilyNode = new CompactionNode("fileName", 100, "startKey", "endKey", null);
+    CompactionNode nullStartKeyNode = new CompactionNode("fileName", 100, null, "endKey", "columnFamily");
+    CompactionNode nullEndKeyNode = new CompactionNode("fileName", 100, "startKey", null, "columnFamily");
 
     return Stream.of(
         Arguments.of(node, Collections.emptyMap(), false),

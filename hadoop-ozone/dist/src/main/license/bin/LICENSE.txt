@@ -363,6 +363,7 @@ Apache License 2.0
    jakarta.validation:jakarta.validation-api
    javax.enterprise:cdi-api
    javax.inject:javax.inject
+   log4j:apache-log4j-extras
    net.java.dev.jna:jna
    net.java.dev.jna:jna-platform
    org.apache.commons:commons-compress
