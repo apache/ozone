@@ -1663,9 +1663,9 @@ public class TestKeyManagerImpl {
         new InMemoryTestTable<>(ImmutableMap.of(
             getDirectoryKey(volumeId, bucketInfo, prevKey), prevKey,
             getDirectoryKey(volumeId, bucketInfo, prevKey2), prevKey2));
-    Table<String, String> renameTable = getMockedTable(
-        ImmutableMap.of(getRenameKey(VOLUME_NAME, BUCKET_NAME, 1), getPath(volumeId, bucketInfo, prevKey),
-            getRenameKey(VOLUME_NAME, BUCKET_NAME, 3), getPath(volumeId, bucketInfo,
+    Table<String, String> renameTable = new InMemoryTestTable<>(
+        ImmutableMap.of(getRenameKey(VOLUME_NAME, BUCKET_NAME, 1), getDirectoryKey(volumeId, bucketInfo, prevKey),
+            getRenameKey(VOLUME_NAME, BUCKET_NAME, 3), getDirectoryKey(volumeId, bucketInfo,
                 getMockedOmKeyInfo(bucketInfo, 6, "unknownKey", 9))));
     when(previousMetadataManager.getKeyTable(eq(bucketLayout))).thenReturn(prevKeyTable);
     when(omMetadataManager.getSnapshotRenamedTable()).thenReturn(renameTable);
