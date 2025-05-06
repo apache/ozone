@@ -21,9 +21,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 /**
  * Maps S3 storage class values to Ozone replication values.
@@ -31,17 +29,21 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 public enum S3StorageType {
 
-  REDUCED_REDUNDANCY(ReplicationType.RATIS, ReplicationFactor.ONE),
-  STANDARD(ReplicationType.RATIS, ReplicationFactor.THREE);
+  REDUCED_REDUNDANCY(ReplicationType.RATIS, ReplicationFactor.ONE, null),
+  STANDARD(ReplicationType.RATIS, ReplicationFactor.THREE, null),
+  STANDARD_IA(ReplicationType.EC, null, ECReplicationConfig.EcCodec.RS + "-3-2-1024k");
 
   private final ReplicationType type;
   private final ReplicationFactor factor;
+  private final String ecReplicationString;
 
   S3StorageType(
       ReplicationType type,
-      ReplicationFactor factor) {
+      ReplicationFactor factor,
+      String ecReplicationString) {
     this.type = type;
     this.factor = factor;
+    this.ecReplicationString = ecReplicationString;
   }
 
   public ReplicationFactor getFactor() {
@@ -52,33 +54,13 @@ public enum S3StorageType {
     return type;
   }
 
-  /**
-   * Get default S3StorageType for a new key to be uploaded.
-   * This should align to the ozone cluster configuration.
-   * @param config OzoneConfiguration
-   * @return S3StorageType which wraps ozone replication type and factor
-   */
-  public static S3StorageType getDefault(ConfigurationSource config) {
-    String replicationString = config.get(OzoneConfigKeys.OZONE_REPLICATION);
-    ReplicationFactor configFactor;
-    if (replicationString == null) {
-      // if no config is set then let server take decision
-      return null;
-    }
-    try {
-      configFactor = ReplicationFactor.valueOf(
-          Integer.parseInt(replicationString));
-    } catch (NumberFormatException ex) {
-      // conservatively defaults to STANDARD on wrong config value
-      return STANDARD;
-    }
-    return configFactor == ReplicationFactor.ONE
-        ? REDUCED_REDUNDANCY : STANDARD;
+  public String getEcReplicationString() {
+    return ecReplicationString;
   }
 
   public static S3StorageType fromReplicationConfig(ReplicationConfig config) {
     if (config instanceof ECReplicationConfig) {
-      return S3StorageType.STANDARD;
+      return STANDARD_IA;
     }
     if (config.getReplicationType() == HddsProtos.ReplicationType.STAND_ALONE ||
         config.getRequiredNodes() == 1) {

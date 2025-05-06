@@ -69,6 +69,7 @@ public final class S3Consts {
   // Constants related to custom metadata
   public static final String CUSTOM_METADATA_HEADER_PREFIX = "x-amz-meta-";
   public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
+  public static final String STORAGE_CONFIG_HEADER = "storage-config";
 
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";
