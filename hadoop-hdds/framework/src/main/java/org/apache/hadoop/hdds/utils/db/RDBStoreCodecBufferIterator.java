@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
 import java.util.Deque;
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.BlockingDeque;
