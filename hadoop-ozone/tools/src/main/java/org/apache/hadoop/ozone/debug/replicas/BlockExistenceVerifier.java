@@ -52,7 +52,8 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
 
   @Override
   public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation,
-                                             int replicaIndex) {
+      int replicaIndex) {
+    XceiverClientSpi client = null;
     try {
       Pipeline pipeline = Pipeline.newBuilder(keyLocation.getPipeline())
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
@@ -60,7 +61,7 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
           .setReplicaIndexes(Collections.singletonMap(datanode, replicaIndex))
           .build();
 
-      XceiverClientSpi client = xceiverClientManager.acquireClientForReadData(pipeline);
+      client = xceiverClientManager.acquireClientForReadData(pipeline);
       ContainerProtos.GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
           client,
           keyLocation.getBlockID(),
@@ -77,6 +78,9 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
       }
     } catch (IOException e) {
       return BlockVerificationResult.failIncomplete(e.getMessage());
+    }
+    finally {
+      xceiverClientManager.releaseClient(client, false);
     }
   }
 }
