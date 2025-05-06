@@ -152,7 +152,7 @@ public final class ContainerMerkleTreeTestUtils {
       for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
         chunks.add(buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
       }
-      tree.addChunks(blockIndex, chunks);
+      tree.addChunks(blockIndex, true, chunks);
     }
     return tree;
   }
