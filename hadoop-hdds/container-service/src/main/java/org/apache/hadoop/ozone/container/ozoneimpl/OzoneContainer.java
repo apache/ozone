@@ -433,7 +433,7 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    onDemandScanner = new OnDemandContainerDataScanner(c, controller);
+    onDemandScanner = new OnDemandContainerDataScanner(c, controller, checksumTreeManager);
     containerSet.registerContainerScanHandler(onDemandScanner::scanContainer);
   }
 

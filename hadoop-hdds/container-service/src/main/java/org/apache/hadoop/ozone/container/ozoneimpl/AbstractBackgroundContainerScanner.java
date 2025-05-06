@@ -23,7 +23,6 @@ import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,15 +131,6 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
         LOG.warn("Background container scan was interrupted.");
         Thread.currentThread().interrupt();
       }
-    }
-  }
-
-  public static void logUnhealthyScanResult(long containerID, ScanResult result, Logger log) {
-    LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerID, result);
-    if (log.isDebugEnabled()) {
-      StringBuilder allErrorString = new StringBuilder();
-      result.getErrors().forEach(r -> allErrorString.append(r).append('\n'));
-      log.debug("Complete list of errors detected while scanning container {}:\n{}", containerID, allErrorString);
     }
   }
 

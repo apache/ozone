@@ -45,6 +45,8 @@ import org.apache.commons.compress.utils.Lists;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.junit.jupiter.api.AfterEach;
@@ -54,6 +56,10 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
 
+import java.util.Arrays;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+
 /**
  * Unit tests for the on-demand container scanner.
  */
@@ -62,11 +68,13 @@ public class TestOnDemandContainerDataScanner extends
     TestContainerScannersAbstract {
   
   private OnDemandContainerDataScanner onDemandScanner;
+  private ContainerChecksumTreeManager mockChecksumManager;
 
   @BeforeEach
   public void setup() {
     super.setup();
-    onDemandScanner = new OnDemandContainerDataScanner(conf, controller);
+    mockChecksumManager = mock(ContainerChecksumTreeManager .class);
+    onDemandScanner = new OnDemandContainerDataScanner(conf, controller, mockChecksumManager);
   }
 
   @Test
@@ -278,6 +286,23 @@ public class TestOnDemandContainerDataScanner extends
     assertEquals(2, metrics.getNumContainersScanned());
     // numUnHealthyContainers metrics is not incremented in the 2nd iteration.
     assertEquals(1, metrics.getNumUnHealthyContainers());
+  }
+
+  @Test
+  public void testMerkleTreeWritten() throws Exception {
+    // Merkle trees should not be written for open or deleted containers
+    for (Container<ContainerData> container : Arrays.asList(openContainer, openCorruptMetadata, deletedContainer)) {
+      scanContainer(container);
+      verify(mockChecksumManager, times(0))
+          .writeContainerDataTree(eq(container.getContainerData()), any());
+    }
+
+    // Merkle trees should be written for all other containers.
+    for (Container<ContainerData> container : Arrays.asList(healthy, corruptData)) {
+      scanContainer(container);
+      verify(mockChecksumManager, times(1))
+          .writeContainerDataTree(eq(container.getContainerData()), any());
+    }
   }
 
   private void scanContainer(Container<?> container) throws Exception {

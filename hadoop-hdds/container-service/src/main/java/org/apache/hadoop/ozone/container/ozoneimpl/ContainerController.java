@@ -112,14 +112,16 @@ public class ContainerController {
   public boolean markContainerUnhealthy(final long containerId, ScanResult reason)
           throws IOException {
     Container container = getContainer(containerId);
-    if (container != null && container.getContainerState() != State.UNHEALTHY) {
+    if (container == null) {
+      LOG.warn("Container {} not found, may be deleted, skip marking UNHEALTHY", containerId);
+      return false;
+    } else if (container.getContainerState() == State.UNHEALTHY) {
+      LOG.debug("Container {} is already UNHEALTHY, skip marking UNHEALTHY", containerId);
+      return false;
+    } else {
       getHandler(container).markContainerUnhealthy(container, reason);
       return true;
-    } else {
-      LOG.warn("Container {} not found, may be deleted, skip mark UNHEALTHY",
-          containerId);
     }
-    return false;
   }
 
   /**
