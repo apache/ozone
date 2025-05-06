@@ -45,16 +45,18 @@ import org.sqlite.SQLiteConfig;
  */
 public class ContainerDatanodeDatabase {
   
-  private static String databasePath;
+  private final String databasePath;
   private static final int DEFAULT_REPLICATION_FACTOR;
 
   private final PrintWriter out;
 
-  public ContainerDatanodeDatabase() {
+  public ContainerDatanodeDatabase(String dbPath) {
+    this.databasePath = dbPath;
     this.out = new PrintWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8), true);
   }
 
-  public ContainerDatanodeDatabase(PrintWriter out) {
+  public ContainerDatanodeDatabase(String dbPath, PrintWriter out) {
+    this.databasePath = dbPath;
     this.out = out;
   }
   
@@ -67,13 +69,7 @@ public class ContainerDatanodeDatabase {
     DEFAULT_REPLICATION_FACTOR = Integer.parseInt(replication.toUpperCase());
   }
   
-  public static void setDatabasePath(String dbPath) {
-    if (databasePath == null) {
-      databasePath = dbPath;
-    }
-  }
-
-  private static Connection getConnection() throws Exception {
+  private Connection getConnection() throws Exception {
     if (databasePath == null) {
       throw new IllegalStateException("Database path not set");
     }

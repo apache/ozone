@@ -81,8 +81,7 @@ public class ContainerLogParser extends AbstractSubcommand implements Callable<V
       }
     }
     
-    ContainerDatanodeDatabase.setDatabasePath(providedDbPath.toString());
-    ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
+    ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(providedDbPath.toString());
     ContainerLogFileParser parser = new ContainerLogFileParser();
     
     cdd.createDatanodeContainerLogTable();
