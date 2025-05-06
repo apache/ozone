@@ -34,9 +34,17 @@ import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.ReferenceCountedObject;
 
 /**
- * Implement {@link RDBStoreAbstractIterator} using {@link CodecBuffer}.
- * Any Key or Value returned will be only valid within the lifecycle of this iterator.
- */
+ * An implementation of {@link RDBStoreAbstractIterator} that uses {@link CodecBuffer}
+ * for efficient memory management when iterating over RocksDB entries.
+ * <p>
+ * This iterator employs a buffer pooling strategy to minimize memory allocations
+ * during iteration. Key and value buffers are pre-allocated and reused through a
+ * reference-counting mechanism, which significantly reduces GC pressure when
+ * processing large datasets.
+ * <p>
+ * Key features:
+ * <ul>
+ **/
 class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> {
 
   private final BlockingDeque<RawKeyValue<Buffer>> availableBufferStack;
