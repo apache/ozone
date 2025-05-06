@@ -29,7 +29,5 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-execute_robot_test datanode_1 basic
-
 execute_robot_test datanode_1 freon/read-write-key.robot
 
