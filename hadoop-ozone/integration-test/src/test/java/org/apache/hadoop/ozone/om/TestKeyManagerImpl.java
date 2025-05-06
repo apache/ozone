@@ -106,6 +106,7 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -1589,19 +1590,12 @@ public class TestKeyManagerImpl {
     assertEquals(0, locationList.size());
   }
 
-  private <T> Table<String, T> getMockedTable(Map<String, T> map) throws IOException {
-    Table<String, T> table = mock(Table.class);
-    when(table.get(anyString())).thenAnswer(i -> map.get(i.getArgument(0)));
-    when(table.getIfExist(anyString())).thenAnswer(i -> map.get(i.getArgument(0)));
-    return table;
-  }
-
   private OmKeyInfo getMockedOmKeyInfo(OmBucketInfo bucketInfo, long parentId, String key, long objectId) {
     OmKeyInfo omKeyInfo = mock(OmKeyInfo.class);
     if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
       when(omKeyInfo.getFileName()).thenReturn(key);
-    } else {
       when(omKeyInfo.getParentObjectID()).thenReturn(parentId);
+    } else {
       when(omKeyInfo.getKeyName()).thenReturn(key);
     }
     when(omKeyInfo.getObjectID()).thenReturn(objectId);
@@ -1612,12 +1606,11 @@ public class TestKeyManagerImpl {
     OmDirectoryInfo omKeyInfo = mock(OmDirectoryInfo.class);
     when(omKeyInfo.getName()).thenReturn(key);
     when(omKeyInfo.getParentObjectID()).thenReturn(parentId);
-    when(omKeyInfo.getParentObjectID()).thenReturn(0L);
     when(omKeyInfo.getObjectID()).thenReturn(objectId);
     return omKeyInfo;
   }
 
-  private String getPath(long volumeId, OmBucketInfo bucketInfo, OmKeyInfo omKeyInfo) {
+  private String getDirectoryKey(long volumeId, OmBucketInfo bucketInfo, OmKeyInfo omKeyInfo) {
     if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
       return volumeId + "/" + bucketInfo.getObjectID() + "/" + omKeyInfo.getParentObjectID() + "/" +
           omKeyInfo.getFileName();
@@ -1626,7 +1619,7 @@ public class TestKeyManagerImpl {
     }
   }
 
-  private String getPath(long volumeId, OmBucketInfo bucketInfo, OmDirectoryInfo omDirInfo) {
+  private String getDirectoryKey(long volumeId, OmBucketInfo bucketInfo, OmDirectoryInfo omDirInfo) {
     return volumeId + "/" + bucketInfo.getObjectID() + "/" + omDirInfo.getParentObjectID() + "/" +
         omDirInfo.getName();
   }
@@ -1653,7 +1646,7 @@ public class TestKeyManagerImpl {
         .setObjectID(2L).setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED).build();
     OmDirectoryInfo prevKey = getMockedOmDirInfo(5, "key", 1);
     OmDirectoryInfo prevKey2 = getMockedOmDirInfo(7, "key2", 2);
-    OmKeyInfo currentKey = getMockedOmKeyInfo(bucketInfo, 6, "renamedKey", 1);
+    OmKeyInfo currentKey =  getMockedOmKeyInfo(bucketInfo, 6, "renamedKey", 1);
     OmDirectoryInfo currentKeyDir = getMockedOmDirInfo(6, "renamedKey", 1);
     OmKeyInfo currentKey2 = getMockedOmKeyInfo(bucketInfo, 7, "key2", 2);
     OmDirectoryInfo currentKeyDir2 = getMockedOmDirInfo(7, "key2", 2);
@@ -1661,14 +1654,14 @@ public class TestKeyManagerImpl {
     OmDirectoryInfo currentKeyDir3 = getMockedOmDirInfo(8, "key3", 3);
     OmKeyInfo currentKey4 = getMockedOmKeyInfo(bucketInfo, 8, "key4", 4);
     OmDirectoryInfo currentKeyDir4 = getMockedOmDirInfo(8, "key4", 4);
-    Table<String, OmDirectoryInfo> prevDirTable =
-        getMockedTable(ImmutableMap.of(
-            getPath(volumeId, bucketInfo, prevKey), prevKey,
-            getPath(volumeId, bucketInfo, prevKey2), prevKey2));
-    Table<String, String> renameTable = getMockedTable(
-        ImmutableMap.of(getRenameKey(VOLUME_NAME, BUCKET_NAME, 1), getPath(volumeId, bucketInfo, prevKey),
-            getRenameKey(VOLUME_NAME, BUCKET_NAME, 3), getPath(volumeId, bucketInfo,
-                getMockedOmKeyInfo(bucketInfo, 6, "unknownKey", 9))));
+    Table<String, OmDirectoryInfo> prevDirTable = new InMemoryTestTable<>(
+        ImmutableMap.of(getDirectoryKey(volumeId, bucketInfo, prevKey), prevKey,
+            getDirectoryKey(volumeId, bucketInfo, prevKey2), prevKey2));
+    Table<String, String> renameTable = new InMemoryTestTable<>(
+        ImmutableMap.of(getRenameKey(VOLUME_NAME, BUCKET_NAME, 1),
+            getDirectoryKey(volumeId, bucketInfo, prevKey),
+        getRenameKey(VOLUME_NAME, BUCKET_NAME, 3), getDirectoryKey(volumeId, bucketInfo,
+            getMockedOmKeyInfo(bucketInfo, 6, "unknownKey", 9))));
     when(previousMetadataManager.getDirectoryTable()).thenReturn(prevDirTable);
     when(omMetadataManager.getSnapshotRenamedTable()).thenReturn(renameTable);
     assertEquals(prevKey, km.getPreviousSnapshotOzoneDirInfo(volumeId, bucketInfo, currentKey).apply(prevKM));
