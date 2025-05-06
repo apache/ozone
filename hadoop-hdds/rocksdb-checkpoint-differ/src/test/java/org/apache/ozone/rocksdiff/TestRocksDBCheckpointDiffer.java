@@ -62,7 +62,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -1146,7 +1145,7 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   private void printMutableGraphFromAGivenNode(
-      ConcurrentHashMap<String, CompactionNode> compactionNodeMap,
+      ConcurrentMap<String, CompactionNode> compactionNodeMap,
       String fileName,
       int sstLevel,
       MutableGraph<CompactionNode> mutableGraph) {
