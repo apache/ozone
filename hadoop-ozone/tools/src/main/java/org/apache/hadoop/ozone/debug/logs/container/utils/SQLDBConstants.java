@@ -72,6 +72,9 @@ public final class SQLDBConstants {
       "ON ContainerLogTable(container_id);";
   public static final String SELECT_DISTINCT_CONTAINER_IDS_QUERY =
       "SELECT DISTINCT container_id FROM ContainerLogTable";
+  public static final String SELECT_CONTAINER_DETAILS_OPEN_STATE = "SELECT d.timestamp, d.container_id, " +
+      "d.datanode_id, d.container_state FROM DatanodeContainerLogTable d " +
+      "WHERE d.container_id = ? AND d.container_state = 'OPEN' ORDER BY d.timestamp ASC;";
   
   private SQLDBConstants() {
     //Never constructed

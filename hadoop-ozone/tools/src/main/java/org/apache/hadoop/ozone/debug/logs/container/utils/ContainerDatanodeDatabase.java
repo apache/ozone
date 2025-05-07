@@ -562,12 +562,14 @@ public class ContainerDatanodeDatabase {
 
         while (resultSet.next()) {
           Long containerID = resultSet.getLong("container_id");
-          List<DatanodeContainerInfo> logEntries = getContainerLogData(containerID, connection);
-          logEntries.sort(Comparator.comparing(DatanodeContainerInfo::getTimestamp));
+          List<DatanodeContainerInfo> logEntries = getContainerLogDataFoOpen(containerID, connection);
           boolean hasIssue = checkForMultipleOpenStates(logEntries);
           if (hasIssue) {
+            int openStateCount = (int) logEntries.stream()
+                .filter(entry -> "OPEN".equalsIgnoreCase(entry.getState()))
+                .count();
             count++;
-            out.println("Container ID: " + containerID);
+            out.println("Container ID: " + containerID + " - OPEN state count: " + openStateCount);
           }
         }
 
@@ -575,10 +577,33 @@ public class ContainerDatanodeDatabase {
 
       }
     } catch (SQLException e) {
-      throw new SQLException("Error while retrieving containers.");
+      throw new SQLException("Error while retrieving containers." + e.getMessage(), e);
     } catch (Exception e) {
       throw new RuntimeException("Unexpected error: "  + e);
     }
+  }
+
+  private List<DatanodeContainerInfo> getContainerLogDataFoOpen(Long containerID, Connection connection)
+      throws SQLException {
+    String query = SQLDBConstants.SELECT_CONTAINER_DETAILS_OPEN_STATE;
+    List<DatanodeContainerInfo> logEntries = new ArrayList<>();
+
+    try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+      preparedStatement.setLong(1, containerID);
+      try (ResultSet rs = preparedStatement.executeQuery()) {
+        while (rs.next()) {
+          DatanodeContainerInfo entry = new DatanodeContainerInfo.Builder()
+              .setTimestamp(rs.getString("timestamp"))
+              .setContainerId(rs.getLong("container_id"))
+              .setDatanodeId(rs.getString("datanode_id"))
+              .setState(rs.getString("container_state"))
+              .build();
+          logEntries.add(entry);
+        }
+      }
+    }
+
+    return logEntries;
   }
 }
 
