@@ -56,14 +56,13 @@ public class RootEndpoint extends EndpointBase {
 
       Iterator<? extends OzoneBucket> bucketIterator;
       try {
-        bucketIterator = listS3Buckets(null);
+        bucketIterator =
+            listS3Buckets(null, volume -> response.setOwner(new S3Owner(volume.getOwner(), volume.getOwner()))
+            );
       } catch (Exception e) {
         getMetrics().updateListS3BucketsFailureStats(startNanos);
         throw e;
       }
-
-      OzoneVolume volume = getVolume();
-      response.setOwner(new S3Owner(volume.getOwner(), volume.getOwner()));
 
       while (bucketIterator.hasNext()) {
         OzoneBucket next = bucketIterator.next();
