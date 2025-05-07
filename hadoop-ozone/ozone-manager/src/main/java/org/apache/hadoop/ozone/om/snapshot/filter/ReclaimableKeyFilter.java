@@ -72,6 +72,18 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
   }
 
   @Override
+  /**
+   * Determines whether a deleted key entry is reclaimable by checking its presence in prior snapshots.
+   *
+   * This method validates the existence of the deleted key in the previous snapshot's key table or file table.
+   * If the key is not found in the previous snapshot, it is marked as reclaimable. Otherwise, additional checks
+   * are performed using the previous-to-previous snapshot to confirm if the key is exclusively present in the
+   * previous snapshot and accounted in the previous snapshot's exclusive size.
+   *
+   * @param deletedKeyInfo The key-value pair representing the deleted key information.
+   * @return {@code true} if the key is reclaimable (not present in prior snapshots), {@code false} otherwise.
+   * @throws IOException If an error occurs while accessing snapshot data or key information.
+   */
   protected Boolean isReclaimable(Table.KeyValue<String, OmKeyInfo> deletedKeyInfo) throws IOException {
     ReferenceCounted<OmSnapshot> previousSnapshot = getPreviousOmSnapshot(1);
 
@@ -82,7 +94,7 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
 
     // Getting keyInfo from prev snapshot's keyTable/fileTable
     CheckedSupplier<Optional<OmKeyInfo>, IOException> previousKeyInfo =
-        MemoizedCheckedSupplier.valueOf(() -> getPreviousSnapshotKey(getVolumeId(), getBucketInfo(),
+        MemoizedCheckedSupplier.valueOf(() -> getPreviousSnapshotKeyInfo(getVolumeId(), getBucketInfo(),
             deletedKeyInfo.getValue(), getKeyManager(), previousKeyManager));
     // If file not present in previous snapshot then it won't be present in previous to previous snapshot either.
     if (!previousKeyInfo.get().isPresent()) {
@@ -95,7 +107,7 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
 
     // Getting keyInfo from prev to prev snapshot's keyTable/fileTable based on keyInfo of prev keyTable
     CheckedSupplier<Optional<OmKeyInfo>, IOException> previousPrevKeyInfo =
-        MemoizedCheckedSupplier.valueOf(() -> getPreviousSnapshotKey(
+        MemoizedCheckedSupplier.valueOf(() -> getPreviousSnapshotKeyInfo(
             getVolumeId(), getBucketInfo(), previousKeyInfo.get().orElse(null), previousKeyManager,
             previousToPreviousKeyManager));
     SnapshotInfo previousSnapshotInfo = getPreviousSnapshotInfo(1);
@@ -139,13 +151,11 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
       exclusiveReplicatedSizes.compute(previousSnapshotInfo.getSnapshotId(),
           (k, v) -> (v == null ? 0 : v) + keyInfo.getReplicatedSize());
     }
-
   }
 
-  private Optional<OmKeyInfo> getPreviousSnapshotKey(long volumeId, OmBucketInfo bucketInfo,
-                                                     OmKeyInfo keyInfo, KeyManager keyManager,
-                                                     KeyManager previousKeyManager) throws IOException {
-
+  private Optional<OmKeyInfo> getPreviousSnapshotKeyInfo(long volumeId, OmBucketInfo bucketInfo,
+                                                         OmKeyInfo keyInfo, KeyManager keyManager,
+                                                         KeyManager previousKeyManager) throws IOException {
     if (keyInfo == null || previousKeyManager == null) {
       return Optional.empty();
     }

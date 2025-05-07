@@ -301,6 +301,10 @@ public final class SnapshotUtils {
     }
   }
 
+  /**
+   * Compares the block location info of 2 key info.
+   * @return true if block locations are same else false.
+   */
   public static boolean isBlockLocationInfoSame(OmKeyInfo prevKeyInfo,
                                                 OmKeyInfo deletedKeyInfo) {
     if (prevKeyInfo == null && deletedKeyInfo == null) {
