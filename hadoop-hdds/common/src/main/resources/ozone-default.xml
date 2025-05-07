@@ -339,7 +339,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.ratis.leader.first.election.minimum.timeout.duration</name>
+    <name>hdds.raft.server.rpc.first-election.timeout</name>
     <value/>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>ratis Minimum timeout for the first election of a leader.
@@ -1154,7 +1154,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.initial.heartbeat.interval</name>
+    <name>hdds.heartbeat.initial-interval</name>
     <value>2s</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
@@ -1162,7 +1162,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.recon.heartbeat.interval</name>
+    <name>hdds.heartbeat.recon.interval</name>
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
@@ -1170,7 +1170,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.recon.initial.heartbeat.interval</name>
+    <name>hdds.heartbeat.recon.initial-interval</name>
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
