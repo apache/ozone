@@ -301,7 +301,7 @@ public class DBCheckpointServlet extends HttpServlet
         sstParam.add(Streams.asString(item.openStream()));
       }
     } catch (Exception e) {
-      LOG.warn("Exception occured during form data parsing {}", e.getMessage());
+      LOG.warn("Exception occurred during form data parsing {}", e.getMessage());
     }
 
     return sstParam.isEmpty() ? null : sstParam.toArray(new String[0]);

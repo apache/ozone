@@ -39,7 +39,7 @@ public class TestReplicatedBlockChecksumComputer {
   @Test
   public void testComputeMd5Crc() throws IOException {
     final int lenOfBytes = 32;
-    byte[] randomChunkChecksum = RandomUtils.nextBytes(lenOfBytes);
+    byte[] randomChunkChecksum = RandomUtils.secure().randomBytes(lenOfBytes);
 
     MD5Hash emptyBlockMD5 = MD5Hash.digest(randomChunkChecksum);
     byte[] emptyBlockMD5Hash = emptyBlockMD5.getDigest();
@@ -54,7 +54,7 @@ public class TestReplicatedBlockChecksumComputer {
   @Test
   public void testComputeCompositeCrc() throws IOException {
     final int lenOfBytes = 32;
-    byte[] randomChunkChecksum = RandomUtils.nextBytes(lenOfBytes);
+    byte[] randomChunkChecksum = RandomUtils.secure().randomBytes(lenOfBytes);
 
     CrcComposer crcComposer =
         CrcComposer.newCrcComposer(DataChecksum.Type.CRC32C, 4);

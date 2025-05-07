@@ -42,7 +42,7 @@ public class NestedDirLoadGenerator extends LoadGenerator {
 
   @Override
   public void generateLoad() throws Exception {
-    int index = RandomUtils.nextInt(0, maxDirDepth);
+    int index = RandomUtils.secure().randomInt(0, maxDirDepth);
     String str = this.pathMap.compute(index, this::createNewPath);
     fsBucket.createDirectory(str);
     fsBucket.readDirectory(str);

@@ -57,44 +57,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       SnapshotInfo::getProtobuf,
       SnapshotInfo.class);
 
-  public static Codec<SnapshotInfo> getCodec() {
-    return CODEC;
-  }
-
-  /**
-   * SnapshotStatus enum composed of active and deleted statuses.
-   */
-  public enum SnapshotStatus {
-    SNAPSHOT_ACTIVE,
-    SNAPSHOT_DELETED;
-
-    public static final SnapshotStatus DEFAULT = SNAPSHOT_ACTIVE;
-
-    public SnapshotStatusProto toProto() {
-      switch (this) {
-      case SNAPSHOT_ACTIVE:
-        return SnapshotStatusProto.SNAPSHOT_ACTIVE;
-      case SNAPSHOT_DELETED:
-        return SnapshotStatusProto.SNAPSHOT_DELETED;
-      default:
-        throw new IllegalStateException(
-            "BUG: missing valid SnapshotStatus, found status=" + this);
-      }
-    }
-
-    public static SnapshotStatus valueOf(SnapshotStatusProto status) {
-      switch (status) {
-      case SNAPSHOT_ACTIVE:
-        return SNAPSHOT_ACTIVE;
-      case SNAPSHOT_DELETED:
-        return SNAPSHOT_DELETED;
-      default:
-        throw new IllegalStateException(
-            "BUG: missing valid SnapshotStatus, found status=" + status);
-      }
-    }
-  }
-
   private static final String SEPARATOR = "-";
   private static final long INVALID_TIMESTAMP = -1;
   private static final UUID INITIAL_SNAPSHOT_ID = UUID.randomUUID();
@@ -144,6 +106,10 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.exclusiveReplicatedSize = b.exclusiveReplicatedSize;
     this.deepCleanedDeletedDir = b.deepCleanedDeletedDir;
     this.lastTransactionInfo = b.lastTransactionInfo;
+  }
+
+  public static Codec<SnapshotInfo> getCodec() {
+    return CODEC;
   }
 
   public void setName(String name) {
@@ -552,6 +518,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         "SnapshotId is needed to create checkpoint directory");
     return SEPARATOR + snapshotId;
   }
+
   /**
    * Get the name of the checkpoint directory, (non-static).
    */
@@ -743,5 +710,39 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         ", deepCleanedDeletedDir: '" + deepCleanedDeletedDir + '\'' +
         ", lastTransactionInfo: '" + lastTransactionInfo + '\'' +
         '}';
+  }
+
+  /**
+   * SnapshotStatus enum composed of active and deleted statuses.
+   */
+  public enum SnapshotStatus {
+    SNAPSHOT_ACTIVE,
+    SNAPSHOT_DELETED;
+
+    public static final SnapshotStatus DEFAULT = SNAPSHOT_ACTIVE;
+
+    public SnapshotStatusProto toProto() {
+      switch (this) {
+      case SNAPSHOT_ACTIVE:
+        return SnapshotStatusProto.SNAPSHOT_ACTIVE;
+      case SNAPSHOT_DELETED:
+        return SnapshotStatusProto.SNAPSHOT_DELETED;
+      default:
+        throw new IllegalStateException(
+            "BUG: missing valid SnapshotStatus, found status=" + this);
+      }
+    }
+
+    public static SnapshotStatus valueOf(SnapshotStatusProto status) {
+      switch (status) {
+      case SNAPSHOT_ACTIVE:
+        return SNAPSHOT_ACTIVE;
+      case SNAPSHOT_DELETED:
+        return SNAPSHOT_DELETED;
+      default:
+        throw new IllegalStateException(
+            "BUG: missing valid SnapshotStatus, found status=" + status);
+      }
+    }
   }
 }

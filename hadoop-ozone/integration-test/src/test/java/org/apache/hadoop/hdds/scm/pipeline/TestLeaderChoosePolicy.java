@@ -43,7 +43,6 @@ import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for LeaderChoosePolicy.
@@ -102,7 +101,7 @@ public class TestLeaderChoosePolicy {
     }
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 360000)
+  @Test
   public void testRestoreSuggestedLeader() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
@@ -151,7 +150,7 @@ public class TestLeaderChoosePolicy {
     }
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 360000)
+  @Test
   public void testMinLeaderCountChoosePolicy() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
@@ -182,9 +181,9 @@ public class TestLeaderChoosePolicy {
           .getPipelines(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
 
-      int destroyNum = RandomUtils.nextInt(0, pipelines.size());
+      int destroyNum = RandomUtils.secure().randomInt(0, pipelines.size());
       for (int k = 0; k <= destroyNum; k++) {
-        pipelineManager.closePipeline(pipelines.get(k), false);
+        pipelineManager.closePipeline(pipelines.get(k).getId());
       }
 
       waitForPipelines(pipelineNum);
@@ -193,7 +192,7 @@ public class TestLeaderChoosePolicy {
     }
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 60000)
+  @Test
   public void testDefaultLeaderChoosePolicy() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,

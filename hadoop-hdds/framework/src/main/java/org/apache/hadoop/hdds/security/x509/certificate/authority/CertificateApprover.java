@@ -66,7 +66,6 @@ public interface CertificateApprover {
       String certSerialId)
       throws IOException, CertificateException;
 
-
   /**
    * Approval Types for a certificate request.
    */

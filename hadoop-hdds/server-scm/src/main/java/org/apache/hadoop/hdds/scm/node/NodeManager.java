@@ -75,7 +75,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 public interface NodeManager extends StorageContainerNodeProtocol,
     EventHandler<CommandForDatanode>, NodeManagerMXBean, Closeable {
 
-
   /**
    * Register API without a layout version info object passed in. Useful for
    * tests.

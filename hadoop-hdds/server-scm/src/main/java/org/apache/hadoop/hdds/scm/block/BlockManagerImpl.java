@@ -70,6 +70,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private ObjectName mxBean;
   private final SequenceIdGenerator sequenceIdGen;
   private ScmBlockDeletingServiceMetrics metrics;
+
   /**
    * Constructor.
    *
@@ -279,12 +280,5 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   @Override
   public SCMBlockDeletingService getSCMBlockDeletingService() {
     return this.blockDeletingService;
-  }
-
-  /**
-   * Get class logger.
-   * */
-  public static Logger getLogger() {
-    return LOG;
   }
 }

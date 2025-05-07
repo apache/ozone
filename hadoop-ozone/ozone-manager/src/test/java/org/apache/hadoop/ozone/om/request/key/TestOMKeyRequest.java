@@ -254,16 +254,15 @@ public class TestOMKeyRequest {
         .thenReturn(omSnapshotManager);
 
     // Enable DEBUG level logging for relevant classes
-    GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyCommitRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.class, Level.DEBUG);
   }
 
   @Nonnull
   protected OzoneConfiguration getOzoneConfiguration() {
     return new OzoneConfiguration();
   }
-
 
   /**
    * Verify path in open key table. Also, it returns OMKeyInfo for the given

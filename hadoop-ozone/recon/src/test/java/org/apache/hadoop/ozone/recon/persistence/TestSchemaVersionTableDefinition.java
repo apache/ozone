@@ -34,6 +34,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
+import javax.sql.DataSource;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.recon.ReconContext;
@@ -78,7 +79,6 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
     assertEquals(2, actualPairs.size(), "Unexpected number of columns");
     assertEquals(expectedPairs, actualPairs, "Column definitions do not match expected values.");
   }
-
 
   @Test
   public void testSchemaVersionCRUDOperations() throws SQLException {
@@ -162,8 +162,9 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize ReconSchemaVersionTableManager and ReconLayoutVersionManager
     ReconSchemaVersionTableManager schemaVersionTableManager = new ReconSchemaVersionTableManager(getDataSource());
+    DataSource mockDataSource = mock(DataSource.class);
     ReconLayoutVersionManager layoutVersionManager =
-        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
+        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class), mockDataSource);
 
     // Fetch and verify the current MLV
     int mlv = layoutVersionManager.getCurrentMLV();
@@ -201,8 +202,9 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize ReconSchemaVersionTableManager and ReconLayoutVersionManager
     ReconSchemaVersionTableManager schemaVersionTableManager = new ReconSchemaVersionTableManager(getDataSource());
+    DataSource mockDataSource = mock(DataSource.class);
     ReconLayoutVersionManager layoutVersionManager =
-        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
+        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class), mockDataSource);
 
     // Fetch and verify the current MLV
     int mlv = layoutVersionManager.getCurrentMLV();
@@ -249,8 +251,9 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize managers to interact with schema version framework
     ReconSchemaVersionTableManager schemaVersionTableManager = new ReconSchemaVersionTableManager(getDataSource());
+    DataSource mockDataSource = mock(DataSource.class);
     ReconLayoutVersionManager layoutVersionManager =
-        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
+        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class), mockDataSource);
 
     // Fetch and verify the current MLV stored in the database
     int mlv = layoutVersionManager.getCurrentMLV();

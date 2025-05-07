@@ -54,9 +54,10 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
  * Helpers for upgrade tests.
  */
 public final class UpgradeTestHelper {
+  private static final Random RANDOM = new Random();
+
   private UpgradeTestHelper() {
   }
-  private static final Random RANDOM = new Random();
 
   /**
    * Starts the datanode with the fore layout version, and calls the version
@@ -177,7 +178,6 @@ public final class UpgradeTestHelper {
 
     return vol;
   }
-
 
   public static void dispatchRequest(
       ContainerDispatcher dispatcher,

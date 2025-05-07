@@ -68,11 +68,11 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test ContainerReader class which loads containers from disks.
@@ -83,7 +83,6 @@ public class TestContainerReader {
   private HddsVolume hddsVolume;
   private ContainerSet containerSet;
   private OzoneConfiguration conf;
-
 
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private UUID datanodeId;
@@ -356,8 +355,7 @@ public class TestContainerReader {
       FileUtils.deleteFully(dbPath.toPath());
     }
 
-    GenericTestUtils.LogCapturer dnLogs = GenericTestUtils.LogCapturer.captureLogs(
-        LoggerFactory.getLogger(ContainerReader.class));
+    LogCapturer dnLogs = LogCapturer.captureLogs(ContainerReader.class);
     dnLogs.clearOutput();
     ContainerReader containerReader = new ContainerReader(volumeSet1,
         hddsVolume1, containerSet1, conf, true);
@@ -377,7 +375,7 @@ public class TestContainerReader {
     for (int i = 0; i < volumeNum; i++) {
       volumeDirs[i] =
           Files.createDirectory(tempDir.resolve("volumeDir" + i)).toFile();
-      datanodeDirs = datanodeDirs.append(volumeDirs[i]).append(",");
+      datanodeDirs = datanodeDirs.append(volumeDirs[i]).append(',');
     }
 
     BlockUtils.shutdownCache(conf);
@@ -452,7 +450,7 @@ public class TestContainerReader {
           (HddsVolume) volumes.get(i), containerSet, conf, true);
       threads[i] = new Thread(containerReaders[i]);
     }
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     for (int i = 0; i < volumeNum; i++) {
       threads[i].start();
     }
@@ -460,7 +458,7 @@ public class TestContainerReader {
       threads[i].join();
     }
     System.out.println("Open " + volumeNum + " Volume with " + containerCount +
-        " costs " + (System.currentTimeMillis() - startTime) / 1000 + "s");
+        " costs " + (Time.monotonicNow() - startTime) / 1000 + "s");
     assertEquals(containerCount,
         containerSet.getContainerMap().entrySet().size());
     assertEquals(volumeSet.getFailedVolumesList().size(), 0);

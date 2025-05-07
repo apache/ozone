@@ -37,6 +37,7 @@ function ozone_usage
   ozone_add_option "--validate (continue)" "validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present, command execution shall continue post validation failure if 'continue' is passed"
 
   ozone_add_subcommand "classpath" client "prints the class path needed for running ozone commands"
+  ozone_add_subcommand "completion" client "generate autocompletion script for bash/zsh"
   ozone_add_subcommand "datanode" daemon "run a HDDS datanode"
   ozone_add_subcommand "envvars" client "display computed Hadoop environment variables"
   ozone_add_subcommand "daemonlog" admin "get/set the log level for each daemon"
@@ -97,6 +98,10 @@ function ozonecmd_case
         exit -1
       fi
     ;;
+    completion)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.utils.AutoCompletion;
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+    ;;
     datanode)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       ozone_deprecate_envvar HDDS_DN_OPTS OZONE_DATANODE_OPTS
@@ -121,7 +126,7 @@ function ozonecmd_case
     freon)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Freon
       OZONE_FREON_OPTS="${OZONE_FREON_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-freon"
     ;;
     getconf)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.conf.OzoneGetConf;
@@ -210,7 +215,7 @@ function ozonecmd_case
     admin)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin
       OZONE_ADMIN_OPTS="${OZONE_ADMIN_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-admin"
     ;;
     debug)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.debug.OzoneDebug
@@ -263,8 +268,7 @@ function ozone_suppress_shell_log
 {
   if [[ "${OZONE_RUN_ARTIFACT_NAME}" =~ ozone-cli-.* ]] \
       || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]]; then
-    if [[ "${OZONE_CLASSNAME}" != "org.apache.hadoop.ozone.freon.Freon" ]] \
-        && [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
+    if [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
         && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
       OZONE_LOGLEVEL=OFF
       OZONE_ROOT_LOGGER="${OZONE_LOGLEVEL},console"

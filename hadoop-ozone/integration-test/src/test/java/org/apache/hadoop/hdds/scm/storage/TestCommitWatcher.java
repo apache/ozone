@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -68,12 +67,10 @@ import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Class to test CommitWatcher functionality.
  */
-@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestCommitWatcher {
 
   private MiniOzoneCluster cluster;
@@ -86,7 +83,6 @@ public class TestCommitWatcher {
   private long blockSize;
   private String volumeName;
   private String bucketName;
-  private String keyString;
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
@@ -147,7 +143,6 @@ public class TestCommitWatcher {
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
-    keyString = UUID.randomUUID().toString();
     volumeName = "testblockoutputstream";
     bucketName = volumeName;
     objectStore.createVolume(volumeName);

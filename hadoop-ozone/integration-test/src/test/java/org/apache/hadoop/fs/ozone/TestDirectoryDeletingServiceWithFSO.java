@@ -86,7 +86,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
@@ -95,7 +94,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Directory deletion service test cases.
  */
-@Timeout(300)
 public class TestDirectoryDeletingServiceWithFSO {
 
   private static final Logger LOG =
@@ -551,7 +549,7 @@ public class TestDirectoryDeletingServiceWithFSO {
 
   private void createFileKey(OzoneBucket bucket, String key)
       throws Exception {
-    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
     OzoneOutputStream fileKey = bucket.createKey(key, value.length);
     fileKey.write(value);
     fileKey.close();
