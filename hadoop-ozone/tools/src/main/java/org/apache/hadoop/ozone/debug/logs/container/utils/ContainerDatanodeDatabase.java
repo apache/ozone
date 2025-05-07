@@ -549,7 +549,7 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  public void findDoubleOpenContainer() throws SQLException {
+  public void findDuplicateOpenContainer() throws SQLException {
     String sql = SQLDBConstants.SELECT_DISTINCT_CONTAINER_IDS_QUERY;
 
     try (Connection connection = getConnection()) {

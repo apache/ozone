@@ -43,9 +43,9 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
   @CommandLine.Mixin
   private ListOptions listOptions;
 
-  @CommandLine.Option(names = {"--double-open"},
+  @CommandLine.Option(names = {"--duplicate-open"},
           description = "List all the containers which have duplicate open states.")
-  private boolean doubleOpen;
+  private boolean duplicateOpen;
 
   @CommandLine.ParentCommand
   private ContainerLogController parent;
@@ -60,8 +60,8 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(dbPath.toString());
 
-    if (doubleOpen) {
-      cdd.findDoubleOpenContainer();
+    if (duplicateOpen) {
+      cdd.findDuplicateOpenContainer();
     } else if (state != null) {
       cdd.listContainersByState(state.name(), listOptions.getLimit());
     } else {
