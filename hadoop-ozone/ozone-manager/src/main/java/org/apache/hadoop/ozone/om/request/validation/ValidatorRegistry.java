@@ -33,7 +33,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.Versioned;
@@ -61,7 +60,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    * greater than the request versions get triggered.
    * {@link #validationsFor(Enum, RequestProcessingPhase, Class, Versioned)}
    */
-  private final Map<Class<? extends Annotation>, EnumMap<RequestType,
+  private final Map<Class<? extends Versioned>, EnumMap<RequestType,
       EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>>>> indexedValidatorMap;
 
   /**
@@ -113,8 +112,11 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
                 .equals(requestArrayClass))
             .map(annotationClass -> (Class<? extends Annotation>) annotationClass)
             .collect(Collectors.toSet());
-    this.indexedValidatorMap = allowedValidators.stream().collect(ImmutableMap.toImmutableMap(Function.identity(),
-        validatorClass -> new EnumMap<>(requestType)));
+    this.indexedValidatorMap =
+        allowedValidators.stream().collect(ImmutableMap.toImmutableMap(annotationClass ->
+                (Class<? extends Versioned>) getReturnTypeOfAnnotationMethod(annotationClass,
+                RegisterValidator.APPLY_BEFORE_METHOD_NAME),
+          validatorClass -> new EnumMap<>(requestType)));
     Reflections reflections = new Reflections(new ConfigurationBuilder()
         .setUrls(searchUrls)
         .setScanners(Scanners.MethodsAnnotated)
@@ -236,6 +238,9 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
                                  Class<? extends Annotation> validatorToBeRegistered,
                                  Reflections reflections) {
     Collection<Method> methods =  reflections.getMethodsAnnotatedWith(validatorToBeRegistered);
+    Class<? extends Versioned> versionClass =
+        (Class<? extends Versioned>) this.getReturnTypeOfAnnotationMethod(validatorToBeRegistered,
+        RegisterValidator.APPLY_BEFORE_METHOD_NAME);
     List<Pair<? extends Annotation, Method>> sortedMethodsByApplyBeforeVersion = methods.stream()
         .map(method -> Pair.of(method.getAnnotation(validatorToBeRegistered), method))
         .sorted((validatorMethodPair1, validatorMethodPair2) ->
@@ -254,7 +259,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
       method.setAccessible(true);
       for (RequestType type : types) {
         EnumMap<RequestType, EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>>> requestMap =
-            this.indexedValidatorMap.get(validatorToBeRegistered);
+            this.indexedValidatorMap.get(versionClass);
         EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>> phaseMap =
             requestMap.computeIfAbsent(type, k -> new EnumMap<>(RequestProcessingPhase.class));
         phaseMap.computeIfAbsent(phase, k -> new IndexedItems<>()).add(method, applyBeforeVersion.version());
