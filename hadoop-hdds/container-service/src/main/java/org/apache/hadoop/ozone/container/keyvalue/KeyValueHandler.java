@@ -1540,7 +1540,10 @@ public class KeyValueHandler extends Handler {
     }
     // Avoid holding write locks for disk operations
     sendICR(container);
+    long bytesUsed = container.getContainerData().getBytesUsed();
+    HddsVolume volume = container.getContainerData().getVolume();
     container.delete();
+    volume.decrementUsedSpace(bytesUsed);
   }
 
   private void triggerVolumeScanAndThrowException(Container container,

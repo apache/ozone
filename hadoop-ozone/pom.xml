@@ -25,6 +25,7 @@
   <name>Apache Ozone</name>
   <description>Apache Ozone Project</description>
   <modules>
+    <module>cli-admin</module>
     <module>cli-shell</module>
     <module>client</module>
     <module>common</module>
@@ -32,6 +33,7 @@
     <module>datanode</module>
     <module>dist</module>
     <module>fault-injection-test</module>
+    <module>freon</module>
     <module>httpfsgateway</module>
     <module>insight</module>
     <module>integration-test</module>
@@ -173,8 +175,8 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-tools</artifactId>
-        <version>${hdds.version}</version>
+        <artifactId>ozone-cli-admin</artifactId>
+        <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
@@ -239,13 +241,18 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-freon</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-httpfsgateway</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-insight</artifactId>
-        <version>${hdds.version}</version>
+        <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>

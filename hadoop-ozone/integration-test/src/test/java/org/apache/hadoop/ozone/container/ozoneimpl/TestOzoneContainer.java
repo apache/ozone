@@ -51,13 +51,11 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests ozone containers.
  */
-@Timeout(300)
 public class TestOzoneContainer {
   @TempDir
   private Path tempDir;

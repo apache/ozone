@@ -43,13 +43,11 @@ import java.util.TreeSet;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit tests for {@link OmUtils}.
  */
-@Timeout(60)
 public class TestOmUtils {
 
   @TempDir

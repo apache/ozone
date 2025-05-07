@@ -56,14 +56,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test Snapshot Directory Service.
  */
-@Timeout(300)
 public class TestSnapshotDirectoryCleaningService {
 
   private static final Logger LOG =
