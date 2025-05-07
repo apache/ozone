@@ -532,12 +532,14 @@ public class StateContext {
    *
    * @param pipelineAction PipelineAction to be added
    */
-  public void addPipelineActionIfAbsent(PipelineAction pipelineAction) {
+  public boolean addPipelineActionIfAbsent(PipelineAction pipelineAction) {
     // Put only if the pipeline id with the same action is absent.
     final PipelineKey key = new PipelineKey(pipelineAction);
+    boolean added = false;
     for (InetSocketAddress endpoint : endpoints) {
-      pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction);
+      added = pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction) || added;
     }
+    return added;
   }
 
   /**
@@ -958,9 +960,9 @@ public class StateContext {
       return map.size();
     }
 
-    synchronized void putIfAbsent(PipelineKey key,
+    synchronized boolean putIfAbsent(PipelineKey key,
         PipelineAction pipelineAction) {
-      map.putIfAbsent(key, pipelineAction);
+      return map.putIfAbsent(key, pipelineAction) == null;
     }
 
     synchronized List<PipelineAction> getActions(List<PipelineReport> reports,

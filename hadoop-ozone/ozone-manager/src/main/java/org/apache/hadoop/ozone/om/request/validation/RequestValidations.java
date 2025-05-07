@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om.request.validation;
 
-import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
-import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
+import static org.apache.hadoop.ozone.request.validation.RequestProcessingPhase.POST_PROCESS;
+import static org.apache.hadoop.ozone.request.validation.RequestProcessingPhase.PRE_PROCESS;
 
 import com.google.protobuf.ServiceException;
 import java.lang.reflect.InvocationTargetException;

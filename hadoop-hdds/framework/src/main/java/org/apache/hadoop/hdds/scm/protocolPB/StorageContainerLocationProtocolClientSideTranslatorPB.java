@@ -27,7 +27,6 @@ import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -158,12 +157,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private final StorageContainerLocationProtocolPB rpcProxy;
   private final SCMContainerLocationFailoverProxyProvider fpp;
-
-  /**
-   * This is used to check if 'leader' or 'follower' exists,
-   * in order to confirm whether we have enabled Ratis.
-   */
-  private final List<String> scmRatisRolesToCheck = Arrays.asList("leader", "follower");
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
@@ -376,12 +369,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .getContainerWithPipelinesList();
 
     for (HddsProtos.ContainerWithPipeline cp : protoCps) {
-      try {
-        cps.add(ContainerWithPipeline.fromProtobuf(cp));
-      } catch (IOException uex) {
-          // "fromProtobuf" may throw an exception
-          // do nothing , just go ahead
-      }
+      cps.add(ContainerWithPipeline.fromProtobuf(cp));
     }
     return cps;
   }
