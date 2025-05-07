@@ -237,7 +237,6 @@ public class ContainerReader implements Runnable {
 
       try {
         containerSet.addContainer(kvContainer);
-
         // this should be the last step of this block
         containerData.commitSpace();
       } catch (StorageContainerException e) {

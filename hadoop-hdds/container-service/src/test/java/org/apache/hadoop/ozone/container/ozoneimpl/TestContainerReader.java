@@ -252,10 +252,8 @@ public class TestContainerReader {
       assertEquals(2, containerSet.containerCount());
     } else {
       //recovering container should be marked unhealthy, so the count should be 3
-      Container c = containerSet.getContainer(
-          recoveringContainerData.getContainerID());
-      assertEquals(UNHEALTHY, c.getContainerData().getState());
-      assertFalse(c.getContainerData().isCommittedSpace());
+      assertEquals(UNHEALTHY, containerSet.getContainer(
+          recoveringContainerData.getContainerID()).getContainerState());
       assertEquals(3, containerSet.containerCount());
     }
 

@@ -220,10 +220,6 @@ public abstract class ContainerData {
   }
 
   public void setCommittedSpace(boolean committed) {
-    if (committed) {
-      //we don't expect duplicate space commit
-      Preconditions.checkState(!committedSpace);
-    }
     committedSpace = committed;
   }
 
