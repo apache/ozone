@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -166,8 +167,8 @@ public class TestReconTasks {
       List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
               .getUnhealthyContainers(
-                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-                  0, 1000);
+                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING, 0L,
+                Optional.empty(), 1000);
       return (allMissingContainers.size() == 1);
     });
 
@@ -178,7 +179,7 @@ public class TestReconTasks {
           reconContainerManager.getContainerSchemaManager()
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-                  0, 1000);
+                  0L, Optional.empty(), 1000);
       return (allMissingContainers.isEmpty());
     });
     IOUtils.closeQuietly(client);
@@ -244,7 +245,7 @@ public class TestReconTasks {
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.
                       EMPTY_MISSING,
-                  0, 1000);
+                  0L, Optional.empty(), 1000);
 
       // Check if EMPTY_MISSING containers are not added to the DB and their count is logged
       Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
@@ -272,7 +273,7 @@ public class TestReconTasks {
           reconContainerManager.getContainerSchemaManager()
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-                  0, 1000);
+                  0L, Optional.empty(), 1000);
       return (allMissingContainers.size() == 1);
     });
 
@@ -282,7 +283,7 @@ public class TestReconTasks {
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.
                       EMPTY_MISSING,
-                  0, 1000);
+                  0L, Optional.empty(), 1000);
 
 
       Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
@@ -312,7 +313,7 @@ public class TestReconTasks {
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.
                       EMPTY_MISSING,
-                  0, 1000);
+                  0L, Optional.empty(), 1000);
 
       Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
           unhealthyContainerStateStatsMap = reconScm.getContainerHealthTask()
@@ -332,7 +333,7 @@ public class TestReconTasks {
           reconContainerManager.getContainerSchemaManager()
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-                  0, 1000);
+                  0L, Optional.empty(), 1000);
       return (allMissingContainers.isEmpty());
     });
 
