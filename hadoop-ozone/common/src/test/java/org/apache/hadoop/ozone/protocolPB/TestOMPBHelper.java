@@ -40,7 +40,7 @@ public final class TestOMPBHelper {
   /**
    * This is to test backward compatibility for a bug fixed by HDDS-12954
    * for {@link OMPBHelper#convertMD5MD5FileChecksum(MD5MD5Crc32FileChecksumProto)}.
-   * Previously, the proto md5 was created with 20 bytes with last 4 bytes unused and set to zeros.
+   * Previously, the proto md5 was created using a 20-byte buffer with the last 4 bytes unused.
    * This test verifies the new code can handle the previous (buggy) case.
    */
   @Test

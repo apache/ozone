@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
+import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -34,7 +35,8 @@ import org.apache.ratis.util.MemoizedSupplier;
  * <p>
  * This class is immutable.
  */
-public class ChecksumData {
+@Immutable
+public final class ChecksumData {
 
   private final ChecksumType type;
   // Checksum will be computed for every bytesPerChecksum number of bytes and
@@ -114,7 +116,7 @@ public class ChecksumData {
     final int thatChecksumsCount = that.checksums.size();
     if (thatChecksumsCount > thisChecksumsCount - thisStartIndex) {
       throw new OzoneChecksumException("Checksum count mismatched: thatChecksumsCount=" + thatChecksumsCount
-          + " > thisChecksumsCount (=" + thisChecksumsCount + " ) + thisStartIndex (=" + thisStartIndex + ")");
+          + " > thisChecksumsCount (=" + thisChecksumsCount + " ) - thisStartIndex (=" + thisStartIndex + ")");
     }
 
     // Verify that checksum matches at each index

@@ -188,8 +188,8 @@ public final class OMPBHelper {
     long crcPerBlock = proto.getCrcPerBlock();
     ByteString protoMd5 = proto.getMd5();
     if (protoMd5.size() > MD5Hash.MD5_LEN) {
-      // This was a bug fixed by HDDS-12954.
-      // Previously, the proto md5 was created with 20 bytes with less 4 bytes unused.
+      // There was a bug fixed by HDDS-12954.
+      // Previously, the proto md5 was created using a 20-byte buffer with the last 4 bytes unused.
       protoMd5 = protoMd5.substring(0, MD5Hash.MD5_LEN);
     }
 

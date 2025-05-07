@@ -228,7 +228,7 @@ public class Checksum {
     try {
       function = Algorithm.valueOf(checksumType).newChecksumFunction();
     } catch (Exception e) {
-      throw new OzoneChecksumException("Failed get the checksum function for " + checksumType, e);
+      throw new OzoneChecksumException("Failed to get the checksum function for " + checksumType, e);
     }
 
     final List<ByteString> checksumList;
@@ -325,7 +325,8 @@ public class Checksum {
     }
 
     if (byteStrings.size() == 1) {
-      // The data is a single ByteString (old format).
+      // Optimization for a single ByteString.
+      // Note that the old format (V0) also only has a single ByteString.
       verifyChecksum(byteStrings.get(0).asReadOnlyByteBuffer(), checksumData, startIndex);
       return;
     }
