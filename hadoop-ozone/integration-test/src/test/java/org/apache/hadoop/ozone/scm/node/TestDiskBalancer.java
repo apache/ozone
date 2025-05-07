@@ -21,8 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -35,8 +37,11 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DiskBalancerManager;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -58,6 +63,7 @@ public class TestDiskBalancer {
     ozoneConf = new OzoneConfiguration();
     ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
+    ozoneConf.setTimeDuration("hdds.datanode.disk.balancer.service.interval", 3, TimeUnit.SECONDS);
     cluster = MiniOzoneCluster.newBuilder(ozoneConf).setNumDatanodes(3).build();
     storageClient = new ContainerOperationClient(ozoneConf);
     cluster.waitForClusterToBeReady();
@@ -92,39 +98,35 @@ public class TestDiskBalancer {
   @Test
   public void testDiskBalancerStopAfterEven() throws IOException,
       InterruptedException, TimeoutException {
+    //capture LOG for DiskBalancerManager and DiskBalancerService
+    LogCapturer logCapturer = LogCapturer.captureLogs(DiskBalancerManager.LOG);
+    LogCapturer dnLogCapturer = LogCapturer.captureLogs(DiskBalancerService.class);
+
     // Start DiskBalancer on all datanodes
     diskBalancerManager.startDiskBalancer(
         Optional.of(10.0), // threshold
         Optional.of(10L),  // bandwidth in MB
         Optional.of(5),    // parallel threads
         Optional.of(true), // stopAfterDiskEven
-        Optional.empty());   // apply to all datanodes
+        Optional.empty()); // apply to all datanodes
 
-    // Wait until all datanodes report DiskBalancer status as RUNNING
+    // verify logs for all DNs has started
+    String logs = logCapturer.getOutput();
+    for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+      String uuid = dn.getDatanodeDetails().getUuidString();
+      assertTrue(logs.contains("Sending diskBalancerCommand: opType=START") &&
+              logs.contains(uuid));
+    }
+
+    // Wait up to 5 seconds for all DNs to log the stop message
     GenericTestUtils.waitFor(() -> {
-      try {
-        List<HddsProtos.DatanodeDiskBalancerInfoProto> statusList =
-            storageClient.getDiskBalancerStatus(Optional.empty(), Optional.empty());
-
-        return statusList.stream().allMatch(status ->
-            status.getRunningStatus() == HddsProtos.DiskBalancerRunningStatus.RUNNING);
-      } catch (IOException e) {
-        return false;
-      }
-    }, 100, 60000); // poll every 5s, timeout after 60s
-
-    // Wait until all datanodes report DiskBalancer status as STOPPED
-    GenericTestUtils.waitFor(() -> {
-      try {
-        List<HddsProtos.DatanodeDiskBalancerInfoProto> statusList =
-            storageClient.getDiskBalancerStatus(Optional.empty(), Optional.empty());
-
-        return statusList.stream().allMatch(status ->
-            status.getRunningStatus() == HddsProtos.DiskBalancerRunningStatus.STOPPED);
-      } catch (IOException e) {
-        return false;
-      }
-    }, 100, 60000); // poll every 5s, timeout after 60s
+      String dnLogs = dnLogCapturer.getOutput();
+      long count = Arrays.stream(dnLogs.split("\n"))
+          .filter(line -> line.contains("Disk balancer is stopped due to disk even as" +
+              " the property StopAfterDiskEven is set to true"))
+          .count();
+      return count >= cluster.getHddsDatanodes().size();
+    }, 100, 5000); // check every 100ms, timeout after 5s
   }
 
   @Test

@@ -329,7 +329,7 @@ public class DiskBalancerManager {
     statusMap.put(dn, new DiskBalancerStatus(
         isRunning ? DiskBalancerRunningStatus.RUNNING : DiskBalancerRunningStatus.STOPPED,
         diskBalancerConfiguration, successMoveCount, failureMoveCount, bytesToMove, balancedBytes));
-    if (reportProto.hasBalancedBytes()) {
+    if (reportProto.hasBalancedBytes() && balancedBytesMap != null) {
       balancedBytesMap.put(dn, reportProto.getBalancedBytes());
     }
   }
