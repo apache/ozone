@@ -417,6 +417,7 @@ public class KeyValueHandler extends Handler {
         newContainerData, conf);
 
     boolean created = false;
+    boolean exceptionThrown = false;
     Lock containerIdLock = containerCreationLocks.get(containerID);
     containerIdLock.lock();
     try {
@@ -434,8 +435,12 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Container already exists. container Id {}", containerID);
       }
     } catch (StorageContainerException ex) {
+      exceptionThrown = true;
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } finally {
+      if (exceptionThrown) {
+        newContainerData.releaseCommitSpace();
+      }
       containerIdLock.unlock();
     }
 

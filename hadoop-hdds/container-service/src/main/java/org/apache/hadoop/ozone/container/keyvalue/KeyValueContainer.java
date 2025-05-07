@@ -168,12 +168,13 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
               CONTAINER_INTERNAL_ERROR);
         }
 
-        Boolean exceptionThrown = false;
         try {
           String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
           // Set volume before getContainerDBFile(), because we may need the
           // volume to deduce the db file.
           containerData.setVolume(containerVolume);
+          // commit space has been reserved by volumeChoosingPolicy
+          containerData.setCommittedSpace(true);
 
           long containerID = containerData.getContainerID();
           String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
@@ -207,25 +208,18 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           // Create .container file
           File containerFile = getContainerFile();
           createContainerFile(containerFile);
-
-          // commit space has been reserved by volumeChoosingPolicy
-          containerData.setCommittedSpace(true);
-
           return;
         } catch (StorageContainerException ex) {
-          exceptionThrown = true;
           if (containerMetaDataPath != null
               && containerMetaDataPath.getParentFile().exists()) {
             FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
           }
           throw ex;
         } catch (FileAlreadyExistsException ex) {
-          exceptionThrown = true;
           throw new StorageContainerException("Container creation failed " +
               "because ContainerFile already exists", ex,
               CONTAINER_ALREADY_EXISTS);
         } catch (IOException ex) {
-          exceptionThrown = true;
           // This is a general catch all - no space left of device, which should
           // not happen as the volume Choosing policy should filter out full
           // disks, but it may still be possible if the disk quickly fills,
@@ -242,10 +236,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
             throw new StorageContainerException(
                 "Failed to create " + containerData + " on all volumes: " + volumeSet.getVolumesList(),
                 ex, CONTAINER_INTERNAL_ERROR);
-          }
-        } finally {
-          if (exceptionThrown) {
-            containerData.releaseCommitSpace();
           }
         }
       }
