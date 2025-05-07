@@ -35,20 +35,25 @@ import picocli.CommandLine;
     description = "Finds containers from the database based on the option provided."
 )
 public class ListContainers extends AbstractSubcommand implements Callable<Void> {
-  
-  @CommandLine.Option(names = {"--state"},
-      description = "Life cycle state of the container.")
-  private HddsProtos.LifeCycleState state;
+
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private ExclusiveOptions exclusiveOptions;
 
   @CommandLine.Mixin
   private ListOptions listOptions;
 
-  @CommandLine.Option(names = {"--duplicate-open"},
-          description = "List all the containers which have duplicate open states.")
-  private boolean duplicateOpen;
-
   @CommandLine.ParentCommand
   private ContainerLogController parent;
+
+  private static final class ExclusiveOptions {
+    @CommandLine.Option(names = {"--state"},
+            description = "Life cycle state of the container.")
+    private HddsProtos.LifeCycleState state;
+
+    @CommandLine.Option(names = {"--duplicate-open"},
+            description = "List all the containers which have duplicate open states.")
+    private boolean duplicateOpen;
+  }
 
   @Override
   public Void call() throws Exception {
@@ -60,12 +65,10 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(dbPath.toString());
 
-    if (duplicateOpen) {
+    if (exclusiveOptions.duplicateOpen) {
       cdd.findDuplicateOpenContainer();
-    } else if (state != null) {
-      cdd.listContainersByState(state.name(), listOptions.getLimit());
-    } else {
-      err().println("Please provide either a container state or use --double-open.");
+    } else if (exclusiveOptions.state != null) {
+      cdd.listContainersByState(exclusiveOptions.state.name(), listOptions.getLimit());
     }
     
     return null;
