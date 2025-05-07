@@ -194,13 +194,13 @@ public enum DBProfile {
       return SSD.getBlockBasedTableConfig(optionsPath, cfName);
     }
   };
+  
+  private static final Logger LOG = LoggerFactory.getLogger(DBProfile.class);
 
   public static long toLong(double value) {
     BigDecimal temp = BigDecimal.valueOf(value);
     return temp.longValue();
   }
-
-  private static final Logger LOG = LoggerFactory.getLogger(DBProfile.class);
 
   public abstract ManagedDBOptions getDBOptions(Path optionsPath);
 
