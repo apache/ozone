@@ -562,7 +562,7 @@ public class ContainerDatanodeDatabase {
 
         while (resultSet.next()) {
           Long containerID = resultSet.getLong("container_id");
-          List<DatanodeContainerInfo> logEntries = getContainerLogDataFoOpen(containerID, connection);
+          List<DatanodeContainerInfo> logEntries = getContainerLogDataForOpenContainers(containerID, connection);
           boolean hasIssue = checkForMultipleOpenStates(logEntries);
           if (hasIssue) {
             int openStateCount = (int) logEntries.stream()
@@ -583,7 +583,7 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  private List<DatanodeContainerInfo> getContainerLogDataFoOpen(Long containerID, Connection connection)
+  private List<DatanodeContainerInfo> getContainerLogDataForOpenContainers(Long containerID, Connection connection)
       throws SQLException {
     String query = SQLDBConstants.SELECT_CONTAINER_DETAILS_OPEN_STATE;
     List<DatanodeContainerInfo> logEntries = new ArrayList<>();
