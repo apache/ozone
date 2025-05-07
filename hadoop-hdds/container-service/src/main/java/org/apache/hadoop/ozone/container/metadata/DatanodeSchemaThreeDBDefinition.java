@@ -56,44 +56,39 @@ import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
  */
 public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinition
     implements DBDefinition.WithMapInterface {
-  public static final String BLOCK_DATA_TABLE = "block_data";
-  public static final String METADATA_TABLE = "metadata";
-  public static final String DELETE_TXNS_TABLE = "delete_txns";
-  public static final String FINALIZE_BLOCKS_TABLE = "finalize_blocks";
-  public static final String LAST_CHUNK_INFO_TABLE = "last_chunk_info";
 
   public static final DBColumnFamilyDefinition<String, BlockData>
       BLOCK_DATA =
       new DBColumnFamilyDefinition<>(
-          BLOCK_DATA_TABLE,
+          "block_data",
           FixedLengthStringCodec.get(),
           BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
       METADATA =
       new DBColumnFamilyDefinition<>(
-          METADATA_TABLE,
+          "metadata",
           FixedLengthStringCodec.get(),
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, DeletedBlocksTransaction>
       DELETE_TRANSACTION =
       new DBColumnFamilyDefinition<>(
-          DELETE_TXNS_TABLE,
+          "delete_txns",
           FixedLengthStringCodec.get(),
           Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()));
 
   public static final DBColumnFamilyDefinition<String, Long>
       FINALIZE_BLOCKS =
       new DBColumnFamilyDefinition<>(
-          FINALIZE_BLOCKS_TABLE,
+          "finalize_blocks",
           FixedLengthStringCodec.get(),
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, BlockData>
       LAST_CHUNK_INFO =
       new DBColumnFamilyDefinition<>(
-          LAST_CHUNK_INFO_TABLE,
+          "last_chunk_info",
           FixedLengthStringCodec.get(),
           BlockData.getCodec());
 
@@ -121,11 +116,11 @@ public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinitio
     Path optionsPath = Paths.get(
         config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT));
 
-    BLOCK_DATA.setCfOptions(getCFOptions(config, dbProfile, optionsPath, "block_data"));
-    METADATA.setCfOptions(getCFOptions(config, dbProfile, optionsPath, "metadata"));
-    DELETE_TRANSACTION.setCfOptions(getCFOptions(config, dbProfile, optionsPath, "delete_txns"));
-    FINALIZE_BLOCKS.setCfOptions(getCFOptions(config, dbProfile, optionsPath, "finalize_blocks"));
-    LAST_CHUNK_INFO.setCfOptions(getCFOptions(config, dbProfile, optionsPath, "last_chunk_info"));
+    setCfOptions(config, dbProfile, optionsPath, BLOCK_DATA);
+    setCfOptions(config, dbProfile, optionsPath, METADATA);
+    setCfOptions(config, dbProfile, optionsPath, DELETE_TRANSACTION);
+    setCfOptions(config, dbProfile, optionsPath, FINALIZE_BLOCKS);
+    setCfOptions(config, dbProfile, optionsPath, LAST_CHUNK_INFO);
   }
 
   @Override
@@ -197,12 +192,13 @@ public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinitio
     separator = keySeparator;
   }
 
-  private ManagedColumnFamilyOptions getCFOptions(
-      ConfigurationSource config, DatanodeDBProfile dbProfile, Path pathToOptions, String cfName) {
+  private void setCfOptions(ConfigurationSource config, DatanodeDBProfile dbProfile, Path pathToOptions,
+      DBColumnFamilyDefinition<?, ?> definition) {
     // Use prefix seek to mitigating seek overhead.
     // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
-    return (ManagedColumnFamilyOptions) dbProfile
-        .getColumnFamilyOptions(config, pathToOptions, cfName)
-        .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
+    ManagedColumnFamilyOptions cfOptions =
+        (ManagedColumnFamilyOptions) dbProfile.getColumnFamilyOptions(config, pathToOptions, definition.getName())
+            .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
+    definition.setCfOptions(cfOptions);
   }
 }

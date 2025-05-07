@@ -383,9 +383,7 @@ public final class DBStoreBuilder {
     if (Objects.nonNull(defaultCfOptions)) {
       return defaultCfOptions;
     }
-    if (Objects.isNull(defaultCfProfile)) {
-      throw new RuntimeException();
-    }
+    Objects.requireNonNull(defaultCfProfile, "defaultCFProfile == null");
     Path configuredPath = optionsPath != null ? optionsPath : dbPath;
     return defaultCfProfile.getColumnFamilyOptions(configuredPath, cfName);
   }
