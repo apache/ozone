@@ -177,11 +177,11 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     }
 
     if (!badDnsWithReasons.isEmpty()) {
-      LOG.warn("Below DNs reported by Pipeline: {} are either in bad health or un-registered with SCMs",
-          pipeline.getId());
-      for (Map.Entry<DatanodeDetails, String> entry : badDnsWithReasons.entrySet()) {
-        LOG.warn("DN {}: {}", entry.getKey().getID(), entry.getValue());
-      }
+      String badDnSummary = badDnsWithReasons.entrySet().stream()
+          .map(entry -> String.format("DN %s: %s", entry.getKey().getID(), entry.getValue()))
+          .collect(Collectors.joining("; "));
+      LOG.warn("Below DNs reported by Pipeline: {} are either in bad health or un-registered with SCMs. Details: {}",
+          pipeline.getId(), badDnSummary);
       return;
     }
 
