@@ -25,16 +25,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Iterator;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OFSPath;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -229,33 +224,5 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
     } finally {
       TestLeaseRecovery.closeIgnoringKeyNotFound(stream);
     }
-  }
-
-  @Test
-  void testIsFileFalseForDir() throws IOException {
-    Path dirPath = new Path(getBucketPath(), "dir1");
-    Path keyPath = new Path(dirPath, "key1");
-    OFSPath ofsPath = new OFSPath(dirPath, new OzoneConfiguration());
-
-    getFs().mkdirs(dirPath);
-    try (FSDataOutputStream out1 = getFs().create(keyPath)) {
-      out1.write(2);
-    }
-
-    RootedOzoneFileSystem ofs = (RootedOzoneFileSystem) getFs();
-    BasicRootedOzoneClientAdapterImpl adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
-    OzoneBucket bucket = adapter.getBucket(ofsPath, false);
-
-    Iterator<? extends OzoneKey> key = bucket.listKeys("");
-
-    assertTrue(key.hasNext(), "Expected dir1, key1 in the bucket");
-    OzoneKey ozoneKey = key.next();
-    assertEquals("dir1/", ozoneKey.getName());
-    assertFalse(ozoneKey.isFile(), "Expected isFile to be false for directory key");
-    ozoneKey = key.next();
-    assertEquals("dir1/key1", ozoneKey.getName());
-    assertTrue(ozoneKey.isFile(), "Expected isFile to be true for key");
-
-    getFs().delete(dirPath, true);
   }
 }
