@@ -32,6 +32,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_CO
 import static org.apache.hadoop.util.Time.now;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.PRUNED_SST_FILE_TEMP;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -1939,71 +1940,78 @@ public class TestRocksDBCheckpointDiffer {
     List<Pair<byte[], Integer>> keys = new ArrayList<Pair<byte[], Integer>>();
     keys.add(Pair.of("key1".getBytes(UTF_8), Integer.valueOf(1)));
     keys.add(Pair.of("key2".getBytes(UTF_8), Integer.valueOf(0)));
+    keys.add(Pair.of("key3".getBytes(UTF_8), Integer.valueOf(1)));
 
-    // Create src files in backup & activedirectory.
+    String inputFile78 = "000078";
+    String inputFile73 = "000073";
+    String outputFile81 = "000081";
+    // Create src & destination files in backup & activedirectory.
     // Pruning job should succeed when pruned temp file is already present.
-    List<String> filesInBackupDir = Arrays.asList(
-        sstBackUpDir + "/000078.sst", sstBackUpDir + "/pruned.sst.tmp", sstBackUpDir + "/000073.sst");
-    for (String f : filesInBackupDir) {
-      createSSTFileWithKeys(f, keys);
-    }
-    createSSTFileWithKeys(activeDbDir + "/000081.sst", keys);
+    createSSTFileWithKeys(sstBackUpDir + "/" + inputFile78 + SST_FILE_EXTENSION, keys);
+    createSSTFileWithKeys(sstBackUpDir + "/" + inputFile73 + SST_FILE_EXTENSION, keys);
+    createSSTFileWithKeys(sstBackUpDir + PRUNED_SST_FILE_TEMP, keys);
+    createSSTFileWithKeys(activeDbDir + "/" + outputFile81 + SST_FILE_EXTENSION, keys);
 
-    // Load dummy previous compaction logs.
-    CompactionLogEntry dummyEntry = new CompactionLogEntry(178, System.currentTimeMillis(),
-        Arrays.asList(new CompactionFileInfo("000078", "/volume/bucket1/key-0000001411",
-                "/volume/bucket2/key-0000099649", "keyTable"),
-            new CompactionFileInfo("000073", "/volume/bucket1/key-0000000730",
-                "/volume/bucket2/key-0000097010", "keyTable")),
-        Collections.singletonList(new CompactionFileInfo("000081", "/volume/bucket1/key-0000000730",
-            "/volume/bucket2/key-0000099649", "keyTable")),
+    // Load compaction log
+    CompactionLogEntry compactionLogEntry = new CompactionLogEntry(178, System.currentTimeMillis(),
+        Arrays.asList(
+            new CompactionFileInfo(inputFile78, "/volume/bucket1/key-5", "/volume/bucket2/key-10", "keyTable"),
+            new CompactionFileInfo(inputFile73, "/volume/bucket1/key-1", "/volume/bucket2/key-5", "keyTable")),
+        Collections.singletonList(
+            new CompactionFileInfo(outputFile81, "/volume/bucket1/key-1", "/volume/bucket2/key-10", "keyTable")),
         null
     );
-    byte[] dummyEntryKey = rocksDBCheckpointDiffer.addToCompactionLogTable(dummyEntry);
+    byte[] compactionLogEntryKey = rocksDBCheckpointDiffer.addToCompactionLogTable(compactionLogEntry);
     rocksDBCheckpointDiffer.loadAllCompactionLogs();
 
-    // Pruning should succeed even if a source SST file is missing.
-    Files.delete(sstBackUpDir.toPath().resolve("000073.sst"));
+    // Pruning should not fail a source SST file has been removed by a another pruner.
+    Files.delete(sstBackUpDir.toPath().resolve(inputFile73 + SST_FILE_EXTENSION));
+    // Run the SST file pruner.
     ManagedRawSSTFileIterator mockedRawSSTFileItr = mock(ManagedRawSSTFileIterator.class);
-    when(mockedRawSSTFileItr.hasNext()).thenReturn(true, true, false);
-    when(mockedRawSSTFileItr.next()).thenReturn(keys.get(0), keys.get(1));
+    Iterator keyItr = keys.iterator();
+    when(mockedRawSSTFileItr.hasNext()).thenReturn(true, true, true, false);
+    when(mockedRawSSTFileItr.next()).thenReturn(keyItr.next(), keyItr.next(), keyItr.next());
     try (MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
-             ManagedRawSSTFileReader.class, (mock, context) -> {
-               when(mock.newIterator(any(), any(), any())).thenReturn(mockedRawSSTFileItr);
-               doNothing().when(mock).close();
-             })) {
-      // Run the SST file pruner.
-      waitForLock(rocksDBCheckpointDiffer, RocksDBCheckpointDiffer::pruneSstFileValues);
+        ManagedRawSSTFileReader.class, (mock, context) -> {
+          when(mock.newIterator(any(), any(), any())).thenReturn(mockedRawSSTFileItr);
+          doNothing().when(mock).close();
+        })) {
+      rocksDBCheckpointDiffer.pruneSstFileValues();
     }
-    assertFalse(Files.exists(sstBackUpDir.toPath().resolve("pruned.sst.tmp")));
+    // pruned.sst.tmp should be deleted when pruning job exits successfully.
+    assertFalse(Files.exists(sstBackUpDir.toPath().resolve(PRUNED_SST_FILE_TEMP)));
 
-    // Verify that files are pruned.
-    CompactionLogEntry compactionLogEntry;
+    CompactionLogEntry updatedLogEntry;
     try {
-      compactionLogEntry = CompactionLogEntry.getCodec().fromPersistedFormat(
-          activeRocksDB.get().get(compactionLogTableCFHandle, dummyEntryKey));
+      updatedLogEntry = CompactionLogEntry.getCodec().fromPersistedFormat(
+          activeRocksDB.get().get(compactionLogTableCFHandle, compactionLogEntryKey));
     } catch (RocksDBException ex) {
       throw new RocksDatabaseException("Failed to get compaction log entry.", ex);
     }
-    for (CompactionFileInfo fileInfo : compactionLogEntry.getInputFileInfoList()) {
-      if (fileInfo.getFileName().equals("000078")) {
-        assertTrue(fileInfo.isPruned());
-        File file = sstBackUpDir.toPath().resolve(fileInfo.getFileName() + SST_FILE_EXTENSION).toFile();
-        ManagedSstFileReader sstFileReader = new ManagedSstFileReader(new ManagedOptions());
-        sstFileReader.open(file.getAbsolutePath());
-        ManagedSstFileReaderIterator itr = ManagedSstFileReaderIterator
-            .managed(sstFileReader.newIterator(new ManagedReadOptions()));
-        itr.get().seekToFirst();
-        while (itr.get().isValid()) {
-          assertEquals(0, itr.get().value().length);
-          itr.get().next();
-        }
-        itr.close();
-        sstFileReader.close();
-      } else {
-        assertFalse(fileInfo.isPruned());
-      }
+    CompactionFileInfo fileInfo78 = updatedLogEntry.getInputFileInfoList().get(0);
+    CompactionFileInfo fileInfo73 = updatedLogEntry.getInputFileInfoList().get(1);
+
+    // Verify 000078.sst has been pruned
+    assertTrue(fileInfo78.getFileName().equals(inputFile78));
+    assertTrue(fileInfo78.isPruned());
+    ManagedSstFileReader sstFileReader = new ManagedSstFileReader(new ManagedOptions());
+    sstFileReader.open(sstBackUpDir.toPath().resolve(inputFile78 + SST_FILE_EXTENSION).toFile().getAbsolutePath());
+    ManagedSstFileReaderIterator itr = ManagedSstFileReaderIterator
+        .managed(sstFileReader.newIterator(new ManagedReadOptions()));
+    itr.get().seekToFirst();
+    int prunedKeys = 0;
+    while (itr.get().isValid()) {
+      // Verify that value is removed for non-tombstone keys.
+      assertEquals(0, itr.get().value().length);
+      prunedKeys++;
+      itr.get().next();
     }
+    assertEquals(2, prunedKeys);
+    itr.close();
+    sstFileReader.close();
+
+    // Verify 000073.sst pruning has been skipped
+    assertFalse(fileInfo73.isPruned());
   }
 
   private void createSSTFileWithKeys(String filePath, List<Pair<byte[], Integer>> keys)

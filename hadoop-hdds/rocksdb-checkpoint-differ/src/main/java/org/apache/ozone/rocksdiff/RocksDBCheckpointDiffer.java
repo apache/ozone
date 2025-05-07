@@ -153,6 +153,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   static final String SST_FILE_EXTENSION = ".sst";
   public static final int SST_FILE_EXTENSION_LENGTH =
       SST_FILE_EXTENSION.length();
+  static final String PRUNED_SST_FILE_TEMP = "pruned.sst.tmp";
 
   private static final int LONG_MAX_STR_LEN =
       String.valueOf(Long.MAX_VALUE).length();
@@ -1258,7 +1259,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
 
     Path sstBackupDirPath = Paths.get(sstBackupDir);
-    Path prunedSSTFilePath = sstBackupDirPath.resolve("pruned.sst.tmp");
+    Path prunedSSTFilePath = sstBackupDirPath.resolve(PRUNED_SST_FILE_TEMP);
     try (ManagedOptions managedOptions = new ManagedOptions();
          ManagedEnvOptions envOptions = new ManagedEnvOptions();
          ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions)) {
@@ -1346,7 +1347,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         pruneQueue.poll();
       }
       Files.deleteIfExists(prunedSSTFilePath);
-    } catch (Exception e) {
+    } catch (IOException | InterruptedException e) {
       LOG.error("Could not prune source OMKeyInfo from backup SST files.", e);
     }
   }
