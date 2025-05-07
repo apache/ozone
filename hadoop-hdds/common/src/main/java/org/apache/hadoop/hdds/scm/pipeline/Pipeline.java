@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -335,6 +337,22 @@ public final class Pipeline {
           String.format("Datanode=%s not part of pipeline=%s", dn, id));
     }
     nodeStatus.put(dn, System.currentTimeMillis());
+  }
+
+  @VisibleForTesting
+  public DatanodeDetails removeFirstFromNodeStatus() {
+    Iterator<DatanodeDetails> iterator = nodeStatus.keySet().iterator();
+    DatanodeDetails firstKey = null;
+    if (iterator.hasNext()) {
+      firstKey = iterator.next();
+      nodeStatus.remove(firstKey);
+    }
+    return firstKey;
+  }
+
+  @VisibleForTesting
+  public void setInNodeStatus(DatanodeDetails dd) {
+    nodeStatus.put(dd, Time.now());
   }
 
   public boolean isHealthy() {
