@@ -78,7 +78,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
@@ -179,7 +178,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private ManagedRocksDB activeRocksDB;
   private final ConcurrentMap<String, CompactionFileInfo> inflightCompactions;
   private Queue<byte[]> pruneQueue = null;
-
 
   /**
    * For snapshot diff calculation we only need to track following column
@@ -1268,11 +1266,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       int batchCounter = 0;
       while ((compactionLogEntryKey = pruneQueue.peek()) != null && ++batchCounter <= pruneSSTFileBatchSize) {
         CompactionLogEntry compactionLogEntry;
-        try {
-          compactionLogEntry = CompactionLogEntry.getCodec().fromPersistedFormat(
-              activeRocksDB.get().get(compactionLogTableCFHandle, compactionLogEntryKey));
-        } catch (RocksDBException ex) {
-          throw new RocksDatabaseException("Failed to get compaction log entry.", ex);
+        synchronized (this) {
+          try {
+            compactionLogEntry = CompactionLogEntry.getCodec().fromPersistedFormat(
+                activeRocksDB.get().get(compactionLogTableCFHandle, compactionLogEntryKey));
+          } catch (RocksDBException ex) {
+            throw new RocksDatabaseException("Failed to get compaction log entry.", ex);
+          }
         }
         boolean shouldUpdateTable = false;
         List<CompactionFileInfo> fileInfoList = compactionLogEntry.getInputFileInfoList();
