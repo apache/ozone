@@ -37,11 +37,10 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 public class ContainerSchemaDefinition implements ReconSchemaDefinition {
+  private static final Logger LOG = LoggerFactory.getLogger(ContainerSchemaDefinition.class);
 
   public static final String UNHEALTHY_CONTAINERS_TABLE_NAME =
       "UNHEALTHY_CONTAINERS";
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerSchemaDefinition.class);
 
   private static final String CONTAINER_ID = "container_id";
   private static final String CONTAINER_STATE = "container_state";
@@ -78,8 +77,11 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
         .constraint(DSL.constraint("pk_container_id")
             .primaryKey(CONTAINER_ID, CONTAINER_STATE))
         .constraint(DSL.constraint(UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
-            .check(field(name("container_state"))
+            .check(field(name(CONTAINER_STATE))
                 .in(UnHealthyContainerStates.values())))
+        .execute();
+    dslContext.createIndex("idx_container_state")
+        .on(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME), DSL.field(name(CONTAINER_STATE)))
         .execute();
   }
 
