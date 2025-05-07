@@ -1992,7 +1992,7 @@ public class TestRocksDBCheckpointDiffer {
     CompactionFileInfo fileInfo73 = updatedLogEntry.getInputFileInfoList().get(1);
 
     // Verify 000078.sst has been pruned
-    assertTrue(fileInfo78.getFileName().equals(inputFile78));
+    assertEquals(inputFile78, fileInfo78.getFileName());
     assertTrue(fileInfo78.isPruned());
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(new ManagedOptions());
     sstFileReader.open(sstBackUpDir.toPath().resolve(inputFile78 + SST_FILE_EXTENSION).toFile().getAbsolutePath());
