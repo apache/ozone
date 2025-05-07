@@ -37,12 +37,15 @@ import picocli.CommandLine;
 public class ListContainers extends AbstractSubcommand implements Callable<Void> {
   
   @CommandLine.Option(names = {"--state"},
-      description = "Life cycle state of the container.",
-      required = true)
+      description = "Life cycle state of the container.")
   private HddsProtos.LifeCycleState state;
 
   @CommandLine.Mixin
   private ListOptions listOptions;
+
+  @CommandLine.Option(names = {"--double-open"},
+          description = "List all the containers which have duplicate open states.")
+  private boolean doubleOpen;
 
   @CommandLine.ParentCommand
   private ContainerLogController parent;
@@ -57,7 +60,13 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(dbPath.toString());
 
-    cdd.listContainersByState(state.name(), listOptions.getLimit());
+    if (doubleOpen) {
+      cdd.findDoubleOpenContainer();
+    } else if (state != null) {
+      cdd.listContainersByState(state.name(), listOptions.getLimit());
+    } else {
+      err().println("Please provide either a container state or use --double-open.");
+    }
     
     return null;
   }

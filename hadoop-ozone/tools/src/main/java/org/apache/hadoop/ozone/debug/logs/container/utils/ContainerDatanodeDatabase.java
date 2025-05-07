@@ -541,5 +541,44 @@ public class ContainerDatanodeDatabase {
 
     return logEntries;
   }
+
+  private void createIdxContainerlogContainerId(Connection conn) throws SQLException {
+    String sql = SQLDBConstants.CREATE_CONTAINER_ID_INDEX;
+    try (Statement stmt = conn.createStatement()) {
+      stmt.execute(sql);
+    }
+  }
+
+  public void findDoubleOpenContainer() throws SQLException {
+    String sql = SQLDBConstants.SELECT_DISTINCT_CONTAINER_IDS_QUERY;
+
+    try (Connection connection = getConnection()) {
+
+      createIdxContainerlogContainerId(connection);
+
+      try (PreparedStatement statement = connection.prepareStatement(sql);
+           ResultSet resultSet = statement.executeQuery()) {
+        int count = 0;
+
+        while (resultSet.next()) {
+          Long containerID = resultSet.getLong("container_id");
+          List<DatanodeContainerInfo> logEntries = getContainerLogData(containerID, connection);
+          logEntries.sort(Comparator.comparing(DatanodeContainerInfo::getTimestamp));
+          boolean hasIssue = checkForMultipleOpenStates(logEntries);
+          if (hasIssue) {
+            count++;
+            out.println("Container ID: " + containerID);
+          }
+        }
+
+        out.println("Total containers that might have duplicate OPEN state : " + count);
+
+      }
+    } catch (SQLException e) {
+      throw new SQLException("Error while retrieving containers.");
+    } catch (Exception e) {
+      throw new RuntimeException("Unexpected error: "  + e);
+    }
+  }
 }
 
