@@ -134,7 +134,7 @@ public class NodeEndpoint {
               new DatanodePipeline(pipelineID.getId(),
                   pipeline.getReplicationConfig(), leaderNode);
           pipelines.add(datanodePipeline);
-          if (datanode.getUuid().equals(pipeline.getLeaderId())) {
+          if (datanode.getID().equals(pipeline.getLeaderId())) {
             leaderCount.getAndIncrement();
           }
           int openContainerPerPipeline =

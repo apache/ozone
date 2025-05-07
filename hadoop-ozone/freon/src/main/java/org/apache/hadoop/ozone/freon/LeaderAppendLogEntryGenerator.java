@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -195,7 +196,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
         .setState(PipelineState.OPEN)
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
-        .setLeaderId(UUID.fromString(serverId))
+        .setLeaderId(DatanodeID.fromUuidString(serverId))
         .setNodes(datanodes)
         .build();
 
