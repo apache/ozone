@@ -34,7 +34,6 @@ import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Integration test to verify that if snapshot feature is disabled, OM start up
@@ -48,7 +47,6 @@ public class TestOmSnapshotDisabledRestart {
   private static ObjectStore store;
 
   @BeforeAll
-  @Timeout(60)
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 

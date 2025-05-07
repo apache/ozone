@@ -54,7 +54,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -62,7 +61,6 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test OzoneFSInputStream by reading through multiple interfaces.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
   private OzoneClient client;

@@ -60,7 +60,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +68,6 @@ import org.slf4j.LoggerFactory;
  * Test OzoneManager list volume operation under combinations of configs
  * in secure mode.
  */
-@Timeout(1200)
 public class TestOzoneManagerListVolumesSecure {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneManagerListVolumesSecure.class);

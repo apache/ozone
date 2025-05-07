@@ -32,17 +32,9 @@ public class CompactionNode {
   private final String endKey;
   private final String columnFamily;
 
-  /**
-   * CompactionNode constructor.
-   * @param file SST file (filename without extension)
-   * @param numKeys Number of keys in the SST
-   * @param seqNum Snapshot generation (sequence number)
-   */
-
-  public CompactionNode(String file, long numKeys, long seqNum,
-                        String startKey, String endKey, String columnFamily) {
+  public CompactionNode(String file, long seqNum, String startKey, String endKey, String columnFamily) {
     fileName = file;
-    totalNumberOfKeys = numKeys;
+    totalNumberOfKeys = 0L;
     snapshotGeneration = seqNum;
     cumulativeKeysReverseTraversal = 0L;
     this.startKey = startKey;
@@ -51,7 +43,7 @@ public class CompactionNode {
   }
 
   public CompactionNode(CompactionFileInfo compactionFileInfo) {
-    this(compactionFileInfo.getFileName(), -1, -1, compactionFileInfo.getStartKey(),
+    this(compactionFileInfo.getFileName(), -1, compactionFileInfo.getStartKey(),
         compactionFileInfo.getEndKey(), compactionFileInfo.getColumnFamily());
   }
 
