@@ -32,6 +32,11 @@ public class CompactionNode {
   private final String endKey;
   private final String columnFamily;
 
+  /**
+   * CompactionNode constructor.
+   * @param file SST file (filename without extension)
+   * @param seqNum Snapshot generation (sequence number)
+   */
   public CompactionNode(String file, long seqNum, String startKey, String endKey, String columnFamily) {
     fileName = file;
     totalNumberOfKeys = 0L;
