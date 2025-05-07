@@ -27,6 +27,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -158,8 +159,9 @@ public class TestSendContainerRequestHandler {
     // Verify commit space is reserved
     assertEquals(volume.getCommittedBytes(), initialCommittedBytes + 2 * containerMaxSize);
 
-    // Send a failed response with wrong offset
-    request = createRequest(containerId, ByteString.copyFromUtf8("test"), 0);
+    // mock the importer is not allowed to import this container
+    when(importer.isAllowedContainerImport(containerId)).thenReturn(false);
+    
     sendContainerRequestHandler.onNext(request);
 
     // Verify commit space is released

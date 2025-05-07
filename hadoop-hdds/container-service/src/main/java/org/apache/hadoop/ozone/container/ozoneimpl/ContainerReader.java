@@ -236,8 +236,10 @@ public class ContainerReader implements Runnable {
       }
 
       try {
-        containerData.commitSpace();
         containerSet.addContainer(kvContainer);
+
+        // this should be the last step of this block
+        containerData.commitSpace();
       } catch (StorageContainerException e) {
         if (e.getResult() != ContainerProtos.Result.CONTAINER_EXISTS) {
           throw e;
@@ -246,7 +248,6 @@ public class ContainerReader implements Runnable {
           resolveDuplicate((KeyValueContainer) containerSet.getContainer(
               kvContainer.getContainerData().getContainerID()), kvContainer);
         }
-        containerData.releaseCommitSpace();
       }
       break;
     default:

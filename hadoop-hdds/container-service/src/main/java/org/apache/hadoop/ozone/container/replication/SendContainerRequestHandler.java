@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -119,7 +118,7 @@ class SendContainerRequestHandler
       responseObserver.onError(t);
     } finally {
       if (volume != null) {
-        volume.incCommittedBytes(-HddsServerUtil.requiredReplicationSpace(importer.getDefaultContainerSize()));
+        volume.incCommittedBytes(-importer.getDefaultReplicationSpace());
       }
     }
   }
@@ -148,7 +147,7 @@ class SendContainerRequestHandler
       }
     } finally {
       if (volume != null) {
-        volume.incCommittedBytes(-HddsServerUtil.requiredReplicationSpace(importer.getDefaultContainerSize()));
+        volume.incCommittedBytes(-importer.getDefaultReplicationSpace());
       }
     }
   }

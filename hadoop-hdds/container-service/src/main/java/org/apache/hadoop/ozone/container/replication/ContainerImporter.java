@@ -143,7 +143,7 @@ public class ContainerImporter {
     // Choose volume that can hold both container in tmp and dest directory
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        HddsServerUtil.requiredReplicationSpace(containerSize));
+        getDefaultReplicationSpace());
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)
@@ -166,7 +166,7 @@ public class ContainerImporter {
     return new TarContainerPacker(compression);
   }
 
-  public long getDefaultContainerSize() {
-    return containerSize;
+  public long getDefaultReplicationSpace() {
+    return HddsServerUtil.requiredReplicationSpace(containerSize);
   }
 }
