@@ -37,12 +37,10 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Ozone Prefix Parser.
  */
-@Timeout(120)
 public class TestOzoneFileSystemPrefixParser {
 
   private static MiniOzoneCluster cluster = null;

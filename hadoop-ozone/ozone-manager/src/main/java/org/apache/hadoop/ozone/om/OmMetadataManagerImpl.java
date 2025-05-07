@@ -136,128 +136,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private static final Logger LOG =
       LoggerFactory.getLogger(OmMetadataManagerImpl.class);
 
-  /**
-   * OM RocksDB Structure .
-   * <p>
-   * OM DB stores metadata as KV pairs iThis n different column families.
-   * <p>
-   * OM DB Schema:
-   *
-   * <pre>
-   * {@code
-   * Common Tables:
-   * |----------------------------------------------------------------------|
-   * |  Column Family     |        VALUE                                    |
-   * |----------------------------------------------------------------------|
-   * | userTable          |     /user->UserVolumeInfo                       |
-   * |----------------------------------------------------------------------|
-   * | volumeTable        |     /volume->VolumeInfo                         |
-   * |----------------------------------------------------------------------|
-   * | bucketTable        |     /volume/bucket-> BucketInfo                 |
-   * |----------------------------------------------------------------------|
-   * | s3SecretTable      | s3g_access_key_id -> s3Secret                   |
-   * |----------------------------------------------------------------------|
-   * | dTokenTable        | OzoneTokenID -> renew_time                      |
-   * |----------------------------------------------------------------------|
-   * | prefixInfoTable    | prefix -> PrefixInfo                            |
-   * |----------------------------------------------------------------------|
-   * | multipartInfoTable | /volumeName/bucketName/keyName/uploadId ->...   |
-   * |----------------------------------------------------------------------|
-   * | transactionInfoTable| #TRANSACTIONINFO -> OMTransactionInfo          |
-   * |----------------------------------------------------------------------|
-   * }
-   * </pre>
-   * <pre>
-   * {@code
-   * Multi-Tenant Tables:
-   * |----------------------------------------------------------------------|
-   * | tenantStateTable          | tenantId -> OmDBTenantState              |
-   * |----------------------------------------------------------------------|
-   * | tenantAccessIdTable       | accessId -> OmDBAccessIdInfo             |
-   * |----------------------------------------------------------------------|
-   * | principalToAccessIdsTable | userPrincipal -> OmDBUserPrincipalInfo   |
-   * |----------------------------------------------------------------------|
-   * }
-   * </pre>
-   * <pre>
-   * {@code
-   * Simple Tables:
-   * |----------------------------------------------------------------------|
-   * |  Column Family     |        VALUE                                    |
-   * |----------------------------------------------------------------------|
-   * | keyTable           | /volumeName/bucketName/keyName->KeyInfo         |
-   * |----------------------------------------------------------------------|
-   * | deletedTable       | /volumeName/bucketName/keyName->RepeatedKeyInfo |
-   * |----------------------------------------------------------------------|
-   * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |
-   * |----------------------------------------------------------------------|
-   * }
-   * </pre>
-   * <pre>
-   * {@code
-   * Prefix Tables:
-   * |----------------------------------------------------------------------|
-   * |  Column Family   |        VALUE                                      |
-   * |----------------------------------------------------------------------|
-   * |  directoryTable  | /volumeId/bucketId/parentId/dirName -> DirInfo    |
-   * |----------------------------------------------------------------------|
-   * |  fileTable       | /volumeId/bucketId/parentId/fileName -> KeyInfo   |
-   * |----------------------------------------------------------------------|
-   * |  openFileTable   | /volumeId/bucketId/parentId/fileName/id -> KeyInfo|
-   * |----------------------------------------------------------------------|
-   * |  deletedDirTable | /volumeId/bucketId/parentId/dirName/objectId ->   |
-   * |                  |                                      KeyInfo      |
-   * |----------------------------------------------------------------------|
-   * }
-   * </pre>
-   * <pre>
-   * {@code
-   * Snapshot Tables:
-   * |-------------------------------------------------------------------------|
-   * |  Column Family        |        VALUE                                    |
-   * |-------------------------------------------------------------------------|
-   * | snapshotInfoTable     | /volume/bucket/snapshotName -> SnapshotInfo     |
-   * |-------------------------------------------------------------------------|
-   * | snapshotRenamedTable  | /volumeName/bucketName/objectID -> One of:      |
-   * |                       |  1. /volumeId/bucketId/parentId/dirName         |
-   * |                       |  2. /volumeId/bucketId/parentId/fileName        |
-   * |                       |  3. /volumeName/bucketName/keyName              |
-   * |-------------------------------------------------------------------------|
-   * | compactionLogTable    | dbTrxId-compactionTime -> compactionLogEntry    |
-   * |-------------------------------------------------------------------------|
-   * }
-   * </pre>
-   */
-
-  public static final String USER_TABLE = "userTable";
-  public static final String VOLUME_TABLE = "volumeTable";
-  public static final String BUCKET_TABLE = "bucketTable";
-  public static final String KEY_TABLE = "keyTable";
-  public static final String DELETED_TABLE = "deletedTable";
-  public static final String OPEN_KEY_TABLE = "openKeyTable";
-  public static final String MULTIPARTINFO_TABLE = "multipartInfoTable";
-  public static final String S3_SECRET_TABLE = "s3SecretTable";
-  public static final String DELEGATION_TOKEN_TABLE = "dTokenTable";
-  public static final String PREFIX_TABLE = "prefixTable";
-  public static final String DIRECTORY_TABLE = "directoryTable";
-  public static final String FILE_TABLE = "fileTable";
-  public static final String OPEN_FILE_TABLE = "openFileTable";
-  public static final String DELETED_DIR_TABLE = "deletedDirectoryTable";
-  public static final String TRANSACTION_INFO_TABLE =
-      "transactionInfoTable";
-  public static final String META_TABLE = "metaTable";
-
-  // Tables for multi-tenancy
-  public static final String TENANT_ACCESS_ID_TABLE = "tenantAccessIdTable";
-  public static final String PRINCIPAL_TO_ACCESS_IDS_TABLE =
-      "principalToAccessIdsTable";
-  public static final String TENANT_STATE_TABLE = "tenantStateTable";
-  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
-  public static final String SNAPSHOT_RENAMED_TABLE =
-      "snapshotRenamedTable";
-  public static final String COMPACTION_LOG_TABLE =
-      "compactionLogTable";
-
   private DBStore store;
 
   private final IOzoneManagerLock lock;
@@ -566,48 +444,48 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throws IOException {
     final TableInitializer initializer = new TableInitializer(addCacheMetrics);
 
-    userTable = initializer.get(OMDBDefinition.USER_TABLE);
+    userTable = initializer.get(OMDBDefinition.USER_TABLE_DEF);
 
-    volumeTable = initializer.get(OMDBDefinition.VOLUME_TABLE, cacheType);
-    bucketTable = initializer.get(OMDBDefinition.BUCKET_TABLE, cacheType);
-    keyTable = initializer.get(OMDBDefinition.KEY_TABLE);
+    volumeTable = initializer.get(OMDBDefinition.VOLUME_TABLE_DEF, cacheType);
+    bucketTable = initializer.get(OMDBDefinition.BUCKET_TABLE_DEF, cacheType);
+    keyTable = initializer.get(OMDBDefinition.KEY_TABLE_DEF);
 
-    openKeyTable = initializer.get(OMDBDefinition.OPEN_KEY_TABLE);
-    multipartInfoTable = initializer.get(OMDBDefinition.MULTIPART_INFO_TABLE);
-    deletedTable = initializer.get(OMDBDefinition.DELETED_TABLE);
+    openKeyTable = initializer.get(OMDBDefinition.OPEN_KEY_TABLE_DEF);
+    multipartInfoTable = initializer.get(OMDBDefinition.MULTIPART_INFO_TABLE_DEF);
+    deletedTable = initializer.get(OMDBDefinition.DELETED_TABLE_DEF);
 
-    dirTable = initializer.get(OMDBDefinition.DIRECTORY_TABLE);
-    fileTable = initializer.get(OMDBDefinition.FILE_TABLE);
-    openFileTable = initializer.get(OMDBDefinition.OPEN_FILE_TABLE);
-    deletedDirTable = initializer.get(OMDBDefinition.DELETED_DIR_TABLE);
+    dirTable = initializer.get(OMDBDefinition.DIRECTORY_TABLE_DEF);
+    fileTable = initializer.get(OMDBDefinition.FILE_TABLE_DEF);
+    openFileTable = initializer.get(OMDBDefinition.OPEN_FILE_TABLE_DEF);
+    deletedDirTable = initializer.get(OMDBDefinition.DELETED_DIR_TABLE_DEF);
 
-    dTokenTable = initializer.get(OMDBDefinition.DELEGATION_TOKEN_TABLE);
-    s3SecretTable = initializer.get(OMDBDefinition.S3_SECRET_TABLE);
-    prefixTable = initializer.get(OMDBDefinition.PREFIX_TABLE);
+    dTokenTable = initializer.get(OMDBDefinition.DELEGATION_TOKEN_TABLE_DEF);
+    s3SecretTable = initializer.get(OMDBDefinition.S3_SECRET_TABLE_DEF);
+    prefixTable = initializer.get(OMDBDefinition.PREFIX_TABLE_DEF);
 
-    transactionInfoTable = initializer.get(OMDBDefinition.TRANSACTION_INFO_TABLE);
+    transactionInfoTable = initializer.get(OMDBDefinition.TRANSACTION_INFO_TABLE_DEF);
 
-    metaTable = initializer.get(OMDBDefinition.META_TABLE);
+    metaTable = initializer.get(OMDBDefinition.META_TABLE_DEF);
 
     // accessId -> OmDBAccessIdInfo (tenantId, secret, Kerberos principal)
-    tenantAccessIdTable = initializer.get(OMDBDefinition.TENANT_ACCESS_ID_TABLE);
+    tenantAccessIdTable = initializer.get(OMDBDefinition.TENANT_ACCESS_ID_TABLE_DEF);
 
     // User principal -> OmDBUserPrincipalInfo (a list of accessIds)
-    principalToAccessIdsTable = initializer.get(OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE);
+    principalToAccessIdsTable = initializer.get(OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE_DEF);
 
     // tenant name -> tenant (tenant states)
-    tenantStateTable = initializer.get(OMDBDefinition.TENANT_STATE_TABLE);
+    tenantStateTable = initializer.get(OMDBDefinition.TENANT_STATE_TABLE_DEF);
 
     // TODO: [SNAPSHOT] Consider FULL_CACHE for snapshotInfoTable since
     //  exclusiveSize in SnapshotInfo can be frequently updated.
     // path -> snapshotInfo (snapshot info for snapshot)
-    snapshotInfoTable = initializer.get(OMDBDefinition.SNAPSHOT_INFO_TABLE);
+    snapshotInfoTable = initializer.get(OMDBDefinition.SNAPSHOT_INFO_TABLE_DEF);
 
     // volumeName/bucketName/objectID -> renamedKey or renamedDir
-    snapshotRenamedTable = initializer.get(OMDBDefinition.SNAPSHOT_RENAMED_TABLE);
+    snapshotRenamedTable = initializer.get(OMDBDefinition.SNAPSHOT_RENAMED_TABLE_DEF);
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
-    compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE);
+    compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
   }
 
   /**
@@ -2002,6 +1880,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     renameKey.append(OM_KEY_PREFIX).append(bucketName);
     renameKey.append(OM_KEY_PREFIX).append(objectID);
     return renameKey.toString();
+  }
+
+  @Override
+  public String[] splitRenameKey(String renameKey) {
+    String[] splitVals = renameKey.split(OM_KEY_PREFIX);
+    return new String[]{splitVals[1], splitVals[2], splitVals[3]};
   }
 
   @Override

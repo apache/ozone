@@ -79,13 +79,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests to verify Object store with prefix enabled cases.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(1200)
 public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   private static final Path ROOT =
       new Path(OZONE_URI_DELIMITER);

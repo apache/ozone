@@ -1550,7 +1550,7 @@ public class SCMNodeManager implements NodeManager {
     HashSet<DatanodeDetails> dns = new HashSet<>();
     Preconditions.checkNotNull(dn);
     Set<PipelineID> pipelines =
-        nodeStateManager.getPipelineByDnID(dn.getUuid());
+        nodeStateManager.getPipelineByDnID(dn.getID());
     PipelineManager pipelineManager = scmContext.getScm().getPipelineManager();
     if (!pipelines.isEmpty()) {
       pipelines.forEach(id -> {
@@ -1576,7 +1576,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public Set<PipelineID> getPipelines(DatanodeDetails datanodeDetails) {
-    return nodeStateManager.getPipelineByDnID(datanodeDetails.getUuid());
+    return nodeStateManager.getPipelineByDnID(datanodeDetails.getID());
   }
 
   /**

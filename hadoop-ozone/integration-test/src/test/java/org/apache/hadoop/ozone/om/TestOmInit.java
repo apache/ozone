@@ -26,12 +26,10 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Ozone Manager Init.
  */
-@Timeout(300)
 public class TestOmInit {
 
   private static MiniOzoneCluster cluster = null;

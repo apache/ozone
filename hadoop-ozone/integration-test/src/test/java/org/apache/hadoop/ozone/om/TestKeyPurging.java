@@ -43,12 +43,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test OM's {@link KeyDeletingService}.
  */
-@Timeout(300)
 public class TestKeyPurging {
 
   private MiniOzoneCluster cluster;

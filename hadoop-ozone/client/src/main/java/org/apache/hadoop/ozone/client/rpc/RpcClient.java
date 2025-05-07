@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
@@ -1027,6 +1028,7 @@ public class RpcClient implements ClientProtocol {
    * @return message which tells the image name, parent dir and OM leader
    * node information.
    */
+  @Deprecated
   @Override
   public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType) throws IOException {
@@ -1722,8 +1724,10 @@ public class RpcClient implements ClientProtocol {
               key.getCreationTime(),
               key.getModificationTime(),
               key.getReplicationConfig(),
+              Collections.singletonMap(ETAG, key.getETag()),
               key.isFile(),
-              key.getOwnerName()))
+              key.getOwnerName(),
+              Collections.emptyMap()))
           .collect(Collectors.toList());
     } else {
       List<OmKeyInfo> keys = ozoneManagerClient.listKeys(
@@ -1735,8 +1739,10 @@ public class RpcClient implements ClientProtocol {
               key.getCreationTime(),
               key.getModificationTime(),
               key.getReplicationConfig(),
+              key.getMetadata(),
               key.isFile(),
-              key.getOwnerName()))
+              key.getOwnerName(),
+              key.getTags()))
           .collect(Collectors.toList());
     }
   }

@@ -214,7 +214,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     for (DatanodeDetails dn : reportMap.keySet()) {
       List<PipelineReport> reports = new ArrayList<>();
       for (PipelineID pipeline : mockNodeManager.
-              getNode2PipelineMap().getPipelines(dn.getUuid())) {
+              getNode2PipelineMap().getPipelines(dn.getID())) {
         try {
           if (!pipelines.contains(pipelineManager.getPipeline(pipeline))) {
             continue;

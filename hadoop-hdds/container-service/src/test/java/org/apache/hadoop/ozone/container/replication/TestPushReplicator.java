@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Sta
 import org.apache.ozone.test.SpyOutputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
@@ -47,7 +46,6 @@ import org.mockito.ArgumentCaptor;
 /**
  * Test for {@link PushReplicator}.
  */
-@Timeout(30)
 class TestPushReplicator {
 
   private OzoneConfiguration conf;

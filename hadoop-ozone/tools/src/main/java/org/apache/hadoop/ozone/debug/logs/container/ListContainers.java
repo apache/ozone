@@ -17,13 +17,11 @@
 
 package org.apache.hadoop.ozone.debug.logs.container;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.containerlog.parser.ContainerDatanodeDatabase;
-import org.apache.hadoop.ozone.containerlog.parser.DBConsts;
+import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
 import org.apache.hadoop.ozone.shell.ListOptions;
 import picocli.CommandLine;
 
@@ -36,7 +34,7 @@ import picocli.CommandLine;
     name = "list",
     description = "Finds containers from the database based on the option provided."
 )
-public class ListContainers implements Callable<Void> {
+public class ListContainers extends AbstractSubcommand implements Callable<Void> {
   
   @CommandLine.Option(names = {"--state"},
       description = "Life cycle state of the container.",
@@ -51,35 +49,15 @@ public class ListContainers implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    Path providedDbPath;
-    if (parent.getDbPath() == null) {
-      providedDbPath = Paths.get(System.getProperty("user.dir"), DBConsts.DEFAULT_DB_FILENAME);
-
-      if (Files.exists(providedDbPath) && Files.isRegularFile(providedDbPath)) {
-        System.out.println("Using default database file found in current directory: " + providedDbPath);
-      } else {
-        System.err.println("No database path provided and default file '" + DBConsts.DEFAULT_DB_FILENAME + "' not " +
-            "found in current directory. Please provide a valid database path");
-        return null;
-      }
-    } else {
-      providedDbPath = Paths.get(parent.getDbPath());
-      Path parentDir = providedDbPath.getParent();
-
-      if (parentDir != null && !Files.exists(parentDir)) {
-        System.err.println("The parent directory of the provided database path does not exist: " + parentDir);
-        return null;
-      }
-    }
-
-    ContainerDatanodeDatabase.setDatabasePath(providedDbPath.toString());
     
-    ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase();
-    try {
-      cdd.listContainersByState(state.name(), listOptions.getLimit());
-    } catch (Exception e) {
-      throw e;
+    Path dbPath = parent.resolveDbPath();
+    if (dbPath == null) {
+      return null;
     }
+
+    ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(dbPath.toString());
+
+    cdd.listContainersByState(state.name(), listOptions.getLimit());
     
     return null;
   }
