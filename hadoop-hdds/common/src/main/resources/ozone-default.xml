@@ -4756,6 +4756,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.prefetch.min.blocks</name>
+    <value>500</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Minimum number of prefetched blocks to maintain in the OM.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.prefetched.blocks.periodic.expiry.interval</name>
     <value>30s</value>
     <tag>OZONE, OM</tag>
