@@ -157,7 +157,7 @@ public class SignedChunksInputStream extends InputStream {
           // if we encounter this chunk
           isFinalChunkEncountered = true;
         }
-        if (isFinalChunkEncountered || remainingData < 0) {
+        if (isFinalChunkEncountered || remainingData == -1) {
           break;
         }
       }

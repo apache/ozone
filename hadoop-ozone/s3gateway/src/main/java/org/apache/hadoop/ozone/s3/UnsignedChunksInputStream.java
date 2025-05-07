@@ -153,7 +153,7 @@ public class UnsignedChunksInputStream extends InputStream {
           // if we encounter this chunk
           isFinalChunkEncountered = true;
         }
-        if (remainingData <= 0) {
+        if (isFinalChunkEncountered || remainingData == -1) {
           break;
         }
       }
