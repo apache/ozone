@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.s3.awssdk.v1;
 
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
+
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -36,6 +38,7 @@ public class TestS3SDKV1WithRatisStreaming extends AbstractS3SDKV1Tests {
         false);
     conf.setBoolean(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         true);
+    conf.set(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, "5GB");
     conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED, true);
     // Ensure that all writes use datastream
