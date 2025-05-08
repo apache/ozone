@@ -19,17 +19,7 @@ package org.apache.hadoop.ozone.shell;
 
 import picocli.CommandLine;
 
-/**
- * Options for limiting the size of lists.
- * <p>
- * Usage:
- * <pre>
- * {@code
- * @CommandLine.Mixin
- * private ListLimitOptions limitOptions;
- * }
- * </pre>
- */
+/** Options for limiting the size of lists.  Use with {@link CommandLine.Mixin}. */
 public class ListLimitOptions {
 
   @CommandLine.ArgGroup

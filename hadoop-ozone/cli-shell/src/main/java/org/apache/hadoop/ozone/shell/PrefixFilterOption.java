@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.shell;
 
 import picocli.CommandLine;
 
-/** Option for filtering lists by prefix. */
+/** Option for filtering lists by prefix.  Use with {@link CommandLine.Mixin}. */
 public class PrefixFilterOption {
 
   @CommandLine.Option(names = {"--prefix", "-p"},
