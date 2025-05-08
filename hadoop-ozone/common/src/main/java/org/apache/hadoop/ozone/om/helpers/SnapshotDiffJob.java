@@ -258,7 +258,7 @@ public class SnapshotDiffJob {
   }
 
   public SnapshotDiffJobProto toProtoBuf() {
-    return SnapshotDiffJobProto.newBuilder()
+    SnapshotDiffJobProto.Builder builder = SnapshotDiffJobProto.newBuilder()
         .setCreationTime(creationTime)
         .setJobId(jobId)
         .setStatus(status.toProtobuf())
@@ -269,9 +269,11 @@ public class SnapshotDiffJob {
         .setForceFullDiff(forceFullDiff)
         .setDisableNativeDiff(disableNativeDiff)
         .setTotalDiffEntries(totalDiffEntries)
-        .setSubStatus(subStatus.toProtoBuf())
-        .setKeysProcessedPct(keysProcessedPct)
-        .build();
+        .setKeysProcessedPct(keysProcessedPct);
+    if (subStatus != null) {
+      builder.setSubStatus(subStatus.toProtoBuf());
+    }
+    return builder.build();
   }
 
   public static SnapshotDiffJob getFromProtoBuf(
