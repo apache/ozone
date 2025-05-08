@@ -33,6 +33,7 @@
     <module>datanode</module>
     <module>dist</module>
     <module>fault-injection-test</module>
+    <module>freon</module>
     <module>httpfsgateway</module>
     <module>insight</module>
     <module>integration-test</module>
@@ -112,11 +113,6 @@
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-hadoop-dependency-client</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-hadoop-dependency-server</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
@@ -236,6 +232,11 @@
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-filesystem-shaded</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-freon</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>

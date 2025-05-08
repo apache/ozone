@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.containerlog.parser;
+package org.apache.hadoop.ozone.debug.logs.container.utils;
 
 /**
  *Holds information about a container.
