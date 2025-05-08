@@ -46,7 +46,22 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.rocksdb.RocksDBException;
 
 /**
- * Test class for ReclaimableKeyFilter.
+ * Test class for verifying the behavior of the ReclaimableKeyFilter.
+ *
+ * <p>The ReclaimableKeyFilter is responsible for determining if a deleted key entry
+ * can be reclaimed based on its presence in previous snapshots. In essence, if a key
+ * does not appear in a previous snapshot—or if the snapshot chain's state indicates that
+ * the key is no longer valid—the key is considered reclaimable. These tests simulate a
+ * variety of snapshot chain scenarios to validate that:
+ * <ul>
+ *   <li>Keys are not reclaimed if they exist in prior snapshots.</li>
+ *   <li>Keys are reclaimed if they are removed from the previous snapshot.</li>
+ *   <li>Exclusive size metrics, including data and replicated sizes, are correctly updated
+ *       for snapshots where keys are not reclaimed.</li>
+ * </ul>
+ *
+ * <p>This class extends {@link AbstractReclaimableFilterTest} to leverage common setup, snapshot
+ * chain preparation, and utility methods.
  */
 public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
   @Override
@@ -146,6 +161,14 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
     return getMockedOmKeyInfo(objectId, 0, 0);
   }
 
+  /**
+   * Tests that a key present in prior snapshots is not reclaimable.
+   *
+   * @param actualNumberOfSnapshots the total number of snapshots in the chain.
+   * @param index the snapshot chain index used for testing.
+   * @throws IOException if an I/O error occurs during the test.
+   * @throws RocksDBException if RocksDB encounters an error.
+   */
   @ParameterizedTest
   @MethodSource("testReclaimableFilterArguments")
   public void testNonReclaimableKey(int actualNumberOfSnapshots, int index) throws IOException, RocksDBException {
@@ -169,6 +192,14 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
         prevKeyInfo == null, size, size);
   }
 
+  /**
+   * Tests the filter when the object IDs differ between current and previous snapshot key entries.
+   *
+   * @param actualNumberOfSnapshots the total number of snapshots in the chain.
+   * @param index the snapshot chain index used for testing.
+   * @throws IOException if an I/O error occurs during the test.
+   * @throws RocksDBException if RocksDB encounters an error.
+   */
   @ParameterizedTest
   @MethodSource("testReclaimableFilterArguments")
   public void testReclaimableKeyWithDifferentObjId(int actualNumberOfSnapshots, int index)
@@ -188,6 +219,14 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
         true, Optional.empty(), Optional.empty());
   }
 
+  /**
+   * Tests the filter behavior when block location information differs between snapshots.
+   *
+   * @param actualNumberOfSnapshots the total number of snapshots in the chain.
+   * @param index the snapshot chain index used for testing.
+   * @throws IOException if an I/O error occurs during the test.
+   * @throws RocksDBException if RocksDB encounters an error.
+   */
   @ParameterizedTest
   @MethodSource("testReclaimableFilterArguments")
   public void testReclaimableKeyWithDifferentBlockIds(int actualNumberOfSnapshots, int index)
@@ -207,6 +246,18 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
         true, Optional.empty(), Optional.empty());
   }
 
+  /**
+   * Tests the exclusive size calculation for a non-reclaimable key.
+   *
+   * This test verifies that for a key which is not reclaimable,
+   * the filter correctly updates the exclusive size and exclusive replicated size
+   * stored in the filter's maps.
+   *
+   * @param actualNumberOfSnapshots the total number of snapshots in the chain.
+   * @param index the snapshot chain index used for testing size calculations.
+   * @throws IOException if an I/O error occurs during the test.
+   * @throws RocksDBException if RocksDB encounters an error.
+   */
   @ParameterizedTest
   @MethodSource("testReclaimableFilterArguments")
   public void testExclusiveSizeCalculationWithNonReclaimableKey(int actualNumberOfSnapshots, int index)
