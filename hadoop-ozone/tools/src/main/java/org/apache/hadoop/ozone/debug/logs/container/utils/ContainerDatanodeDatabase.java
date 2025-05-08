@@ -122,6 +122,7 @@ public class ContainerDatanodeDatabase {
       createIdxDclContainerStateTime(stmt);
       createContainerLogIndex(stmt);
       createIdxContainerlogContainerId(stmt);
+      createIndexForQuasiClosedQuery(stmt);
     } catch (SQLException e) {
       throw new SQLException("Error while creating index: " + e.getMessage());
     } catch (Exception e) {
@@ -141,6 +142,11 @@ public class ContainerDatanodeDatabase {
 
   private void createIdxContainerlogContainerId(Statement stmt) throws SQLException {
     String createIndexSQL = SQLDBConstants.CREATE_CONTAINER_ID_INDEX;
+    stmt.execute(createIndexSQL);
+  }
+
+  private void createIndexForQuasiClosedQuery(Statement stmt) throws SQLException {
+    String createIndexSQL = SQLDBConstants.CREATE_DCL_STATE_CONTAINER_DATANODE_TIME_INDEX;
     stmt.execute(createIndexSQL);
   }
 
@@ -608,6 +614,180 @@ public class ContainerDatanodeDatabase {
     }
 
     return logEntries;
+  }
+
+  /**
+   * Lists container replicas with key details such as Container ID, Datanode ID, State, BCSID for over- 
+   * or under-replicated containers.
+   */
+  
+  public void listReplicatedContainers(String overOrUnder, Integer limit) throws SQLException {
+    String operator;
+    if ("OVER_REPLICATED".equalsIgnoreCase(overOrUnder)) {
+      operator = ">";
+    } else if ("UNDER_REPLICATED".equalsIgnoreCase(overOrUnder)) {
+      operator = "<";
+    } else {
+      out.println("Invalid type. Use OVER_REPLICATED or UNDER_REPLICATED.");
+      return;
+    }
+    
+    String rawQuery = SQLDBConstants.SELECT_REPLICATED_CONTAINERS;
+
+    if (!rawQuery.contains("{operator}")) {
+      out.println("Query not defined correctly.");
+      return;
+    }
+
+    String finalQuery = rawQuery.replace("{operator}", operator);
+
+    boolean limitProvided = limit != Integer.MAX_VALUE;
+    if (limitProvided) {
+      finalQuery += " LIMIT ?";
+    }
+
+    try (Connection connection = getConnection();
+         PreparedStatement pstmt = connection.prepareStatement(finalQuery)) {
+
+      pstmt.setInt(1, DEFAULT_REPLICATION_FACTOR);
+      
+      if (limitProvided) {
+        pstmt.setInt(2, limit + 1);
+      }
+
+      try (ResultSet rs = pstmt.executeQuery()) {
+        int count = 0;
+
+        out.printf("| %-15s | %-35s | %-15s | %-15s %n", "Container ID", "Datanode ID", "State", "BCSID");
+        out.println("+-----------------+-------------------------------------+-----------------+-----------------+");
+
+        while (rs.next()) {
+          if (limitProvided && count >= limit) {
+            out.println("Note: There might be more containers. Use -all option to list all entries.");
+            break;
+          }
+          out.printf("| %-15d | %-35s | %-15s | %-15d %n",
+              rs.getLong("container_id"),
+              rs.getString("datanode_id"),
+              rs.getString("latest_state"),
+              rs.getLong("latest_bcsid"));
+          count++;
+        }
+
+        out.println("Number of containers listed: " + count);
+
+      }
+
+    } catch (SQLException e) {
+      throw new SQLException("Error while retrieving containers." + e.getMessage(), e);
+    } catch (Exception e) {
+      throw new RuntimeException("Unexpected error: "  + e);
+    }
+  }
+
+  /**
+   * Lists container replicas with key details such as Container ID, Datanode ID, Timestamp, BCSID for 
+   * containers that are UNHEALTHY.
+   */
+
+  public void listUnhealthyContainers(Integer limit) throws SQLException {
+    
+    String query = SQLDBConstants.SELECT_UNHEALTHY_CONTAINERS;
+
+    boolean limitProvided = limit != Integer.MAX_VALUE;
+    if (limitProvided) {
+      query += " LIMIT ?";
+    }
+
+    try (Connection connection = getConnection();
+         PreparedStatement stmt = connection.prepareStatement(query)) {
+
+      if (limitProvided) {
+        stmt.setInt(1, limit + 1);
+      }
+
+      try (ResultSet rs = stmt.executeQuery()) {
+        int count = 0;
+
+        out.printf("| %-15s | %-35s | %-25s | %-10s %n", "Container ID", "Datanode ID", "Timestamp", "BCSID");
+        out.println("+-----------------+-------------------------------------+---------------------------+----------");
+
+        while (rs.next()) {
+          if (limitProvided && count >= limit) {
+            out.println("Note: There might be more containers. Use -all option to list all entries.");
+            break;
+          }
+
+          String containerId = rs.getString("container_id");
+          String datanodeId = rs.getString("datanode_id");
+          String timestamp = rs.getString("latest_unhealthy_timestamp");
+          long bcsid = rs.getLong("bcsid");
+
+          out.printf("| %-15s | %-35s | %-25s | %-10d %n", containerId, datanodeId, timestamp, bcsid);
+          count++;
+        }
+
+        out.println("Number of containers listed: " + count);
+      }
+
+    } catch (SQLException e) {
+      throw new SQLException("Error while retrieving containers." + e.getMessage(), e);
+    } catch (Exception e) {
+      throw new RuntimeException("Unexpected error: "  + e);
+    }
+  }
+
+  /**
+   * Lists container replicas with key details such as Container ID, Datanode ID, Timestamp, BCSID for 
+   * containers that are QUASI_CLOSED stuck.
+   */
+
+  public void listQuasiClosedStuckContainers(Integer limit) throws SQLException {
+  
+    String query =  SQLDBConstants.SELECT_QUASI_CLOSED_STUCK_CONTAINERS;
+
+    boolean limitProvided = limit != Integer.MAX_VALUE;
+    if (limitProvided) {
+      query += " LIMIT ?";
+    }
+
+    try (Connection connection = getConnection();
+         PreparedStatement statement = connection.prepareStatement(query)) {
+
+      if (limitProvided) {
+        statement.setInt(1, limit + 1);
+      }
+
+      try (ResultSet resultSet = statement.executeQuery()) {
+        int count = 0;
+
+        out.printf("| %-15s | %-35s | %-30s | %-15s %n", "Container ID", "Datanode ID", "Timestamp", "BCSID");
+        out.println("+-----------------+-------------------------------------+--------------------------" +
+            "----+-----------------+");
+
+        while (resultSet.next()) {
+          if (limitProvided && count >= limit) {
+            out.println("Note: There might be more containers. Use -all option to list all entries.");
+            break;
+          }
+
+          String containerId = resultSet.getString("container_id");
+          String datanodeId = resultSet.getString("datanode_id");
+          String timestamp = resultSet.getString("latest_quasi_closed_timestamp");
+          long bcsid = resultSet.getLong("bcsid");
+
+          out.printf("| %-15s | %-35s | %-30s | %-15d %n", containerId, datanodeId, timestamp, bcsid);
+          count++;
+        }
+
+        out.println("Number of containers listed: " + count);
+      }
+
+    } catch (SQLException e) {
+      throw new SQLException("Error while retrieving containers." + e.getMessage(), e);
+    } catch (Exception e) {
+      throw new RuntimeException("Unexpected error: "  + e);
+    }
   }
 }
 
