@@ -74,6 +74,7 @@ public class DatanodeInfo extends DatanodeDetails {
         layoutInfo != null ? layoutInfo.getMetadataLayoutVersion() : 0,
         layoutInfo != null ? layoutInfo.getSoftwareLayoutVersion() : 0);
     this.storageReports = Collections.emptyList();
+    this.volumeInfos = Collections.emptyList();
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
     this.commandCounts = new HashMap<>();
@@ -194,6 +195,7 @@ public class DatanodeInfo extends DatanodeDetails {
       lastStatsUpdatedTime = Time.monotonicNow();
       failedVolumeCount = failedCount;
       storageReports = reports;
+      volumeInfos = volumeInfoLists;
     } finally {
       lock.writeLock().unlock();
     }

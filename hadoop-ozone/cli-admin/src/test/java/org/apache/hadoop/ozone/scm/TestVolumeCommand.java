@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.scm;
 
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,16 +27,10 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.scm.cli.datanode.VolumeSubCommand;
@@ -55,23 +49,15 @@ import picocli.CommandLine;
  */
 public class TestVolumeCommand {
   private VolumeSubCommand cmd;
-  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
-  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
-  private final PrintStream originalOut = System.out;
-  private final PrintStream originalErr = System.err;
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new VolumeSubCommand();
-    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
-    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
   @AfterEach
   public void tearDown() {
-    System.setOut(originalOut);
-    System.setErr(originalErr);
   }
 
   @Test
@@ -83,13 +69,14 @@ public class TestVolumeCommand {
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--json", "--length", "20");
 
+
     try (GenericTestUtils.SystemOutCapturer capture =
         new GenericTestUtils.SystemOutCapturer()) {
       cmd.execute(scmClient);
       String output = capture.getOutput();
       assertNotNull(output);
       ObjectMapper mapper = new ObjectMapper();
-      JsonNode json = mapper.readTree(outContent.toString("UTF-8"));
+      JsonNode json = mapper.readTree(output);
       assertTrue(json.isArray());
       assertEquals(5, json.size());
       System.out.println(output);
@@ -105,7 +92,6 @@ public class TestVolumeCommand {
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--table", "--length", "20");
-    cmd.execute(scmClient);
 
     try (GenericTestUtils.SystemOutCapturer capture =
          new GenericTestUtils.SystemOutCapturer()) {
@@ -120,7 +106,7 @@ public class TestVolumeCommand {
     GetVolumeInfosResponseProto.Builder builder = GetVolumeInfosResponseProto.newBuilder();
     List<HddsProtos.VolumeInfoProto> result = new ArrayList<>();
     for (int i = 0; i < 5; i++) {
-      HddsProtos.DatanodeDetailsProto datanodeDetails = createDatanodeDetails();
+      HddsProtos.DatanodeDetailsProto datanodeDetails = randomDatanodeDetails().getProtoBufMessage();
       String hostName = datanodeDetails.getHostName();
       String uuId = datanodeDetails.getUuid();
       VolumeInfo volumeInfo =
@@ -139,26 +125,5 @@ public class TestVolumeCommand {
     builder.setCurrentPage(1);
     builder.addAllVolumeInfos(result);
     return builder.build();
-  }
-
-  private HddsProtos.DatanodeDetailsProto createDatanodeDetails() {
-    Random random = ThreadLocalRandom.current();
-    String ipAddress = random.nextInt(256)
-        + "." + random.nextInt(256)
-        + "." + random.nextInt(256)
-        + "." + random.nextInt(256);
-
-    DatanodeDetails.Builder dn = DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID())
-        .setHostName("localhost" + "-" + ipAddress)
-        .setIpAddress(ipAddress)
-        .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
-        .setPersistedOpStateExpiry(0);
-
-    for (DatanodeDetails.Port.Name name : ALL_PORTS) {
-      dn.addPort(DatanodeDetails.newPort(name, 0));
-    }
-
-    return dn.build().getProtoBufMessage();
   }
 }

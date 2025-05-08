@@ -130,6 +130,7 @@ public class VolumeSubCommand extends ScmSubcommand {
     // Print the relevant information if the return value is empty.
     if (response == null || CollectionUtils.isEmpty(response.getVolumeInfosList())) {
       out().println("No volume data was retrieved.");
+      out().flush();
       return;
     }
 
@@ -139,6 +140,7 @@ public class VolumeSubCommand extends ScmSubcommand {
     // If displayed in JSON format.
     if (formatOptions.json) {
       out().print(JsonUtils.toJsonStringWithDefaultPrettyPrinter(volumeInfos));
+      out().flush();
       return;
     }
 
@@ -155,11 +157,13 @@ public class VolumeSubCommand extends ScmSubcommand {
         formattingCLIUtils.addLine(values);
       }
       out().println(formattingCLIUtils.render());
+      out().flush();
       return;
     }
 
     out().printf("Datanode Volume (%d Volumes)%n%n", volumeInfos.size());
     volumeInfos.forEach(this::printInfo);
+    out().flush();
   }
 
   /**
