@@ -129,6 +129,21 @@ public class ContainerDatanodeDatabase {
     }
   }
 
+  private void createIdxDclContainerStateTime(Statement stmt) throws SQLException {
+    String createIndexSQL = SQLDBConstants.CREATE_DCL_CONTAINER_STATE_TIME_INDEX;
+    stmt.execute(createIndexSQL);
+  }
+
+  private void createContainerLogIndex(Statement stmt) throws SQLException {
+    String createIndexSQL = SQLDBConstants.CREATE_INDEX_LATEST_STATE;
+    stmt.execute(createIndexSQL);
+  }
+
+  private void createIdxContainerlogContainerId(Statement stmt) throws SQLException {
+    String createIndexSQL = SQLDBConstants.CREATE_CONTAINER_ID_INDEX;
+    stmt.execute(createIndexSQL);
+  }
+
   /**
    * Inserts a list of container log entries into the DatanodeContainerLogTable.
    *
@@ -241,11 +256,6 @@ public class ContainerDatanodeDatabase {
     stmt.executeUpdate(dropTableSQL);
   }
 
-  private void createContainerLogIndex(Statement stmt) throws SQLException {
-    String createIndexSQL = SQLDBConstants.CREATE_INDEX_LATEST_STATE;
-    stmt.execute(createIndexSQL);
-  }
-
   /**
    * Lists containers filtered by the specified state and writes their details to stdout 
    * unless redirected to a file explicitly.
@@ -312,11 +322,6 @@ public class ContainerDatanodeDatabase {
     } catch (Exception e) {
       throw new RuntimeException("Unexpected error: "  + e);
     }
-  }
-
-  private void createIdxDclContainerStateTime(Statement stmt) throws SQLException {
-    String createIndexSQL = SQLDBConstants.CREATE_DCL_CONTAINER_STATE_TIME_INDEX;
-    stmt.execute(createIndexSQL);
   }
 
   /**
@@ -548,11 +553,6 @@ public class ContainerDatanodeDatabase {
     }
 
     return logEntries;
-  }
-
-  private void createIdxContainerlogContainerId(Statement stmt) throws SQLException {
-    String createIndexSQL = SQLDBConstants.CREATE_CONTAINER_ID_INDEX;
-    stmt.execute(createIndexSQL);
   }
 
   public void findDuplicateOpenContainer() throws SQLException {
