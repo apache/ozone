@@ -32,8 +32,12 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -65,6 +69,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test for Snapshot feature with ACL.
@@ -84,8 +90,14 @@ public class TestOzoneManagerSnapshotAcl {
   private static final String GROUP2 = "group2";
   private static final UserGroupInformation UGI2 =
       UserGroupInformation.createUserForTesting(USER2, new String[] {GROUP2});
+  private static final String USER3 = "user3";
+  private static final String GROUP3 = "group3";
+  private static final UserGroupInformation UGI3 =
+      UserGroupInformation.createUserForTesting(USER3, new String[] {GROUP3});
   private static final OzoneObj.ResourceType RESOURCE_TYPE_KEY =
       OzoneObj.ResourceType.KEY;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOzoneManagerSnapshotAcl.class);
   private static MiniOzoneCluster cluster;
   private static ObjectStore objectStore;
   private static OzoneManager ozoneManager;
@@ -103,8 +115,13 @@ public class TestOzoneManagerSnapshotAcl {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+
     final String omServiceId = "om-service-test-1"
         + RandomStringUtils.secure().nextNumeric(32);
+
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, omServiceId);
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
@@ -436,6 +453,108 @@ public class TestOzoneManagerSnapshotAcl {
     assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
   }
 
+  @ParameterizedTest
+  @EnumSource(BucketLayout.class)
+  public void testSnapshotPermissions(BucketLayout bucketLayout) throws Exception {
+    createVolume();
+
+    // create a bucket whose owner is user1
+    final OzoneVolume volume = objectStore.getVolume(volumeName);
+    createBucket(bucketLayout, volume, USER1);
+    // allow user2 volume read and bucket read and list permissions.
+    setDefaultVolumeAcls();
+    setBucketAcl();
+    String bucket1Name = bucketName;
+
+    String snapshot1 =
+        "snapshot-" + RandomStringUtils.secure().nextNumeric(32);
+    objectStore.createSnapshot(volumeName, bucketName, snapshot1);
+    String snapshot2 =
+        "snapshot-" + RandomStringUtils.secure().nextNumeric(32);
+    objectStore.createSnapshot(volumeName, bucketName, snapshot2);
+
+    // user2 should be able to list the snapshots, get snapshot info,
+    // snapshot diff, list snapshot diff jobs and cancel snapshot diff jobs
+    UGI2.doAs(
+        (PrivilegedExceptionAction<Void>)()
+            -> {
+          OzoneClient client2 = cluster.newClient();
+          ObjectStore objectStore2 = client2.getObjectStore();
+          objectStore2.listSnapshot(volumeName, bucketName, null, null);
+          objectStore2.getSnapshotInfo(volumeName, bucketName, snapshot1);
+          objectStore2.snapshotDiff(volumeName, bucketName,
+              snapshot1, snapshot2, null, 0, false, false);
+          objectStore2.listSnapshotDiffJobs(volumeName, bucketName, "", true, null);
+          objectStore2.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2);
+          return null;
+        });
+
+    // user3 has no permission, should not be able to list the snapshots, get snapshot info,
+    // snapshot diff, list snapshot diff jobs and cancel snapshot diff jobs.
+    ObjectStore objectStore3 = UGI3.doAs(
+        (PrivilegedExceptionAction<ObjectStore>)()
+            -> {
+          OzoneClient client2 = cluster.newClient();
+          return client2.getObjectStore();
+        });
+    OMException ex = assertThrows(OMException.class,
+        () -> objectStore3.listSnapshot(volumeName, bucketName, null, null));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+
+    ex = assertThrows(OMException.class,
+        () -> objectStore3.getSnapshotInfo(volumeName, bucketName, snapshot1));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+
+    ex = assertThrows(OMException.class,
+        () -> objectStore3.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+            null, 0, false, false));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+
+    ex = assertThrows(OMException.class,
+        () -> objectStore3.listSnapshotDiffJobs(volumeName, bucketName, "", true, null));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+
+    ex = assertThrows(OMException.class,
+        () -> objectStore3.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+
+    // create a bucket whose owner is user2
+    createBucket(bucketLayout, volume, USER2);
+    String bucket2Name = bucketName;
+
+    // user2 should not be able to create a snapshot on bucket1 but should
+    // be able to create a snapshot on bucket2, rename it and delete it
+    final FileSystem fs2 = UGI2.doAs(
+        (PrivilegedExceptionAction<FileSystem>)()
+            -> FileSystem.get(cluster.getConf()));
+    final String snapshotPrefix = "snapshot-";
+    final String snapshotName =
+        snapshotPrefix + RandomStringUtils.secure().nextNumeric(32);
+    ex = assertThrows(OMException.class, () -> {
+      fs2.createSnapshot(new Path("/" + volumeName + "/" + bucket1Name), snapshotName);
+    });
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+    Path bucket2Path = new Path("/" + volumeName + "/" + bucket2Name);
+    fs2.createSnapshot(bucket2Path, snapshotName);
+    final String snapshotNameNew = snapshotName + ".new";
+    fs2.renameSnapshot(bucket2Path, snapshotName, snapshotNameNew);
+    fs2.deleteSnapshot(bucket2Path, snapshotNameNew);
+
+    // user3 should not be able to create a snapshot on bucket2
+    // and should not be able to rename it, delete it
+    ex = assertThrows(OMException.class,
+        () -> objectStore3.createSnapshot(volumeName, bucket2Name, snapshotName));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+
+    ex = assertThrows(OMException.class,
+        () -> objectStore3.renameSnapshot(volumeName, bucket2Name, snapshotName, snapshotNameNew));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+
+    ex = assertThrows(OMException.class,
+        () -> objectStore3.deleteSnapshot(volumeName, bucket2Name, snapshotName));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+  }
+
   private void setup(BucketLayout bucketLayout)
       throws IOException {
     UserGroupInformation.setLoginUser(UGI1);
@@ -612,10 +731,15 @@ public class TestOzoneManagerSnapshotAcl {
 
   private void createBucket(BucketLayout bucketLayout,
       OzoneVolume volume) throws IOException {
+    createBucket(bucketLayout, volume, ADMIN);
+  }
+
+  private void createBucket(BucketLayout bucketLayout,
+      OzoneVolume volume, String owner) throws IOException {
     final String bucketPrefix = "bucket-";
     bucketName = bucketPrefix + RandomStringUtils.secure().nextNumeric(32);
     final BucketArgs bucketArgs = BucketArgs.newBuilder()
-        .setOwner(ADMIN)
+        .setOwner(owner)
         .setBucketLayout(bucketLayout).build();
     volume.createBucket(bucketName, bucketArgs);
   }
