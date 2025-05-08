@@ -1205,8 +1205,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
-  public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
-    return (ConcurrentHashMap<String, CompactionNode>) compactionDag.getCompactionMap();
+  public ConcurrentMap<String, CompactionNode> getCompactionNodeMap() {
+    return compactionDag.getCompactionMap();
   }
 
   @VisibleForTesting

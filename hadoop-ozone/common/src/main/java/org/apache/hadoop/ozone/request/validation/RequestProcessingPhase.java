@@ -15,8 +15,15 @@
  * limitations under the License.
  */
 
-/**
- * Classes used for Ozone Container Log parser tool.
- */
+package org.apache.hadoop.ozone.request.validation;
 
-package org.apache.hadoop.ozone.containerlog.parser;
+/**
+ * Processing phase defines when a request validator should run.
+ *
+ * There are two hooking point at the moment, before and after the generic
+ * request processing code.
+ */
+public enum RequestProcessingPhase {
+  PRE_PROCESS,
+  POST_PROCESS
+}

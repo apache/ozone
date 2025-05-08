@@ -36,7 +36,6 @@ import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import javax.net.ssl.TrustManager;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -415,8 +414,7 @@ public final class RatisHelper {
 
   private static Map<String, String> getDatanodeRatisPrefixProps(
       ConfigurationSource configuration) {
-    return configuration.getPropsMatchPrefixAndTrimPrefix(
-        StringUtils.appendIfNotPresent(HDDS_DATANODE_RATIS_PREFIX_KEY, '.'));
+    return configuration.getPropsMatchPrefixAndTrimPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY + '.');
   }
 
   // For External gRPC client to server with gRPC TLS.

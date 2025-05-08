@@ -357,10 +357,10 @@ public class TestSCMCommonPlacementPolicy {
             ContainerID.valueOf(1), CLOSED, 0, 0, 0, list.subList(3, 6)));
     Set<ContainerReplica> replicasToBeRemoved = Sets.newHashSet(
             HddsTestUtils.getReplicaBuilder(ContainerID.valueOf(1), CLOSED, 0, 0, 0,
-                    list.get(7).getUuid(), list.get(7))
+                    list.get(7).getID(), list.get(7))
                     .setReplicaIndex(1).build(),
             HddsTestUtils.getReplicaBuilder(ContainerID.valueOf(1), CLOSED, 0, 0, 0,
-                    list.get(8).getUuid(), list.get(8)).setReplicaIndex(1)
+                    list.get(8).getID(), list.get(8)).setReplicaIndex(1)
                     .build());
     replicas.addAll(replicasToBeRemoved);
 
