@@ -25,37 +25,42 @@ import picocli.CommandLine;
  * Usage:
  * <pre>
  * {@code
- * @CommandLine.ArgGroup
+ * @CommandLine.Mixin
  * private ListLimitOptions limitOptions;
  * }
  * </pre>
  */
 public class ListLimitOptions {
 
-  @CommandLine.Option(names = {"--length", "-l"},
-      description = "Maximum number of items to list",
-      defaultValue = "100",
-      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
-  private int limit;
-
-  @CommandLine.Option(names = {"--all", "-a"},
-      description = "List all results",
-      defaultValue = "false")
-  private boolean all;
+  @CommandLine.ArgGroup
+  private ExclusiveGroup group = new ExclusiveGroup();
 
   public boolean isAll() {
-    return all;
+    return group.all;
   }
 
   public int getLimit() {
-    if (all) {
+    if (group.all) {
       return Integer.MAX_VALUE;
     }
-    if (limit < 1) {
+    if (group.limit < 1) {
       throw new IllegalArgumentException(
           "List length should be a positive number");
     }
 
-    return limit;
+    return group.limit;
+  }
+
+  static class ExclusiveGroup {
+    @CommandLine.Option(names = {"--length", "-l"},
+        description = "Maximum number of items to list",
+        defaultValue = "100",
+        showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+    private int limit;
+
+    @CommandLine.Option(names = {"--all", "-a"},
+        description = "List all results",
+        defaultValue = "false")
+    private boolean all;
   }
 }

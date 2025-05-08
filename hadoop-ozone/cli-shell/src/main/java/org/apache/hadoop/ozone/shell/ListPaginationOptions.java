@@ -32,8 +32,8 @@ import picocli.CommandLine;
  */
 public class ListPaginationOptions {
 
-  @CommandLine.ArgGroup
-  private ListLimitOptions limitOptions = new ListLimitOptions();
+  @CommandLine.Mixin
+  private ListLimitOptions limitOptions;
 
   @CommandLine.Option(names = {"--start", "-s"},
       description = "The item to start the listing from.\n" +

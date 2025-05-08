@@ -41,7 +41,7 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
       required = true)
   private HddsProtos.LifeCycleState state;
 
-  @CommandLine.ArgGroup
+  @CommandLine.Mixin
   private ListLimitOptions listOptions;
 
   @CommandLine.ParentCommand
