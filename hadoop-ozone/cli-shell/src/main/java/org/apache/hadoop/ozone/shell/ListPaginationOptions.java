@@ -20,7 +20,15 @@ package org.apache.hadoop.ozone.shell;
 import picocli.CommandLine;
 
 /**
- * Common options for 'list' commands.
+ * Options to provide pagination of lists.
+ * <p>
+ * Usage:
+ * <pre>
+ * {@code
+ * @CommandLine.Mixin
+ * private ListPaginationOptions listOptions;
+ * }
+ * </pre>
  */
 public class ListPaginationOptions {
 

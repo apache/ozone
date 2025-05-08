@@ -21,6 +21,7 @@ import picocli.CommandLine;
 
 /**
  * Options for limiting the size of lists.
+ * <p>
  * Usage:
  * <pre>
  * {@code
