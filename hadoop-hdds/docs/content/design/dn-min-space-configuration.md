@@ -1,7 +1,7 @@
 ---
 title: Minimum free space configuration for datanode volumes
 summary: Describe proposal for minimum free space configuration which volume must have to function correctly.
-date: 2025-05-5
+date: 2025-05-05
 jira: HDDS-12928
 status: implemented
 author: Sumit Agrawal
