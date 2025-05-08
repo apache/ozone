@@ -87,24 +87,6 @@ public final class SQLDBConstants {
           "    GROUP BY container_id\n" +
           "    HAVING COUNT(DISTINCT datanode_id) {operator} ? \n" +
           ") AS grouped ON cl.container_id = grouped.container_id";
-  /*    "SELECT cl.datanode_id, cl.container_id, cl.latest_state, cl.latest_bcsid\n" +
-          "FROM ContainerLogTable cl\n" +
-          "JOIN (\n" +
-          "  SELECT container_id\n" +
-          "  FROM ContainerLogTable\n" +
-          "  GROUP BY container_id\n" +
-          "  HAVING COUNT(datanode_id) {operator} ?\n" +
-          ") AS grouped ON cl.container_id = grouped.container_id\n" +
-          "WHERE cl.container_id NOT IN (\n" +
-          "  SELECT dcl.container_id\n" +
-          "  FROM DatanodeContainerLogTable dcl\n" +
-          "  LEFT JOIN DatanodeContainerLogTable other\n" +
-          "    ON dcl.container_id = other.container_id AND other.container_state != 'CLOSED'\n" +
-          "  WHERE dcl.container_state = 'CLOSED'\n" +
-          "  GROUP BY dcl.container_id\n" +
-          "  HAVING COUNT(dcl.container_id) = ?\n" +
-          "    AND MIN(dcl.timestamp) > MAX(other.timestamp)\n" +
-          ")";*/
   public static final String SELECT_UNHEALTHY_CONTAINERS =
       "SELECT u.container_id, u.datanode_id, u.latest_unhealthy_timestamp, u.bcsid\n" +
           "FROM (\n" +
