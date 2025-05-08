@@ -405,7 +405,9 @@ public class TestReplicationSupervisor {
     // Initially volume has 0 used space
     assertEquals(0, usedSpace);
     // Increase committed bytes so that volume has only remaining 3 times container size space
-    long initialCommittedBytes = vol1.getCurrentUsage().getCapacity() - containerSize * 3;
+    long minFreeSpace =
+        conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(vol1.getCurrentUsage().getCapacity());
+    long initialCommittedBytes = vol1.getCurrentUsage().getCapacity() - containerSize * 3 - minFreeSpace;
     vol1.incCommittedBytes(initialCommittedBytes);
     ContainerReplicator replicator =
         new DownloadAndImportReplicator(conf, set, importer, moc);
@@ -424,7 +426,7 @@ public class TestReplicationSupervisor {
 
     // Wait such that first container import reserve space
     GenericTestUtils.waitFor(() ->
-        vol1.getCommittedBytes() > vol1.getCurrentUsage().getCapacity() - containerSize * 3,
+        vol1.getCommittedBytes() > vol1.getCurrentUsage().getCapacity() - containerSize * 3 - minFreeSpace,
         1000, 50000);
 
     // Volume has reserved space of 2 * containerSize
