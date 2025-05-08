@@ -52,17 +52,14 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test that KeyValueHandler fails certain operations when the
@@ -74,8 +71,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   private File tempDir;
 
   private IncrementalReportSender<Container> mockIcrSender;
-  private final GenericTestUtils.LogCapturer logCapturer =
-          GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
 
   @BeforeEach
   public void init() {
@@ -237,7 +232,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     handler.markContainerUnhealthy(container,
         ContainerTestUtils.getUnhealthyScanResult());
     verify(mockIcrSender, atMostOnce()).send(any());
-    assertThat(logCapturer.getOutput()).contains("CORRUPT_CHUNK");
   }
 
   // -- Helper methods below.

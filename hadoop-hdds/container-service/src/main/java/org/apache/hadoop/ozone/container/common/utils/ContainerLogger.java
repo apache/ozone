@@ -51,7 +51,7 @@ public final class ContainerLogger {
    * @param containerData The container that was created and opened.
    */
   public static void logOpen(ContainerData containerData) {
-    LOG.info(getMessage(containerData, "CommandType=CreateContainer"));
+    LOG.info(getMessage(containerData));
   }
 
   /**
@@ -80,7 +80,7 @@ public final class ContainerLogger {
    * @param containerData The container that was closed.
    */
   public static void logClosed(ContainerData containerData) {
-    LOG.info(getMessage(containerData, "CommandType=CloseContainer"));
+    LOG.info(getMessage(containerData));
   }
 
   /**
@@ -116,9 +116,9 @@ public final class ContainerLogger {
    */
   public static void logDeleted(ContainerData containerData, boolean force) {
     if (force) {
-      LOG.info(getMessage(containerData, "Container force deleted, CommandType=DeleteContainer"));
+      LOG.info(getMessage(containerData, "Container force deleted"));
     } else {
-      LOG.info(getMessage(containerData, "Empty container deleted, CommandType=DeleteContainer"));
+      LOG.info(getMessage(containerData, "Empty container deleted"));
     }
   }
 
@@ -146,7 +146,7 @@ public final class ContainerLogger {
    * @param containerData The container that was recovered on this datanode.
    */
   public static void logRecovered(ContainerData containerData) {
-    LOG.info(getMessage(containerData, "action=Recovered"));
+    LOG.info(getMessage(containerData));
   }
 
   private static String getMessage(ContainerData containerData,
