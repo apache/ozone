@@ -19,45 +19,34 @@ package org.apache.hadoop.ozone.debug.logs.container;
 
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
-import org.apache.hadoop.ozone.shell.ListOptions;
 import picocli.CommandLine;
 
-
 /**
- * List containers based on the parameter given.
+ * Subcommand to list containers that have duplicate OPEN states.
  */
 
 @CommandLine.Command(
-    name = "list",
-    description = "Finds containers from the database based on the option provided."
+    name = "duplicate-open",
+    description = "List all containers which have duplicate open states." +
+        "Outputs the container ID along with the count of OPEN state entries."
 )
-public class ListContainers implements Callable<Void> {
-  
-  @CommandLine.Option(names = {"--state"},
-      description = "Life cycle state of the container.",
-      required = true)
-  private HddsProtos.LifeCycleState state;
-
-  @CommandLine.Mixin
-  private ListOptions listOptions;
+public class DuplicateOpenContainersCommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
   private ContainerLogController parent;
 
   @Override
   public Void call() throws Exception {
-    
     Path dbPath = parent.resolveDbPath();
     if (dbPath == null) {
       return null;
     }
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(dbPath.toString());
+    cdd.findDuplicateOpenContainer();
 
-    cdd.listContainersByState(state.name(), listOptions.getLimit());
-    
     return null;
   }
 }
+

@@ -89,6 +89,7 @@ public class ContainerLogParser extends AbstractSubcommand implements Callable<V
     parser.processLogEntries(path, cdd, threadCount);
 
     cdd.insertLatestContainerLogData();
+    cdd.createIndexes();
     out().println("Successfully parsed the log files and updated the respective tables");
 
     return null;
