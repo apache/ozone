@@ -390,15 +390,11 @@ public final class Pipeline {
       builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
     }
     if (leaderId != null) {
-      HddsProtos.DatanodeIDProto leaderIdProto = HddsProtos.DatanodeIDProto.newBuilder()
-          .build();
-      builder.setLeaderDatanodeID(leaderIdProto);
+      builder.setLeaderDatanodeID(leaderId.toProto());
     }
 
     if (suggestedLeaderId != null) {
-      HddsProtos.DatanodeIDProto suggestedLeaderIdProto = HddsProtos.DatanodeIDProto.newBuilder()
-          .build();
-      builder.setSuggestedLeaderDatanodeID(suggestedLeaderIdProto);
+      builder.setSuggestedLeaderDatanodeID(suggestedLeaderId.toProto());
     }
 
     // To save the message size on wire, only transfer the node order based on
