@@ -52,12 +52,10 @@ public class RootEndpoint extends EndpointBase {
     boolean auditSuccess = true;
     try {
       ListBucketResponse response = new ListBucketResponse();
-
       Iterator<? extends OzoneBucket> bucketIterator;
       try {
         bucketIterator =
-            listS3Buckets(null, volume -> response.setOwner(new S3Owner(volume.getOwner(), volume.getOwner()))
-            );
+            listS3Buckets(null, volume -> response.setOwner(new S3Owner(volume.getOwner(), volume.getOwner())));
       } catch (Exception e) {
         getMetrics().updateListS3BucketsFailureStats(startNanos);
         throw e;
