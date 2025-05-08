@@ -91,7 +91,6 @@ public class ContainerMerkleTreeWriter {
     }
   }
 
-
   public void addChunks(long blockID, ContainerProtos.ChunkMerkleTree... chunks) {
     for (ContainerProtos.ChunkMerkleTree chunkTree: chunks) {
       addChunks(blockID, new ChunkMerkleTreeWriter(chunkTree));
@@ -109,7 +108,7 @@ public class ContainerMerkleTreeWriter {
    * @param blockID The ID of the empty block to add to the tree
    */
   public void addBlock(long blockID) {
-    addChunks(blockID, true);
+    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new);
   }
 
   /**

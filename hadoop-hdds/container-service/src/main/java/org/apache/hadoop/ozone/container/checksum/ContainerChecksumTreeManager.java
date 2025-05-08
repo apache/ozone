@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.checksum;
 
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -113,7 +114,8 @@ public class ContainerChecksumTreeManager {
       write(data, checksumInfo);
       // If write succeeds, update the checksum in memory. Otherwise 0 will be used to indicate the metadata failure.
       dataChecksum = treeProto.getDataChecksum();
-      LOG.debug("Data merkle tree for container {} updated with container checksum {}", containerID, dataChecksum);
+      LOG.debug("Merkle tree for container {} updated with container data checksum {}", containerID,
+          checksumToString(dataChecksum));
     } finally {
       // Even if persisting the tree fails, we should still update the data checksum in memory to report back to SCM.
       data.setDataChecksum(dataChecksum);
