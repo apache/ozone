@@ -66,12 +66,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
   // In this case when availableSpace is 10GB or below, volume is assumed as full
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE = "hdds.datanode.volume.min.free.space";
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT = "5GB";
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT = "20GB";
   // Minimum percent of space should be left on volume.
   // Ex: If volume has 1000GB and minFreeSpacePercent is configured as 2%,
   // In this case when availableSpace is 20GB(2% of 1000) or below, volume is assumed as full
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
       "hdds.datanode.volume.min.free.space.percent";
+  public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT = 0.001f;
   static final byte MIN_FREE_SPACE_UNSET = -1;
 
   public static final String WAIT_ON_ALL_FOLLOWERS = "hdds.datanode.wait.on.all.followers";
@@ -296,7 +297,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           " Either of min.free.space or min.free.space.percent should be configured, when both are set then" +
           " min.free.space will be used."
   )
-  private float minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+  private float minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
 
   @Config(key = "periodic.disk.check.interval.minutes",
       defaultValue = "60",
@@ -689,33 +690,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
    */
   private void validateMinFreeSpace() {
-    if (minFreeSpaceRatio > 1) {
+    if (minFreeSpaceRatio > 1 || minFreeSpaceRatio < 0) {
       LOG.warn("{} = {} is invalid, should be between 0 and 1",
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
           minFreeSpaceRatio);
-
-      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+      minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
     }
 
-    final boolean minFreeSpaceConfigured = minFreeSpace >= 0;
-    final boolean minFreeSpaceRatioConfigured = minFreeSpaceRatio >= 0;
-
-    if (minFreeSpaceConfigured && minFreeSpaceRatioConfigured) {
-      // Only one property should be configured.
-      // Since both properties are configured, HDDS_DATANODE_VOLUME_MIN_FREE_SPACE is used to determine minFreeSpace
-      LOG.warn("Only one of {}={} and {}={} should be set. With both set, {} value will be used.",
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
-          minFreeSpace,
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
-          minFreeSpaceRatio,
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
-
-      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
-    }
-
-    if (!minFreeSpaceConfigured && !minFreeSpaceRatioConfigured) {
-      // If both are not configured use defaultFreeSpace
-      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+    if (minFreeSpace < 0) {
       minFreeSpace = getDefaultFreeSpace();
     }
   }
@@ -781,9 +763,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   }
 
   public long getMinFreeSpace(long capacity) {
-    return minFreeSpaceRatio >= 0
-        ? ((long) (capacity * minFreeSpaceRatio))
-        : minFreeSpace;
+    return Math.max((long) (capacity * minFreeSpaceRatio), minFreeSpace);
   }
 
   public long getMinFreeSpace() {
