@@ -22,7 +22,7 @@ import picocli.CommandLine;
 /**
  * Common options for 'list' commands.
  */
-public class ListOptions {
+public class ListPaginationOptions {
 
   @CommandLine.ArgGroup(exclusive = true)
   private ExclusiveLimit exclusiveLimit = new ExclusiveLimit();

@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.Handler;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListPaginationOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.PrefixFilterOption;
 import org.apache.hadoop.ozone.shell.Shell;
@@ -47,7 +47,7 @@ public class ListVolumeHandler extends Handler {
   private String uri;
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
+  private ListPaginationOptions listOptions;
 
   @CommandLine.Mixin
   private PrefixFilterOption prefixFilter;

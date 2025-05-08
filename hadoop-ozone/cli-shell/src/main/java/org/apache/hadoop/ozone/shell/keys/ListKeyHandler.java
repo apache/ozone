@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListPaginationOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.PrefixFilterOption;
 import org.apache.hadoop.ozone.shell.common.VolumeBucketHandler;
@@ -40,7 +40,7 @@ import picocli.CommandLine.Command;
 public class ListKeyHandler extends VolumeBucketHandler {
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
+  private ListPaginationOptions listOptions;
 
   @CommandLine.Mixin
   private PrefixFilterOption prefixFilter;

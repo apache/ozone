@@ -33,7 +33,7 @@ import java.util.concurrent.Callable;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.server.JsonUtils;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListPaginationOptions;
 import org.apache.hadoop.ozone.shell.PrefixFilterOption;
 import picocli.CommandLine;
 
@@ -68,7 +68,7 @@ public class DiskUsageSubCommand implements Callable {
   private boolean noHeader;
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
+  private ListPaginationOptions listOptions;
 
   @CommandLine.Mixin
   private PrefixFilterOption prefixFilter;

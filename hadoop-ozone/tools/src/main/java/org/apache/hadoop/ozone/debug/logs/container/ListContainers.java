@@ -22,7 +22,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListPaginationOptions;
 import picocli.CommandLine;
 
 
@@ -42,7 +42,7 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
   private HddsProtos.LifeCycleState state;
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
+  private ListPaginationOptions listOptions;
 
   @CommandLine.ParentCommand
   private ContainerLogController parent;
