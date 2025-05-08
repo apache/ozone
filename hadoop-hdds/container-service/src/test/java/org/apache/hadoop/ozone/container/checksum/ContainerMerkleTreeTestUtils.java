@@ -88,6 +88,7 @@ public final class ContainerMerkleTreeTestUtils {
         assertEquals(expectedChunkTree.getOffset(), actualChunkTree.getOffset());
         assertEquals(expectedChunkTree.getLength(), actualChunkTree.getLength());
         assertEquals(expectedChunkTree.getDataChecksum(), actualChunkTree.getDataChecksum());
+        assertEquals(expectedChunkTree.getIsHealthy(), actualChunkTree.getIsHealthy());
       }
     }
   }

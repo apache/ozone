@@ -91,7 +91,7 @@ public class ContainerMerkleTreeWriter {
     }
   }
 
-  public void addChunks(long blockID, ContainerProtos.ChunkMerkleTree... chunks) {
+  private void addChunks(long blockID, ContainerProtos.ChunkMerkleTree... chunks) {
     for (ContainerProtos.ChunkMerkleTree chunkTree: chunks) {
       addChunks(blockID, new ChunkMerkleTreeWriter(chunkTree));
     }
