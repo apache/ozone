@@ -202,12 +202,12 @@ public class TestReservedVolumeSpace {
     assertEquals(minSpace, conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(capacity));
 
     conf.setFloat(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, 0.01f);
-    // When both are set, minSpace will be used
+    // When both are set, max(minSpace, %cent), minSpace will be used
     assertEquals(minSpace, conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(capacity));
 
-    // capacity * 1% = 10
-    conf.unset(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
-    assertEquals(10, conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(capacity));
+    conf.setFloat(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, 1f);
+    // When both are set, max(minSpace, %cent), hence %cent will be used
+    assertEquals(1000, conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(capacity));
   }
 
   private long getExpectedDefaultReserved(HddsVolume volume) {
