@@ -87,7 +87,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -96,7 +95,6 @@ import org.slf4j.event.Level;
 /**
  * Tests ozone containers via secure grpc/netty.
  */
-@Timeout(300)
 public class TestOzoneContainerWithTLS {
 
   private static final int CERT_LIFETIME = 10; // seconds

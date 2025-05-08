@@ -1219,6 +1219,7 @@ public interface ClientProtocol {
    * @return message which tells the image name, parent dir and OM leader
    * node information.
    */
+  @Deprecated
   String printCompactionLogDag(String fileNamePrefix, String graphType)
       throws IOException;
 
