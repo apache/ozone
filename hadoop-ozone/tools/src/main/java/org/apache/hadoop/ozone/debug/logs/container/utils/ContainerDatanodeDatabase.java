@@ -116,6 +116,20 @@ public class ContainerDatanodeDatabase {
     }
   }
 
+  public void createIndexes() throws SQLException {
+    try (Connection connection = getConnection();
+         Statement stmt = connection.createStatement()) {
+      createIdxDclContainerStateTime(stmt);
+      createContainerLogIndex(stmt);
+      createIdxContainerlogContainerId(stmt);
+    } catch (SQLException e) {
+      throw new SQLException("Error while creating index: " + e.getMessage());
+    } catch (Exception e) {
+      throw new RuntimeException("Unexpected error: "  + e);
+    }
+  }
+
+
   /**
    * Inserts a list of container log entries into the DatanodeContainerLogTable.
    *
@@ -255,10 +269,7 @@ public class ContainerDatanodeDatabase {
     String baseQuery = SQLDBConstants.SELECT_LATEST_CONTAINER_LOGS_BY_STATE;
     String finalQuery = limitProvided ? baseQuery + " LIMIT ?" : baseQuery;
 
-    try (Connection connection = getConnection();
-         Statement stmt = connection.createStatement()) {
-
-      createContainerLogIndex(stmt);
+    try (Connection connection = getConnection()) {
 
       try (PreparedStatement pstmt = connection.prepareStatement(finalQuery)) {
         pstmt.setString(1, state);
@@ -304,11 +315,9 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  private void createIdxDclContainerStateTime(Connection conn) throws SQLException {
-    String sql = SQLDBConstants.CREATE_DCL_CONTAINER_STATE_TIME_INDEX;
-    try (Statement stmt = conn.createStatement()) {
-      stmt.execute(sql);
-    }
+  private void createIdxDclContainerStateTime(Statement stmt) throws SQLException {
+    String createIndexSQL = SQLDBConstants.CREATE_DCL_CONTAINER_STATE_TIME_INDEX;
+    stmt.execute(createIndexSQL);
   }
 
   /**
@@ -323,7 +332,7 @@ public class ContainerDatanodeDatabase {
   public void showContainerDetails(Long containerID) throws SQLException {
 
     try (Connection connection = getConnection()) {
-      createIdxDclContainerStateTime(connection);
+
       List<DatanodeContainerInfo> logEntries = getContainerLogData(containerID, connection);
 
       if (logEntries.isEmpty()) {
@@ -542,19 +551,15 @@ public class ContainerDatanodeDatabase {
     return logEntries;
   }
 
-  private void createIdxContainerlogContainerId(Connection conn) throws SQLException {
-    String sql = SQLDBConstants.CREATE_CONTAINER_ID_INDEX;
-    try (Statement stmt = conn.createStatement()) {
-      stmt.execute(sql);
-    }
+  private void createIdxContainerlogContainerId(Statement stmt) throws SQLException {
+    String createIndexSQL = SQLDBConstants.CREATE_CONTAINER_ID_INDEX;
+    stmt.execute(createIndexSQL);
   }
 
   public void findDuplicateOpenContainer() throws SQLException {
     String sql = SQLDBConstants.SELECT_DISTINCT_CONTAINER_IDS_QUERY;
 
     try (Connection connection = getConnection()) {
-
-      createIdxContainerlogContainerId(connection);
 
       try (PreparedStatement statement = connection.prepareStatement(sql);
            ResultSet resultSet = statement.executeQuery()) {
