@@ -31,8 +31,10 @@ import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.datanode.VolumeInfo;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.shell.ListOptions;
 import org.apache.hadoop.ozone.utils.FormattingCLIUtils;
 import org.apache.hadoop.util.StringUtils;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -46,30 +48,18 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class)
 public class VolumeSubCommand extends ScmSubcommand {
 
-  // Display it in JSON format.
-  @Option(names = { "--json" },
-       defaultValue = "false",
-       description = "Format output as JSON.")
-  private boolean json;
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private OutputFormatOptions formatOptions = new OutputFormatOptions();
 
-  // Display it in TABLE format.
-  @Option(names = { "--table" },
-       defaultValue = "false",
-       description = "Format output as Table.")
-  private boolean table;
+  // 用于分页
+  @CommandLine.Mixin
+  private ListOptions listOptions;
 
-  // PageSize refers to the number of items displayed per page
-  // in a paginated view.
-  @Option(names = { "--pageSize" },
-       defaultValue = "20",
-       description = "The number of volume information items displayed per page.")
-  private int pageSize;
-
-  // The current page.
-  @Option(names = { "--currentPage" },
-       defaultValue = "1",
-       description = "The current page.")
-  private int currentPage;
+  enum DisplayMode {
+    all,
+    normal,
+    failed
+  }
 
   /**
    * We have designed a new option called 'show',
@@ -77,25 +67,48 @@ public class VolumeSubCommand extends ScmSubcommand {
    * 'failed' is used to display failed disks,
    * and 'normal' is used to display normal disks.
    */
-  @Option(names = { "--displayMode" },
+  @Option(names = { "--displayMode", "-d"},
       defaultValue = "all",
-      description = "failed is used to display failed disks, " +
-      "normal is used to display normal disks.")
-  private String displayMode;
+      description = "The `displayMode` currently offers two display options: " +
+      "`normal` for showing healthy disks, and `fail` for displaying failed disks.")
+  private DisplayMode displayMode;
 
   // The UUID identifier of the DataNode.
   @Option(names = { "--uuid" },
       defaultValue = "",
-      description = "failed is used to display failed disks, " +
-      "normal is used to display normal disks.")
+      description = "The `uuid` allows specifying the UUID of a DataNode to " +
+      "filter and display only the specified DataNode.")
   private String uuid;
 
   // The HostName identifier of the DataNode.
   @Option(names = { "--hostname" },
       defaultValue = "",
-      description = "failed is used to display failed disks, " +
-      "normal is used to display normal disks.")
+      description = "The `hostname` allows specifying the hostname of a DataNode to " +
+      "filter and display only the specified DataNode.")
   private String hostName;
+
+  static class OutputFormatOptions {
+
+    // Display it in JSON format.
+    @Option(names = {"--json"},
+        description = "Format output as JSON",
+        defaultValue = "false")
+    private boolean json;
+
+    // Display it in TABLE format.
+    @Option(names = {"--table"},
+        description = "Format output as Table",
+        defaultValue = "false")
+    private boolean table;
+
+    // Custom validation to ensure only one of --json or --table is selected
+    public void validate() {
+      if (json && table) {
+        throw new CommandLine.ParameterException(
+            new CommandLine(this), "--json and --table are mutually exclusive.");
+      }
+    }
+  }
 
   private SimpleDateFormat sdf = new SimpleDateFormat(
       "EEE MMM dd HH:mm:ss Z yyyy", Locale.ENGLISH);
@@ -106,20 +119,17 @@ public class VolumeSubCommand extends ScmSubcommand {
       "UUID", "Host Name", "Volume Name", "Volume Status", "Capacity / Capacity Lost",
       "Failure Time");
 
-  private final String[] validModes = {"all", "normal", "failed"};
-
   @Override
   public void execute(ScmClient client) throws IOException {
 
-    validateDisplayMode(displayMode);
-
     // Retrieve the volume data based on the conditions.
     GetVolumeInfosResponseProto response =
-        client.getVolumeInfos(displayMode, uuid, hostName, pageSize, currentPage);
+        client.getVolumeInfos(displayMode.name(), uuid, hostName,
+        listOptions.getLimit(), listOptions.getCurrentPage());
 
     // Print the relevant information if the return value is empty.
     if (response == null || CollectionUtils.isEmpty(response.getVolumeInfosList())) {
-      System.out.println("No volume data was retrieved.");
+      out().println("No volume data was retrieved.");
       return;
     }
 
@@ -127,13 +137,13 @@ public class VolumeSubCommand extends ScmSubcommand {
     List<VolumeInfo> volumeInfos = convertToVolumeInfos(volumeInfosList);
 
     // If displayed in JSON format.
-    if (json) {
-      System.out.print(JsonUtils.toJsonStringWithDefaultPrettyPrinter(volumeInfos));
+    if (formatOptions.json) {
+      out().print(JsonUtils.toJsonStringWithDefaultPrettyPrinter(volumeInfos));
       return;
     }
 
     // If displayed in TABLE format.
-    if (table) {
+    if (formatOptions.table) {
       FormattingCLIUtils formattingCLIUtils = new FormattingCLIUtils(DATANODE_VOLUME_FAILURES_TITLE)
           .addHeaders(DATANODE_VOLUME_FAILURES_HEADER);
       for (VolumeInfo info : volumeInfos) {
@@ -144,11 +154,11 @@ public class VolumeSubCommand extends ScmSubcommand {
             volumeStatus, capacity, failureTime};
         formattingCLIUtils.addLine(values);
       }
-      System.out.println(formattingCLIUtils.render());
+      out().println(formattingCLIUtils.render());
       return;
     }
 
-    System.out.printf("Datanode Volume (%d Volumes)%n%n", volumeInfos.size());
+    out().printf("Datanode Volume (%d Volumes)%n%n", volumeInfos.size());
     volumeInfos.forEach(this::printInfo);
   }
 
@@ -158,13 +168,13 @@ public class VolumeSubCommand extends ScmSubcommand {
    * @param info volume information.
    */
   private void printInfo(VolumeInfo info) {
-    System.out.printf("%-13s: %s %n", "Uuid", info.getUuid());
-    System.out.printf("%-13s: %s %n", "HostName", info.getHostName());
-    System.out.printf("%-13s: %s %n", "Volume Status", getVolumeStatus(info.isFailed()));
-    System.out.printf("%-13s: %s %n", "Volume Name", info.getVolumeName());
-    System.out.printf("%-13s: %s (%s) %n", "Capacity / Capacity Lost", info.getCapacity()
+    out().printf("%-13s: %s %n", "Uuid", info.getUuid());
+    out().printf("%-13s: %s %n", "HostName", info.getHostName());
+    out().printf("%-13s: %s %n", "Volume Status", getVolumeStatus(info.isFailed()));
+    out().printf("%-13s: %s %n", "Volume Name", info.getVolumeName());
+    out().printf("%-13s: %s (%s) %n", "Capacity / Capacity Lost", info.getCapacity()
         + " B", StringUtils.byteDesc(info.getCapacity()));
-    System.out.printf("%-13s: %s %n%n", "Failure Time", sdf.format(info.getFailureTime()));
+    out().printf("%-13s: %s %n%n", "Failure Time", sdf.format(info.getFailureTime()));
   }
 
   /**
@@ -180,32 +190,6 @@ public class VolumeSubCommand extends ScmSubcommand {
       volumeInfoList.add(volumeInfo);
     }
     return volumeInfoList;
-  }
-
-  /**
-   * Validate whether the displayMode meets the expected values,
-   * where displayMode must be one of the following: all, normal, or failed.
-   *
-   * @param pDisplayMode
-   * The displayMode parameter determines how the volume is displayed.
-   *
-   * @throws IOException
-   * If the parameter is invalid, we will throw an exception.
-   */
-  private void validateDisplayMode(String pDisplayMode) throws IOException {
-
-    boolean isValid = false;
-    for (String validMode : validModes) {
-      if (validMode.equals(pDisplayMode)) {
-        isValid = true;
-        break;
-      }
-    }
-
-    if (!isValid) {
-      throw new IOException("Invalid displayMode. " +
-          "It must be one of the following: 'all', 'normal', or 'failed'.");
-    }
   }
 
   /**

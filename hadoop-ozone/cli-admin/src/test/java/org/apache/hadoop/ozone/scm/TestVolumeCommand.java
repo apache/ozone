@@ -81,7 +81,7 @@ public class TestVolumeCommand {
         thenAnswer(invocation -> getUsageProto());
 
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--json");
+    c.parseArgs("--json", "--length", "20");
 
     try (GenericTestUtils.SystemOutCapturer capture =
         new GenericTestUtils.SystemOutCapturer()) {
@@ -104,7 +104,7 @@ public class TestVolumeCommand {
         thenAnswer(invocation -> getUsageProto());
 
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--table");
+    c.parseArgs("--table", "--length", "20");
     cmd.execute(scmClient);
 
     try (GenericTestUtils.SystemOutCapturer capture =

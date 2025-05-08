@@ -48,6 +48,19 @@ public class ListOptions {
     return exclusiveLimit.limit;
   }
 
+  public int getCurrentPage() {
+    if (exclusiveLimit.all) {
+      return 1;
+    }
+
+    if (exclusiveLimit.currentPage < 1) {
+      throw new IllegalArgumentException(
+          "Current Page should be a positive number");
+    }
+
+    return exclusiveLimit.currentPage;
+  }
+
   public boolean isAll() {
     return exclusiveLimit.all;
   }
@@ -66,6 +79,12 @@ public class ListOptions {
         defaultValue = "100",
         showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
     private int limit;
+
+    @CommandLine.Option(names = {"--currentPage", "-c"},
+        description = "The current page.",
+        defaultValue = "1",
+        showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+    private int currentPage;
 
     @CommandLine.Option(names = {"--all", "-a"},
         description = "List all results",
