@@ -129,7 +129,6 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-
   /**
    * Inserts a list of container log entries into the DatanodeContainerLogTable.
    *
