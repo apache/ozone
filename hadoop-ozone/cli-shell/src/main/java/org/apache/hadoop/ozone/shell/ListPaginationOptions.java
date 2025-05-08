@@ -24,7 +24,7 @@ import picocli.CommandLine;
  */
 public class ListPaginationOptions {
 
-  @CommandLine.ArgGroup(exclusive = true)
+  @CommandLine.ArgGroup
   private ListLimitOptions limitOptions = new ListLimitOptions();
 
   @CommandLine.Option(names = {"--start", "-s"},
