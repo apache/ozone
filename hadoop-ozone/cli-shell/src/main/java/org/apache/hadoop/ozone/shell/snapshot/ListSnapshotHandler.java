@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.ListOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.apache.hadoop.ozone.shell.PrefixFilterOption;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import picocli.CommandLine;
 
@@ -42,6 +43,9 @@ public class ListSnapshotHandler extends Handler {
   @CommandLine.Mixin
   private ListOptions listOptions;
 
+  @CommandLine.Mixin
+  private PrefixFilterOption prefixFilter;
+
   @Override
   protected OzoneAddress getAddress() {
     return snapshotPath.getValue();
@@ -54,7 +58,7 @@ public class ListSnapshotHandler extends Handler {
     String bucketName = snapshotPath.getValue().getBucketName();
 
     Iterator<OzoneSnapshot> snapshotInfos = client.getObjectStore()
-        .listSnapshot(volumeName, bucketName, listOptions.getPrefix(),
+        .listSnapshot(volumeName, bucketName, prefixFilter.getPrefix(),
             listOptions.getStartItem());
     int counter = printAsJsonArray(snapshotInfos, listOptions.getLimit());
     if (isVerbose()) {

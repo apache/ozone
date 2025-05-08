@@ -32,10 +32,6 @@ public class ListOptions {
           "This will be excluded from the result.")
   private String startItem;
 
-  @CommandLine.Option(names = {"--prefix", "-p"},
-      description = "Prefix to filter the items")
-  private String prefix;
-
   public int getLimit() {
     if (exclusiveLimit.all) {
       return Integer.MAX_VALUE;
@@ -54,10 +50,6 @@ public class ListOptions {
 
   public String getStartItem() {
     return startItem;
-  }
-
-  public String getPrefix() {
-    return prefix;
   }
 
   static class ExclusiveLimit {
