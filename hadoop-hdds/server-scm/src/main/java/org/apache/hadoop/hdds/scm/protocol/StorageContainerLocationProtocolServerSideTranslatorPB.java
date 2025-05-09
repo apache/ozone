@@ -1404,6 +1404,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           conf.hasThreshold() ? Optional.of(conf.getThreshold()) : Optional.empty(),
           conf.hasDiskBandwidthInMB() ? Optional.of(conf.getDiskBandwidthInMB()) : Optional.empty(),
           conf.hasParallelThread() ? Optional.of(conf.getParallelThread()) : Optional.empty(),
+          conf.hasStopAfterDiskEven() ? Optional.of(conf.getStopAfterDiskEven()) : Optional.empty(),
           request.getHostsList().isEmpty() ? Optional.empty() : Optional.of(request.getHostsList()));
       break;
     case UPDATE:
@@ -1412,6 +1413,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           conf.hasThreshold() ? Optional.of(conf.getThreshold()) : Optional.empty(),
           conf.hasDiskBandwidthInMB() ? Optional.of(conf.getDiskBandwidthInMB()) : Optional.empty(),
           conf.hasParallelThread() ? Optional.of(conf.getParallelThread()) : Optional.empty(),
+          conf.hasStopAfterDiskEven() ? Optional.of(conf.getStopAfterDiskEven()) : Optional.empty(),
           request.getHostsList().isEmpty() ? Optional.empty() : Optional.of(request.getHostsList()));
       break;
     case STOP:

@@ -31,6 +31,7 @@ public class DiskBalancerInfo {
   private double threshold;
   private long bandwidthInMB;
   private int parallelThread;
+  private boolean stopAfterDiskEven;
   private DiskBalancerVersion version;
   private long successCount;
   private long failureCount;
@@ -38,28 +39,30 @@ public class DiskBalancerInfo {
   private long balancedBytes;
 
   public DiskBalancerInfo(boolean shouldRun, double threshold,
-      long bandwidthInMB, int parallelThread) {
-    this(shouldRun, threshold, bandwidthInMB, parallelThread,
+      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven) {
+    this(shouldRun, threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
         DiskBalancerVersion.DEFAULT_VERSION);
   }
 
   public DiskBalancerInfo(boolean shouldRun, double threshold,
-      long bandwidthInMB, int parallelThread, DiskBalancerVersion version) {
+      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version) {
     this.shouldRun = shouldRun;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
     this.parallelThread = parallelThread;
+    this.stopAfterDiskEven = stopAfterDiskEven;
     this.version = version;
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public DiskBalancerInfo(boolean shouldRun, double threshold,
-      long bandwidthInMB, int parallelThread, DiskBalancerVersion version,
+      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version,
       long successCount, long failureCount, long bytesToMove, long balancedBytes) {
     this.shouldRun = shouldRun;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
     this.parallelThread = parallelThread;
+    this.stopAfterDiskEven = stopAfterDiskEven;
     this.version = version;
     this.successCount = successCount;
     this.failureCount = failureCount;
@@ -73,6 +76,7 @@ public class DiskBalancerInfo {
     this.threshold = diskBalancerConf.getThreshold();
     this.bandwidthInMB = diskBalancerConf.getDiskBandwidthInMB();
     this.parallelThread = diskBalancerConf.getParallelThread();
+    this.stopAfterDiskEven = diskBalancerConf.isStopAfterDiskEven();
     this.version = DiskBalancerVersion.DEFAULT_VERSION;
   }
 
@@ -86,11 +90,14 @@ public class DiskBalancerInfo {
     if (parallelThread != diskBalancerConf.getParallelThread()) {
       setParallelThread(diskBalancerConf.getParallelThread());
     }
+    if (stopAfterDiskEven != diskBalancerConf.isStopAfterDiskEven()) {
+      setStopAfterDiskEven(diskBalancerConf.isStopAfterDiskEven());
+    }
   }
 
   public StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto toDiskBalancerReportProto() {
     DiskBalancerConfiguration conf = new DiskBalancerConfiguration(Optional.of(threshold),
-        Optional.of(bandwidthInMB), Optional.of(parallelThread));
+        Optional.of(bandwidthInMB), Optional.of(parallelThread), Optional.of(stopAfterDiskEven));
     HddsProtos.DiskBalancerConfigurationProto confProto = conf.toProtobufBuilder().build();
 
     StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto.Builder builder =
@@ -136,6 +143,14 @@ public class DiskBalancerInfo {
     this.parallelThread = parallelThread;
   }
 
+  public boolean isStopAfterDiskEven() {
+    return stopAfterDiskEven;
+  }
+
+  public void setStopAfterDiskEven(boolean stopAfterDiskEven) {
+    this.stopAfterDiskEven = stopAfterDiskEven;
+  }
+
   public DiskBalancerVersion getVersion() {
     return version;
   }
@@ -157,12 +172,13 @@ public class DiskBalancerInfo {
         Double.compare(that.threshold, threshold) == 0 &&
         bandwidthInMB == that.bandwidthInMB &&
         parallelThread == that.parallelThread &&
+        stopAfterDiskEven == that.stopAfterDiskEven &&
         version == that.version;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(shouldRun, threshold, bandwidthInMB, parallelThread,
+    return Objects.hash(shouldRun, threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
         version);
   }
 }
