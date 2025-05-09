@@ -325,7 +325,7 @@ public class ECReconstructionCoordinator implements Closeable {
                 // If the buffer is empty, we don't need to write it as it will cause
                 // an empty chunk to be added to the end of the block.
                 CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-                    future = targetBlockStreams[i].write(bufs[i]);
+                    future = targetBlockStreams[i].write(bufs[i], false);
                 checkFailures(targetBlockStreams[i], future);
               }
               bufs[i].clear();
