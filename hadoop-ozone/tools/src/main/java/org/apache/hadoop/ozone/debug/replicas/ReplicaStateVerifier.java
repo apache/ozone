@@ -1,25 +1,24 @@
 package org.apache.hadoop.ozone.debug.replicas;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
-import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.Objects;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 
 /**
  * Verifies the state of a replica from the DN.
@@ -28,9 +27,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 public class ReplicaStateVerifier implements ReplicaVerifier {
   private final ContainerOperationClient containerOperationClient;
   private final XceiverClientManager xceiverClientManager;
+  // cache for replica details from the DNs
   private final Cache<ReplicaKey, ContainerDataProto> containerDataCache = CacheBuilder.newBuilder()
       .maximumSize(1000)
       .build();
+  // cache for container info and encodedToken from the SCM
   private final Cache<Long, ContainerInfoToken> encodedTokenCache = CacheBuilder.newBuilder()
       .maximumSize(1000)
       .build();
@@ -39,12 +40,15 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
     containerOperationClient = new ContainerOperationClient(conf);
     xceiverClientManager = containerOperationClient.getXceiverClientManager();
   }
-  @Override
-  public void verifyKey(OzoneKeyDetails keyDetails) {
 
+  private static final String CHECK_TYPE = "replicaState";
+
+  @Override
+  public String getType() {
+    return CHECK_TYPE;
   }
 
-  //@Override
+  @Override
   public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation,
                                              int replicaIndex) {
     try {
@@ -138,7 +142,6 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
     return cachedData;
   }
 
-
   private class ReplicaKey {
     private final DatanodeDetails datanode;
     private final long containerID;
@@ -150,7 +153,9 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
+      if (this == o) {
+        return true;
+      }
       if (!(o instanceof ReplicaKey)) {
         return false;
       }
@@ -172,6 +177,19 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
     ContainerInfoToken(ContainerInfo info, String token) {
       this.containerInfo = info;
       this.encodedToken = token;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof ContainerInfoToken)) {
+        return false;
+      }
+      ContainerInfoToken key = (ContainerInfoToken) o;
+      return Objects.equals(containerInfo, key.containerInfo) &&
+          Objects.equals(encodedToken, key.encodedToken);
     }
 
     @Override
