@@ -14,5 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-OZONE-SITE.XML_ozone.client.read.short-circuit=true
-OZONE-SITE.XML_ozone.domain.socket.path=/opt/ozone_dn3_socket
+x-short-circuit-config:
+  &short-circuit-config
+  environment:
+    - OZONE-SITE.XML_ozone.client.read.short-circuit=true
+    - OZONE-SITE.XML_ozone.domain.socket.path=/opt/ozone_dn_socket
+
+services:
+  datanode:
+    <<: *short-circuit-config
