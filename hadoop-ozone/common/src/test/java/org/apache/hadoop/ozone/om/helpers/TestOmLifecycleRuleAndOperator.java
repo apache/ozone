@@ -21,10 +21,15 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperatorBuilder;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
+import java.util.Map;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRuleAndOperator;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -65,6 +70,38 @@ class TestOmLifecycleRuleAndOperator {
 
     OmLifecycleRuleAndOperator.Builder andOperator3 = getOmLCAndOperatorBuilder(null, null);
     assertOMException(andOperator3::build, INVALID_REQUEST, "Either 'Tags' or 'Prefix' must be specified.");
+  }
+
+  @Test
+  public void testProtobufConversion() throws OMException {
+    // Prefix and tags
+    Map<String, String> tags = ImmutableMap.of("tag1", "value1", "tag2", "");
+    OmLifecycleRuleAndOperator andOp = getOmLCAndOperatorBuilder("prefix", tags).build();
+    LifecycleRuleAndOperator proto = andOp.getProtobuf();
+    OmLifecycleRuleAndOperator andOpFromProto =
+        OmLifecycleRuleAndOperator.getFromProtobuf(proto);
+    assertEquals("prefix", andOpFromProto.getPrefix());
+    assertEquals(2, andOpFromProto.getTags().size());
+    assertTrue(andOpFromProto.getTags().containsKey("tag1"));
+    assertEquals("value1", andOpFromProto.getTags().get("tag1"));
+    assertTrue(andOpFromProto.getTags().containsKey("tag2"));
+    assertEquals("", andOpFromProto.getTags().get("tag2"));
+
+    // Multiple tags
+    OmLifecycleRuleAndOperator andOp2 = getOmLCAndOperatorBuilder(null, tags).build();
+    LifecycleRuleAndOperator proto2 = andOp2.getProtobuf();
+    OmLifecycleRuleAndOperator andOpFromProto2 =
+        OmLifecycleRuleAndOperator.getFromProtobuf(proto2);
+    assertNull(andOpFromProto2.getPrefix());
+    assertEquals(2, andOpFromProto2.getTags().size());
+
+    // Prefix is ""
+    OmLifecycleRuleAndOperator andOp3 = getOmLCAndOperatorBuilder("", tags).build();
+    LifecycleRuleAndOperator proto3 = andOp3.getProtobuf();
+    OmLifecycleRuleAndOperator andOpFromProto3 =
+        OmLifecycleRuleAndOperator.getFromProtobuf(proto3);
+    assertEquals("", andOpFromProto3.getPrefix());
+    assertEquals(2, andOpFromProto2.getTags().size());
   }
 
 }

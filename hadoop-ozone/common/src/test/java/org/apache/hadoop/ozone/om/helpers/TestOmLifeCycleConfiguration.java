@@ -22,10 +22,12 @@ import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getFutureDateString;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperatorBuilder;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCFilterBuilder;
+import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCRuleBuilder;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLifecycleConfiguration;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
@@ -33,6 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -186,6 +189,35 @@ public class TestOmLifeCycleConfiguration {
 
     assertFalse(rule.isEnabled());
     assertDoesNotThrow(rule::valid);
+  }
+
+  @Test
+  public void testProtobufConversion() throws OMException {
+    // Object to proto
+    OmLCRule rule = getOmLCRuleBuilder("test-rule", "/logs/", true,  30, null).build();
+    List<OmLCRule> rules = Collections.singletonList(rule);
+    OmLifecycleConfiguration.Builder builder = getOmLifecycleConfiguration("test-volume", "test-bucket", rules);
+    OmLifecycleConfiguration config = builder.setCreationTime(System.currentTimeMillis())
+        .setRules(rules)
+        .setObjectID(123456L)
+        .setUpdateID(78910L)
+        .build();
+    LifecycleConfiguration proto = config.getProtobuf();
+
+    // Proto to Object
+    OmLifecycleConfiguration configFromProto =
+        OmLifecycleConfiguration.getFromProtobuf(proto);
+    assertEquals("test-volume", configFromProto.getVolume());
+    assertEquals("test-bucket", configFromProto.getBucket());
+    assertEquals(config.getCreationTime(), configFromProto.getCreationTime());
+    assertEquals(config.getObjectID(), configFromProto.getObjectID());
+    assertEquals(config.getUpdateID(), configFromProto.getUpdateID());
+    assertNotNull(configFromProto.getRules());
+    assertEquals(1, configFromProto.getRules().size());
+    OmLCRule ruleFromProto = configFromProto.getRules().get(0);
+    assertEquals(config.getRules().get(0).getId(), ruleFromProto.getId());
+    assertEquals(config.getRules().get(0).getPrefix(), ruleFromProto.getPrefix());
+    assertEquals(30, ruleFromProto.getExpiration().getDays());
   }
 
 }

@@ -22,8 +22,11 @@ import jakarta.annotation.Nullable;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilterTag;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRuleAndOperator;
 
 /**
  * A class that encapsulates lifecycleRule andOperator.
@@ -116,6 +119,39 @@ public final class OmLifecycleRuleAndOperator {
       omLifecycleRuleAndOperator.valid();
       return omLifecycleRuleAndOperator;
     }
+  }
+
+  public LifecycleRuleAndOperator getProtobuf() {
+    LifecycleRuleAndOperator.Builder andOpBuilder = LifecycleRuleAndOperator.newBuilder();
+
+    if (tags != null) {
+      andOpBuilder.addAllTags(
+          tags.entrySet().stream()
+              .map(lcTag ->
+                  LifecycleFilterTag.newBuilder()
+                      .setKey(lcTag.getKey())
+                      .setValue(lcTag.getValue())
+                      .build())
+              .collect(Collectors.toList()));
+    }
+    if (prefix != null) {
+      andOpBuilder.setPrefix(prefix);
+    }
+
+    return andOpBuilder.build();
+  }
+
+  public static OmLifecycleRuleAndOperator getFromProtobuf(LifecycleRuleAndOperator andOperator) throws OMException {
+    OmLifecycleRuleAndOperator.Builder builder = new OmLifecycleRuleAndOperator.Builder();
+
+    if (andOperator.hasPrefix()) {
+      builder.setPrefix(andOperator.getPrefix());
+    }
+    andOperator.getTagsList().forEach(tag -> {
+      builder.addTag(tag.getKey(), tag.getValue());
+    });
+
+    return builder.build();
   }
 
   @Override

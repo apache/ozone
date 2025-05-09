@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import jakarta.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -24,6 +25,8 @@ import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
 
 /**
  * A class that encapsulates lifecycle rule.
@@ -76,6 +79,7 @@ public final class OmLCRule {
     return id;
   }
 
+  @Nullable
   public String getPrefix() {
     return prefix;
   }
@@ -93,6 +97,7 @@ public final class OmLCRule {
    *
    * @return the expiration action if present, null otherwise
    */
+  @Nullable
   public OmLCExpiration getExpiration() {
     for (OmLCAction action : actions) {
       if (action instanceof OmLCExpiration) {
@@ -102,6 +107,7 @@ public final class OmLCRule {
     return null;
   }
 
+  @Nullable
   public OmLCFilter getFilter() {
     return filter;
   }
@@ -160,6 +166,48 @@ public final class OmLCRule {
     }
   }
 
+  public LifecycleRule getProtobuf() {
+    LifecycleRule.Builder builder = LifecycleRule.newBuilder()
+        .setId(id)
+        .setEnabled(enabled);
+
+    if (prefix != null) {
+      builder.setPrefix(prefix);
+    }
+    if (actions != null) {
+      for (OmLCAction action : actions) {
+        builder.addAction(action.getProtobuf());
+      }
+    }
+    if (filter != null) {
+      builder.setFilter(filter.getProtobuf());
+    }
+
+    return builder.build();
+  }
+
+  public static OmLCRule getFromProtobuf(LifecycleRule lifecycleRule) throws OMException {
+    Builder builder = new Builder()
+        .setEnabled(lifecycleRule.getEnabled());
+
+    if (lifecycleRule.hasId()) {
+      builder.setId(lifecycleRule.getId());
+    }
+    if (lifecycleRule.hasPrefix()) {
+      builder.setPrefix(lifecycleRule.getPrefix());
+    }
+    for (LifecycleAction lifecycleAction : lifecycleRule.getActionList()) {
+      if (lifecycleAction.hasExpiration()) {
+        builder.addAction(OmLCExpiration.getFromProtobuf(lifecycleAction.getExpiration()));
+      }
+    }
+    if (lifecycleRule.hasFilter()) {
+      builder.setFilter(OmLCFilter.getFromProtobuf(lifecycleRule.getFilter()));
+    }
+
+    return builder.build();
+  }
+
   @Override
   public String toString() {
     return "OmLCRule{" +
@@ -201,6 +249,13 @@ public final class OmLCRule {
     public Builder setAction(OmLCAction lcAction) {
       if (lcAction != null) {
         this.actions = new ArrayList<>();
+        this.actions.add(lcAction);
+      }
+      return this;
+    }
+
+    public Builder addAction(OmLCAction lcAction) {
+      if (lcAction != null) {
         this.actions.add(lcAction);
       }
       return this;

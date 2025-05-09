@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import jakarta.annotation.Nullable;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -24,6 +25,8 @@ import java.time.format.DateTimeParseException;
 import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleExpiration;
 
 /**
  * A class that encapsulates lifecycle rule expiration action.
@@ -44,10 +47,12 @@ public final class OmLCExpiration implements OmLCAction {
     this.date = builder.date;
   }
 
+  @Nullable
   public Integer getDays() {
     return days;
   }
 
+  @Nullable
   public String getDate() {
     return date;
   }
@@ -122,6 +127,34 @@ public final class OmLCExpiration implements OmLCAction {
           "time and time zone included. Examples: '2042-04-02T00:00:00Z' or '2042-04-02T00:00:00+00:00'",
           OMException.ResultCodes.INVALID_REQUEST);
     }
+  }
+
+  @Override
+  public LifecycleAction getProtobuf() {
+    LifecycleExpiration.Builder builder = LifecycleExpiration.newBuilder();
+
+    if (date != null) {
+      builder.setDate(date);
+    }
+    if (days != null) {
+      builder.setDays(days);
+    }
+
+    return LifecycleAction.newBuilder().setExpiration(builder).build();
+  }
+
+  public static OmLCExpiration getFromProtobuf(
+      LifecycleExpiration lifecycleExpiration) throws OMException {
+    OmLCExpiration.Builder builder = new Builder();
+
+    if (lifecycleExpiration.hasDate()) {
+      builder.setDate(lifecycleExpiration.getDate());
+    }
+    if (lifecycleExpiration.hasDays()) {
+      builder.setDays(lifecycleExpiration.getDays());
+    }
+
+    return builder.build();
   }
 
   @Override
