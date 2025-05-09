@@ -49,15 +49,18 @@ public class ContainerDatanodeDatabase {
   private static final int DEFAULT_REPLICATION_FACTOR;
 
   private final PrintWriter out;
+  private final PrintWriter err;
 
   public ContainerDatanodeDatabase(String dbPath) {
     this.databasePath = dbPath;
     this.out = new PrintWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8), true);
+    this.err = new PrintWriter(new OutputStreamWriter(System.err, StandardCharsets.UTF_8), true);
   }
 
-  public ContainerDatanodeDatabase(String dbPath, PrintWriter out) {
+  public ContainerDatanodeDatabase(String dbPath, PrintWriter out, PrintWriter err) {
     this.databasePath = dbPath;
     this.out = out;
+    this.err = err;
   }
   
   static {
@@ -627,14 +630,14 @@ public class ContainerDatanodeDatabase {
     } else if ("UNDER_REPLICATED".equalsIgnoreCase(overOrUnder)) {
       operator = "<";
     } else {
-      out.println("Invalid type. Use OVER_REPLICATED or UNDER_REPLICATED.");
+      err.println("Invalid type. Use OVER_REPLICATED or UNDER_REPLICATED.");
       return;
     }
     
     String rawQuery = SQLDBConstants.SELECT_REPLICATED_CONTAINERS;
 
     if (!rawQuery.contains("{operator}")) {
-      out.println("Query not defined correctly.");
+      err.println("Query not defined correctly.");
       return;
     }
 
@@ -659,7 +662,7 @@ public class ContainerDatanodeDatabase {
 
         while (rs.next()) {
           if (limitProvided && count >= limit) {
-            out.println("Note: There might be more containers. Use --all option to list all entries.");
+            err.println("Note: There might be more containers. Use --all option to list all entries.");
             break;
           }
 
@@ -704,7 +707,7 @@ public class ContainerDatanodeDatabase {
 
         while (rs.next()) {
           if (limitProvided && count >= limit) {
-            out.println("Note: There might be more containers. Use --all option to list all entries.");
+            err.println("Note: There might be more containers. Use --all option to list all entries.");
             break;
           }
 
@@ -748,7 +751,7 @@ public class ContainerDatanodeDatabase {
 
         while (resultSet.next()) {
           if (limitProvided && count >= limit) {
-            out.println("Note: There might be more containers. Use --all option to list all entries.");
+            err.println("Note: There might be more containers. Use --all option to list all entries.");
             break;
           }
 
