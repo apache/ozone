@@ -617,8 +617,7 @@ public class ContainerDatanodeDatabase {
   }
 
   /**
-   * Lists container replicas with key details such as Container ID, Datanode ID, State, BCSID for over- 
-   * or under-replicated containers.
+   * Lists containers that are over- or under-replicated also provides count of replicas.
    */
   
   public void listReplicatedContainers(String overOrUnder, Integer limit) throws SQLException {
@@ -658,19 +657,14 @@ public class ContainerDatanodeDatabase {
       try (ResultSet rs = pstmt.executeQuery()) {
         int count = 0;
 
-        out.printf("| %-15s | %-35s | %-15s | %-15s %n", "Container ID", "Datanode ID", "State", "BCSID");
-        out.println("+-----------------+-------------------------------------+-----------------+-----------------+");
-
         while (rs.next()) {
           if (limitProvided && count >= limit) {
-            out.println("Note: There might be more containers. Use -all option to list all entries.");
+            out.println("Note: There might be more containers. Use --all option to list all entries.");
             break;
           }
-          out.printf("| %-15d | %-35s | %-15s | %-15d %n",
-              rs.getLong("container_id"),
-              rs.getString("datanode_id"),
-              rs.getString("latest_state"),
-              rs.getLong("latest_bcsid"));
+
+          out.printf("Container ID = %s - Count = %d%n", rs.getLong("container_id"), 
+                  rs.getInt("replica_count"));
           count++;
         }
 
@@ -686,8 +680,7 @@ public class ContainerDatanodeDatabase {
   }
 
   /**
-   * Lists container replicas with key details such as Container ID, Datanode ID, Timestamp, BCSID for 
-   * containers that are UNHEALTHY.
+   * Lists containers that are UNHEALTHY also provides count of replicas which are in UNHEALTHY state.
    */
 
   public void listUnhealthyContainers(Integer limit) throws SQLException {
@@ -709,21 +702,14 @@ public class ContainerDatanodeDatabase {
       try (ResultSet rs = stmt.executeQuery()) {
         int count = 0;
 
-        out.printf("| %-15s | %-35s | %-25s | %-10s %n", "Container ID", "Datanode ID", "Timestamp", "BCSID");
-        out.println("+-----------------+-------------------------------------+---------------------------+----------");
-
         while (rs.next()) {
           if (limitProvided && count >= limit) {
-            out.println("Note: There might be more containers. Use -all option to list all entries.");
+            out.println("Note: There might be more containers. Use --all option to list all entries.");
             break;
           }
 
-          String containerId = rs.getString("container_id");
-          String datanodeId = rs.getString("datanode_id");
-          String timestamp = rs.getString("latest_unhealthy_timestamp");
-          long bcsid = rs.getLong("bcsid");
-
-          out.printf("| %-15s | %-35s | %-25s | %-10d %n", containerId, datanodeId, timestamp, bcsid);
+          out.printf("Container ID = %s - Count = %d%n", rs.getString("container_id"), 
+                  rs.getInt("unhealthy_replica_count"));
           count++;
         }
 
@@ -738,8 +724,7 @@ public class ContainerDatanodeDatabase {
   }
 
   /**
-   * Lists container replicas with key details such as Container ID, Datanode ID, Timestamp, BCSID for 
-   * containers that are QUASI_CLOSED stuck.
+   * Lists containers that are QUASI_CLOSED stuck also provides count of replicas which are in QUASI_CLOSED state.
    */
 
   public void listQuasiClosedStuckContainers(Integer limit) throws SQLException {
@@ -761,22 +746,14 @@ public class ContainerDatanodeDatabase {
       try (ResultSet resultSet = statement.executeQuery()) {
         int count = 0;
 
-        out.printf("| %-15s | %-35s | %-30s | %-15s %n", "Container ID", "Datanode ID", "Timestamp", "BCSID");
-        out.println("+-----------------+-------------------------------------+--------------------------" +
-            "----+-----------------+");
-
         while (resultSet.next()) {
           if (limitProvided && count >= limit) {
-            out.println("Note: There might be more containers. Use -all option to list all entries.");
+            out.println("Note: There might be more containers. Use --all option to list all entries.");
             break;
           }
 
-          String containerId = resultSet.getString("container_id");
-          String datanodeId = resultSet.getString("datanode_id");
-          String timestamp = resultSet.getString("latest_quasi_closed_timestamp");
-          long bcsid = resultSet.getLong("bcsid");
-
-          out.printf("| %-15s | %-35s | %-30s | %-15d %n", containerId, datanodeId, timestamp, bcsid);
+          out.printf("Container ID = %s - Count = %d%n", resultSet.getString("container_id"),
+                  resultSet.getInt("quasi_closed_replica_count"));
           count++;
         }
 
