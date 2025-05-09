@@ -19,8 +19,12 @@ package org.apache.ozone.rocksdb.util;
 
 import com.google.common.collect.Sets;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.StringUtils;
@@ -48,5 +52,21 @@ public final class RdbUtil {
     return getLiveSSTFilesForCFs(rocksDB, cfs).stream()
         .map(lfm -> new File(lfm.path(), lfm.fileName()).getPath())
         .collect(Collectors.toCollection(HashSet::new));
+  }
+
+  public static Map<Object,String> getSSTFilesWithInodesForComparison(
+      final ManagedRocksDB rocksDB, List<String> cfs){
+    return getLiveSSTFilesForCFs(rocksDB, cfs).stream()
+        .collect(Collectors.toMap(
+            lfm -> {
+              try {
+                return Files.readAttributes(new File(lfm.path(), lfm.fileName()).toPath(),
+                    BasicFileAttributes.class).fileKey();
+              } catch (IOException e) {
+                throw new RuntimeException(e);
+              }
+            },
+            lfm -> new File(lfm.path(), lfm.fileName()).getPath()
+        ));
   }
 }
