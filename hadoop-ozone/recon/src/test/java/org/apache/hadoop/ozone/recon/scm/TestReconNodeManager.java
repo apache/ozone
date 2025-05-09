@@ -36,7 +36,6 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -101,8 +100,7 @@ public class TestReconNodeManager {
         new ReconStorageConfig(conf, reconUtils);
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    Table<UUID, DatanodeDetails> nodeTable =
-        ReconSCMDBDefinition.NODES.getTable(store);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
     assertThat(reconNodeManager.getAllNodes()).isEmpty();
@@ -130,8 +128,7 @@ public class TestReconNodeManager {
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    Table<UUID, DatanodeDetails> nodeTable =
-        ReconSCMDBDefinition.NODES.getTable(store);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
     ReconNewNodeHandler reconNewNodeHandler =
@@ -212,8 +209,7 @@ public class TestReconNodeManager {
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    Table<UUID, DatanodeDetails> nodeTable =
-        ReconSCMDBDefinition.NODES.getTable(store);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
 
@@ -246,8 +242,7 @@ public class TestReconNodeManager {
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    Table<UUID, DatanodeDetails> nodeTable =
-        ReconSCMDBDefinition.NODES.getTable(store);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
     ReconNewNodeHandler reconNewNodeHandler =
