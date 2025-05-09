@@ -93,7 +93,7 @@ public final class Proto2Codec<M extends MessageLite> implements Codec<M> {
     try {
       return parser.parseFrom(in);
     } catch (InvalidProtocolBufferException e) {
-      throw new CodecException("Failed to parse " + buffer, e);
+      throw new CodecException("Failed to parse " + buffer + " for " + getTypeClass(), e);
     } finally {
       IOUtils.closeQuietly(in);
     }

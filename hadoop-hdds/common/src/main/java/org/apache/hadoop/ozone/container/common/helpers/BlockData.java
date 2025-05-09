@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.helpers;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto3Codec;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 
 /**
  * Helper class to convert Protobuf to Java classes.
@@ -103,8 +103,10 @@ public class BlockData {
       blockData.addMetadata(meta.getKey(), meta.getValue(), CodecException::new);
     }
     blockData.setChunks(data.getChunksList());
-    if (data.hasSize()) {
-      Preconditions.checkArgument(data.getSize() == blockData.getSize());
+    if (data.hasSize() && data.getSize() != blockData.getSize()) {
+      throw new CodecException("Size mismatch: size (=" + data.getSize()
+          + ") != sum of chunks (=" + blockData.getSize()
+          + "), proto: " + TextFormat.shortDebugString(data));
     }
     return blockData;
   }
@@ -113,7 +115,14 @@ public class BlockData {
    * Returns a Protobuf message from BlockData.
    * @return Proto Buf Message.
    */
-  public ContainerProtos.BlockData getProtoBufMessage() {
+  public ContainerProtos.BlockData getProtoBufMessage() throws CodecException {
+    final long sum = computeSize(getChunks());
+    if (sum != getSize()) {
+      throw new CodecException("Size mismatch: size (=" + getSize()
+          + ") != sum of chunks (=" + sum
+          + "), chunks: " + chunkList);
+    }
+
     ContainerProtos.BlockData.Builder builder =
         ContainerProtos.BlockData.newBuilder();
     builder.setBlockID(this.blockID.getDatanodeBlockIDProtobuf());
@@ -257,11 +266,15 @@ public class BlockData {
         size = singleChunk.getLen();
       } else {
         chunkList = chunks;
-        size = chunks.stream()
-            .mapToLong(ContainerProtos.ChunkInfo::getLen)
-            .sum();
+        size = computeSize(chunks);
       }
     }
+  }
+
+  static long computeSize(List<ContainerProtos.ChunkInfo> chunks) {
+    return chunks.stream()
+        .mapToLong(ContainerProtos.ChunkInfo::getLen)
+        .sum();
   }
 
   /**
