@@ -42,7 +42,6 @@ public class CopyObjectResponse {
   @XmlElement(name = OzoneConsts.ETAG)
   private String eTag;
 
-
   public Instant getLastModified() {
     return lastModified;
   }
@@ -58,6 +57,4 @@ public class CopyObjectResponse {
   public void setETag(String tag) {
     this.eTag = tag;
   }
-
-
 }

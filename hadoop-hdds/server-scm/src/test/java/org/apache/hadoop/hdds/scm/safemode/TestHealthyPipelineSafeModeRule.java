@@ -200,7 +200,6 @@ public class TestHealthyPipelineSafeModeRule {
     }
   }
 
-
   @Test
   public void testHealthyPipelineSafeModeRuleWithMixedPipelines()
       throws Exception {

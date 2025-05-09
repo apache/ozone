@@ -133,7 +133,7 @@ public class MockDatanodeStorage {
     if (!blocks.containsKey(id)) {
       StringBuilder sb = new StringBuilder();
       for (BlockID bid : blocks.keySet()) {
-        sb.append(bid).append("\n");
+        sb.append(bid).append('\n');
       }
       throw new AssertionError("blockID " + id +
           " not found in blocks. Available block ID: \n" + sb);

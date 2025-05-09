@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.shell;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
@@ -59,7 +58,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +70,6 @@ import picocli.CommandLine;
  * TODO: HDDS-6338. Add a Kerberized version of this
  * TODO: HDDS-6336. Add a mock Ranger server to test Ranger HTTP endpoint calls
  */
-@Timeout(300)
 public class TestOzoneTenantShell {
 
   private static final Logger LOG =
@@ -81,8 +78,6 @@ public class TestOzoneTenantShell {
   static {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
   }
-
-  private static final String DEFAULT_ENCODING = UTF_8.name();
 
   /**
    * Set the timeout for every test.

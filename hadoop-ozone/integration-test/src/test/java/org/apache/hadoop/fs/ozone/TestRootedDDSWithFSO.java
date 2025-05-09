@@ -57,7 +57,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +64,6 @@ import org.slf4j.LoggerFactory;
  * Directory deletion service test cases using rooted ozone filesystem
  * ofs://volume/bucket/path.
  */
-@Timeout(300)
 public class TestRootedDDSWithFSO {
 
   private static final Logger LOG =

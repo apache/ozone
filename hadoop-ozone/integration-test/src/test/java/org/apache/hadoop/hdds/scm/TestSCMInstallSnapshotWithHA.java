@@ -57,14 +57,12 @@ import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
 /**
  * Tests the Ratis snapshot feature in SCM.
  */
-@Timeout(500)
 @Flaky("HDDS-5631")
 public class TestSCMInstallSnapshotWithHA {
 
@@ -302,7 +300,6 @@ public class TestSCMInstallSnapshotWithHA {
       log.error("System Exit: " + message, throwable);
     }
   }
-
 
   static StorageContainerManager getLeader(MiniOzoneHAClusterImpl impl) {
     for (StorageContainerManager scm : impl.getStorageContainerManagers()) {

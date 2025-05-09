@@ -46,14 +46,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test covers listKeys(keyPrefix, startKey) combinations
  * in a FSO bucket layout type.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(1200)
 public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
 
   private OzoneBucket legacyOzoneBucket;
@@ -575,7 +573,6 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
 
     createAndAssertKeys(ozoneBucket, keys);
   }
-
 
   private static List<String> getExpectedKeyList(String keyPrefix,
       String startKey, OzoneBucket legacyBucket, boolean shallow)

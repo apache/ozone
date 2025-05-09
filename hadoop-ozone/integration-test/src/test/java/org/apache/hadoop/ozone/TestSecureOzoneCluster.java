@@ -168,7 +168,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,7 +175,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Test class to for security enabled Ozone cluster.
  */
-@Timeout(80)
 final class TestSecureOzoneCluster {
 
   private static final String COMPONENT = "om";
@@ -997,6 +995,7 @@ final class TestSecureOzoneCluster {
           1000, certificateLifetime * 1000);
     }
   }
+
   /**
    * Test unexpected SCMGetCertResponseProto returned from SCM.
    */

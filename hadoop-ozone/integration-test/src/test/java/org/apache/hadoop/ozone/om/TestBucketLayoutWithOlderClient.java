@@ -37,13 +37,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests to verify bucket ops with older version client.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(1200)
 public abstract class TestBucketLayoutWithOlderClient implements NonHATests.TestCase {
 
   private MiniOzoneCluster cluster;

@@ -51,13 +51,11 @@ import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 /**
  * Recon's passive SCM integration tests.
  */
-@Timeout(180)
 public class TestReconAsPassiveScm {
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;

@@ -65,7 +65,7 @@ public class TestS3PutObjectTaggingRequestWithFSO extends TestS3PutObjectTagging
         bucketName, PARENT_DIR, omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY, RatisReplicationConfig.getInstance(ONE))
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_NAME, RatisReplicationConfig.getInstance(ONE))
             .setObjectID(parentId + 1L)
             .setParentObjectID(parentId)
             .setUpdateID(1L)
@@ -90,6 +90,4 @@ public class TestS3PutObjectTaggingRequestWithFSO extends TestS3PutObjectTagging
   protected S3PutObjectTaggingRequest getPutObjectTaggingRequest(OMRequest originalRequest) {
     return new S3PutObjectTaggingRequestWithFSO(originalRequest, getBucketLayout());
   }
-
-
 }

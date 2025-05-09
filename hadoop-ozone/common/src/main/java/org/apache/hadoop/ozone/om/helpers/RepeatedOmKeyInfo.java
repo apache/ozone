@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -41,6 +40,8 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   private static final Codec<RepeatedOmKeyInfo> CODEC_TRUE = newCodec(true);
   private static final Codec<RepeatedOmKeyInfo> CODEC_FALSE = newCodec(false);
 
+  private final List<OmKeyInfo> omKeyInfoList;
+
   private static Codec<RepeatedOmKeyInfo> newCodec(boolean ignorePipeline) {
     return new DelegatedCodec<>(
         Proto2Codec.get(RepeatedKeyInfo.getDefaultInstance()),
@@ -52,8 +53,6 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   public static Codec<RepeatedOmKeyInfo> getCodec(boolean ignorePipeline) {
     return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
   }
-
-  private final List<OmKeyInfo> omKeyInfoList;
 
   public RepeatedOmKeyInfo() {
     this.omKeyInfoList = new ArrayList<>();
@@ -90,17 +89,15 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
       }
       unreplicatedSize += omKeyInfo.getDataSize();
     }
-    return new ImmutablePair<Long, Long>(unreplicatedSize, replicatedSize);
+    return new ImmutablePair<>(unreplicatedSize, replicatedSize);
   }
-
 
   // HDDS-7041. Return a new ArrayList to avoid ConcurrentModifyException
   public List<OmKeyInfo> cloneOmKeyInfoList() {
     return new ArrayList<>(omKeyInfoList);
   }
 
-  public static RepeatedOmKeyInfo getFromProto(RepeatedKeyInfo
-      repeatedKeyInfo) throws IOException {
+  public static RepeatedOmKeyInfo getFromProto(RepeatedKeyInfo repeatedKeyInfo) {
     List<OmKeyInfo> list = new ArrayList<>();
     for (KeyInfo k : repeatedKeyInfo.getKeyInfoList()) {
       list.add(OmKeyInfo.getFromProtobuf(k));

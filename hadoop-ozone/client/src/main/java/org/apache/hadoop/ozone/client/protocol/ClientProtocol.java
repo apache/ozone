@@ -1112,7 +1112,6 @@ public interface ClientProtocol {
    */
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
-
   void setIsS3Request(boolean isS3Request);
 
   /**
@@ -1208,6 +1207,7 @@ public interface ClientProtocol {
    * @return message which tells the image name, parent dir and OM leader
    * node information.
    */
+  @Deprecated
   String printCompactionLogDag(String fileNamePrefix, String graphType)
       throws IOException;
 

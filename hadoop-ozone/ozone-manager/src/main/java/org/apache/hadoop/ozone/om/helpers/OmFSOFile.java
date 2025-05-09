@@ -36,7 +36,6 @@ public final class OmFSOFile {
   private long bucketId;
   private long parentID;
 
-
   @SuppressWarnings("checkstyle:parameternumber")
   private OmFSOFile(String volumeName, String bucketName, String keyName, 
       OMMetadataManager omMetadataManager, String fileName,

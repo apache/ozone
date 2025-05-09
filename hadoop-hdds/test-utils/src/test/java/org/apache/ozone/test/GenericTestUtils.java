@@ -245,6 +245,7 @@ public abstract class GenericTestUtils {
       writer().getBuffer().setLength(0);
     }
   }
+
   @Deprecated
   public static Logger toLog4j(org.slf4j.Logger logger) {
     return LogManager.getLogger(logger.getName());

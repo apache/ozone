@@ -213,7 +213,6 @@ public final class TestHelper {
     waitForContainerClose(cluster, containerIdList.toArray(new Long[0]));
   }
 
-
   public static void waitForContainerClose(OzoneDataStreamOutput outputStream,
       MiniOzoneCluster cluster) throws Exception {
     KeyDataStreamOutput keyOutputStream =
@@ -290,7 +289,7 @@ public final class TestHelper {
     for (Pipeline pipeline1 : pipelineList) {
       // issue pipeline destroy command
       cluster.getStorageContainerManager()
-          .getPipelineManager().closePipeline(pipeline1, false);
+          .getPipelineManager().closePipeline(pipeline1.getId());
     }
 
     // wait for the pipeline to get destroyed in the datanodes

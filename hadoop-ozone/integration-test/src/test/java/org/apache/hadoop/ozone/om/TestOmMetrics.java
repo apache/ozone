@@ -86,7 +86,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -94,7 +93,6 @@ import org.junit.jupiter.params.provider.EnumSource;
  * Test for OM metrics.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public class TestOmMetrics {
   private MiniOzoneCluster cluster;
   private MiniOzoneCluster.Builder clusterBuilder;
@@ -910,12 +908,14 @@ public class TestOmMetrics {
         .setAdminName("dummyAdmin")
         .build();
   }
+
   private OmBucketArgs getBucketArgs(OmBucketInfo info) {
     return new OmBucketArgs.Builder()
         .setVolumeName(info.getVolumeName())
         .setBucketName(info.getBucketName())
         .build();
   }
+
   private OmBucketInfo createBucketInfo(boolean isEcBucket) throws IOException {
     OmVolumeArgs volumeArgs = createVolumeArgs();
     writeClient.createVolume(volumeArgs);

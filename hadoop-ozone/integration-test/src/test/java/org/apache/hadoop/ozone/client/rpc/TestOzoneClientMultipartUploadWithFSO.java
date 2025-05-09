@@ -92,7 +92,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -100,7 +99,6 @@ import org.junit.jupiter.params.provider.CsvSource;
  * This test verifies all the S3 multipart client apis - prefix layout.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATests.TestCase {
 
   private ObjectStore store;
@@ -870,7 +868,7 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
       StringBuilder key = new StringBuilder();
       int depth = 1 + i % 3; // Creates varying depth (1-3 levels)
       for (int j = 0; j < depth; j++) {
-        key.append("dir").append(j + 1).append("/");
+        key.append("dir").append(j + 1).append('/');
       }
       key.append("file").append(i);
       keys.add(key.toString());

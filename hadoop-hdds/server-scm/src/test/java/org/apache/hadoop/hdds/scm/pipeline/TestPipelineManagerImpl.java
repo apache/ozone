@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -350,7 +351,7 @@ public class TestPipelineManagerImpl {
       Pipeline pipeline = assertAllocate(pipelineManager);
       changeToFollower(pipelineManager);
       assertFailsNotLeader(
-          () -> pipelineManager.closePipeline(pipeline, false));
+          () -> pipelineManager.closePipeline(pipeline.getId()));
     }
   }
 
@@ -521,7 +522,7 @@ public class TestPipelineManagerImpl {
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE));
     pipelineManager.openPipeline(closedPipeline.getId());
-    pipelineManager.closePipeline(closedPipeline, true);
+    pipelineManager.closePipeline(closedPipeline.getId());
 
     // pipeline should be seen in pipelineManager as CLOSED.
     assertTrue(pipelineManager
@@ -945,7 +946,7 @@ public class TestPipelineManagerImpl {
           .setContainerState(StorageContainerDatanodeProtocolProtos
               .ContainerReplicaProto.State.CLOSED)
           .setKeyCount(1)
-          .setOriginNodeId(UUID.randomUUID())
+          .setOriginNodeId(DatanodeID.randomID())
           .setSequenceId(1)
           .setReplicaIndex(0)
           .setDatanodeDetails(dn)

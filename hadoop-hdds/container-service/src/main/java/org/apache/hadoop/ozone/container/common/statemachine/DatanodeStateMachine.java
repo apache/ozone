@@ -132,6 +132,7 @@ public class DatanodeStateMachine implements Closeable {
 
   private final DatanodeQueueMetrics queueMetrics;
   private final ReconfigurationHandler reconfigurationHandler;
+
   /**
    * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
@@ -308,7 +309,6 @@ public class DatanodeStateMachine implements Closeable {
   public DatanodeDetails getDatanodeDetails() {
     return datanodeDetails;
   }
-
 
   /**
    * Returns the Connection manager for this state machine.
@@ -559,6 +559,7 @@ public class DatanodeStateMachine implements Closeable {
           ExitUtils.terminate(1, message, ex, LOG);
         })
         .build().newThread(startStateMachineTask);
+    stateMachineThread.setPriority(Thread.MAX_PRIORITY);
     stateMachineThread.start();
   }
 
@@ -682,6 +683,7 @@ public class DatanodeStateMachine implements Closeable {
 
     // We will have only one thread for command processing in a datanode.
     cmdProcessThread = getCommandHandlerThread(processCommandQueue);
+    cmdProcessThread.setPriority(Thread.NORM_PRIORITY);
     cmdProcessThread.start();
   }
 
@@ -734,6 +736,7 @@ public class DatanodeStateMachine implements Closeable {
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
         true);
   }
+
   public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
     return upgradeFinalizer;
   }
@@ -748,6 +751,14 @@ public class DatanodeStateMachine implements Closeable {
 
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
+  }
+
+  public Thread getStateMachineThread() {
+    return stateMachineThread;
+  }
+
+  public Thread getCmdProcessThread() {
+    return cmdProcessThread;
   }
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {

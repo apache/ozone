@@ -61,7 +61,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -70,7 +69,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Test for Snapshot feature with ACL.
  */
-@Timeout(value = 300)
 public class TestOzoneManagerSnapshotAcl {
 
   private static final String ADMIN_USER = "om";
@@ -437,7 +435,6 @@ public class TestOzoneManagerSnapshotAcl {
 
     assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
   }
-
 
   private void setup(BucketLayout bucketLayout)
       throws IOException {

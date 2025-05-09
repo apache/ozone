@@ -412,7 +412,6 @@ public class TestKeyValueContainerMetadataInspector extends TestKeyValueContaine
     assertTrue(matchFound);
   }
 
-
   public void setDBBlockAndByteCounts(KeyValueContainerData containerData,
       long blockCount, long byteCount) throws Exception {
     setDB(containerData, blockCount, byteCount,

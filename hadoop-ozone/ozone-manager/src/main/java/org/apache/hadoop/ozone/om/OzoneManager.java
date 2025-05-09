@@ -102,7 +102,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.Time.monotonicNow;
-import static org.apache.ozone.graph.PrintableGraph.GraphType.FILE_NAME;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -330,7 +329,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.KMSUtil;
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.graph.PrintableGraph;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -364,7 +362,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           "There is no leader among the Ozone Manager servers. If this message " +
                   "persists, the service may be down. Possible cause: only one OM is up, or " +
                   "other OMs are unable to respond to Ratis leader vote messages";
-
 
   // This is set for read requests when OMRequest has S3Authentication set,
   // and it is reset when read request is processed.
@@ -481,22 +478,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private boolean fsSnapshotEnabled;
 
   private String omHostName;
-
-  /**
-   * OM Startup mode.
-   */
-  public enum StartupOption {
-    REGUALR,
-    BOOTSTRAP,
-    FORCE_BOOTSTRAP
-  }
-
-  private enum State {
-    INITIALIZED,
-    BOOTSTRAPPING,
-    RUNNING,
-    STOPPED
-  }
 
   // Used in MiniOzoneCluster testing
   private State omState;
@@ -906,7 +887,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     StringBuilder scmBlockAddressBuilder = new StringBuilder();
     for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
       scmBlockAddressBuilder.append(scmNodeInfo.getBlockClientAddress())
-          .append(",");
+          .append(',');
     }
     String scmBlockAddress = scmBlockAddressBuilder.toString();
     if (!StringUtils.isBlank(scmBlockAddress)) {
@@ -1000,10 +981,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         LOG.info("New OM snapshot received with higher layout version {}. " +
             "Attempting to finalize current OM to that version.",
             layoutVersionInDB);
-        OmUpgradeConfig uConf = configuration.getObject(OmUpgradeConfig.class);
         upgradeFinalizer.finalizeAndWaitForCompletion(
             "om-ratis-snapshot", this,
-            uConf.getRatisBasedFinalizationTimeout());
+            config.getRatisBasedFinalizationTimeout());
         if (versionManager.getMetadataLayoutVersion() < layoutVersionInDB) {
           throw new IOException("Unable to finalize OM to the desired layout " +
               "version " + layoutVersionInDB + " present in the snapshot DB.");
@@ -1759,6 +1739,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OMPerformanceMetrics getPerfMetrics() {
     return perfMetrics;
   }
+
   public DeletingServiceMetrics getDeletionMetrics() {
     return omDeletionMetrics;
   }
@@ -2719,8 +2700,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     return omMetadataReader.checkAcls(obj, context, throwIfPermissionDenied);
   }
-
-
 
   /**
    * Return true if Ozone acl's are enabled, else false.
@@ -4325,6 +4304,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public long getMaxUserVolumeCount() {
     return config.getMaxUserVolumeCount();
   }
+
   /**
    * Return true, if the current OM node is leader and in ready state to
    * process the requests.
@@ -4881,7 +4861,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager
@@ -5048,36 +5027,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         jobStatus, listAllStatus, prevSnapshotDiffJob, maxListResult);
   }
 
-  @Override
-  public String printCompactionLogDag(String fileNamePrefix,
-                                      String graphType)
-      throws IOException {
-    checkAdminUserPrivilege("print compaction DAG.");
-
-    if (StringUtils.isBlank(fileNamePrefix)) {
-      fileNamePrefix = "dag-";
-    } else {
-      fileNamePrefix = fileNamePrefix + "-";
-    }
-    File tempFile = File.createTempFile(fileNamePrefix, ".png");
-
-    PrintableGraph.GraphType type;
-
-    try {
-      type = PrintableGraph.GraphType.valueOf(graphType);
-    } catch (IllegalArgumentException e) {
-      type = FILE_NAME;
-    }
-
-    getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer()
-        .pngPrintMutableGraph(tempFile.getAbsolutePath(), type);
-
-    return String.format("Graph was generated at '\\tmp\\%s' on OM " +
-        "node '%s'.", tempFile.getName(), getOMNodeId());
-  }
-
   private String reconfOzoneAdmins(String newVal) {
     getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
     Collection<String> admins =
@@ -5158,5 +5107,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OMExecutionFlow getOmExecutionFlow() {
     return omExecutionFlow;
+  }
+
+  /**
+   * OM Startup mode.
+   */
+  public enum StartupOption {
+    REGUALR,
+    BOOTSTRAP,
+    FORCE_BOOTSTRAP
+  }
+
+  private enum State {
+    INITIALIZED,
+    BOOTSTRAPPING,
+    RUNNING,
+    STOPPED
   }
 }

@@ -264,7 +264,6 @@ public class TestOMKeyRequest {
     return new OzoneConfiguration();
   }
 
-
   /**
    * Verify path in open key table. Also, it returns OMKeyInfo for the given
    * key path.

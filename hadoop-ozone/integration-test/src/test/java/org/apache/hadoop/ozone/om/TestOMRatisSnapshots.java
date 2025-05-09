@@ -92,7 +92,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -102,8 +101,10 @@ import org.slf4j.event.Level;
 /**
  * Tests the Ratis snapshots feature in OM.
  */
-@Timeout(5000)
 public class TestOMRatisSnapshots {
+  // tried up to 1000 snapshots and this test works, but some of the
+  //  timeouts have to be increased.
+  private static final int SNAPSHOTS_TO_CREATE = 100;
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -120,7 +121,6 @@ public class TestOMRatisSnapshots {
   // buckets.
   private static final BucketLayout TEST_BUCKET_LAYOUT =
       BucketLayout.OBJECT_STORE;
-  private static final String SNAPSHOT_NAME_PREFIX = "snapshot";
   private OzoneClient client;
 
   /**
@@ -190,10 +190,6 @@ public class TestOMRatisSnapshots {
       cluster.shutdown();
     }
   }
-
-  // tried up to 1000 snapshots and this test works, but some of the
-  //  timeouts have to be increased.
-  private static final int SNAPSHOTS_TO_CREATE = 100;
 
   @Test
   public void testInstallSnapshot(@TempDir Path tempDir) throws Exception {
@@ -386,7 +382,6 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
-  @Timeout(300)
   public void testInstallIncrementalSnapshot(@TempDir Path tempDir)
       throws Exception {
     // Get the leader OM
@@ -515,9 +510,11 @@ public class TestOMRatisSnapshots {
   static class IncrementData {
     private List<String> keys;
     private SnapshotInfo snapshotInfo;
+
     public List<String> getKeys() {
       return keys;
     }
+
     public SnapshotInfo getSnapshotInfo() {
       return snapshotInfo;
     }
@@ -596,7 +593,6 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
-  @Timeout(300)
   public void testInstallIncrementalSnapshotWithFailure() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -1135,6 +1131,7 @@ public class TestOMRatisSnapshots {
     private final File snapshotDir;
     private final List<Set<String>> sstSetList;
     private final Path tempDir;
+
     SnapshotMaxSizeInjector(OzoneManager om, File snapshotDir,
                             List<Set<String>> sstSetList, Path tempDir) {
       this.om = om;

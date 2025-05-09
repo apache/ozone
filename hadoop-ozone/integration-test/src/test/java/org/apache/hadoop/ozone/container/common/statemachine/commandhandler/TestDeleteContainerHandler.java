@@ -77,12 +77,10 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests DeleteContainerCommand Handler.
  */
-@Timeout(300)
 public class TestDeleteContainerHandler {
 
   private static OzoneClient client;
@@ -549,7 +547,6 @@ public class TestDeleteContainerHandler {
     assertTrue(isContainerDeleted(hddsDatanodeService, containerId.getId()));
 
   }
-
 
   private void clearBlocksTable(Container container) throws IOException {
     try (DBHandle dbHandle

@@ -30,7 +30,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DIS
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
-import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -116,7 +117,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -214,7 +215,7 @@ public abstract class TestOmSnapshot {
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
-    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion());
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, KeyManagerImpl.DISABLE_VALUE);
 
@@ -1558,6 +1559,7 @@ public abstract class TestOmSnapshot {
 
     return response.getSnapshotDiffReport();
   }
+
   @Test
   public void testSnapDiffNoSnapshot() throws Exception {
     String volume = "vol-" + counter.incrementAndGet();
@@ -1937,19 +1939,19 @@ public abstract class TestOmSnapshot {
       throws IOException {
     if (!bucketLayout.isFileSystemOptimized()) {
       return getRdbStore().getDb().getSstFileList().stream()
-          .filter(x -> StringUtils.bytes2String(x.columnFamilyName()).equals(OmMetadataManagerImpl.KEY_TABLE))
+          .filter(x -> StringUtils.bytes2String(x.columnFamilyName()).equals(KEY_TABLE))
           .collect(Collectors.toList());
     }
     return getRdbStore().getDb().getSstFileList().stream()
-        .filter(x -> StringUtils.bytes2String(x.columnFamilyName()).equals(OmMetadataManagerImpl.FILE_TABLE))
+        .filter(x -> StringUtils.bytes2String(x.columnFamilyName()).equals(FILE_TABLE))
         .collect(Collectors.toList());
   }
 
   private void flushKeyTable() throws IOException {
     if (!bucketLayout.isFileSystemOptimized()) {
-      getRdbStore().getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
+      getRdbStore().getDb().flush(KEY_TABLE);
     } else {
-      getRdbStore().getDb().flush(OmMetadataManagerImpl.FILE_TABLE);
+      getRdbStore().getDb().flush(FILE_TABLE);
     }
   }
 

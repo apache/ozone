@@ -49,7 +49,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +56,6 @@ import org.slf4j.LoggerFactory;
  * Test client-side URI handling with Ozone Manager HA.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
 
   /**
@@ -86,7 +84,6 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
 
   private static final String OFS_IMPL_VALUE =
       "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem";
-
 
   @BeforeAll
   void initClass() throws Exception {

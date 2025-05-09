@@ -174,6 +174,7 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -467,6 +468,7 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(edek);
     return edek;
   }
+
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args, ResolvedBucket bucket,
       String clientAddress) throws IOException {
@@ -606,6 +608,7 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
   }
+
   /**
    * Refresh pipeline info in OM by asking SCM.
    * @param keyList a list of OmKeyInfo
@@ -770,6 +773,33 @@ public class KeyManagerImpl implements KeyManager {
              renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
       return getTableEntries(startKey, renamedKeyIter, Function.identity(), size);
     }
+  }
+
+  @Override
+  public CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmDirectoryInfo keyInfo) throws IOException {
+    String currentKeyPath = metadataManager.getOzonePathKey(volumeId, bucketInfo.getObjectID(),
+        keyInfo.getParentObjectID(), keyInfo.getName());
+    return getPreviousSnapshotOzonePathInfo(bucketInfo, keyInfo.getObjectID(), currentKeyPath,
+        (km) -> km.getMetadataManager().getDirectoryTable());
+  }
+
+  @Override
+  public CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmKeyInfo keyInfo) throws IOException {
+    String currentKeyPath = metadataManager.getOzonePathKey(volumeId, bucketInfo.getObjectID(),
+        keyInfo.getParentObjectID(), keyInfo.getFileName());
+    return getPreviousSnapshotOzonePathInfo(bucketInfo, keyInfo.getObjectID(), currentKeyPath,
+        (previousSnapshotKM) -> previousSnapshotKM.getMetadataManager().getDirectoryTable());
+  }
+
+  private <T> CheckedFunction<KeyManager, T, IOException> getPreviousSnapshotOzonePathInfo(
+      OmBucketInfo bucketInfo, long objectId, String currentKeyPath,
+      Function<KeyManager, Table<String, T>> table) throws IOException {
+    String renameKey = metadataManager.getRenameKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName(), objectId);
+    String renamedKey = metadataManager.getSnapshotRenamedTable().getIfExist(renameKey);
+    return (previousSnapshotKM) -> table.apply(previousSnapshotKM).get(
+        renamedKey != null ? renamedKey : currentKeyPath);
   }
 
   @Override
@@ -1541,6 +1571,7 @@ public class KeyManagerImpl implements KeyManager {
         .setOwnerName(keyInfo.getOwnerName())
         .build();
   }
+
   /**
    * OzoneFS api to lookup for a file.
    *
@@ -2057,6 +2088,7 @@ public class KeyManagerImpl implements KeyManager {
     }
     return nodeSet;
   }
+
   private void slimLocationVersion(OmKeyInfo... keyInfos) {
     if (keyInfos != null) {
       for (OmKeyInfo keyInfo : keyInfos) {

@@ -103,7 +103,6 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
     // same as checkpoint interval
     private long emptierInterval;
 
-
     private ThreadPoolExecutor executor;
 
     Emptier(OzoneConfiguration conf, long emptierInterval,
@@ -215,6 +214,7 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
     private long ceiling(long time, long interval) {
       return floor(time, interval) + interval;
     }
+
     private long floor(long time, long interval) {
       return (time / interval) * interval;
     }
