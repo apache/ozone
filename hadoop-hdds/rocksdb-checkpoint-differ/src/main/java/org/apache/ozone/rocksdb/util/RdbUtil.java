@@ -54,8 +54,7 @@ public final class RdbUtil {
         .collect(Collectors.toCollection(HashSet::new));
   }
 
-  public static Map<Object,String> getSSTFilesWithInodesForComparison(
-      final ManagedRocksDB rocksDB, List<String> cfs){
+  public static Map<Object, String> getSSTFilesWithInodesForComparison(final ManagedRocksDB rocksDB, List<String> cfs) {
     return getLiveSSTFilesForCFs(rocksDB, cfs).stream()
         .collect(Collectors.toMap(
             lfm -> {

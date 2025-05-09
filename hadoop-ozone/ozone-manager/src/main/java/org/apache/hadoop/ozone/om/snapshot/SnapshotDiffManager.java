@@ -376,7 +376,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @VisibleForTesting
-  protected Map<Object,String> getSSTFileMapForSnapshot(OmSnapshot snapshot,
+  protected Map<Object, String> getSSTFileMapForSnapshot(OmSnapshot snapshot,
       List<String> tablesToLookUp) {
     return RdbUtil.getSSTFilesWithInodesForComparison(((RDBStore)snapshot
             .getMetadataManager().getStore()).getDb().getManagedRocksDb(),
