@@ -33,7 +33,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -445,19 +444,22 @@ public final class Pipeline {
       index++;
     }
     DatanodeID leaderId = null;
-    if (pipeline.hasLeaderID128()) {
+    if (pipeline.hasLeaderDatanodeID()) {
+      leaderId = DatanodeID.of(pipeline.getLeaderDatanodeID().getUuid());
+    } else if (pipeline.hasLeaderID128()) {
       HddsProtos.UUID uuid = pipeline.getLeaderID128();
-      leaderId = DatanodeID.of(new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits()));
+      leaderId = DatanodeID.of(uuid);
     } else if (pipeline.hasLeaderID() &&
         StringUtils.isNotEmpty(pipeline.getLeaderID())) {
-      leaderId = DatanodeID.of(UUID.fromString(pipeline.getLeaderID()));
+      leaderId = DatanodeID.fromUuidString(pipeline.getLeaderID());
     }
 
     DatanodeID suggestedLeaderId = null;
-    if (pipeline.hasSuggestedLeaderID()) {
+    if (pipeline.hasSuggestedLeaderDatanodeID()) {
+      suggestedLeaderId = DatanodeID.of(pipeline.getSuggestedLeaderDatanodeID().getUuid());
+    } else if (pipeline.hasSuggestedLeaderID()) {
       HddsProtos.UUID uuid = pipeline.getSuggestedLeaderID();
-      suggestedLeaderId =
-          DatanodeID.of(new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits()));
+      suggestedLeaderId = DatanodeID.of(uuid);
     }
 
     final ReplicationConfig config = ReplicationConfig
