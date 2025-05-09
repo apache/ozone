@@ -32,6 +32,7 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import java.net.URI;
+import java.net.URISyntaxException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.slf4j.Logger;
@@ -39,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 
 /**
@@ -152,6 +154,56 @@ public class S3ClientFactory {
     AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
 
     return S3Client.builder()
+        .region(region)
+        .endpointOverride(new URI(endpoint))
+        .credentialsProvider(StaticCredentialsProvider.create(credentials))
+        .forcePathStyle(enablePathStyle)
+        .build();
+  }
+
+  /**
+   * Creates an S3AsyncClient (AWS SDK V2) with path style access enabled.
+   *
+   * @return S3AsyncClient
+   * @throws URISyntaxException if there is an error creating the client
+   */
+  public S3AsyncClient createS3AsyncClientV2() throws Exception {
+    return createS3AsyncClientV2(true);
+  }
+
+  /**
+   * Creates an S3AsyncClient (AWS SDK V2).
+   *
+   * @param enablePathStyle whether to enable path style access
+   * @return S3AsyncClient
+   * @throws Exception if there is an error creating the client
+   */
+  public S3AsyncClient createS3AsyncClientV2(boolean enablePathStyle) throws Exception {
+    final String accessKey = "user";
+    final String secretKey = "password";
+    final Region region = Region.US_EAST_1;
+
+    final String protocol;
+    final HttpConfig.Policy webPolicy = getHttpPolicy(conf);
+    String host;
+
+    if (webPolicy.isHttpsEnabled()) {
+      // TODO: Currently HTTPS is disabled in the test, we can add HTTPS
+      // integration in the future
+      protocol = HTTPS_SCHEME;
+      host = conf.get(OZONE_S3G_HTTPS_ADDRESS_KEY);
+    } else {
+      protocol = HTTP_SCHEME;
+      host = conf.get(OZONE_S3G_HTTP_ADDRESS_KEY);
+    }
+
+    String endpoint = protocol + "://" + host;
+
+    LOG.info("S3 Endpoint is {}", endpoint);
+
+    AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
+
+    return S3AsyncClient.builder()
         .region(region)
         .endpointOverride(new URI(endpoint))
         .credentialsProvider(StaticCredentialsProvider.create(credentials))
