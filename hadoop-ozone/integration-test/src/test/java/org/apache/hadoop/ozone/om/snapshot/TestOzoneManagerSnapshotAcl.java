@@ -36,8 +36,6 @@ import java.security.PrivilegedExceptionAction;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -449,6 +447,16 @@ public class TestOzoneManagerSnapshotAcl {
     assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
   }
 
+  /**
+   * Verifies that bucket owner can: create, rename and delete snapshots.
+   * Verifies that non bucket owner can not create, rename and delete.
+   * Verifies that user with bucket read permissions can: list snapshots, get snapshot info,
+   * snapshot diff, list snapshot diff jobs and cancel snapshot diff jobs.
+   * Verifies that user with no permissions cannot do any of the above.
+   *
+   * @param bucketLayout
+   * @throws Exception
+   */
   @ParameterizedTest
   @EnumSource(BucketLayout.class)
   public void testSnapshotPermissions(BucketLayout bucketLayout) throws Exception {
@@ -457,43 +465,60 @@ public class TestOzoneManagerSnapshotAcl {
     // create a bucket whose owner is user1
     final OzoneVolume volume = objectStore.getVolume(volumeName);
     createBucket(bucketLayout, volume, USER1);
-    // allow user2 volume read and bucket read and list permissions.
+    // allow user2 volume read, and bucket read and list permissions.
     setDefaultVolumeAcls();
     setBucketAcl();
-    String bucket1Name = bucketName;
 
-    String snapshot1 =
-        "snapshot-" + RandomStringUtils.secure().nextNumeric(32);
-    objectStore.createSnapshot(volumeName, bucketName, snapshot1);
-    String snapshot2 =
-        "snapshot-" + RandomStringUtils.secure().nextNumeric(32);
-    objectStore.createSnapshot(volumeName, bucketName, snapshot2);
+    ObjectStore objectStore1 = UGI1.doAs(
+        (PrivilegedExceptionAction<ObjectStore>)() -> cluster.newClient().getObjectStore());
+    String snapshot1 = "snapshot-" + RandomStringUtils.secure().nextNumeric(32);
+    objectStore1.createSnapshot(volumeName, bucketName, snapshot1);
+    String snapshot2 = "snapshot-" + RandomStringUtils.secure().nextNumeric(32);
+    objectStore1.createSnapshot(volumeName, bucketName, snapshot2);
+    String snapshot3 = "snapshot-" + RandomStringUtils.secure().nextNumeric(32);
+    objectStore1.createSnapshot(volumeName, bucketName, snapshot3);
+    String snapshot4 = "snapshot-" + RandomStringUtils.secure().nextNumeric(32);
+
+    objectStore1.renameSnapshot(volumeName, bucketName, snapshot3, snapshot4);
+    objectStore1.deleteSnapshot(volumeName, bucketName, snapshot4);
+
+    objectStore1.listSnapshot(volumeName, bucketName, null, null);
+    objectStore1.getSnapshotInfo(volumeName, bucketName, snapshot1);
+    objectStore1.snapshotDiff(volumeName, bucketName,
+        snapshot1, snapshot2, null, 0, false, false);
+    objectStore1.listSnapshotDiffJobs(volumeName, bucketName, "", true, null);
+    objectStore1.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2);
+
+    ObjectStore objectStore2 = UGI2.doAs(
+        (PrivilegedExceptionAction<ObjectStore>)() -> cluster.newClient().getObjectStore());
+    // user2 should not be able to create a snapshot in bucket1,
+    // should not be able to rename in it, delete in it.
+    OMException ex = assertThrows(OMException.class,
+        () -> objectStore2.createSnapshot(volumeName, bucketName, snapshot1));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+
+    ex = assertThrows(OMException.class,
+        () -> objectStore2.renameSnapshot(volumeName, bucketName, snapshot1, snapshot2));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+
+    ex = assertThrows(OMException.class,
+        () -> objectStore2.deleteSnapshot(volumeName, bucketName, snapshot1));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
 
     // user2 should be able to list the snapshots, get snapshot info,
     // snapshot diff, list snapshot diff jobs and cancel snapshot diff jobs
-    UGI2.doAs(
-        (PrivilegedExceptionAction<Void>)()
-            -> {
-          OzoneClient client2 = cluster.newClient();
-          ObjectStore objectStore2 = client2.getObjectStore();
-          objectStore2.listSnapshot(volumeName, bucketName, null, null);
-          objectStore2.getSnapshotInfo(volumeName, bucketName, snapshot1);
-          objectStore2.snapshotDiff(volumeName, bucketName,
+    objectStore2.listSnapshot(volumeName, bucketName, null, null);
+    objectStore2.getSnapshotInfo(volumeName, bucketName, snapshot1);
+    objectStore2.snapshotDiff(volumeName, bucketName,
               snapshot1, snapshot2, null, 0, false, false);
-          objectStore2.listSnapshotDiffJobs(volumeName, bucketName, "", true, null);
-          objectStore2.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2);
-          return null;
-        });
+    objectStore2.listSnapshotDiffJobs(volumeName, bucketName, "", true, null);
+    objectStore2.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2);
 
-    // user3 has no permission, should not be able to list the snapshots, get snapshot info,
+    // user3 has no ACL permissions, should not be able to list the snapshots, get snapshot info,
     // snapshot diff, list snapshot diff jobs and cancel snapshot diff jobs.
     ObjectStore objectStore3 = UGI3.doAs(
-        (PrivilegedExceptionAction<ObjectStore>)()
-            -> {
-          OzoneClient client2 = cluster.newClient();
-          return client2.getObjectStore();
-        });
-    OMException ex = assertThrows(OMException.class,
+        (PrivilegedExceptionAction<ObjectStore>)() -> cluster.newClient().getObjectStore());
+    ex = assertThrows(OMException.class,
         () -> objectStore3.listSnapshot(volumeName, bucketName, null, null));
     assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
 
@@ -514,41 +539,6 @@ public class TestOzoneManagerSnapshotAcl {
         () -> objectStore3.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2));
     assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
 
-    // create a bucket whose owner is user2
-    createBucket(bucketLayout, volume, USER2);
-    String bucket2Name = bucketName;
-
-    // user2 should not be able to create a snapshot on bucket1 but should
-    // be able to create a snapshot on bucket2, rename it and delete it
-    final FileSystem fs2 = UGI2.doAs(
-        (PrivilegedExceptionAction<FileSystem>)()
-            -> FileSystem.get(cluster.getConf()));
-    final String snapshotPrefix = "snapshot-";
-    final String snapshotName =
-        snapshotPrefix + RandomStringUtils.secure().nextNumeric(32);
-    ex = assertThrows(OMException.class, () -> {
-      fs2.createSnapshot(new Path("/" + volumeName + "/" + bucket1Name), snapshotName);
-    });
-    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
-    Path bucket2Path = new Path("/" + volumeName + "/" + bucket2Name);
-    fs2.createSnapshot(bucket2Path, snapshotName);
-    final String snapshotNameNew = snapshotName + ".new";
-    fs2.renameSnapshot(bucket2Path, snapshotName, snapshotNameNew);
-    fs2.deleteSnapshot(bucket2Path, snapshotNameNew);
-
-    // user3 should not be able to create a snapshot on bucket2
-    // and should not be able to rename it, delete it
-    ex = assertThrows(OMException.class,
-        () -> objectStore3.createSnapshot(volumeName, bucket2Name, snapshotName));
-    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
-
-    ex = assertThrows(OMException.class,
-        () -> objectStore3.renameSnapshot(volumeName, bucket2Name, snapshotName, snapshotNameNew));
-    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
-
-    ex = assertThrows(OMException.class,
-        () -> objectStore3.deleteSnapshot(volumeName, bucket2Name, snapshotName));
-    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
   }
 
   private void setup(BucketLayout bucketLayout)
