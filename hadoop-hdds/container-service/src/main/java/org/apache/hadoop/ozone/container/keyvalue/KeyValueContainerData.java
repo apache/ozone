@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import static java.lang.Math.max;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
@@ -44,9 +45,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -79,11 +81,6 @@ public class KeyValueContainerData extends ContainerData {
 
   private String schemaVersion;
 
-  /**
-   * Number of pending deletion blocks in KeyValueContainer.
-   */
-  private final AtomicLong numPendingDeletionBlocks;
-
   private long deleteTransactionId;
 
   private long blockCommitSequenceId;
@@ -110,7 +107,6 @@ public class KeyValueContainerData extends ContainerData {
       long size, String originPipelineId, String originNodeId) {
     super(ContainerProtos.ContainerType.KeyValueContainer, id, layoutVersion,
         size, originPipelineId, originNodeId);
-    this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
     finalizedBlockSet =  ConcurrentHashMap.newKeySet();
   }
@@ -119,7 +115,6 @@ public class KeyValueContainerData extends ContainerData {
     super(source);
     Preconditions.checkArgument(source.getContainerType()
         == ContainerProtos.ContainerType.KeyValueContainer);
-    this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
     this.schemaVersion = source.getSchemaVersion();
     finalizedBlockSet = ConcurrentHashMap.newKeySet();
@@ -240,23 +235,14 @@ public class KeyValueContainerData extends ContainerData {
    * @param numBlocks increment number
    */
   public void incrPendingDeletionBlocks(long numBlocks) {
-    this.numPendingDeletionBlocks.addAndGet(numBlocks);
-  }
-
-  /**
-   * Decrease the count of pending deletion blocks.
-   *
-   * @param numBlocks decrement number
-   */
-  public void decrPendingDeletionBlocks(long numBlocks) {
-    this.numPendingDeletionBlocks.addAndGet(-1 * numBlocks);
+    getStatistics().addBlockPendingDeletion(numBlocks);
   }
 
   /**
    * Get the number of pending deletion blocks.
    */
   public long getNumPendingDeletionBlocks() {
-    return this.numPendingDeletionBlocks.get();
+    return getStatistics().getBlockPendingDeletion();
   }
 
   /**
@@ -273,6 +259,39 @@ public class KeyValueContainerData extends ContainerData {
    */
   public long getDeleteTransactionId() {
     return deleteTransactionId;
+  }
+
+  ContainerReplicaProto buildContainerReplicaProto() throws StorageContainerException {
+    return getStatistics().setContainerReplicaProto(ContainerReplicaProto.newBuilder())
+        .setContainerID(getContainerID())
+        .setState(getContainerReplicaProtoState(getState()))
+        .setIsEmpty(isEmpty())
+        .setOriginNodeId(getOriginNodeId())
+        .setReplicaIndex(getReplicaIndex())
+        .setBlockCommitSequenceId(getBlockCommitSequenceId())
+        .setDeleteTransactionId(getDeleteTransactionId())
+        .build();
+  }
+
+  // TODO remove one of the State from proto
+  static ContainerReplicaProto.State getContainerReplicaProtoState(ContainerDataProto.State state)
+      throws StorageContainerException {
+    switch (state) {
+    case OPEN:
+      return ContainerReplicaProto.State.OPEN;
+    case CLOSING:
+      return ContainerReplicaProto.State.CLOSING;
+    case QUASI_CLOSED:
+      return ContainerReplicaProto.State.QUASI_CLOSED;
+    case CLOSED:
+      return ContainerReplicaProto.State.CLOSED;
+    case UNHEALTHY:
+      return ContainerReplicaProto.State.UNHEALTHY;
+    case DELETED:
+      return ContainerReplicaProto.State.DELETED;
+    default:
+      throw new StorageContainerException("Invalid container state: " + state, INVALID_CONTAINER_STATE);
+    }
   }
 
   /**
@@ -315,7 +334,6 @@ public class KeyValueContainerData extends ContainerData {
     builder.setContainerID(this.getContainerID());
     builder.setContainerPath(this.getContainerPath());
     builder.setState(this.getState());
-    builder.setBlockCount(this.getBlockCount());
 
     for (Map.Entry<String, String> entry : getMetadata().entrySet()) {
       ContainerProtos.KeyValue.Builder keyValBuilder =
@@ -324,9 +342,7 @@ public class KeyValueContainerData extends ContainerData {
           .setValue(entry.getValue()).build());
     }
 
-    if (this.getBytesUsed() >= 0) {
-      builder.setBytesUsed(this.getBytesUsed());
-    }
+    getStatistics().setContainerDataProto(builder);
 
     if (this.getContainerType() != null) {
       builder.setContainerType(ContainerProtos.ContainerType.KeyValueContainer);
@@ -353,20 +369,18 @@ public class KeyValueContainerData extends ContainerData {
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
     // Set Bytes used and block count key.
-    metadataTable.putWithBatch(batchOperation, getBytesUsedKey(),
-            getBytesUsed() - releasedBytes);
-    metadataTable.putWithBatch(batchOperation, getBlockCountKey(),
-            getBlockCount() - deletedBlockCount);
-    metadataTable.putWithBatch(batchOperation,
-        getPendingDeleteBlockCountKey(),
-        getNumPendingDeletionBlocks() - deletedBlockCount);
+    final BlockByteAndCounts b = getStatistics().getBlockByteAndCounts();
+    metadataTable.putWithBatch(batchOperation, getBytesUsedKey(), b.getBytes() - releasedBytes);
+    metadataTable.putWithBatch(batchOperation, getBlockCountKey(), b.getCount() - deletedBlockCount);
+    metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockCountKey(),
+        b.getPendingDeletion() - deletedBlockCount);
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
   }
 
   public void resetPendingDeleteBlockCount(DBHandle db) throws IOException {
     // Reset the in memory metadata.
-    numPendingDeletionBlocks.set(0);
+    getStatistics().resetBlockPendingDeletion();
     // Reset the metadata on disk.
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
     metadataTable.put(getPendingDeleteBlockCountKey(), 0L);
