@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.container.common.interfaces;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.time.Clock;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -232,6 +232,6 @@ public abstract class Handler {
     this.clusterId = clusterID;
   }
 
-  public abstract FileDescriptor getBlockFileDescriptor(ContainerCommandRequestProto request)
+  public abstract RandomAccessFile getBlockFile(ContainerCommandRequestProto request)
       throws IOException;
 }

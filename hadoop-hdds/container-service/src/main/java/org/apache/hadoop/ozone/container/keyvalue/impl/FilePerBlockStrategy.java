@@ -31,7 +31,6 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import java.io.File;
-import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -44,7 +43,6 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -58,6 +56,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.util.Shell;
 import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -213,13 +212,17 @@ public class FilePerBlockStrategy implements ChunkManager {
   }
 
   @Override
-  public FileDescriptor getShortCircuitFd(Container container, BlockID blockID) throws StorageContainerException {
+  public RandomAccessFile getShortCircuitFd(Container container, BlockID blockID) throws StorageContainerException {
     checkLayoutVersion(container);
     final File chunkFile = getChunkFile(container, blockID);
-    FileDescriptor fd = null;
     try {
-      fd = NativeIO.getShareDeleteFileDescriptor(chunkFile, 0);
-      return fd;
+      if (!Shell.WINDOWS) {
+        RandomAccessFile rf = new RandomAccessFile(chunkFile, "r");
+        return rf;
+      } else {
+        throw new StorageContainerException("Operation is not supported for platform "
+            + System.getProperty("os.name"), UNSUPPORTED_REQUEST);
+      }
     } catch (Exception e) {
       LOG.warn("getShortCircuitFds failed", e);
       throw new StorageContainerException("getShortCircuitFds " +

@@ -55,11 +55,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
 import java.io.File;
-import java.io.FileDescriptor;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -153,8 +153,8 @@ public class KeyValueHandler extends Handler {
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
   private static FaultInjector injector;
-  // map temporarily carries the FileDescriptor for short-circuit read requests
-  private final Map<String, FileDescriptor> streamMap = new ConcurrentHashMap<>();
+  // map temporarily carries the RandomAccessFile for short-circuit read requests
+  private final Map<String, RandomAccessFile> blockFileMap = new ConcurrentHashMap<>();
   private OzoneContainer ozoneContainer;
   private final Clock clock;
 
@@ -729,10 +729,10 @@ public class KeyValueHandler extends Handler {
             && ozoneContainer.getReadDomainSocketChannel() != null
             && ozoneContainer.getReadDomainSocketChannel().isStarted();
         if (domainSocketServerEnabled) {
-          FileDescriptor fd = chunkManager.getShortCircuitFd(kvContainer, blockID);
-          Preconditions.checkState(fd != null);
+          RandomAccessFile file = chunkManager.getShortCircuitFd(kvContainer, blockID);
+          Preconditions.checkState(file != null);
           String mapKey = getBlockMapKey(request);
-          streamMap.put(mapKey, fd);
+          blockFileMap.put(mapKey, file);
           shortCircuitGranted = true;
         }
       }
@@ -754,17 +754,17 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public FileDescriptor getBlockFileDescriptor(ContainerCommandRequestProto request) throws IOException {
+  public RandomAccessFile getBlockFile(ContainerCommandRequestProto request) throws IOException {
     if (request.getCmdType() != Type.GetBlock) {
       throw new StorageContainerException("Request type mismatch, expected " +  Type.GetBlock +
           ", received " + request.getCmdType(), ContainerProtos.Result.MALFORMED_REQUEST);
     }
     String mapKey = getBlockMapKey(request);
-    FileDescriptor fd = streamMap.remove(mapKey);
+    RandomAccessFile file = blockFileMap.remove(mapKey);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("streamMap remove stream for {}", mapKey);
+      LOG.debug("File removed from blockFileMap for {}", mapKey);
     }
-    return fd;
+    return file;
   }
 
   /**

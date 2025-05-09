@@ -35,6 +35,7 @@ import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.net.SocketTimeoutException;
 import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -208,10 +209,10 @@ final class Receiver implements Runnable {
         if (responseProto.getResult() == ContainerProtos.Result.SUCCESS && type == ContainerProtos.Type.GetBlock) {
           // get FileDescriptor
           Handler handler = dispatcher.getHandler(ContainerProtos.ContainerType.KeyValueContainer);
-          FileDescriptor fd = handler.getBlockFileDescriptor(request);
-          Preconditions.checkNotNull(fd,
-              "Failed to get block InputStream for block " + request.getGetBlock().getBlockID());
-          entry.setFD(fd);
+          RandomAccessFile file = handler.getBlockFile(request);
+          Preconditions.checkNotNull(file,
+              "Failed to get block file for block " + request.getGetBlock().getBlockID());
+          entry.setFile(file);
         }
         entry.setResponse(responseProto);
         sendResponse(entry);
@@ -232,7 +233,7 @@ final class Receiver implements Runnable {
     lock.lock();
     try {
       entry.setSendStartTimeNs();
-      FileDescriptor fd = entry.getFD();
+      RandomAccessFile file = entry.getFile();
       DataOutputStream output = new DataOutputStream(new BufferedOutputStream(socketOut, bufferSize));
       output.writeShort(DATA_TRANSFER_VERSION);
       output.writeShort(type.getNumber());
@@ -242,10 +243,10 @@ final class Receiver implements Runnable {
             getBlockMapKey(entry.getRequest()), peer.getDomainSocket());
       }
       output.flush();
-      if (fd != null) {
+      if (file != null) {
         // send FileDescriptor
         FileDescriptor[] fds = new FileDescriptor[1];
-        fds[0] = fd;
+        fds[0] = file.getFD();
         DomainSocket sock = peer.getDomainSocket();
         // this API requires send at least one byte buf.
         sock.sendFileDescriptors(fds, buf, 0, buf.length);
@@ -258,6 +259,11 @@ final class Receiver implements Runnable {
     } finally {
       lock.unlock();
       entry.setSendFinishTimeNs();
+      try {
+        entry.getFile().close();
+      } catch (IOException e) {
+        LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
+      }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Request {} {}:{}, receive {} ns, in queue {} ns, " +
                 " handle {} ns, send out {} ns, total {} ns", type, responseProto.getClientId().toStringUtf8(),
@@ -277,7 +283,7 @@ final class Receiver implements Runnable {
   static class TaskEntry {
     private ContainerCommandRequestProto request;
     private ContainerCommandResponseProto response;
-    private FileDescriptor fileDescriptor;
+    private RandomAccessFile file;
     private long receiveStartTimeNs;
     private long inQueueStartTimeNs;
     private long outQueueStartTimeNs;
@@ -293,8 +299,8 @@ final class Receiver implements Runnable {
       return response;
     }
 
-    public FileDescriptor getFD() {
-      return fileDescriptor;
+    public RandomAccessFile getFile() {
+      return file;
     }
 
     public ContainerCommandRequestProto getRequest() {
@@ -329,8 +335,8 @@ final class Receiver implements Runnable {
       this.response = responseProto;
     }
 
-    public void setFD(FileDescriptor fd) {
-      this.fileDescriptor = fd;
+    public void setFile(RandomAccessFile f) {
+      this.file = f;
     }
 
     public void setSendStartTimeNs() {
