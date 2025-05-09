@@ -205,7 +205,7 @@ public class TestReconContainerEndpoint {
             cluster.getReconServer().getReconNamespaceSummaryManager(),
             cluster.getReconServer().getReconContainerMetadataManager(),
             omMetadataManagerInstance);
-    return containerEndpoint.getKeysForContainer(containerId, 10, "");
+    return containerEndpoint.getKeysForContainer(containerId, 10, "", "");
   }
 
   private void writeTestData(String volumeName, String bucketName,
