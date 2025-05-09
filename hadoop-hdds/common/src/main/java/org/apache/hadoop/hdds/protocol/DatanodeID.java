@@ -114,7 +114,9 @@ public final class DatanodeID implements Comparable<DatanodeID> {
   }
 
   // TODO: Remove this in follow-up Jira. (HDDS-12015)
-  UUID getUuid() {
+  //   Exposing this temporarily to help with refactoring.
+  @Deprecated
+  public UUID getUuid() {
     return uuid;
   }
 }

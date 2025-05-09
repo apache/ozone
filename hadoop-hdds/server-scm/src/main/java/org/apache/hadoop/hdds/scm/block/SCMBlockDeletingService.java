@@ -29,7 +29,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -38,6 +37,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -175,9 +175,9 @@ public class SCMBlockDeletingService extends BackgroundService
           }
 
           Set<Long> processedTxIDs = new HashSet<>();
-          for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
+          for (Map.Entry<DatanodeID, List<DeletedBlocksTransaction>> entry :
               transactions.getDatanodeTransactionMap().entrySet()) {
-            UUID dnId = entry.getKey();
+            DatanodeID dnId = entry.getKey();
             List<DeletedBlocksTransaction> dnTXs = entry.getValue();
             if (!dnTXs.isEmpty()) {
               Set<Long> dnTxSet = dnTXs.stream()
