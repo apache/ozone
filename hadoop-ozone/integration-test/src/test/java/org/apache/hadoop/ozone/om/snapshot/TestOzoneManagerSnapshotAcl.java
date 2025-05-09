@@ -69,8 +69,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test for Snapshot feature with ACL.
@@ -96,8 +94,6 @@ public class TestOzoneManagerSnapshotAcl {
       UserGroupInformation.createUserForTesting(USER3, new String[] {GROUP3});
   private static final OzoneObj.ResourceType RESOURCE_TYPE_KEY =
       OzoneObj.ResourceType.KEY;
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestOzoneManagerSnapshotAcl.class);
   private static MiniOzoneCluster cluster;
   private static ObjectStore objectStore;
   private static OzoneManager ozoneManager;
