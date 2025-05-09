@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.security;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELEGATION_TOKEN_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELEGATION_TOKEN_TABLE;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;

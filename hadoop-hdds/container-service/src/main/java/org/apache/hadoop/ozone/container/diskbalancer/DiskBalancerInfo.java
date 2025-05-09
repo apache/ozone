@@ -138,7 +138,7 @@ public class DiskBalancerInfo {
 
   public DiskBalancerVersion getVersion() {
     return version;
-  };
+  }
 
   public void setVersion(DiskBalancerVersion version) {
     this.version = version;

@@ -279,8 +279,6 @@ public class DiskBalancerService extends BackgroundService {
     DiskBalancerYaml.createDiskBalancerInfoFile(diskBalancerInfo, path);
   }
 
-
-
   public void setShouldRun(boolean shouldRun) {
     this.shouldRun = shouldRun;
   }

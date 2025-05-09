@@ -39,12 +39,10 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests Handler interface.
  */
-@Timeout(300)
 public class TestHandler {
 
   private OzoneConfiguration conf;

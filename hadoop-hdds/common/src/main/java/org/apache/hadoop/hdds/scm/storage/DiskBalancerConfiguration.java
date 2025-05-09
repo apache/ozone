@@ -45,10 +45,6 @@ public final class DiskBalancerConfiguration {
           "back to use metadata directory instead.")
   private String infoDir;
 
-  public String getDiskBalancerInfoDir() {
-    return infoDir;
-  }
-
   @Config(key = "volume.density.threshold", type = ConfigType.DOUBLE,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "Threshold is a percentage in the range of 0 to 100. A " +
@@ -79,14 +75,6 @@ public final class DiskBalancerConfiguration {
   )
   private boolean diskBalancerShouldRun = false;
 
-  public boolean getDiskBalancerShouldRun() {
-    return diskBalancerShouldRun;
-  }
-
-  public void setDiskBalancerShouldRun(boolean shouldRun) {
-    this.diskBalancerShouldRun = shouldRun;
-  }
-
   @Config(key = "service.interval",
       defaultValue = "60s",
       type = ConfigType.TIME,
@@ -98,14 +86,6 @@ public final class DiskBalancerConfiguration {
   )
   private long diskBalancerInterval = Duration.ofSeconds(60).toMillis();
 
-  public Duration getDiskBalancerInterval() {
-    return Duration.ofMillis(diskBalancerInterval);
-  }
-
-  public void setDiskBalancerInterval(Duration duration) {
-    this.diskBalancerInterval = duration.toMillis();
-  }
-
   @Config(key = "service.timeout",
       defaultValue = "300s",
       type = ConfigType.TIME,
@@ -115,24 +95,12 @@ public final class DiskBalancerConfiguration {
   )
   private long diskBalancerTimeout = Duration.ofSeconds(300).toMillis();
 
-  public Duration getDiskBalancerTimeout() {
-    return Duration.ofMillis(diskBalancerTimeout);
-  }
-
-  public void setDiskBalancerTimeout(Duration duration) {
-    this.diskBalancerTimeout = duration.toMillis();
-  }
-
   @Config(key = "volume.choosing.policy", type = ConfigType.CLASS,
       defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
           ".DefaultVolumeChoosingPolicy",
       tags = {ConfigTag.DISKBALANCER},
       description = "The volume choosing policy of the disk balancer service.")
   private Class<?> volumeChoosingPolicyClass;
-
-  public Class<?> getVolumeChoosingPolicyClass() {
-    return volumeChoosingPolicyClass;
-  }
 
   @Config(key = "container.choosing.policy", type = ConfigType.CLASS,
       defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
@@ -142,19 +110,51 @@ public final class DiskBalancerConfiguration {
           "service.")
   private Class<?> containerChoosingPolicyClass;
 
-  public Class<?> getContainerChoosingPolicyClass() {
-    return containerChoosingPolicyClass;
-  }
-
-  public DiskBalancerConfiguration() {
-  }
-
   public DiskBalancerConfiguration(Optional<Double> threshold,
       Optional<Long> bandwidthInMB,
       Optional<Integer> parallelThread) {
     threshold.ifPresent(aDouble -> this.threshold = aDouble);
     bandwidthInMB.ifPresent(aLong -> this.diskBandwidthInMB = aLong);
     parallelThread.ifPresent(integer -> this.parallelThread = integer);
+  }
+
+  public DiskBalancerConfiguration() {
+  }
+
+  public String getDiskBalancerInfoDir() {
+    return infoDir;
+  }
+
+  public boolean getDiskBalancerShouldRun() {
+    return diskBalancerShouldRun;
+  }
+
+  public void setDiskBalancerShouldRun(boolean shouldRun) {
+    this.diskBalancerShouldRun = shouldRun;
+  }
+
+  public Duration getDiskBalancerInterval() {
+    return Duration.ofMillis(diskBalancerInterval);
+  }
+
+  public void setDiskBalancerInterval(Duration duration) {
+    this.diskBalancerInterval = duration.toMillis();
+  }
+
+  public Duration getDiskBalancerTimeout() {
+    return Duration.ofMillis(diskBalancerTimeout);
+  }
+
+  public void setDiskBalancerTimeout(Duration duration) {
+    this.diskBalancerTimeout = duration.toMillis();
+  }
+
+  public Class<?> getVolumeChoosingPolicyClass() {
+    return volumeChoosingPolicyClass;
+  }
+
+  public Class<?> getContainerChoosingPolicyClass() {
+    return containerChoosingPolicyClass;
   }
 
   /**

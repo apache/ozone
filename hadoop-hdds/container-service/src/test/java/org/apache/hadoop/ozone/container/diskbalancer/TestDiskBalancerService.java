@@ -166,7 +166,7 @@ public class TestDiskBalancerService {
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < volumeCount; i++) {
       sb.append(base).append("/vol").append(i);
-      sb.append(",");
+      sb.append(',');
     }
     return sb.substring(0, sb.length() - 1);
   }

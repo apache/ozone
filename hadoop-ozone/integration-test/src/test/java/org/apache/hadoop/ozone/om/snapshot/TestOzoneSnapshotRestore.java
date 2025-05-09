@@ -57,7 +57,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -66,7 +65,6 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Tests Snapshot Restore function.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(value = 300)
 public class TestOzoneSnapshotRestore {
   private static final String OM_SERVICE_ID = "om-service-test-1";
   private MiniOzoneHAClusterImpl cluster;

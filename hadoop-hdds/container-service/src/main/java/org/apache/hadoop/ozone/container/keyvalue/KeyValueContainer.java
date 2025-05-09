@@ -335,7 +335,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     writeToContainerFile(containerFile, false);
   }
 
-
   @Override
   public void delete() throws StorageContainerException {
     try {

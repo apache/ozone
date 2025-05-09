@@ -102,16 +102,6 @@ public abstract class AbstractContractDistCpTest
    */
   protected static final int DEFAULT_WIDTH = 2;
 
-  /**
-   * The timeout value is extended over the default so that large updates
-   * are allowed to take time, especially to remote stores.
-   * @return the current test timeout
-   */
-  @Override
-  protected int getTestTimeoutMillis() {
-    return 15  * 60 * 1000;
-  }
-
   private Configuration conf;
   private FileSystem localFS, remoteFS;
   private Path localDir, remoteDir;
@@ -151,6 +141,16 @@ public abstract class AbstractContractDistCpTest
   private Path outputFile4;
 
   private Path inputDirUnderOutputDir;
+
+  /**
+   * The timeout value is extended over the default so that large updates
+   * are allowed to take time, especially to remote stores.
+   * @return the current test timeout
+   */
+  @Override
+  protected int getTestTimeoutMillis() {
+    return 15  * 60 * 1000;
+  }
 
   @Override
   protected Configuration createConfiguration() {
@@ -398,7 +398,6 @@ public abstract class AbstractContractDistCpTest
     ContractTestUtils.touch(localFS, inputFileNew1);
     return inputFileNew1;
   }
-
 
   @Test
   public void testTrackDeepDirectoryStructureToRemote() throws Exception {
@@ -828,6 +827,7 @@ public abstract class AbstractContractDistCpTest
                     Collections.singletonList(srcDir), destDir)
                     .withDirectWrite(true)));
   }
+
   /**
    * Run distcp srcDir destDir.
    * @param srcDir local source directory

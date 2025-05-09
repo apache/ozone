@@ -379,7 +379,7 @@ public class SCMClientProtocolServer implements
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
         strContainerIDs.append(ContainerID.valueOf(containerID).toString());
-        strContainerIDs.append(",");
+        strContainerIDs.append(',');
       } catch (IOException ex) {
         AUDIT.logReadFailure(buildAuditMessageForFailure(
             SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
@@ -882,7 +882,7 @@ public class SCMClientProtocolServer implements
       PipelineManager pipelineManager = scm.getPipelineManager();
       Pipeline pipeline =
           pipelineManager.getPipeline(PipelineID.getFromProtobuf(pipelineID));
-      pipelineManager.closePipeline(pipeline, true);
+      pipelineManager.closePipeline(pipeline.getId());
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.CLOSE_PIPELINE, auditMap));
     } catch (Exception ex) {
@@ -1554,7 +1554,6 @@ public class SCMClientProtocolServer implements
     return scm.getDiskBalancerManager().stopDiskBalancer(hosts);
   }
 
-
   @Override
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
       Optional<Double> threshold, Optional<Long> bandwidthInMB,
@@ -1602,7 +1601,6 @@ public class SCMClientProtocolServer implements
   public boolean getSafeModeStatus() {
     return scm.getScmContext().isInSafeMode();
   }
-
 
   /**
    * Query the System for Nodes.

@@ -133,6 +133,7 @@ public final class NodeSchema {
   public int getCost() {
     return this.cost;
   }
+
   public void setCost(int cost) {
     this.cost = cost;
   }
@@ -170,6 +171,7 @@ public final class NodeSchema {
     public int getCost() {
       return cost;
     }
+
     public static LayerType getType(String typeStr) {
       for (LayerType type: LayerType.values()) {
         if (typeStr.equalsIgnoreCase(type.toString())) {

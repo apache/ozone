@@ -1387,12 +1387,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public static SCMMetrics getMetrics() {
     return metrics == null ? SCMMetrics.create() : metrics;
   }
+
   /**
    * Initialize SCMPerformance metrics.
    */
   public static void initPerfMetrics() {
     perfMetrics = SCMPerformanceMetrics.create();
   }
+
   /**
    * Return SCMPerformance metrics instance.
    */
@@ -2026,6 +2028,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public String getNamespace() {
     return scmHANodeDetails.getLocalNodeDetails().getServiceId();
   }
+
   /**
    * Get the safe mode status of all rules.
    *

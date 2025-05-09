@@ -50,6 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -83,7 +84,6 @@ import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -94,7 +94,6 @@ import org.slf4j.event.Level;
 /**
  * Tests ozone containers replication.
  */
-@Timeout(300)
 class TestContainerReplication {
 
   private static final String VOLUME = "vol1";
@@ -236,7 +235,6 @@ class TestContainerReplication {
     return locations.getLocationList().get(0);
   }
 
-
   public void assertState(MiniOzoneCluster cluster, Map<Integer, DatanodeDetails> expectedReplicaMap)
       throws IOException {
     OmKeyLocationInfo keyLocation = lookupKeyFirstLocation(cluster);
@@ -267,7 +265,6 @@ class TestContainerReplication {
           }
         });
   }
-
 
   private static void deleteContainer(MiniOzoneCluster cluster, DatanodeDetails dn, long containerId)
       throws IOException {
@@ -316,7 +313,6 @@ class TestContainerReplication {
     }
   }
 
-
   @Test
   @Flaky("HDDS-11087")
   public void testECContainerReplication() throws Exception {
@@ -364,7 +360,7 @@ class TestContainerReplication {
           //Reading through file and comparing with input data.
           byte[] readData = new byte[size];
           try (OzoneInputStream inputStream = createInputStream(client)) {
-            inputStream.read(readData);
+            IOUtils.readFully(inputStream, readData);
             Assertions.assertArrayEquals(readData, originalData);
           }
           Assertions.assertEquals(0, failedReadChunkCountMap.size());
@@ -373,7 +369,7 @@ class TestContainerReplication {
             int firstReadLen = 1024 * 3;
             Arrays.fill(readData, (byte) 0);
             //Reading first stripe.
-            inputStream.read(readData, 0, firstReadLen);
+            IOUtils.readFully(inputStream, readData, 0, firstReadLen);
             Assertions.assertEquals(0, failedReadChunkCountMap.size());
             //Checking the initial state as per the latest location.
             assertState(cluster, ImmutableMap.of(1, replicaIndexMap.get(1), 2, replicaIndexMap.get(2),
@@ -402,7 +398,7 @@ class TestContainerReplication {
             assertState(cluster, ImmutableMap.of(1, replicaIndexMap.get(3), 2, replicaIndexMap.get(2),
                 3, replicaIndexMap.get(1), 4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
             // Reading the Stripe 2 from the pre initialized inputStream
-            inputStream.read(readData, firstReadLen, size - firstReadLen);
+            IOUtils.readFully(inputStream, readData, firstReadLen, size - firstReadLen);
             // Asserting there was a failure in the first read chunk.
             Assertions.assertEquals(ImmutableMap.of(1, 1, 3, 1), failedReadChunkCountMap);
             Assertions.assertArrayEquals(readData, originalData);

@@ -52,10 +52,10 @@ public interface ContainerManager extends Closeable {
   ContainerInfo getContainer(ContainerID containerID)
       throws ContainerNotFoundException;
 
-
   default List<ContainerInfo> getContainers() {
     return getContainers(ContainerID.valueOf(0), Integer.MAX_VALUE);
   }
+
   /**
    * Returns containers under certain conditions.
    * Search container IDs from start ID(exclusive),
@@ -71,7 +71,6 @@ public interface ContainerManager extends Closeable {
    * @return a list of container.
    */
   List<ContainerInfo> getContainers(ContainerID startID, int count);
-
 
   List<ContainerInfo> getContainers(ReplicationType type);
 

@@ -102,6 +102,7 @@ public final class NodeUtils {
     }
     return false;
   }
+
   static class HostDefinition {
     private String rawHostname;
     private String hostname;

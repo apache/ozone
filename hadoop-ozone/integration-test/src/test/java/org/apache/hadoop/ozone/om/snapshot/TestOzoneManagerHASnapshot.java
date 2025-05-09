@@ -61,12 +61,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests snapshot in OM HA setup.
  */
-@Timeout(300)
 public class TestOzoneManagerHASnapshot {
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
@@ -266,7 +264,6 @@ public class TestOzoneManagerHASnapshot {
         .isSnapshotChainCorrupted());
   }
 
-
   private void createFileKey(OzoneBucket bucket, String keyName)
       throws IOException {
     byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
@@ -343,6 +340,29 @@ public class TestOzoneManagerHASnapshot {
     });
     omDoubleBuffer.awaitFlush();
     checkSnapshotIsPurgedFromDB(omFollower, tableKey);
+  }
+
+  @Test
+  public void testSnapshotInFlightCount() throws Exception {
+    // snapshot inflight count should be reset to 0 when leader changes
+
+    // first do some snapshot creations
+    String snapshotName1 = UUID.randomUUID().toString();
+    store.createSnapshot(volumeName, bucketName, snapshotName1);
+
+    // then shutdown the leader
+    OzoneManager omLeader = cluster.getOMLeader();
+    cluster.shutdownOzoneManager(omLeader);
+
+    // wait for the new leader to be elected
+    cluster.waitForLeaderOM();
+
+    // check the inflight count on the new leader is 0
+    OzoneManager newLeader = cluster.getOMLeader();
+    assertEquals(0, newLeader.getOmSnapshotManager().getInFlightSnapshotCount());
+
+    // restart the previous shutdowned node
+    cluster.restartOzoneManager(omLeader, true);
   }
 
   private void createSnapshot(String volName, String buckName, String snapName) throws IOException {

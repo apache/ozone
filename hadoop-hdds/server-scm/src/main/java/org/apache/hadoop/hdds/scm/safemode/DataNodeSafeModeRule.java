@@ -95,7 +95,6 @@ public class DataNodeSafeModeRule extends
             this.registeredDns, this.requiredDns);
   }
 
-
   @Override
   public void refresh(boolean forceRefresh) {
     // Do nothing.

@@ -141,7 +141,6 @@ public final class HddsVolumeUtil {
             hddsVolume.getStorageID(), null)));
   }
 
-
   /**
    * Get the HddsVolume according to the path.
    * @param volumes volume list to match from

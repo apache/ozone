@@ -67,7 +67,6 @@ public final class SCMDatanodeHeartbeatDispatcher {
   private final NodeManager nodeManager;
   private final EventPublisher eventPublisher;
 
-
   public SCMDatanodeHeartbeatDispatcher(NodeManager nodeManager,
                                         EventPublisher eventPublisher) {
     Preconditions.checkNotNull(nodeManager);
@@ -75,7 +74,6 @@ public final class SCMDatanodeHeartbeatDispatcher {
     this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
   }
-
 
   /**
    * Dispatches heartbeat to registered event handlers.
@@ -253,6 +251,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
       extends ReportFromDatanode<CommandQueueReportProto> {
 
     private final Map<SCMCommandProto.Type, Integer> commandsToBeSent;
+
     public CommandQueueReportFromDatanode(DatanodeDetails datanodeDetails,
         CommandQueueReportProto report,
         Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
@@ -282,7 +281,9 @@ public final class SCMDatanodeHeartbeatDispatcher {
    */
   public interface ContainerReport {
     DatanodeDetails getDatanodeDetails();
+
     ContainerReportType getType();
+
     void mergeReport(ContainerReport val);
   }
 

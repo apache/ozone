@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 
-
 /**
  * A test class implementation for {@link DiskBalancerService}.
  */

@@ -217,7 +217,6 @@ public class TestBackgroundContainerDataScanner extends
     verify(openCorruptMetadata, never()).scanData(any(), any());
   }
 
-
   @Test
   @Override
   public void testShutdownDuringScan() throws Exception {

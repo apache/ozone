@@ -201,7 +201,6 @@ public class DiskBalancerManager {
     return errors;
   }
 
-
   /**
    * Send update DiskBalancerConf command to datanodes.
    * If hosts is not specified, send commands to all healthy datanodes.
@@ -273,6 +272,7 @@ public class DiskBalancerManager {
     }
     return builder.build();
   }
+
   /**
    * Get volume density for a specific DatanodeDetails node.
    *

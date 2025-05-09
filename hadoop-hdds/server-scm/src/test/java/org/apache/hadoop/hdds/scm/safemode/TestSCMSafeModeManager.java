@@ -72,7 +72,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -82,7 +81,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /** Test class for SCMSafeModeManager.
  */
-@Timeout(300)
 public class TestSCMSafeModeManager {
 
   private EventQueue queue;
@@ -204,7 +202,6 @@ public class TestSCMSafeModeManager {
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 5);
   }
-
 
   private OzoneConfiguration createConf(double healthyPercent,
       double oneReplicaPercent) {
@@ -431,7 +428,6 @@ public class TestSCMSafeModeManager {
               pipelineReportsProto.build()));
     }
   }
-
 
   @Test
   public void testDisableSafeMode() {

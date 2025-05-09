@@ -821,7 +821,6 @@ public final class OMRequestTestUtils {
         .setSetVolumePropertyRequest(setVolumePropertyRequest).build();
   }
 
-
   /**
    * Create OMRequest for set volume property request with quota set.
    * @param volumeName

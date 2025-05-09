@@ -41,19 +41,13 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests unhealthy container functionality in the {@link KeyValueContainer}
  * class.
  */
-@Timeout(600)
 public class TestKeyValueContainerMarkUnhealthy {
-  private static final Logger LOG = LoggerFactory.getLogger(
-      TestKeyValueContainerMarkUnhealthy.class);
 
   @TempDir
   private Path folder;

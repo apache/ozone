@@ -41,7 +41,6 @@ public class ReadOnlyLoadGenerator extends LoadGenerator {
     replBucket.readKey(buffer, keyName);
   }
 
-
   @Override
   public void initialize() throws Exception {
     for (int index = 0; index < NUM_KEYS; index++) {

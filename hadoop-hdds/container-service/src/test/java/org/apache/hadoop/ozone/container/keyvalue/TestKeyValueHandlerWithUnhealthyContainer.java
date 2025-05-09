@@ -106,7 +106,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         .mapToObj(rid -> Arguments.of(client, rid)));
   }
 
-
   @ParameterizedTest
   @MethodSource("getAllClientVersions")
   public void testGetBlockWithReplicaIndexMismatch(ClientVersion clientVersion, int replicaIndex) {
