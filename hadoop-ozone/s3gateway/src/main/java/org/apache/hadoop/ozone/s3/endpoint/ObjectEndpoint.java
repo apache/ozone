@@ -104,6 +104,7 @@ import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.StreamingOutput;
 import javax.xml.bind.DatatypeConverter;
+import net.jcip.annotations.Immutable;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -308,26 +309,10 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
       // Normal put object
-      final String amzContentSha256Header = validateSignatureHeader(headers, keyPath);
-      InputStream chunkInputStream;
-      if (hasMultiChunksPayload(amzContentSha256Header)) {
-        validateMultiChunksUpload(headers, amzDecodedLength, keyPath);
-        if (hasUnsignedPayload(amzContentSha256Header)) {
-          chunkInputStream = new UnsignedChunksInputStream(body);
-        } else {
-          chunkInputStream = new SignedChunksInputStream(body);
-        }
-        length = Long.parseLong(amzDecodedLength);
-      } else {
-        // Single chunk upload: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
-        // Possible x-amz-content-sha256 values
-        // - Actual payload checksum value: For signed payload
-        // - UNSIGNED-PAYLOAD: For unsigned payload
-        chunkInputStream = body;
-      }
-
-      // DigestInputStream is used for ETag calculation
-      digestInputStream = new DigestInputStream(chunkInputStream, getMessageDigestInstance());
+      S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(body,
+          length, amzDecodedLength, keyPath);
+      digestInputStream = chunkInputStreamInfo.getDigestInputStream();
+      length = chunkInputStreamInfo.getEffectiveLength();
 
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
@@ -974,26 +959,11 @@ public class ObjectEndpoint extends EndpointBase {
     String copyHeader = null;
     DigestInputStream digestInputStream = null;
     try {
-      final String amzContentSha256Header = validateSignatureHeader(headers, key);
-      InputStream chunkInputStream;
-      if (hasMultiChunksPayload(amzContentSha256Header)) {
-        String amzDecodedLength = headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER);
-        validateMultiChunksUpload(headers, amzDecodedLength, key);
-        if (hasUnsignedPayload(amzContentSha256Header)) {
-          chunkInputStream = new UnsignedChunksInputStream(body);
-        } else {
-          chunkInputStream = new SignedChunksInputStream(body);
-        }
-        length = Long.parseLong(amzDecodedLength);
-      } else {
-        // Single chunk upload: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
-        // Possible x-amz-content-sha256 values
-        // - Actual payload checksum value: For signed payload
-        // - UNSIGNED-PAYLOAD: For unsigned payload
-        chunkInputStream = body;
-      }
-      // DigestInputStream is used for ETag calculation
-      digestInputStream = new DigestInputStream(chunkInputStream, getMessageDigestInstance());
+      String amzDecodedLength = headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER);
+      S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(
+          body, length, amzDecodedLength, key);
+      digestInputStream = chunkInputStreamInfo.getDigestInputStream();
+      length = chunkInputStreamInfo.getEffectiveLength();
 
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
@@ -1557,6 +1527,56 @@ public class ObjectEndpoint extends EndpointBase {
       return bufferSize;
     } else {
       return fileLength < bufferSize ? (int) fileLength : bufferSize;
+    }
+  }
+
+  /**
+   * Create a {@link S3ChunkInputStreamInfo} that contains the necessary information to handle
+   * the S3 chunk upload.
+   */
+  private S3ChunkInputStreamInfo getS3ChunkInputStreamInfo(
+      InputStream body, long contentLength, String amzDecodedLength, String keyPath) throws OS3Exception {
+    final String amzContentSha256Header = validateSignatureHeader(headers, keyPath);
+    final InputStream chunkInputStream;
+    final long effectiveLength;
+    if (hasMultiChunksPayload(amzContentSha256Header)) {
+      validateMultiChunksUpload(headers, amzDecodedLength, keyPath);
+      if (hasUnsignedPayload(amzContentSha256Header)) {
+        chunkInputStream = new UnsignedChunksInputStream(body);
+      } else {
+        chunkInputStream = new SignedChunksInputStream(body);
+      }
+      effectiveLength = Long.parseLong(amzDecodedLength);
+    } else {
+      // Single chunk upload: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+      // Possible x-amz-content-sha256 header values
+      // - Actual payload checksum value: For signed payload
+      // - UNSIGNED-PAYLOAD: For unsigned payload
+      chunkInputStream = body;
+      effectiveLength = contentLength;
+    }
+
+    // DigestInputStream is used for ETag calculation
+    DigestInputStream digestInputStream = new DigestInputStream(chunkInputStream, getMessageDigestInstance());
+    return new S3ChunkInputStreamInfo(digestInputStream, effectiveLength);
+  }
+
+  @Immutable
+  static final class S3ChunkInputStreamInfo {
+    private final DigestInputStream digestInputStream;
+    private final long effectiveLength;
+
+    S3ChunkInputStreamInfo(DigestInputStream digestInputStream, long effectiveLength) {
+      this.digestInputStream = digestInputStream;
+      this.effectiveLength = effectiveLength;
+    }
+
+    public DigestInputStream getDigestInputStream() {
+      return digestInputStream;
+    }
+
+    public long getEffectiveLength() {
+      return effectiveLength;
     }
   }
 }

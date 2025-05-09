@@ -144,12 +144,19 @@ public final class S3Utils {
 
   public static boolean hasMultiChunksPayload(@Nonnull String amzContentSha256Header) {
     Preconditions.checkNotNull(amzContentSha256Header);
+    // Multiple chunk uploads
+    // - https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming.html
+    // - https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming-trailers.html
     // Possible values
     // - STREAMING-UNSIGNED-PAYLOAD-TRAILER
     // - STREAMING-AWS4-HMAC-SHA256-PAYLOAD
     // - STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER
     // - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD
     // - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER
+    // Currently since all the multi chunks values have x-amz-content-sha256 header value that starts
+    // with STREAMING, we can use this prefix to differentiates between multi chunks and single chunks upload.
+    // In the future if there are more multi chunks signature algorithms that has the same prefix,
+    // this function will be able to handle detect it.
     return amzContentSha256Header.startsWith(MULTI_CHUNKS_UPLOAD_PREFIX);
   }
 
