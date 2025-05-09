@@ -68,6 +68,13 @@ public final class SQLDBConstants {
       "WHERE d.container_id = ? ORDER BY d.datanode_id ASC, d.timestamp ASC;";
   public static final String CREATE_DCL_CONTAINER_STATE_TIME_INDEX = "CREATE INDEX IF NOT EXISTS " +
       "idx_dcl_container_state_time ON DatanodeContainerLogTable(container_id, container_state, timestamp);";
+  public static final String CREATE_CONTAINER_ID_INDEX = "CREATE INDEX IF NOT EXISTS idx_containerlog_container_id " +
+      "ON ContainerLogTable(container_id);";
+  public static final String SELECT_DISTINCT_CONTAINER_IDS_QUERY =
+      "SELECT DISTINCT container_id FROM ContainerLogTable";
+  public static final String SELECT_CONTAINER_DETAILS_OPEN_STATE = "SELECT d.timestamp, d.container_id, " +
+      "d.datanode_id, d.container_state FROM DatanodeContainerLogTable d " +
+      "WHERE d.container_id = ? AND d.container_state = 'OPEN' ORDER BY d.timestamp ASC;";
   
   private SQLDBConstants() {
     //Never constructed

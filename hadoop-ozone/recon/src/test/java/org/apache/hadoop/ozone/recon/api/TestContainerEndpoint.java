@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -1053,7 +1054,7 @@ public class TestContainerEndpoint {
 
   UUID newDatanode(String hostName, String ipAddress) throws IOException {
     final UUID uuid = UUID.randomUUID();
-    reconContainerManager.getNodeDB().put(uuid,
+    reconContainerManager.getNodeDB().put(DatanodeID.of(uuid),
         DatanodeDetails.newBuilder()
             .setUuid(uuid)
             .setHostName(hostName)
