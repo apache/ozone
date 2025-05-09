@@ -116,7 +116,7 @@ public final class DiskBalancerConfiguration {
       tags = {ConfigTag.DISKBALANCER},
       description = "If true, the DiskBalancer will automatically stop once disks are balanced.")
   private boolean stopAfterDiskEven = true;
-  
+
   public DiskBalancerConfiguration(Optional<Double> threshold,
       Optional<Long> bandwidthInMB,
       Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven) {
@@ -165,10 +165,10 @@ public final class DiskBalancerConfiguration {
     return containerChoosingPolicyClass;
   }
 
-  public boolean getStopAfterDiskEven() {
+  public boolean isStopAfterDiskEven() {
     return stopAfterDiskEven;
   }
-
+  
   public void setStopAfterDiskEven(boolean stopAfterDiskEven) {
     this.stopAfterDiskEven = stopAfterDiskEven;
   }
