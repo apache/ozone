@@ -25,7 +25,6 @@ weight: 30
 * JDK 1.8 or higher
 * [Maven 3.6 or later](https://maven.apache.org/download.cgi)
 * Internet connection for first build (to fetch all Maven and Ozone dependencies)
-* [Docker Compose v2.32.1 or higher](https://docs.docker.com/compose/install/) (to prevent unexpected character “-” in variable name issue)
 
 You will also need to install the following dependencies to build native code (optional):
 * gcc
