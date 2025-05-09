@@ -176,6 +176,7 @@ public final class ContainerCommandResponseBuilders {
         .setListBlock(builder)
         .build();
   }
+
   /**
    * Returns successful getCommittedBlockLength Response.
    * @param msg - Request.
@@ -289,6 +290,7 @@ public final class ContainerCommandResponseBuilders {
         .setGetSmallFile(getSmallFile)
         .build();
   }
+
   /**
    * Returns a ReadContainer Response.
    *
@@ -370,7 +372,7 @@ public final class ContainerCommandResponseBuilders {
     ContainerProtos.EchoResponseProto.Builder echo =
         ContainerProtos.EchoResponseProto
             .newBuilder()
-            .setPayload(UnsafeByteOperations.unsafeWrap(RandomUtils.nextBytes(responsePayload)));
+            .setPayload(UnsafeByteOperations.unsafeWrap(RandomUtils.secure().randomBytes(responsePayload)));
 
     return getSuccessResponseBuilder(msg).setEcho(echo).build();
   }

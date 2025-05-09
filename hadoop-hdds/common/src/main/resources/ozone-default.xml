@@ -301,15 +301,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.container.ratis.replication.level</name>
-    <value>MAJORITY</value>
-    <tag>OZONE, RATIS</tag>
-    <description>Replication level to be used by datanode for submitting a
-      container command to ratis. Available replication levels are ALL and
-      MAJORTIY, MAJORITY is used as the default replication level.
-    </description>
-  </property>
-  <property>
     <name>hdds.container.ratis.num.container.op.executors</name>
     <value>10</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
@@ -348,7 +339,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.ratis.leader.first.election.minimum.timeout.duration</name>
+    <name>hdds.raft.server.rpc.first-election.timeout</name>
     <value/>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>ratis Minimum timeout for the first election of a leader.
@@ -1163,7 +1154,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.initial.heartbeat.interval</name>
+    <name>hdds.heartbeat.initial-interval</name>
     <value>2s</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
@@ -1171,7 +1162,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.recon.heartbeat.interval</name>
+    <name>hdds.heartbeat.recon.interval</name>
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
@@ -1179,7 +1170,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.recon.initial.heartbeat.interval</name>
+    <name>hdds.heartbeat.recon.initial-interval</name>
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
@@ -1519,6 +1510,43 @@
   </property>
 
   <property>
+    <name>ozone.compaction.service.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Enable or disable a background job that periodically compacts rocksdb tables flagged for compaction.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.compaction.service.run.interval</name>
+    <value>6h</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      A background job that periodically compacts rocksdb tables flagged for compaction.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.compaction.service.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>A timeout value of compaction service. If this is set
+      greater than 0, the service will stop waiting for compaction
+      completion after this time.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.compaction.service.columnfamilies</name>
+    <value>keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>A comma separated, no spaces list of all the column families
+      that are compacted by the compaction service.
+      If this is empty, no column families are compacted.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.rocksdb.metrics.enabled</name>
     <value>false</value>
     <tag>OZONE, OM</tag>
@@ -1527,12 +1555,6 @@
     </description>
   </property>
 
-  <property>
-    <name>hdds.rest.http-address</name>
-    <value>0.0.0.0:9880</value>
-    <description>The http address of Object Store REST server inside the
-      datanode.</description>
-  </property>
   <property>
     <name>hdds.datanode.plugins</name>
     <value/>
@@ -1853,10 +1875,11 @@
 
   <property>
     <name>ozone.s3g.https-address</name>
-    <value/>
+    <value>0.0.0.0:9879</value>
     <tag>OZONE, S3GATEWAY</tag>
-    <description>Ozone S3Gateway serverHTTPS server address and port
-      .</description>
+    <description>
+      Ozone S3Gateway HTTPS server address and port.
+    </description>
   </property>
 
   <property>
@@ -1878,7 +1901,7 @@
 
   <property>
     <name>ozone.s3g.webadmin.https-address</name>
-    <value/>
+    <value>0.0.0.0:19879</value>
     <tag>OZONE, S3GATEWAY</tag>
     <description>Ozone S3Gateway content server's HTTPS address and port.</description>
   </property>
@@ -3058,6 +3081,15 @@
       Property to determine the transport protocol for the client to Ozone Manager channel.
     </description>
   </property>
+
+  <property>
+    <name>ozone.recon.address</name>
+    <value/>
+    <tag>RECON, MANAGEMENT</tag>
+    <description>
+      RPC address of Recon Server. If not set, datanodes will not configure Recon Server.
+    </description>
+  </property>
   <property>
     <name>ozone.recon.http.enabled</name>
     <value>true</value>
@@ -3968,6 +4000,16 @@
       OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.s3.grpc.server_enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM, S3GATEWAY</tag>
+    <description>
+      Property to enable or disable Ozone Manager gRPC endpoint for clients.  Right now, it is used by S3 Gateway only.
+    </description>
+  </property>
+
   <property>
     <name>ozone.om.grpc.maximum.response.length</name>
     <value>134217728</value>

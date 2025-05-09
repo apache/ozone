@@ -35,7 +35,6 @@ import org.slf4j.LoggerFactory;
 public class OzoneClientConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(OzoneClientConfig.class);
-
   public static final boolean OZONE_READ_SHORT_CIRCUIT_DEFAULT = false;
   public static final String OZONE_DOMAIN_SOCKET_PATH = "ozone.domain.socket.path";
   public static final String SHORT_CIRCUIT_PREFIX = "read.short-circuit.";
@@ -63,44 +62,7 @@ public class OzoneClientConfig {
           "temporarily for this period of time(seconds).",
       tags = { ConfigTag.CLIENT })
   private long shortCircuitReadDisableInterval = 60 * 10;
-
-  public boolean isShortCircuitEnabled() {
-    return shortCircuitEnabled;
-  }
-
-  public void setShortCircuit(boolean enabled) {
-    shortCircuitEnabled = enabled;
-  }
-
-
-  public int getShortCircuitBufferSize() {
-    return shortCircuitBufferSize;
-  }
-
-  public void setShortCircuitBufferSize(int size) {
-    this.shortCircuitBufferSize = size;
-  }
-
-  public long getShortCircuitReadDisableInterval() {
-    return shortCircuitReadDisableInterval;
-  }
-
-  public void setShortCircuitReadDisableInterval(long value) {
-    shortCircuitReadDisableInterval = value;
-  }
-
-  /**
-   * Enum for indicating what mode to use when combining chunk and block
-   * checksums to define an aggregate FileChecksum. This should be considered
-   * a client-side runtime option rather than a persistent property of any
-   * stored metadata, which is why this is not part of ChecksumOpt, which
-   * deals with properties of files at rest.
-   */
-  public enum ChecksumCombineMode {
-    MD5MD5CRC,  // MD5 of block checksums, which are MD5 over chunk CRCs
-    COMPOSITE_CRC  // Block/chunk-independent composite CRC
-  }
-
+  
   @Config(key = "ozone.client.stream.buffer.flush.size",
       defaultValue = "16MB",
       type = ConfigType.SIZE,
@@ -259,7 +221,7 @@ public class OzoneClientConfig {
 
   @Config(key = "ozone.client.ec.reconstruct.stripe.read.pool.limit",
       defaultValue = "30",
-      description = "Thread pool max size for parallelly read" +
+      description = "Thread pool max size for parallel read" +
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
   // For the largest recommended EC policy rs-10-4-1024k,
@@ -270,7 +232,7 @@ public class OzoneClientConfig {
 
   @Config(key = "ozone.client.ec.reconstruct.stripe.write.pool.limit",
       defaultValue = "30",
-      description = "Thread pool max size for parallelly write" +
+      description = "Thread pool max size for parallel write" +
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
   private int ecReconstructStripeWritePoolLimit = 10 * 3;
@@ -393,6 +355,30 @@ public class OzoneClientConfig {
       }
       // Note: ozone.fs.hsync.enabled is enforced by OzoneFSUtils#canEnableHsync, not here
     }
+  }
+
+  public boolean isShortCircuitEnabled() {
+    return shortCircuitEnabled;
+  }
+
+  public void setShortCircuit(boolean enabled) {
+    shortCircuitEnabled = enabled;
+  }
+
+  public int getShortCircuitBufferSize() {
+    return shortCircuitBufferSize;
+  }
+
+  public void setShortCircuitBufferSize(int size) {
+    this.shortCircuitBufferSize = size;
+  }
+
+  public long getShortCircuitReadDisableInterval() {
+    return shortCircuitReadDisableInterval;
+  }
+
+  public void setShortCircuitReadDisableInterval(long value) {
+    shortCircuitReadDisableInterval = value;
   }
 
   public long getStreamBufferFlushSize() {
@@ -601,5 +587,17 @@ public class OzoneClientConfig {
 
   public int getMaxConcurrentWritePerKey() {
     return this.maxConcurrentWritePerKey;
+  }
+
+  /**
+   * Enum for indicating what mode to use when combining chunk and block
+   * checksums to define an aggregate FileChecksum. This should be considered
+   * a client-side runtime option rather than a persistent property of any
+   * stored metadata, which is why this is not part of ChecksumOpt, which
+   * deals with properties of files at rest.
+   */
+  public enum ChecksumCombineMode {
+    MD5MD5CRC,  // MD5 of block checksums, which are MD5 over chunk CRCs
+    COMPOSITE_CRC  // Block/chunk-independent composite CRC
   }
 }

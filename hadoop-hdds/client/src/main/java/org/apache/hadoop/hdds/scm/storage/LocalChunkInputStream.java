@@ -102,7 +102,7 @@ public class LocalChunkInputStream extends ChunkInputStream
           chunkInfo.getOffset();
       int bytesPerChecksum = checksumData.getBytesPerChecksum();
       int startIndex = (int) (relativeOffset / bytesPerChecksum);
-      Checksum.verifyChecksum(bufferList, checksumData, startIndex);
+      Checksum.verifyChecksum(bufferList, startIndex, checksumData);
     }
   }
 

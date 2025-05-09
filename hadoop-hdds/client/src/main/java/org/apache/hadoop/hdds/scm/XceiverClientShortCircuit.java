@@ -439,7 +439,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   @Override
   public String toString() {
     final StringBuilder b =
-        new StringBuilder(getClass().getSimpleName()).append("[");
+        new StringBuilder(getClass().getSimpleName()).append('[');
     b.append(" DomainSocket: ").append(domainSocket.toString());
     b.append(" Pipeline: ").append(pipeline.toString());
     return b.toString();

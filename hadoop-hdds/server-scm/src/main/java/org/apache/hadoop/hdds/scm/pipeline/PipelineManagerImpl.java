@@ -446,7 +446,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   protected void removePipeline(Pipeline pipeline)
       throws IOException {
-    pipelineFactory.close(pipeline.getType(), pipeline);
+    // Removing the pipeline from SCM.
     HddsProtos.PipelineID pipelineID = pipeline.getId().getProtobuf();
     acquireWriteLock();
     try {
@@ -457,6 +457,8 @@ public class PipelineManagerImpl implements PipelineManager {
     } finally {
       releaseWriteLock();
     }
+    // Firing pipeline close command to datanode.
+    pipelineFactory.close(pipeline.getType(), pipeline);
     LOG.info("Pipeline {} removed.", pipeline);
     metrics.incNumPipelineDestroyed();
   }
@@ -484,20 +486,6 @@ public class PipelineManagerImpl implements PipelineManager {
       eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
       LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);
     }
-  }
-
-  /**
-   * put pipeline in CLOSED state.
-   * @param pipeline - ID of the pipeline.
-   * @param onTimeout - whether to remove pipeline after some time.
-   * @throws IOException throws exception in case of failure
-   * @deprecated Do not use this method, onTimeout is not honored.
-   */
-  @Override
-  @Deprecated
-  public void closePipeline(Pipeline pipeline, boolean onTimeout)
-          throws IOException {
-    closePipeline(pipeline.getId());
   }
 
   /**
@@ -544,8 +532,7 @@ public class PipelineManagerImpl implements PipelineManager {
     List<Pipeline> pipelinesWithStaleIpOrHostname =
             getStalePipelines(datanodeDetails);
     if (pipelinesWithStaleIpOrHostname.isEmpty()) {
-      LOG.debug("No stale pipelines for datanode {}",
-              datanodeDetails.getUuidString());
+      LOG.debug("No stale pipelines for datanode {}", datanodeDetails);
       return;
     }
     LOG.info("Found {} stale pipelines",

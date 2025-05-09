@@ -49,13 +49,11 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test some client operations after cluster starts. And perform restart and
  * then performs client operations and check the behavior is expected or not.
  */
-@Timeout(240)
 public class TestOzoneManagerRestart {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
@@ -96,7 +94,7 @@ public class TestOzoneManagerRestart {
 
   @Test
   public void testRestartOMWithVolumeOperation() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     ObjectStore objectStore = client.getObjectStore();
 
@@ -118,11 +116,10 @@ public class TestOzoneManagerRestart {
 
   }
 
-
   @Test
   public void testRestartOMWithBucketOperation() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
 
     ObjectStore objectStore = client.getObjectStore();
 
@@ -149,16 +146,15 @@ public class TestOzoneManagerRestart {
     assertEquals(bucketName, ozoneBucket.getName());
   }
 
-
   @Test
   public void testRestartOMWithKeyOperation() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-    String key1 = "key1" + RandomStringUtils.randomNumeric(5);
-    String key2 = "key2" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    String key1 = "key1" + RandomStringUtils.secure().nextNumeric(5);
+    String key2 = "key2" + RandomStringUtils.secure().nextNumeric(5);
 
-    String newKey1 = "key1new" + RandomStringUtils.randomNumeric(5);
-    String newKey2 = "key2new" + RandomStringUtils.randomNumeric(5);
+    String newKey1 = "key1new" + RandomStringUtils.secure().nextNumeric(5);
+    String newKey2 = "key2new" + RandomStringUtils.secure().nextNumeric(5);
 
     ObjectStore objectStore = client.getObjectStore();
 

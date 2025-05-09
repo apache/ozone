@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.xml.bind.JAXBContext;
@@ -53,13 +54,13 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.slf4j.Logger;
 
 /**
  * Configuration for ozone.
  */
 @InterfaceAudience.Private
-public class OzoneConfiguration extends Configuration
-    implements MutableConfigurationSource {
+public class OzoneConfiguration extends Configuration implements MutableConfigurationSource {
 
   public static final SortedSet<String> TAGS = unmodifiableSortedSet(
       Arrays.stream(ConfigTag.values())
@@ -71,6 +72,8 @@ public class OzoneConfiguration extends Configuration
 
     activate();
   }
+
+  private Properties delegatingProps;
 
   public static OzoneConfiguration of(ConfigurationSource source) {
     if (source instanceof LegacyHadoopConfigurationSource) {
@@ -358,8 +361,6 @@ public class OzoneConfiguration extends Configuration
             ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY),
         new DeprecationDelta("dfs.container.ratis.num.write.chunk.threads.per.volume",
             ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME),
-        new DeprecationDelta("dfs.container.ratis.replication.level",
-            ScmConfigKeys.HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY),
         new DeprecationDelta("dfs.container.ratis.rpc.type",
             ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY),
         new DeprecationDelta("dfs.container.ratis.segment.preallocated.size",
@@ -408,6 +409,8 @@ public class OzoneConfiguration extends Configuration
             HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
         new DeprecationDelta("dfs.metrics.percentiles.intervals",
             HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY),
+        new DeprecationDelta("hdds.recon.heartbeat.interval",
+            HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL),
     });
   }
 
@@ -433,8 +436,6 @@ public class OzoneConfiguration extends Configuration
     }
     return Integer.parseInt(value);
   }
-
-  private Properties delegatingProps;
 
   @Override
   public synchronized void reloadConfiguration() {
@@ -474,6 +475,36 @@ public class OzoneConfiguration extends Configuration
       // that version, so we are safe to catch the exception and return a new Properties object.
       return new Properties();
     }
+  }
+
+  /**
+   * Get a duration value from the configuration, and default to the given value if it's invalid.
+   * @param logger the logger to use
+   * @param key the key to get the value from
+   * @param defaultValue the default value to use if the key is not set
+   * @param unit the unit of the duration
+   * @return the duration value
+   */
+  public long getOrFixDuration(Logger logger, String key, String defaultValue, TimeUnit unit) {
+    maybeFixInvalidDuration(logger, key, defaultValue, unit);
+    return getTimeDuration(key, defaultValue, unit);
+  }
+
+  private boolean maybeFixInvalidDuration(Logger logger, String key, String defaultValue, TimeUnit unit) {
+    boolean fixed = maybeFixInvalidDuration(key, defaultValue, unit);
+    if (fixed) {
+      logger.warn("{} must be greater than zero, defaulting to {}", key, defaultValue);
+    }
+    return fixed;
+  }
+
+  private boolean maybeFixInvalidDuration(String key, String defaultValue, TimeUnit unit) {
+    long duration = getTimeDuration(key, defaultValue, unit);
+    if (duration <= 0) {
+      set(key, defaultValue);
+      return true;
+    }
+    return false;
   }
 
   @Override

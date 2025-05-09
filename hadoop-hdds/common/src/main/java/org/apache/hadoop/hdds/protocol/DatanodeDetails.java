@@ -67,21 +67,15 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class DatanodeDetails extends NodeImpl implements
-    Comparable<DatanodeDetails> {
+public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDetails> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeDetails.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DatanodeDetails.class);
 
   private static final Codec<DatanodeDetails> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(ExtendedDatanodeDetailsProto.getDefaultInstance()),
       DatanodeDetails::getFromProtoBuf,
       DatanodeDetails::getExtendedProtoBufMessage,
       DatanodeDetails.class);
-
-  public static Codec<DatanodeDetails> getCodec() {
-    return CODEC;
-  }
 
   /**
    * DataNode's unique identifier in the cluster.
@@ -143,6 +137,10 @@ public class DatanodeDetails extends NodeImpl implements
         datanodeDetails.getPersistedOpStateExpiryEpochSec();
     this.initialVersion = datanodeDetails.getInitialVersion();
     this.currentVersion = datanodeDetails.getCurrentVersion();
+  }
+
+  public static Codec<DatanodeDetails> getCodec() {
+    return CODEC;
   }
 
   public DatanodeID getID() {
@@ -414,7 +412,6 @@ public class DatanodeDetails extends NodeImpl implements
     return getPort(Name.STANDALONE);
   }
 
-
   /**
    * Starts building a new DatanodeDetails from the protobuf input.
    *
@@ -680,7 +677,6 @@ public class DatanodeDetails extends NodeImpl implements
     return obj instanceof DatanodeDetails &&
         id.equals(((DatanodeDetails) obj).id);
   }
-
 
   /**
    * Checks hostname, ipAddress and port of the 2 nodes are the same.
@@ -1018,6 +1014,8 @@ public class DatanodeDetails extends NodeImpl implements
    * Container to hold DataNode Port details.
    */
   public static final class Port {
+    private final Name name;
+    private final Integer value;
 
     /**
      * Ports that are supported in DataNode.
@@ -1041,9 +1039,6 @@ public class DatanodeDetails extends NodeImpl implements
       public static final Set<Name> IO_PORTS = ImmutableSet.copyOf(
           EnumSet.of(STANDALONE, RATIS, RATIS_DATASTREAM));
     }
-
-    private final Name name;
-    private final Integer value;
 
     /**
      * Private constructor for constructing Port object. Use

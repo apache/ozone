@@ -39,7 +39,6 @@ public class TestDomainSocketFactory {
   @TempDir
   private File dir;
 
-
   private DomainSocketFactory getDomainSocketFactory() {
     // enable short-circuit read
     OzoneConfiguration conf = new OzoneConfiguration();

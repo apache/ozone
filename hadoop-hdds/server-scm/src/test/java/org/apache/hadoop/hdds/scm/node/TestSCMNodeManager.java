@@ -74,6 +74,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
@@ -115,6 +116,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -321,7 +323,7 @@ public class TestSCMNodeManager {
     DatanodeDetails details = MockDatanodeDetails.randomDatanodeDetails();
 
     StorageReportProto storageReport =
-        HddsTestUtils.createStorageReport(details.getUuid(),
+        HddsTestUtils.createStorageReport(details.getID(),
             details.getNetworkFullPath(), Long.MAX_VALUE);
     MetadataStorageReportProto metadataStorageReport =
         HddsTestUtils.createMetadataStorageReport(details.getNetworkFullPath(),
@@ -434,7 +436,7 @@ public class TestSCMNodeManager {
       // creation, they will fail with not enough healthy nodes for ratis 3
       // pipeline. Therefore we do not have to worry about this create call
       // failing due to datanodes reaching their maximum pipeline limit.
-      assertPipelineCreationFailsWithNotEnoughNodes(1);
+      assertPipelineCreationFailsWithExceedingLimit(2);
 
       // Heartbeat bad MLV nodes back to healthy.
       nodeManager.processLayoutVersionReport(badMlvNode1, CORRECT_LAYOUT_PROTO);
@@ -464,6 +466,19 @@ public class TestSCMNodeManager {
     }, "3 nodes should not have been found for a pipeline.");
     assertThat(ex.getMessage()).contains("Required 3. Found " +
         actualNodeCount);
+  }
+
+  private void assertPipelineCreationFailsWithExceedingLimit(int limit) {
+    // Build once, outside the assertion
+    ReplicationConfig config = ReplicationConfig.fromProtoTypeAndFactor(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.THREE);
+    SCMException ex = assertThrows(
+        SCMException.class,
+        () -> scm.getPipelineManager().createPipeline(config),
+        "3 nodes should not have been found for a pipeline.");
+    assertThat(ex.getMessage())
+        .contains("Cannot create pipeline as it would exceed the limit per datanode: " + limit);
   }
 
   private void assertPipelines(HddsProtos.ReplicationFactor factor,
@@ -883,8 +898,7 @@ public class TestSCMNodeManager {
     // than SCM should not be found in the cluster.
     DatanodeDetails node1 =
         HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(SCMNodeManager.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(SCMNodeManager.class);
     int scmMlv =
         nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
     int scmSlv =
@@ -1487,7 +1501,7 @@ public class TestSCMNodeManager {
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
         dnList.add(dn);
-        UUID dnId = dn.getUuid();
+        DatanodeID dnId = dn.getID();
         long free = capacity - used;
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
         StorageReportProto report = HddsTestUtils
@@ -1509,7 +1523,7 @@ public class TestSCMNodeManager {
   }
 
   private List<StorageReportProto> generateStorageReportProto(
-      int volumeCount, UUID dnId, long capacity, long used, long remaining) {
+      int volumeCount, DatanodeID dnId, long capacity, long used, long remaining) {
     List<StorageReportProto> reports = new ArrayList<>(volumeCount);
     boolean failed = true;
     for (int x = 0; x < volumeCount; x++) {
@@ -1539,7 +1553,7 @@ public class TestSCMNodeManager {
       long used, long remaining, int volumeCount, String totalCapacity,
           String scmUsedPerc, String nonScmUsedPerc) {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-    UUID dnId = dn.getUuid();
+    DatanodeID dnId = dn.getID();
     List<StorageReportProto> reports = volumeCount > 0 ?
         generateStorageReportProto(volumeCount, dnId, perCapacity,
             used, remaining) : null;
@@ -1573,7 +1587,7 @@ public class TestSCMNodeManager {
       EventQueue eventQueue = (EventQueue) scm.getEventQueue();
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       dnList.add(dn);
-      UUID dnId = dn.getUuid();
+      DatanodeID dnId = dn.getID();
       long free = capacity - used;
       List<StorageReportProto> reports = new ArrayList<>(volumeCount);
       boolean failed = true;
@@ -1626,7 +1640,7 @@ public class TestSCMNodeManager {
       EventPublisher publisher = mock(EventPublisher.class);
       final long capacity = 2000;
       final long usedPerHeartbeat = 100;
-      UUID dnId = datanodeDetails.getUuid();
+      DatanodeID dnId = datanodeDetails.getID();
       for (int x = 0; x < heartbeatCount; x++) {
         long scmUsed = x * usedPerHeartbeat;
         long remaining = capacity - scmUsed;
@@ -1745,7 +1759,7 @@ public class TestSCMNodeManager {
         100, TimeUnit.MILLISECONDS);
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
-    UUID dnId = datanodeDetails.getUuid();
+    DatanodeID dnId = datanodeDetails.getID();
     String storagePath = testDir.getAbsolutePath() + "/" + dnId;
     StorageReportProto report =
         HddsTestUtils.createStorageReport(dnId, storagePath, 100, 10, 90, null);
@@ -1885,7 +1899,7 @@ public class TestSCMNodeManager {
       final long capacity = 2000;
       final long used = 100;
       final long remaining = 1900;
-      UUID dnId = datanodeDetails.getUuid();
+      DatanodeID dnId = datanodeDetails.getID();
       String storagePath = testDir.getAbsolutePath() + "/" + dnId;
       StorageReportProto report = HddsTestUtils
           .createStorageReport(dnId, storagePath, capacity, used,

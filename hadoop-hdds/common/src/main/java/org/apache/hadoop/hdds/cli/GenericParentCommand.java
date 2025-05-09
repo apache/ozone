@@ -28,4 +28,6 @@ public interface GenericParentCommand {
 
   /** Returns a cached configuration, i.e. it is created only once, subsequent calls return the same instance. */
   OzoneConfiguration getOzoneConf();
+
+  void printError(Throwable t);
 }

@@ -188,8 +188,7 @@ public class MockNodeManager implements NodeManager {
           setContainers(usageInfo.getDatanodeDetails(), entry.getValue());
         } catch (NodeNotFoundException e) {
           LOG.warn("Could not find Datanode {} for adding containers to it. " +
-                  "Skipping this node.", usageInfo
-              .getDatanodeDetails().getUuidString());
+                  "Skipping this node.", usageInfo.getDatanodeDetails());
           continue;
         }
 
@@ -271,12 +270,11 @@ public class MockNodeManager implements NodeManager {
         long used = nodeMetricMap.get(dd).getScmUsed().get();
         long remaining = nodeMetricMap.get(dd).getRemaining().get();
         StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-            di.getUuid(), "/data1-" + di.getUuidString(),
+            di.getID(), "/data1-" + di.getID(),
             capacity, used, remaining, null);
         MetadataStorageReportProto metaStorage1 =
             HddsTestUtils.createMetadataStorageReport(
-                "/metadata1-" + di.getUuidString(), capacity, used,
-                remaining, null);
+                "/metadata1-" + di.getID(), capacity, used, remaining, null);
         di.updateStorageReports(Collections.singletonList(storage1));
         di.updateMetaDataStorageReports(Collections.singletonList(metaStorage1));
 
@@ -460,7 +458,7 @@ public class MockNodeManager implements NodeManager {
    */
   @Override
   public Set<PipelineID> getPipelines(DatanodeDetails dnId) {
-    return node2PipelineMap.getPipelines(dnId.getUuid());
+    return node2PipelineMap.getPipelines(dnId.getID());
   }
 
   /**
@@ -470,7 +468,7 @@ public class MockNodeManager implements NodeManager {
    */
   @Override
   public int getPipelinesCount(DatanodeDetails datanodeDetails) {
-    return node2PipelineMap.getPipelinesCount(datanodeDetails.getUuid());
+    return node2PipelineMap.getPipelinesCount(datanodeDetails.getID());
   }
 
   /**

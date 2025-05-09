@@ -174,6 +174,7 @@ public class ContainerMetrics implements Closeable {
   public void incContainerDeleteFailedBlockCountNotZero() {
     containerDeleteFailedBlockCountNotZero.incr();
   }
+
   public void incContainerDeleteFailedNonEmpty() {
     containerDeleteFailedNonEmpty.incr();
   }

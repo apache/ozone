@@ -96,7 +96,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +105,6 @@ import org.slf4j.LoggerFactory;
  * these tests are specific to {@link KeyValueContainer}. If a new {@link
  * ContainerProtos.ContainerType} is added, the tests need to be modified.
  */
-@Timeout(300)
 public class TestContainerPersistence {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String SCM_ID = UUID.randomUUID().toString();
@@ -1074,13 +1072,10 @@ public class TestContainerPersistence {
     // Test force update flag.
     // Close the container and then try to update without force update flag.
     container.close();
-    try {
-      container.update(newMetadata, false);
-    } catch (StorageContainerException ex) {
-      assertEquals("Updating a closed container without " +
-          "force option is not allowed. ContainerID: " +
-          testContainerID, ex.getMessage());
-    }
+    StorageContainerException exception = assertThrows(StorageContainerException.class,
+        () -> container.update(newMetadata, false));
+    assertThat(exception).hasMessageContaining(container.getContainerData().toString());
+
 
     // Update with force flag, it should be success.
     newMetadata.put("VOLUME", "shire_new_1");

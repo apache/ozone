@@ -51,7 +51,6 @@ import java.net.InetAddress;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -73,7 +72,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +80,6 @@ import org.slf4j.LoggerFactory;
  * Integration test to verify symmetric SecretKeys APIs in a secure cluster.
  */
 
-@Timeout(value = 500, unit = TimeUnit.SECONDS)
 @InterfaceAudience.Private
 public final class TestSecretKeysApi {
   private static final Logger LOG = LoggerFactory

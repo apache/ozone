@@ -38,6 +38,16 @@ import org.slf4j.LoggerFactory;
 public final class DomainSocketFactory {
   private static final Logger LOG = LoggerFactory.getLogger(
       DomainSocketFactory.class);
+  public static final String FEATURE = "short-circuit reads";
+  public static final String FEATURE_FLAG = "SC";
+  private static boolean nativeLibraryLoaded = false;
+  private static String nativeLibraryLoadFailureReason;
+  private long pathExpireMills;
+  private final ConcurrentHashMap<String, PathInfo> pathMap;
+  private Timer timer;
+  private boolean isEnabled = false;
+  private String domainSocketPath;
+  private static volatile DomainSocketFactory instance = null;
 
   /**
    *  Domain socket path state.
@@ -47,6 +57,8 @@ public final class DomainSocketFactory {
     DISABLED(false),
     VALID(true);
 
+    private final boolean usableForShortCircuit;
+
     PathState(boolean usableForShortCircuit) {
       this.usableForShortCircuit = usableForShortCircuit;
     }
@@ -54,7 +66,6 @@ public final class DomainSocketFactory {
     public boolean getUsableForShortCircuit() {
       return usableForShortCircuit;
     }
-    private final boolean usableForShortCircuit;
   }
 
   /**
@@ -87,16 +98,6 @@ public final class DomainSocketFactory {
     }
   }
 
-  public static final String FEATURE = "short-circuit reads";
-  public static final String FEATURE_FLAG = "SC";
-  private static boolean nativeLibraryLoaded = false;
-  private static String nativeLibraryLoadFailureReason;
-  private long pathExpireMills;
-  private final ConcurrentHashMap<String, PathInfo> pathMap;
-  private Timer timer;
-  private boolean isEnabled = false;
-  private String domainSocketPath;
-
   static {
     // Try to load native hadoop library and set fallback flag appropriately
     if (SystemUtils.IS_OS_WINDOWS) {
@@ -120,8 +121,6 @@ public final class DomainSocketFactory {
       }
     }
   }
-
-  private static volatile DomainSocketFactory instance = null;
 
   public static DomainSocketFactory getInstance(ConfigurationSource conf) {
     if (instance == null) {

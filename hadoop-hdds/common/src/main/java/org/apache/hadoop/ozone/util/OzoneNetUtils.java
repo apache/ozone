@@ -40,6 +40,8 @@ import org.slf4j.LoggerFactory;
 public final class OzoneNetUtils {
   private static final Logger LOG =
           LoggerFactory.getLogger(OzoneNetUtils.class);
+  private static final Map<String, Boolean> CACHE =
+      Collections.synchronizedMap(new HashMap<String, Boolean>());
 
   private OzoneNetUtils() {
   }
@@ -91,9 +93,6 @@ public final class OzoneNetUtils {
     return fqdn.split("\\.")[0];
   }
 
-
-  private static final Map<String, Boolean> CACHE =
-      Collections.synchronizedMap(new HashMap<String, Boolean>());
   /**
    * Match input address to local address.
    * Return true if it matches, false otherwise.

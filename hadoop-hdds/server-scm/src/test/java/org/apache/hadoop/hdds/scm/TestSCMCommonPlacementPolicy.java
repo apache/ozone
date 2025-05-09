@@ -357,10 +357,10 @@ public class TestSCMCommonPlacementPolicy {
             ContainerID.valueOf(1), CLOSED, 0, 0, 0, list.subList(3, 6)));
     Set<ContainerReplica> replicasToBeRemoved = Sets.newHashSet(
             HddsTestUtils.getReplicaBuilder(ContainerID.valueOf(1), CLOSED, 0, 0, 0,
-                    list.get(7).getUuid(), list.get(7))
+                    list.get(7).getID(), list.get(7))
                     .setReplicaIndex(1).build(),
             HddsTestUtils.getReplicaBuilder(ContainerID.valueOf(1), CLOSED, 0, 0, 0,
-                    list.get(8).getUuid(), list.get(8)).setReplicaIndex(1)
+                    list.get(8).getID(), list.get(8)).setReplicaIndex(1)
                     .build());
     replicas.addAll(replicasToBeRemoved);
 
@@ -482,14 +482,14 @@ public class TestSCMCommonPlacementPolicy {
 
     // capacity = 200000, used = 90000, remaining = 101000, committed = 500
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =
-        HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
+        HddsTestUtils.createStorageReport(DatanodeID.randomID(), "/data/hdds",
                 200000, 90000, 101000, DISK).toBuilder()
             .setCommitted(500)
             .setFreeSpaceToSpare(10000)
             .build();
     // capacity = 200000, used = 90000, remaining = 101000, committed = 1000
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport2 =
-        HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
+        HddsTestUtils.createStorageReport(DatanodeID.randomID(), "/data/hdds",
                 200000, 90000, 101000, DISK).toBuilder()
             .setCommitted(1000)
             .setFreeSpaceToSpare(100000)
@@ -525,7 +525,6 @@ public class TestSCMCommonPlacementPolicy {
     private List<Node> racks;
     private int rackCnt;
 
-
     /**
      * Creates Dummy Placement Policy with dn index to rack Mapping
      * in round robin fashion (rack Index = dn Index % total number of racks).
@@ -559,8 +558,6 @@ public class TestSCMCommonPlacementPolicy {
                       entry -> datanodeDetails.get(entry.getKey()),
                       entry -> racks.get(entry.getValue())));
     }
-
-
 
     @Override
     public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {

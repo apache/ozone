@@ -71,7 +71,7 @@ import org.slf4j.LoggerFactory;
 public class SCMBlockDeletingService extends BackgroundService
     implements SCMService {
 
-  public static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(SCMBlockDeletingService.class);
 
   private static final int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 1;
@@ -93,6 +93,7 @@ public class SCMBlockDeletingService extends BackgroundService
   private final long safemodeExitRunDelayMillis;
   private final long deleteBlocksPendingCommandLimit;
   private final Clock clock;
+  private final int transactionToDNsCommitMapLimit;
 
   @SuppressWarnings("parameternumber")
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
@@ -115,6 +116,7 @@ public class SCMBlockDeletingService extends BackgroundService
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
     this.deleteBlocksPendingCommandLimit = dnConf.getBlockDeleteQueueLimit();
+    this.transactionToDNsCommitMapLimit = scmConfig.getTransactionToDNsCommitMapLimit();
     this.clock = clock;
     this.deletedBlockLog = deletedBlockLog;
     this.nodeManager = nodeManager;
@@ -167,6 +169,12 @@ public class SCMBlockDeletingService extends BackgroundService
           final Set<DatanodeDetails> included =
               getDatanodesWithinCommandLimit(datanodes);
           int blockDeletionLimit = getBlockDeleteTXNum();
+          int txnToDNsCommitMapSize = deletedBlockLog.getTransactionToDNsCommitMapSize();
+          if (txnToDNsCommitMapSize >= transactionToDNsCommitMapLimit) {
+            LOG.warn("Skipping block deletion as transactionToDNsCommitMap size = {}, exceeds threshold {}",
+                txnToDNsCommitMapSize, transactionToDNsCommitMapLimit);
+            return EmptyTaskResult.newResult();
+          }
           DatanodeDeletedBlockTransactions transactions =
               deletedBlockLog.getTransactions(blockDeletionLimit, included);
 

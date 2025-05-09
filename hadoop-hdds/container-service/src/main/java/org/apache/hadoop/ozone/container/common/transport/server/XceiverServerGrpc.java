@@ -64,7 +64,6 @@ import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * Creates a Grpc server endpoint that acts as the communication layer for
  * Ozone containers.

@@ -73,12 +73,14 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerDomainSocket;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.utils.FaultInjectorImpl;
@@ -108,6 +110,7 @@ public class TestXceiverServerDomainSocket {
   private static ContainerMetrics metrics;
   private static int readTimeout;
   private static int writeTimeout;
+  private static VolumeChoosingPolicy volumeChoosingPolicy;
 
   @BeforeAll
   public static void setup() {
@@ -120,6 +123,7 @@ public class TestXceiverServerDomainSocket {
     metrics = ContainerMetrics.create(conf);
     readTimeout = 5 * 1000;
     writeTimeout = 5 * 1000;
+    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
   }
 
   @Test
@@ -745,7 +749,7 @@ public class TestXceiverServerDomainSocket {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics,
+              containerSet, volumeSet, volumeChoosingPolicy, metrics,
               c -> { }, ozoneContainer));
     }
     HddsDispatcher dispatcher =

@@ -41,14 +41,11 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests {@link MutableVolumeSet} operations.
  */
-@Timeout(300)
 public class TestVolumeSet {
 
   private OzoneConfiguration conf;
@@ -164,8 +161,7 @@ public class TestVolumeSet {
 
     // Attempting to remove a volume which does not exist in VolumeSet should
     // log a warning.
-    LogCapturer logs = LogCapturer.captureLogs(
-        LoggerFactory.getLogger(MutableVolumeSet.class));
+    LogCapturer logs = LogCapturer.captureLogs(MutableVolumeSet.class);
     volumeSet.removeVolume(HddsVolumeUtil.getHddsRoot(volume1));
     assertEquals(1, volumeSet.getVolumesList().size());
     String expectedLogMessage = "Volume : " +

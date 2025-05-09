@@ -748,7 +748,6 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       return Collections.emptySet();
     }
 
-
     @Override
     public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
             Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica) {

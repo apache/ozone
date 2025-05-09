@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -102,6 +103,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -111,7 +113,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests for PipelineManagerImpl.
@@ -350,7 +351,7 @@ public class TestPipelineManagerImpl {
       Pipeline pipeline = assertAllocate(pipelineManager);
       changeToFollower(pipelineManager);
       assertFailsNotLeader(
-          () -> pipelineManager.closePipeline(pipeline, false));
+          () -> pipelineManager.closePipeline(pipeline.getId()));
     }
   }
 
@@ -521,7 +522,7 @@ public class TestPipelineManagerImpl {
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE));
     pipelineManager.openPipeline(closedPipeline.getId());
-    pipelineManager.closePipeline(closedPipeline, true);
+    pipelineManager.closePipeline(closedPipeline.getId());
 
     // pipeline should be seen in pipelineManager as CLOSED.
     assertTrue(pipelineManager
@@ -670,8 +671,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testAddContainerWithClosedPipelineScmStart() throws Exception {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.
-            captureLogs(LoggerFactory.getLogger(PipelineStateMap.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(PipelineStateMap.class);
     SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
             createPipelineManager(true, buffer);
@@ -716,8 +716,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testPipelineCloseFlow() throws IOException, TimeoutException {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-            .captureLogs(LoggerFactory.getLogger(PipelineManagerImpl.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(PipelineManagerImpl.class);
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(
             RatisReplicationConfig
@@ -947,7 +946,7 @@ public class TestPipelineManagerImpl {
           .setContainerState(StorageContainerDatanodeProtocolProtos
               .ContainerReplicaProto.State.CLOSED)
           .setKeyCount(1)
-          .setOriginNodeId(UUID.randomUUID())
+          .setOriginNodeId(DatanodeID.randomID())
           .setSequenceId(1)
           .setReplicaIndex(0)
           .setDatanodeDetails(dn)

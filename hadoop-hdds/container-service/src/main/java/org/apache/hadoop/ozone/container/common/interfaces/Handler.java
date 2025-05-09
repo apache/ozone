@@ -70,23 +70,28 @@ public abstract class Handler {
     this.icrSender = icrSender;
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public static Handler getHandlerForContainerType(
       final ContainerType containerType, final ConfigurationSource config,
       final String datanodeId, final ContainerSet contSet,
-      final VolumeSet volumeSet, final ContainerMetrics metrics,
+      final VolumeSet volumeSet, final VolumeChoosingPolicy volumeChoosingPolicy,
+      final ContainerMetrics metrics,
       IncrementalReportSender<Container> icrSender) {
-    return getHandlerForContainerType(containerType, config, datanodeId, contSet, volumeSet, metrics, icrSender, null);
+    return getHandlerForContainerType(containerType, config, datanodeId, contSet, volumeSet,
+        volumeChoosingPolicy, metrics, icrSender, null);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
   public static Handler getHandlerForContainerType(
       final ContainerType containerType, final ConfigurationSource config,
       final String datanodeId, final ContainerSet contSet,
-      final VolumeSet volumeSet, final ContainerMetrics metrics,
+      final VolumeSet volumeSet, final VolumeChoosingPolicy volumeChoosingPolicy,
+      final ContainerMetrics metrics,
       IncrementalReportSender<Container> icrSender, OzoneContainer ozoneContainer) {
     switch (containerType) {
     case KeyValueContainer:
-      return new KeyValueHandler(config, datanodeId, contSet, volumeSet, metrics,
+      return new KeyValueHandler(config,
+          datanodeId, contSet, volumeSet, volumeChoosingPolicy, metrics,
           icrSender, Clock.systemUTC(), ozoneContainer);
     default:
       throw new IllegalArgumentException("Handler for ContainerType: " +
