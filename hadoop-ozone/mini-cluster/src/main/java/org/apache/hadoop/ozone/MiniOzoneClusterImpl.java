@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeRuleFactory;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -646,8 +647,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       initializeScmStorage(scmStore);
       StorageContainerManager scm = HddsTestUtils.getScmSimple(conf,
           scmConfigurator);
-      HealthyPipelineSafeModeRule rule =
-          scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
+      HealthyPipelineSafeModeRule rule = SafeModeRuleFactory.getInstance()
+          .getSafeModeRule(HealthyPipelineSafeModeRule.class);
       if (rule != null) {
         // Set threshold to wait for safe mode exit - this is needed since a
         // pipeline is marked open only after leader election.

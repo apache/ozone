@@ -117,4 +117,12 @@ public final class SafeModeRuleFactory {
   public List<SafeModeExitRule<?>> getPreCheckRules() {
     return preCheckRules;
   }
+
+  public <T extends SafeModeExitRule<?>> T getSafeModeRule(Class<T> ruleClass) {
+    return safeModeRules.stream()
+        .filter(r -> ruleClass.isAssignableFrom(r.getClass()))
+        .map(ruleClass::cast)
+        .findFirst()
+        .orElse(null);
+  }
 }

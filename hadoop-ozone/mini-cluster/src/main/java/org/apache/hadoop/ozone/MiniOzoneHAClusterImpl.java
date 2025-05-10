@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeRuleFactory;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -572,8 +573,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             }
             StorageContainerManager scm =
                 HddsTestUtils.getScmSimple(scmConfig, scmConfigurator);
-            HealthyPipelineSafeModeRule rule =
-                scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
+            HealthyPipelineSafeModeRule rule = SafeModeRuleFactory.getInstance()
+                .getSafeModeRule(HealthyPipelineSafeModeRule.class);
             if (rule != null) {
               // Set threshold to wait for safe mode exit -
               // this is needed since a pipeline is marked open only after
