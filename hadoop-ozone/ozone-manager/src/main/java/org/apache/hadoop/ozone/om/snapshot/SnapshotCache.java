@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
@@ -27,6 +28,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.utils.Scheduler;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -57,6 +60,24 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       "SnapshotCacheCleanupService";
 
   private final OMMetrics omMetrics;
+
+  private boolean shouldCompactTable(String tableName) {
+    return !COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(tableName);
+  }
+
+  private void compactSnapshotDB(OmSnapshot snapshot) throws IOException {
+    OMMetadataManager metadataManager = snapshot.getMetadataManager();
+    for (Table<?, ?> table : metadataManager.getStore().listTables()) {
+      if (shouldCompactTable(table.getName())) {
+        try {
+          metadataManager.getStore().compactTable(table.getName());
+        } catch (IOException e) {
+          LOG.warn("Failed to compact table {} in snapshot {}: {}", 
+              table.getName(), snapshot.getSnapshotID(), e.getMessage());
+        }
+      }
+    }
+  }
 
   public SnapshotCache(CacheLoader<UUID, OmSnapshot> cacheLoader, int cacheSizeLimit, OMMetrics omMetrics,
                        long cleanupInterval) {
@@ -220,6 +241,8 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
             LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
             // Close the instance, which also closes its DB handle.
             try {
+              compactSnapshotDB(v.get());
+              // Close the instance, which also closes its DB handle.
               v.get().close();
             } catch (IOException ex) {
               throw new IllegalStateException("Error while closing snapshot DB.", ex);
