@@ -44,14 +44,6 @@ public class OzoneManagerRatisServerConfig {
   )
   private long logAppenderWaitTimeMin;
 
-  public long getLogAppenderWaitTimeMin() {
-    return logAppenderWaitTimeMin;
-  }
-
-  public void setLogAppenderWaitTimeMin(long logAppenderWaitTimeMin) {
-    this.logAppenderWaitTimeMin = logAppenderWaitTimeMin;
-  }
-
   @Config(key = "retrycache.expirytime",
       defaultValue = "300s",
       type = ConfigType.TIME,
@@ -59,6 +51,14 @@ public class OzoneManagerRatisServerConfig {
       description = "The timeout duration of the retry cache."
   )
   private long retryCacheTimeout = Duration.ofSeconds(300).toMillis();
+
+  public long getLogAppenderWaitTimeMin() {
+    return logAppenderWaitTimeMin;
+  }
+
+  public void setLogAppenderWaitTimeMin(long logAppenderWaitTimeMin) {
+    this.logAppenderWaitTimeMin = logAppenderWaitTimeMin;
+  }
 
   public long getRetryCacheTimeout() {
     return retryCacheTimeout;

@@ -141,7 +141,6 @@ public class PipelineReportHandler implements
     }
   }
 
-
   protected void setReportedDatanode(Pipeline pipeline, DatanodeDetails dn)
       throws IOException {
     pipeline.reportDatanode(dn);
@@ -154,7 +153,7 @@ public class PipelineReportHandler implements
     if (report.getIsLeader() ||
         RatisReplicationConfig.hasFactor(pipeline.getReplicationConfig(),
             ReplicationFactor.ONE)) {
-      pipeline.setLeaderId(dn.getUuid());
+      pipeline.setLeaderId(dn.getID());
       metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
     }
   }

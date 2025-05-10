@@ -43,13 +43,11 @@ import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test for Ozone Bucket Owner.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(120)
 public abstract class TestBucketOwner implements NonHATests.TestCase {
 
   private static final String UNIQUE = UUID.randomUUID().toString();

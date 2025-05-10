@@ -40,12 +40,10 @@ import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Recon SCM Snapshot Download implementation.
  */
-@Timeout(100)
 public class TestReconScmSnapshot {
   private OzoneConfiguration conf;
   private MiniOzoneCluster ozoneCluster = null;

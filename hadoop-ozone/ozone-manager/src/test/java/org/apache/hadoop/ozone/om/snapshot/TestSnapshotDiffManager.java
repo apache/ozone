@@ -32,6 +32,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NAT
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_JOB_TABLE_NAME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_REPORT_TABLE_NAME;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_CANCELLED_JOB;
@@ -122,7 +125,6 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -133,7 +135,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
-import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotTestUtils.StubbedPersistentMap;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage;
@@ -427,7 +428,7 @@ public class TestSnapshotDiffManager {
     String diffDir = snapDiffDir.getAbsolutePath();
     String diffJobKey = snap1 + DELIMITER + snap2;
     Set<String> randomStrings = IntStream.range(0, numberOfFiles)
-        .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
+        .mapToObj(i -> RandomStringUtils.secure().nextAlphabetic(10))
         .collect(Collectors.toSet());
 
     when(differ.getSSTDiffListWithFullPath(
@@ -450,7 +451,7 @@ public class TestSnapshotDiffManager {
          MockedStatic<RocksDiffUtils> mockedRocksDiffUtils = Mockito.mockStatic(RocksDiffUtils.class,
              Mockito.CALLS_REAL_METHODS)) {
       mockedRdbUtil.when(() -> RdbUtil.getSSTFilesForComparison(any(), any()))
-          .thenReturn(Collections.singleton(RandomStringUtils.randomAlphabetic(10)));
+          .thenReturn(Collections.singleton(RandomStringUtils.secure().nextAlphabetic(10)));
       mockedRocksDiffUtils.when(() -> RocksDiffUtils.filterRelevantSstFiles(any(), any())).thenAnswer(i -> null);
       SnapshotDiffManager spy = spy(snapshotDiffManager);
       doNothing().when(spy).recordActivity(any(), any());
@@ -483,7 +484,7 @@ public class TestSnapshotDiffManager {
               () -> RdbUtil.getSSTFilesForComparison(any(), anyList()))
           .thenAnswer((Answer<Set<String>>) invocation -> {
             Set<String> retVal = IntStream.range(0, numberOfFiles)
-                .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
+                .mapToObj(i -> RandomStringUtils.secure().nextAlphabetic(10))
                 .collect(Collectors.toSet());
             deltaStrings.addAll(retVal);
             return retVal;
@@ -555,7 +556,7 @@ public class TestSnapshotDiffManager {
               () -> RdbUtil.getSSTFilesForComparison(any(), anyList()))
           .thenAnswer((Answer<Set<String>>) invocation -> {
             Set<String> retVal = IntStream.range(0, numberOfFiles)
-                .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
+                .mapToObj(i -> RandomStringUtils.secure().nextAlphabetic(10))
                 .collect(Collectors.toSet());
             deltaStrings.addAll(retVal);
             return retVal;
@@ -631,7 +632,7 @@ public class TestSnapshotDiffManager {
                                         int parentObjectId,
                                         String snapshotTableName) {
     String name = "key" + objectId;
-    if (snapshotTableName.equals(OmMetadataManagerImpl.DIRECTORY_TABLE)) {
+    if (snapshotTableName.equals(DIRECTORY_TABLE)) {
       return OmDirectoryInfo.newBuilder()
           .setObjectID(objectId).setName(name).build();
     }
@@ -653,12 +654,12 @@ public class TestSnapshotDiffManager {
    * object Ids in the range 50-100 & should be empty otherwise
    */
   @ParameterizedTest
-  @CsvSource({"false," + OmMetadataManagerImpl.DIRECTORY_TABLE,
-      "true," + OmMetadataManagerImpl.DIRECTORY_TABLE,
-      "false," + OmMetadataManagerImpl.FILE_TABLE,
-      "true," + OmMetadataManagerImpl.FILE_TABLE,
-      "false," + OmMetadataManagerImpl.KEY_TABLE,
-      "true," + OmMetadataManagerImpl.KEY_TABLE})
+  @CsvSource({"false," + DIRECTORY_TABLE,
+      "true," + DIRECTORY_TABLE,
+      "false," + FILE_TABLE,
+      "true," + FILE_TABLE,
+      "false," + KEY_TABLE,
+      "true," + KEY_TABLE})
   public void testObjectIdMapWithTombstoneEntries(boolean nativeLibraryLoaded,
                                                   String snapshotTableName)
       throws IOException, RocksDBException {
@@ -719,8 +720,7 @@ public class TestSnapshotDiffManager {
           nativeLibraryLoaded, oldObjectIdKeyMap, newObjectIdKeyMap,
           objectIdsToCheck, Optional.of(oldParentIds),
           Optional.of(newParentIds),
-          ImmutableMap.of(OmMetadataManagerImpl.DIRECTORY_TABLE, "", OmMetadataManagerImpl.KEY_TABLE, "",
-              OmMetadataManagerImpl.FILE_TABLE, ""), "");
+          ImmutableMap.of(DIRECTORY_TABLE, "", KEY_TABLE, "", FILE_TABLE, ""), "");
 
       try (ClosableIterator<Map.Entry<byte[], byte[]>> oldObjectIdIter =
                oldObjectIdKeyMap.iterator()) {
@@ -819,11 +819,10 @@ public class TestSnapshotDiffManager {
     String bucketName = "buck";
     String fromSnapName = "fs";
     String toSnapName = "ts";
-    try (MockedStatic<SnapshotDeletingService>
-             mockedSnapshotDeletingService = mockStatic(
-                 SnapshotDeletingService.class)) {
-      mockedSnapshotDeletingService.when(() ->
-          SnapshotDeletingService.isBlockLocationInfoSame(any(OmKeyInfo.class),
+    try (MockedStatic<SnapshotUtils>
+             mockedSnapshotUtils = mockStatic(SnapshotUtils.class)) {
+      mockedSnapshotUtils.when(() ->
+          SnapshotUtils.isBlockLocationInfoSame(any(OmKeyInfo.class),
               any(OmKeyInfo.class)))
           .thenAnswer(i -> {
             int keyVal = Integer.parseInt(((OmKeyInfo)i.getArgument(0))
@@ -976,11 +975,11 @@ public class TestSnapshotDiffManager {
   @Test
   public void testGetSnapshotDiffReportForCancelledJob() throws IOException {
 
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
 
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     UUID fromSnapshotUUID = UUID.randomUUID();
     UUID toSnapshotUUID = UUID.randomUUID();
@@ -1060,11 +1059,11 @@ public class TestSnapshotDiffManager {
                                             CancelMessage cancelMessage)
       throws IOException {
 
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
 
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     UUID fromSnapshotUUID = UUID.randomUUID();
     UUID toSnapshotUUID = UUID.randomUUID();
@@ -1095,11 +1094,11 @@ public class TestSnapshotDiffManager {
 
   @Test
   public void testCancelNewSnapshotDiff() throws IOException {
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
 
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     UUID fromSnapshotUUID = UUID.randomUUID();
     UUID toSnapshotUUID = UUID.randomUUID();
@@ -1138,10 +1137,10 @@ public class TestSnapshotDiffManager {
                                        boolean listAllStatus,
                                        boolean containsJob)
       throws IOException {
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     UUID fromSnapshotUUID = UUID.randomUUID();
     UUID toSnapshotUUID = UUID.randomUUID();
@@ -1200,10 +1199,10 @@ public class TestSnapshotDiffManager {
 
   @Test
   public void testListSnapDiffWithInvalidStatus() throws IOException {
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     UUID fromSnapshotUUID = UUID.randomUUID();
     UUID toSnapshotUUID = UUID.randomUUID();
@@ -1256,10 +1255,10 @@ public class TestSnapshotDiffManager {
 
   @Test
   public void testGenerateDiffReportFailure() throws IOException {
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
-    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
+    String fromSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     PersistentMap<byte[], Boolean> objectIdToIsDirectoryMap =
         new SnapshotTestUtils.StubbedPersistentMap<>();
@@ -1513,12 +1512,9 @@ public class TestSnapshotDiffManager {
       String volumeName, String bucketName)
       throws IOException {
     Map<BucketLayout, String> keyTableMap = new HashMap<>();
-    keyTableMap.put(BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        OmMetadataManagerImpl.FILE_TABLE);
-    keyTableMap.put(BucketLayout.OBJECT_STORE,
-        OmMetadataManagerImpl.KEY_TABLE);
-    keyTableMap.put(BucketLayout.LEGACY,
-        OmMetadataManagerImpl.KEY_TABLE);
+    keyTableMap.put(BucketLayout.FILE_SYSTEM_OPTIMIZED, FILE_TABLE);
+    keyTableMap.put(BucketLayout.OBJECT_STORE, KEY_TABLE);
+    keyTableMap.put(BucketLayout.LEGACY, KEY_TABLE);
 
     for (Map.Entry<BucketLayout, String> entry : keyTableMap.entrySet()) {
       when(omMetadataManager.getKeyTable(entry.getKey()))

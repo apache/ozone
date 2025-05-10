@@ -32,7 +32,7 @@ public class TestOMHAMetrics {
   private static final MetricsCollectorImpl METRICS_COLLECTOR =
       new MetricsCollectorImpl();
   private static final String NODE_ID =
-      "om" + RandomStringUtils.randomNumeric(5);
+      "om" + RandomStringUtils.secure().nextNumeric(5);
   private OMHAMetrics omhaMetrics;
   private String leaderId;
 
@@ -52,7 +52,7 @@ public class TestOMHAMetrics {
 
   @Test
   public void testGetMetricsWithFollower() {
-    leaderId = "om" + RandomStringUtils.randomNumeric(5);
+    leaderId = "om" + RandomStringUtils.secure().nextNumeric(5);
     omhaMetrics = OMHAMetrics.create(NODE_ID, leaderId);
 
     omhaMetrics.getMetrics(METRICS_COLLECTOR, true);

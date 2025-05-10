@@ -441,7 +441,7 @@ public class TestECKeyOutputStream {
     PipelineManager pm =
         cluster.getStorageContainerManager().getPipelineManager();
     for (Pipeline p : pm.getPipelines(repConfig)) {
-      pm.closePipeline(p, true);
+      pm.closePipeline(p.getId());
     }
 
     String keyName = UUID.randomUUID().toString();

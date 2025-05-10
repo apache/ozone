@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -89,7 +90,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 
 public class TestReplicationManagerScenarios {
-  private static final Map<String, UUID> ORIGINS = new HashMap<>();
+  private static final Map<String, DatanodeID> ORIGINS = new HashMap<>();
   private static final Map<String, DatanodeDetails> DATANODE_ALIASES
       = new HashMap<>();
   private static final Map<DatanodeDetails, NodeStatus> NODE_STATUS_MAP
@@ -238,8 +239,8 @@ public class TestReplicationManagerScenarios {
     };
   }
 
-  protected static UUID getOrCreateOrigin(String origin) {
-    return ORIGINS.computeIfAbsent(origin, (k) -> UUID.randomUUID());
+  protected static DatanodeID getOrCreateOrigin(String origin) {
+    return ORIGINS.computeIfAbsent(origin, k -> DatanodeID.randomID());
   }
 
   private static Stream<Scenario> getTestScenarios() {
@@ -382,7 +383,7 @@ public class TestReplicationManagerScenarios {
     private long used = 10;
     private boolean isEmpty = false;
     private String origin;
-    private UUID originId;
+    private DatanodeID originId;
 
     public void setContainerId(long containerId) {
       this.containerId = containerId;
@@ -481,7 +482,7 @@ public class TestReplicationManagerScenarios {
       if (origin != null) {
         originId = getOrCreateOrigin(origin);
       } else {
-        originId = UUID.randomUUID();
+        originId = DatanodeID.randomID();
       }
     }
   }

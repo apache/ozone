@@ -223,7 +223,6 @@ public class ReconTestInjector {
     return configuration;
   }
 
-
   /**
    * Builder for Recon Test Injector.
    */

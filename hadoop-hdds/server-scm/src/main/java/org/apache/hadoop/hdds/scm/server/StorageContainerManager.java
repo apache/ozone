@@ -1378,12 +1378,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public static SCMMetrics getMetrics() {
     return metrics == null ? SCMMetrics.create() : metrics;
   }
+
   /**
    * Initialize SCMPerformance metrics.
    */
   public static void initPerfMetrics() {
     perfMetrics = SCMPerformanceMetrics.create();
   }
+
   /**
    * Return SCMPerformance metrics instance.
    */
@@ -1575,8 +1577,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           getScmSecurityClientWithMaxRetry(configuration, getCurrentUser()).listCACertificate();
       // Write the primary SCM CA and Root CA during startup.
       for (String cert : pemEncodedCerts) {
-        X509Certificate x509Certificate = CertificateCodec.getX509Certificate(
-            cert, CertificateCodec::toIOException);
+        final X509Certificate x509Certificate = CertificateCodec.readX509Certificate(cert);
         if (certificateStore.getCertificateByID(x509Certificate.getSerialNumber()) == null) {
           LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
                   "{}", x509Certificate.getSerialNumber(),
@@ -2013,6 +2014,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public String getNamespace() {
     return scmHANodeDetails.getLocalNodeDetails().getServiceId();
   }
+
   /**
    * Get the safe mode status of all rules.
    *

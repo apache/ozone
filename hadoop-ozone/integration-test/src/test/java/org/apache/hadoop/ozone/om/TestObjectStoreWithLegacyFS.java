@@ -58,7 +58,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +65,6 @@ import org.slf4j.LoggerFactory;
  * Test verifies object store with OZONE_OM_ENABLE_FILESYSTEM_PATHS enabled.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(200)
 public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase {
 
   private OzoneClient client;
@@ -99,8 +97,8 @@ public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase
 
   @BeforeEach
   public void init() throws Exception {
-    volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    volumeName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
+    bucketName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,

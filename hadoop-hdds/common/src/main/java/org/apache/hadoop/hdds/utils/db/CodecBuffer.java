@@ -79,6 +79,7 @@ public class CodecBuffer implements UncheckedAutoCloseable {
   private static class Factory {
     private static volatile BiFunction<ByteBuf, Object, CodecBuffer> constructor
         = CodecBuffer::new;
+
     static void set(BiFunction<ByteBuf, Object, CodecBuffer> f, String name) {
       constructor = f;
       LOG.info("Successfully set constructor to {}: {}", name, f);
@@ -461,16 +462,16 @@ public class CodecBuffer implements UncheckedAutoCloseable {
    * @param source put bytes to an {@link OutputStream} and return the size.
    *               The returned size must be non-null and non-negative.
    * @return this object.
-   * @throws IOException in case the source throws an {@link IOException}.
+   * @throws CodecException in case the source throws an {@link IOException}.
    */
-  public CodecBuffer put(
-      CheckedFunction<OutputStream, Integer, IOException> source)
-      throws IOException {
+  public CodecBuffer put(CheckedFunction<OutputStream, Integer, IOException> source) throws CodecException {
     assertRefCnt(1);
     final int w = buf.writerIndex();
     final int size;
     try (ByteBufOutputStream out = new ByteBufOutputStream(buf)) {
       size = source.apply(out);
+    } catch (IOException e) {
+      throw new CodecException("Failed to apply source to " + this + ", " + source, e);
     }
     final ByteBuf returned = buf.setIndex(buf.readerIndex(), w + size);
     Preconditions.assertSame(buf, returned, "buf");

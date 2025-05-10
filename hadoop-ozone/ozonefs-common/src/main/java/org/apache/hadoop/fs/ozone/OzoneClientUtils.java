@@ -56,9 +56,11 @@ import org.slf4j.LoggerFactory;
 public final class OzoneClientUtils {
   static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientUtils.class);
+
   private OzoneClientUtils() {
     // Not used.
   }
+
   public static BucketLayout resolveLinkBucketLayout(OzoneBucket bucket,
                                                      ObjectStore objectStore,
                                                      Set<Pair<String,
