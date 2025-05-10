@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
@@ -815,14 +816,14 @@ public class TestContainerStateMachineFailures {
 
   private void induceFollowerFailure(OmKeyLocationInfo omKeyLocationInfo,
                                      int failureCount) {
-    UUID leader = omKeyLocationInfo.getPipeline().getLeaderId();
+    DatanodeID leader = omKeyLocationInfo.getPipeline().getLeaderId();
     Set<HddsDatanodeService> datanodeSet =
         TestHelper.getDatanodeServices(cluster,
             omKeyLocationInfo.getPipeline());
     int count = 0;
     for (HddsDatanodeService dn : datanodeSet) {
-      UUID dnUuid = dn.getDatanodeDetails().getUuid();
-      if (!dnUuid.equals(leader)) {
+      DatanodeID dnId = dn.getDatanodeDetails().getID();
+      if (!dnId.equals(leader)) {
         count++;
         long containerID = omKeyLocationInfo.getContainerID();
         Container container = dn

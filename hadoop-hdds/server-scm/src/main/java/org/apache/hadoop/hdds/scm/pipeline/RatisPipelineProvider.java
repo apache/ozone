@@ -192,7 +192,7 @@ public class RatisPipelineProvider
         .setReplicationConfig(RatisReplicationConfig.getInstance(factor))
         .setNodes(dns)
         .setSuggestedLeaderId(
-            suggestedLeader != null ? suggestedLeader.getUuid() : null)
+            suggestedLeader != null ? suggestedLeader.getID() : null)
         .build();
 
     // Send command to datanodes to create pipeline
