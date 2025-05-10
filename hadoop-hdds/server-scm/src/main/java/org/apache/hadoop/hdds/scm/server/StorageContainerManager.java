@@ -1975,6 +1975,22 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return true;
   }
 
+  /**
+   * Allow SCM into safe mode.
+   */
+  public boolean enterSafeMode() {
+    scmSafeModeManager.enterManualSafeMode();
+    return true;
+  }
+
+  /**
+   * Returns manual safe mode status.
+   * @return boolean
+   */
+  public boolean inManualSafeMode() {
+    return scmSafeModeManager.isManualSafeModeEnabled();
+  }
+
   @VisibleForTesting
   public double getCurrentContainerThreshold() {
     return scmSafeModeManager.getCurrentContainerThreshold();

@@ -42,6 +42,28 @@ Incomplete command
                         Should contain   ${output}   exit
                         Should contain   ${output}   wait
 
+Verify entering and status for manual safemode
+    # Enter Safe Mode
+    ${output} =         Execute           ozone admin safemode enter
+                        Should Contain    ${output}    SCM entered to safe mode successfully
+
+    # Verify Safe Mode Status
+    ${output} =         Execute           ozone admin safemode status
+                        Should Contain    ${output}    SCM is in manual safe mode
+
+Verify wait on manual safemode
+    ${output} =         Execute          ozone admin safemode wait -t 2
+                        Should contain   ${output}   SCM is in manual safe mode. Manual intervention is required
+
+Verify Exit and Status for manual safemode
+    # Exit Safe Mode
+    ${output} =         Execute            ozone admin safemode exit
+                        Should Contain     ${output}   SCM exit safe mode successfully
+
+    # Verify Status After Exiting Safe Mode
+    ${output} =         Execute             ozone admin safemode status
+                        Should Contain    ${output}    SCM is out of safe mode
+
 #Check safemode on unknown host
 #    ${output} =         Execute And Ignore Error     ozone admin --verbose safemode status --scm unknown-host
 #                        Should contain   ${output}   Invalid host name
