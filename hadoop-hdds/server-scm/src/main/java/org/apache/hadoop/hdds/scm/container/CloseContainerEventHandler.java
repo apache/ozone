@@ -158,7 +158,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
       throws ContainerNotFoundException {
     getNodes(container).forEach(node ->
         publisher.fireEvent(DATANODE_COMMAND,
-            new CommandForDatanode<>(node.getUuid(), command)));
+            new CommandForDatanode<>(node, command)));
     return null;
   }
 
