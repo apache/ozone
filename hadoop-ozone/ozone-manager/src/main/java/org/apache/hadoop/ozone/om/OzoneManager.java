@@ -4996,15 +4996,40 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            boolean forceFullDiff,
                                            boolean disableNativeDiff)
       throws IOException {
-    // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
-    // permission check, since linked bucket permissions and source bucket permissions could be different.
-    ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
-    if (isAclEnabled) {
-      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-          ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.VOLUME, volume);
+    auditMap.put(OzoneConsts.BUCKET, bucket);
+    auditMap.put(OzoneConsts.FROM_SNAPSHOT, fromSnapshot);
+    auditMap.put(OzoneConsts.TO_SNAPSHOT, toSnapshot);
+    auditMap.put(OzoneConsts.TOKEN, token);
+    auditMap.put(OzoneConsts.PAGE_SIZE, String.valueOf(pageSize));
+    auditMap.put(OzoneConsts.FORCE_FULL_DIFF, String.valueOf(forceFullDiff));
+    auditMap.put(OzoneConsts.DISABLE_NATIVE_DIFF, String.valueOf(disableNativeDiff));
+
+    try {
+      // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+      // permission check, since linked bucket permissions and source bucket permissions could be different.
+      ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+      }
+      // do not increment snapshot diff job metrics here, since it is not
+      // a job, but a request.
+      return omSnapshotManager.getSnapshotDiffReport(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
+          fromSnapshot, toSnapshot, token, pageSize, forceFullDiff, disableNativeDiff);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.GET_SNAPSHOT_DIFF_REPORT,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.GET_SNAPSHOT_DIFF_REPORT,
+            auditMap));
+      }
     }
-    return omSnapshotManager.getSnapshotDiffReport(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
-        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff, disableNativeDiff);
   }
 
   @Override
@@ -5013,13 +5038,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                                        String fromSnapshot,
                                                        String toSnapshot)
       throws IOException {
-    ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
-    if (isAclEnabled) {
-      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-          ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.VOLUME, volume);
+    auditMap.put(OzoneConsts.BUCKET, bucket);
+    auditMap.put(OzoneConsts.FROM_SNAPSHOT, fromSnapshot);
+    auditMap.put(OzoneConsts.TO_SNAPSHOT, toSnapshot);
+
+    try {
+      ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+      }
+      return omSnapshotManager.cancelSnapshotDiff(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
+          fromSnapshot, toSnapshot);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.CANCEL_SNAPSHOT_DIFF_JOBS,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.CANCEL_SNAPSHOT_DIFF_JOBS,
+            auditMap));
+      }
     }
-    return omSnapshotManager.cancelSnapshotDiff(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
-        fromSnapshot, toSnapshot);
   }
 
   @Override
@@ -5030,13 +5074,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       boolean listAllStatus,
       String prevSnapshotDiffJob,
       int maxListResult) throws IOException {
-    ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
-    if (isAclEnabled) {
-      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, volume, bucket, null);
-    }
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.VOLUME, volume);
+    auditMap.put(OzoneConsts.BUCKET, bucket);
+    auditMap.put(OzoneConsts.JOB_STATUS, jobStatus);
 
-    return omSnapshotManager.getSnapshotDiffList(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
-        jobStatus, listAllStatus, prevSnapshotDiffJob, maxListResult);
+    try {
+      ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, volume, bucket, null);
+      }
+
+      return omSnapshotManager.getSnapshotDiffList(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
+          jobStatus, listAllStatus, prevSnapshotDiffJob, maxListResult);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_SNAPSHOT_DIFF_JOBS,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_SNAPSHOT_DIFF_JOBS,
+            auditMap));
+      }
+    }
   }
 
   private String reconfOzoneAdmins(String newVal) {
