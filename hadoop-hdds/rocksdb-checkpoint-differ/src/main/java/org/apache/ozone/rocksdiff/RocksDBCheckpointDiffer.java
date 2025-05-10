@@ -21,7 +21,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -36,6 +41,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,8 +52,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,10 +68,17 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.Scheduler;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -138,6 +153,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   static final String SST_FILE_EXTENSION = ".sst";
   public static final int SST_FILE_EXTENSION_LENGTH =
       SST_FILE_EXTENSION.length();
+  static final String PRUNED_SST_FILE_TEMP = "pruned.sst.tmp";
 
   private static final int LONG_MAX_STR_LEN =
       String.valueOf(Long.MAX_VALUE).length();
@@ -153,7 +169,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private final long maxAllowedTimeInDag;
   private final BootstrapStateHandler.Lock lock
       = new BootstrapStateHandler.Lock();
-
+  private static final int SST_READ_AHEAD_SIZE = 2 * 1024 * 1024;
+  private int pruneSSTFileBatchSize;
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
   private static final String DAG_PRUNING_SERVICE_NAME = "CompactionDagPruningService";
   private AtomicBoolean suspended;
@@ -161,6 +178,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private ColumnFamilyHandle compactionLogTableCFHandle;
   private ManagedRocksDB activeRocksDB;
   private final ConcurrentMap<String, CompactionFileInfo> inflightCompactions;
+  private Queue<byte[]> pruneQueue = null;
 
   /**
    * For snapshot diff calculation we only need to track following column
@@ -217,6 +235,19 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
 
+    this.pruneSSTFileBatchSize = configuration.getInt(
+        OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE,
+        OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT);
+    try {
+      if (configuration.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB, OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)
+          && ManagedRawSSTFileReader.loadLibrary()) {
+        pruneQueue = new ConcurrentLinkedQueue<>();
+      }
+    } catch (NativeLibraryNotLoadedException e) {
+      LOG.warn("Native Library for raw sst file reading loading failed." +
+          " Cannot prune OMKeyInfo from SST files. {}", e.getMessage());
+    }
+
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
       this.scheduler = new Scheduler(DAG_PRUNING_SERVICE_NAME,
           true, 1);
@@ -231,8 +262,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           this::pruneSstFiles,
           pruneCompactionDagDaemonRunIntervalInMs,
           pruneCompactionDagDaemonRunIntervalInMs,
-          TimeUnit.MILLISECONDS
-      );
+          TimeUnit.MILLISECONDS);
+
+      if (pruneQueue != null) {
+        this.scheduler.scheduleWithFixedDelay(
+            this::pruneSstFileValues,
+            pruneCompactionDagDaemonRunIntervalInMs,
+            pruneCompactionDagDaemonRunIntervalInMs,
+            TimeUnit.MILLISECONDS);
+      }
     } else {
       this.scheduler = null;
     }
@@ -466,6 +504,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         }
 
         CompactionLogEntry compactionLogEntry = builder.build();
+        byte[] key;
         synchronized (this) {
           if (closed) {
             return;
@@ -478,7 +517,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           }
 
           // Add the compaction log entry to Compaction log table.
-          addToCompactionLogTable(compactionLogEntry);
+          key = addToCompactionLogTable(compactionLogEntry);
 
           // Populate the DAG
           compactionDag.populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
@@ -488,12 +527,17 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             inflightCompactions.remove(inputFile);
           }
         }
+        // Add the compaction log entry to the prune queue
+        // so that the backup input sst files can be pruned.
+        if (pruneQueue != null) {
+          pruneQueue.offer(key);
+        }
       }
     };
   }
 
   @VisibleForTesting
-  void addToCompactionLogTable(CompactionLogEntry compactionLogEntry) {
+  byte[] addToCompactionLogTable(CompactionLogEntry compactionLogEntry) {
     String dbSequenceIdStr =
         String.valueOf(compactionLogEntry.getDbSequenceNumber());
 
@@ -518,6 +562,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       // TODO: Revisit exception handling before merging the PR.
       throw new RuntimeException(exception);
     }
+    return key;
   }
 
   /**
@@ -697,6 +742,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             CompactionLogEntry.getFromProtobuf(CompactionLogEntryProto.parseFrom(value));
         compactionDag.populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
             compactionLogEntry.getOutputFileInfoList(), compactionLogEntry.getDbSequenceNumber());
+        // Add the compaction log entry to the prune queue so that the backup input sst files can be pruned.
+        if (pruneQueue != null) {
+          pruneQueue.offer(managedRocksIterator.get().key());
+        }
         managedRocksIterator.get().next();
       }
     } catch (InvalidProtocolBufferException e) {
@@ -1197,6 +1246,109 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       removeSstFiles(nonLeafSstFiles);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Defines the task that removes OMKeyInfo from SST files from backup directory to
+   * save disk space.
+   */
+  public void pruneSstFileValues() {
+    if (!shouldRun()) {
+      return;
+    }
+
+    Path sstBackupDirPath = Paths.get(sstBackupDir);
+    Path prunedSSTFilePath = sstBackupDirPath.resolve(PRUNED_SST_FILE_TEMP);
+    try (ManagedOptions managedOptions = new ManagedOptions();
+         ManagedEnvOptions envOptions = new ManagedEnvOptions();
+         ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions)) {
+      byte[] compactionLogEntryKey;
+      int batchCounter = 0;
+      while ((compactionLogEntryKey = pruneQueue.peek()) != null && ++batchCounter <= pruneSSTFileBatchSize) {
+        CompactionLogEntry compactionLogEntry;
+        synchronized (this) {
+          try {
+            compactionLogEntry = CompactionLogEntry.getCodec().fromPersistedFormat(
+                activeRocksDB.get().get(compactionLogTableCFHandle, compactionLogEntryKey));
+          } catch (RocksDBException ex) {
+            throw new RocksDatabaseException("Failed to get compaction log entry.", ex);
+          }
+
+          boolean shouldUpdateTable = false;
+          List<CompactionFileInfo> fileInfoList = compactionLogEntry.getInputFileInfoList();
+          List<CompactionFileInfo> updatedFileInfoList = new ArrayList<>();
+          for (CompactionFileInfo fileInfo : fileInfoList) {
+            if (fileInfo.isPruned()) {
+              updatedFileInfoList.add(fileInfo);
+              continue;
+            }
+            Path sstFilePath = sstBackupDirPath.resolve(fileInfo.getFileName() + ROCKSDB_SST_SUFFIX);
+            if (Files.notExists(sstFilePath)) {
+              LOG.debug("Skipping pruning SST file {} as it does not exist in backup directory.", sstFilePath);
+              updatedFileInfoList.add(fileInfo);
+              continue;
+            }
+
+            // Write the file.sst => pruned.sst.tmp
+            Files.deleteIfExists(prunedSSTFilePath);
+            try (ManagedRawSSTFileReader<Pair<byte[], Integer>> sstFileReader = new ManagedRawSSTFileReader<>(
+                     managedOptions, sstFilePath.toFile().getAbsolutePath(), SST_READ_AHEAD_SIZE);
+                 ManagedRawSSTFileIterator<Pair<byte[], Integer>> itr = sstFileReader.newIterator(
+                     keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null)) {
+              sstFileWriter.open(prunedSSTFilePath.toFile().getAbsolutePath());
+              while (itr.hasNext()) {
+                Pair<byte[], Integer> keyValue = itr.next();
+                if (keyValue.getValue() == 0) {
+                  sstFileWriter.delete(keyValue.getKey());
+                } else {
+                  sstFileWriter.put(keyValue.getKey(), new byte[0]);
+                }
+              }
+            } catch (RocksDBException ex) {
+              throw new RocksDatabaseException("Failed to write pruned entries for " + sstFilePath, ex);
+            } finally {
+              try {
+                sstFileWriter.finish();
+              } catch (RocksDBException ex) {
+                throw new RocksDatabaseException("Failed to close SSTFileWriter writing to path: "
+                    + prunedSSTFilePath, ex);
+              }
+            }
+
+            // Move file.sst.tmp to file.sst and replace existing file atomically
+            try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+              Files.move(prunedSSTFilePath, sstFilePath,
+                  StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            }
+            shouldUpdateTable = true;
+            fileInfo.setPruned();
+            updatedFileInfoList.add(fileInfo);
+            LOG.debug("Completed pruning OMKeyInfo from {}", sstFilePath);
+          }
+
+          // Update Compaction Log table. Track keys that need updating.
+          if (shouldUpdateTable) {
+            CompactionLogEntry.Builder builder = new CompactionLogEntry.Builder(
+                compactionLogEntry.getDbSequenceNumber(), compactionLogEntry.getCompactionTime(),
+                updatedFileInfoList, compactionLogEntry.getOutputFileInfoList());
+            String compactionReason = compactionLogEntry.getCompactionReason();
+            if (compactionReason != null) {
+              builder.setCompactionReason(compactionReason);
+            }
+            try {
+              activeRocksDB.get().put(compactionLogTableCFHandle, compactionLogEntryKey,
+                  builder.build().getProtobuf().toByteArray());
+            } catch (RocksDBException ex) {
+              throw new RocksDatabaseException("Failed to update the compaction log table for entry: "
+                  + compactionLogEntry, ex);
+            }
+          }
+        }
+        pruneQueue.poll();
+      }
+    } catch (IOException | InterruptedException e) {
+      LOG.error("Could not prune source OMKeyInfo from backup SST files.", e);
     }
   }
 
