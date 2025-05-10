@@ -36,11 +36,6 @@ public class CommandForDatanode<T extends Message> implements
     this(datanode.getID(), command);
   }
 
-  // TODO: Command for datanode should take DatanodeDetails as parameter.
-  public CommandForDatanode(UUID datanodeId, SCMCommand<T> command) {
-    this(DatanodeID.of(datanodeId), command);
-  }
-
   public CommandForDatanode(DatanodeID datanodeId, SCMCommand<T> command) {
     this.datanodeId = datanodeId;
     this.command = command;
