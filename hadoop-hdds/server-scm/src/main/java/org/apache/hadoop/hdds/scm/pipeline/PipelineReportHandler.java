@@ -153,7 +153,7 @@ public class PipelineReportHandler implements
     if (report.getIsLeader() ||
         RatisReplicationConfig.hasFactor(pipeline.getReplicationConfig(),
             ReplicationFactor.ONE)) {
-      pipeline.setLeaderId(dn.getUuid());
+      pipeline.setLeaderId(dn.getID());
       metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
     }
   }
