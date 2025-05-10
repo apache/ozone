@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,7 @@ import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
 import software.amazon.awssdk.services.s3.model.CreateMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
@@ -127,6 +129,20 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  public void listBuckets() throws Exception {
+    final String bucketName = getBucketName();
+    final String expectedOwner = UserGroupInformation.getCurrentUser().getUserName();
+
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    ListBucketsResponse syncResponse = s3Client.listBuckets();
+    assertEquals(1, syncResponse.buckets().size());
+    assertEquals(bucketName, syncResponse.buckets().get(0).name());
+    assertEquals(expectedOwner, syncResponse.owner().displayName());
+    assertEquals(expectedOwner, syncResponse.owner().id());
   }
 
   @Test
