@@ -85,6 +85,6 @@ run_robot_test objectmultidelete
 run_robot_test objecthead
 run_robot_test MultipartUpload
 run_robot_test objecttagging
-run_robot_test maxkeys_validation
+run_robot_test objectlist
 
 rebot --outputdir results/ results/*.xml
