@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -83,6 +84,8 @@ public class TestObjectTaggingDelete {
     body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Create a key with object tags
     Mockito.when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
+    Mockito.when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
     rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
         1, null, null, null, body);
 

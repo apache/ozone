@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -121,6 +122,8 @@ public class TestMultipartUploadWithCopy {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
 
     REST.setHeaders(headers);
     REST.setClient(CLIENT);
@@ -434,6 +437,8 @@ public class TestMultipartUploadWithCopy {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
 
     additionalHeaders
         .forEach((k, v) -> when(headers.getHeaderString(k)).thenReturn(v));
