@@ -24,7 +24,7 @@ import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import org.apache.hadoop.conf.ReconfigurableBase;
+import org.apache.hadoop.hdds.conf.ReconfigurableBase;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
