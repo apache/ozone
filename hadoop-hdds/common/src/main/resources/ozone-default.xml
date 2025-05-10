@@ -1963,6 +1963,15 @@
   </property>
 
   <property>
+    <name>ozone.s3g.list.max.keys.limit</name>
+    <value>1000</value>
+    <description>
+      Maximum number of keys returned by S3 ListObjects/ListObjectsV2 API.
+      AWS default is 1000. Can be overridden per deployment in ozone-site.xml.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.secret.http.enabled</name>
     <value>false</value>
     <tag>OZONE, S3GATEWAY</tag>
