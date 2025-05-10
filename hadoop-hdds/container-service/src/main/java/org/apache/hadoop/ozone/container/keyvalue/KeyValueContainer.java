@@ -173,6 +173,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           // Set volume before getContainerDBFile(), because we may need the
           // volume to deduce the db file.
           containerData.setVolume(containerVolume);
+          // commit space has been reserved by volumeChoosingPolicy
+          containerData.setCommittedSpace(true);
 
           long containerID = containerData.getContainerID();
           String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
@@ -206,7 +208,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           // Create .container file
           File containerFile = getContainerFile();
           createContainerFile(containerFile);
-
           return;
         } catch (StorageContainerException ex) {
           if (containerMetaDataPath != null
