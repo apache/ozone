@@ -386,16 +386,16 @@ public class TestSCMSafeModeManager {
   }
 
   private void checkHealthy(int expectedCount) throws Exception {
-    GenericTestUtils.waitFor(() -> SafeModeRuleFactory.getInstance()
-            .getSafeModeRule(HealthyPipelineSafeModeRule.class)
-            .getCurrentHealthyPipelineCount() == expectedCount,
+    final HealthyPipelineSafeModeRule pipelineRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(HealthyPipelineSafeModeRule.class);
+    GenericTestUtils.waitFor(() -> pipelineRule.getCurrentHealthyPipelineCount() == expectedCount,
         100,  5000);
   }
 
   private void checkOpen(int expectedCount) throws Exception {
-    GenericTestUtils.waitFor(() -> SafeModeRuleFactory.getInstance()
-            .getSafeModeRule(OneReplicaPipelineSafeModeRule.class)
-            .getCurrentReportedPipelineCount() == expectedCount,
+    final OneReplicaPipelineSafeModeRule pipelineRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(OneReplicaPipelineSafeModeRule.class);
+    GenericTestUtils.waitFor(() -> pipelineRule.getCurrentReportedPipelineCount() == expectedCount,
         1000,  5000);
   }
 
@@ -618,11 +618,11 @@ public class TestSCMSafeModeManager {
         nodeRegistrationContainerReport);
     queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT,
         nodeRegistrationContainerReport);
-    GenericTestUtils.waitFor(() -> {
-      double threshold = SafeModeRuleFactory.getInstance()
-          .getSafeModeRule(RatisContainerSafeModeRule.class).getCurrentContainerThreshold();
-      return threshold == expectedThreshold;
-    }, 100, 2000 * 9);
+    final RatisContainerSafeModeRule containerRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(RatisContainerSafeModeRule.class);
+    GenericTestUtils.waitFor(() ->
+        containerRule.getCurrentContainerThreshold() == expectedThreshold,
+        100, 2000 * 9);
   }
 
   /**
@@ -653,11 +653,10 @@ public class TestSCMSafeModeManager {
     }
 
     // Step2. Wait for the threshold to be reached.
-    GenericTestUtils.waitFor(() -> {
-      double threshold = SafeModeRuleFactory.getInstance()
-          .getSafeModeRule(ECContainerSafeModeRule.class).getCurrentContainerThreshold();
-      return threshold == expectedThreshold;
-    }, 100, 2000 * 9);
+    ECContainerSafeModeRule containerRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(ECContainerSafeModeRule.class);
+    GenericTestUtils.waitFor(() -> containerRule.getCurrentContainerThreshold() == expectedThreshold,
+        100, 2000 * 9);
   }
 
   @Test

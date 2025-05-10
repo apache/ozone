@@ -161,7 +161,6 @@ public class SCMSafeModeManager implements SafeModeManager {
    * When all the precheck rules have been validated, set preCheckComplete to
    * true and then emit the safemode status so any listeners get notified of
    * the safemode state change.
-   * @param eventQueue
    */
   private void completePreCheck() {
     if (validatedPreCheckRules.size() == preCheckRules.size()) {
