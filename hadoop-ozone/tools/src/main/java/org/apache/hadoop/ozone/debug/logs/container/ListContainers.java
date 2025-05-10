@@ -21,7 +21,7 @@ import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListLimitOptions;
 import picocli.CommandLine;
 
 
@@ -41,7 +41,7 @@ public class ListContainers implements Callable<Void> {
   private HddsProtos.LifeCycleState state;
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
+  private ListLimitOptions listOptions;
 
   @CommandLine.ParentCommand
   private ContainerLogController parent;
