@@ -1534,6 +1534,7 @@ public class TestSnapshotDiffManager {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     when(bucketInfoTable.get(bucketKey)).thenReturn(bucketInfo);
   }
+
   @Test
   public void testGetDeltaFilesWithFullDiff() throws  IOException {
     SnapshotDiffManager spy = spy(snapshotDiffManager);
