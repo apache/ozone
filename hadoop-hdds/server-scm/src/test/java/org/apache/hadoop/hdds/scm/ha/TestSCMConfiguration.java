@@ -211,7 +211,6 @@ class TestSCMConfiguration {
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
   }
 
-
   @Test
   public void testSamePortConfig() throws Exception {
     String scmServiceId = "scmserviceId";

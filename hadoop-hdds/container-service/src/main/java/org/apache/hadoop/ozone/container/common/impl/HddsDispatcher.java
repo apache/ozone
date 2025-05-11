@@ -178,8 +178,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void buildMissingContainerSetAndValidate(
       Map<Long, Long> container2BCSIDMap) {
-    containerSet
-        .buildMissingContainerSetAndValidate(container2BCSIDMap);
+    containerSet.buildMissingContainerSetAndValidate(container2BCSIDMap, n -> n);
   }
 
   @Override
@@ -459,6 +458,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       container2BCSIDMap.computeIfPresent(containerId, (u, v) -> v = bcsID);
     }
   }
+
   /**
    * Create a container using the input container request.
    * @param containerRequest - the container request which requires container

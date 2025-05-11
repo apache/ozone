@@ -214,6 +214,7 @@ public final class HttpServer2 implements FilterContainer {
   private static final String X_FRAME_OPTIONS = "X-FRAME-OPTIONS";
   private static final Pattern PATTERN_HTTP_HEADER_REGEX =
       Pattern.compile(HTTP_HEADER_REGEX);
+
   /**
    * Class to construct instances of HTTP server with specific options.
    */
@@ -1409,7 +1410,7 @@ public final class HttpServer2 implements FilterContainer {
             : STATE_DESCRIPTION_NOT_LIVE)
         .append("), listening at:");
     for (ServerConnector l : listeners) {
-      sb.append(l.getHost()).append(":").append(l.getPort()).append("/,");
+      sb.append(l.getHost()).append(':').append(l.getPort()).append("/,");
     }
     return sb.toString();
   }
@@ -1508,7 +1509,6 @@ public final class HttpServer2 implements FilterContainer {
         UserGroupInformation.createRemoteUser(remoteUser);
     return adminsAcl != null && adminsAcl.isUserAllowed(remoteUserUGI);
   }
-
 
   /**
    * A very simple servlet to serve up a text representation of the current
@@ -1703,11 +1703,11 @@ public final class HttpServer2 implements FilterContainer {
   public enum XFrameOption {
     DENY("DENY"), SAMEORIGIN("SAMEORIGIN"), ALLOWFROM("ALLOW-FROM");
 
+    private final String name;
+
     XFrameOption(String name) {
       this.name = name;
     }
-
-    private final String name;
 
     @Override
     public String toString() {

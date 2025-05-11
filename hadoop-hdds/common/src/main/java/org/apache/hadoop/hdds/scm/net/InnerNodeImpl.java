@@ -37,25 +37,15 @@ import org.slf4j.LoggerFactory;
  * A thread safe class that implements InnerNode interface.
  */
 public class InnerNodeImpl extends NodeImpl implements InnerNode {
-  protected static class Factory implements InnerNode.Factory<InnerNodeImpl> {
-    protected Factory() { }
-
-    @Override
-    public InnerNodeImpl newInnerNode(String name, String location,
-        InnerNode parent, int level, int cost) {
-      return new InnerNodeImpl(name, location, parent, level, cost);
-    }
-  }
+  // LOGGER
+  private static final Logger LOG = LoggerFactory.getLogger(InnerNodeImpl.class);
 
   public static final Factory FACTORY = new Factory();
   // a map of node's network name to Node for quick search and keep
   // the insert order
-  private HashMap<String, Node> childrenMap =
-      new LinkedHashMap<String, Node>();
+  private HashMap<String, Node> childrenMap = new LinkedHashMap<String, Node>();
   // number of descendant leaves under this node
   private int numOfLeaves;
-  // LOGGER
-  private static final Logger LOG = LoggerFactory.getLogger(InnerNodeImpl.class);
 
   /**
    * Construct an InnerNode from its name, network location, parent, level and
@@ -686,5 +676,15 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
           excludedScopeNode.getNumOfLeaves());
     }
     return nodeCounts;
+  }
+
+  protected static class Factory implements InnerNode.Factory<InnerNodeImpl> {
+    protected Factory() { }
+
+    @Override
+    public InnerNodeImpl newInnerNode(String name, String location,
+        InnerNode parent, int level, int cost) {
+      return new InnerNodeImpl(name, location, parent, level, cost);
+    }
   }
 }

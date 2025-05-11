@@ -33,17 +33,16 @@ import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests Handler interface.
  */
-@Timeout(300)
 public class TestHandler {
 
   private OzoneConfiguration conf;
@@ -56,6 +55,7 @@ public class TestHandler {
     this.conf = new OzoneConfiguration();
     this.containerSet = mock(ContainerSet.class);
     this.volumeSet = mock(MutableVolumeSet.class);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
     StateContext context = ContainerTestUtils.getMockContext(
         datanodeDetails, conf);
@@ -67,7 +67,7 @@ public class TestHandler {
           Handler.getHandlerForContainerType(
               containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics,
+              containerSet, volumeSet, volumeChoosingPolicy, metrics,
               TestHddsDispatcher.NO_OP_ICR_SENDER));
     }
     this.dispatcher = new HddsDispatcher(

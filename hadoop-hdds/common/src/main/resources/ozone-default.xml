@@ -339,7 +339,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.ratis.leader.first.election.minimum.timeout.duration</name>
+    <name>hdds.raft.server.rpc.first-election.timeout</name>
     <value/>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>ratis Minimum timeout for the first election of a leader.
@@ -1154,7 +1154,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.initial.heartbeat.interval</name>
+    <name>hdds.heartbeat.initial-interval</name>
     <value>2s</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
@@ -1162,7 +1162,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.recon.heartbeat.interval</name>
+    <name>hdds.heartbeat.recon.interval</name>
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
@@ -1170,7 +1170,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.recon.initial.heartbeat.interval</name>
+    <name>hdds.heartbeat.recon.initial-interval</name>
     <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
@@ -1506,6 +1506,43 @@
       number of expired multipart upload. This property is used
       to approximately throttle the number of MPU parts sent
       to the OM.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.compaction.service.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Enable or disable a background job that periodically compacts rocksdb tables flagged for compaction.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.compaction.service.run.interval</name>
+    <value>6h</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      A background job that periodically compacts rocksdb tables flagged for compaction.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.compaction.service.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>A timeout value of compaction service. If this is set
+      greater than 0, the service will stop waiting for compaction
+      completion after this time.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.compaction.service.columnfamilies</name>
+    <value>keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>A comma separated, no spaces list of all the column families
+      that are compacted by the compaction service.
+      If this is empty, no column families are compacted.
     </description>
   </property>
 

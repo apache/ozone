@@ -28,15 +28,15 @@ public final class HddsConfigKeys {
   public static final String HDDS_HEARTBEAT_INTERVAL_DEFAULT =
       "30s";
   public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL =
-      "hdds.initial.heartbeat.interval";
+      "hdds.heartbeat.initial-interval";
   public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
       "2s";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL =
-      "hdds.recon.heartbeat.interval";
+      "hdds.heartbeat.recon.interval";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT =
       "60s";
   public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL =
-      "hdds.recon.initial.heartbeat.interval";
+      "hdds.heartbeat.recon.initial-interval";
   public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
       "2s";
   public static final String HDDS_NODE_REPORT_INTERVAL =
@@ -271,12 +271,6 @@ public final class HddsConfigKeys {
   public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT
       = "10m";
 
-  /**
-   * Do not instantiate.
-   */
-  private HddsConfigKeys() {
-  }
-
   // Enable TLS for GRPC clients/server in ozone.
   public static final String HDDS_GRPC_TLS_ENABLED = "hdds.grpc.tls.enabled";
   public static final boolean HDDS_GRPC_TLS_ENABLED_DEFAULT = false;
@@ -426,4 +420,7 @@ public final class HddsConfigKeys {
   public static final String HDDS_METRICS_PERCENTILES_INTERVALS_KEY =
       "hdds.metrics.percentiles.intervals";
 
+  /** Do not instantiate. */
+  private HddsConfigKeys() {
+  }
 }

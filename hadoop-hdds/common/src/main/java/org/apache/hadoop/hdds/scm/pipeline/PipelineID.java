@@ -34,11 +34,11 @@ public final class PipelineID {
       UuidCodec.get(), PipelineID::valueOf, c -> c.id,
       PipelineID.class, DelegatedCodec.CopyType.SHALLOW);
 
+  private final UUID id;
+
   public static Codec<PipelineID> getCodec() {
     return CODEC;
   }
-
-  private final UUID id;
 
   private PipelineID(UUID id) {
     this.id = id;
@@ -50,6 +50,10 @@ public final class PipelineID {
 
   public static PipelineID valueOf(UUID id) {
     return new PipelineID(id);
+  }
+
+  public static PipelineID valueOf(String id) {
+    return valueOf(UUID.fromString(id));
   }
 
   public UUID getId() {

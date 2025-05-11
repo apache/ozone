@@ -89,6 +89,29 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
+  public void testReplicasVerifyCmd(boolean isEcKey) throws Exception {
+    final String volumeName = UUID.randomUUID().toString();
+    final String bucketName = UUID.randomUUID().toString();
+    final String keyName = UUID.randomUUID().toString();
+
+    writeKey(volumeName, bucketName, keyName, isEcKey, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    String bucketPath = Path.SEPARATOR + volumeName + Path.SEPARATOR + bucketName;
+    String fullKeyPath = bucketPath + Path.SEPARATOR + keyName;
+
+    //TODO HDDS-12715: Create common integration test cluster for debug and repair tools
+    String[] args = new String[] {
+        getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
+        getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY),
+        "replicas", "verify", "--checksums", "--block-existence", fullKeyPath, "--output-dir", "/"//, "--all-results"
+    };
+
+    int exitCode = ozoneDebugShell.execute(args);
+    assertEquals(0, exitCode);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
   public void testChunkInfoCmdBeforeAfterCloseContainer(boolean isEcKey) throws Exception {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();

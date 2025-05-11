@@ -169,12 +169,11 @@ abstract class StringCodecBase implements Codec<String> {
   }
 
   @Override
-  public CodecBuffer toCodecBuffer(@Nonnull String object,
-      CodecBuffer.Allocator allocator) throws IOException {
+  public CodecBuffer toCodecBuffer(@Nonnull String object, CodecBuffer.Allocator allocator) throws CodecException {
     // allocate a larger buffer to avoid encoding twice.
     final int upperBound = getSerializedSizeUpperBound(object);
     final CodecBuffer buffer = allocator.apply(upperBound);
-    buffer.putFromSource(encode(object, null, IOException::new));
+    buffer.putFromSource(encode(object, null, CodecException::new));
     return buffer;
   }
 

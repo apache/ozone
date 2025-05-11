@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedFunction;
 
@@ -194,6 +193,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
    */
   void restartHddsDatanode(DatanodeDetails dn, boolean waitForDatanode)
       throws InterruptedException, TimeoutException, IOException;
+
   /**
    * Shutdown a particular HddsDatanode.
    *
@@ -250,7 +250,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
   }
 
   default String getBaseDir() {
-    return GenericTestUtils.getTempPath(getName());
+    return Builder.getTempPath(getName());
   }
 
   /**
@@ -262,6 +262,10 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected static final int ACTIVE_OMS_NOT_SET = -1;
     protected static final int ACTIVE_SCMS_NOT_SET = -1;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
+
+    private static final String SYSPROP_TEST_DATA_DIR = "test.build.data";
+    private static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
+    private static final boolean WINDOWS = System.getProperty("os.name").startsWith("Windows");
 
     protected OzoneConfiguration conf;
     protected String path;
@@ -296,6 +300,28 @@ public interface MiniOzoneCluster extends AutoCloseable {
       setClusterId();
     }
 
+    /**
+     * Get a temp path. This may or may not be relative; it depends on what the
+     * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
+     * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
+     *
+     * @param subpath sub path, with no leading "/" character
+     * @return a string to use in paths
+     */
+    protected static String getTempPath(String subpath) {
+      String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
+          : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
+
+      if (prop.isEmpty()) {
+        // corner case: property is there but empty
+        prop = DEFAULT_TEST_DATA_PATH;
+      }
+      if (!prop.endsWith("/")) {
+        prop = prop + "/";
+      }
+      return prop + subpath;
+    }
+
     public Builder setSCMConfigurator(SCMConfigurator configurator) {
       this.scmConfigurator = configurator;
       return this;
@@ -303,7 +329,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     private void setClusterId() {
       clusterId = UUID.randomUUID().toString();
-      path = GenericTestUtils.getTempPath(
+      path = getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
     }
 
@@ -383,6 +409,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
   /** Service to manage as part of the mini cluster. */
   interface Service {
     void start(OzoneConfiguration conf) throws Exception;
+
     void stop() throws Exception;
   }
 }

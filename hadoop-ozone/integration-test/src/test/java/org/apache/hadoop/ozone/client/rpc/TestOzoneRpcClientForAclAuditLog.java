@@ -175,7 +175,7 @@ public class TestOzoneRpcClientForAclAuditLog {
 
     String userName = ugi.getUserName();
     String adminName = ugi.getUserName();
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setAdmin(adminName)
@@ -223,7 +223,7 @@ public class TestOzoneRpcClientForAclAuditLog {
 
     String userName = "bilbo";
     String adminName = "bilbo";
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setAdmin(adminName)
