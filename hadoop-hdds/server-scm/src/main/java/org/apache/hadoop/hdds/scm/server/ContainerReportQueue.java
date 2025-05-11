@@ -24,8 +24,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
@@ -40,7 +40,7 @@ import org.jetbrains.annotations.Nullable;
  * avoiding duplicate FCR reports.
  */
 public class ContainerReportQueue
-    implements BlockingQueue<ContainerReport>, IQueueMetrics {
+    implements Queue<ContainerReport>, IQueueMetrics {
 
   private final Integer maxCapacity;
 
@@ -48,8 +48,8 @@ public class ContainerReportQueue
    * i.e. report execution from multiple datanode will be executed in same
    * order as added to queue.
    */
-  private LinkedBlockingQueue<String> orderingQueue
-      = new LinkedBlockingQueue<>();
+  private ConcurrentLinkedQueue<String> orderingQueue
+      = new ConcurrentLinkedQueue<>();
   private Map<String, List<ContainerReport>> dataMap = new HashMap<>();
 
   private int capacity = 0;
@@ -257,16 +257,6 @@ public class ContainerReportQueue
   @Override
   public ContainerReport take() throws InterruptedException {
     String uuid = orderingQueue.take();
-    synchronized (this) {
-      return removeAndGet(uuid);
-    }
-  }
-
-  @Nullable
-  @Override
-  public ContainerReport poll(long timeout, @NotNull TimeUnit unit)
-      throws InterruptedException {
-    String uuid = orderingQueue.poll(timeout, unit);
     synchronized (this) {
       return removeAndGet(uuid);
     }

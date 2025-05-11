@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 
 import java.util.Collections;
+import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -524,7 +525,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     long execWaitThreshold = configuration.getInt(
         ScmUtils.getContainerReportConfPrefix() + ".execute.wait.threshold",
         OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT);
-    List<BlockingQueue<ContainerReport>> queues
+    List<Queue<ContainerReport>> queues
         = ScmUtils.initContainerReportQueue(configuration);
     List<ThreadPoolExecutor> executors
         = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(

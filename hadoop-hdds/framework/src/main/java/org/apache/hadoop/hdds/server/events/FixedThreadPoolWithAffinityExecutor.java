@@ -30,8 +30,10 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -63,7 +65,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
 
   private final EventPublisher eventPublisher;
 
-  private final List<BlockingQueue<Q>> workQueues;
+  private final List<Queue<Q>> workQueues;
 
   private final List<ThreadPoolExecutor> executors;
 
@@ -104,7 +106,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
    */
   public FixedThreadPoolWithAffinityExecutor(
       String name, EventHandler<P> eventHandler,
-      List<BlockingQueue<Q>> workQueues, EventPublisher eventPublisher,
+      List<Queue<Q>> workQueues, EventPublisher eventPublisher,
       Class<P> clazz, List<ThreadPoolExecutor> executors,
       Map<String, FixedThreadPoolWithAffinityExecutor> executorMap) {
     this.name = name;
@@ -118,7 +120,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     // Add runnable which will wait for task over another queue
     // This needs terminate canceling each task in shutdown
     int i = 0;
-    for (BlockingQueue<Q> queue : workQueues) {
+    for (Queue<Q> queue : workQueues) {
       ThreadPoolExecutor threadPoolExecutor = executors.get(i);
       if (threadPoolExecutor.getActiveCount() == 0) {
         threadPoolExecutor.submit(new ContainerReportProcessTask<>(queue,
@@ -140,15 +142,15 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   }
 
   public static <Q> List<ThreadPoolExecutor> initializeExecutorPool(
-      List<BlockingQueue<Q>> workQueues) {
+      List<Queue<Q>> workQueues) {
     return initializeExecutorPool("", workQueues);
   }
 
   public static <Q> List<ThreadPoolExecutor> initializeExecutorPool(
-      String threadNamePrefix, List<BlockingQueue<Q>> workQueues) {
+      String threadNamePrefix, List<Queue<Q>> workQueues) {
     List<ThreadPoolExecutor> executors = new ArrayList<>();
     for (int i = 0; i < workQueues.size(); ++i) {
-      LinkedBlockingQueue<Runnable> poolQueue = new LinkedBlockingQueue<>(1);
+      BlockingQueue<Runnable> poolQueue = new LinkedBlockingQueue<>(1);
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
           .setDaemon(true)
           .setNameFormat(threadNamePrefix
@@ -174,7 +176,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     // implement hashCode to match the messages. This should be safe for
     // other messages that implement the native hash.
     int index = message.hashCode() & (workQueues.size() - 1);
-    BlockingQueue<Q> queue = workQueues.get(index);
+    Queue<Q> queue = workQueues.get(index);
     queue.add((Q) message);
     if (queue instanceof IQueueMetrics) {
       dropped.incr(((IQueueMetrics) queue).getAndResetDropCount(
@@ -234,11 +236,11 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
    * Runnable class to perform execution of payload.
    */
   public static class ContainerReportProcessTask<P> implements Runnable {
-    private BlockingQueue<P> queue;
+    private Queue<P> queue;
     private AtomicBoolean isRunning;
     private Map<String, FixedThreadPoolWithAffinityExecutor> executorMap;
 
-    public ContainerReportProcessTask(BlockingQueue<P> queue,
+    public ContainerReportProcessTask(Queue<P> queue,
         AtomicBoolean isRunning,
         Map<String, FixedThreadPoolWithAffinityExecutor> executorMap) {
       this.queue = queue;
@@ -249,57 +251,51 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     @Override
     public void run() {
       while (isRunning.get()) {
-        try {
-          Object report = queue.poll(1, TimeUnit.MILLISECONDS);
-          if (report == null) {
-            continue;
-          }
+        Object report = queue.poll();
+        if (report == null) {
+          continue;
+        }
 
-          FixedThreadPoolWithAffinityExecutor executor = executorMap.get(
-              report.getClass().getName());
-          if (null == executor) {
-            LOG.warn("Executor for report is not found");
-            continue;
-          }
-          
-          long createTime = 0;
-          String eventId = "";
-          if (report instanceof IEventInfo) {
-            createTime = ((IEventInfo) report).getCreateTime();
-            eventId = ((IEventInfo) report).getEventId();
-          }
-          
-          long curTime = Time.monotonicNow();
+        FixedThreadPoolWithAffinityExecutor executor = executorMap.get(
+            report.getClass().getName());
+        if (null == executor) {
+          LOG.warn("Executor for report is not found");
+          continue;
+        }
+        
+        long createTime = 0;
+        String eventId = "";
+        if (report instanceof IEventInfo) {
+          createTime = ((IEventInfo) report).getCreateTime();
+          eventId = ((IEventInfo) report).getEventId();
+        }
+        
+        long curTime = Time.monotonicNow();
+        if (createTime != 0
+            && ((curTime - createTime) > executor.queueWaitThreshold)) {
+          executor.longWaitInQueue.incr();
+          LOG.warn("Event remained in queue for long time {} millisec, {}",
+              (curTime - createTime), eventId);
+        }
+
+        executor.scheduled.incr();
+        try {
+          executor.eventHandler.onMessage(report,
+              executor.eventPublisher);
+          executor.done.incr();
+          curTime = Time.monotonicNow();
           if (createTime != 0
-              && ((curTime - createTime) > executor.queueWaitThreshold)) {
-            executor.longWaitInQueue.incr();
-            LOG.warn("Event remained in queue for long time {} millisec, {}",
+              && (curTime - createTime) > executor.execWaitThreshold) {
+            executor.longTimeExecution.incr();
+            LOG.warn("Event taken long execution time {} millisec, {}",
                 (curTime - createTime), eventId);
           }
-
-          executor.scheduled.incr();
-          try {
-            executor.eventHandler.onMessage(report,
-                executor.eventPublisher);
-            executor.done.incr();
-            curTime = Time.monotonicNow();
-            if (createTime != 0
-                && (curTime - createTime) > executor.execWaitThreshold) {
-              executor.longTimeExecution.incr();
-              LOG.warn("Event taken long execution time {} millisec, {}",
-                  (curTime - createTime), eventId);
-            }
-          } catch (Exception ex) {
-            LOG.error("Error on execution message {}", report, ex);
-            executor.failed.incr();
-          }
-          if (Thread.currentThread().isInterrupted()) {
-            LOG.warn("Interrupt of execution of Reports");
-            return;
-          }
-        } catch (InterruptedException e) {
+        } catch (Exception ex) {
+          LOG.error("Error on execution message {}", report, ex);
+          executor.failed.incr();
+        }
+        if (Thread.currentThread().isInterrupted()) {
           LOG.warn("Interrupt of execution of Reports");
-          Thread.currentThread().interrupt();
           return;
         }
       }

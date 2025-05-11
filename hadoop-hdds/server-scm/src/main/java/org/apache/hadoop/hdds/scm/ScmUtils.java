@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -205,7 +206,7 @@ public final class ScmUtils {
   }
 
   @NotNull
-  public static List<BlockingQueue<ContainerReport>> initContainerReportQueue(
+  public static List<Queue<ContainerReport>> initContainerReportQueue(
       OzoneConfiguration configuration) {
     int threadPoolSize = configuration.getInt(getContainerReportConfPrefix()
             + ".thread.pool.size",
@@ -213,7 +214,7 @@ public final class ScmUtils {
     int queueSize = configuration.getInt(getContainerReportConfPrefix()
             + ".queue.size",
         OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT);
-    List<BlockingQueue<ContainerReport>> queues = new ArrayList<>();
+    List<Queue<ContainerReport>> queues = new ArrayList<>();
     for (int i = 0; i < threadPoolSize; ++i) {
       queues.add(new ContainerReportQueue(queueSize));
     }

@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -309,7 +309,7 @@ public class ReconStorageContainerManagerFacade
     long execWaitThreshold = ozoneConfiguration.getInt(
         ScmUtils.getContainerReportConfPrefix() + ".execute.wait.threshold",
         OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT);
-    List<BlockingQueue<ContainerReport>> queues
+    List<Queue<ContainerReport>> queues
         = ReconUtils.initContainerReportQueue(ozoneConfiguration);
     List<ThreadPoolExecutor> executors
         = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
