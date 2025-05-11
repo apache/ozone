@@ -24,6 +24,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE;
@@ -65,6 +67,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
@@ -175,6 +179,9 @@ public final class OmSnapshotManager implements AutoCloseable {
   // Soft limit of the snapshot cache size.
   private final int softCacheSize;
 
+  private int fsSnapshotMaxLimit;
+  private final AtomicInteger inFlightSnapshotCount = new AtomicInteger(0);
+
   public OmSnapshotManager(OzoneManager ozoneManager) {
 
     boolean isFilesystemSnapshotEnabled =
@@ -249,6 +256,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.softCacheSize = ozoneManager.getConfiguration().getInt(
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE,
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT);
+      
+    fsSnapshotMaxLimit = ozoneManager.getConfiguration().getInt(OZONE_OM_FS_SNAPSHOT_MAX_LIMIT,
+        OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
 
     CacheLoader<UUID, OmSnapshot> loader = createCacheLoader();
 
@@ -862,6 +872,48 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Block SnapDiff if either of the snapshots is not active.
     checkSnapshotActive(fromSnapInfo, false);
     checkSnapshotActive(toSnapInfo, false);
+  }
+
+  public void snapshotLimitCheck() throws IOException, OMException {
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager = omMetadataManager.getSnapshotChainManager();
+
+    AtomicReference<IOException> exceptionRef = new AtomicReference<>(null);
+    inFlightSnapshotCount.updateAndGet(count -> {
+      int currentSnapshotNum = 0;
+      try {
+        currentSnapshotNum = snapshotChainManager.getGlobalSnapshotChain().size();
+      } catch (IOException e) {
+        exceptionRef.set(e);
+        return count;
+      }
+      if (currentSnapshotNum + count >= fsSnapshotMaxLimit) {
+        exceptionRef.set(new OMException(
+            String.format("Snapshot limit of %d reached. Cannot create more snapshots. " +
+                "Current snapshots: %d, In-flight creations: %d",
+                fsSnapshotMaxLimit, currentSnapshotNum, count) +
+                " If you already deleted some snapshots, " +
+                "please wait for the background service to complete the cleanup.",
+            OMException.ResultCodes.TOO_MANY_SNAPSHOTS));
+        return count;
+      }
+      return count + 1;
+    });
+    if (exceptionRef.get() != null) {
+      throw exceptionRef.get();
+    }
+  }
+
+  public void decrementInFlightSnapshotCount() {
+    inFlightSnapshotCount.decrementAndGet();
+  }
+
+  public void resetInFlightSnapshotCount() {
+    inFlightSnapshotCount.set(0);
+  }
+
+  public int getInFlightSnapshotCount() {
+    return inFlightSnapshotCount.get();
   }
 
   private int getIndexFromToken(final String token) throws IOException {

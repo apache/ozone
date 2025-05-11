@@ -107,7 +107,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
 
   @Override
   public Table<String, KeyEntityInfoProtoWrapper> getKeyTableLite(BucketLayout bucketLayout) throws IOException {
-    String tableName = bucketLayout.isFileSystemOptimized() ? FILE_TABLE : KEY_TABLE;
+    String tableName = bucketLayout.isFileSystemOptimized() ? OMDBDefinition.FILE_TABLE : OMDBDefinition.KEY_TABLE;
     return getStore().getTable(tableName, StringCodec.get(), KeyEntityInfoProtoWrapper.getCodec());
   }
 
