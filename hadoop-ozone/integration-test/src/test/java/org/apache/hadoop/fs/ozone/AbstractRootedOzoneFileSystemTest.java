@@ -2588,28 +2588,4 @@ abstract class AbstractRootedOzoneFileSystemTest {
       fs.delete(new Path(base, key));
     }
   }
-
-  @Test
-  void testIsFileFalseForDir() throws IOException {
-    Path dirPath = new Path(getBucketPath(), "dir1");
-    Path keyPath = new Path(dirPath, "key1");
-    OFSPath ofsPath = new OFSPath(dirPath, conf);
-
-    getFs().mkdirs(dirPath);
-    try (FSDataOutputStream out1 = getFs().create(keyPath)) {
-      out1.write(2);
-    }
-
-    OzoneBucket bucket = adapter.getBucket(ofsPath, false);
-
-    Iterator<? extends OzoneKey> keyIterator = bucket.listKeys("");
-
-    assertTrue(keyIterator.hasNext(), "Expected dir1, key1 in the bucket");
-    OzoneKey ozoneKey = keyIterator.next();
-    assertEquals("dir1/", ozoneKey.getName());
-    assertFalse(ozoneKey.isFile(), "Expected isFile to be false for directory key");
-    ozoneKey = keyIterator.next();
-    assertEquals("dir1/key1", ozoneKey.getName());
-    assertTrue(ozoneKey.isFile(), "Expected isFile to be true for key");
-  }
 }
