@@ -137,6 +137,7 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-client</artifactId>
+      <!-- <scope>test</scope> but transitive via ozone-client -->
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -169,6 +170,7 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-interface-client</artifactId>
+      <!-- <scope>test</scope> but transitive via ozone-client -->
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
@@ -197,6 +199,7 @@
     <dependency>
       <groupId>org.glassfish.jersey.core</groupId>
       <artifactId>jersey-common</artifactId>
+      <!-- <scope>test</scope> but transitive via jersey-server -->
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.core</groupId>
