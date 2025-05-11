@@ -67,8 +67,16 @@
       <artifactId>guava</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+    </dependency>
+    <dependency>
       <groupId>commons-codec</groupId>
       <artifactId>commons-codec</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-collections</groupId>
+      <artifactId>commons-collections</artifactId>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>
@@ -213,6 +221,10 @@
       </exclusions>
     </dependency>
     <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>rocksdb-checkpoint-differ</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-client</artifactId>
     </dependency>
@@ -223,6 +235,10 @@
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-proto</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-server</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
