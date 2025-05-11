@@ -132,6 +132,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -941,7 +942,7 @@ public class TestStorageContainerManager {
   @Test
   public void testContainerReportQueueWithDrop() throws Exception {
     EventQueue eventQueue = new EventQueue();
-    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
+    List<Queue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
         queues = new ArrayList<>();
     for (int i = 0; i < 1; ++i) {
       queues.add(new ContainerReportQueue());
@@ -987,7 +988,7 @@ public class TestStorageContainerManager {
   @Category(FlakyTest.class) @Flaky("HDDS-8470")
   public void testContainerReportQueueTakingMoreTime() throws Exception {
     EventQueue eventQueue = new EventQueue();
-    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
+    List<Queue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
         queues = new ArrayList<>();
     for (int i = 0; i < 1; ++i) {
       queues.add(new ContainerReportQueue());
@@ -1038,7 +1039,7 @@ public class TestStorageContainerManager {
   @Test
   public void testIncrementalContainerReportQueue() throws Exception {
     EventQueue eventQueue = new EventQueue();
-    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
+    List<Queue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
         queues = new ArrayList<>();
     for (int i = 0; i < 1; ++i) {
       queues.add(new ContainerReportQueue());

@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
@@ -76,8 +77,8 @@ public class TestEventQueue {
       throws Exception {
 
     TestHandler testHandler = new TestHandler();
-    BlockingQueue<Long> eventQueue = new LinkedBlockingQueue<>();
-    List<BlockingQueue<Long>> queues = new ArrayList<>();
+    Queue<Long> eventQueue = new LinkedBlockingQueue<>();
+    List<Queue<Long>> queues = new ArrayList<>();
     queues.add(eventQueue);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();

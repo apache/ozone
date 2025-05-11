@@ -31,6 +31,7 @@ import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -101,7 +102,7 @@ public class ReconUtils {
   }
 
   @NotNull
-  public static List<BlockingQueue<SCMDatanodeHeartbeatDispatcher
+  public static List<Queue<SCMDatanodeHeartbeatDispatcher
       .ContainerReport>> initContainerReportQueue(
       OzoneConfiguration configuration) {
     int threadPoolSize =
@@ -111,7 +112,7 @@ public class ReconUtils {
     int queueSize = configuration.getInt(
         ScmUtils.getContainerReportConfPrefix() + ".queue.size",
         OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT);
-    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>> queues =
+    List<Queue<SCMDatanodeHeartbeatDispatcher.ContainerReport>> queues =
         new ArrayList<>();
     for (int i = 0; i < threadPoolSize; ++i) {
       queues.add(new ReconContainerReportQueue(queueSize));
