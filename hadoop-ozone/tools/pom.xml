@@ -59,6 +59,10 @@
       <artifactId>jackson-datatype-jsr310</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.github.vlsi.mxgraph</groupId>
+      <artifactId>jgraphx</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
     </dependency>
@@ -239,6 +243,14 @@
     <dependency>
       <groupId>org.glassfish.jaxb</groupId>
       <artifactId>jaxb-runtime</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.jgrapht</groupId>
+      <artifactId>jgrapht-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.jgrapht</groupId>
+      <artifactId>jgrapht-ext</artifactId>
     </dependency>
     <dependency>
       <groupId>org.jline</groupId>
