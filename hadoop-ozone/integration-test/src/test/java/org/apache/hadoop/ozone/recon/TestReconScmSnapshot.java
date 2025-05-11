@@ -46,7 +46,8 @@ import org.junit.jupiter.api.Test;
  */
 public class TestReconScmSnapshot {
   private OzoneConfiguration conf;
-  private MiniOzoneCluster ozoneCluster = null;
+  private MiniOzoneCluster cluster;
+  private ReconService recon;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -56,33 +57,30 @@ public class TestReconScmSnapshot {
     conf.setBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED, true);
     conf.setInt(ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD, 0);
-    ozoneCluster = MiniOzoneCluster.newBuilder(conf)
+    recon = new ReconService(conf);
+    cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(4)
-        .includeRecon(true)
+        .addService(recon)
         .build();
-    ozoneCluster.waitForClusterToBeReady();
+    cluster.waitForClusterToBeReady();
   }
 
   @Test
   public void testScmSnapshot() throws Exception {
-    testSnapshot(ozoneCluster);
-  }
-
-  public static void testSnapshot(MiniOzoneCluster cluster) throws Exception {
     LogCapturer logCapturer = LogCapturer.captureLogs(ReconStorageContainerManagerFacade.class);
 
-    List<ContainerInfo> reconContainers = cluster.getReconServer()
+    List<ContainerInfo> reconContainers = recon.getReconServer()
         .getReconStorageContainerManager().getContainerManager()
         .getContainers();
     assertEquals(0, reconContainers.size());
 
     ReconNodeManager nodeManager;
-    nodeManager = (ReconNodeManager) cluster.getReconServer()
+    nodeManager = (ReconNodeManager) recon.getReconServer()
         .getReconStorageContainerManager().getScmNodeManager();
     long keyCountBefore = nodeManager.getNodeDBKeyCount();
 
     //Stopping Recon to add Containers in SCM
-    cluster.stopRecon();
+    recon.stop();
 
     ContainerManager containerManager;
     containerManager = cluster.getStorageContainerManager()
@@ -93,12 +91,12 @@ public class TestReconScmSnapshot {
           HddsProtos.ReplicationFactor.ONE), "testOwner");
     }
 
-    cluster.startRecon();
+    recon.start(conf);
 
     //ContainerCount after Recon DB is updated with SCM DB
     containerManager = cluster.getStorageContainerManager()
         .getContainerManager();
-    ContainerManager reconContainerManager = cluster.getReconServer()
+    ContainerManager reconContainerManager = recon.getReconServer()
         .getReconStorageContainerManager().getContainerManager();
     assertTrue(logCapturer.getOutput()
         .contains("Recon Container Count: " + reconContainers.size() +
@@ -109,13 +107,13 @@ public class TestReconScmSnapshot {
     //PipelineCount after Recon DB is updated with SCM DB
     PipelineManager scmPipelineManager = cluster.getStorageContainerManager()
         .getPipelineManager();
-    PipelineManager reconPipelineManager = cluster.getReconServer()
+    PipelineManager reconPipelineManager = recon.getReconServer()
         .getReconStorageContainerManager().getPipelineManager();
     assertEquals(scmPipelineManager.getPipelines().size(),
         reconPipelineManager.getPipelines().size());
 
     //NodeCount after Recon DB updated with SCM DB
-    nodeManager = (ReconNodeManager) cluster.getReconServer()
+    nodeManager = (ReconNodeManager) recon.getReconServer()
         .getReconStorageContainerManager().getScmNodeManager();
     long keyCountAfter = nodeManager.getNodeDBKeyCount();
     assertEquals(keyCountAfter, keyCountBefore);
@@ -124,14 +122,14 @@ public class TestReconScmSnapshot {
   @Test
   @Flaky("HDDS-11645")
   public void testExplicitRemovalOfNode() throws Exception {
-    ReconNodeManager nodeManager = (ReconNodeManager) ozoneCluster.getReconServer()
+    ReconNodeManager nodeManager = (ReconNodeManager) recon.getReconServer()
         .getReconStorageContainerManager().getScmNodeManager();
     long nodeDBCountBefore = nodeManager.getNodeDBKeyCount();
     List<? extends DatanodeDetails> allNodes = nodeManager.getAllNodes();
     assertEquals(nodeDBCountBefore, allNodes.size());
 
     DatanodeDetails datanodeDetails = allNodes.get(3);
-    ozoneCluster.shutdownHddsDatanode(datanodeDetails);
+    cluster.shutdownHddsDatanode(datanodeDetails);
 
     GenericTestUtils.waitFor(() -> {
       try {
@@ -168,8 +166,8 @@ public class TestReconScmSnapshot {
 
   @AfterEach
   public void shutdown() throws Exception {
-    if (ozoneCluster != null) {
-      ozoneCluster.shutdown();
+    if (cluster != null) {
+      cluster.shutdown();
     }
   }
 }

@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.recon.ReconService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -59,7 +60,9 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
     conf.set(OZONE_RECON_ADDRESS_KEY, "localhost:9888");
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .withoutDatanodes().includeRecon(true).build();
+        .withoutDatanodes()
+        .addService(new ReconService(conf))
+        .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     store = client.getObjectStore();
