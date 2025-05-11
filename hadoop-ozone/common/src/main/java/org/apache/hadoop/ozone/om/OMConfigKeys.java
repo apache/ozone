@@ -642,6 +642,13 @@ public final class OMConfigKeys {
       "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable";
 
   /**
+   * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.
+   */
+  public static final String OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES = 
+      "ozone.om.snapshot.compact.non.snapshot.diff.tables";
+  public static final boolean OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES_DEFAULT = false;
+
+  /**
    * Never constructed.
    */
   private OMConfigKeys() {

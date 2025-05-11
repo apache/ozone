@@ -58,6 +58,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   private final Scheduler scheduler;
   private static final String SNAPSHOT_CACHE_CLEANUP_SERVICE =
       "SnapshotCacheCleanupService";
+  private final boolean compactNonSnapshotDiffTables;
 
   private final OMMetrics omMetrics;
 
@@ -66,6 +67,9 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   }
 
   private void compactSnapshotDB(OmSnapshot snapshot) throws IOException {
+    if (!compactNonSnapshotDiffTables) {
+      return;
+    }
     OMMetadataManager metadataManager = snapshot.getMetadataManager();
     for (Table<?, ?> table : metadataManager.getStore().listTables()) {
       if (shouldCompactTable(table.getName())) {
@@ -80,12 +84,13 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   }
 
   public SnapshotCache(CacheLoader<UUID, OmSnapshot> cacheLoader, int cacheSizeLimit, OMMetrics omMetrics,
-                       long cleanupInterval) {
+                       long cleanupInterval, boolean compactNonSnapshotDiffTables) {
     this.dbMap = new ConcurrentHashMap<>();
     this.cacheLoader = cacheLoader;
     this.cacheSizeLimit = cacheSizeLimit;
     this.omMetrics = omMetrics;
     this.pendingEvictionQueue = ConcurrentHashMap.newKeySet();
+    this.compactNonSnapshotDiffTables = compactNonSnapshotDiffTables;
     if (cleanupInterval > 0) {
       this.scheduler = new Scheduler(SNAPSHOT_CACHE_CLEANUP_SERVICE,
           true, 1);
