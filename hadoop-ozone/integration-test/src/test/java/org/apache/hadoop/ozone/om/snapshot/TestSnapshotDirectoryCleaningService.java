@@ -234,17 +234,18 @@ public class TestSnapshotDirectoryCleaningService {
         put("snap2", 5L);
         put("snap3", 0L);
       }};
-    Thread.sleep(500);
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
         iterator = snapshotInfoTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
         String snapshotName = snapshotEntry.getValue().getName();
-        assertEquals(expectedSize.get(snapshotName), snapshotEntry.getValue().
-            getExclusiveSize());
+        SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotEntry.getKey());
+        System.out.println(snapshotInfo.getName() + " " + snapshotInfo.getDeepCleanedDeletedDir());
+        assertEquals(expectedSize.get(snapshotName),
+            snapshotInfo.getExclusiveSize() + snapshotInfo.getExclusiveDirSize());
         // Since for the test we are using RATIS/THREE
         assertEquals(expectedSize.get(snapshotName) * 3,
-            snapshotEntry.getValue().getExclusiveReplicatedSize());
+            snapshotInfo.getExclusiveReplicatedSize() + snapshotInfo.getExclusiveDirReplicatedSize());
 
       }
     }

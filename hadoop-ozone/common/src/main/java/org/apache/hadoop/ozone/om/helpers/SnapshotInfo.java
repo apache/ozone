@@ -82,6 +82,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private long referencedReplicatedSize;
   private long exclusiveSize;
   private long exclusiveReplicatedSize;
+  private long exclusiveDirSize;
+  private long exclusiveDirReplicatedSize;
   private boolean deepCleanedDeletedDir;
   private ByteString lastTransactionInfo;
 
@@ -104,6 +106,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.referencedReplicatedSize = b.referencedReplicatedSize;
     this.exclusiveSize = b.exclusiveSize;
     this.exclusiveReplicatedSize = b.exclusiveReplicatedSize;
+    this.exclusiveDirSize = b.exclusiveDirSize;
+    this.exclusiveDirReplicatedSize = b.exclusiveDirReplicatedSize;
     this.deepCleanedDeletedDir = b.deepCleanedDeletedDir;
     this.lastTransactionInfo = b.lastTransactionInfo;
   }
@@ -233,6 +237,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setReferencedReplicatedSize(referencedReplicatedSize)
         .setExclusiveSize(exclusiveSize)
         .setExclusiveReplicatedSize(exclusiveReplicatedSize)
+        .setExclusiveDirSize(exclusiveDirSize)
+        .setExclusiveDirReplicatedSize(exclusiveDirReplicatedSize)
         .setDeepCleanedDeletedDir(deepCleanedDeletedDir)
         .setLastTransactionInfo(lastTransactionInfo);
   }
@@ -259,6 +265,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     private long referencedReplicatedSize;
     private long exclusiveSize;
     private long exclusiveReplicatedSize;
+    private long exclusiveDirSize;
+    private long exclusiveDirReplicatedSize;
     private boolean deepCleanedDeletedDir;
     private ByteString lastTransactionInfo;
 
@@ -374,6 +382,18 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       return this;
     }
 
+    /** @param exclusiveDirSize - Snapshot exclusive size. */
+    public Builder setExclusiveDirSize(long exclusiveDirSize) {
+      this.exclusiveDirSize = exclusiveDirSize;
+      return this;
+    }
+
+    /** @param exclusiveDirReplicatedSize - Snapshot exclusive size w/ replication. */
+    public Builder setExclusiveDirReplicatedSize(long exclusiveDirReplicatedSize) {
+      this.exclusiveDirReplicatedSize = exclusiveDirReplicatedSize;
+      return this;
+    }
+
     public Builder setDeepCleanedDeletedDir(boolean deepCleanedDeletedDir) {
       this.deepCleanedDeletedDir = deepCleanedDeletedDir;
       return this;
@@ -408,6 +428,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
             .setReferencedReplicatedSize(referencedReplicatedSize)
             .setExclusiveSize(exclusiveSize)
             .setExclusiveReplicatedSize(exclusiveReplicatedSize)
+            .setExclusiveDirSize(exclusiveDirSize)
+            .setExclusiveDirReplicatedSize(exclusiveDirReplicatedSize)
             .setDeepCleanedDeletedDir(deepCleanedDeletedDir);
 
     if (pathPreviousSnapshotId != null) {
@@ -483,6 +505,14 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     if (snapshotInfoProto.hasExclusiveReplicatedSize()) {
       osib.setExclusiveReplicatedSize(
           snapshotInfoProto.getExclusiveReplicatedSize());
+    }
+
+    if (snapshotInfoProto.hasExclusiveDirSize()) {
+      osib.setExclusiveDirSize(snapshotInfoProto.getExclusiveDirSize());
+    }
+
+    if (snapshotInfoProto.hasExclusiveDirReplicatedSize()) {
+      osib.setExclusiveDirReplicatedSize(snapshotInfoProto.getExclusiveDirReplicatedSize());
     }
 
     if (snapshotInfoProto.hasDeepCleanedDeletedDir()) {
@@ -571,8 +601,24 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     return exclusiveSize;
   }
 
+  public void setExclusiveDirSize(long exclusiveDirSize) {
+    this.exclusiveDirSize = exclusiveDirSize;
+  }
+
+  public long getExclusiveDirSize() {
+    return exclusiveDirSize;
+  }
+
   public void setExclusiveReplicatedSize(long exclusiveReplicatedSize) {
     this.exclusiveReplicatedSize = exclusiveReplicatedSize;
+  }
+
+  public void setExclusiveDirReplicatedSize(long exclusiveDirReplicatedSize) {
+    this.exclusiveDirReplicatedSize = exclusiveDirReplicatedSize;
+  }
+
+  public long getExclusiveDirReplicatedSize() {
+    return exclusiveDirReplicatedSize;
   }
 
   public long getExclusiveReplicatedSize() {
@@ -707,6 +753,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         ", referencedReplicatedSize: '" + referencedReplicatedSize + '\'' +
         ", exclusiveSize: '" + exclusiveSize + '\'' +
         ", exclusiveReplicatedSize: '" + exclusiveReplicatedSize + '\'' +
+        ", exclusiveDirSize: '" + exclusiveDirSize + '\'' +
+        ", exclusiveDirReplicatedSize: '" + exclusiveDirReplicatedSize + '\'' +
         ", deepCleanedDeletedDir: '" + deepCleanedDeletedDir + '\'' +
         ", lastTransactionInfo: '" + lastTransactionInfo + '\'' +
         '}';

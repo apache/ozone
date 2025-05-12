@@ -330,7 +330,7 @@ public class SnapshotDirectoryCleaningService
     }
   }
 
-  private void updateExclusiveSize(String prevSnapshotKeyTable) {
+  private void updateExclusiveSize(String prevSnapshotKeyTable) throws IOException {
     ClientId clientId = ClientId.randomId();
     SnapshotSize snapshotSize = SnapshotSize.newBuilder()
             .setExclusiveSize(
@@ -345,7 +345,7 @@ public class SnapshotDirectoryCleaningService
         setSnapshotPropertyRequest =
         SetSnapshotPropertyRequest.newBuilder()
             .setSnapshotKey(prevSnapshotKeyTable)
-            .setSnapshotSize(snapshotSize)
+            .setSnapshotDirSize(snapshotSize)
             .build();
 
     OMRequest omRequest = OMRequest.newBuilder()

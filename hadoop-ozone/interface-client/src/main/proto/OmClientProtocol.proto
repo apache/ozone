@@ -303,6 +303,7 @@ message OMRequest {
   optional GetObjectTaggingRequest          getObjectTaggingRequest        = 140;
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
+  repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
 }
 
 message OMResponse {
@@ -892,6 +893,9 @@ message SnapshotInfo {
   // note: shared sizes can be calculated from: referenced - exclusive
   optional bool deepCleanedDeletedDir = 19;
   optional bytes lastTransactionInfo = 20;
+  optional uint64 exclusiveDirSize = 21;
+  // snapshot exclusive size after replication
+  optional uint64 exclusiveDirReplicatedSize = 22;
 }
 
 message SnapshotDiffJobProto {
@@ -2029,6 +2033,7 @@ message SetSnapshotPropertyRequest {
   optional SnapshotSize snapshotSize = 3;
   optional bool deepCleanedDeletedDir = 4;
   optional bool deepCleanedDeletedKey = 5;
+  optional SnapshotSize snapshotDirSize = 6;
 }
 
 // SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility
