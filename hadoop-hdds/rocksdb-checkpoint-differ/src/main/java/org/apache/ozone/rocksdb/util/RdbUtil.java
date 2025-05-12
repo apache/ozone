@@ -20,6 +20,7 @@ package org.apache.ozone.rocksdb.util;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashSet;
@@ -62,7 +63,7 @@ public final class RdbUtil {
                 return Files.readAttributes(new File(lfm.path(), lfm.fileName()).toPath(),
                     BasicFileAttributes.class).fileKey();
               } catch (IOException e) {
-                throw new RuntimeException(e);
+                throw new UncheckedIOException("Failed to read inode for " + lfm.path(), e);
               }
             },
             lfm -> new File(lfm.path(), lfm.fileName()).getPath()

@@ -70,6 +70,7 @@ import jakarta.annotation.Nonnull;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1223,12 +1224,20 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   private Set<String> getDiffFiles(OmSnapshot fromSnapshot, OmSnapshot toSnapshot, List<String> tablesToLookUp) {
-    Map<Object, String> fromSnapshotFiles = getSSTFileMapForSnapshot(fromSnapshot, tablesToLookUp);
-    Map<Object, String> toSnapshotFiles = getSSTFileMapForSnapshot(toSnapshot, tablesToLookUp);
-    return Stream.concat(fromSnapshotFiles.entrySet().stream(),
-        toSnapshotFiles.entrySet().stream().filter(e -> !fromSnapshotFiles.containsKey(e.getKey())))
-        .map(Map.Entry::getValue)
-        .collect(Collectors.toSet());
+    Set<String> diffFiles;
+    try {
+      Map<Object, String> fromSnapshotFiles = getSSTFileMapForSnapshot(fromSnapshot, tablesToLookUp);
+      Map<Object, String> toSnapshotFiles = getSSTFileMapForSnapshot(toSnapshot, tablesToLookUp);
+      diffFiles = Stream.concat(fromSnapshotFiles.entrySet().stream(),
+              toSnapshotFiles.entrySet().stream().filter(e -> !fromSnapshotFiles.containsKey(e.getKey())))
+          .map(Map.Entry::getValue).collect(Collectors.toSet());
+    } catch (UncheckedIOException e) {
+      // In case of exception during inode read use all files
+      diffFiles = new HashSet<>();
+      diffFiles.addAll(getSSTFileListForSnapshot(fromSnapshot, tablesToLookUp));
+      diffFiles.addAll(getSSTFileListForSnapshot(toSnapshot, tablesToLookUp));
+    }
+    return diffFiles;
   }
 
   private void validateEstimatedKeyChangesAreInLimits(
