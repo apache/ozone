@@ -200,7 +200,6 @@ public class TestContainerDataYaml {
     assertThat(exception).hasMessageContaining("No enum constant");
   }
 
-
   @ContainerLayoutTestInfo.ContainerTest
   void testCheckBackWardCompatibilityOfContainerFile(
       ContainerLayoutVersion layout) throws Exception {

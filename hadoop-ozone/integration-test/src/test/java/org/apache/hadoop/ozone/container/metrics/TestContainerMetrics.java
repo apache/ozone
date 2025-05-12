@@ -74,13 +74,11 @@ import org.apache.ratis.util.function.CheckedFunction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for metrics published by storage containers.
  */
-@Timeout(300)
 public class TestContainerMetrics {
   @TempDir
   private static Path testDir;

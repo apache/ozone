@@ -39,6 +39,26 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class ContainerTestVersionInfo {
 
+  private static List<ContainerTestVersionInfo> layoutList = new ArrayList<>();
+
+  private static final String[] SCHEMA_VERSIONS = new String[] {
+      null,
+      OzoneConsts.SCHEMA_V1,
+      OzoneConsts.SCHEMA_V2,
+      OzoneConsts.SCHEMA_V3,
+  };
+
+  static {
+    for (ContainerLayoutVersion ch : ContainerLayoutVersion.getAllVersions()) {
+      for (String sch : SCHEMA_VERSIONS) {
+        layoutList.add(new ContainerTestVersionInfo(sch, ch));
+      }
+    }
+  }
+
+  private final String schemaVersion;
+  private final ContainerLayoutVersion layout;
+
   /**
    * Composite annotation for tests parameterized with {@link ContainerTestVersionInfo}.
    */
@@ -50,29 +70,10 @@ public class ContainerTestVersionInfo {
     // composite annotation
   }
 
-  private static final String[] SCHEMA_VERSIONS = new String[] {
-      null,
-      OzoneConsts.SCHEMA_V1,
-      OzoneConsts.SCHEMA_V2,
-      OzoneConsts.SCHEMA_V3,
-  };
-
-  private final String schemaVersion;
-  private final ContainerLayoutVersion layout;
-
   public ContainerTestVersionInfo(String schemaVersion,
       ContainerLayoutVersion layout) {
     this.schemaVersion = schemaVersion;
     this.layout = layout;
-  }
-
-  private static List<ContainerTestVersionInfo> layoutList = new ArrayList<>();
-  static {
-    for (ContainerLayoutVersion ch : ContainerLayoutVersion.getAllVersions()) {
-      for (String sch : SCHEMA_VERSIONS) {
-        layoutList.add(new ContainerTestVersionInfo(sch, ch));
-      }
-    }
   }
 
   public String getSchemaVersion() {
@@ -91,6 +92,7 @@ public class ContainerTestVersionInfo {
   public static List<ContainerTestVersionInfo> getLayoutList() {
     return layoutList;
   }
+
   public static void setTestSchemaVersion(String schemaVersion,
       OzoneConfiguration conf) {
     if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {

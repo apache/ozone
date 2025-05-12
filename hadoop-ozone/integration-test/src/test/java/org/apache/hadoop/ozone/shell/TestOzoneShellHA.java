@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
@@ -108,7 +109,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -127,7 +127,6 @@ import picocli.CommandLine.RunLast;
  * Inspired by TestS3Shell
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestOzoneShellHA {
 
@@ -182,8 +181,7 @@ public class TestOzoneShellHA {
 
     testFilePathString = path + OZONE_URI_DELIMITER + "testFile";
     testFile = new File(testFilePathString);
-    testFile.getParentFile().mkdirs();
-    testFile.createNewFile();
+    FileUtils.touch(testFile);
 
     // Init HA cluster
     omServiceId = "om-service-test1";
@@ -1159,7 +1157,6 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  @Timeout(10)
   public void testListBucket() throws Exception {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf =
@@ -1262,7 +1259,6 @@ public class TestOzoneShellHA {
     }
 
   }
-
 
   @Test
   @SuppressWarnings("methodlength")
@@ -1848,7 +1844,6 @@ public class TestOzoneShellHA {
           e.getCause().getMessage());
     }
   }
-
 
   @Test
   public void testKeyDeleteOrSkipTrashWhenTrashEnableFSO()

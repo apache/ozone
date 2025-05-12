@@ -70,6 +70,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -373,7 +374,7 @@ public class TestReplicationManager {
     Set<ContainerReplica> replicas =
         createReplicasWithSameOrigin(container.containerID(),
             ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
-    UUID origin = replicas.iterator().next().getOriginDatanodeId();
+    final DatanodeID origin = replicas.iterator().next().getOriginDatanodeId();
     ContainerReplica unhealthy =
         createContainerReplica(container.containerID(), 0, IN_SERVICE,
             ContainerReplicaProto.State.UNHEALTHY, 1, 123,
@@ -660,7 +661,7 @@ public class TestReplicationManager {
 
     ContainerReplica replica  = createContainerReplica(container.containerID(),
         1, IN_SERVICE, ContainerReplicaProto.State.CLOSED,
-        0, 0, MockDatanodeDetails.randomDatanodeDetails(), UUID.randomUUID());
+        0, 0, MockDatanodeDetails.randomDatanodeDetails(), DatanodeID.randomID());
 
     storeContainerAndReplicas(container, Collections.singleton(replica));
 

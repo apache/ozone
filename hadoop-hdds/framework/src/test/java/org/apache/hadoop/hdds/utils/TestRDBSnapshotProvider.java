@@ -228,9 +228,9 @@ public class TestRDBSnapshotProvider {
       assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         byte[] value =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
       }
     } catch (Exception e) {

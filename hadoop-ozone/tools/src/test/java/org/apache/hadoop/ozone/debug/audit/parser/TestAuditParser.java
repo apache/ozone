@@ -63,6 +63,7 @@ public class TestAuditParser {
       .getClassLoader().getResource("testaudit.log").getPath();
   private static final String LOGS1 = TestAuditParser.class
       .getClassLoader().getResource("testloadaudit.log").getPath();
+
   /**
    * Creates output directory which will be used by the test-cases.
    * If a test-case needs a separate directory, it has to create a random
@@ -206,7 +207,7 @@ public class TestAuditParser {
 
   private static File getRandomTempDir() throws IOException {
     File tempDir = new File(outputBaseDir,
-        RandomStringUtils.randomAlphanumeric(5));
+        RandomStringUtils.secure().nextAlphanumeric(5));
     FileUtils.forceMkdir(tempDir);
     return tempDir;
   }

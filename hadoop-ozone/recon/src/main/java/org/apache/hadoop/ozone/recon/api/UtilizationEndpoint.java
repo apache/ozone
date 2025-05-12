@@ -58,6 +58,7 @@ public class UtilizationEndpoint {
   private ContainerCountBySizeDao containerCountBySizeDao;
   private static final Logger LOG = LoggerFactory
       .getLogger(UtilizationEndpoint.class);
+
   @Inject
   public UtilizationEndpoint(FileCountBySizeDao fileCountBySizeDao,
                              ContainerCountBySizeDao containerCountBySizeDao,

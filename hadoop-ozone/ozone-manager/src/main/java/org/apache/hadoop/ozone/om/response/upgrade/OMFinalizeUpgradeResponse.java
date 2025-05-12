@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.response.upgrade;
 
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.META_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -37,6 +37,7 @@ public class OMFinalizeUpgradeResponse extends OMClientResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFinalizeUpgradeResponse.class);
   private int layoutVersionToWrite = -1;
+
   public OMFinalizeUpgradeResponse(
       OzoneManagerProtocolProtos.OMResponse omResponse,
       int layoutVersionToWrite) {

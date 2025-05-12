@@ -29,7 +29,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_USER_PREFIX;
  */
 final class OzoneManagerLockUtil {
 
-
   private OzoneManagerLockUtil() {
   }
 

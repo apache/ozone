@@ -34,13 +34,11 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * This class tests container balancer operations
  * from cblock clients.
  */
-@Timeout(value = 300)
 public class TestContainerBalancerOperations {
 
   private static ScmClient containerBalancerClient;

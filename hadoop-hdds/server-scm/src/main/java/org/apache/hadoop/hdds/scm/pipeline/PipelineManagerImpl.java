@@ -489,20 +489,6 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   /**
-   * put pipeline in CLOSED state.
-   * @param pipeline - ID of the pipeline.
-   * @param onTimeout - whether to remove pipeline after some time.
-   * @throws IOException throws exception in case of failure
-   * @deprecated Do not use this method, onTimeout is not honored.
-   */
-  @Override
-  @Deprecated
-  public void closePipeline(Pipeline pipeline, boolean onTimeout)
-          throws IOException {
-    closePipeline(pipeline.getId());
-  }
-
-  /**
    * Move the Pipeline to CLOSED state.
    * @param pipelineID ID of the Pipeline to be closed
    * @throws IOException In case of exception while closing the Pipeline
@@ -546,8 +532,7 @@ public class PipelineManagerImpl implements PipelineManager {
     List<Pipeline> pipelinesWithStaleIpOrHostname =
             getStalePipelines(datanodeDetails);
     if (pipelinesWithStaleIpOrHostname.isEmpty()) {
-      LOG.debug("No stale pipelines for datanode {}",
-              datanodeDetails.getUuidString());
+      LOG.debug("No stale pipelines for datanode {}", datanodeDetails);
       return;
     }
     LOG.info("Found {} stale pipelines",
