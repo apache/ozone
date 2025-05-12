@@ -18,6 +18,7 @@
 package org.apache.ozone.rocksdiff;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.commons.lang3.ArrayUtils.EMPTY_BYTE_ARRAY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
@@ -1261,12 +1262,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     Path sstBackupDirPath = Paths.get(sstBackupDir);
     Path prunedSSTFilePath = sstBackupDirPath.resolve(PRUNED_SST_FILE_TEMP);
     try (ManagedOptions managedOptions = new ManagedOptions();
-         ManagedEnvOptions envOptions = new ManagedEnvOptions();
-         ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions)) {
+         ManagedEnvOptions envOptions = new ManagedEnvOptions()) {
       byte[] compactionLogEntryKey;
       int batchCounter = 0;
       while ((compactionLogEntryKey = pruneQueue.peek()) != null && ++batchCounter <= pruneSSTFileBatchSize) {
         CompactionLogEntry compactionLogEntry;
+        // Get the compaction log entry.
         synchronized (this) {
           try {
             compactionLogEntry = CompactionLogEntry.getCodec().fromPersistedFormat(
@@ -1279,6 +1280,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           List<CompactionFileInfo> fileInfoList = compactionLogEntry.getInputFileInfoList();
           List<CompactionFileInfo> updatedFileInfoList = new ArrayList<>();
           for (CompactionFileInfo fileInfo : fileInfoList) {
+            // Skip pruning file if it is already pruned or is removed.
             if (fileInfo.isPruned()) {
               updatedFileInfoList.add(fileInfo);
               continue;
@@ -1290,33 +1292,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
               continue;
             }
 
-            // Write the file.sst => pruned.sst.tmp
+            // Prune file.sst => pruned.sst.tmp
             Files.deleteIfExists(prunedSSTFilePath);
-            try (ManagedRawSSTFileReader<Pair<byte[], Integer>> sstFileReader = new ManagedRawSSTFileReader<>(
-                     managedOptions, sstFilePath.toFile().getAbsolutePath(), SST_READ_AHEAD_SIZE);
-                 ManagedRawSSTFileIterator<Pair<byte[], Integer>> itr = sstFileReader.newIterator(
-                     keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null)) {
-              sstFileWriter.open(prunedSSTFilePath.toFile().getAbsolutePath());
-              while (itr.hasNext()) {
-                Pair<byte[], Integer> keyValue = itr.next();
-                if (keyValue.getValue() == 0) {
-                  sstFileWriter.delete(keyValue.getKey());
-                } else {
-                  sstFileWriter.put(keyValue.getKey(), new byte[0]);
-                }
-              }
-            } catch (RocksDBException ex) {
-              throw new RocksDatabaseException("Failed to write pruned entries for " + sstFilePath, ex);
-            } finally {
-              try {
-                sstFileWriter.finish();
-              } catch (RocksDBException ex) {
-                throw new RocksDatabaseException("Failed to close SSTFileWriter writing to path: "
-                    + prunedSSTFilePath, ex);
-              }
-            }
+            removeValueFromSSTFile(managedOptions, envOptions, sstFilePath.toFile().getAbsolutePath(),
+                prunedSSTFilePath.toFile().getAbsolutePath());
 
-            // Move file.sst.tmp to file.sst and replace existing file atomically
+            // Move pruned.sst.tmp => file.sst and replace existing file atomically.
             try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
               Files.move(prunedSSTFilePath, sstFilePath,
                   StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
@@ -1327,15 +1308,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             LOG.debug("Completed pruning OMKeyInfo from {}", sstFilePath);
           }
 
-          // Update Compaction Log table. Track keys that need updating.
+          // Update compaction log entry in table.
           if (shouldUpdateTable) {
-            CompactionLogEntry.Builder builder = new CompactionLogEntry.Builder(
-                compactionLogEntry.getDbSequenceNumber(), compactionLogEntry.getCompactionTime(),
-                updatedFileInfoList, compactionLogEntry.getOutputFileInfoList());
-            String compactionReason = compactionLogEntry.getCompactionReason();
-            if (compactionReason != null) {
-              builder.setCompactionReason(compactionReason);
-            }
+            CompactionLogEntry.Builder builder = CompactionLogEntry.toBuilder(compactionLogEntry);
+            builder.updateInputFileInoList(updatedFileInfoList);
             try {
               activeRocksDB.get().put(compactionLogTableCFHandle, compactionLogEntryKey,
                   builder.build().getProtobuf().toByteArray());
@@ -1349,6 +1325,31 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       }
     } catch (IOException | InterruptedException e) {
       LOG.error("Could not prune source OMKeyInfo from backup SST files.", e);
+    }
+  }
+
+  private void removeValueFromSSTFile(ManagedOptions options, ManagedEnvOptions envOptions,
+      String sstFilePath, String prunedFilePath)
+      throws IOException {
+    ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, options);
+    try (ManagedRawSSTFileReader<Pair<byte[], Integer>> sstFileReader = new ManagedRawSSTFileReader<>(
+             options, sstFilePath, SST_READ_AHEAD_SIZE);
+         ManagedRawSSTFileIterator<Pair<byte[], Integer>> itr = sstFileReader.newIterator(
+             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null)) {
+      sstFileWriter.open(prunedFilePath);
+      while (itr.hasNext()) {
+        Pair<byte[], Integer> keyValue = itr.next();
+        if (keyValue.getValue() == 0) {
+          sstFileWriter.delete(keyValue.getKey());
+        } else {
+          sstFileWriter.put(keyValue.getKey(), EMPTY_BYTE_ARRAY);
+        }
+      }
+      sstFileWriter.finish();
+    } catch (RocksDBException ex) {
+      throw new RocksDatabaseException("Failed to write pruned entries for " + sstFilePath, ex);
+    } finally {
+      sstFileWriter.close();
     }
   }
 
