@@ -132,9 +132,9 @@ public final class CompactionLogEntry implements
   public Builder toBuilder() {
     Builder builder = new Builder(this.getDbSequenceNumber(), this.getCompactionTime(),
         this.getInputFileInfoList(), this.getOutputFileInfoList());
-    String compactionReason = this.getCompactionReason();
-    if (compactionLogEntry.getCompactionReason() != null) {
-      builder.setCompactionReason(compactionReason);
+    String reason = this.getCompactionReason();
+    if (this.getCompactionReason() != null) {
+      builder.setCompactionReason(reason);
     }
     return builder;
   }
