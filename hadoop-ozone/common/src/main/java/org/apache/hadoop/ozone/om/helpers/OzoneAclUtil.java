@@ -57,14 +57,12 @@ public final class OzoneAclUtil {
    * */
   public static List<OzoneAcl> getDefaultAclList(UserGroupInformation ugi, OmConfig conf) {
     // Get default acl rights for user and group.
-    ACLType[] userRights = conf.getUserDefaultRights();
-    ACLType[] groupRights = conf.getGroupDefaultRights();
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     // User ACL.
-    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, userRights));
+    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, conf.getUserDefaultRights()));
     try {
       String groupName = ugi.getPrimaryGroupName();
-      listOfAcls.add(OzoneAcl.of(GROUP, groupName, ACCESS, groupRights));
+      listOfAcls.add(OzoneAcl.of(GROUP, groupName, ACCESS, conf.getGroupDefaultRights()));
     } catch (IOException e) {
       // do nothing, since user has the permission, user can add ACL for selected groups later.
       LOG.warn("Failed to get primary group from user {}", ugi);

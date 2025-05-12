@@ -33,7 +33,6 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OmConfig;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
@@ -182,15 +181,13 @@ public class TestOzoneAclUtil {
     }
 
     OmConfig omConfig = newInstanceOf(OmConfig.class);
-    IAccessAuthorizer.ACLType[] userRights = omConfig.getUserDefaultRights();
-    IAccessAuthorizer.ACLType[] groupRights = omConfig.getGroupDefaultRights();
 
     OzoneAclUtil.addAcl(ozoneAcls, OzoneAcl.of(USER,
-        ugi.getUserName(), ACCESS, userRights));
+        ugi.getUserName(), ACCESS, omConfig.getUserDefaultRights()));
     //Group ACLs of the User
     List<String> userGroups = Arrays.asList(ugi.getGroupNames());
     userGroups.stream().forEach((group) -> OzoneAclUtil.addAcl(ozoneAcls,
-        OzoneAcl.of(GROUP, group, ACCESS, groupRights)));
+        OzoneAcl.of(GROUP, group, ACCESS, omConfig.getGroupDefaultRights())));
     return ozoneAcls;
   }
 

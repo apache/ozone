@@ -1191,7 +1191,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ClientProtocol proxy = objectStore.getClientProxy();
     // Get default acl rights for user
     OmConfig omConfig = cluster.getOzoneManager().getConfig();
-    ACLType[] userRights = omConfig.getUserDefaultRights();
     // Construct ACL for world access
     // ACL admin owner, world read+write
     EnumSet<ACLType> aclRights = EnumSet.of(READ, WRITE);
@@ -1202,7 +1201,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
         .setAdmin("admin")
         .setOwner("admin")
         .addAcl(OzoneAcl.of(ACLIdentityType.WORLD, "", ACCESS, aclRights))
-        .addAcl(OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, userRights))
+        .addAcl(OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, omConfig.getUserDefaultRights()))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
     // Sanity check
@@ -1237,7 +1236,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     BucketArgs bucketArgs = new BucketArgs.Builder()
         .setOwner("admin")
         .addAcl(OzoneAcl.of(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE, LIST))
-        .addAcl(OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, userRights))
+        .addAcl(OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, omConfig.getUserDefaultRights()))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
 
@@ -1294,10 +1293,9 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ClientProtocol proxy = objectStore.getClientProxy();
     // Get default acl rights for user
     OmConfig omConfig = cluster.getOzoneManager().getConfig();
-    ACLType[] userRights = omConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = OzoneAcl.of(ACLIdentityType.WORLD, "",
-        ACCESS, userRights);
+        ACCESS, omConfig.getUserDefaultRights());
     // Construct VolumeArgs
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addAcl(aclWorldAccess)
@@ -2274,10 +2272,9 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
     // Get default acl rights for user
     OmConfig omConfig = cluster.getOzoneManager().getConfig();
-    ACLType[] userRights = omConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = OzoneAcl.of(ACLIdentityType.WORLD, "",
-        ACCESS, userRights);
+        ACCESS, omConfig.getUserDefaultRights());
     // Construct VolumeArgs, set ACL to world access
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addAcl(aclWorldAccess)
