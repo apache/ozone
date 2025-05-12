@@ -20,10 +20,9 @@ package org.apache.ozone.rocksdb.util;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.AbstractMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,16 +55,15 @@ public final class RdbUtil {
         .collect(Collectors.toCollection(HashSet::new));
   }
 
-  public static Map<Object, String> getSSTFilesWithInodesForComparison(final ManagedRocksDB rocksDB, List<String> cfs) {
-    return getLiveSSTFilesForCFs(rocksDB, cfs).stream()
-        .map(lfm -> {
-          File sstFile = new File(lfm.path(), lfm.fileName());
-          try {
-            Object inode = Files.readAttributes(sstFile.toPath(), BasicFileAttributes.class).fileKey();
-            return new AbstractMap.SimpleEntry<>(inode, sstFile.getPath());
-          } catch (IOException e) {
-            throw new UncheckedIOException("Failed to read inode for " + sstFile.getPath(), e);
-          }
-        }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  public static Map<Object, String> getSSTFilesWithInodesForComparison(final ManagedRocksDB rocksDB, List<String> cfs)
+      throws IOException {
+    List<LiveFileMetaData> liveSSTFilesForCFs = getLiveSSTFilesForCFs(rocksDB, cfs);
+    Map<Object, String> inodeToSstMap = new HashMap<>();
+    for (LiveFileMetaData lfm : liveSSTFilesForCFs) {
+      File sstFile = new File(lfm.path(), lfm.fileName());
+      Object inode = Files.readAttributes(sstFile.toPath(), BasicFileAttributes.class).fileKey();
+      inodeToSstMap.put(inode, sstFile.getPath());
+    }
+    return inodeToSstMap;
   }
 }
