@@ -1566,7 +1566,7 @@ public class TestSnapshotDiffManager {
     String diffJobKey = snap1 + DELIMITER + snap2;
     Set<String> deltaFiles = spy.getDeltaFiles(fromSnapshot, toSnapshot, Collections.emptyList(), snapshotInfo,
         snapshotInfo, true, Collections.emptyMap(), null, diffJobKey);
-    Assertions.assertEquals(Sets.newHashSet("1.sst", "2.sst", "3.sst", "4.sst"), deltaFiles);
+    Assertions.assertEquals(Sets.newHashSet("3.sst", "4.sst"), deltaFiles);
   }
 
   @Test

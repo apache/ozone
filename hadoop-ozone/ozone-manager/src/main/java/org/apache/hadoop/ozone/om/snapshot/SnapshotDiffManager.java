@@ -1228,9 +1228,13 @@ public class SnapshotDiffManager implements AutoCloseable {
     try {
       Map<Object, String> fromSnapshotFiles = getSSTFileMapForSnapshot(fromSnapshot, tablesToLookUp);
       Map<Object, String> toSnapshotFiles = getSSTFileMapForSnapshot(toSnapshot, tablesToLookUp);
-      diffFiles = Stream.concat(fromSnapshotFiles.entrySet().stream(),
-              toSnapshotFiles.entrySet().stream().filter(e -> !fromSnapshotFiles.containsKey(e.getKey())))
-          .map(Map.Entry::getValue).collect(Collectors.toSet());
+      diffFiles = Stream.concat(
+          fromSnapshotFiles.entrySet().stream()
+              .filter(e -> !toSnapshotFiles.containsKey(e.getKey())),
+          toSnapshotFiles.entrySet().stream()
+              .filter(e -> !fromSnapshotFiles.containsKey(e.getKey())))
+              .map(Map.Entry::getValue)
+          .collect(Collectors.toSet());
     } catch (UncheckedIOException e) {
       // In case of exception during inode read use all files
       diffFiles = new HashSet<>();

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.AbstractMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -57,16 +58,14 @@ public final class RdbUtil {
 
   public static Map<Object, String> getSSTFilesWithInodesForComparison(final ManagedRocksDB rocksDB, List<String> cfs) {
     return getLiveSSTFilesForCFs(rocksDB, cfs).stream()
-        .collect(Collectors.toMap(
-            lfm -> {
-              try {
-                return Files.readAttributes(new File(lfm.path(), lfm.fileName()).toPath(),
-                    BasicFileAttributes.class).fileKey();
-              } catch (IOException e) {
-                throw new UncheckedIOException("Failed to read inode for " + lfm.path(), e);
-              }
-            },
-            lfm -> new File(lfm.path(), lfm.fileName()).getPath()
-        ));
+        .map(lfm -> {
+          File sstFile = new File(lfm.path(), lfm.fileName());
+          try {
+            Object inode = Files.readAttributes(sstFile.toPath(), BasicFileAttributes.class).fileKey();
+            return new AbstractMap.SimpleEntry<>(inode, sstFile.getPath());
+          } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read inode for " + sstFile.getPath(), e);
+          }
+        }).collect(Collectors.toMap(Map.Entry::getKey,Map.Entry::getValue));
   }
 }
