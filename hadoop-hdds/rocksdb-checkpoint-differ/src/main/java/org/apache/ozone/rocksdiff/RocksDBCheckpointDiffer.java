@@ -1310,8 +1310,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
           // Update compaction log entry in table.
           if (shouldUpdateTable) {
-            CompactionLogEntry.Builder builder = CompactionLogEntry.toBuilder(compactionLogEntry);
-            builder.updateInputFileInoList(updatedFileInfoList);
+            CompactionLogEntry.Builder builder = compactionLogEntry.toBuilder();
+            builder.updateInputFileInfoList(updatedFileInfoList);
             try {
               activeRocksDB.get().put(compactionLogTableCFHandle, compactionLogEntryKey,
                   builder.build().getProtobuf().toByteArray());
@@ -1331,11 +1331,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private void removeValueFromSSTFile(ManagedOptions options, ManagedEnvOptions envOptions,
       String sstFilePath, String prunedFilePath)
       throws IOException {
-    ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, options);
     try (ManagedRawSSTFileReader<Pair<byte[], Integer>> sstFileReader = new ManagedRawSSTFileReader<>(
              options, sstFilePath, SST_READ_AHEAD_SIZE);
          ManagedRawSSTFileIterator<Pair<byte[], Integer>> itr = sstFileReader.newIterator(
-             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null)) {
+             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null);
+         ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, options);) {
       sstFileWriter.open(prunedFilePath);
       while (itr.hasNext()) {
         Pair<byte[], Integer> keyValue = itr.next();
@@ -1348,8 +1348,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       sstFileWriter.finish();
     } catch (RocksDBException ex) {
       throw new RocksDatabaseException("Failed to write pruned entries for " + sstFilePath, ex);
-    } finally {
-      sstFileWriter.close();
     }
   }
 

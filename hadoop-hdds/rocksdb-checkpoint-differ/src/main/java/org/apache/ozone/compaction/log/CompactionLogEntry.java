@@ -167,7 +167,7 @@ public final class CompactionLogEntry implements
       return this;
     }
 
-    public Builder updateInputFileInoList(List<CompactionFileInfo> fileInfoList) {
+    public Builder updateInputFileInfoList(List<CompactionFileInfo> fileInfoList) {
       this.inputFileInfoList = fileInfoList;
       return this;
     }
