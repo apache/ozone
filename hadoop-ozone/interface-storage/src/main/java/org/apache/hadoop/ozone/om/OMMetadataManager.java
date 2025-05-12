@@ -614,6 +614,11 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getRenameKey(String volume, String bucket, long objectID);
 
   /**
+   * Given renameKey, return the volume, bucket and objectID from the key.
+   */
+  String[] splitRenameKey(String renameKey);
+
+  /**
    * Returns the DB key name of a multipart upload key in OM metadata store
    * for FSO-enabled buckets.
    *

@@ -23,7 +23,7 @@ Test Timeout        5 minutes
 
 *** Variables ***
 ${SCHEME}           ofs
-${volume}           volume1
+${volume}           obs-volume1
 ${bucket}           obs-bucket1
 ${PREFIX}           ozone
 

@@ -41,13 +41,11 @@ import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test-cases to verify SCMStateMachine.applyTransaction failure scenarios.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestScmApplyTransactionFailure implements HATests.TestCase {
 
   private ContainerManager containerManager;

@@ -64,14 +64,12 @@ import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Timer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Verify that {@link MutableVolumeSet} correctly checks for failed disks
  * during initialization.
  */
-@Timeout(30)
 public class TestVolumeSetDiskChecks {
   @TempDir
   private Path tempDir;

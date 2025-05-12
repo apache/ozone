@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 import com.google.common.base.Preconditions;
@@ -263,8 +264,7 @@ public class OzoneListStatusHelper {
       return null;
     }
     Object value = entry.getValue();
-    boolean isDir =
-        OmMetadataManagerImpl.DIRECTORY_TABLE.equals(entry.getTableName());
+    final boolean isDir = DIRECTORY_TABLE.equals(entry.getTableName());
     OmKeyInfo keyInfo;
     if (isDir) {
       Preconditions.checkArgument(value instanceof OmDirectoryInfo);
