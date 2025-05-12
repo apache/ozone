@@ -154,6 +154,7 @@ public class TestDatanodeConfiguration {
   public void isCreatedWitDefaultValues() {
     // GIVEN
     OzoneConfiguration conf = new OzoneConfiguration();
+    // unset over-ridding configuration from ozone-site.xml defined for the test module
     conf.unset(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE); // set in ozone-site.xml
 
     // WHEN
@@ -197,7 +198,7 @@ public class TestDatanodeConfiguration {
   }
 
   @Test
-  void useMaxAsPercentIfBothMinFreeSpacePropertiesSet() {
+  void useMaxIfBothMinFreeSpacePropertiesSet() {
     OzoneConfiguration conf = new OzoneConfiguration();
     int minFreeSpace = 10000;
     conf.setLong(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, minFreeSpace);

@@ -280,7 +280,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           " When the difference between volume capacity and used reaches this number," +
           " containers that reside on this volume will be closed and no new containers" +
           " would be allocated on this volume." +
-          " Max of min.free.space and min.free.space.percent will be configured when both are set."
+          " Max of min.free.space and min.free.space.percent will be used as final value."
   )
   private long minFreeSpace = getDefaultFreeSpace();
 
@@ -292,7 +292,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           " When the difference between volume capacity and used reaches (free.space.percent of volume capacity)," +
           " containers that reside on this volume will be closed and no new containers" +
           " would be allocated on this volume." +
-          " Max of min.free.space or min.free.space.percent will be configured when both are set."
+          " Max of min.free.space or min.free.space.percent will be used as final value."
   )
   private float minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
 
