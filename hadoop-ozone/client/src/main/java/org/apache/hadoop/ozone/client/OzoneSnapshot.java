@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client;
 
+import java.util.Objects;
 import java.util.UUID;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
@@ -197,5 +198,22 @@ public class OzoneSnapshot {
         snapshotInfo.getExclusiveSize() + snapshotInfo.getExclusiveDirSize(),
         snapshotInfo.getExclusiveReplicatedSize() + snapshotInfo.getExclusiveDirReplicatedSize()
     );
+  }
+
+  @Override
+  public final boolean equals(Object o) {
+    if (!(o instanceof OzoneSnapshot)) {
+      return false;
+    }
+
+    OzoneSnapshot that = (OzoneSnapshot) o;
+    return creationTime == that.creationTime && referencedSize == that.referencedSize &&
+        referencedReplicatedSize == that.referencedReplicatedSize && exclusiveSize == that.exclusiveSize &&
+        exclusiveReplicatedSize == that.exclusiveReplicatedSize &&
+        Objects.equals(volumeName, that.volumeName) && Objects.equals(bucketName, that.bucketName) &&
+        Objects.equals(name, that.name) && snapshotStatus == that.snapshotStatus &&
+        Objects.equals(snapshotId, that.snapshotId) &&
+        Objects.equals(snapshotPath, that.snapshotPath) &&
+        Objects.equals(checkpointDir, that.checkpointDir);
   }
 }
