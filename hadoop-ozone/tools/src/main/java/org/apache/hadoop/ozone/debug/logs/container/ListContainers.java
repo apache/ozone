@@ -42,6 +42,9 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
 
   @CommandLine.Mixin
   private ListLimitOptions listOptions;
+  
+  @CommandLine.ParentCommand
+  private ContainerLogController parent;
 
   private static final class ExclusiveOptions {
     @CommandLine.Option(names = {"--lifecycle"},
@@ -52,9 +55,6 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
         description = "Health state of the container.")
     private ReplicationManagerReport.HealthState healthState;
   }
-  
-  @CommandLine.ParentCommand
-  private ContainerLogController parent;
 
   @Override
   public Void call() throws Exception {
