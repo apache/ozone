@@ -45,6 +45,14 @@ Test ozone debug replicas verify checksums
     Should Be Empty      ${json}[keys]
     Should Be True       ${json}[pass]     ${True}
 
+Test ozone debug replicas verify replica states
+    ${output} =    Execute   ozone debug replicas verify --container-state o3://om/${VOLUME}/${BUCKET}/${TESTFILE} --output-dir ${TEMP_DIR}
+    ${json} =      Evaluate  json.loads('''${output}''')      json
+
+    # 'keys' array should be empty if all keys and their replicas passed replica state verification
+    Should Be Empty      ${json}[keys]
+    Should Be True       ${json}[pass]     ${True}
+
 Test ozone debug version
     ${output} =    Execute    ozone debug version
                    Execute    echo '${output}' | jq -r '.' # validate JSON
