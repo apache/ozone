@@ -66,6 +66,6 @@ public final class RdbUtil {
           } catch (IOException e) {
             throw new UncheckedIOException("Failed to read inode for " + sstFile.getPath(), e);
           }
-        }).collect(Collectors.toMap(Map.Entry::getKey,Map.Entry::getValue));
+        }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 }
