@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.debug.replicas;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
@@ -25,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
  * [DELETED, UNHEALTHY, INVALID] are considered bad states.
  */
 public class ReplicaStateVerifier implements ReplicaVerifier {
+  private static final String CHECK_TYPE = "replicaState";
   private final ContainerOperationClient containerOperationClient;
   private final XceiverClientManager xceiverClientManager;
   // cache for replica details from the DNs
@@ -40,8 +58,6 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
     containerOperationClient = new ContainerOperationClient(conf);
     xceiverClientManager = containerOperationClient.getXceiverClientManager();
   }
-
-  private static final String CHECK_TYPE = "replicaState";
 
   @Override
   public String getType() {
@@ -59,9 +75,6 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
       ContainerInfo containerInfo = containerInfoToken.getContainerInfo();
 
       ContainerDataProto containerData = getContainerData(datanode, keyLocation, replicaIndex, containerInfoToken);
-      if (containerData == null) {
-        return BlockVerificationResult.failCheck("ContainerData is missing in the datanode.");
-      }
       if (containerData.getState().equals(ContainerDataProto.State.UNHEALTHY)) {
         replicaCheckMsg.append("UNHEALTHY");
       } else if (containerData.getState().equals(ContainerDataProto.State.INVALID)) {
@@ -141,69 +154,68 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
     encodedTokenCache.put(containerId, cachedData);
     return cachedData;
   }
+}
 
-  private class ReplicaKey {
-    private final DatanodeDetails datanode;
-    private final long containerID;
+class ReplicaKey {
+  private final DatanodeDetails datanode;
+  private final long containerID;
 
-    ReplicaKey(DatanodeDetails datanode, long containerID) {
-      this.datanode = datanode;
-      this.containerID = containerID;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (!(o instanceof ReplicaKey)) {
-        return false;
-      }
-      ReplicaKey key = (ReplicaKey) o;
-      return Objects.equals(datanode, key.datanode) &&
-          Objects.equals(containerID, key.containerID);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(datanode, containerID);
-    }
+  ReplicaKey(DatanodeDetails datanode, long containerID) {
+    this.datanode = datanode;
+    this.containerID = containerID;
   }
 
-  private class ContainerInfoToken {
-    private final ContainerInfo containerInfo;
-    private final String encodedToken;
-
-    ContainerInfoToken(ContainerInfo info, String token) {
-      this.containerInfo = info;
-      this.encodedToken = token;
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
     }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (!(o instanceof ContainerInfoToken)) {
-        return false;
-      }
-      ContainerInfoToken key = (ContainerInfoToken) o;
-      return Objects.equals(containerInfo, key.containerInfo) &&
-          Objects.equals(encodedToken, key.encodedToken);
+    if (!(o instanceof ReplicaKey)) {
+      return false;
     }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(containerInfo, encodedToken);
-    }
-
-    public ContainerInfo getContainerInfo() {
-      return containerInfo;
-    }
-
-    public String getEncodedToken() {
-      return encodedToken;
-    }
+    ReplicaKey key = (ReplicaKey) o;
+    return Objects.equals(datanode, key.datanode) &&
+        Objects.equals(containerID, key.containerID);
   }
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(datanode, containerID);
+  }
+}
+
+class ContainerInfoToken {
+  private final ContainerInfo containerInfo;
+  private final String encodedToken;
+
+  ContainerInfoToken(ContainerInfo info, String token) {
+    this.containerInfo = info;
+    this.encodedToken = token;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof ContainerInfoToken)) {
+      return false;
+    }
+    ContainerInfoToken key = (ContainerInfoToken) o;
+    return Objects.equals(containerInfo, key.containerInfo) &&
+        Objects.equals(encodedToken, key.encodedToken);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(containerInfo, encodedToken);
+  }
+
+  public ContainerInfo getContainerInfo() {
+    return containerInfo;
+  }
+
+  public String getEncodedToken() {
+    return encodedToken;
+  }
 }
