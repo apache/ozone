@@ -216,4 +216,10 @@ public class OzoneSnapshot {
         Objects.equals(snapshotPath, that.snapshotPath) &&
         Objects.equals(checkpointDir, that.checkpointDir);
   }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(volumeName, bucketName, name, creationTime, snapshotStatus, snapshotId, snapshotPath,
+        checkpointDir, referencedSize, referencedReplicatedSize, exclusiveSize, exclusiveReplicatedSize);
+  }
 }
