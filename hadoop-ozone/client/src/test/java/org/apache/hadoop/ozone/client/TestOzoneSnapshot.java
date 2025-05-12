@@ -26,6 +26,9 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+/**
+ * Test class for OzoneSnapshot class.
+ */
 public class TestOzoneSnapshot {
 
   private SnapshotInfo getMockedSnapshotInfo(UUID snapshotId) {
