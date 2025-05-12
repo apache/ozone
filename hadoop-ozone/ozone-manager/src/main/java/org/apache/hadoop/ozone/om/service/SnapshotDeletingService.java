@@ -304,8 +304,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
     private void submitRequest(OMRequest omRequest) {
       try {
-        Status status =
-            OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, getRunCount().get()).getStatus();
+        Status status = OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId,
+                getCallId().incrementAndGet()).getStatus();
         if (!Objects.equals(status, Status.OK)) {
           LOG.error("Request: {} failed with an status: {}. Will retry in the next run.", omRequest, status);
         }

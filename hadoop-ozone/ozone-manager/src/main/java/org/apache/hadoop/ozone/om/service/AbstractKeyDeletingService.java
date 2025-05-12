@@ -81,6 +81,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
   private final AtomicLong runCount;
+  private final AtomicLong callId;
   private final BootstrapStateHandler.Lock lock =
       new BootstrapStateHandler.Lock();
 
@@ -97,6 +98,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.runCount = new AtomicLong(0);
     this.metrics = ozoneManager.getDeletionMetrics();
     this.perfMetrics = ozoneManager.getPerfMetrics();
+    this.callId = new AtomicLong(0);
   }
 
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
@@ -220,7 +222,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit PurgeKeys request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callId.incrementAndGet());
     } catch (ServiceException e) {
       LOG.error("PurgeKey request failed. Will retry at next run.", e);
       return 0;
@@ -250,7 +252,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   protected void submitPurgePaths(List<PurgePathRequest> requests,
                                   String snapTableKey,
-                                  UUID expectedPreviousSnapshotId, long rnCnt) {
+                                  UUID expectedPreviousSnapshotId) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -275,7 +277,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit Purge paths request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, rnCnt);
+      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callId.incrementAndGet());
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.", e);
     }
@@ -403,7 +405,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, rnCnt);
+      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
@@ -611,6 +613,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   @VisibleForTesting
   public AtomicLong getRunCount() {
     return runCount;
+  }
+
+  public AtomicLong getCallId() {
+    return callId;
   }
 
   /**
