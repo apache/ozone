@@ -178,12 +178,12 @@ public class TestDatanodeConfiguration {
         subject.getBlockDeleteCommandWorkerInterval());
     assertEquals(DatanodeConfiguration.getDefaultFreeSpace(), subject.getMinFreeSpace());
     assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT, subject.getMinFreeSpaceRatio());
-    final long one_gb = 1024 * 1024 * 1024;
+    final long oneGB = 1024 * 1024 * 1024;
     // capacity is less, consider default min_free_space
-    assertEquals(DatanodeConfiguration.getDefaultFreeSpace(), subject.getMinFreeSpace(one_gb));
+    assertEquals(DatanodeConfiguration.getDefaultFreeSpace(), subject.getMinFreeSpace(oneGB));
     // capacity is large, consider min_free_space_percent, max(min_free_space, min_free_space_percent * capacity)ß
-    assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT * one_gb * one_gb,
-        subject.getMinFreeSpace(one_gb * one_gb));
+    assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT * oneGB * oneGB,
+        subject.getMinFreeSpace(oneGB * oneGB));
   }
 
   @Test
