@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListLimitOptions;
 import picocli.CommandLine;
 
 
@@ -46,7 +46,7 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
   private ReplicationManagerReport.HealthState healthState;
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
+  private ListLimitOptions listOptions;
 
   @CommandLine.ParentCommand
   private ContainerLogController parent;

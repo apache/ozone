@@ -32,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
@@ -71,7 +72,7 @@ public class ReconNodeManager extends SCMNodeManager {
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconNodeManager.class);
 
-  private Table<UUID, DatanodeDetails> nodeDB;
+  private Table<DatanodeID, DatanodeDetails> nodeDB;
   private ReconContext reconContext;
   private static final Set<Type> ALLOWED_COMMANDS =
       ImmutableSet.of(reregisterCommand);
@@ -93,7 +94,7 @@ public class ReconNodeManager extends SCMNodeManager {
                           SCMStorageConfig scmStorageConfig,
                           EventPublisher eventPublisher,
                           NetworkTopology networkTopology,
-                          Table<UUID, DatanodeDetails> nodeDB,
+                          Table<DatanodeID, DatanodeDetails> nodeDB,
                           HDDSLayoutVersionManager scmLayoutVersionManager) {
     super(conf, scmStorageConfig, eventPublisher, networkTopology,
         SCMContext.emptyContext(), scmLayoutVersionManager);
@@ -103,7 +104,7 @@ public class ReconNodeManager extends SCMNodeManager {
   }
 
   public ReconNodeManager(OzoneConfiguration conf, SCMStorageConfig scmStorageConfig, EventQueue eventQueue,
-                          NetworkTopology clusterMap, Table<UUID, DatanodeDetails> table,
+                          NetworkTopology clusterMap, Table<DatanodeID, DatanodeDetails> table,
                           HDDSLayoutVersionManager scmLayoutVersionManager, ReconContext reconContext) {
     this(conf, scmStorageConfig, eventQueue, clusterMap, table, scmLayoutVersionManager);
     this.reconContext = reconContext;
@@ -111,7 +112,7 @@ public class ReconNodeManager extends SCMNodeManager {
   }
 
   private void loadExistingNodes() {
-    try (TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
+    try (TableIterator<DatanodeID, ? extends Table.KeyValue<DatanodeID, DatanodeDetails>>
              iterator = nodeDB.iterator()) {
       int nodeCount = 0;
       while (iterator.hasNext()) {
@@ -143,7 +144,7 @@ public class ReconNodeManager extends SCMNodeManager {
    * @param datanodeDetails Datanode details.
    */
   public void addNodeToDB(DatanodeDetails datanodeDetails) throws IOException {
-    nodeDB.put(datanodeDetails.getUuid(), datanodeDetails);
+    nodeDB.put(datanodeDetails.getID(), datanodeDetails);
     LOG.info("Adding new node {} to Node DB.", datanodeDetails.getUuid());
   }
 
@@ -268,7 +269,7 @@ public class ReconNodeManager extends SCMNodeManager {
     inMemDatanodeDetails.put(datanodeDetails.getUuid(), datanodeDetails);
     if (isNodeRegistered(datanodeDetails)) {
       try {
-        nodeDB.put(datanodeDetails.getUuid(), datanodeDetails);
+        nodeDB.put(datanodeDetails.getID(), datanodeDetails);
         LOG.info("Updating nodeDB for " + datanodeDetails.getHostName());
       } catch (IOException e) {
         LOG.error("Can not update node {} to Node DB.",
@@ -318,7 +319,7 @@ public class ReconNodeManager extends SCMNodeManager {
         reconDatanodeOutdatedTime;
   }
 
-  public void reinitialize(Table<UUID, DatanodeDetails> nodeTable) {
+  public void reinitialize(Table<DatanodeID, DatanodeDetails> nodeTable) {
     this.nodeDB = nodeTable;
     loadExistingNodes();
   }
@@ -326,7 +327,7 @@ public class ReconNodeManager extends SCMNodeManager {
   @VisibleForTesting
   public long getNodeDBKeyCount() throws IOException {
     long nodeCount = 0;
-    try (TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
+    try (TableIterator<DatanodeID, ? extends Table.KeyValue<DatanodeID, DatanodeDetails>>
         iterator = nodeDB.iterator()) {
       while (iterator.hasNext()) {
         iterator.next();
@@ -347,7 +348,7 @@ public class ReconNodeManager extends SCMNodeManager {
   public void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
     try {
       super.removeNode(datanodeDetails);
-      nodeDB.delete(datanodeDetails.getUuid());
+      nodeDB.delete(datanodeDetails.getID());
     } catch (IOException ioException) {
       LOG.error("Node {} deletion fails from Node DB.", datanodeDetails.getUuid());
       throw ioException;

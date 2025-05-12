@@ -72,7 +72,7 @@ public final class SCMContext {
   private SCMContext(Builder b) {
     isLeader = b.isLeader;
     term = b.term;
-    safeModeStatus = new SafeModeStatus(b.isInSafeMode, b.isPreCheckComplete);
+    safeModeStatus = SafeModeStatus.of(b.isInSafeMode, b.isPreCheckComplete);
     finalizationCheckpoint = b.finalizationCheckpoint;
     scm = b.scm;
     threadNamePrefix = b.threadNamePrefix;

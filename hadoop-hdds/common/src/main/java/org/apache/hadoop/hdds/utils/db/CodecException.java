@@ -15,16 +15,23 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.replicas;
+package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import java.io.IOException;
 
 /**
- * Functional interface for implementing a block verifier.
+ * Exceptions thrown from the {@link Codec} subclasses.
  */
-public interface ReplicaVerifier {
-  BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation, int replicaIndex);
+public class CodecException extends IOException {
+  public CodecException(String message, Throwable cause) {
+    super(message, cause);
+  }
 
-  String getType();
+  public CodecException(String message) {
+    super(message);
+  }
+
+  public CodecException() {
+    super();
+  }
 }

@@ -15,16 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.replicas;
+package org.apache.hadoop.ozone.shell;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import picocli.CommandLine;
 
-/**
- * Functional interface for implementing a block verifier.
- */
-public interface ReplicaVerifier {
-  BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation, int replicaIndex);
+/** Option for filtering lists by prefix.  Use with {@link CommandLine.Mixin}. */
+public class PrefixFilterOption {
 
-  String getType();
+  @CommandLine.Option(names = {"--prefix", "-p"},
+      description = "Prefix to filter the items")
+  private String prefix;
+
+  public String getPrefix() {
+    return prefix;
+  }
+
 }
