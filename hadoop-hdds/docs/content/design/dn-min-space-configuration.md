@@ -100,6 +100,9 @@ This case is more useful for test environment where disk space is less and no ne
 
 # Conclusion
 1. Going with Approach 1
+- Approach 2 is simple setting only min-free-space, but it does not expand with higher disk size.
+- Approach 3 is more applicable for test environment where disk space is less, else same as Approach 2.
+- So Approach 1 is selected considering advantage where higher free space can be configured by default.
 2. Min Space will be 20GB as default
 
 

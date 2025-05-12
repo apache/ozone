@@ -73,7 +73,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
       "hdds.datanode.volume.min.free.space.percent";
   public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT = 0.001f;
-  static final byte MIN_FREE_SPACE_UNSET = -1;
 
   public static final String WAIT_ON_ALL_FOLLOWERS = "hdds.datanode.wait.on.all.followers";
   public static final String CONTAINER_SCHEMA_V3_ENABLED = "hdds.datanode.container.schema.v3.enabled";
@@ -281,10 +280,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           " When the difference between volume capacity and used reaches this number," +
           " containers that reside on this volume will be closed and no new containers" +
           " would be allocated on this volume." +
-          " Either of min.free.space or min.free.space.percent should be configured, when both are set then" +
-          " min.free.space will be used."
+          " Max of min.free.space and min.free.space.percent will be configured when both are set."
   )
-  private long minFreeSpace = MIN_FREE_SPACE_UNSET;
+  private long minFreeSpace = getDefaultFreeSpace();
 
   @Config(key = "hdds.datanode.volume.min.free.space.percent",
       defaultValue = "-1",
@@ -294,8 +292,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           " When the difference between volume capacity and used reaches (free.space.percent of volume capacity)," +
           " containers that reside on this volume will be closed and no new containers" +
           " would be allocated on this volume." +
-          " Either of min.free.space or min.free.space.percent should be configured, when both are set then" +
-          " min.free.space will be used."
+          " Max of min.free.space or min.free.space.percent will be configured when both are set."
   )
   private float minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
 
@@ -684,10 +681,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   }
 
   /**
-   * If 'hdds.datanode.volume.min.free.space' is defined,
-   * it will be honored first. If it is not defined and
-   * 'hdds.datanode.volume.min.free.space.percent' is defined, it will honor this
-   * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
+   * validate value of 'hdds.datanode.volume.min.free.space' and 'hdds.datanode.volume.min.free.space.percent'
+   * and update with default value if not within range.
    */
   private void validateMinFreeSpace() {
     if (minFreeSpaceRatio > 1 || minFreeSpaceRatio < 0) {
