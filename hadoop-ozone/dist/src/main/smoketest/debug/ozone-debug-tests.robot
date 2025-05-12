@@ -36,13 +36,13 @@ Write keys
     Execute             ozone sh key put o3://om/${VOLUME}/${BUCKET}/${TESTFILE} ${TEMP_DIR}/${TESTFILE}
 
 *** Test Cases ***
-Test ozone debug read-replicas
-    ${directory} =                      Execute replicas verify checksums CLI tool
-    Set Test Variable    ${DIR}         ${directory}
+Test ozone debug replicas verify checksums
+    ${output} =    Execute   ozone debug replicas verify --checksums o3://om/${VOLUME}/${BUCKET}/${TESTFILE} --output-dir ${TEMP_DIR}
+    ${json} =      Evaluate  json.loads('''${output}''')      json
 
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     1
-
+    # 'keys' array should be empty if all keys and their replicas passed checksum verification
+    Should Be Empty      ${json}[keys]
+    Should Be True       ${json}[pass]     ${True}
 
 Test ozone debug version
     ${output} =    Execute    ozone debug version

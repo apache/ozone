@@ -116,6 +116,34 @@ public class ContainerDatanodeDatabase {
     }
   }
 
+  public void createIndexes() throws SQLException {
+    try (Connection connection = getConnection();
+         Statement stmt = connection.createStatement()) {
+      createIdxDclContainerStateTime(stmt);
+      createContainerLogIndex(stmt);
+      createIdxContainerlogContainerId(stmt);
+    } catch (SQLException e) {
+      throw new SQLException("Error while creating index: " + e.getMessage());
+    } catch (Exception e) {
+      throw new RuntimeException("Unexpected error: "  + e);
+    }
+  }
+
+  private void createIdxDclContainerStateTime(Statement stmt) throws SQLException {
+    String createIndexSQL = SQLDBConstants.CREATE_DCL_CONTAINER_STATE_TIME_INDEX;
+    stmt.execute(createIndexSQL);
+  }
+
+  private void createContainerLogIndex(Statement stmt) throws SQLException {
+    String createIndexSQL = SQLDBConstants.CREATE_INDEX_LATEST_STATE;
+    stmt.execute(createIndexSQL);
+  }
+
+  private void createIdxContainerlogContainerId(Statement stmt) throws SQLException {
+    String createIndexSQL = SQLDBConstants.CREATE_CONTAINER_ID_INDEX;
+    stmt.execute(createIndexSQL);
+  }
+
   /**
    * Inserts a list of container log entries into the DatanodeContainerLogTable.
    *
@@ -228,11 +256,6 @@ public class ContainerDatanodeDatabase {
     stmt.executeUpdate(dropTableSQL);
   }
 
-  private void createContainerLogIndex(Statement stmt) throws SQLException {
-    String createIndexSQL = SQLDBConstants.CREATE_INDEX_LATEST_STATE;
-    stmt.execute(createIndexSQL);
-  }
-
   /**
    * Lists containers filtered by the specified state and writes their details to stdout 
    * unless redirected to a file explicitly.
@@ -255,10 +278,7 @@ public class ContainerDatanodeDatabase {
     String baseQuery = SQLDBConstants.SELECT_LATEST_CONTAINER_LOGS_BY_STATE;
     String finalQuery = limitProvided ? baseQuery + " LIMIT ?" : baseQuery;
 
-    try (Connection connection = getConnection();
-         Statement stmt = connection.createStatement()) {
-
-      createContainerLogIndex(stmt);
+    try (Connection connection = getConnection()) {
 
       try (PreparedStatement pstmt = connection.prepareStatement(finalQuery)) {
         pstmt.setString(1, state);
@@ -304,13 +324,6 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  private void createIdxDclContainerStateTime(Connection conn) throws SQLException {
-    String sql = SQLDBConstants.CREATE_DCL_CONTAINER_STATE_TIME_INDEX;
-    try (Statement stmt = conn.createStatement()) {
-      stmt.execute(sql);
-    }
-  }
-
   /**
    * Displays detailed information about a container based on its ID, including its state, BCSID, 
    * timestamp, message, and index value. It also checks for issues such as UNHEALTHY 
@@ -323,7 +336,7 @@ public class ContainerDatanodeDatabase {
   public void showContainerDetails(Long containerID) throws SQLException {
 
     try (Connection connection = getConnection()) {
-      createIdxDclContainerStateTime(connection);
+
       List<DatanodeContainerInfo> logEntries = getContainerLogData(containerID, connection);
 
       if (logEntries.isEmpty()) {
@@ -534,6 +547,61 @@ public class ContainerDatanodeDatabase {
               .setIndexValue(rs.getInt("index_value"))
               .build();
 
+          logEntries.add(entry);
+        }
+      }
+    }
+
+    return logEntries;
+  }
+
+  public void findDuplicateOpenContainer() throws SQLException {
+    String sql = SQLDBConstants.SELECT_DISTINCT_CONTAINER_IDS_QUERY;
+
+    try (Connection connection = getConnection()) {
+
+      try (PreparedStatement statement = connection.prepareStatement(sql);
+           ResultSet resultSet = statement.executeQuery()) {
+        int count = 0;
+
+        while (resultSet.next()) {
+          Long containerID = resultSet.getLong("container_id");
+          List<DatanodeContainerInfo> logEntries = getContainerLogDataForOpenContainers(containerID, connection);
+          boolean hasIssue = checkForMultipleOpenStates(logEntries);
+          if (hasIssue) {
+            int openStateCount = (int) logEntries.stream()
+                .filter(entry -> "OPEN".equalsIgnoreCase(entry.getState()))
+                .count();
+            count++;
+            out.println("Container ID: " + containerID + " - OPEN state count: " + openStateCount);
+          }
+        }
+
+        out.println("Total containers that might have duplicate OPEN state : " + count);
+
+      }
+    } catch (SQLException e) {
+      throw new SQLException("Error while retrieving containers." + e.getMessage(), e);
+    } catch (Exception e) {
+      throw new RuntimeException("Unexpected error: "  + e);
+    }
+  }
+
+  private List<DatanodeContainerInfo> getContainerLogDataForOpenContainers(Long containerID, Connection connection)
+      throws SQLException {
+    String query = SQLDBConstants.SELECT_CONTAINER_DETAILS_OPEN_STATE;
+    List<DatanodeContainerInfo> logEntries = new ArrayList<>();
+
+    try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+      preparedStatement.setLong(1, containerID);
+      try (ResultSet rs = preparedStatement.executeQuery()) {
+        while (rs.next()) {
+          DatanodeContainerInfo entry = new DatanodeContainerInfo.Builder()
+              .setTimestamp(rs.getString("timestamp"))
+              .setContainerId(rs.getLong("container_id"))
+              .setDatanodeId(rs.getString("datanode_id"))
+              .setState(rs.getString("container_state"))
+              .build();
           logEntries.add(entry);
         }
       }

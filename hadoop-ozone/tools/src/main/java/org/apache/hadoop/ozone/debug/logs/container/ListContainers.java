@@ -19,10 +19,9 @@ package org.apache.hadoop.ozone.debug.logs.container;
 
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListLimitOptions;
 import picocli.CommandLine;
 
 
@@ -34,7 +33,7 @@ import picocli.CommandLine;
     name = "list",
     description = "Finds containers from the database based on the option provided."
 )
-public class ListContainers extends AbstractSubcommand implements Callable<Void> {
+public class ListContainers implements Callable<Void> {
   
   @CommandLine.Option(names = {"--state"},
       description = "Life cycle state of the container.",
@@ -42,7 +41,7 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
   private HddsProtos.LifeCycleState state;
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
+  private ListLimitOptions listOptions;
 
   @CommandLine.ParentCommand
   private ContainerLogController parent;

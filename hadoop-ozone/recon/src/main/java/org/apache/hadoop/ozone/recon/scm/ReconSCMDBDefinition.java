@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.util.Map;
-import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -31,14 +31,14 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
  * Recon SCM db file for ozone.
  */
 public final class ReconSCMDBDefinition extends SCMDBDefinition {
-  private static final Codec<UUID> UUID_CODEC = new DelegatedCodec<>(
-      StringCodec.get(), UUID::fromString, UUID::toString,
-      UUID.class, DelegatedCodec.CopyType.SHALLOW);
+  private static final Codec<DatanodeID> DATANODE_ID_CODEC = new DelegatedCodec<>(
+      StringCodec.get(), DatanodeID::fromUuidString, DatanodeID::toString,
+      DatanodeID.class, DelegatedCodec.CopyType.SHALLOW);
 
   public static final String RECON_SCM_DB_NAME = "recon-scm.db";
 
-  public static final DBColumnFamilyDefinition<UUID, DatanodeDetails> NODES
-      = new DBColumnFamilyDefinition<>("nodes", UUID_CODEC, DatanodeDetails.getCodec());
+  public static final DBColumnFamilyDefinition<DatanodeID, DatanodeDetails> NODES
+      = new DBColumnFamilyDefinition<>("nodes", DATANODE_ID_CODEC, DatanodeDetails.getCodec());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
