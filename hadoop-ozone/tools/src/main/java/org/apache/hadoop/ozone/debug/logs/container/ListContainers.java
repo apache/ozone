@@ -37,17 +37,22 @@ import picocli.CommandLine;
 )
 public class ListContainers extends AbstractSubcommand implements Callable<Void> {
   
-  @CommandLine.Option(names = {"--lifecycle"},
-      description = "Life cycle state of the container.")
-  private HddsProtos.LifeCycleState lifecycleState;
-
-  @CommandLine.Option(names = {"--health"},
-      description = "Health state of the container.")
-  private ReplicationManagerReport.HealthState healthState;
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private ExclusiveOptions exclusiveOptions;
 
   @CommandLine.Mixin
   private ListLimitOptions listOptions;
 
+  private static final class ExclusiveOptions {
+    @CommandLine.Option(names = {"--lifecycle"},
+        description = "Life cycle state of the container.")
+    private HddsProtos.LifeCycleState lifecycleState;
+
+    @CommandLine.Option(names = {"--health"},
+        description = "Health state of the container.")
+    private ReplicationManagerReport.HealthState healthState;
+  }
+  
   @CommandLine.ParentCommand
   private ContainerLogController parent;
 
@@ -58,13 +63,13 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(dbPath.toString());
 
-    if (lifecycleState != null) {
-      cdd.listContainersByState(lifecycleState.name(), listOptions.getLimit());
-    } else if (healthState != null) {
-      switch (healthState) {
+    if (exclusiveOptions.lifecycleState != null) {
+      cdd.listContainersByState(exclusiveOptions.lifecycleState.name(), listOptions.getLimit());
+    } else if (exclusiveOptions.healthState != null) {
+      switch (exclusiveOptions.healthState) {
       case UNDER_REPLICATED:
       case OVER_REPLICATED:
-        cdd.listReplicatedContainers(healthState.name(), listOptions.getLimit());
+        cdd.listReplicatedContainers(exclusiveOptions.healthState.name(), listOptions.getLimit());
         break;
       case UNHEALTHY:
         cdd.listUnhealthyContainers(listOptions.getLimit());
@@ -73,11 +78,8 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
         cdd.listQuasiClosedStuckContainers(listOptions.getLimit());
         break;
       default:
-        err().println("Unsupported health state: " + healthState);
+        err().println("Unsupported health state: " + exclusiveOptions.healthState);
       }
-    } else {
-      err().println("Please provide either a lifecycle state (--lifecycle) or health state " +
-          "(--health) to filter the containers.");
     }
     
     return null;
