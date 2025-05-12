@@ -129,10 +129,10 @@ public final class CompactionLogEntry implements
         inputFileInfoList, outputFileInfoList, compactionReason);
   }
 
-  public static Builder toBuilder(CompactionLogEntry compactionLogEntry) {
-    Builder builder = new Builder(compactionLogEntry.getDbSequenceNumber(), compactionLogEntry.getCompactionTime(),
-        compactionLogEntry.getInputFileInfoList(), compactionLogEntry.getOutputFileInfoList());
-    String compactionReason = compactionLogEntry.getCompactionReason();
+  public Builder toBuilder() {
+    Builder builder = new Builder(this.getDbSequenceNumber(), this.getCompactionTime(),
+        this.getInputFileInfoList(), this.getOutputFileInfoList());
+    String compactionReason = this.getCompactionReason();
     if (compactionLogEntry.getCompactionReason() != null) {
       builder.setCompactionReason(compactionReason);
     }
