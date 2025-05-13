@@ -88,6 +88,7 @@ public final class ContainerMerkleTreeTestUtils {
         assertEquals(expectedChunkTree.getOffset(), actualChunkTree.getOffset());
         assertEquals(expectedChunkTree.getLength(), actualChunkTree.getLength());
         assertEquals(expectedChunkTree.getDataChecksum(), actualChunkTree.getDataChecksum());
+        assertEquals(expectedChunkTree.getIsHealthy(), actualChunkTree.getIsHealthy());
       }
     }
   }
@@ -152,7 +153,7 @@ public final class ContainerMerkleTreeTestUtils {
       for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
         chunks.add(buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
       }
-      tree.addChunks(blockIndex, chunks);
+      tree.addChunks(blockIndex, true, chunks);
     }
     return tree;
   }

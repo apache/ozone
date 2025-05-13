@@ -70,7 +70,7 @@ class TestContainerMerkleTreeWriter {
 
     // Use the ContainerMerkleTree to build the same tree.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
-    actualTree.addChunks(blockID, Collections.singletonList(chunk));
+    actualTree.addChunks(blockID, true, Collections.singletonList(chunk));
 
     // Ensure the trees match.
     ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
@@ -106,7 +106,7 @@ class TestContainerMerkleTreeWriter {
 
     // Use the ContainerMerkleTree to build the same tree.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
-    actualTree.addChunks(blockID, Arrays.asList(chunk1, chunk3));
+    actualTree.addChunks(blockID, true, Arrays.asList(chunk1, chunk3));
 
     // Ensure the trees match.
     ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
@@ -137,8 +137,8 @@ class TestContainerMerkleTreeWriter {
     // Use the ContainerMerkleTree to build the same tree.
     // Add blocks and chunks out of order to test sorting.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
-    actualTree.addChunks(blockID3, Arrays.asList(b3c2, b3c1));
-    actualTree.addChunks(blockID1, Arrays.asList(b1c1, b1c2));
+    actualTree.addChunks(blockID3, true, Arrays.asList(b3c2, b3c1));
+    actualTree.addChunks(blockID1, true, Arrays.asList(b1c1, b1c2));
 
     // Ensure the trees match.
     ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
@@ -173,17 +173,57 @@ class TestContainerMerkleTreeWriter {
     // Test building by adding chunks to the blocks individually and out of order.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
     // Add all of block 2 first.
-    actualTree.addChunks(blockID2, Arrays.asList(b2c1, b2c2));
+    actualTree.addChunks(blockID2, true, Arrays.asList(b2c1, b2c2));
     // Then add block 1 in multiple steps wth chunks out of order.
-    actualTree.addChunks(blockID1, Collections.singletonList(b1c2));
-    actualTree.addChunks(blockID1, Arrays.asList(b1c3, b1c1));
+    actualTree.addChunks(blockID1, true, Collections.singletonList(b1c2));
+    actualTree.addChunks(blockID1, true, Arrays.asList(b1c3, b1c1));
     // Add a duplicate chunk to block 3. It should overwrite the existing one.
-    actualTree.addChunks(blockID3, Arrays.asList(b3c1, b3c2));
-    actualTree.addChunks(blockID3, Collections.singletonList(b3c2));
+    actualTree.addChunks(blockID3, true, Arrays.asList(b3c1, b3c2));
+    actualTree.addChunks(blockID3, true, Collections.singletonList(b3c2));
 
     // Ensure the trees match.
     ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
     assertTreesSortedAndMatch(expectedTree, actualTreeProto);
+  }
+
+  /**
+   * Test that a {@link ContainerMerkleTreeWriter} built from a {@link ContainerProtos.ContainerMerkleTree} will
+   * write produce an identical proto as the input when it is written again.
+   */
+  @Test
+  public void testProtoToWriterConversion() {
+    final long blockID1 = 1;
+    final long blockID2 = 2;
+    final long blockID3 = 3;
+    final long blockID4 = 4;
+    ContainerProtos.ChunkInfo b1c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo b1c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{1, 2}));
+    ContainerProtos.ChunkInfo b1c3 = buildChunk(config, 2, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo b2c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo b2c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.BlockMerkleTree blockTree1 = buildExpectedBlockTree(blockID1,
+        Arrays.asList(buildExpectedChunkTree(b1c1), buildExpectedChunkTree(b1c2), buildExpectedChunkTree(b1c3)));
+    ContainerProtos.BlockMerkleTree blockTree2 = buildExpectedBlockTree(blockID2,
+        Arrays.asList(buildExpectedChunkTree(b2c1), buildExpectedChunkTree(b2c2)));
+    // Test that an empty block is preserved during tree conversion.
+    ContainerProtos.BlockMerkleTree blockTree3 = buildExpectedBlockTree(blockID3, Collections.emptyList());
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(
+        Arrays.asList(blockTree1, blockTree2, blockTree3));
+
+    ContainerMerkleTreeWriter treeWriter = new ContainerMerkleTreeWriter(expectedTree);
+    assertTreesSortedAndMatch(expectedTree, treeWriter.toProto());
+
+    // Modifying the tree writer created from the proto should also succeed.
+    ContainerProtos.ChunkInfo b3c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1}));
+    treeWriter.addChunks(blockID3, false, b3c1);
+    treeWriter.addBlock(blockID4);
+
+    blockTree3 = buildExpectedBlockTree(blockID3, Collections.singletonList(buildExpectedChunkTree(b3c1, false)));
+    ContainerProtos.BlockMerkleTree blockTree4 = buildExpectedBlockTree(blockID4, Collections.emptyList());
+    ContainerProtos.ContainerMerkleTree expectedUpdatedTree = buildExpectedContainerTree(
+        Arrays.asList(blockTree1, blockTree2, blockTree3, blockTree4));
+
+    assertTreesSortedAndMatch(expectedUpdatedTree, treeWriter.toProto());
   }
 
   private ContainerProtos.ContainerMerkleTree buildExpectedContainerTree(List<ContainerProtos.BlockMerkleTree> blocks) {
@@ -209,10 +249,15 @@ class TestContainerMerkleTreeWriter {
   }
 
   private ContainerProtos.ChunkMerkleTree buildExpectedChunkTree(ContainerProtos.ChunkInfo chunk) {
+    return buildExpectedChunkTree(chunk, true);
+  }
+
+  private ContainerProtos.ChunkMerkleTree buildExpectedChunkTree(ContainerProtos.ChunkInfo chunk, boolean isHealthy) {
     return ContainerProtos.ChunkMerkleTree.newBuilder()
         .setOffset(chunk.getOffset())
         .setLength(chunk.getLen())
         .setDataChecksum(computeExpectedChunkChecksum(chunk.getChecksumData().getChecksumsList()))
+        .setIsHealthy(isHealthy)
         .build();
   }
 

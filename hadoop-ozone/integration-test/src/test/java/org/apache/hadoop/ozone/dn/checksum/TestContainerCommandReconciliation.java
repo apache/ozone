@@ -378,7 +378,7 @@ public class TestContainerCommandReconciliation {
 
     // TODO: Use On-demand container scanner to build the new container merkle tree. (HDDS-10374)
     Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
-    kvHandler.createContainerMerkleTree(container);
+    kvHandler.createContainerMerkleTreeFromMetadata(container);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());
     long dataChecksumAfterBlockDelete = containerChecksumAfterBlockDelete.getContainerMerkleTree().getDataChecksum();
@@ -461,7 +461,7 @@ public class TestContainerCommandReconciliation {
     }
 
     Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
-    kvHandler.createContainerMerkleTree(container);
+    kvHandler.createContainerMerkleTreeFromMetadata(container);
     // To set unhealthy for chunks that are corrupted.
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterChunkCorruption =
         readChecksumFile(container.getContainerData());
@@ -559,7 +559,7 @@ public class TestContainerCommandReconciliation {
 
     // TODO: Use On-demand container scanner to build the new container merkle tree. (HDDS-10374)
     Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
-    kvHandler.createContainerMerkleTree(container);
+    kvHandler.createContainerMerkleTreeFromMetadata(container);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());
     long dataChecksumAfterBlockDelete = containerChecksumAfterBlockDelete.getContainerMerkleTree().getDataChecksum();
