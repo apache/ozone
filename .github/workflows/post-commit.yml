@@ -26,7 +26,7 @@ jobs:
           local_ip=$(host "$host" | head -1 | awk '{ print $NF }')
           sudo netstat -vatnp | grep LISTEN
           port=12345
-          for addr in localhost $host $local_ip 0.0.0.0; do
+          for addr in localhost 127.0.0.1 "$host" "$local_ip"; do
             # listen on any interface
             nc -l 0.0.0.0 "$port" &
             sleep 1
