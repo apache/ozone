@@ -17,11 +17,19 @@ on:
   pull_request:
     types: [opened, ready_for_review, synchronize]
   push:
-concurrency:
-  group: ci-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
-  CI:
-    if: github.event_name == 'pull_request' || !startsWith(github.ref_name, 'dependabot')
-    uses: ./.github/workflows/ci.yml
-    secrets: inherit
+  debug:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: sudo netstat -vatnp | grep LISTEN
+        continue-on-error: true
+      - run: hostname -f
+        continue-on-error: true
+      - run: nslookup $(hostname -f)
+        continue-on-error: true
+      - run: nc -z 127.0.0.1 22
+        continue-on-error: true
+      - run: nc -z $(hostname -f) 22
+        continue-on-error: true
+      - run: nc -z 0.0.0.0 22
+        continue-on-error: true
