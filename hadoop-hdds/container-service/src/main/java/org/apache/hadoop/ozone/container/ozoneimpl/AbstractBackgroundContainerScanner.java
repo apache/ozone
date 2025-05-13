@@ -37,6 +37,8 @@ public abstract class AbstractBackgroundContainerScanner implements Runnable {
   private final Thread scannerThread;
   private final AtomicBoolean stopping;
   private final AtomicBoolean pausing = new AtomicBoolean();
+  private int numUnHealthyEachIteration = 0;
+  private int numContainersScannedEachIteration = 0;
 
   public AbstractBackgroundContainerScanner(String name,
       long dataScanInterval) {
@@ -57,8 +59,6 @@ public abstract class AbstractBackgroundContainerScanner implements Runnable {
     try {
       while (!stopping.get()) {
         runIteration();
-        metrics.resetNumContainersScanned();
-        metrics.resetNumUnhealthyContainers();
       }
       LOG.info("{} exiting.", this);
     } catch (Exception e) {
@@ -72,6 +72,8 @@ public abstract class AbstractBackgroundContainerScanner implements Runnable {
 
   @VisibleForTesting
   public final void runIteration() {
+    numUnHealthyEachIteration = 0;
+    numContainersScannedEachIteration = 0;
     final boolean paused = pausing.get();
     long startTime = System.nanoTime();
     if (!paused) {
@@ -86,6 +88,11 @@ public abstract class AbstractBackgroundContainerScanner implements Runnable {
     } else {
       AbstractContainerScannerMetrics metrics = getMetrics();
       metrics.incNumScanIterations();
+      metrics.incTotalRunTime(TimeUnit.NANOSECONDS.toMillis(totalDuration));
+      metrics.resetNumContainersScanned();
+      metrics.resetNumUnhealthyContainers();
+      metrics.incNumContainersScanned(numContainersScannedEachIteration);
+      metrics.incNumUnHealthyContainers(numUnHealthyEachIteration);
       LOG.info("Completed an iteration in {} minutes." +
               " Number of iterations (since the data-node restart) : {}" +
               ", Number of containers scanned in this iteration : {}" +
@@ -137,6 +144,14 @@ public abstract class AbstractBackgroundContainerScanner implements Runnable {
         Thread.currentThread().interrupt();
       }
     }
+  }
+
+  public void incNumUnHealthyEachIteration() {
+    numUnHealthyEachIteration++;
+  }
+
+  public void incNumContainersScannedEachIteration() {
+    numContainersScannedEachIteration++;
   }
 
   /**
