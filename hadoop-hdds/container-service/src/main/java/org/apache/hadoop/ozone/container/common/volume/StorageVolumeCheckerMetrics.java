@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import java.util.Collection;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import java.util.Collection;
 
 /**
  * This class captures the volume scanner metrics on the data-node.
