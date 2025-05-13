@@ -152,8 +152,8 @@ public final class S3ErrorTable {
 
   public static final OS3Exception INVALID_STORAGE_CLASS = new OS3Exception(
       "InvalidStorageClass", "The storage class that you specified is not valid. " +
-      "Check that storage class is supported and if using STANDARD_IA check that " +
-      "storage config is a valid EC replication string.",
+      "Provide a supported storage class[STANDARD|REDUCED_REDUNDANCY|STANDARD_IA] or " +
+      "a valid custom EC storage config for if using STANDARD_IA.",
       HTTP_BAD_REQUEST);
 
   private static Function<Exception, OS3Exception> generateInternalError =

@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -118,18 +119,26 @@ public class TestS3Utils {
     }
   }
 
+  public static List<Arguments> invalidS3ReplicationConfigs() {
+    List<Arguments> args = new ArrayList<>();
+    args.add(Arguments.of("GLACIER", null, RATIS3REPLICATIONCONFIG, RATIS1REPLICATIONCONFIG));
+    args.add(Arguments.of(S3StorageType.STANDARD_IA.name(), "INVALID",
+        RATIS3REPLICATIONCONFIG, RATIS1REPLICATIONCONFIG));
+    return args;
+  }
   /**
-   * When bucket default is non-EC and client side passed value also not valid
-   * but configured value is valid, we would just return configured value.
+   * When client side passed value also not valid
+   * OS3Exception is thrown.
    */
-  @Test
-  public void testResolveRepConfWhenUserPassedIsInvalid() throws OS3Exception {
-    assertThrows(OS3Exception.class, () -> S3Utils.
+  @ParameterizedTest
+  @MethodSource("invalidS3ReplicationConfigs")
+  public void testResolveRepConfWhenUserPassedIsInvalid(String s3StorageType, String s3StorageConfig,
+      ReplicationConfig clientConfiguredReplConfig, ReplicationConfig bucketReplConfig)
+      throws OS3Exception {
+    OS3Exception exception = assertThrows(OS3Exception.class, () -> S3Utils.
         resolveS3ClientSideReplicationConfig(
-            "INVALID", null, RATIS3REPLICATIONCONFIG, RATIS1REPLICATIONCONFIG));
-    assertThrows(OS3Exception.class, () -> S3Utils.
-        resolveS3ClientSideReplicationConfig(S3StorageType.STANDARD_IA.name(),
-            "INVALID", RATIS3REPLICATIONCONFIG, RATIS1REPLICATIONCONFIG));
+            s3StorageType, s3StorageConfig, clientConfiguredReplConfig, bucketReplConfig));
+    assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getCode(), exception.getCode());
   }
 
 }

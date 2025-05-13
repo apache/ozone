@@ -59,7 +59,7 @@ public enum S3StorageType {
   }
 
   public static S3StorageType fromReplicationConfig(ReplicationConfig config) {
-    if (config instanceof ECReplicationConfig) {
+    if (config.getReplicationType() == HddsProtos.ReplicationType.EC) {
       return STANDARD_IA;
     }
     if (config.getReplicationType() == HddsProtos.ReplicationType.STAND_ALONE ||

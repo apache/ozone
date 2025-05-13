@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_T
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
@@ -858,11 +859,11 @@ public class ObjectEndpoint extends EndpointBase {
       String storageType, String storageConfig) throws OS3Exception {
 
     ReplicationConfig clientConfiguredReplicationConfig = null;
-    ReplicationType replicationType = ReplicationType.valueOf(
-        ozoneConfiguration.get(OZONE_REPLICATION_TYPE));
     String replication = ozoneConfiguration.get(OZONE_REPLICATION);
 
     if (replication != null) {
+      ReplicationType replicationType = ReplicationType.valueOf(
+          ozoneConfiguration.get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
       clientConfiguredReplicationConfig =
           (replicationType == ReplicationType.EC) ?
               new ECReplicationConfig(replication) : ReplicationConfig.parse(

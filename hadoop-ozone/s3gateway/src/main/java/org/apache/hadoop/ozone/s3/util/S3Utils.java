@@ -88,20 +88,20 @@ public final class S3Utils {
         clientConfiguredReplConfig : bucketReplConfig;
   }
 
-  public static ReplicationConfig toReplicationConfig(String storageType, String storageConfig)
+  public static ReplicationConfig toReplicationConfig(String s3StorageType, String s3StorageConfig)
       throws OS3Exception {
     try {
-      if (S3StorageType.STANDARD_IA.name().equals(storageType)) {
-        return (!StringUtils.isEmpty(storageConfig)) ? new ECReplicationConfig(storageConfig) :
+      if (S3StorageType.STANDARD_IA.name().equals(s3StorageType)) {
+        return (!StringUtils.isEmpty(s3StorageConfig)) ? new ECReplicationConfig(s3StorageConfig) :
             new ECReplicationConfig(S3StorageType.STANDARD_IA.getEcReplicationString());
       } else {
-        S3StorageType s3StorageType = S3StorageType.valueOf(storageType);
+        S3StorageType storageType = S3StorageType.valueOf(s3StorageType);
         return ReplicationConfig.fromProtoTypeAndFactor(
-            ReplicationType.toProto(s3StorageType.getType()),
-            ReplicationFactor.toProto(s3StorageType.getFactor()));
+            ReplicationType.toProto(storageType.getType()),
+            ReplicationFactor.toProto(storageType.getFactor()));
       }
     } catch (IllegalArgumentException ex) {
-      throw newError(INVALID_STORAGE_CLASS, storageType, ex);
+      throw newError(INVALID_STORAGE_CLASS, s3StorageType, ex);
     }
   }
 
