@@ -22,9 +22,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - run: |
+          local_ip=$(nslookup $(hostname -f))
           # listen
           nc -l 0.0.0.0 12345 &
+          sudo netstat -vatnp | grep LISTEN | grep 12345
           # check if can connect
           nc -z 127.0.0.1 12345
-          nc -z $(hostname -f) 12345
+          nc -z $local_ip 12345
           nc -z 0.0.0.0 12345
