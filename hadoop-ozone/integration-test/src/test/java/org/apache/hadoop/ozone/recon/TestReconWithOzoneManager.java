@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -119,9 +120,7 @@ public class TestReconWithOzoneManager {
 
     cluster.getStorageContainerManager().exitSafeMode();
 
-    InetSocketAddress address =
-        cluster.getReconServer().getHttpServer().getHttpAddress();
-    String reconHTTPAddress = address.getHostName() + ":" + address.getPort();
+    String reconHTTPAddress = conf.get(ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY);
     taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
 
     // initialize HTTPClient
