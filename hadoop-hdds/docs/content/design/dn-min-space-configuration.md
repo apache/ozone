@@ -29,8 +29,8 @@ This free space is used to ensure volume allocation if `required space < (volume
 Any container creation and import container need ensure this constrain is met. And block write need ensure that this space is available if new blocks are written.
 Note: Any issue related to ensuring free space is tracked with separate JIRA.
 
-# Existing configuration
-Two configuration is provided,
+# Existing configuration (before HDDS-12928)
+Two configurations are provided,
 - hdds.datanode.volume.min.free.space  (default: 5GB)
 - hdds.datanode.volume.min.free.space.percent
 
