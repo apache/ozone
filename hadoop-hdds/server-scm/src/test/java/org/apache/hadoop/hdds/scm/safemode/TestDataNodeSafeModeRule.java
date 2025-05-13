@@ -76,13 +76,13 @@ public class TestDataNodeSafeModeRule {
     serviceManager = new SCMServiceManager();
     scmContext = SCMContext.emptyContext();
 
-    SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(ozoneConfiguration, containerManager,
-            null, nodeManager, eventQueue, serviceManager, scmContext);
+    SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(ozoneConfiguration,
+        nodeManager, null, containerManager, serviceManager, eventQueue, scmContext);
+    scmSafeModeManager.start();
 
-    rule = scmSafeModeManager.getDataNodeSafeModeRule();
+    rule = SafeModeRuleFactory.getInstance().getSafeModeRule(DataNodeSafeModeRule.class);
     assertNotNull(rule);
-    
+
     rule.setValidateBasedOnReportProcessing(true);
   }
 

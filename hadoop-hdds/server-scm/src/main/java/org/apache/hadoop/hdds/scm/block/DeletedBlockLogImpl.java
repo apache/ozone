@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -342,7 +343,7 @@ public class DeletedBlockLogImpl
       DatanodeDetails details = replica.getDatanodeDetails();
       if (!transactionStatusManager.isDuplication(
           details, updatedTxn.getTxID(), commandStatus)) {
-        transactions.addTransactionToDN(details.getUuid(), updatedTxn);
+        transactions.addTransactionToDN(details.getID(), updatedTxn);
         metrics.incrProcessedTransaction();
       }
     }
@@ -506,10 +507,10 @@ public class DeletedBlockLogImpl
   }
 
   @Override
-  public void recordTransactionCreated(UUID dnId, long scmCmdId,
+  public void recordTransactionCreated(DatanodeID dnId, long scmCmdId,
       Set<Long> dnTxSet) {
     getSCMDeletedBlockTransactionStatusManager()
-        .recordTransactionCreated(dnId, scmCmdId, dnTxSet);
+        .recordTransactionCreated(dnId.getUuid(), scmCmdId, dnTxSet);
   }
 
   @Override
@@ -518,8 +519,8 @@ public class DeletedBlockLogImpl
   }
 
   @Override
-  public void onDatanodeDead(UUID dnId) {
-    getSCMDeletedBlockTransactionStatusManager().onDatanodeDead(dnId);
+  public void onDatanodeDead(DatanodeID dnId) {
+    getSCMDeletedBlockTransactionStatusManager().onDatanodeDead(dnId.getUuid());
   }
 
   @Override
@@ -536,7 +537,7 @@ public class DeletedBlockLogImpl
     }
 
     DatanodeDetails details = deleteBlockStatus.getDatanodeDetails();
-    UUID dnId = details.getUuid();
+    DatanodeID dnId = details.getID();
     for (CommandStatus commandStatus : deleteBlockStatus.getCmdStatus()) {
       CommandStatus.Status status = commandStatus.getStatus();
       lock.lock();
@@ -545,7 +546,7 @@ public class DeletedBlockLogImpl
           ContainerBlocksDeletionACKProto ackProto =
               commandStatus.getBlockDeletionAck();
           getSCMDeletedBlockTransactionStatusManager()
-              .commitTransactions(ackProto.getResultsList(), dnId);
+              .commitTransactions(ackProto.getResultsList(), dnId.getUuid());
           metrics.incrBlockDeletionCommandSuccess();
           metrics.incrDNCommandsSuccess(dnId, 1);
         } else if (status == CommandStatus.Status.FAILED) {
@@ -557,7 +558,7 @@ public class DeletedBlockLogImpl
         }
 
         getSCMDeletedBlockTransactionStatusManager()
-            .commitSCMCommandStatus(deleteBlockStatus.getCmdStatus(), dnId);
+            .commitSCMCommandStatus(deleteBlockStatus.getCmdStatus(), dnId.getUuid());
       } finally {
         lock.unlock();
       }
