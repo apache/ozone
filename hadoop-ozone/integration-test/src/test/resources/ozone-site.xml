@@ -128,4 +128,27 @@
     <value>8MB</value>
   </property>
 
+  <property><name>hdds.datanode.client.bind.host</name><value>127.0.0.1</value></property>
+  <property><name>hdds.datanode.http-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>hdds.datanode.https-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.freon.http-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.freon.https-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.om.address</name><value>127.0.0.1:9862</value></property>
+  <property><name>ozone.om.http-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.om.https-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.recon.datanode.bind.host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.recon.http-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.recon.https-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.recon.scmconfigozone.scm.block.client.bind.host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.recon.scmconfigozone.scm.client.bind.host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.recon.scmconfigozone.scm.datanode.bind.host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.recon.scmconfigozone.scm.http-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.recon.scmconfigozone.scm.https-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.recon.scmconfigozone.scm.security.service.bind.host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.scm.block.client.bind.host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.scm.client.bind.host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.scm.datanode.bind.host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.scm.http-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.scm.https-bind-host</name><value>127.0.0.1</value></property>
+  <property><name>ozone.scm.security.service.bind.host</name><value>127.0.0.1</value></property>
 </configuration>
