@@ -45,8 +45,8 @@ public class TestOzoneSnapshot {
     when(snapshotInfo.getReferencedReplicatedSize()).thenReturn(3000L);
     when(snapshotInfo.getExclusiveSize()).thenReturn(4000L);
     when(snapshotInfo.getExclusiveReplicatedSize()).thenReturn(12000L);
-    when(snapshotInfo.getExclusiveDirSize()).thenReturn(2000L);
-    when(snapshotInfo.getExclusiveDirReplicatedSize()).thenReturn(6000L);
+    when(snapshotInfo.getExclusiveSizeDeltaFromDirDeepCleaning()).thenReturn(2000L);
+    when(snapshotInfo.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning()).thenReturn(6000L);
     return snapshotInfo;
   }
 

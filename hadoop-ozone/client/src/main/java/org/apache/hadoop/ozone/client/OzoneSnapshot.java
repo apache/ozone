@@ -195,8 +195,8 @@ public class OzoneSnapshot {
         snapshotInfo.getCheckpointDir(),
         snapshotInfo.getReferencedSize(),
         snapshotInfo.getReferencedReplicatedSize(),
-        snapshotInfo.getExclusiveSize() + snapshotInfo.getExclusiveDirSize(),
-        snapshotInfo.getExclusiveReplicatedSize() + snapshotInfo.getExclusiveDirReplicatedSize()
+        snapshotInfo.getExclusiveSize() + snapshotInfo.getExclusiveSizeDeltaFromDirDeepCleaning(),
+        snapshotInfo.getExclusiveReplicatedSize() + snapshotInfo.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning()
     );
   }
 

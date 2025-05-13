@@ -78,8 +78,8 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     if (setSnapshotPropertyRequest.hasSnapshotDirSize()) {
       SnapshotSize snapshotSize = setSnapshotPropertyRequest.getSnapshotDirSize();
       // Set Exclusive size.
-      snapInfo.setExclusiveDirSize(snapshotSize.getExclusiveSize());
-      snapInfo.setExclusiveDirReplicatedSize(snapshotSize.getExclusiveReplicatedSize());
+      snapInfo.setExclusiveSizeDeltaFromDirDeepCleaning(snapshotSize.getExclusiveSize());
+      snapInfo.setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(snapshotSize.getExclusiveReplicatedSize());
     }
   }
 
