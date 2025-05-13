@@ -159,6 +159,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         HddsVolume containerVolume;
         try {
           containerVolume = volumeChoosingPolicy.chooseVolume(volumes, maxSize);
+          // commit bytes have been reserved in volumeChoosingPolicy#chooseVolume
+          containerData.setCommittedSpace(true);
         } catch (DiskOutOfSpaceException ex) {
           throw new StorageContainerException("Container creation failed, " +
               "due to disk out of space", ex, DISK_OUT_OF_SPACE);
@@ -173,8 +175,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           // Set volume before getContainerDBFile(), because we may need the
           // volume to deduce the db file.
           containerData.setVolume(containerVolume);
-          // commit space has been reserved by volumeChoosingPolicy
-          containerData.setCommittedSpace(true);
 
           long containerID = containerData.getContainerID();
           String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
