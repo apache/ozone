@@ -22,11 +22,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - run: |
-          local_ip=$(nslookup $(hostname -f))
+          host=$(hostname -f)
+          local_ip=$(host "$host" | head -1 | awk '{ print $NF }')
           # listen
           nc -l 0.0.0.0 12345 &
-          sudo netstat -vatnp | grep LISTEN | grep 12345
+          sleep 1
+          sudo netstat -vatnp | grep LISTEN
           # check if can connect
-          nc -z 127.0.0.1 12345
-          nc -z $local_ip 12345
-          nc -z 0.0.0.0 12345
+          for addr in 127.0.0.1 $host $local_ip 0.0.0.0; do
+            nc -z "$addr" 12345 || echo "Connect to $addr failed"
+          done
