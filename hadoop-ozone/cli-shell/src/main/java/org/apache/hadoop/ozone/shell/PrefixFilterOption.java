@@ -15,29 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.replicas.chunk;
+package org.apache.hadoop.ozone.shell;
 
-/**
- * Class that gives datanode details on which the chunk is present.
- */
-public class ChunkDataNodeDetails {
-  private String ipAddress;
-  private String hostName;
+import picocli.CommandLine;
 
-  public ChunkDataNodeDetails(String ipAddress, String hostName) {
-    this.ipAddress = ipAddress;
-    this.hostName = hostName;
+/** Option for filtering lists by prefix.  Use with {@link CommandLine.Mixin}. */
+public class PrefixFilterOption {
+
+  @CommandLine.Option(names = {"--prefix", "-p"},
+      description = "Prefix to filter the items")
+  private String prefix;
+
+  public String getPrefix() {
+    return prefix;
   }
 
-  @Override
-    public String toString() {
-    return "{"
-            + "ipAddress='"
-            + ipAddress
-            + '\''
-            + ", hostName='"
-            + hostName
-            + '\''
-            + '}';
-  }
 }

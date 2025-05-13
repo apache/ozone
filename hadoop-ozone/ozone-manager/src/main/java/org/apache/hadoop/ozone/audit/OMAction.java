@@ -113,7 +113,11 @@ public enum OMAction implements AuditAction {
 
   GET_OBJECT_TAGGING,
   PUT_OBJECT_TAGGING,
-  DELETE_OBJECT_TAGGING;
+  DELETE_OBJECT_TAGGING,
+
+  GET_SNAPSHOT_DIFF_REPORT,
+  LIST_SNAPSHOT_DIFF_JOBS,
+  CANCEL_SNAPSHOT_DIFF_JOBS;
 
   @Override
   public String getAction() {
