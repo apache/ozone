@@ -33,8 +33,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATAS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -123,8 +123,8 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
   }
 
   private void configureDatanodePorts(ConfigurationTarget conf) {
-    conf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, anyHostWithFreePort());
-    conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, anyHostWithFreePort());
+    conf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, localhostWithFreePort());
+    conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, localhostWithFreePort());
     conf.setInt(HDDS_CONTAINER_IPC_PORT, getFreePort());
     conf.setInt(HDDS_CONTAINER_RATIS_IPC_PORT, getFreePort());
     conf.setInt(HDDS_CONTAINER_RATIS_ADMIN_PORT, getFreePort());

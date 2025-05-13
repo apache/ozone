@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFE
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
@@ -802,8 +801,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           + "/ozone_recon_derby.db");
       conf.setFromObject(dbConfig);
 
-      conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, anyHostWithFreePort());
-      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, anyHostWithFreePort());
+      conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, localhostWithFreePort());
+      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, localhostWithFreePort());
       conf.set(OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD, "10s");
 
       ConfigurationProvider.setConfiguration(conf);

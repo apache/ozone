@@ -407,10 +407,6 @@ public abstract class GenericTestUtils {
     public static String localhostWithFreePort() {
       return HOST_ADDRESS + ":" + getFreePort();
     }
-
-    public static String anyHostWithFreePort() {
-      return "0.0.0.0:" + getFreePort();
-    }
   }
 
   /**
