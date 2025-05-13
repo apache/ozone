@@ -229,7 +229,7 @@ public final class DatanodeTestUtils {
   public static void waitForCheckVolume(MutableVolumeSet volSet,
                                         long numOfChecks) throws Exception {
     GenericTestUtils.waitFor(
-        () -> numOfChecks == volSet.getVolumeChecker().getNumVolumeChecks(),
+        () -> numOfChecks == volSet.getVolumeChecker().getMetrics().getNumVolumeChecks(),
         100, 10000);
   }
 
