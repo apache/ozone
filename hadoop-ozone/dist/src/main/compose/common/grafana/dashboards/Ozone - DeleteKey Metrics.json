@@ -4407,7 +4407,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "(block_deleting_service_metrics_processed_transaction_success_count / clamp_min(block_deleting_service_metrics_received_block_count, 1)) * 100",
+              "expr": "(block_deleting_service_metrics_success_count / clamp_min(block_deleting_service_metrics_received_block_count, 1)) * 100",
               "legendFormat": "{{hostname}}",
               "range": true,
               "refId": "A"
