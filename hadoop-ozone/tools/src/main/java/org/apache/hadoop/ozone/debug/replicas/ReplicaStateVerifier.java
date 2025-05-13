@@ -83,15 +83,6 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
       } else {
         pass = true;
       }
-      if (containerData.getState().equals(ContainerDataProto.State.UNHEALTHY)) {
-        replicaCheckMsg.append("UNHEALTHY");
-      } else if (containerData.getState().equals(ContainerDataProto.State.INVALID)) {
-        replicaCheckMsg.append("INVALID");
-      } else if (containerData.getState().equals(ContainerDataProto.State.DELETED)) {
-        replicaCheckMsg.append("DELETED");
-      } else {
-        pass = true;
-      }
       replicaCheckMsg.append(", Container state in SCM is ").append(containerInfo.getState());
 
       if (pass) {
