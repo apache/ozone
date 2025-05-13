@@ -32,6 +32,6 @@ jobs:
           sleep 1
           sudo netstat -vatnp | grep LISTEN
           # check if can connect
-          for addr in 127.0.0.1 $host $local_ip 0.0.0.0; do
+          for addr in $host $local_ip 0.0.0.0; do
             nc -z "$addr" 12345 || echo "Connect to $addr failed"
           done
