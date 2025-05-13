@@ -22,16 +22,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - run: |
-          sudo hostname localhost
-          hostname
-          hostname -f
           host=$(hostname -f)
           local_ip=$(host "$host" | head -1 | awk '{ print $NF }')
-          # listen
-          nc -l 0.0.0.0 12345 &
-          sleep 1
           sudo netstat -vatnp | grep LISTEN
-          # check if can connect
-          for addr in $host $local_ip 0.0.0.0; do
-            nc -z "$addr" 12345 || echo "Connect to $addr failed"
+          port=12345
+          for addr in localhost $host $local_ip 0.0.0.0; do
+            # listen on any interface
+            nc -l 0.0.0.0 "$port" &
+            sleep 1
+            # check if can connect
+            nc -z "$addr" "$port" || echo "Connect to $addr:$port failed"
+            let port++
           done
