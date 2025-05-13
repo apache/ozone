@@ -148,7 +148,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
                 .append('/').append(p.getReplicationConfig().toString())
                 .append('/').append(p.getType().toString())
                 .append('/').append(p.getPipelineState().toString()).append('/')
-                .append(datanode.getUuid().equals(p.getLeaderId()) ?
+                .append(datanode.getID().equals(p.getLeaderId()) ?
                     "Leader" : "Follower")
                 .append(System.getProperty("line.separator")));
       }

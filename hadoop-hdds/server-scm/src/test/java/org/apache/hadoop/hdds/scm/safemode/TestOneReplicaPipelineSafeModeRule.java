@@ -115,11 +115,11 @@ public class TestOneReplicaPipelineSafeModeRule {
     createPipelines(pipelineFactorOneCount,
         HddsProtos.ReplicationFactor.ONE);
 
-    SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(ozoneConfiguration, containerManager,
-            pipelineManager, mockNodeManager, eventQueue, serviceManager, scmContext);
+    SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(ozoneConfiguration,
+        mockNodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
+    scmSafeModeManager.start();
 
-    rule = scmSafeModeManager.getOneReplicaPipelineSafeModeRule();
+    rule = SafeModeRuleFactory.getInstance().getSafeModeRule(OneReplicaPipelineSafeModeRule.class);
   }
 
   @Test

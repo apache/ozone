@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -295,16 +296,15 @@ public class TestDeletedBlockLog {
   private List<DeletedBlocksTransaction> getTransactions(
       int maximumAllowedBlocksNum) throws IOException, TimeoutException {
     DatanodeDeletedBlockTransactions transactions =
-        deletedBlockLog.getTransactions(maximumAllowedBlocksNum,
-            dnList.stream().collect(Collectors.toSet()));
+        deletedBlockLog.getTransactions(maximumAllowedBlocksNum, new HashSet<>(dnList));
     List<DeletedBlocksTransaction> txns = new LinkedList<>();
     for (DatanodeDetails dn : dnList) {
       txns.addAll(Optional.ofNullable(
-          transactions.getDatanodeTransactionMap().get(dn.getUuid()))
+          transactions.getDatanodeTransactionMap().get(dn.getID()))
           .orElseGet(LinkedList::new));
     }
     // Simulated transactions are sent
-    for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
+    for (Map.Entry<DatanodeID, List<DeletedBlocksTransaction>> entry :
         transactions.getDatanodeTransactionMap().entrySet()) {
       DeleteBlocksCommand command = new DeleteBlocksCommand(entry.getValue());
       recordScmCommandToStatusManager(entry.getKey(), command);
@@ -556,29 +556,29 @@ public class TestDeletedBlockLog {
   }
 
   private void recordScmCommandToStatusManager(
-      UUID dnId, DeleteBlocksCommand command) {
+      DatanodeID dnId, DeleteBlocksCommand command) {
     Set<Long> dnTxSet = command.blocksTobeDeleted()
         .stream().map(DeletedBlocksTransaction::getTxID)
         .collect(Collectors.toSet());
     deletedBlockLog.recordTransactionCreated(dnId, command.getId(), dnTxSet);
   }
 
-  private void sendSCMDeleteBlocksCommand(UUID dnId, SCMCommand<?> scmCommand) {
+  private void sendSCMDeleteBlocksCommand(DatanodeID dnId, SCMCommand<?> scmCommand) {
     deletedBlockLog.onSent(
-        DatanodeDetails.newBuilder().setUuid(dnId).build(), scmCommand);
+        DatanodeDetails.newBuilder().setUuid(dnId.getUuid()).build(), scmCommand);
   }
 
   private void assertNoDuplicateTransactions(
       DatanodeDeletedBlockTransactions transactions1,
       DatanodeDeletedBlockTransactions transactions2) {
-    Map<UUID, List<DeletedBlocksTransaction>> map1 =
+    Map<DatanodeID, List<DeletedBlocksTransaction>> map1 =
         transactions1.getDatanodeTransactionMap();
-    Map<UUID, List<DeletedBlocksTransaction>> map2 =
+    Map<DatanodeID, List<DeletedBlocksTransaction>> map2 =
         transactions2.getDatanodeTransactionMap();
 
-    for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
+    for (Map.Entry<DatanodeID, List<DeletedBlocksTransaction>> entry :
         map1.entrySet()) {
-      UUID dnId = entry.getKey();
+      DatanodeID dnId = entry.getKey();
       Set<DeletedBlocksTransaction> txSet1 = new HashSet<>(entry.getValue());
       Set<DeletedBlocksTransaction> txSet2 = new HashSet<>(map2.get(dnId));
 
@@ -592,14 +592,14 @@ public class TestDeletedBlockLog {
   private void assertContainsAllTransactions(
       DatanodeDeletedBlockTransactions transactions1,
       DatanodeDeletedBlockTransactions transactions2) {
-    Map<UUID, List<DeletedBlocksTransaction>> map1 =
+    Map<DatanodeID, List<DeletedBlocksTransaction>> map1 =
         transactions1.getDatanodeTransactionMap();
-    Map<UUID, List<DeletedBlocksTransaction>> map2 =
+    Map<DatanodeID, List<DeletedBlocksTransaction>> map2 =
         transactions2.getDatanodeTransactionMap();
 
-    for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
+    for (Map.Entry<DatanodeID, List<DeletedBlocksTransaction>> entry :
         map1.entrySet()) {
-      UUID dnId = entry.getKey();
+      DatanodeID dnId = entry.getKey();
       Set<DeletedBlocksTransaction> txSet1 = new HashSet<>(entry.getValue());
       Set<DeletedBlocksTransaction> txSet2 = new HashSet<>(map2.get(dnId));
 
@@ -607,7 +607,7 @@ public class TestDeletedBlockLog {
     }
   }
 
-  private void commitSCMCommandStatus(Long scmCmdId, UUID dnID,
+  private void commitSCMCommandStatus(Long scmCmdId, DatanodeID dnID,
       StorageContainerDatanodeProtocolProtos.CommandStatus.Status status) {
     List<StorageContainerDatanodeProtocolProtos
         .CommandStatus> deleteBlockStatus = new ArrayList<>();
@@ -619,15 +619,15 @@ public class TestDeletedBlockLog {
         .getProtoBufMessage());
 
     deletedBlockLog.getSCMDeletedBlockTransactionStatusManager()
-        .commitSCMCommandStatus(deleteBlockStatus, dnID);
+        .commitSCMCommandStatus(deleteBlockStatus, dnID.getUuid());
   }
 
   private void createDeleteBlocksCommandAndAction(
       DatanodeDeletedBlockTransactions transactions,
-      BiConsumer<UUID, DeleteBlocksCommand> afterCreate) {
-    for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
+      BiConsumer<DatanodeID, DeleteBlocksCommand> afterCreate) {
+    for (Map.Entry<DatanodeID, List<DeletedBlocksTransaction>> entry :
         transactions.getDatanodeTransactionMap().entrySet()) {
-      UUID dnId = entry.getKey();
+      DatanodeID dnId = entry.getKey();
       List<DeletedBlocksTransaction> dnTXs = entry.getValue();
       DeleteBlocksCommand command = new DeleteBlocksCommand(dnTXs);
       afterCreate.accept(dnId, command);

@@ -24,8 +24,9 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListPaginationOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.apache.hadoop.ozone.shell.PrefixFilterOption;
 import org.apache.hadoop.ozone.shell.common.VolumeBucketHandler;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -39,7 +40,10 @@ import picocli.CommandLine.Command;
 public class ListKeyHandler extends VolumeBucketHandler {
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
+  private ListPaginationOptions listOptions;
+
+  @CommandLine.Mixin
+  private PrefixFilterOption prefixFilter;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -62,13 +66,13 @@ public class ListKeyHandler extends VolumeBucketHandler {
     if (!Strings.isNullOrEmpty(snapshotNameWithIndicator)) {
       keyPrefix += snapshotNameWithIndicator;
 
-      if (!Strings.isNullOrEmpty(listOptions.getPrefix())) {
+      if (!Strings.isNullOrEmpty(prefixFilter.getPrefix())) {
         keyPrefix += "/";
       }
     }
 
-    if (!Strings.isNullOrEmpty(listOptions.getPrefix())) {
-      keyPrefix += listOptions.getPrefix();
+    if (!Strings.isNullOrEmpty(prefixFilter.getPrefix())) {
+      keyPrefix += prefixFilter.getPrefix();
     }
 
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
@@ -111,8 +115,8 @@ public class ListKeyHandler extends VolumeBucketHandler {
         vol.listBuckets(null);
     int maxKeyLimit = listOptions.getLimit();
     String keyPrefix = "";
-    if (!Strings.isNullOrEmpty(listOptions.getPrefix())) {
-      keyPrefix += listOptions.getPrefix();
+    if (!Strings.isNullOrEmpty(prefixFilter.getPrefix())) {
+      keyPrefix += prefixFilter.getPrefix();
     }
 
     int totalKeys = 0;

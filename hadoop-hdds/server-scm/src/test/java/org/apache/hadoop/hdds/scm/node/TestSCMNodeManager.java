@@ -1070,11 +1070,11 @@ public class TestSCMNodeManager {
             HddsProtos.ReplicationFactor.THREE, emptyList());
 
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, closeContainerCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), closeContainerCommand), null);
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, closeContainerCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), closeContainerCommand), null);
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, createPipelineCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), createPipelineCommand), null);
 
     assertEquals(2, nodeManager.getCommandQueueCount(
         datanode1, SCMCommandProto.Type.closeContainerCommand));
@@ -1773,7 +1773,7 @@ public class TestSCMNodeManager {
               Arrays.asList(report), emptyList()),
                   HddsTestUtils.getRandomPipelineReports());
       eq.fireEvent(DATANODE_COMMAND,
-          new CommandForDatanode<>(datanodeDetails.getUuid(),
+          new CommandForDatanode<>(datanodeDetails,
               new CloseContainerCommand(1L,
                   PipelineID.randomId())));
 

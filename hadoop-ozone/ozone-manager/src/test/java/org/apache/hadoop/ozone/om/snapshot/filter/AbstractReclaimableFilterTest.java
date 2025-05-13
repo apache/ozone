@@ -80,7 +80,8 @@ import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 
 /**
- * Test class for ReclaimableFilter.
+ * <p>Class for having a common setup containing util functions to test out functionalities of various
+ * implementations of {@link ReclaimableFilter} class.</p>
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class AbstractReclaimableFilterTest {

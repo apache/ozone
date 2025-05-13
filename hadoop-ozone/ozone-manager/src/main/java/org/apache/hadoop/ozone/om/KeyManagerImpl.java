@@ -793,6 +793,17 @@ public class KeyManagerImpl implements KeyManager {
         (previousSnapshotKM) -> previousSnapshotKM.getMetadataManager().getDirectoryTable());
   }
 
+  @Override
+  public CheckedFunction<KeyManager, OmKeyInfo, IOException> getPreviousSnapshotOzoneKeyInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmKeyInfo keyInfo) throws IOException {
+    String currentKeyPath = bucketInfo.getBucketLayout().isFileSystemOptimized()
+        ? metadataManager.getOzonePathKey(volumeId, bucketInfo.getObjectID(), keyInfo.getParentObjectID(),
+        keyInfo.getFileName()) : metadataManager.getOzoneKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName(),
+        keyInfo.getKeyName());
+    return getPreviousSnapshotOzonePathInfo(bucketInfo, keyInfo.getObjectID(), currentKeyPath,
+        (previousSnapshotKM) -> previousSnapshotKM.getMetadataManager().getKeyTable(bucketInfo.getBucketLayout()));
+  }
+
   private <T> CheckedFunction<KeyManager, T, IOException> getPreviousSnapshotOzonePathInfo(
       OmBucketInfo bucketInfo, long objectId, String currentKeyPath,
       Function<KeyManager, Table<String, T>> table) throws IOException {

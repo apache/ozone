@@ -52,8 +52,7 @@ public interface Codec<T> {
    * @param allocator To allocate a buffer.
    * @return a buffer storing the serialized bytes.
    */
-  default CodecBuffer toCodecBuffer(@Nonnull T object,
-      CodecBuffer.Allocator allocator) throws IOException {
+  default CodecBuffer toCodecBuffer(@Nonnull T object, CodecBuffer.Allocator allocator) throws CodecException {
     throw new UnsupportedOperationException();
   }
 
@@ -63,8 +62,7 @@ public interface Codec<T> {
    * @param object The object to be serialized.
    * @return a direct buffer storing the serialized bytes.
    */
-  default CodecBuffer toDirectCodecBuffer(@Nonnull T object)
-      throws IOException {
+  default CodecBuffer toDirectCodecBuffer(@Nonnull T object) throws CodecException {
     return toCodecBuffer(object, CodecBuffer.Allocator.getDirect());
   }
 
@@ -74,8 +72,7 @@ public interface Codec<T> {
    * @param object The object to be serialized.
    * @return a heap buffer storing the serialized bytes.
    */
-  default CodecBuffer toHeapCodecBuffer(@Nonnull T object)
-      throws IOException {
+  default CodecBuffer toHeapCodecBuffer(@Nonnull T object) throws CodecException {
     return toCodecBuffer(object, CodecBuffer.Allocator.getHeap());
   }
 
@@ -85,7 +82,7 @@ public interface Codec<T> {
    * @param buffer Storing the serialized bytes of an object.
    * @return the deserialized object.
    */
-  default T fromCodecBuffer(@Nonnull CodecBuffer buffer) throws IOException {
+  default T fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
     throw new UnsupportedOperationException();
   }
 

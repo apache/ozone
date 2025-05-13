@@ -52,6 +52,10 @@ public final class PipelineID {
     return new PipelineID(id);
   }
 
+  public static PipelineID valueOf(String id) {
+    return valueOf(UUID.fromString(id));
+  }
+
   public UUID getId() {
     return id;
   }

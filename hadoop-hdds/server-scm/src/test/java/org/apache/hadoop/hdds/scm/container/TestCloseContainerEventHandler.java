@@ -228,7 +228,7 @@ public class TestCloseContainerEventHandler {
       dns.add(MockDatanodeDetails.randomDatanodeDetails());
     }
     builder.setNodes(dns);
-    builder.setLeaderId(dns.get(0).getUuid());
+    builder.setLeaderId(dns.get(0).getID());
     return builder.build();
   }
 
