@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.isBlockLocationInfoSame;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
@@ -81,6 +81,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
   private final AtomicLong runCount;
+  private final AtomicLong callId;
   private final BootstrapStateHandler.Lock lock =
       new BootstrapStateHandler.Lock();
 
@@ -97,6 +98,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.runCount = new AtomicLong(0);
     this.metrics = ozoneManager.getDeletionMetrics();
     this.perfMetrics = ozoneManager.getPerfMetrics();
+    this.callId = new AtomicLong(0);
   }
 
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
@@ -220,13 +222,17 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit PurgeKeys request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+      submitRequest(omRequest);
     } catch (ServiceException e) {
       LOG.error("PurgeKey request failed. Will retry at next run.", e);
       return 0;
     }
 
     return deletedCount;
+  }
+
+  protected OzoneManagerProtocolProtos.OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
+    return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callId.incrementAndGet());
   }
 
   /**
@@ -250,7 +256,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   protected void submitPurgePaths(List<PurgePathRequest> requests,
                                   String snapTableKey,
-                                  UUID expectedPreviousSnapshotId, long rnCnt) {
+                                  UUID expectedPreviousSnapshotId) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -275,7 +281,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit Purge paths request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, rnCnt);
+      submitRequest(omRequest);
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.", e);
     }
@@ -403,7 +409,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, rnCnt);
+      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {

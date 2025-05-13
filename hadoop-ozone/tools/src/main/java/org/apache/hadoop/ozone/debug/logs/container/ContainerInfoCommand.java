@@ -49,9 +49,6 @@ public class ContainerInfoCommand extends AbstractSubcommand implements Callable
     }
     
     Path dbPath = parent.resolveDbPath();
-    if (dbPath == null) {
-      return null;
-    }
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(dbPath.toString());
  
