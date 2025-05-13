@@ -29,7 +29,6 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Arrays;
 import javax.sql.DataSource;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
@@ -48,8 +47,8 @@ public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
   private DSLContext dslContext;
 
   @Override
-  public void execute(ReconStorageContainerManagerFacade scmFacade) throws SQLException {
-    this.dataSource = scmFacade.getDataSource();
+  public void execute(DataSource source) throws SQLException {
+    dataSource = source;
     try (Connection conn = dataSource.getConnection()) {
       if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
         return;
