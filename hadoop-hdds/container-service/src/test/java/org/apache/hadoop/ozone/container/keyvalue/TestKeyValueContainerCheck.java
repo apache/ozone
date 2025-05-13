@@ -17,6 +17,30 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.CORRUPT_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.CORRUPT_CONTAINER_FILE;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CHUNKS_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CONTAINER_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CONTAINER_FILE;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.TRUNCATED_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.TRUNCATED_CONTAINER_FILE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+
+import java.io.File;
+import java.io.RandomAccessFile;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -32,8 +56,8 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -41,31 +65,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.RandomAccessFile;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.CORRUPT_BLOCK;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.CORRUPT_CONTAINER_FILE;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_BLOCK;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CHUNKS_DIR;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CONTAINER_DIR;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CONTAINER_FILE;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.TRUNCATED_BLOCK;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.TRUNCATED_CONTAINER_FILE;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
 
 /**
  * Test the KeyValueContainerCheck class's ability to detect container errors.

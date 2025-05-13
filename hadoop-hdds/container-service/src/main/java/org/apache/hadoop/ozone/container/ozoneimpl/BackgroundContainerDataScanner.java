@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Iterator;
-
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;

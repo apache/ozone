@@ -308,8 +308,7 @@ public class KeyValueHandler extends Handler {
 
   @VisibleForTesting
   static ContainerCommandResponseProto dispatchRequest(KeyValueHandler handler,
-                                                       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
-                                                       DispatcherContext dispatcherContext) {
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer, DispatcherContext dispatcherContext) {
     Type cmdType = request.getCmdType();
     // Validate the request has been made to the correct datanode with the node id matching.
     if (kvContainer != null) {
