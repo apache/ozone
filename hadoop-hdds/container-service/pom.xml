@@ -220,6 +220,12 @@
       <artifactId>apache-log4j-extras</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <dependency>
+      <!-- StorageLocation in hadoop-hdfs requires HdfsConfiguration from hadoop-hdfs-client -->
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdfs-client</artifactId>
+      <scope>runtime</scope>
+    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
