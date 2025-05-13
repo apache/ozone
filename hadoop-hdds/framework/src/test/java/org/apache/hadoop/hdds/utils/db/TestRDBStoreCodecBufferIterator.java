@@ -33,7 +33,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -47,12 +46,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRawKeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -88,8 +87,8 @@ public class TestRDBStoreCodecBufferIterator {
     return newIterator(1);
   }
 
-  RDBStoreCodecBufferIterator newIterator(int numberOfThreads) {
-    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null, numberOfThreads);
+  RDBStoreCodecBufferIterator newIterator(int maxNumberOfBuffers) {
+    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null, maxNumberOfBuffers);
   }
 
   RDBStoreCodecBufferIterator newIterator(CodecBuffer prefix) {
@@ -121,7 +120,7 @@ public class TestRDBStoreCodecBufferIterator {
   @ValueSource(ints = {0, 1, 2, 3, 5, 10})
   public void testRDBStoreCodecBufferIterGetsFailBeyondMaxBuffers(int maxBuffers)
       throws InterruptedException, TimeoutException {
-    List<UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>>> vals = new ArrayList<>();
+    List<AutoCloseableRawKeyValue<CodecBuffer>> vals = new ArrayList<>();
     when(rocksIteratorMock.isValid()).thenReturn(true);
     AtomicInteger counter = new AtomicInteger(0);
 
@@ -130,45 +129,45 @@ public class TestRDBStoreCodecBufferIterator {
     when(rocksIteratorMock.value(any()))
         .thenAnswer(i -> writeToBuffer(i.getArgument(0), (byte)counter.getAndIncrement()));
     try (RDBStoreCodecBufferIterator iterator = newIterator(maxBuffers)) {
-      for (int i = 0; i < maxBuffers - 1; i++) {
+      for (int i = 0; i < maxBuffers; i++) {
         vals.add(iterator.next());
       }
-      assertEquals(Math.max(maxBuffers - 1, 0), vals.size());
+      assertEquals(Math.max(maxBuffers, 0), vals.size());
       ExecutorService executor = Executors.newSingleThreadExecutor();
       AtomicReference<CompletableFuture<Boolean>> nextThread = new AtomicReference<>(CompletableFuture.supplyAsync(
           () -> {
-            UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>> v = iterator.next();
+            AutoCloseableRawKeyValue<CodecBuffer> v = iterator.next();
             vals.add(v);
             return true;
           },
           executor));
 
-      if (maxBuffers <= 1) {
-        // Number of max buffers is always going to be 2. We need atleast 2 buffers one for getting the next value
-        // and one for returning the current value.
+      if (maxBuffers < 1) {
+        // Number of max buffers is always going to be at least 1. We need at least 1 buffers one for getting the next
+        // value and one for returning the current value.
         GenericTestUtils.waitFor(() -> nextThread.get().isDone() && nextThread.get().join(), 10, 100);
         System.out.println(Thread.currentThread().getName());
         nextThread.set(CompletableFuture.supplyAsync(
             () -> {
-              UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>> v = iterator.next();
+              AutoCloseableRawKeyValue<CodecBuffer> v = iterator.next();
               vals.add(v);
               return true;
             },
             executor));
       }
-      assertEquals(Math.max(maxBuffers - 1, 1), vals.size());
+      assertEquals(Math.max(1, maxBuffers), vals.size());
       for (int i = 0; i < vals.size(); i++) {
-        assertEquals(2 * i, vals.get(i).get().getKey().getArray()[0]);
-        assertEquals(2 * i + 1, vals.get(i).get().getValue().getArray()[0]);
+        assertEquals(2 * i, vals.get(i).getKey().getArray()[0]);
+        assertEquals(2 * i + 1, vals.get(i).getValue().getArray()[0]);
       }
       assertFalse(nextThread.get().isDone());
       int size = vals.size();
       vals.get(0).close();
       GenericTestUtils.waitFor(() -> nextThread.get().isDone() && nextThread.get().join(), 10, 100);
       assertEquals(size + 1, vals.size());
-      assertEquals(2 * size, vals.get(size).get().getKey().getArray()[0]);
-      assertEquals(2 * size + 1, vals.get(size).get().getValue().getArray()[0]);
-      for (UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>> v : vals) {
+      assertEquals(2 * size, vals.get(size).getKey().getArray()[0]);
+      assertEquals(2 * size + 1, vals.get(size).getValue().getArray()[0]);
+      for (AutoCloseableRawKeyValue<CodecBuffer> v : vals) {
         v.close();
       }
       executor.shutdown();
@@ -194,11 +193,8 @@ public class TestRDBStoreCodecBufferIterator {
     try (RDBStoreCodecBufferIterator i = newIterator()) {
       i.forEachRemaining(kvSupplier -> {
         try {
-          Table.KeyValue<CodecBuffer, CodecBuffer> kv = kvSupplier.get();
           remaining.add(RawKeyValue.create(
-              kv.getKey().getArray(), kv.getValue().getArray()));
-        } catch (IOException e) {
-          throw new RuntimeException(e);
+              kvSupplier.getKey().getArray(), kvSupplier.getValue().getArray()));
         } finally {
           kvSupplier.close();
         }
@@ -285,7 +281,7 @@ public class TestRDBStoreCodecBufferIterator {
 
     try (RDBStoreCodecBufferIterator i = newIterator();
          CodecBuffer target = CodecBuffer.wrap(new byte[] {0x55});
-         UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>> valSupplier = i.seek(target)) {
+         AutoCloseableRawKeyValue<CodecBuffer> valSupplier = i.seek(target)) {
       assertFalse(i.hasNext());
       InOrder verifier = inOrder(rocksIteratorMock);
       verify(rocksIteratorMock, times(1)).seekToFirst(); //at construct time
@@ -309,7 +305,7 @@ public class TestRDBStoreCodecBufferIterator {
 
     try (RDBStoreCodecBufferIterator i = newIterator();
          CodecBuffer target = CodecBuffer.wrap(new byte[] {0x55});
-         UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>> valSupplier = i.seek(target)) {
+         AutoCloseableRawKeyValue<CodecBuffer> valSupplier = i.seek(target)) {
       assertTrue(i.hasNext());
       InOrder verifier = inOrder(rocksIteratorMock);
       verify(rocksIteratorMock, times(1)).seekToFirst(); //at construct time
@@ -319,8 +315,8 @@ public class TestRDBStoreCodecBufferIterator {
       verifier.verify(rocksIteratorMock, times(1)).isValid();
       verifier.verify(rocksIteratorMock, times(1)).key(any());
       verifier.verify(rocksIteratorMock, times(1)).value(any());
-      assertArrayEquals(new byte[] {0x00}, valSupplier.get().getKey().getArray());
-      assertArrayEquals(new byte[] {0x7f}, valSupplier.get().getValue().getArray());
+      assertArrayEquals(new byte[] {0x00}, valSupplier.getKey().getArray());
+      assertArrayEquals(new byte[] {0x7f}, valSupplier.getValue().getArray());
     }
 
     CodecTestUtil.gc();
@@ -335,8 +331,8 @@ public class TestRDBStoreCodecBufferIterator {
     byte[] key = null;
     try (RDBStoreCodecBufferIterator i = newIterator()) {
       if (i.hasNext()) {
-        try (UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>> kv = i.next()) {
-          key = kv.get().getKey().getArray();
+        try (AutoCloseableRawKeyValue<CodecBuffer> kv = i.next()) {
+          key = kv.getKey().getArray();
         }
       }
     }
@@ -362,9 +358,9 @@ public class TestRDBStoreCodecBufferIterator {
     byte[] value = null;
     try (RDBStoreCodecBufferIterator i = newIterator()) {
       if (i.hasNext()) {
-        try (UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>> entry = i.next()) {
-          key = entry.get().getKey().getArray();
-          value = entry.get().getValue().getArray();
+        try (AutoCloseableRawKeyValue<CodecBuffer> entry = i.next()) {
+          key = entry.getKey().getArray();
+          value = entry.getValue().getArray();
         }
       }
     }
@@ -427,9 +423,13 @@ public class TestRDBStoreCodecBufferIterator {
       clearInvocations(rocksIteratorMock);
       when(rocksIteratorMock.isValid()).thenReturn(true);
       i.seekToFirst();
+      verify(rocksIteratorMock, times(0)).isValid();
+      verify(rocksIteratorMock, times(0)).key(any());
+      verify(rocksIteratorMock, times(1)).seekToFirst();
+      clearInvocations(rocksIteratorMock);
+      i.hasNext();
       verify(rocksIteratorMock, times(1)).isValid();
       verify(rocksIteratorMock, times(1)).key(any());
-      verify(rocksIteratorMock, times(1)).seekToFirst();
       clearInvocations(rocksIteratorMock);
 
       assertTrue(i.hasNext());
@@ -456,9 +456,14 @@ public class TestRDBStoreCodecBufferIterator {
       when(rocksIteratorMock.key(any()))
           .then(newAnswer("key1", prefixBytes));
       i.seekToFirst();
+      verify(rocksIteratorMock, times(0)).isValid();
+      verify(rocksIteratorMock, times(0)).key(any());
+      verify(rocksIteratorMock, times(1)).seek(prefix);
+      clearInvocations(rocksIteratorMock);
+      i.hasNext();
       verify(rocksIteratorMock, times(1)).isValid();
       verify(rocksIteratorMock, times(1)).key(any());
-      verify(rocksIteratorMock, times(1)).seek(prefix);
+      verify(rocksIteratorMock, times(0)).seek(prefix);
       clearInvocations(rocksIteratorMock);
 
       assertTrue(i.hasNext());

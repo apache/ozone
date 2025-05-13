@@ -50,8 +50,8 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
       CodecBuffer prefix, int maxNumberOfBuffersInMemory) {
     super(iterator, table, prefix);
-    // We need atleast 2 buffers one for setting next value and one for sending the current value.
-    maxNumberOfBuffersInMemory = Math.max(2, maxNumberOfBuffersInMemory);
+    // We need atleast 1 buffers one for setting next value and one for sending the current value.
+    maxNumberOfBuffersInMemory = Math.max(1, maxNumberOfBuffersInMemory);
     final String name = table != null ? table.getName() : null;
     this.availableBufferStack = new LinkedBlockingDeque<>(maxNumberOfBuffersInMemory);
     this.inUseBuffers = Sets.newConcurrentHashSet();

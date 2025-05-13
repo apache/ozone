@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * @param <RAW> the raw type.
  */
 abstract class RDBStoreAbstractIterator<RAW>
-    implements TableIterator<RAW, UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>> {
+    implements TableIterator<RAW, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<RAW>> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStoreAbstractIterator.class);
@@ -44,7 +44,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   // This is for schemas that use a fixed-length
   // prefix for each key.
   private final RAW prefix;
-  private boolean hasNext;
+  private Boolean hasNext;
   private boolean closed;
 
   RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table,
@@ -84,18 +84,22 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final void forEachRemaining(
-      Consumer<? super UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>> action) {
+      Consumer<? super AutoCloseableRawKeyValue<RAW>> action) {
     while (hasNext()) {
-      UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> entry = next();
+      AutoCloseableRawKeyValue<RAW> entry = next();
       action.accept(entry);
     }
   }
 
-  private void setCurrentEntry() {
+  private void releaseEntry() {
     if (currentEntry != null) {
       currentEntry.release();
     }
+    currentEntry = null;
+    hasNext = null;
+  }
 
+  private void setCurrentEntry() {
     boolean isValid = !closed && rocksDBIterator.get().isValid();
     if (isValid) {
       currentEntry = getKeyValue();
@@ -112,16 +116,19 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final boolean hasNext() {
+    if (hasNext == null) {
+      setCurrentEntry();
+    }
     return hasNext;
   }
 
   @Override
-  public final UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> next() {
+  public final AutoCloseableRawKeyValue<RAW> next() {
     if (hasNext()) {
-      UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> entry = currentEntry.retainAndReleaseOnClose();
-      this.previousKeyValue = entry.get();
+      AutoCloseableRawKeyValue<RAW> entry = new AutoCloseableRawKeyValue<>(currentEntry);
+      this.previousKeyValue = currentEntry.get();
       rocksDBIterator.get().next();
-      setCurrentEntry();
+      releaseEntry();
       return entry;
     }
     throw new NoSuchElementException("RocksDB Store has no more elements");
@@ -134,7 +141,7 @@ abstract class RDBStoreAbstractIterator<RAW>
     } else {
       seek0(prefix);
     }
-    setCurrentEntry();
+    releaseEntry();
   }
 
   @Override
@@ -144,16 +151,17 @@ abstract class RDBStoreAbstractIterator<RAW>
     } else {
       throw new UnsupportedOperationException("seekToLast: prefix != null");
     }
-    setCurrentEntry();
+    releaseEntry();
   }
 
   @Override
-  public final UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> seek(RAW key) {
+  public final AutoCloseableRawKeyValue<RAW> seek(RAW key) {
     seek0(key);
+    releaseEntry();
     setCurrentEntry();
     // Current entry should be only closed when the next() and thus closing the returned entry should be a noop.
     if (hasNext()) {
-      return currentEntry.retainAndReleaseOnClose();
+      return new AutoCloseableRawKeyValue<>(currentEntry);
     }
     return null;
   }
@@ -174,6 +182,20 @@ abstract class RDBStoreAbstractIterator<RAW>
   public void close() {
     rocksDBIterator.close();
     closed = true;
-    setCurrentEntry();
+    releaseEntry();
+  }
+
+  public static final class AutoCloseableRawKeyValue<RAW> extends RawKeyValue<RAW> implements AutoCloseable {
+    private final UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> keyValue;
+
+    private AutoCloseableRawKeyValue(ReferenceCountedObject<RawKeyValue<RAW>> kv) {
+      super(kv.get().getKey(), kv.get().getValue());
+      this.keyValue = kv.retainAndReleaseOnClose();
+    }
+
+    @Override
+    public void close() {
+      keyValue.close();
+    }
   }
 }

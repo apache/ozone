@@ -26,9 +26,9 @@ import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRawKeyValue;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +95,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public boolean isEmpty() throws IOException {
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> keyIter = iterator()) {
+    try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> keyIter = iterator()) {
       keyIter.seekToFirst();
       return !keyIter.hasNext();
     }
@@ -211,68 +211,23 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator()
+  public TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> iterator()
       throws IOException {
     return iterator((byte[])null);
   }
 
   @Override
-  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix)
+  public TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> iterator(byte[] prefix)
       throws IOException {
-    RDBStoreByteArrayIterator itr  = new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
-    return new TableIterator<byte[], KeyValue<byte[], byte[]>>() {
-      @Override
-      public void seekToFirst() {
-        itr.seekToFirst();
-      }
-
-      @Override
-      public void seekToLast() {
-        itr.seekToLast();
-      }
-
-      @Override
-      public KeyValue<byte[], byte[]> seek(byte[] bytes) {
-        try (UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> kv = itr.seek(bytes)) {
-          return kv == null ? null : kv.get();
-        }
-      }
-
-      @Override
-      public void removeFromDB() throws IOException {
-        itr.removeFromDB();
-      }
-
-      @Override
-      public void close() {
-        itr.close();
-      }
-
-      @Override
-      public boolean hasNext() {
-        return itr.hasNext();
-      }
-
-      @Override
-      public KeyValue<byte[], byte[]> next() {
-        try (UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> kv = itr.next()) {
-          return kv.get();
-        }
-      }
-    };
-  }
-
-  public TableIterator<byte[], UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>>> closeableSupplierIterator(
-      byte[] prefix) throws IOException {
     return new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
   }
 
-  TableIterator<CodecBuffer, UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>>> iterator(
+  TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
       CodecBuffer prefix) throws IOException {
-    return iterator(prefix, 2);
+    return iterator(prefix, 1);
   }
 
-  TableIterator<CodecBuffer, UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>>> iterator(
+  TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
       CodecBuffer prefix, int maxNumberOfBuffers) throws IOException {
     return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
         this, prefix, maxNumberOfBuffers);
@@ -312,7 +267,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void deleteBatchWithPrefix(BatchOperation batch, byte[] prefix)
       throws IOException {
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter
+    try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iter
              = iterator(prefix)) {
       while (iter.hasNext()) {
         deleteWithBatch(batch, iter.next().getKey());
@@ -323,7 +278,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
       throws IOException {
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter = iterator(prefix);
+    try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iter = iterator(prefix);
          RDBSstFileWriter fileWriter = new RDBSstFileWriter(externalFile)) {
       while (iter.hasNext()) {
         final KeyValue<byte[], byte[]> entry = iter.next();
@@ -348,7 +303,7 @@ class RDBTable implements Table<byte[], byte[]> {
             "Invalid count given " + count + ", count must be greater than 0");
     }
     final List<KeyValue<byte[], byte[]>> result = new ArrayList<>();
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> it
+    try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> it
              = iterator(prefix)) {
       if (startKey == null) {
         it.seekToFirst();

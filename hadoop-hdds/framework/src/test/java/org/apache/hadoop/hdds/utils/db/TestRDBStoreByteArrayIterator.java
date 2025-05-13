@@ -37,11 +37,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
+import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRawKeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -90,33 +90,33 @@ public class TestRDBStoreByteArrayIterator {
         .thenReturn(new byte[]{0x7f}, new byte[]{0x7e}, new byte[]{0x7d})
         .thenThrow(new NoSuchElementException());
 
-    final Consumer<UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>>> consumerStub
+    final Consumer<AutoCloseableRawKeyValue<byte[]>> consumerStub
         = mock(Consumer.class);
 
     try (RDBStoreByteArrayIterator iter = newIterator()) {
       iter.forEachRemaining(consumerStub);
-      ArgumentCaptor<UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>>> capture =
-          forClass(UncheckedAutoCloseableSupplier.class);
+      ArgumentCaptor<AutoCloseableRawKeyValue<byte[]>> capture = forClass(AutoCloseableRawKeyValue.class);
       verify(consumerStub, times(3)).accept(capture.capture());
       assertArrayEquals(
-          new byte[]{0x00}, capture.getAllValues().get(0).get().getKey());
+          new byte[]{0x00}, capture.getAllValues().get(0).getKey());
       assertArrayEquals(
-          new byte[]{0x7f}, capture.getAllValues().get(0).get().getValue());
+          new byte[]{0x7f}, capture.getAllValues().get(0).getValue());
       assertArrayEquals(
-          new byte[]{0x01}, capture.getAllValues().get(1).get().getKey());
+          new byte[]{0x01}, capture.getAllValues().get(1).getKey());
       assertArrayEquals(
-          new byte[]{0x7e}, capture.getAllValues().get(1).get().getValue());
+          new byte[]{0x7e}, capture.getAllValues().get(1).getValue());
       assertArrayEquals(
-          new byte[]{0x02}, capture.getAllValues().get(2).get().getKey());
+          new byte[]{0x02}, capture.getAllValues().get(2).getKey());
       assertArrayEquals(
-          new byte[]{0x7d}, capture.getAllValues().get(2).get().getValue());
+          new byte[]{0x7d}, capture.getAllValues().get(2).getValue());
     }
   }
 
   @Test
   public void testHasNextDoesNotDependsOnIsvalid() {
     when(rocksDBIteratorMock.isValid()).thenReturn(true, false);
-
+    when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x00});
+    when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x00f});
     try (RDBStoreByteArrayIterator iter = newIterator()) {
       assertTrue(iter.hasNext());
       assertTrue(iter.hasNext());
@@ -129,7 +129,10 @@ public class TestRDBStoreByteArrayIterator {
 
   @Test
   public void testNextCallsIsValidThenGetsTheValueAndStepsToNext() {
+    byte[] testKey = new byte[]{0x00};
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
+    when(rocksDBIteratorMock.key()).thenReturn(testKey);
+    when(rocksDBIteratorMock.value()).thenReturn(testKey);
     RDBStoreByteArrayIterator iter = newIterator();
 
     InOrder verifier = inOrder(rocksDBIteratorMock);
@@ -172,7 +175,7 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.isValid()).thenReturn(false);
 
     try (RDBStoreByteArrayIterator iter = newIterator()) {
-      final UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> val = iter.seek(new byte[] {0x55});
+      final AutoCloseableRawKeyValue<byte[]> val = iter.seek(new byte[] {0x55});
       assertFalse(iter.hasNext());
       InOrder verifier = inOrder(rocksDBIteratorMock);
       verify(rocksDBIteratorMock, times(1)).seekToFirst(); //at construct time
@@ -192,7 +195,7 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x7f});
 
     RDBStoreByteArrayIterator iter = newIterator();
-    final UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> val = iter.seek(new byte[]{0x55});
+    final AutoCloseableRawKeyValue<byte[]> val = iter.seek(new byte[]{0x55});
     assertTrue(iter.hasNext());
     InOrder verifier = inOrder(rocksDBIteratorMock);
 
@@ -202,20 +205,20 @@ public class TestRDBStoreByteArrayIterator {
     verifier.verify(rocksDBIteratorMock, times(1)).isValid();
     verifier.verify(rocksDBIteratorMock, times(1)).key();
     verifier.verify(rocksDBIteratorMock, times(1)).value();
-    assertArrayEquals(new byte[]{0x00}, val.get().getKey());
-    assertArrayEquals(new byte[]{0x7f}, val.get().getValue());
+    assertArrayEquals(new byte[]{0x00}, val.getKey());
+    assertArrayEquals(new byte[]{0x7f}, val.getValue());
   }
 
   @Test
   public void testGettingTheKeyIfIteratorIsValid() throws Exception {
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
     when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x00});
-
+    when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x00});
     RDBStoreByteArrayIterator iter = newIterator();
     byte[] key = null;
     if (iter.hasNext()) {
-      try (UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> entry = iter.next()) {
-        key = entry.get().getKey();
+      try (AutoCloseableRawKeyValue<byte[]> entry = iter.next()) {
+        key = entry.getKey();
       }
     }
 
@@ -233,13 +236,13 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x7f});
 
     try (RDBStoreByteArrayIterator iter = newIterator()) {
-      UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>> entry;
+      AutoCloseableRawKeyValue<byte[]> entry;
       byte[] key = null;
       byte[] value = null;
       if (iter.hasNext()) {
         entry = iter.next();
-        key = entry.get().getKey();
-        value = entry.get().getValue();
+        key = entry.getKey();
+        value = entry.getValue();
       }
       InOrder verifier = inOrder(rocksDBIteratorMock);
 
@@ -255,6 +258,7 @@ public class TestRDBStoreByteArrayIterator {
     byte[] testKey = new byte[]{0x00};
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
     when(rocksDBIteratorMock.key()).thenReturn(testKey);
+    when(rocksDBIteratorMock.value()).thenReturn(testKey);
 
     RDBStoreByteArrayIterator iter = newIterator(null);
     iter.next();
@@ -288,9 +292,14 @@ public class TestRDBStoreByteArrayIterator {
     clearInvocations(rocksDBIteratorMock);
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
     iter.seekToFirst();
-    verify(rocksDBIteratorMock, times(1)).isValid();
-    verify(rocksDBIteratorMock, times(1)).key();
+    verify(rocksDBIteratorMock, times(0)).isValid();
+    verify(rocksDBIteratorMock, times(0)).key();
     verify(rocksDBIteratorMock, times(1)).seekToFirst();
+    clearInvocations(rocksDBIteratorMock);
+    verify(rocksDBIteratorMock, times(0)).isValid();
+    verify(rocksDBIteratorMock, times(0)).key();
+    verify(rocksDBIteratorMock, times(0)).seekToFirst();
+    iter.hasNext();
     clearInvocations(rocksDBIteratorMock);
     assertTrue(iter.hasNext());
     verify(rocksDBIteratorMock, times(0)).isValid();
@@ -311,9 +320,14 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
     when(rocksDBIteratorMock.key()).thenReturn(testPrefix);
     iter.seekToFirst();
+    verify(rocksDBIteratorMock, times(0)).isValid();
+    verify(rocksDBIteratorMock, times(0)).key();
+    verify(rocksDBIteratorMock, times(1)).seek(testPrefix);
+    clearInvocations(rocksDBIteratorMock);
+    iter.hasNext();
     verify(rocksDBIteratorMock, times(1)).isValid();
     verify(rocksDBIteratorMock, times(1)).key();
-    verify(rocksDBIteratorMock, times(1)).seek(testPrefix);
+    verify(rocksDBIteratorMock, times(0)).seek(testPrefix);
     clearInvocations(rocksDBIteratorMock);
     assertTrue(iter.hasNext());
     // hasNext shouldn't make isValid() redundant calls.

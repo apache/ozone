@@ -33,6 +33,7 @@ import java.util.Objects;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
+import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRawKeyValue;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheResult;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -43,7 +44,6 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Strongly typed table implementation.
@@ -427,7 +427,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       }
     } else {
       final byte[] prefixBytes = encodeKey(prefix);
-      return new TypedTableIterator(rawTable.closeableSupplierIterator(prefixBytes));
+      return new TypedTableIterator(rawTable.iterator(prefixBytes));
     }
   }
 
@@ -568,7 +568,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   private RawIterator<CodecBuffer> newCodecBufferTableIterator(
-      TableIterator<CodecBuffer, UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>>> i) {
+      TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> i) {
     return new RawIterator<CodecBuffer>(i) {
       @Override
       AutoCloseSupplier<CodecBuffer> convert(KEY key) throws IOException {
@@ -610,14 +610,14 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       }
 
       @Override
-      TableIterator<CodecBuffer, UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>>> getRawIterator(
+      TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> getRawIterator(
           KEY prefix, KEY startKey, int maxParallelism) throws IOException {
 
         CodecBuffer prefixBuffer = encodeKeyCodecBuffer(prefix);
         CodecBuffer startKeyBuffer = encodeKeyCodecBuffer(startKey);
         try {
-          TableIterator<CodecBuffer, UncheckedAutoCloseableSupplier<RawKeyValue<CodecBuffer>>> itr =
-              rawTable.iterator(prefixBuffer, maxParallelism + 1);
+          TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> itr =
+              rawTable.iterator(prefixBuffer, maxParallelism);
           if (startKeyBuffer != null) {
             itr.seek(startKeyBuffer);
           }
@@ -649,12 +649,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       }
 
       @Override
-      TableIterator<byte[], UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>>> getRawIterator(
+      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> getRawIterator(
           KEY prefix, KEY startKey, int maxParallelism) throws IOException {
         byte[] prefixBytes = encodeKey(prefix);
         byte[] startKeyBytes = encodeKey(startKey);
-        TableIterator<byte[], UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>>> itr =
-            rawTable.closeableSupplierIterator(prefixBytes);
+        TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = rawTable.iterator(prefixBytes);
         if (startKeyBytes != null) {
           itr.seek(startKeyBytes);
         }
@@ -668,7 +667,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    */
   public class TypedTableIterator extends RawIterator<byte[]> {
     TypedTableIterator(
-        TableIterator<byte[], UncheckedAutoCloseableSupplier<RawKeyValue<byte[]>>> rawIterator) {
+        TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> rawIterator) {
       super(rawIterator);
     }
 
@@ -691,9 +690,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    */
   abstract class RawIterator<RAW>
       implements Table.KeyValueIterator<KEY, VALUE> {
-    private final TableIterator<RAW, UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>> rawIterator;
+    private final TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> rawIterator;
 
-    RawIterator(TableIterator<RAW, UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>> rawIterator) {
+    RawIterator(TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> rawIterator) {
       this.rawIterator = rawIterator;
     }
 
@@ -720,8 +719,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     @Override
     public KeyValue<KEY, VALUE> seek(KEY key) throws IOException {
       try (AutoCloseSupplier<RAW> rawKey = convert(key);
-           UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> result = rawIterator.seek(rawKey.get())) {
-        return result == null ? null : convert(result.get());
+           AutoCloseableRawKeyValue<RAW> result = rawIterator.seek(rawKey.get())) {
+        return result == null ? null : convert(result);
       }
     }
 
@@ -737,8 +736,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     public KeyValue<KEY, VALUE> next() {
-      try (UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> kv = rawIterator.next()) {
-        return convert(kv.get());
+      try (AutoCloseableRawKeyValue<RAW> kv = rawIterator.next()) {
+        return convert(kv);
       } catch (IOException e) {
         throw new IllegalStateException("Failed next()", e);
       }

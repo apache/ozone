@@ -24,8 +24,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRawKeyValue;
 import org.apache.ratis.util.ReferenceCountedObject;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * A {@link Table.KeyValueIterator} backed by a raw iterator.
@@ -34,19 +34,18 @@ import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
  */
 abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSpliterator<KEY, VALUE> {
 
-  private final ReferenceCountedObject<TableIterator<RAW,
-      UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>>> rawIterator;
+  private final ReferenceCountedObject<TableIterator<RAW, AutoCloseableRawKeyValue<RAW>>> rawIterator;
   private final AtomicInteger maxNumberOfAdditionalSplits;
   private final Lock lock;
   private final AtomicReference<IOException> closeException = new AtomicReference<>();
 
   abstract Table.KeyValue<KEY, VALUE> convert(RawKeyValue<RAW> kv) throws IOException;
 
-  abstract TableIterator<RAW, UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>> getRawIterator(
+  abstract TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> getRawIterator(
       KEY prefix, KEY startKey, int maxParallelism) throws IOException;
 
   RawSpliterator(KEY prefix, KEY startKey, int maxParallelism) throws IOException {
-    TableIterator<RAW, UncheckedAutoCloseableSupplier<RawKeyValue<RAW>>> itr = getRawIterator(prefix,
+    TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> itr = getRawIterator(prefix,
         startKey, maxParallelism);
     this.lock = new ReentrantLock();
     this.maxNumberOfAdditionalSplits = new AtomicInteger(maxParallelism - 1);
@@ -70,7 +69,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
   @Override
   public boolean tryAdvance(Consumer<? super Table.KeyValue<KEY, VALUE>> action) {
     lock.lock();
-    UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> kv = null;
+    AutoCloseableRawKeyValue<RAW> kv = null;
     try {
       if (this.rawIterator.get().hasNext()) {
         kv = rawIterator.get().next();
@@ -80,7 +79,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
     }
     try {
       if (kv != null) {
-        action.accept(convert(kv.get()));
+        action.accept(convert(kv));
         return true;
       }
     } catch (IOException e) {
