@@ -21,6 +21,8 @@ import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -60,9 +62,9 @@ public final class RdbUtil {
     List<LiveFileMetaData> liveSSTFilesForCFs = getLiveSSTFilesForCFs(rocksDB, cfs);
     Map<Object, String> inodeToSstMap = new HashMap<>();
     for (LiveFileMetaData lfm : liveSSTFilesForCFs) {
-      File sstFile = new File(lfm.path(), lfm.fileName());
-      Object inode = Files.readAttributes(sstFile.toPath(), BasicFileAttributes.class).fileKey();
-      inodeToSstMap.put(inode, sstFile.getPath());
+      Path sstFilePath = Paths.get(lfm.path(), lfm.fileName());
+      Object inode = Files.readAttributes(sstFilePath, BasicFileAttributes.class).fileKey();
+      inodeToSstMap.put(inode, sstFilePath.toString());
     }
     return inodeToSstMap;
   }

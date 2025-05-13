@@ -1237,6 +1237,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     } catch (IOException e) {
       // In case of exception during inode read use all files
       LOG.error("Exception occurred while populating delta files for snapDiff", e);
+      LOG.warn("Falling back to full file list comparison, inode-based optimization skipped.");
       diffFiles = new HashSet<>();
       diffFiles.addAll(getSSTFileListForSnapshot(fromSnapshot, tablesToLookUp));
       diffFiles.addAll(getSSTFileListForSnapshot(toSnapshot, tablesToLookUp));
