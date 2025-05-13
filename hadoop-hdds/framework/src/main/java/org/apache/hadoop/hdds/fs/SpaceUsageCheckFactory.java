@@ -54,6 +54,15 @@ public interface SpaceUsageCheckFactory {
   SpaceUsageCheckParams paramsFor(File dir);
 
   /**
+   * Creates configuration for the HDDS volume rooted at {@code dir} with exclusion path for du.
+   *
+   * @throws UncheckedIOException if canonical path for {@code dir} cannot be resolved
+   */
+  default SpaceUsageCheckParams paramsFor(File dir, File excludeDirPath) {
+    return paramsFor(dir);
+  }
+
+  /**
    * Updates the factory with global configuration.
    * @return factory configured with {@code conf}
    */
@@ -108,8 +117,8 @@ public interface SpaceUsageCheckFactory {
     return instance.setConfiguration(config);
   }
 
-  static DUFactory defaultImplementation() {
-    return new DUFactory();
+  static SpaceUsageCheckFactory defaultImplementation() {
+    return new DUOptimizedFactory();
   }
 
   /**
