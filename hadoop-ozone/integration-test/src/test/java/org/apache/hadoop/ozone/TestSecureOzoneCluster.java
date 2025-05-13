@@ -54,6 +54,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_MISMATCH;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -219,8 +220,7 @@ final class TestSecureOzoneCluster {
       conf.setInt(OZONE_SCM_SECURITY_SERVICE_PORT_KEY, getFreePort());
       conf.setInt(OZONE_SCM_RATIS_PORT_KEY, getFreePort());
       conf.setInt(OZONE_SCM_GRPC_PORT_KEY, getFreePort());
-      conf.set(OZONE_OM_ADDRESS_KEY,
-          InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
+      conf.set(OZONE_OM_ADDRESS_KEY, localhostWithFreePort());
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       ExitUtils.disableSystemExit();
@@ -845,8 +845,7 @@ final class TestSecureOzoneCluster {
 
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
       conf.setBoolean(OZONE_OM_S3_GPRC_SERVER_ENABLED, true);
-      conf.set(OZONE_OM_ADDRESS_KEY,
-          InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
+      conf.set(OZONE_OM_ADDRESS_KEY, localhostWithFreePort());
 
       OzoneManager.omInit(conf);
       om = OzoneManager.createOm(conf);
