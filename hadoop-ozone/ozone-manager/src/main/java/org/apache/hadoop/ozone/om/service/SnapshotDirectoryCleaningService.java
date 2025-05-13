@@ -345,7 +345,7 @@ public class SnapshotDirectoryCleaningService
         setSnapshotPropertyRequest =
         SetSnapshotPropertyRequest.newBuilder()
             .setSnapshotKey(prevSnapshotKeyTable)
-            .setSnapshotDirSize(snapshotSize)
+            .setSnapshotSizeDeltaFromDirDeepCleaning(snapshotSize)
             .build();
 
     OMRequest omRequest = OMRequest.newBuilder()

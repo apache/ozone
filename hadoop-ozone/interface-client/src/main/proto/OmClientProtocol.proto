@@ -2033,7 +2033,7 @@ message SetSnapshotPropertyRequest {
   optional SnapshotSize snapshotSize = 3;
   optional bool deepCleanedDeletedDir = 4;
   optional bool deepCleanedDeletedKey = 5;
-  optional SnapshotSize snapshotDirSize = 6;
+  optional SnapshotSize snapshotSizeDeltaFromDirDeepCleaning = 6;
 }
 
 // SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility
