@@ -889,7 +889,8 @@ public class KeyValueHandler extends Handler {
           final ChunkBuffer b = (ChunkBuffer)data;
           Checksum.verifyChecksum(b.duplicate(b.position(), b.limit()), info.getChecksumData(), 0);
         } else {
-          Checksum.verifyChecksum(data.toByteString(byteBufferToByteString), info.getChecksumData(), 0);
+          Checksum.verifyChecksum(data.toByteString(byteBufferToByteString).asReadOnlyByteBuffer(),
+              info.getChecksumData(), 0);
         }
       } catch (OzoneChecksumException ex) {
         throw ChunkUtils.wrapInStorageContainerException(ex);

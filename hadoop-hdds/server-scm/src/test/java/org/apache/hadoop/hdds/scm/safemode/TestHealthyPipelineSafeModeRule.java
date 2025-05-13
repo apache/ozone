@@ -94,12 +94,12 @@ public class TestHealthyPipelineSafeModeRule {
               pipelineManager.getStateManager(), config);
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
           mockRatisProvider);
-      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, nodeManager, eventQueue,
-          serviceManager, scmContext);
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(config,
+          nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
+      scmSafeModeManager.start();
 
-      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
-          scmSafeModeManager.getHealthyPipelineSafeModeRule();
+      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
+          .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
       // This should be immediately satisfied, as no pipelines are there yet.
       assertTrue(healthyPipelineSafeModeRule.validate());
@@ -172,12 +172,12 @@ public class TestHealthyPipelineSafeModeRule {
       pipeline3 = pipelineManager.getPipeline(pipeline3.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
-      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, nodeManager, eventQueue,
-          serviceManager, scmContext);
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(config,
+          nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
+      scmSafeModeManager.start();
 
-      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
-          scmSafeModeManager.getHealthyPipelineSafeModeRule();
+      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
+          .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
       // No datanodes have sent pipelinereport from datanode
       assertFalse(healthyPipelineSafeModeRule.validate());
@@ -265,13 +265,12 @@ public class TestHealthyPipelineSafeModeRule {
       pipeline3 = pipelineManager.getPipeline(pipeline3.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
-      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, nodeManager, eventQueue,
-          serviceManager, scmContext);
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(config,
+          nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
+      scmSafeModeManager.start();
 
-      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
-          scmSafeModeManager.getHealthyPipelineSafeModeRule();
-
+      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
+          .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
       // No pipeline event have sent to SCMSafemodeManager
       assertFalse(healthyPipelineSafeModeRule.validate());
