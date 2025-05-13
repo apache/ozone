@@ -29,7 +29,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -38,6 +40,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.ratis.statemachine.StateMachine;
@@ -150,6 +153,17 @@ public abstract class Handler {
    * @throws IOException in case of exception
    */
   public abstract void markContainerForClose(Container container)
+      throws IOException;
+
+  /**
+   * Updates the container checksum information on disk and in memory.
+   *
+   * @param container The container to update
+   * @param treeWriter The container merkle tree with the updated information about the container
+   * @throws IOException For errors sending an ICR. If updating the checksums on disk fails, the checksum information
+   *   will remain unchanged with no exception thrown.
+   */
+  public abstract void updateContainerChecksum(Container container, ContainerMerkleTreeWriter treeWriter)
       throws IOException;
 
   /**

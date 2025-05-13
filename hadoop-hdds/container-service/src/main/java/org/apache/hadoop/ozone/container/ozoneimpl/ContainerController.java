@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,6 +123,23 @@ public class ContainerController {
     } else {
       getHandler(container).markContainerUnhealthy(container, reason);
       return true;
+    }
+  }
+  /**
+   * Updates the container checksum information on disk and in memory.
+   *
+   * @param containerId The ID of the container to update
+   * @param treeWriter The container merkle tree with the updated information about the container
+   * @throws IOException For errors sending an ICR. If updating the checksums on disk fails, the checksum information
+   *   will remain unchanged with no exception thrown.
+   */
+  public void updateContainerChecksum(long containerId, ContainerMerkleTreeWriter treeWriter)
+      throws IOException {
+    Container container = getContainer(containerId);
+    if (container == null) {
+      LOG.warn("Container {} not found, may be deleted, skip updating checksums", containerId);
+    } else {
+      getHandler(container).updateContainerChecksum(container, treeWriter);
     }
   }
 

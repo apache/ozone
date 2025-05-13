@@ -48,12 +48,11 @@ public class BackgroundContainerDataScanner extends
   private final Canceler canceler;
   private static final String NAME_FORMAT = "ContainerDataScanner(%s)";
   private final ContainerDataScannerMetrics metrics;
-  private final ContainerChecksumTreeManager checksumManager;
   private final ContainerScannerMixin scannerMixin;
 
   public BackgroundContainerDataScanner(ContainerScannerConfiguration conf,
                                         ContainerController controller,
-                                        HddsVolume volume, ContainerChecksumTreeManager checksumManager) {
+                                        HddsVolume volume) {
     super(String.format(NAME_FORMAT, volume), conf.getDataScanInterval());
     this.controller = controller;
     this.volume = volume;
@@ -61,7 +60,6 @@ public class BackgroundContainerDataScanner extends
     canceler = new Canceler();
     this.metrics = ContainerDataScannerMetrics.create(volume.toString());
     this.metrics.setStorageDirectory(volume.toString());
-    this.checksumManager = checksumManager;
     this.scannerMixin = new ContainerScannerMixin(LOG, controller, metrics, conf);
   }
 
@@ -74,21 +72,12 @@ public class BackgroundContainerDataScanner extends
       shutdown("The volume has failed.");
       return;
     }
-    scannerMixin.scanData(c, checksumManager, throttler, canceler);
+    scannerMixin.scanData(c, throttler, canceler);
   }
 
   @Override
   public Iterator<Container<?>> getContainerIterator() {
     return controller.getContainers(volume);
-  }
-
-  private static void logScanStart(ContainerData containerData) {
-    if (LOG.isDebugEnabled()) {
-      Optional<Instant> scanTimestamp = containerData.lastDataScanTime();
-      Object lastScanTime = scanTimestamp.map(ts -> "at " + ts).orElse("never");
-      LOG.debug("Scanning container {}, last scanned {}",
-          containerData.getContainerID(), lastScanTime);
-    }
   }
 
   @Override

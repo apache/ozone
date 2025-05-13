@@ -61,13 +61,11 @@ public class TestBackgroundContainerDataScanner extends
     TestContainerScannersAbstract {
 
   private BackgroundContainerDataScanner scanner;
-  private ContainerChecksumTreeManager mockChecksumManager;
 
   @BeforeEach
   public void setup() {
     super.setup();
-    mockChecksumManager = mock(ContainerChecksumTreeManager.class);
-    scanner = new BackgroundContainerDataScanner(conf, controller, vol, mockChecksumManager);
+    scanner = new BackgroundContainerDataScanner(conf, controller, vol);
   }
 
   @Test
@@ -253,14 +251,14 @@ public class TestBackgroundContainerDataScanner extends
 
     // Merkle trees should not be written for open or deleted containers
     for (Container<ContainerData> container : Arrays.asList(openContainer, openCorruptMetadata, deletedContainer)) {
-      verify(mockChecksumManager, times(0))
-          .writeContainerDataTree(eq(container.getContainerData()), any());
+      verify(controller, times(0))
+          .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
     }
 
     // Merkle trees should be written for all other containers.
     for (Container<ContainerData> container : Arrays.asList(healthy, corruptData)) {
-      verify(mockChecksumManager, times(1))
-          .writeContainerDataTree(eq(container.getContainerData()), any());
+      verify(controller, times(1))
+          .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
     }
   }
 }

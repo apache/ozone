@@ -50,46 +50,20 @@ public class ContainerScannerMixin {
     this.minScanGap = conf.getContainerScanMinGap();
   }
 
-  public void scanData(Container<?> container, ContainerChecksumTreeManager checksumManager,
-                       DataTransferThrottler throttler, Canceler canceler)
+  public void scanData(Container<?> container, DataTransferThrottler throttler, Canceler canceler)
       throws IOException, InterruptedException {
     if (!shouldScanData(container)) {
       return;
     }
     ContainerData containerData = container.getContainerData();
     long containerId = containerData.getContainerID();
-    long originalDataChecksum = containerData.getDataChecksum();
-    long updatedDataChecksum = originalDataChecksum;
-    boolean hasChecksumFile = ContainerChecksumTreeManager.hasContainerChecksumFile(containerData);
     logScanStart(containerData);
     DataScanResult result = container.scanData(throttler, canceler);
 
     if (result.isDeleted()) {
       log.debug("Container [{}] has been deleted during the data scan.", containerId);
     } else {
-      // Merkle tree write failure should not abort the scanning process. Continue marking the scan as completed.
-      try {
-        // Also updates the data checksum in containerData.
-        checksumManager.writeContainerDataTree(containerData, result.getDataTree());
-        updatedDataChecksum = containerData.getDataChecksum();
-      } catch (IOException ex) {
-        log.error("Failed to write container merkle tree for container {}", containerId, ex);
-      }
-
-      if (updatedDataChecksum != originalDataChecksum) {
-        String message =
-            "Container data checksum updated from " + checksumToString(originalDataChecksum) + " to " +
-                checksumToString(updatedDataChecksum);
-        if (hasChecksumFile) {
-          log.warn(message);
-          ContainerLogger.logChecksumUpdated(containerData, originalDataChecksum);
-        } else {
-          // If this is the first time the scanner has run with the feature to generate a checksum file, don't
-          // log a warning for the checksum update.
-          log.debug(message);
-        }
-      }
-
+      controller.updateContainerChecksum(containerId, result.getDataTree());
       if (!result.isHealthy()) {
         handleUnhealthyScanResult(containerId, result);
       }

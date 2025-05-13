@@ -304,7 +304,7 @@ public class TestContainerReconciliationWithMockDatanodes {
       ContainerController controller = new ContainerController(containerSet,
           Collections.singletonMap(ContainerProtos.ContainerType.KeyValueContainer, handler));
       onDemandScanner = new OnDemandContainerDataScanner(
-          conf.getObject(ContainerScannerConfiguration.class), controller, handler.getChecksumManager());
+          conf.getObject(ContainerScannerConfiguration.class), controller);
       // Register the on-demand container scanner with the container set used by the KeyValueHandler.
       containerSet.registerContainerScanHandler(onDemandScanner::scanContainer);
     }

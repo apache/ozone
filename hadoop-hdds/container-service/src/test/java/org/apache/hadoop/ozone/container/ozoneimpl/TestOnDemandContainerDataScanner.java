@@ -68,13 +68,11 @@ public class TestOnDemandContainerDataScanner extends
     TestContainerScannersAbstract {
   
   private OnDemandContainerDataScanner onDemandScanner;
-  private ContainerChecksumTreeManager mockChecksumManager;
 
   @BeforeEach
   public void setup() {
     super.setup();
-    mockChecksumManager = mock(ContainerChecksumTreeManager .class);
-    onDemandScanner = new OnDemandContainerDataScanner(conf, controller, mockChecksumManager);
+    onDemandScanner = new OnDemandContainerDataScanner(conf, controller);
   }
 
   @Test
@@ -293,15 +291,15 @@ public class TestOnDemandContainerDataScanner extends
     // Merkle trees should not be written for open or deleted containers
     for (Container<ContainerData> container : Arrays.asList(openContainer, openCorruptMetadata, deletedContainer)) {
       scanContainer(container);
-      verify(mockChecksumManager, times(0))
-          .writeContainerDataTree(eq(container.getContainerData()), any());
+      verify(controller, times(0))
+          .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
     }
 
     // Merkle trees should be written for all other containers.
     for (Container<ContainerData> container : Arrays.asList(healthy, corruptData)) {
       scanContainer(container);
-      verify(mockChecksumManager, times(1))
-          .writeContainerDataTree(eq(container.getContainerData()), any());
+      verify(controller, times(1))
+          .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
     }
   }
 

@@ -399,7 +399,7 @@ public class OzoneContainer {
     dataScanners = new ArrayList<>();
     for (StorageVolume v : volumeSet.getVolumesList()) {
       BackgroundContainerDataScanner s =
-          new BackgroundContainerDataScanner(c, controller, (HddsVolume) v, checksumTreeManager);
+          new BackgroundContainerDataScanner(c, controller, (HddsVolume) v);
       s.start();
       dataScanners.add(s);
       backgroundScanners.add(s);
@@ -433,7 +433,7 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    onDemandScanner = new OnDemandContainerDataScanner(c, controller, checksumTreeManager);
+    onDemandScanner = new OnDemandContainerDataScanner(c, controller);
     containerSet.registerContainerScanHandler(onDemandScanner::scanContainer);
   }
 

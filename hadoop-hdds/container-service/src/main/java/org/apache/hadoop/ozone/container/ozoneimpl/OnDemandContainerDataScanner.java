@@ -44,19 +44,16 @@ public final class OnDemandContainerDataScanner {
   private final ConcurrentHashMap
       .KeySetView<Long, Boolean> containerRescheduleCheckSet;
   private final OnDemandScannerMetrics metrics;
-  private final ContainerChecksumTreeManager checksumManager;
   private final ContainerScannerMixin scannerMixin;
 
   public OnDemandContainerDataScanner(
-      ContainerScannerConfiguration conf, ContainerController controller,
-      ContainerChecksumTreeManager checksumManager) {
+      ContainerScannerConfiguration conf, ContainerController controller) {
     throttler = new DataTransferThrottler(
         conf.getOnDemandBandwidthPerVolume());
     canceler = new Canceler();
     metrics = OnDemandScannerMetrics.create();
     scanExecutor = Executors.newSingleThreadExecutor();
     containerRescheduleCheckSet = ConcurrentHashMap.newKeySet();
-    this.checksumManager = checksumManager;
     this.scannerMixin = new ContainerScannerMixin(LOG, controller, metrics, conf);
   }
 
@@ -87,7 +84,7 @@ public final class OnDemandContainerDataScanner {
 
   private void performOnDemandScan(Container<?> container) {
     try {
-      scannerMixin.scanData(container, checksumManager, throttler, canceler);
+      scannerMixin.scanData(container, throttler, canceler);
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
           + container.getContainerData().getContainerID(), e);

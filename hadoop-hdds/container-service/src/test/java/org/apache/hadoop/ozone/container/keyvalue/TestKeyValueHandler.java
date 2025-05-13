@@ -658,7 +658,7 @@ public class TestKeyValueHandler {
     ContainerController controller = new ContainerController(containerSet,
         Collections.singletonMap(ContainerType.KeyValueContainer, kvHandler));
     OnDemandContainerDataScanner onDemandScanner = new OnDemandContainerDataScanner(
-        conf.getObject(ContainerScannerConfiguration.class), controller, kvHandler.getChecksumManager());
+        conf.getObject(ContainerScannerConfiguration.class), controller);
     containerSet.registerContainerScanHandler(onDemandScanner::scanContainer);
 
     return kvHandler;
