@@ -3,7 +3,7 @@ title: Datanode used space calculation
 summary: Describe proposal for optimization in datanode used space calculation.
 date: 2025-04-30
 jira: HDDS-12924
-status: draft
+status: Implemented
 author: Sumit Agrawal
 ---
 <!--
@@ -85,3 +85,7 @@ Container data are corrupted / <to be deleted> containers which needs to be remo
 
 So considering above impact, this might be one of simple solution providing higher performance.
 
+# Conclusion
+
+`Approach 2` `Run DU over meta path only (excluding container dir path)` is preferred over other as
+it identify ozone used space more close in accuracy to DU implementation and handle the time issue.

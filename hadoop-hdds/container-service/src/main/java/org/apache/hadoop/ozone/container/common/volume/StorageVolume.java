@@ -749,7 +749,8 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     return getStorageDir().toString();
   }
 
-  private static SpaceUsageCheckParams getSpaceUsageCheckParams(StorageVolume v, File containerDirPath) throws IOException {
+  private static SpaceUsageCheckParams getSpaceUsageCheckParams(StorageVolume v, File containerDirPath)
+      throws IOException {
     File root = new File(v.volumeRoot);
 
     boolean succeeded = root.isDirectory() || root.mkdirs();

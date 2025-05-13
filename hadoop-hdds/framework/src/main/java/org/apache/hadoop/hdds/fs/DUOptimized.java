@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.fs;
 
 import java.io.File;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

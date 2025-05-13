@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.fs;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 import java.io.File;
 import java.io.IOException;
@@ -94,6 +93,7 @@ public class SpaceUsageCheckParams {
   public void setContainerUsedSpace(Supplier<Long> containerUsedSpace) {
     this.containerUsedSpace = containerUsedSpace;
   }
+
   public Supplier<Long> getContainerUsedSpace() {
     return containerUsedSpace;
   }
