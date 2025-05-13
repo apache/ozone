@@ -17,33 +17,29 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
-
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
-import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 
 /**
  * Mixin to handle common data and metadata scan operations among background and on-demand scanners.
  */
-public class ContainerScannerMixin {
+public class ContainerScanHelper {
   private final Logger log;
   private final ContainerController controller;
   private final AbstractContainerScannerMetrics metrics;
   private final long minScanGap;
 
-  public ContainerScannerMixin(Logger log, ContainerController controller,
-      AbstractContainerScannerMetrics metrics, ContainerScannerConfiguration conf) {
+  public ContainerScanHelper(Logger log, ContainerController controller,
+                             AbstractContainerScannerMetrics metrics, ContainerScannerConfiguration conf) {
     this.log = log;
     this.controller = controller;
     this.metrics = metrics;

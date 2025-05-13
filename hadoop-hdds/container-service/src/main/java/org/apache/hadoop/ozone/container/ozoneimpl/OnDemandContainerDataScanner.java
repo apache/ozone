@@ -26,7 +26,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +43,7 @@ public final class OnDemandContainerDataScanner {
   private final ConcurrentHashMap
       .KeySetView<Long, Boolean> containerRescheduleCheckSet;
   private final OnDemandScannerMetrics metrics;
-  private final ContainerScannerMixin scannerMixin;
+  private final ContainerScanHelper scannerMixin;
 
   public OnDemandContainerDataScanner(
       ContainerScannerConfiguration conf, ContainerController controller) {
@@ -54,7 +53,7 @@ public final class OnDemandContainerDataScanner {
     metrics = OnDemandScannerMetrics.create();
     scanExecutor = Executors.newSingleThreadExecutor();
     containerRescheduleCheckSet = ConcurrentHashMap.newKeySet();
-    this.scannerMixin = new ContainerScannerMixin(LOG, controller, metrics, conf);
+    this.scannerMixin = new ContainerScanHelper(LOG, controller, metrics, conf);
   }
 
   public Optional<Future<?>> scanContainer(Container<?> container) {

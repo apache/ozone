@@ -35,14 +35,14 @@ public class BackgroundContainerMetadataScanner extends
       LoggerFactory.getLogger(BackgroundContainerMetadataScanner.class);
   private final ContainerMetadataScannerMetrics metrics;
   private final ContainerController controller;
-  private final ContainerScannerMixin scannerMixin;
+  private final ContainerScanHelper scannerMixin;
 
   public BackgroundContainerMetadataScanner(ContainerScannerConfiguration conf,
                                             ContainerController controller) {
     super("ContainerMetadataScanner", conf.getMetadataScanInterval());
     this.controller = controller;
     this.metrics = ContainerMetadataScannerMetrics.create();
-    this.scannerMixin = new ContainerScannerMixin(LOG, controller, metrics, conf);
+    this.scannerMixin = new ContainerScanHelper(LOG, controller, metrics, conf);
   }
 
   @Override

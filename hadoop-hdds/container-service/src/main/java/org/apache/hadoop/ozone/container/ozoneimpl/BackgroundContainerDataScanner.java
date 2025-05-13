@@ -19,13 +19,10 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Iterator;
-import java.util.Optional;
+
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
@@ -48,7 +45,7 @@ public class BackgroundContainerDataScanner extends
   private final Canceler canceler;
   private static final String NAME_FORMAT = "ContainerDataScanner(%s)";
   private final ContainerDataScannerMetrics metrics;
-  private final ContainerScannerMixin scannerMixin;
+  private final ContainerScanHelper scannerMixin;
 
   public BackgroundContainerDataScanner(ContainerScannerConfiguration conf,
                                         ContainerController controller,
@@ -60,7 +57,7 @@ public class BackgroundContainerDataScanner extends
     canceler = new Canceler();
     this.metrics = ContainerDataScannerMetrics.create(volume.toString());
     this.metrics.setStorageDirectory(volume.toString());
-    this.scannerMixin = new ContainerScannerMixin(LOG, controller, metrics, conf);
+    this.scannerMixin = new ContainerScanHelper(LOG, controller, metrics, conf);
   }
 
   @Override
