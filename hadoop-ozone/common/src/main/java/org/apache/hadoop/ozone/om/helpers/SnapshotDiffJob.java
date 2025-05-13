@@ -261,7 +261,6 @@ public class SnapshotDiffJob {
     SnapshotDiffJobProto.Builder builder = SnapshotDiffJobProto.newBuilder()
         .setCreationTime(creationTime)
         .setJobId(jobId)
-        .setStatus(status.toProtobuf())
         .setVolume(volume)
         .setBucket(bucket)
         .setFromSnapshot(fromSnapshot)
@@ -270,6 +269,9 @@ public class SnapshotDiffJob {
         .setDisableNativeDiff(disableNativeDiff)
         .setTotalDiffEntries(totalDiffEntries)
         .setKeysProcessedPct(keysProcessedPct);
+    if (status != null) {
+      builder.setStatus(status.toProtobuf());
+    }
     if (subStatus != null) {
       builder.setSubStatus(subStatus.toProtoBuf());
     }
@@ -278,10 +280,14 @@ public class SnapshotDiffJob {
 
   public static SnapshotDiffJob getFromProtoBuf(
       SnapshotDiffJobProto diffJobProto) {
+    JobStatus status = (diffJobProto.hasStatus()) ?
+        JobStatus.fromProtobuf(diffJobProto.getStatus()) : null;
+    SubStatus subStatus = (diffJobProto.hasSubStatus()) ?
+        SubStatus.fromProtoBuf(diffJobProto.getSubStatus()) : null;
     return new SnapshotDiffJob(
         diffJobProto.getCreationTime(),
         diffJobProto.getJobId(),
-        JobStatus.fromProtobuf(diffJobProto.getStatus()),
+        status,
         diffJobProto.getVolume(),
         diffJobProto.getBucket(),
         diffJobProto.getFromSnapshot(),
@@ -289,7 +295,7 @@ public class SnapshotDiffJob {
         diffJobProto.getForceFullDiff(),
         diffJobProto.getDisableNativeDiff(),
         diffJobProto.getTotalDiffEntries(),
-        SubStatus.fromProtoBuf(diffJobProto.getSubStatus()),
+        subStatus,
         diffJobProto.getKeysProcessedPct());
   }
 
