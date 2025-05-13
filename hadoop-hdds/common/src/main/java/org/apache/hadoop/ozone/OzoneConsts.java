@@ -290,6 +290,13 @@ public final class OzoneConsts {
   public static final String TENANT = "tenant";
   public static final String USER_PREFIX = "userPrefix";
   public static final String REWRITE_GENERATION = "rewriteGeneration";
+  public static final String FROM_SNAPSHOT = "fromSnapshot";
+  public static final String TO_SNAPSHOT = "toSnapshot";
+  public static final String TOKEN = "token";
+  public static final String PAGE_SIZE = "pageSize";
+  public static final String FORCE_FULL_DIFF = "forceFullDiff";
+  public static final String DISABLE_NATIVE_DIFF = "disableNativeDiff";
+  public static final String JOB_STATUS = "jobStatus";
 
   // For multi-tenancy
   public static final String TENANT_ID_USERNAME_DELIMITER = "$";

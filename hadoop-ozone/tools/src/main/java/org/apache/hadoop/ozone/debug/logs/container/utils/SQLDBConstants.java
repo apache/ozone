@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.debug.logs.container.utils;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+
 /**
  * Constants used for ContainerDatanodeDatabase.
  */
@@ -29,6 +32,11 @@ public final class SQLDBConstants {
   public static final int BATCH_SIZE = 2500;
   public static final String DATANODE_CONTAINER_LOG_TABLE_NAME = "DatanodeContainerLogTable";
   public static final String CONTAINER_LOG_TABLE_NAME = "ContainerLogTable";
+  public static final String CLOSED_STATE = HddsProtos.LifeCycleState.CLOSED.name();
+  public static final String DELETED_STATE = HddsProtos.LifeCycleState.DELETED.name();
+  public static final String UNHEALTHY_STATE = ReplicationManagerReport.HealthState.UNHEALTHY.name();
+  public static final String QUASI_CLOSED_STATE = HddsProtos.LifeCycleState.QUASI_CLOSED.name();
+
   public static final String CREATE_DATANODE_CONTAINER_LOG_TABLE = 
       "CREATE TABLE IF NOT EXISTS DatanodeContainerLogTable (datanode_id TEXT NOT NULL, " +
           "container_id INTEGER NOT NULL, timestamp TEXT NOT NULL, container_state TEXT, bcsid INTEGER, " +
@@ -75,6 +83,62 @@ public final class SQLDBConstants {
   public static final String SELECT_CONTAINER_DETAILS_OPEN_STATE = "SELECT d.timestamp, d.container_id, " +
       "d.datanode_id, d.container_state FROM DatanodeContainerLogTable d " +
       "WHERE d.container_id = ? AND d.container_state = 'OPEN' ORDER BY d.timestamp ASC;";
+  public static final String CREATE_DCL_STATE_CONTAINER_DATANODE_TIME_INDEX =
+      "CREATE INDEX IF NOT EXISTS idx_dcl_state_container_datanode_time " +
+          "ON DatanodeContainerLogTable(container_state, container_id, datanode_id, timestamp DESC);";
+  public static final String SELECT_REPLICATED_CONTAINERS =
+          "SELECT container_id, COUNT(DISTINCT datanode_id) AS replica_count\n" +
+                  "FROM ContainerLogTable\n" +
+                  "WHERE latest_state != '" + DELETED_STATE + "'\n" +
+                  " GROUP BY container_id\n" +
+                  "HAVING COUNT(DISTINCT datanode_id) {operator} ?";
+  public static final String SELECT_UNHEALTHY_CONTAINERS =
+      "SELECT u.container_id, COUNT(*) AS unhealthy_replica_count\n" +
+          "FROM (\n" +
+          "    SELECT container_id, datanode_id, MAX(timestamp) AS latest_unhealthy_timestamp\n" +
+          "    FROM DatanodeContainerLogTable\n" +
+          "    WHERE container_state = '" + UNHEALTHY_STATE + "'\n" +
+          "    GROUP BY container_id, datanode_id\n" +
+          ") AS u\n" +
+          "LEFT JOIN (\n" +
+          "    SELECT container_id, datanode_id, MAX(timestamp) AS latest_closed_timestamp\n" +
+          "    FROM DatanodeContainerLogTable\n" +
+          "    WHERE container_state IN ('" + CLOSED_STATE + "', '" + DELETED_STATE + "')\n" +
+          "    GROUP BY container_id, datanode_id\n" +
+          ") AS c\n" +
+          "ON u.container_id = c.container_id AND u.datanode_id = c.datanode_id\n" +
+          "WHERE c.latest_closed_timestamp IS NULL \n" +
+          "   OR u.latest_unhealthy_timestamp > c.latest_closed_timestamp\n" +
+              "GROUP BY u.container_id\n" +
+              "ORDER BY u.container_id";
+  public static final String SELECT_QUASI_CLOSED_STUCK_CONTAINERS =
+      "WITH quasi_closed_replicas AS ( " +
+          "    SELECT container_id, datanode_id, MAX(timestamp) AS latest_quasi_closed_timestamp\n" +
+          "    FROM DatanodeContainerLogTable " +
+          "    WHERE container_state = '" + QUASI_CLOSED_STATE + "'\n" +
+          "    GROUP BY container_id, datanode_id" +
+          "), " +
+          "container_with_enough_quasi_closed AS (\n" +
+          "    SELECT container_id\n" +
+          "    FROM quasi_closed_replicas\n" +
+          "    GROUP BY container_id\n" +
+          "    HAVING COUNT(DISTINCT datanode_id) >= 3\n" +
+          "),\n" +
+          "closed_or_deleted AS (\n" +
+          "    SELECT container_id, datanode_id, MAX(timestamp) AS latest_closed_timestamp\n" +
+          "    FROM DatanodeContainerLogTable\n" +
+          "    WHERE container_state IN ('" + CLOSED_STATE + "', '" + DELETED_STATE + "')\n" +
+          "    GROUP BY container_id, datanode_id\n" +
+          ")\n" +
+          "SELECT q.container_id, COUNT(*) AS quasi_closed_replica_count\n" +
+          "FROM quasi_closed_replicas q\n" +
+          "JOIN container_with_enough_quasi_closed qc ON q.container_id = qc.container_id\n" +
+          "LEFT JOIN closed_or_deleted c \n" +
+          "    ON q.container_id = c.container_id AND q.datanode_id = c.datanode_id\n" +
+          "WHERE c.latest_closed_timestamp IS NULL\n" +
+          "   OR q.latest_quasi_closed_timestamp > c.latest_closed_timestamp\n" +
+              "GROUP BY q.container_id\n" +
+              "ORDER BY q.container_id";
   
   private SQLDBConstants() {
     //Never constructed

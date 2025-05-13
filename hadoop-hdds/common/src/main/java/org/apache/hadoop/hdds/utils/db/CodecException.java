@@ -15,39 +15,23 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.replicas.chunk;
+package org.apache.hadoop.hdds.utils.db;
+
+import java.io.IOException;
 
 /**
- * Class that gives chunkDetails.
+ * Exceptions thrown from the {@link Codec} subclasses.
  */
-public class ChunkDetails {
-  private String chunkName;
-  private long chunkOffset;
-
-  public String getChunkName() {
-    return chunkName;
+public class CodecException extends IOException {
+  public CodecException(String message, Throwable cause) {
+    super(message, cause);
   }
 
-  public void setChunkName(String chunkName) {
-    this.chunkName = chunkName;
+  public CodecException(String message) {
+    super(message);
   }
 
-  @Override
-    public String toString() {
-    return "{"
-            + "chunkName='"
-            + chunkName
-            + '\''
-            + ", chunkOffset="
-            + chunkOffset
-            + '}';
-  }
-
-  public long getChunkOffset() {
-    return chunkOffset;
-  }
-
-  public void setChunkOffset(long chunkOffset) {
-    this.chunkOffset = chunkOffset;
+  public CodecException() {
+    super();
   }
 }

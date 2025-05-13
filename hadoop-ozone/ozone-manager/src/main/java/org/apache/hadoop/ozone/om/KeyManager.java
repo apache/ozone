@@ -150,6 +150,12 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
       long volumeId, OmBucketInfo bucketInfo, OmKeyInfo directoryInfo) throws IOException;
 
   /**
+   * Returns the previous snapshot's ozone keyInfo corresponding for the object.
+   */
+  CheckedFunction<KeyManager, OmKeyInfo, IOException> getPreviousSnapshotOzoneKeyInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmKeyInfo keyInfo) throws IOException;
+
+  /**
    * Returns a list deleted entries from the deletedTable.
    *
    * @param size max number of keys to return.
