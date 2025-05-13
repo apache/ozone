@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.utils.RocksDBStoreMetrics.ROCKSDB_CONTEXT_P
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -36,6 +38,10 @@ public final class PrometheusMetricsSinkUtil {
       Pattern.compile("(?<!(^|[A-Z_]))(?=[A-Z])|(?<!^)(?=[A-Z][a-z])");
   private static final Pattern REPLACE_PATTERN =
       Pattern.compile("[^a-zA-Z0-9]+");
+
+  // Original metric name -> Normalized Prometheus metric name
+  private static final ConcurrentMap<String, String> NORMALIZED_NAME_CACHE =
+      new ConcurrentHashMap<>();
 
   /**
    * Never constructed.
@@ -99,9 +105,11 @@ public final class PrometheusMetricsSinkUtil {
    * @return normalized name.
    */
   private static String normalizeName(String baseName) {
-    String[] parts = SPLIT_PATTERN.split(baseName);
-    String result = String.join("_", parts).toLowerCase();
-    return REPLACE_PATTERN.matcher(result).replaceAll("_");
+    return NORMALIZED_NAME_CACHE.computeIfAbsent(baseName, k -> {
+      String[] parts = SPLIT_PATTERN.split(baseName);
+      String result = String.join("_", parts).toLowerCase();
+      return REPLACE_PATTERN.matcher(result).replaceAll("_");
+    });
   }
 
   public static String getMetricName(String recordName, String metricName) {
