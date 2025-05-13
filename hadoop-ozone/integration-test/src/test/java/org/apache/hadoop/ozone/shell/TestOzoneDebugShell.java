@@ -216,10 +216,10 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
       ObjectMapper objectMapper = new ObjectMapper();
       // Parse the JSON array string into a JsonNode
       JsonNode jsonNode = objectMapper.readTree(output);
-      JsonNode keyLocations = jsonNode.get("KeyLocations").get(0);
+      JsonNode keyLocations = jsonNode.get("keyLocations").get(0);
       for (JsonNode element : keyLocations) {
         String fileName =
-            element.get("Locations").get("files").get(0).toString();
+            element.get("file").toString();
         blockFilePaths.add(fileName);
       }
       // DN storage directories are set differently for each DN

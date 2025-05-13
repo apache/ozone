@@ -2567,5 +2567,4 @@ abstract class AbstractRootedOzoneFileSystemTest {
       fs.delete(new Path(base, key));
     }
   }
-
 }
