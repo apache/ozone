@@ -21,15 +21,10 @@ jobs:
   debug:
     runs-on: ubuntu-24.04
     steps:
-      - run: sudo netstat -vatnp | grep LISTEN
-        continue-on-error: true
-      - run: hostname -f
-        continue-on-error: true
-      - run: nslookup $(hostname -f)
-        continue-on-error: true
-      - run: nc -z 127.0.0.1 22
-        continue-on-error: true
-      - run: nc -z $(hostname -f) 22
-        continue-on-error: true
-      - run: nc -z 0.0.0.0 22
-        continue-on-error: true
+      - run: |
+          # listen
+          nc -l 0.0.0.0 12345 &
+          # check if can connect
+          nc -z 127.0.0.1 12345
+          nc -z $(hostname -f) 12345
+          nc -z 0.0.0.0 12345
