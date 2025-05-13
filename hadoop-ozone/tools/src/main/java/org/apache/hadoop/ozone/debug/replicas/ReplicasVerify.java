@@ -80,7 +80,7 @@ public class ReplicasVerify extends Handler {
     if (verification.doExecuteBlockExistence) {
       replicaVerifiers.add(new BlockExistenceVerifier(getConf()));
     }
-    if (verification.doExecuteContainerState) {
+    if (verification.doExecuteReplicaState) {
       replicaVerifiers.add(new ReplicaStateVerifier(getConf()));
     }
 
@@ -225,11 +225,11 @@ public class ReplicasVerify extends Handler {
         defaultValue = "false")
     private boolean doExecuteBlockExistence;
 
-    @CommandLine.Option(names = "--container-state",
-        description = "Check the container and replica states",
-        // value will be true only if the "--container-state" option was specified on the CLI
+    @CommandLine.Option(names = "--replica-state",
+        description = "Check the container and replica states. " +
+            "Replicas in [DELETED, UNHEALTHY, INVALID] states fail the check.",
         defaultValue = "false")
-    private boolean doExecuteContainerState;
+    private boolean doExecuteReplicaState;
 
   }
 }

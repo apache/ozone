@@ -75,6 +75,14 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
       ContainerInfo containerInfo = containerInfoToken.getContainerInfo();
 
       ContainerDataProto containerData = getContainerData(datanode, keyLocation, replicaIndex, containerInfoToken);
+      ContainerDataProto.State state = containerData.getState();
+      if (state == ContainerDataProto.State.UNHEALTHY ||
+          state == ContainerDataProto.State.INVALID ||
+          state == ContainerDataProto.State.DELETED) {
+        replicaCheckMsg.append(state.name());
+      } else {
+        pass = true;
+      }
       if (containerData.getState().equals(ContainerDataProto.State.UNHEALTHY)) {
         replicaCheckMsg.append("UNHEALTHY");
       } else if (containerData.getState().equals(ContainerDataProto.State.INVALID)) {
@@ -108,7 +116,9 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
     // Cache miss - fetch and store
     ContainerDataProto data = fetchContainerDataFromDatanode(dn, containerId, keyLocation,
         replicaIndex, containerInfoToken);
-    containerDataCache.put(key, data);
+    if (data != null) {
+      containerDataCache.put(key, data);
+    }
     return data;
   }
 
