@@ -88,9 +88,9 @@ public class TestSCMBlockDeletingService {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(
         datanodeDetails);
     DeletedBlocksTransaction tx1 = createTestDeleteTxn(1, Arrays.asList(1L), 1);
-    ddbt.addTransactionToDN(datanode1.getUuid(), tx1);
-    ddbt.addTransactionToDN(datanode2.getUuid(), tx1);
-    ddbt.addTransactionToDN(datanode3.getUuid(), tx1);
+    ddbt.addTransactionToDN(datanode1.getID(), tx1);
+    ddbt.addTransactionToDN(datanode2.getID(), tx1);
+    ddbt.addTransactionToDN(datanode3.getID(), tx1);
     DeletedBlockLog mockDeletedBlockLog = mock(DeletedBlockLog.class);
     when(mockDeletedBlockLog.getTransactions(
         anyInt(), anySet())).thenReturn(ddbt);
