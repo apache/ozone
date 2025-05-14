@@ -141,9 +141,11 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     if (pipeline.getType() != HddsProtos.ReplicationType.RATIS ||
         ((RatisReplicationConfig) pipeline.getReplicationConfig()).getReplicationFactor() !=
             HddsProtos.ReplicationFactor.THREE) {
-      SCMSafeModeManager.getLogger().warn(
-          "Skipping pipeline safemode report processing as Replication type isn't RATIS " +
-              "or replication factor isn't 3.");
+      Logger safeModeManagerLog = SCMSafeModeManager.getLogger();
+      if (safeModeManagerLog.isDebugEnabled()) {
+        safeModeManagerLog.debug("Skipping pipeline safemode report processing as Replication type isn't RATIS " +
+            "or replication factor isn't 3.");
+      }
       return;
     }
 
