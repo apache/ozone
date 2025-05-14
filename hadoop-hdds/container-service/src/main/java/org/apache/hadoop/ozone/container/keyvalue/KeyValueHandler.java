@@ -508,7 +508,7 @@ public class KeyValueHandler extends Handler {
   }
 
   private void populateContainerPathFields(KeyValueContainer container,
-                                           HddsVolume hddsVolume) throws IOException {
+      HddsVolume hddsVolume) throws IOException {
     volumeSet.readLock();
     try {
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
@@ -982,7 +982,7 @@ public class KeyValueHandler extends Handler {
     if (validateChunkChecksumData) {
       try {
         if (data instanceof ChunkBuffer) {
-          final ChunkBuffer b = (ChunkBuffer) data;
+          final ChunkBuffer b = (ChunkBuffer)data;
           Checksum.verifyChecksum(b.duplicate(b.position(), b.limit()), info.getChecksumData(), 0);
         } else {
           Checksum.verifyChecksum(data.toByteString(byteBufferToByteString), info.getChecksumData(), 0);
@@ -1101,7 +1101,6 @@ public class KeyValueHandler extends Handler {
   /**
    * Handle Put Block operation for closed container. Calls BlockManager to process the request.
    * This is primarily used by container reconciliation process to persist the block data for closed container.
-   *
    * @param kvContainer           - Container for which block data need to be persisted.
    * @param blockData             - Block Data to be persisted (BlockData should have the chunks).
    * @param blockCommitSequenceId - Block Commit Sequence ID for the block.
@@ -1267,7 +1266,6 @@ public class KeyValueHandler extends Handler {
 
   /**
    * Check if container is open. Throw exception otherwise.
-   *
    * @param kvContainer
    * @throws StorageContainerException
    */
@@ -1312,7 +1310,6 @@ public class KeyValueHandler extends Handler {
 
   /**
    * Check if container is Closed.
-   *
    * @param kvContainer
    */
   private boolean checkContainerClose(KeyValueContainer kvContainer) {
@@ -1326,8 +1323,9 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public Container importContainer(ContainerData originalContainerData,
-                                   final InputStream rawContainerStream,
-                                   final TarContainerPacker packer) throws IOException {
+      final InputStream rawContainerStream,
+      final TarContainerPacker packer)
+      throws IOException {
     Preconditions.checkState(originalContainerData instanceof
         KeyValueContainerData, "Should be KeyValueContainerData instance");
 

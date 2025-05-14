@@ -44,7 +44,7 @@ public class BackgroundContainerDataScanner extends
   private final Canceler canceler;
   private static final String NAME_FORMAT = "ContainerDataScanner(%s)";
   private final ContainerDataScannerMetrics metrics;
-  private final ContainerScanHelper scannerMixin;
+  private final ContainerScanHelper scanHelper;
 
   public BackgroundContainerDataScanner(ContainerScannerConfiguration conf,
                                         ContainerController controller,
@@ -56,7 +56,7 @@ public class BackgroundContainerDataScanner extends
     canceler = new Canceler();
     this.metrics = ContainerDataScannerMetrics.create(volume.toString());
     this.metrics.setStorageDirectory(volume.toString());
-    this.scannerMixin = new ContainerScanHelper(LOG, controller, metrics, conf);
+    this.scanHelper = new ContainerScanHelper(LOG, controller, metrics, conf);
   }
 
   @Override
@@ -68,7 +68,7 @@ public class BackgroundContainerDataScanner extends
       shutdown("The volume has failed.");
       return;
     }
-    scannerMixin.scanData(c, throttler, canceler);
+    scanHelper.scanData(c, throttler, canceler);
   }
 
   @Override

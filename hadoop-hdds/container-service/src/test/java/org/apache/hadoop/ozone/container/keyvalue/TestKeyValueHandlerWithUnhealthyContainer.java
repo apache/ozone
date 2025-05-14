@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestBlock
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.mock;
@@ -249,6 +250,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     // unhealthy.
     hddsVolume.setState(StorageVolume.VolumeState.NORMAL);
     handler.markContainerUnhealthy(container, ContainerTestUtils.getUnhealthyDataScanResult());
+    assertTrue(ContainerChecksumTreeManager.checksumFileExist(container));
     verify(mockIcrSender, atMostOnce()).send(any());
   }
 

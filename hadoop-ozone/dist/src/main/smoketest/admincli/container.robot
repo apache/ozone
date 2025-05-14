@@ -150,7 +150,6 @@ Close container
     Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
 
 Reconcile closed container
-<<<<<<< HEAD
     ${container} =      Execute          ozone admin container list --state CLOSED | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
     ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
     # Once the container is closed, the data checksum should be populated

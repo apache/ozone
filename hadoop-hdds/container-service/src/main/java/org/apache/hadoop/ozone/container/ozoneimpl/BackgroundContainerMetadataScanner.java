@@ -35,14 +35,14 @@ public class BackgroundContainerMetadataScanner extends
       LoggerFactory.getLogger(BackgroundContainerMetadataScanner.class);
   private final ContainerMetadataScannerMetrics metrics;
   private final ContainerController controller;
-  private final ContainerScanHelper scannerMixin;
+  private final ContainerScanHelper scanHelper;
 
   public BackgroundContainerMetadataScanner(ContainerScannerConfiguration conf,
                                             ContainerController controller) {
     super("ContainerMetadataScanner", conf.getMetadataScanInterval());
     this.controller = controller;
     this.metrics = ContainerMetadataScannerMetrics.create();
-    this.scannerMixin = new ContainerScanHelper(LOG, controller, metrics, conf);
+    this.scanHelper = new ContainerScanHelper(LOG, controller, metrics, conf);
   }
 
   @Override
@@ -54,7 +54,7 @@ public class BackgroundContainerMetadataScanner extends
   @Override
   public void scanContainer(Container<?> container)
       throws IOException, InterruptedException {
-    if (!scannerMixin.shouldScanMetadata(container)) {
+    if (!scanHelper.shouldScanMetadata(container)) {
       return;
     }
 
@@ -66,7 +66,7 @@ public class BackgroundContainerMetadataScanner extends
       return;
     }
     if (!result.isHealthy()) {
-      scannerMixin.handleUnhealthyScanResult(containerID, result);
+      scanHelper.handleUnhealthyScanResult(containerID, result);
     }
 
     // Do not update the scan timestamp after the scan since this was just a

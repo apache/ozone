@@ -88,7 +88,7 @@ public class ContainerScanHelper {
     }
 
     // Only increment the number of unhealthy containers if the container was not already unhealthy.
-    // TODO HDDS-11593 (to be merged in to the feature branch from master): Scanner counters will start from zero
+    // TODO HDDS-11593: Scanner counters will start from zero
     //  at the beginning of each run, so this will need to be incremented for every unhealthy container seen
     //  regardless of its previous state.
     boolean containerMarkedUnhealthy = controller.markContainerUnhealthy(containerID, result);
@@ -109,8 +109,7 @@ public class ContainerScanHelper {
       return false;
     }
 
-//    return !recentlyScanned(container.getContainerData());
-    return true;
+    return !recentlyScanned(container.getContainerData());
   }
 
   public boolean shouldScanData(Container<?> container) {
