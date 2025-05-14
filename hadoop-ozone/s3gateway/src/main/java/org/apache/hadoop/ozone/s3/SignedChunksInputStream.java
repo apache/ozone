@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.eol;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -119,10 +120,10 @@ public class SignedChunksInputStream extends InputStream {
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
-    if (b == null) {
-      throw new NullPointerException();
-    } else if (off < 0 || len < 0 || len > b.length - off) {
-      throw new IndexOutOfBoundsException();
+    Objects.requireNonNull(b, "b == null");
+    if (off < 0 || len < 0 || len > b.length - off) {
+      throw new IndexOutOfBoundsException("Offset=" + off + " and len="
+          + len + " don't match the array length of " + b.length);
     } else if (len == 0) {
       return 0;
     } else if (isFinalChunkEncountered) {

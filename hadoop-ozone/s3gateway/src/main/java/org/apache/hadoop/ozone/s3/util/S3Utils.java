@@ -27,12 +27,12 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOA
 import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Arrays;
+import java.util.Objects;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -137,13 +137,13 @@ public final class S3Utils {
   }
 
   public static boolean hasUnsignedPayload(@Nonnull String amzContentSha256Header) {
-    Preconditions.checkNotNull(amzContentSha256Header);
+    Objects.requireNonNull(amzContentSha256Header);
     return amzContentSha256Header.equals(UNSIGNED_PAYLOAD) ||
         amzContentSha256Header.equals(STREAMING_UNSIGNED_PAYLOAD_TRAILER);
   }
 
   public static boolean hasMultiChunksPayload(@Nonnull String amzContentSha256Header) {
-    Preconditions.checkNotNull(amzContentSha256Header);
+    Objects.requireNonNull(amzContentSha256Header);
     // Multiple chunk uploads
     // - https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming.html
     // - https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming-trailers.html
