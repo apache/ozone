@@ -198,9 +198,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
      */
     private int processDeletedKeysForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
                                            int remainNum) throws IOException {
-      String volume = currentSnapshotInfo == null ? null : currentSnapshotInfo.getVolumeName();
-      String bucket = currentSnapshotInfo == null ? null : currentSnapshotInfo.getBucketName();
-      String snapshotTableKey = currentSnapshotInfo == null ? null : currentSnapshotInfo.getTableKey();
+      String volume = null, bucket = null, snapshotTableKey = null;
+      if (currentSnapshotInfo != null) {
+        volume = currentSnapshotInfo.getVolumeName();
+        bucket = currentSnapshotInfo.getBucketName();
+        snapshotTableKey = currentSnapshotInfo.getTableKey();
+      }
 
       String startKey = null;
       boolean successStatus = true;
@@ -225,15 +228,16 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         try (ReclaimableKeyFilter reclaimableKeyFilter = new ReclaimableKeyFilter(getOzoneManager(),
             omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock)) {
           // Get pending keys that can be deleted
-          PendingKeysDeletion pendingKeysDeletion = keyManager.getPendingDeletionKeys(volume, bucket, startKey,
-              reclaimableKeyFilter, remainNum);
+          PendingKeysDeletion pendingKeysDeletion = currentSnapshotInfo == null
+              ? keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum)
+              : keyManager.getPendingDeletionKeys(volume, bucket, startKey, reclaimableKeyFilter, remainNum);
           List<BlockGroup> keyBlocksList = pendingKeysDeletion.getKeyBlocksList();
           //submit purge requests if there are renamed entries to be purged or keys to be purged.
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
             // Validating if the previous snapshot is still the same before purging the blocks.
             SnapshotUtils.validatePreviousSnapshotId(currentSnapshotInfo, snapshotChainManager,
                 expectedPreviousSnapshotId);
-            Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, keyManager,
+            Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList,
                  pendingKeysDeletion.getKeysToModify(), snapshotTableKey,
                  expectedPreviousSnapshotId);
             remainNum -= purgeResult.getKey();

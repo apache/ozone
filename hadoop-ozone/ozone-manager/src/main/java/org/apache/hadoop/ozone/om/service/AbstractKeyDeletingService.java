@@ -102,7 +102,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   protected Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
-      KeyManager manager,
       Map<String, RepeatedOmKeyInfo> keysToModify,
       String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
 
