@@ -19,4 +19,4 @@
  * Classes used for Ozone Container Log parser tool.
  */
 
-package org.apache.hadoop.ozone.containerlog.parser;
+package org.apache.hadoop.ozone.debug.logs.container.utils;

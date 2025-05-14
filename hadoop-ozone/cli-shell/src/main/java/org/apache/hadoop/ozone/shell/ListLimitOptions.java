@@ -19,48 +19,29 @@ package org.apache.hadoop.ozone.shell;
 
 import picocli.CommandLine;
 
-/**
- * Common options for 'list' commands.
- */
-public class ListOptions {
+/** Options for limiting the size of lists.  Use with {@link CommandLine.Mixin}. */
+public class ListLimitOptions {
 
-  @CommandLine.ArgGroup(exclusive = true)
-  private ExclusiveLimit exclusiveLimit = new ExclusiveLimit();
+  @CommandLine.ArgGroup
+  private ExclusiveGroup group = new ExclusiveGroup();
 
-  @CommandLine.Option(names = {"--start", "-s"},
-      description = "The item to start the listing from.\n" +
-          "This will be excluded from the result.")
-  private String startItem;
-
-  @CommandLine.Option(names = {"--prefix", "-p"},
-      description = "Prefix to filter the items")
-  private String prefix;
+  public boolean isAll() {
+    return group.all;
+  }
 
   public int getLimit() {
-    if (exclusiveLimit.all) {
+    if (group.all) {
       return Integer.MAX_VALUE;
     }
-    if (exclusiveLimit.limit < 1) {
+    if (group.limit < 1) {
       throw new IllegalArgumentException(
           "List length should be a positive number");
     }
 
-    return exclusiveLimit.limit;
+    return group.limit;
   }
 
-  public boolean isAll() {
-    return exclusiveLimit.all;
-  }
-
-  public String getStartItem() {
-    return startItem;
-  }
-
-  public String getPrefix() {
-    return prefix;
-  }
-
-  static class ExclusiveLimit {
+  static class ExclusiveGroup {
     @CommandLine.Option(names = {"--length", "-l"},
         description = "Maximum number of items to list",
         defaultValue = "100",

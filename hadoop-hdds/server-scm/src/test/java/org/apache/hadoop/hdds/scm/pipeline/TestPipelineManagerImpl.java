@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -358,8 +359,8 @@ public class TestPipelineManagerImpl {
   public void testPipelineReport() throws Exception {
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(conf,
-          mock(ContainerManager.class), pipelineManager, mock(NodeManager.class),
-          new EventQueue(), serviceManager, scmContext);
+          mock(NodeManager.class), pipelineManager, mock(ContainerManager.class),
+          serviceManager, new EventQueue(), scmContext);
       Pipeline pipeline = pipelineManager
           .createPipeline(RatisReplicationConfig
               .getInstance(ReplicationFactor.THREE));
@@ -468,8 +469,8 @@ public class TestPipelineManagerImpl {
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
     SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(new OzoneConfiguration(),
-        mock(ContainerManager.class), pipelineManager, mock(NodeManager.class),
-        new EventQueue(), serviceManager, scmContext);
+        mock(NodeManager.class), pipelineManager, mock(ContainerManager.class),
+        serviceManager, new EventQueue(), scmContext);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,
             SCMContext.emptyContext(), conf);
@@ -612,7 +613,7 @@ public class TestPipelineManagerImpl {
         TimeUnit.MILLISECONDS);
 
     scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, false));
+        SCMSafeModeManager.SafeModeStatus.of(true, false));
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     assertThrows(IOException.class,
@@ -633,7 +634,7 @@ public class TestPipelineManagerImpl {
 
     // Simulate safemode check exiting.
     scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+        SCMSafeModeManager.SafeModeStatus.of(true, true));
     GenericTestUtils.waitFor(() -> !pipelineManager.getPipelines().isEmpty(),
         100, 10000);
     pipelineManager.close();
@@ -649,20 +650,20 @@ public class TestPipelineManagerImpl {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
 
     scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, false));
+        SCMSafeModeManager.SafeModeStatus.of(true, false));
     assertTrue(pipelineManager.getSafeModeStatus());
     assertFalse(pipelineManager.isPipelineCreationAllowed());
 
     // First pass pre-check as true, but safemode still on
     // Simulate safemode check exiting.
     scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+        SCMSafeModeManager.SafeModeStatus.of(true, true));
     assertTrue(pipelineManager.getSafeModeStatus());
     assertTrue(pipelineManager.isPipelineCreationAllowed());
 
     // Then also turn safemode off
     scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(false, true));
+        SCMSafeModeManager.SafeModeStatus.of(false, true));
     assertFalse(pipelineManager.getSafeModeStatus());
     assertTrue(pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();
@@ -945,7 +946,7 @@ public class TestPipelineManagerImpl {
           .setContainerState(StorageContainerDatanodeProtocolProtos
               .ContainerReplicaProto.State.CLOSED)
           .setKeyCount(1)
-          .setOriginNodeId(UUID.randomUUID())
+          .setOriginNodeId(DatanodeID.randomID())
           .setSequenceId(1)
           .setReplicaIndex(0)
           .setDatanodeDetails(dn)

@@ -647,9 +647,14 @@ public class ObjectEndpoint extends EndpointBase {
       throw ex;
     }
 
+    S3StorageType s3StorageType = key.getReplicationConfig() == null ?
+        S3StorageType.STANDARD :
+        S3StorageType.fromReplicationConfig(key.getReplicationConfig());
+
     ResponseBuilder response = Response.ok().status(HttpStatus.SC_OK)
         .header("Content-Length", key.getDataSize())
-        .header("Content-Type", "binary/octet-stream");
+        .header("Content-Type", "binary/octet-stream")
+        .header(STORAGE_CLASS_HEADER, s3StorageType.toString());
 
     String eTag = key.getMetadata().get(ETAG);
     if (eTag != null) {
