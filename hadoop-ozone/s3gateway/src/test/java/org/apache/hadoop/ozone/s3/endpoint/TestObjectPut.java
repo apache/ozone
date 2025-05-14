@@ -676,7 +676,7 @@ class TestObjectPut {
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
         BUCKET_NAME, KEY_NAME, CONTENT.length(), 1, null, null, null, body));
-    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getErrorMessage(),
+    assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getErrorMessage(),
         e.getErrorMessage());
     assertEquals("random", e.getResource());
   }
