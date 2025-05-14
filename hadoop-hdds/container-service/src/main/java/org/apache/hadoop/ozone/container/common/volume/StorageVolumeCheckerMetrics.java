@@ -29,7 +29,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
  * This class captures the volume scanner metrics on the data-node.
  **/
 @InterfaceAudience.Private
-@Metrics(about = "Datanode volume scanner metrics", context = "dfs")
+@Metrics(about = "Datanode storage volume checker metrics", context = "dfs")
 public class StorageVolumeCheckerMetrics {
   private final String name;
   private final MetricsSystem ms;
@@ -53,7 +53,7 @@ public class StorageVolumeCheckerMetrics {
 
   public static StorageVolumeCheckerMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String name = "Volume scanner metrics";
+    String name = "StorageVolumeCheckerMetrics";
     return ms.register(name, null, new StorageVolumeCheckerMetrics(name, ms));
   }
 
