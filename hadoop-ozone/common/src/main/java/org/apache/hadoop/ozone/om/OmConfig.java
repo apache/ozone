@@ -19,12 +19,16 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
 import java.time.Duration;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 
 /**
  * Ozone Manager configuration.
@@ -81,6 +85,27 @@ public class OmConfig extends ReconfigurableConfig {
   )
   private long ratisBasedFinalizationTimeout = Duration.ofSeconds(30).getSeconds();
 
+  // OM Default user/group permissions
+  @Config(key = "user.rights",
+      defaultValue = "ALL",
+      type = ConfigType.STRING,
+      tags = {ConfigTag.OM, ConfigTag.SECURITY},
+      description = "Default user permissions set for an object in " +
+          "OzoneManager."
+  )
+  private String userDefaultRights;
+  private Set<ACLType> userDefaultRightSet;
+
+  @Config(key = "group.rights",
+      defaultValue = "READ, LIST",
+      type = ConfigType.STRING,
+      tags = {ConfigTag.OM, ConfigTag.SECURITY},
+      description = "Default group permissions set for an object in " +
+          "OzoneManager."
+  )
+  private String groupDefaultRights;
+  private Set<ACLType> groupDefaultRightSet;
+
   public long getRatisBasedFinalizationTimeout() {
     return ratisBasedFinalizationTimeout;
   }
@@ -111,6 +136,32 @@ public class OmConfig extends ReconfigurableConfig {
     validate();
   }
 
+  public Set<ACLType> getUserDefaultRights() {
+    if (userDefaultRightSet == null) {
+      userDefaultRightSet = getUserDefaultRightSet();
+    }
+    return userDefaultRightSet;
+  }
+
+  private Set<ACLType> getUserDefaultRightSet() {
+    return userDefaultRights == null
+        ? Collections.singleton(ACLType.ALL)
+        : ACLType.parseList(userDefaultRights);
+  }
+
+  public Set<ACLType> getGroupDefaultRights() {
+    if (groupDefaultRightSet == null) {
+      groupDefaultRightSet = getGroupDefaultRightSet();
+    }
+    return groupDefaultRightSet;
+  }
+
+  private Set<ACLType> getGroupDefaultRightSet() {
+    return groupDefaultRights == null
+        ? Collections.unmodifiableSet(EnumSet.of(ACLType.READ, ACLType.LIST))
+        : ACLType.parseList(groupDefaultRights);
+  }
+
   @PostConstruct
   public void validate() {
     if (maxListSize <= 0) {
@@ -119,6 +170,9 @@ public class OmConfig extends ReconfigurableConfig {
 
     Preconditions.checkArgument(this.maxUserVolumeCount > 0,
         Keys.USER_MAX_VOLUME + " value should be greater than zero");
+
+    userDefaultRightSet = getUserDefaultRightSet();
+    groupDefaultRightSet = getGroupDefaultRightSet();
   }
 
   public OmConfig copy() {
@@ -131,6 +185,10 @@ public class OmConfig extends ReconfigurableConfig {
     fileSystemPathEnabled = other.fileSystemPathEnabled;
     maxListSize = other.maxListSize;
     maxUserVolumeCount = other.maxUserVolumeCount;
+    userDefaultRights = other.userDefaultRights;
+    groupDefaultRights = other.groupDefaultRights;
+
+    validate();
   }
 
   /**
