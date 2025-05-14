@@ -211,15 +211,7 @@ public class ContainerReader implements Runnable {
             config);
         if (kvContainer.getContainerState() == RECOVERING) {
           if (shouldDelete) {
-            // delete Ratis replicated RECOVERING containers
-            if (kvContainer.getContainerData().getReplicaIndex() == 0) {
-              cleanupContainer(hddsVolume, kvContainer);
-            } else {
-              kvContainer.markContainerUnhealthy();
-              LOG.info("Stale recovering container {} marked UNHEALTHY",
-                  kvContainerData.getContainerID());
-              containerSet.addContainer(kvContainer);
-            }
+            cleanupContainer(hddsVolume, kvContainer);
           }
           return;
         }
