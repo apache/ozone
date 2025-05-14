@@ -25,10 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -36,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -281,6 +284,16 @@ public class TestOnDemandContainerDataScanner extends
     assertEquals(2, metrics.getNumContainersScanned());
     // numUnHealthyContainers metrics is not incremented in the 2nd iteration.
     assertEquals(1, metrics.getNumUnHealthyContainers());
+  }
+
+  @Test
+  @Override
+  public void testChecksumUpdateFailure() throws Exception {
+    doThrow(new IOException("Checksum update error for testing")).when(controller)
+        .updateContainerChecksum(anyLong(), any());
+    scanContainer(corruptData);
+    verifyContainerMarkedUnhealthy(corruptData, atMostOnce());
+    verify(corruptData.getContainerData(), atMostOnce()).setState(UNHEALTHY);
   }
 
   @Test

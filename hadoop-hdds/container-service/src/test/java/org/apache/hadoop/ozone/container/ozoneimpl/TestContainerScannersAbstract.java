@@ -124,6 +124,13 @@ public abstract class TestContainerScannersAbstract {
   @Test
   public abstract void testUnhealthyContainerRescanned() throws Exception;
 
+  /**
+   * When the container checksum cannot be updated, the scan should still complete and move the container state without
+   * throwing an exception.
+   */
+  @Test
+  public abstract void testChecksumUpdateFailure() throws Exception;
+
   // HELPER METHODS
 
   protected void setScannedTimestampOld(Container<ContainerData> container) {

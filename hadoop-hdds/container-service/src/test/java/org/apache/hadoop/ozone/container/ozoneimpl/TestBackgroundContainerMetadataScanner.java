@@ -24,15 +24,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -161,6 +164,20 @@ public class TestBackgroundContainerMetadataScanner extends
     assertEquals(4, metrics.getNumContainersScanned());
     // numUnHealthyContainers metrics is not incremented in the 2nd iteration.
     assertEquals(1, metrics.getNumUnHealthyContainers());
+  }
+
+  /**
+   * Metadata scanner should not update container checksum, so any errors that may be injected here should have no
+   * effect.
+   */
+  @Test
+  @Override
+  public void testChecksumUpdateFailure() throws Exception {
+    doThrow(new IOException("Checksum update error for testing")).when(controller)
+        .updateContainerChecksum(anyLong(), any());
+    scanner.runIteration();
+    verifyContainerMarkedUnhealthy(openCorruptMetadata, atMostOnce());
+    verify(openCorruptMetadata.getContainerData(), atMostOnce()).setState(UNHEALTHY);
   }
 
   /**
