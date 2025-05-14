@@ -104,7 +104,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   protected Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
       KeyManager manager,
       Map<String, RepeatedOmKeyInfo> keysToModify,
-      List<String> renameEntries,
       String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
 
     long startTime = Time.monotonicNow();
@@ -127,7 +126,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     if (blockDeletionResults != null) {
       long purgeStartTime = Time.monotonicNow();
       purgeResult = submitPurgeKeysRequest(blockDeletionResults,
-          keysToModify, renameEntries, snapTableKey, expectedPreviousSnapshotId);
+          keysToModify, snapTableKey, expectedPreviousSnapshotId);
       int limit = ozoneManager.getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
@@ -144,7 +143,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
   private Pair<Integer, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-      Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntriesToBeDeleted,
+      Map<String, RepeatedOmKeyInfo> keysToModify,
       String snapTableKey, UUID expectedPreviousSnapshotId) {
     Map<Pair<String, String>, List<String>> purgeKeysMapPerBucket = new HashMap<>();
 
@@ -196,11 +195,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           .build();
       purgeKeysRequest.addDeletedKeys(deletedKeysInBucket);
     }
-    // Adding rename entries to be purged.
-    if (renameEntriesToBeDeleted != null) {
-      purgeKeysRequest.addAllRenamedKeys(renameEntriesToBeDeleted);
-    }
-
 
     List<SnapshotMoveKeyInfos> keysToUpdateList = new ArrayList<>();
     if (keysToModify != null) {
@@ -629,10 +623,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   @VisibleForTesting
   public AtomicLong getRunCount() {
     return runCount;
-  }
-
-  public AtomicLong getCallId() {
-    return callId;
   }
 
   /**
