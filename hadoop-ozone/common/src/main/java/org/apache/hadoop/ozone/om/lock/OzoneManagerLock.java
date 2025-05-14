@@ -668,6 +668,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
 
     Resource(String name) {
+      this.lockLevel = -1;
       this.name = name;
       this.mask = 0;
       this.setMask = 0;
@@ -685,7 +686,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
           && setMask <= lockSetVal) {
         return false;
       }
-
 
       // Our mask is the summation of bits of all previous possible locks. In
       // other words it is the largest possible value for that bit position.
@@ -723,7 +723,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
      * @param lockSetVal
      */
     boolean isLevelLocked(short lockSetVal) {
-      return (lockSetVal & setMask) == setMask;
+      return setMask != 0 && (lockSetVal & setMask) == setMask;
     }
 
     String getName() {
