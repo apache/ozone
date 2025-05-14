@@ -67,7 +67,9 @@ public class TestOmSnapshotInfo {
         .setReferencedSize(2000L)
         .setReferencedReplicatedSize(6000L)
         .setExclusiveSize(1000L)
+        .setExclusiveSizeDeltaFromDirDeepCleaning(2000L)
         .setExclusiveReplicatedSize(3000L)
+        .setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(6000L)
         .setDeepCleanedDeletedDir(false)
         .build();
   }
@@ -92,6 +94,8 @@ public class TestOmSnapshotInfo {
         .setReferencedReplicatedSize(6000L)
         .setExclusiveSize(1000L)
         .setExclusiveReplicatedSize(3000L)
+        .setExclusiveSizeDeltaFromDirDeepCleaning(2000L)
+        .setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(6000L)
         .setDeepCleanedDeletedDir(false)
         .build();
   }
@@ -179,7 +183,10 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getExclusiveReplicatedSize());
     assertEquals(snapshotInfoExpected.getDeepCleanedDeletedDir(),
         snapshotInfoActual.getDeepCleanedDeletedDir());
-
+    assertEquals(snapshotInfoExpected.getExclusiveSizeDeltaFromDirDeepCleaning(),
+        snapshotInfoActual.getExclusiveSizeDeltaFromDirDeepCleaning());
+    assertEquals(snapshotInfoExpected.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning(),
+        snapshotInfoActual.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning());
     assertEquals(snapshotInfoExpected, snapshotInfoActual);
   }
 
