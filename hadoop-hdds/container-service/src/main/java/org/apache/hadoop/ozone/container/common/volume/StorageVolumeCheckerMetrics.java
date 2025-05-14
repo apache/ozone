@@ -26,13 +26,12 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 
 /**
- * This class captures the volume scanner metrics on the data-node.
+ * This class captures the Storage Volume Checker Metrics.
  **/
 @InterfaceAudience.Private
-@Metrics(about = "Datanode storage volume checker metrics", context = "dfs")
+@Metrics(about = "Storage Volume Checker Metrics", context = "dfs")
 public class StorageVolumeCheckerMetrics {
-  private final String name;
-  private final MetricsSystem ms;
+  public static final String SOURCE_NAME = StorageVolumeCheckerMetrics.class.getSimpleName();
 
   @Metric("number of volume checks")
   private MutableCounterLong numVolumeChecks;
@@ -46,15 +45,12 @@ public class StorageVolumeCheckerMetrics {
   @Metric("number of checks skipped because the minimum gap since the last check had not elapsed")
   private MutableCounterLong numSkippedChecks;
 
-  public StorageVolumeCheckerMetrics(String name, MetricsSystem ms) {
-    this.name = name;
-    this.ms = ms;
+  public StorageVolumeCheckerMetrics() {
   }
 
   public static StorageVolumeCheckerMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String name = "StorageVolumeCheckerMetrics";
-    return ms.register(name, null, new StorageVolumeCheckerMetrics(name, ms));
+    return ms.register(SOURCE_NAME, "Storage Volume Checker Metrics", new StorageVolumeCheckerMetrics());
   }
 
   /**
@@ -103,6 +99,6 @@ public class StorageVolumeCheckerMetrics {
   }
 
   public void unregister() {
-    ms.unregisterSource(name);
+    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
   }
 }
