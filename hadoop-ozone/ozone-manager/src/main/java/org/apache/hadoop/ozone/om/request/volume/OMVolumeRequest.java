@@ -74,7 +74,6 @@ public abstract class OMVolumeRequest extends OMClientRequest {
     return newVolList;
   }
 
-
   /**
    * Add volume to user volume list. This method should be called after
    * acquiring user lock.

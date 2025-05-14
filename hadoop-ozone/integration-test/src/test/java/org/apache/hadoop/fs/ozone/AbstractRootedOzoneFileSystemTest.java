@@ -39,6 +39,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.apache.hadoop.security.UserGroupInformation.createUserForTesting;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -115,13 +116,13 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.tools.DistCp;
 import org.apache.hadoop.tools.DistCpOptions;
@@ -146,11 +147,37 @@ import org.slf4j.LoggerFactory;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class AbstractRootedOzoneFileSystemTest {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(AbstractRootedOzoneFileSystemTest.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AbstractRootedOzoneFileSystemTest.class);
 
   private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
+
+  private static final String USER1 = "regularuser1";
+  private static final UserGroupInformation UGI_USER1 = createUserForTesting(USER1,  new String[] {"usergroup"});
+
   private OzoneClient client;
+
+  private final boolean enabledFileSystemPaths;
+  private final boolean isBucketFSOptimized;
+  private final boolean enableAcl;
+
+  private OzoneConfiguration conf;
+  private MiniOzoneCluster cluster;
+  private FileSystem fs;
+  private RootedOzoneFileSystem ofs;
+  private ObjectStore objectStore;
+  private BasicRootedOzoneClientAdapterImpl adapter;
+  private Trash trash;
+
+  private String volumeName;
+  private Path volumePath;
+  private String bucketName;
+  // Store path commonly used by tests that test functionality within a bucket
+  private Path bucketPath;
+  private String rootPath;
+  private final BucketLayout bucketLayout;
+
+  // Non-privileged OFS instance
+  private RootedOzoneFileSystem userOfs;
 
   AbstractRootedOzoneFileSystemTest(BucketLayout bucketLayout, boolean setDefaultFs,
       boolean isAclEnabled) {
@@ -194,32 +221,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
   public Path getBucketPath() {
     return bucketPath;
   }
-
-  private final boolean enabledFileSystemPaths;
-  private final boolean isBucketFSOptimized;
-  private final boolean enableAcl;
-
-  private OzoneConfiguration conf;
-  private MiniOzoneCluster cluster;
-  private FileSystem fs;
-  private RootedOzoneFileSystem ofs;
-  private ObjectStore objectStore;
-  private BasicRootedOzoneClientAdapterImpl adapter;
-  private Trash trash;
-
-  private String volumeName;
-  private Path volumePath;
-  private String bucketName;
-  // Store path commonly used by tests that test functionality within a bucket
-  private Path bucketPath;
-  private String rootPath;
-  private final BucketLayout bucketLayout;
-
-  private static final String USER1 = "regularuser1";
-  private static final UserGroupInformation UGI_USER1 = UserGroupInformation
-      .createUserForTesting(USER1,  new String[] {"usergroup"});
-  // Non-privileged OFS instance
-  private RootedOzoneFileSystem userOfs;
 
   @BeforeAll
   void initClusterAndEnv() throws IOException, InterruptedException, TimeoutException {
@@ -1189,8 +1190,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // Use ClientProtocol to pass in volume ACL, ObjectStore won't do it
     ClientProtocol proxy = objectStore.getClientProxy();
     // Get default acl rights for user
-    OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-    ACLType[] userRights = aclConfig.getUserDefaultRights();
+    OmConfig omConfig = cluster.getOzoneManager().getConfig();
     // Construct ACL for world access
     // ACL admin owner, world read+write
     EnumSet<ACLType> aclRights = EnumSet.of(READ, WRITE);
@@ -1201,7 +1201,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
         .setAdmin("admin")
         .setOwner("admin")
         .addAcl(OzoneAcl.of(ACLIdentityType.WORLD, "", ACCESS, aclRights))
-        .addAcl(OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, userRights))
+        .addAcl(OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, omConfig.getUserDefaultRights()))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
     // Sanity check
@@ -1236,7 +1236,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     BucketArgs bucketArgs = new BucketArgs.Builder()
         .setOwner("admin")
         .addAcl(OzoneAcl.of(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE, LIST))
-        .addAcl(OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, userRights))
+        .addAcl(OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, omConfig.getUserDefaultRights()))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
 
@@ -1292,11 +1292,10 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // Use ClientProtocol to pass in volume ACL, ObjectStore won't do it
     ClientProtocol proxy = objectStore.getClientProxy();
     // Get default acl rights for user
-    OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-    ACLType[] userRights = aclConfig.getUserDefaultRights();
+    OmConfig omConfig = cluster.getOzoneManager().getConfig();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = OzoneAcl.of(ACLIdentityType.WORLD, "",
-        ACCESS, userRights);
+        ACCESS, omConfig.getUserDefaultRights());
     // Construct VolumeArgs
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addAcl(aclWorldAccess)
@@ -1981,7 +1980,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     assertThat(exception.getMessage()).contains("Invalid path Name");
   }
 
-
   @Test
   void testRenameFile() throws Exception {
     final String dir = "/dir" + RandomUtils.secure().randomInt(0, 1000);
@@ -2212,7 +2210,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   }
 
-
   @Test
   void testCreateAndCheckECFileDiskUsage() throws Exception {
     String key = "eckeytest";
@@ -2234,7 +2231,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     //clean up
     ofs.delete(filePath, true);
   }
-
 
   @Test
   void testCreateAndCheckRatisFileDiskUsage() throws Exception {
@@ -2275,11 +2271,10 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ClientProtocol proxy = objectStore.getClientProxy();
 
     // Get default acl rights for user
-    OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-    ACLType[] userRights = aclConfig.getUserDefaultRights();
+    OmConfig omConfig = cluster.getOzoneManager().getConfig();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = OzoneAcl.of(ACLIdentityType.WORLD, "",
-        ACCESS, userRights);
+        ACCESS, omConfig.getUserDefaultRights());
     // Construct VolumeArgs, set ACL to world access
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addAcl(aclWorldAccess)
@@ -2371,7 +2366,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     assertHasPathCapabilities(fs, getBucketPath(), FS_ACLS);
     assertHasPathCapabilities(fs, getBucketPath(), FS_CHECKSUMS);
   }
-
 
   @Test
   void testSnapshotDiff() throws Exception {
@@ -2570,5 +2564,4 @@ abstract class AbstractRootedOzoneFileSystemTest {
       fs.delete(new Path(base, key));
     }
   }
-
 }

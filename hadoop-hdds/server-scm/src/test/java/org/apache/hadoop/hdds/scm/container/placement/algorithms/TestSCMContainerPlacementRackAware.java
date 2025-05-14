@@ -86,7 +86,6 @@ public class TestSCMContainerPlacementRackAware {
   private SCMContainerPlacementMetrics metrics;
   private static final int NODE_PER_RACK = 5;
 
-
   private static IntStream numDatanodes() {
     return IntStream.rangeClosed(3, 15);
   }
@@ -814,6 +813,7 @@ public class TestSCMContainerPlacementRackAware {
         datanodeDetails.get(0).getUuid() && excludedNodes.get(1).getUuid() !=
         datanodeDetails.get(1).getUuid());
   }
+
   @ParameterizedTest
   @ValueSource(ints = {11, 12, 13, 14, 15})
   public void testNoFallbackWithUsedNodes(int datanodeCount) {

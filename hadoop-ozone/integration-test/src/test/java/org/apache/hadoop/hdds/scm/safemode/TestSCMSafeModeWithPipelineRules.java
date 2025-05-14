@@ -79,7 +79,6 @@ public class TestSCMSafeModeWithPipelineRules {
     pipelineManager = scm.getPipelineManager();
   }
 
-
   @Test
   void testScmSafeMode() throws Exception {
     int datanodeCount = 6;
@@ -113,19 +112,18 @@ public class TestSCMSafeModeWithPipelineRules {
     SCMSafeModeManager scmSafeModeManager =
         cluster.getStorageContainerManager().getScmSafeModeManager();
 
-
     // Ceil(0.1 * 2) is 1, as one pipeline is healthy pipeline rule is
     // satisfied
 
-    GenericTestUtils.waitFor(() ->
-        scmSafeModeManager.getHealthyPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    final HealthyPipelineSafeModeRule healthyPipelineRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(HealthyPipelineSafeModeRule.class);
+    GenericTestUtils.waitFor(healthyPipelineRule::validate, 1000, 60000);
 
     // As Ceil(0.9 * 2) is 2, and from second pipeline no datanodes's are
     // reported this rule is not met yet.
-    GenericTestUtils.waitFor(() ->
-        !scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    final OneReplicaPipelineSafeModeRule oneReplicaPipelineRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(OneReplicaPipelineSafeModeRule.class);
+    GenericTestUtils.waitFor(() -> !oneReplicaPipelineRule.validate(), 1000, 60000);
 
     assertTrue(cluster.getStorageContainerManager().isInSafeMode());
 
@@ -133,9 +131,7 @@ public class TestSCMSafeModeWithPipelineRules {
     // Now restart one datanode from the 2nd pipeline
     cluster.restartHddsDatanode(restartedDatanode, false);
 
-    GenericTestUtils.waitFor(() ->
-        scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    GenericTestUtils.waitFor(oneReplicaPipelineRule::validate, 1000, 60000);
 
     // All safeMode preChecks are now satisfied, SCM should be out of safe mode.
 
@@ -158,8 +154,7 @@ public class TestSCMSafeModeWithPipelineRules {
     ReplicationManager replicationManager =
         cluster.getStorageContainerManager().getReplicationManager();
 
-    GenericTestUtils.waitFor(() ->
-        replicationManager.isRunning(), 1000, 60000);
+    GenericTestUtils.waitFor(replicationManager::isRunning, 1000, 60000);
   }
 
   @AfterEach
@@ -168,7 +163,6 @@ public class TestSCMSafeModeWithPipelineRules {
       cluster.shutdown();
     }
   }
-
 
   private void waitForRatis3NodePipelines(int numPipelines)
       throws TimeoutException, InterruptedException {

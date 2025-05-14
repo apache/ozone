@@ -69,7 +69,6 @@ public class LoadExecutors {
     }
   }
 
-
   public void startLoad(long time) throws Exception {
     LOG.info("Starting {} threads for {} generators", numThreads,
         generators.size());

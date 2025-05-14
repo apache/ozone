@@ -62,29 +62,31 @@ public final class Proto3Codec<M extends MessageLite> implements Codec<M> {
     return true;
   }
 
-  private ToIntFunction<ByteBuffer> writeTo(M message, int size) {
-    return buffer -> {
+  @Override
+  public CodecBuffer toCodecBuffer(@Nonnull M message, CodecBuffer.Allocator allocator) {
+    final int size = message.getSerializedSize();
+    final CodecBuffer codecBuffer = allocator.apply(size);
+    final ToIntFunction<ByteBuffer> writeTo = buffer -> {
       try {
         message.writeTo(CodedOutputStream.newInstance(buffer));
       } catch (IOException e) {
+        // The buffer was allocated with the message size, it should never throw an IOException
         throw new IllegalStateException(
             "Failed to writeTo: message=" + message, e);
       }
       return size;
     };
+    codecBuffer.put(writeTo);
+    return codecBuffer;
   }
 
   @Override
-  public CodecBuffer toCodecBuffer(@Nonnull M message,
-      CodecBuffer.Allocator allocator) {
-    final int size = message.getSerializedSize();
-    return allocator.apply(size).put(writeTo(message, size));
-  }
-
-  @Override
-  public M fromCodecBuffer(@Nonnull CodecBuffer buffer)
-      throws InvalidProtocolBufferException {
-    return parser.parseFrom(buffer.asReadOnlyByteBuffer());
+  public M fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
+    try {
+      return parser.parseFrom(buffer.asReadOnlyByteBuffer());
+    } catch (InvalidProtocolBufferException e) {
+      throw new CodecException("Failed to parse " + buffer + " for " + getTypeClass(), e);
+    }
   }
 
   @Override

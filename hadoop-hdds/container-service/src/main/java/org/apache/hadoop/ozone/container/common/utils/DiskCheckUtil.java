@@ -81,9 +81,11 @@ public final class DiskCheckUtil {
     default boolean checkExistence(File storageDir) {
       return true;
     }
+
     default boolean checkPermissions(File storageDir) {
       return true;
     }
+
     default boolean checkReadWrite(File storageDir, File testFileDir,
                             int numBytesToWrite) {
       return true;

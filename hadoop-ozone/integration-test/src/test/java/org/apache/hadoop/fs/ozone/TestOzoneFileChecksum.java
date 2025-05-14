@@ -57,7 +57,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -65,7 +64,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Test FileChecksum API.
  */
-@Timeout(300)
 public class TestOzoneFileChecksum {
 
   private static final boolean[] TOPOLOGY_AWARENESS = new boolean[] {

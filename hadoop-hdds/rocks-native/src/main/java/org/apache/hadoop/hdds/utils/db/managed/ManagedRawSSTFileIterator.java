@@ -38,10 +38,15 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
   }
 
   private native boolean hasNext(long handle);
+
   private native void next(long handle);
+
   private native byte[] getKey(long handle);
+
   private native byte[] getValue(long handle);
+
   private native long getSequenceNumber(long handle);
+
   private native int getType(long handle);
 
   @Override

@@ -436,7 +436,7 @@ public class TestSCMNodeManager {
       // creation, they will fail with not enough healthy nodes for ratis 3
       // pipeline. Therefore we do not have to worry about this create call
       // failing due to datanodes reaching their maximum pipeline limit.
-      assertPipelineCreationFailsWithNotEnoughNodes(1);
+      assertPipelineCreationFailsWithExceedingLimit(2);
 
       // Heartbeat bad MLV nodes back to healthy.
       nodeManager.processLayoutVersionReport(badMlvNode1, CORRECT_LAYOUT_PROTO);
@@ -466,6 +466,19 @@ public class TestSCMNodeManager {
     }, "3 nodes should not have been found for a pipeline.");
     assertThat(ex.getMessage()).contains("Required 3. Found " +
         actualNodeCount);
+  }
+
+  private void assertPipelineCreationFailsWithExceedingLimit(int limit) {
+    // Build once, outside the assertion
+    ReplicationConfig config = ReplicationConfig.fromProtoTypeAndFactor(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.THREE);
+    SCMException ex = assertThrows(
+        SCMException.class,
+        () -> scm.getPipelineManager().createPipeline(config),
+        "3 nodes should not have been found for a pipeline.");
+    assertThat(ex.getMessage())
+        .contains("Cannot create pipeline as it would exceed the limit per datanode: " + limit);
   }
 
   private void assertPipelines(HddsProtos.ReplicationFactor factor,
@@ -1057,11 +1070,11 @@ public class TestSCMNodeManager {
             HddsProtos.ReplicationFactor.THREE, emptyList());
 
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, closeContainerCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), closeContainerCommand), null);
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, closeContainerCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), closeContainerCommand), null);
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, createPipelineCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), createPipelineCommand), null);
 
     assertEquals(2, nodeManager.getCommandQueueCount(
         datanode1, SCMCommandProto.Type.closeContainerCommand));
@@ -1760,7 +1773,7 @@ public class TestSCMNodeManager {
               Arrays.asList(report), emptyList()),
                   HddsTestUtils.getRandomPipelineReports());
       eq.fireEvent(DATANODE_COMMAND,
-          new CommandForDatanode<>(datanodeDetails.getUuid(),
+          new CommandForDatanode<>(datanodeDetails,
               new CloseContainerCommand(1L,
                   PipelineID.randomId())));
 

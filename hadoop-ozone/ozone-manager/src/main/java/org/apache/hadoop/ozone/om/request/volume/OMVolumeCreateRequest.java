@@ -156,7 +156,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
         // Add default ACL for volume
         List<OzoneAcl> listOfAcls = getDefaultAclList(UserGroupInformation.createRemoteUser(owner),
-            ozoneManager.getConfiguration());
+            ozoneManager.getConfig());
         // ACLs from VolumeArgs
         if (omVolumeArgs.getAcls() != null) {
           listOfAcls.addAll(omVolumeArgs.getAcls());

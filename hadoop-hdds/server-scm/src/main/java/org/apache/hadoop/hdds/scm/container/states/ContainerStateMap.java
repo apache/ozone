@@ -74,6 +74,25 @@ public class ContainerStateMap {
       LoggerFactory.getLogger(ContainerStateMap.class);
 
   /**
+   * Map {@link LifeCycleState} to {@link ContainerInfo}.
+   * Note that a {@link ContainerInfo} can only exists in at most one of the {@link LifeCycleState}s.
+   */
+  private final ContainerAttribute<LifeCycleState> lifeCycleStateMap = new ContainerAttribute<>(LifeCycleState.class);
+  /**
+   * Map {@link ReplicationType} to {@link ContainerInfo}.
+   * Note that a {@link ContainerInfo} can only exists in at most one of the {@link ReplicationType}s.
+   */
+  private final ContainerAttribute<ReplicationType> typeMap = new ContainerAttribute<>(ReplicationType.class);
+  /**
+   * Map {@link ContainerID} to ({@link ContainerInfo} and {@link ContainerReplica}).
+   * Note that the following sets are exactly the same
+   * 1. The {@link ContainerInfo} in this map.
+   * 2. The {@link ContainerInfo} in the union of all the states in {@link #lifeCycleStateMap}.
+   * 2. The {@link ContainerInfo} in the union of all the types in {@link #typeMap}.
+   */
+  private final ContainerMap containerMap = new ContainerMap();
+
+  /**
    * Two levels map.
    * Outer container map: {@link ContainerID} -> {@link ContainerEntry} (info and replicas)
    * Inner replica map: {@link DatanodeID} -> {@link ContainerReplica}
@@ -140,24 +159,6 @@ public class ContainerStateMap {
       return entry == null ? null : entry.removeReplica(datanodeID);
     }
   }
-  /**
-   * Map {@link LifeCycleState} to {@link ContainerInfo}.
-   * Note that a {@link ContainerInfo} can only exists in at most one of the {@link LifeCycleState}s.
-   */
-  private final ContainerAttribute<LifeCycleState> lifeCycleStateMap = new ContainerAttribute<>(LifeCycleState.class);
-  /**
-   * Map {@link ReplicationType} to {@link ContainerInfo}.
-   * Note that a {@link ContainerInfo} can only exists in at most one of the {@link ReplicationType}s.
-   */
-  private final ContainerAttribute<ReplicationType> typeMap = new ContainerAttribute<>(ReplicationType.class);
-  /**
-   * Map {@link ContainerID} to ({@link ContainerInfo} and {@link ContainerReplica}).
-   * Note that the following sets are exactly the same
-   * 1. The {@link ContainerInfo} in this map.
-   * 2. The {@link ContainerInfo} in the union of all the states in {@link #lifeCycleStateMap}.
-   * 2. The {@link ContainerInfo} in the union of all the types in {@link #typeMap}.
-   */
-  private final ContainerMap containerMap = new ContainerMap();
 
   /**
    * Create a ContainerStateMap.

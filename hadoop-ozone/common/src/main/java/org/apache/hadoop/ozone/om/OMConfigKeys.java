@@ -27,15 +27,6 @@ import org.apache.ratis.util.TimeDuration;
  * Ozone Manager Constants.
  */
 public final class OMConfigKeys {
-  public static final String OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB =
-      "ozone.om.snapshot.load.native.lib";
-  public static final boolean OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT = true;
-  /**
-   * Never constructed.
-   */
-  private OMConfigKeys() {
-  }
-
   public static final String OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY =
       "ozone.filesystem.snapshot.enabled";
   public static final boolean OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT = true;
@@ -645,4 +636,10 @@ public final class OMConfigKeys {
       = "ozone.om.compaction.service.columnfamilies";
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
       "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable";
+
+  /**
+   * Never constructed.
+   */
+  private OMConfigKeys() {
+  }
 }

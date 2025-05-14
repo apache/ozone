@@ -40,7 +40,6 @@ import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -51,7 +50,6 @@ import org.slf4j.LoggerFactory;
  * A simple test that asserts that list status output is sorted.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(1200)
 public abstract class TestListStatus implements NonHATests.TestCase {
   private static final Logger LOG = LoggerFactory.getLogger(TestListStatus.class);
 
