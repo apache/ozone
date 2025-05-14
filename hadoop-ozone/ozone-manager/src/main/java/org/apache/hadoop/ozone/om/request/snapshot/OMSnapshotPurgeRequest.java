@@ -140,6 +140,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       // current snapshot is deleted. We can potentially
       // reclaim more keys in the next snapshot.
       snapInfo.setDeepClean(false);
+      snapInfo.setDeepCleanedDeletedDir(false);
 
       // Update table cache first
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapInfo.getTableKey()),
