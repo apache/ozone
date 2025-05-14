@@ -59,23 +59,18 @@ public enum DBProfile {
       }
       if (option != null) {
         LOG.info("Using RocksDB DBOptions from {}.ini file", optionsPath);
-      } else {
-        final int maxBackgroundCompactions = 4;
-        final int maxBackgroundFlushes = 2;
-        final long bytesPerSync = toLong(StorageUnit.MB.toBytes(1.00));
-        final boolean createIfMissing = true;
-        final boolean createMissingColumnFamilies = true;
-        ManagedDBOptions dbOptions = new ManagedDBOptions();
-        dbOptions
-            .setIncreaseParallelism(Runtime.getRuntime().availableProcessors())
-            .setMaxBackgroundCompactions(maxBackgroundCompactions)
-            .setMaxBackgroundFlushes(maxBackgroundFlushes)
-            .setBytesPerSync(bytesPerSync)
-            .setCreateIfMissing(createIfMissing)
-            .setCreateMissingColumnFamilies(createMissingColumnFamilies);
-        return dbOptions;
+        return option;
       }
-      return option;
+      LOG.info(".ini file for RocksDB DBOptions unset or can't be read, use default config");
+      ManagedDBOptions dbOptions = new ManagedDBOptions();
+      dbOptions
+          .setIncreaseParallelism(Runtime.getRuntime().availableProcessors())
+          .setMaxBackgroundCompactions(4)
+          .setMaxBackgroundFlushes(2)
+          .setBytesPerSync(toLong(StorageUnit.MB.toBytes(1.00)))
+          .setCreateIfMissing(true)
+          .setCreateMissingColumnFamilies(true);
+      return dbOptions;
     }
 
     @Override
@@ -98,11 +93,10 @@ public enum DBProfile {
         return option;
       }
 
-      final long writeBufferSize = toLong(StorageUnit.MB.toBytes(128));
       ManagedColumnFamilyOptions managedColumnFamilyOptions =
           new ManagedColumnFamilyOptions();
       managedColumnFamilyOptions.setLevelCompactionDynamicLevelBytes(true)
-          .setWriteBufferSize(writeBufferSize)
+          .setWriteBufferSize(toLong(StorageUnit.MB.toBytes(128)))
           .setTableFormatConfig(createDefaultBlockBasedTableConfig());
       return managedColumnFamilyOptions;
     }

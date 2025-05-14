@@ -305,7 +305,7 @@ public final class DBStoreBuilder {
     Set<TableConfig> tableConfigs = new HashSet<>();
 
     // If default column family was not added, add it with the default options.
-    cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME, getCfOptions(DEFAULT_COLUMN_FAMILY_NAME));
+    cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME, getDefaultCFOptions());
 
     for (Map.Entry<String, ManagedColumnFamilyOptions> entry:
         cfOptions.entrySet()) {
@@ -314,7 +314,7 @@ public final class DBStoreBuilder {
 
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
-        tableConfigs.add(new TableConfig(name, getCfOptions(name)));
+        tableConfigs.add(new TableConfig(name, defaultCfOptions));
       } else {
         tableConfigs.add(new TableConfig(name, options));
       }
@@ -330,7 +330,7 @@ public final class DBStoreBuilder {
    * @param defaultCFAutoCompaction
    */
   public DBStoreBuilder disableDefaultCFAutoCompaction(boolean defaultCFAutoCompaction) {
-    ManagedColumnFamilyOptions defaultCFOptions = getCfOptions(DEFAULT_COLUMN_FAMILY_NAME);
+    ManagedColumnFamilyOptions defaultCFOptions = getDefaultCFOptions();
     defaultCFOptions.setDisableAutoCompactions(defaultCFAutoCompaction);
     setDefaultCFOptions(defaultCFOptions);
     return this;
@@ -379,13 +379,12 @@ public final class DBStoreBuilder {
    * @return The {@link ManagedColumnFamilyOptions} that should be used as the default
    * value for this builder if one is not specified by the caller.
    */
-  private ManagedColumnFamilyOptions getCfOptions(String cfName) {
+  private ManagedColumnFamilyOptions getDefaultCFOptions() {
     if (Objects.nonNull(defaultCfOptions)) {
       return defaultCfOptions;
     }
-    Objects.requireNonNull(defaultCfProfile, "defaultCFProfile == null");
     Path configuredPath = optionsPath != null ? optionsPath : dbPath;
-    return defaultCfProfile.getColumnFamilyOptions(configuredPath, cfName);
+    return defaultCfProfile.getColumnFamilyOptions(configuredPath, DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME);
   }
 
   private File getDBFile() throws IOException {
