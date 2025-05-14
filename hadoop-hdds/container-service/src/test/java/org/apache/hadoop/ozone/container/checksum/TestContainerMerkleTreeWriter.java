@@ -222,6 +222,46 @@ class TestContainerMerkleTreeWriter {
     assertTreesSortedAndMatch(expectedTree, actualTreeProto);
   }
 
+  /**
+   * Test that a {@link ContainerMerkleTreeWriter} built from a {@link ContainerProtos.ContainerMerkleTree} will
+   * write produce an identical proto as the input when it is written again.
+   */
+  @Test
+  public void testProtoToWriterConversion() {
+    final long blockID1 = 1;
+    final long blockID2 = 2;
+    final long blockID3 = 3;
+    final long blockID4 = 4;
+    ContainerProtos.ChunkInfo b1c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo b1c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{1, 2}));
+    ContainerProtos.ChunkInfo b1c3 = buildChunk(config, 2, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo b2c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo b2c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.BlockMerkleTree blockTree1 = buildExpectedBlockTree(blockID1,
+        Arrays.asList(buildExpectedChunkTree(b1c1), buildExpectedChunkTree(b1c2), buildExpectedChunkTree(b1c3)));
+    ContainerProtos.BlockMerkleTree blockTree2 = buildExpectedBlockTree(blockID2,
+        Arrays.asList(buildExpectedChunkTree(b2c1), buildExpectedChunkTree(b2c2)));
+    // Test that an empty block is preserved during tree conversion.
+    ContainerProtos.BlockMerkleTree blockTree3 = buildExpectedBlockTree(blockID3, Collections.emptyList());
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(
+        Arrays.asList(blockTree1, blockTree2, blockTree3));
+
+    ContainerMerkleTreeWriter treeWriter = new ContainerMerkleTreeWriter(expectedTree);
+    assertTreesSortedAndMatch(expectedTree, treeWriter.toProto());
+
+    // Modifying the tree writer created from the proto should also succeed.
+    ContainerProtos.ChunkInfo b3c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1}));
+    treeWriter.addChunks(blockID3, false, b3c1);
+    treeWriter.addBlock(blockID4);
+
+    blockTree3 = buildExpectedBlockTree(blockID3, Collections.singletonList(buildExpectedChunkTree(b3c1, false)));
+    ContainerProtos.BlockMerkleTree blockTree4 = buildExpectedBlockTree(blockID4, Collections.emptyList());
+    ContainerProtos.ContainerMerkleTree expectedUpdatedTree = buildExpectedContainerTree(
+        Arrays.asList(blockTree1, blockTree2, blockTree3, blockTree4));
+
+    assertTreesSortedAndMatch(expectedUpdatedTree, treeWriter.toProto());
+  }
+
   private ContainerProtos.ContainerMerkleTree buildExpectedContainerTree(List<ContainerProtos.BlockMerkleTree> blocks) {
     return ContainerProtos.ContainerMerkleTree.newBuilder()
         .addAllBlockMerkleTree(blocks)
@@ -245,10 +285,15 @@ class TestContainerMerkleTreeWriter {
   }
 
   private ContainerProtos.ChunkMerkleTree buildExpectedChunkTree(ContainerProtos.ChunkInfo chunk) {
+    return buildExpectedChunkTree(chunk, true);
+  }
+
+  private ContainerProtos.ChunkMerkleTree buildExpectedChunkTree(ContainerProtos.ChunkInfo chunk, boolean isHealthy) {
     return ContainerProtos.ChunkMerkleTree.newBuilder()
         .setOffset(chunk.getOffset())
         .setLength(chunk.getLen())
         .setDataChecksum(computeExpectedChunkChecksum(chunk.getChecksumData().getChecksumsList()))
+        .setIsHealthy(isHealthy)
         .build();
   }
 

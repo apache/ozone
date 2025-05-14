@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.checksum;
 
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -81,8 +82,6 @@ public class ContainerChecksumTreeManager {
    * The data merkle tree within the file is replaced with the {@code tree} parameter, but all other content of the
    * file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
-   * This method also updates the container's data checksum in the {@code data} parameter, which will be seen by SCM
-   * on container reports.
    */
   public ContainerProtos.ContainerChecksumInfo writeContainerDataTree(ContainerData data,
       ContainerMerkleTreeWriter tree) throws IOException {
@@ -109,7 +108,7 @@ public class ContainerChecksumTreeManager {
       checksumInfo = checksumInfoBuilder.build();
       write(data, checksumInfo);
       LOG.debug("Data merkle tree for container {} updated with container checksum {}", containerID,
-          treeProto.getDataChecksum());
+          checksumToString(treeProto.getDataChecksum()));
     } finally {
       writeLock.unlock();
     }

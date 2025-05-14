@@ -1,5 +1,60 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.text.RandomStringGenerator;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -40,44 +95,6 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyMap;
 
 /**
  * This unit test simulates three datanodes with replicas of a container that need to be reconciled.
@@ -222,14 +239,14 @@ public class TestContainerReconciliationWithMockDatanodes {
    * Checks for the expected number of unique checksums among a container on the provided datanodes.
    * @return The data checksum from one of the nodes. Useful if expectedUniqueChecksums = 1.
    */
-  private static long assertUniqueChecksumCount(long containerID, Collection<MockDatanode> datanodes,
+  private static long assertUniqueChecksumCount(long containerID, Collection<MockDatanode> nodes,
       long expectedUniqueChecksums) {
-    long actualUniqueChecksums = datanodes.stream()
+    long actualUniqueChecksums = nodes.stream()
         .mapToLong(d -> d.checkAndGetDataChecksum(containerID))
         .distinct()
         .count();
     assertEquals(expectedUniqueChecksums, actualUniqueChecksums);
-    return datanodes.stream().findAny().get().checkAndGetDataChecksum(containerID);
+    return nodes.stream().findAny().get().checkAndGetDataChecksum(containerID);
   }
 
   private static void mockContainerProtocolCalls() {
@@ -284,9 +301,9 @@ public class TestContainerReconciliationWithMockDatanodes {
     private final ContainerSet containerSet;
     private final OzoneConfiguration conf;
 
-    public final Logger log;
+    private final Logger log;
 
-    public MockDatanode(DatanodeDetails dnDetails, Path tempDir) throws IOException {
+    MockDatanode(DatanodeDetails dnDetails, Path tempDir) throws IOException {
       this.dnDetails = dnDetails;
       log = LoggerFactory.getLogger("mock-datanode-" + dnDetails.getHostName());
       Path dataVolume = Paths.get(tempDir.toString(), dnDetails.getHostName(), "data");
@@ -419,11 +436,11 @@ public class TestContainerReconciliationWithMockDatanodes {
       onDemandScanner.getMetrics().resetNumContainersScanned();
     }
 
-    public void reconcileContainer(DNContainerOperationClient dnClient, Collection<DatanodeDetails> peers,
+    public void reconcileContainer(DNContainerOperationClient client, Collection<DatanodeDetails> peers,
         long containerID) {
       log.info("Beginning reconciliation on this mock datanode");
       try {
-        handler.reconcileContainer(dnClient, containerSet.getContainer(containerID), peers);
+        handler.reconcileContainer(client, containerSet.getContainer(containerID), peers);
       } catch (IOException ex) {
         fail("Container reconciliation failed", ex);
       }
@@ -446,7 +463,7 @@ public class TestContainerReconciliationWithMockDatanodes {
               .setDatanodeUuid(dnDetails.getUuidString())
               .build();
 
-      handler.handleCreateContainer(request,null);
+      handler.handleCreateContainer(request, null);
       KeyValueContainer container = getContainer(containerId);
 
       // Verify container is initially empty.
@@ -481,7 +498,7 @@ public class TestContainerReconciliationWithMockDatanodes {
           // debugging is needed.
           for (int c = 0; c < chunkData.length; c += 2) {
             chunkData[c] = (byte)generator.generate(1).charAt(0);
-            chunkData[c+1] = (byte)'\n';
+            chunkData[c + 1] = (byte)'\n';
           }
 
           Checksum checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, bytesPerChecksum);
@@ -537,7 +554,8 @@ public class TestContainerReconciliationWithMockDatanodes {
           BlockData blockData = reverse ? blockDataList.get(size - 1 - i) : blockDataList.get(i);
           File blockFile = TestContainerCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
           Assertions.assertTrue(blockFile.delete());
-          handle.getStore().getBlockDataTable().deleteWithBatch(batch, containerData.getBlockKey(blockData.getLocalID()));
+          handle.getStore().getBlockDataTable().deleteWithBatch(batch,
+              containerData.getBlockKey(blockData.getLocalID()));
           log.info("Deleting block {} from container {}", blockData.getBlockID().getLocalID(), containerID);
         }
         handle.getStore().getBatchHandler().commitBatchOperation(batch);

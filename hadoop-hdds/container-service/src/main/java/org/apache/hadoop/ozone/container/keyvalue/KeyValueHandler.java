@@ -1466,6 +1466,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
+    updateContainerChecksumFromMetadata(container);
     // Even if the container file is corrupted/missing and the unhealthy
     // update fails, the unhealthy state is kept in memory and sent to
     // SCM. Write a corresponding entry to the container log as well.
@@ -1722,15 +1723,16 @@ public class KeyValueHandler extends Handler {
   /**
    * Read chunks from a peer datanode and use them to repair our container.
    *
-   * We will keep pulling chunks from the peer until we encounter an error. At that point we will stop trying to
-   * reconcile this block instead of trying to write it with holes. Whatever data we have pulled up to that point will
-   * be committed. Block commit sequence ID of the block and container are only updated if the entire block is read
-   * and written successfully.
+   * We will keep pulling chunks from the peer unless the requested chunk's offset would leave a hole if written past
+   * the end of our current block file. Since we currently don't support leaving holes in block files, reconciliation
+   * for this block will be stopped at this point and whatever data we have pulled will be committed.
+   * Block commit sequence ID of the block and container are only updated based on the peer's value if the entire block
+   * is read and written successfully.
    *
    * To avoid verbose logging during reconciliation, this method should not log successful operations above the debug
    * level.
    *
-   * @return true if this method updated the specified block in our container. False otherwise.
+   * @return The number of chunks that were reconciled in our container.
    */
   private long reconcileChunksPerBlock(KeyValueContainer container, Pipeline pipeline,
       DNContainerOperationClient dnClient, long localID, List<ContainerProtos.ChunkMerkleTree> peerChunkList,
@@ -1749,14 +1751,18 @@ public class KeyValueHandler extends Handler {
     // block.
     NavigableMap<Long, ContainerProtos.ChunkInfo> localOffset2Chunk;
     long localBcsid = 0;
+    BlockData localBlockData;
     if (blockManager.blockExists(container, blockID)) {
-      BlockData localBlockData = blockManager.getBlock(container, blockID);
+      localBlockData = blockManager.getBlock(container, blockID);
       localOffset2Chunk = localBlockData.getChunks().stream()
           .collect(Collectors.toMap(ContainerProtos.ChunkInfo::getOffset,
               Function.identity(), (chunk1, chunk2) -> chunk1, TreeMap::new));
       localBcsid = localBlockData.getBlockCommitSequenceId();
     } else {
       localOffset2Chunk = new TreeMap<>();
+      // If we are creating the block from scratch because we don't have it, use 0 BCSID. This will get incremented
+      // if we pull chunks from the peer to fill this block.
+      localBlockData = new BlockData(blockID);
     }
 
     boolean allChunksSuccessful = true;
@@ -1843,13 +1849,12 @@ public class KeyValueHandler extends Handler {
 
       // Do not update block metadata in this container if we did not ingest any chunks for the block.
       if (!localOffset2Chunk.isEmpty()) {
-        BlockData putBlockData = BlockData.getFromProtoBuf(peerBlockData);
         List<ContainerProtos.ChunkInfo> allChunks = new ArrayList<>(localOffset2Chunk.values());
-        putBlockData.setChunks(allChunks);
-        putBlockForClosedContainer(container, putBlockData, maxBcsId, allChunksSuccessful);
+        localBlockData.setChunks(allChunks);
+        putBlockForClosedContainer(container, localBlockData, maxBcsId, allChunksSuccessful);
         treeWriter.addChunks(localID, true, allChunks);
         // Invalidate the file handle cache, so new read requests get the new file if one was created.
-        chunkManager.finishWriteChunks(container, putBlockData);
+        chunkManager.finishWriteChunks(container, localBlockData);
       }
     }
 
@@ -1887,26 +1892,27 @@ public class KeyValueHandler extends Handler {
    */
   private boolean previousChunkPresent(BlockID blockID, long chunkOffset,
                                        NavigableMap<Long, ContainerProtos.ChunkInfo> localOffset2Chunk) {
+    if (chunkOffset == 0) {
+      return true;
+    }
     long localID = blockID.getLocalID();
     long containerID = blockID.getContainerID();
-    if (chunkOffset != 0) {
-      Map.Entry<Long, ContainerProtos.ChunkInfo> prevEntry = localOffset2Chunk.lowerEntry(chunkOffset);
-      if (prevEntry == null) {
-        // We are trying to write a chunk that is not the first, but we currently have no chunks in the block.
-        LOG.warn("Exiting reconciliation for block {} in container {} at length {}. The previous chunk is not " +
-            "present locally.", localID, containerID, 0);
+    Map.Entry<Long, ContainerProtos.ChunkInfo> prevEntry = localOffset2Chunk.lowerEntry(chunkOffset);
+    if (prevEntry == null) {
+      // We are trying to write a chunk that is not the first, but we currently have no chunks in the block.
+      LOG.warn("Exiting reconciliation for block {} in container {} at length {}. The previous chunk required for " +
+          "offset {} is not present locally.", localID, containerID, 0, chunkOffset);
+      return false;
+    } else {
+      long prevOffset = prevEntry.getKey();
+      long prevLength = prevEntry.getValue().getLen();
+      if (prevOffset + prevLength != chunkOffset) {
+        LOG.warn("Exiting reconciliation for block {} in container {} at length {}. The previous chunk required for " +
+            "offset {} is not present locally.", localID, containerID, prevOffset + prevLength, chunkOffset);
         return false;
-      } else {
-        long prevOffset = prevEntry.getKey();
-        long prevLength = prevEntry.getValue().getLen();
-        if (prevOffset + prevLength != chunkOffset) {
-          LOG.warn("Exiting reconciliation for block {} in container {} at length {}. The previous chunk is not " +
-              "present locally.", localID, containerID, prevOffset + prevLength);
-          return false;
-        }
       }
+      return true;
     }
-    return true;
   }
 
   /**

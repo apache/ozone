@@ -124,6 +124,7 @@ public class ContainerController {
       return true;
     }
   }
+
   /**
    * Updates the container checksum information on disk and in memory.
    *
