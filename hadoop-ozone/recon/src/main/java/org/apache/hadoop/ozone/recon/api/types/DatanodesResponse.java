@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -48,7 +48,11 @@ public class DatanodesResponse {
   private Map<String, String> failedNodeErrorResponseMap;
 
   public DatanodesResponse() {
-    this(0, new ArrayList<>());
+    this(Collections.emptyList());
+  }
+
+  public DatanodesResponse(Collection<DatanodeMetadata> datanodes) {
+    this(datanodes.size(), datanodes);
   }
 
   public DatanodesResponse(long totalCount,
