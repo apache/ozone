@@ -225,6 +225,7 @@ public class ObjectEndpoint extends EndpointBase {
       @QueryParam("tagging") String taggingMarker,
       @QueryParam("acl") String aclMarker,
       final InputStream body) throws IOException, OS3Exception {
+    isValidKeyPath(keyPath);
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_KEY;
     boolean auditSuccess = true;
@@ -398,6 +399,25 @@ public class ObjectEndpoint extends EndpointBase {
         perf.appendOpLatencyNanos(opLatencyNs);
         AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction,
             getAuditParameters(), perf));
+      }
+    }
+  }
+
+  /**
+   * Validate S3 key path.
+   * disallows names containing ':'.
+   * Throws OS3Exception if invalid.
+   */
+  public static void isValidKeyPath(String path) throws OS3Exception {
+
+    // Split path components
+    String[] components = path.split("/");
+
+    for (String component : components) {
+      if (component.contains(":")) {
+        OS3Exception err = newError(S3ErrorTable.INVALID_REQUEST, path);
+        err.setErrorMessage("Invalid key path: contains invalid characters.");
+        throw err;
       }
     }
   }
