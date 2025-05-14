@@ -14,21 +14,9 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       S3 gateway test with aws cli
-Library             OperatingSystem
-Library             String
-Library             DateTime
-Resource            ../commonlib.robot
-Resource            commonawslib.robot
-Resource            mpu_lib.robot
-Test Timeout        5 minutes
-Suite Setup         Setup Multipart Tests
-Suite Teardown      Teardown Multipart Tests
-Test Setup          Generate random prefix
 Documentation       S3 gateway test with aws cli with STANDARD_IA storage class
 Library             OperatingSystem
 Library             String
-Library             DateTime
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Resource            mpu_lib.robot
@@ -64,7 +52,7 @@ Put Object with STANDARD_IA storage class
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
 
 Test multipart upload with STANDARD_IA storage
-    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey32 --storage-class STANDARD_IA
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey32     0     --storage-class STANDARD_IA
     ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/ecmultipartKey32    ${uploadID}    1    /tmp/1mb
     ${result} =         Execute AWSS3APICli   list-parts --bucket ${BUCKET} --key ${PREFIX}/ecmultipartKey32 --upload-id ${uploadID}
     ${part1} =          Execute and checkrc    echo '${result}' | jq -r '.Parts[0].ETag'  0
@@ -72,7 +60,7 @@ Test multipart upload with STANDARD_IA storage
                         Should contain        ${result}    STANDARD_IA
     ${result} =         Abort MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey32    ${uploadID}    0
 
-    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey63 --storage-class STANDARD_IA --metadata="storage-config=rs-6-3-1024k"
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey63     0     --storage-class STANDARD_IA --metadata="storage-config=rs-6-3-1024k"
     ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/ecmultipartKey63    ${uploadID}    1    /tmp/part1
     ${result} =         Execute AWSS3APICli   list-parts --bucket ${BUCKET} --key ${PREFIX}/ecmultipartKey63 --upload-id ${uploadID}
     ${part1} =          Execute and checkrc    echo '${result}' | jq -r '.Parts[0].ETag'  0

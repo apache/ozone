@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -126,6 +125,7 @@ public class TestS3Utils {
         RATIS3REPLICATIONCONFIG, RATIS1REPLICATIONCONFIG));
     return args;
   }
+
   /**
    * When client side passed value also not valid
    * OS3Exception is thrown.
