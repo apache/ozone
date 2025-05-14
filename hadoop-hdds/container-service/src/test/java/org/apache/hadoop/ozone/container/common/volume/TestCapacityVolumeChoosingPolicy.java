@@ -149,4 +149,15 @@ public class TestCapacityVolumeChoosingPolicy {
         VolumeChoosingPolicyFactory.getPolicy(CONF).getClass());
   }
 
+  @Test
+  public void testVolumeCommittedSpace() throws Exception {
+    Map<HddsVolume, Long> initialCommittedSpace = new HashMap<>();
+    volumes.forEach(vol ->
+        initialCommittedSpace.put(vol, vol.getCommittedBytes()));
+
+    HddsVolume selectedVolume = policy.chooseVolume(volumes, 50);
+
+    assertEquals(initialCommittedSpace.get(selectedVolume) + 50,
+        selectedVolume.getCommittedBytes());
+  }
 }
