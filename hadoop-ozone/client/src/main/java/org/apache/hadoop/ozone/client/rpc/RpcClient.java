@@ -1028,6 +1028,7 @@ public class RpcClient implements ClientProtocol {
    * @return message which tells the image name, parent dir and OM leader
    * node information.
    */
+  @Deprecated
   @Override
   public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType) throws IOException {
@@ -1853,7 +1854,8 @@ public class RpcClient implements ClientProtocol {
     return keyInfoWithS3Context.getKeyInfo();
   }
 
-  private OmKeyInfo getKeyInfo(
+  @Override
+  public OmKeyInfo getKeyInfo(
       String volumeName, String bucketName, String keyName,
       boolean forceUpdateContainerCache) throws IOException {
     Preconditions.checkNotNull(volumeName);

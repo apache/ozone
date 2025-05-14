@@ -31,8 +31,8 @@ import picocli.CommandLine;
     subcommands = {
         ContainerLogController.class
     },
-    description = "This serves as a common entry point for all commands that parse and analyze logs," +
-        "regardless of their source or type and require logs to be extracted first."
+    description = "Command to parse and analyze logs, " +
+        "regardless of their source or type. It require logs to be extracted first."
 )
 @MetaInfServices(DebugSubcommand.class)
 public class LogParser implements DebugSubcommand {

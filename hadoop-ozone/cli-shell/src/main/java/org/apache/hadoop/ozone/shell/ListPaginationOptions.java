@@ -15,15 +15,31 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.request.validation;
+package org.apache.hadoop.ozone.shell;
 
-/**
- * Processing phase defines when a request validator should run.
- *
- * There are two hooking point at the moment, before and after the generic
- * request processing code.
- */
-public enum RequestProcessingPhase {
-  PRE_PROCESS,
-  POST_PROCESS
+import picocli.CommandLine;
+
+/** Options to provide pagination of lists.  Use with {@link CommandLine.Mixin}. */
+public class ListPaginationOptions {
+
+  @CommandLine.Mixin
+  private ListLimitOptions limitOptions;
+
+  @CommandLine.Option(names = {"--start", "-s"},
+      description = "The item to start the listing from.\n" +
+          "This will be excluded from the result.")
+  private String startItem;
+
+  public int getLimit() {
+    return limitOptions.getLimit();
+  }
+
+  public boolean isAll() {
+    return limitOptions.isAll();
+  }
+
+  public String getStartItem() {
+    return startItem;
+  }
+
 }

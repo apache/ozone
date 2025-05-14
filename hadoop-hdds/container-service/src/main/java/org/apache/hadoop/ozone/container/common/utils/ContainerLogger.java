@@ -159,6 +159,7 @@ public final class ContainerLogger {
         "ID=" + containerData.getContainerID(),
         "Index=" + containerData.getReplicaIndex(),
         "BCSID=" + containerData.getBlockCommitSequenceId(),
-        "State=" + containerData.getState());
+        "State=" + containerData.getState(),
+        "Volume=" + containerData.getVolume());
   }
 }

@@ -781,7 +781,7 @@ public class SCMNodeManager implements NodeManager {
             // Send Finalize command to the data node. Its OK to
             // send Finalize command multiple times.
             scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-                new CommandForDatanode<>(datanodeDetails.getUuid(),
+                new CommandForDatanode<>(datanodeDetails,
                     finalizeCmd));
           } catch (NotLeaderException ex) {
             LOG.warn("Skip sending finalize upgrade command since current SCM" +
@@ -1550,7 +1550,7 @@ public class SCMNodeManager implements NodeManager {
     HashSet<DatanodeDetails> dns = new HashSet<>();
     Preconditions.checkNotNull(dn);
     Set<PipelineID> pipelines =
-        nodeStateManager.getPipelineByDnID(dn.getUuid());
+        nodeStateManager.getPipelineByDnID(dn.getID());
     PipelineManager pipelineManager = scmContext.getScm().getPipelineManager();
     if (!pipelines.isEmpty()) {
       pipelines.forEach(id -> {
@@ -1576,7 +1576,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public Set<PipelineID> getPipelines(DatanodeDetails datanodeDetails) {
-    return nodeStateManager.getPipelineByDnID(datanodeDetails.getUuid());
+    return nodeStateManager.getPipelineByDnID(datanodeDetails.getID());
   }
 
   /**
