@@ -26,9 +26,12 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -53,6 +56,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -71,6 +75,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -530,6 +536,53 @@ public class TestKeyValueHandler {
     Assertions.assertEquals(1, icrCount.get());
   }
 
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testUpdateContainerChecksum(ContainerLayoutVersion layoutVersion) throws Exception {
+    conf = new OzoneConfiguration();
+    KeyValueContainerData data = new KeyValueContainerData(123L, layoutVersion, GB,
+        PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
+    data.setMetadataPath(tempDir.toString());
+    data.setDbFile(dbFile.toFile());
+    KeyValueContainer container = new KeyValueContainer(data, conf);
+    KeyValueContainerData containerData = container.getContainerData();
+    ContainerSet containerSet = new ContainerSet(1000);
+    containerSet.addContainer(container);
+
+    // Allows checking the invocation count of the lambda.
+    AtomicInteger icrCount = new AtomicInteger(0);
+    ContainerMerkleTreeWriter treeWriter = buildTestTree(conf);
+    final long updatedDataChecksum = treeWriter.toProto().getDataChecksum();
+    IncrementalReportSender<Container> icrSender = c -> {
+      // Check that the ICR contains expected info about the container.
+      ContainerReplicaProto report = c.getContainerReport();
+      long reportedID = report.getContainerID();
+      Assertions.assertEquals(containerData.getContainerID(), reportedID);
+
+      assertEquals(updatedDataChecksum, report.getDataChecksum());
+      icrCount.incrementAndGet();
+    };
+
+    ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
+    KeyValueHandler keyValueHandler = new KeyValueHandler(conf, randomDatanodeDetails().getUuidString(), containerSet,
+        mock(MutableVolumeSet.class), mock(ContainerMetrics.class), icrSender, checksumManager);
+
+
+    // Initially, container should have no checksum information.
+    assertEquals(0, containerData.getDataChecksum());
+    assertFalse(checksumManager.read(containerData).isPresent());
+    assertEquals(0, icrCount.get());
+
+    // Update container with checksum information.
+    keyValueHandler.updateContainerChecksum(container, treeWriter);
+    // Check ICR sent. The ICR sender verifies that the expected checksum is present in the report.
+    assertEquals(1, icrCount.get());
+    // Check checksum in memory.
+    assertEquals(updatedDataChecksum, containerData.getDataChecksum());
+    // Check disk content.
+    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(containerData).get();
+    assertTreesSortedAndMatch(treeWriter.toProto(), checksumInfo.getContainerMerkleTree());
+  }
+
   @Test
   public void testGetContainerChecksumInfoOnInvalidContainerStates() {
     when(handler.handleGetContainerChecksumInfo(any(), any())).thenCallRealMethod();
@@ -630,6 +683,20 @@ public class TestKeyValueHandler {
                 .setContainerType(ContainerType.KeyValueContainer).build())
         .setContainerID(containerID).setPipelineID(UUID.randomUUID().toString())
         .build();
+  }
+
+  private KeyValueContainer addContainer(KeyValueHandler keyValueHandler, ContainerLayoutVersion layoutVersion) {
+    KeyValueContainerData kvData = new KeyValueContainerData(DUMMY_CONTAINER_ID,
+        layoutVersion,
+        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+        UUID.randomUUID().toString());
+    kvData.setMetadataPath(tempDir.toString());
+    kvData.setDbFile(dbFile.toFile());
+    KeyValueContainer container = new KeyValueContainer(kvData, conf);
+    ContainerCommandRequestProto createContainerRequest =
+        createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID);
+    keyValueHandler.handleCreateContainer(createContainerRequest, container);
+    return container;
   }
 
   private KeyValueHandler createKeyValueHandler(Path path) throws IOException {
