@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -497,7 +498,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     keyDeletingService.shutdown();
     GenericTestUtils.waitFor(() -> keyDeletingService.getThreadCount() == 0, 1000,
         100000);
-    when(keyManager.getPendingDeletionKeys(anyInt())).thenAnswer(i -> {
+    when(keyManager.getPendingDeletionKeys(any(), anyInt())).thenAnswer(i -> {
       // wait for SDS to reach the KDS wait block before processing any key.
       GenericTestUtils.waitFor(keyDeletionWaitStarted::get, 1000, 100000);
       keyDeletionStarted.set(true);

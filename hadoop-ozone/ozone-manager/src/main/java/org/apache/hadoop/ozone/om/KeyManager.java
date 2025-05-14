@@ -123,12 +123,31 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * and a hashmap for key-value pair to be updated in the deletedTable.
    * @throws IOException
    */
-  PendingKeysDeletion getPendingDeletionKeys(int count) throws IOException;
+  PendingKeysDeletion getPendingDeletionKeys(
+      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
+      throws IOException;
+
+  /**
+   * Returns a PendingKeysDeletion. It has a list of pending deletion key info
+   * that ups to the given count.Each entry is a {@link BlockGroup}, which
+   * contains the info about the key name and all its associated block IDs.
+   * Second is a Mapping of Key-Value pair which is updated in the deletedTable.
+   *
+   * @param count max number of keys to return.
+   * @return a Pair of list of {@link BlockGroup} representing keys and blocks,
+   * and a hashmap for key-value pair to be updated in the deletedTable.
+   * @throws IOException
+   */
+  PendingKeysDeletion getPendingDeletionKeys(
+      String volume, String bucket, String startKey,
+      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
+      throws IOException;
 
   /**
    * Returns a list rename entries from the snapshotRenamedTable.
    *
-   * @param size max number of keys to return.
+   * @param count max number of keys to return.
+   * @param filter filter to apply on the entries.
    * @return a Pair of list of {@link org.apache.hadoop.hdds.utils.db.Table.KeyValue} representing the keys in the
    * underlying metadataManager.
    * @throws IOException
