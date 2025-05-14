@@ -107,7 +107,7 @@ public abstract class ContainerData {
   private transient Optional<Instant> lastDataScanTime = Optional.empty();
 
   public static final Charset CHARSET_ENCODING = StandardCharsets.UTF_8;
-  private static final String DUMMY_CHECKSUM = new String(new byte[64],
+  public static final String DUMMY_CHECKSUM = new String(new byte[64],
       CHARSET_ENCODING);
 
   // Common Fields need to be stored in .container file.
