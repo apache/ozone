@@ -134,8 +134,10 @@ public class TestHddsDispatcher {
     conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
     DatanodeDetails dd = randomDatanodeDetails();
-    MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf,
+    MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), "test", conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    volumeSet.getVolumesList().forEach(e -> e.setState(StorageVolume.VolumeState.NORMAL));
+    volumeSet.startAllVolume();
 
     try {
       UUID scmId = UUID.randomUUID();
@@ -260,7 +262,7 @@ public class TestHddsDispatcher {
 
     HddsVolume.Builder volumeBuilder =
         new HddsVolume.Builder(testDirPath).datanodeUuid(dd.getUuidString())
-            .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+            .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE).clusterID("test");
     // state of cluster : available (160) > 100  ,datanode volume
     // utilisation threshold not yet reached. container creates are successful.
     AtomicLong usedSpace = new AtomicLong(340);
@@ -272,6 +274,8 @@ public class TestHddsDispatcher {
     MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     when(volumeSet.getVolumesList())
         .thenReturn(Collections.singletonList(volumeBuilder.build()));
+    volumeSet.getVolumesList().get(0).setState(StorageVolume.VolumeState.NORMAL);
+    volumeSet.getVolumesList().get(0).start();
     try {
       UUID scmId = UUID.randomUUID();
       ContainerSet containerSet = newContainerSet();
@@ -524,7 +528,7 @@ public class TestHddsDispatcher {
   static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf, TokenVerifier tokenVerifier) throws IOException {
     ContainerSet containerSet = newContainerSet();
-    VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
+    MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     volumeSet.getVolumesList().stream().forEach(v -> {
       try {
@@ -534,6 +538,7 @@ public class TestHddsDispatcher {
         throw new RuntimeException(e);
       }
     });
+    volumeSet.startAllVolume();
     StateContext context = ContainerTestUtils.getMockContext(dd, conf);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     Map<ContainerType, Handler> handlers = Maps.newHashMap();

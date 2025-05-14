@@ -137,6 +137,7 @@ public class TestBlockDeletingService {
     datanodeUuid = UUID.randomUUID().toString();
     volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+    volumeSet.startAllVolume();
     createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
   }
 

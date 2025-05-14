@@ -128,6 +128,7 @@ public class TestSchemaTwoBackwardsCompatibility {
 
     volumeSet = new MutableVolumeSet(datanodeUuid, clusterID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+    volumeSet.startAllVolume();
 
     blockManager = new BlockManagerImpl(conf);
     chunkManager = new FilePerBlockStrategy(true, blockManager);

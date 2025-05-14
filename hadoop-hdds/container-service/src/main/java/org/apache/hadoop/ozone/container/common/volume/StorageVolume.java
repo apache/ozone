@@ -201,7 +201,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   }
 
   public void start() throws IOException {
-    if (state != VolumeState.FAILED) {
+    if (state == VolumeState.NORMAL) {
       SpaceUsageCheckParams checkParams = getSpaceUsageCheckParams(this, getContainerDirsPath());
       checkParams.setContainerUsedSpace(this::containerUsedSpace);
       volumeUsage = Optional.of(new VolumeUsage(checkParams, this.conf));

@@ -99,6 +99,7 @@ public class TestOzoneContainer {
         clusterId, conf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
     createDbInstancesForTestIfNeeded(volumeSet, clusterId, clusterId, conf);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
+    volumeSet.startAllVolume();
   }
 
   @AfterEach
