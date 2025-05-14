@@ -998,10 +998,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
 
     // Set the presigned URL to expire after one hour.
-    Date expiration = new java.util.Date();
-    long expTimeMillis = Instant.now().plusMillis(1000 * 60 * 60)
-        .toEpochMilli();
-    expiration.setTime(expTimeMillis);
+    Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
 
     // Generate the presigned URL
     GeneratePresignedUrlRequest generatePresignedUrlRequest =
