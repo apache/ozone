@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
+import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequestPath;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.KEY_CONTAINER;
@@ -31,9 +32,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -88,6 +91,9 @@ public class ReconContainerMetadataManagerImpl
 
   @Inject
   private ReconOMMetadataManager omMetadataManager;
+
+  @Inject
+  private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
 
   @Inject
   public ReconContainerMetadataManagerImpl(ReconDBProvider reconDBProvider,
@@ -674,6 +680,67 @@ public class ReconContainerMetadataManagerImpl
     }
     return containers;
   }
+
+  /**
+   * Get container key records from the containerKeyTable that match the given
+   * startPrefix or its subpaths for the provided containerId.
+   *
+   * @param containerId the container ID.
+   * @param startPrefix the key prefix to search for.
+   * @param limit       max number of records to return.
+   * @param isFSO       flag to indicate if the bucket is FSO.
+   * @return A List of ContainerKeyPrefix records if found; an empty list otherwise.
+   * @throws IOException if a DB operation fails.
+   */
+  @Override
+  public List<ContainerKeyPrefix> getKeyRecordsForPrefix(long containerId,
+                                                         String startPrefix,
+                                                         int limit,
+                                                         boolean isFSO)
+      throws IOException {
+    List<ContainerKeyPrefix> records = new ArrayList<>();
+    List<String> subPaths = new ArrayList<>();
+    subPaths.add(startPrefix);
+
+    if (isFSO) {
+      String[] names = parseRequestPath(startPrefix);
+      long parentId = Long.parseLong(names[names.length - 1]);
+      long volumeId = Long.parseLong(names[0]);
+      long bucketId = Long.parseLong(names[1]);
+
+      ReconUtils.gatherSubPaths(parentId, subPaths, volumeId, bucketId, reconNamespaceSummaryManager);
+    }
+
+    try (TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix, Integer>> containerIterator =
+             containerKeyTable.iterator()) {
+
+      for (String path : subPaths) {
+        // Seek to the first subPath (they are all prefixed similarly)
+        ContainerKeyPrefix seekKey = ContainerKeyPrefix.get(containerId, path);
+        KeyValue<ContainerKeyPrefix, Integer> seekKeyValue = containerIterator.seek(seekKey);
+
+        while (seekKeyValue != null &&
+            seekKeyValue.getKey().getKeyPrefix().startsWith(path) &&
+            records.size() < limit) {
+
+          ContainerKeyPrefix currentKey = seekKeyValue.getKey();
+          records.add(currentKey);
+
+          if (!containerIterator.hasNext()) {
+            break;
+          }
+          seekKeyValue = containerIterator.next();
+        }
+
+        if (records.size() >= limit) {
+          break;
+        }
+      }
+    }
+
+    return records;
+  }
+
 
   private void initializeKeyContainerTable() throws IOException {
     Instant start = Instant.now();
