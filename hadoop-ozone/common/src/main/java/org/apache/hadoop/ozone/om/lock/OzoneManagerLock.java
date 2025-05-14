@@ -587,7 +587,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     KEY_PATH_LOCK((byte) 5, "KEY_PATH_LOCK"), //63
     PREFIX_LOCK((byte) 6, "PREFIX_LOCK"), //127
     SNAPSHOT_LOCK((byte) 7, "SNAPSHOT_LOCK"), // = 255
-    SNAPSHOT_GC_LOCK((byte) 8, "SNAPSHOT_GC_LOCK");
+    SNAPSHOT_GC_LOCK("SNAPSHOT_GC_LOCK");
 
     // level of the resource
     private byte lockLevel;
@@ -665,6 +665,12 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       this.mask = (short) (Math.pow(2, lockLevel + 1) - 1);
       this.setMask = (short) Math.pow(2, lockLevel);
       this.name = name;
+    }
+
+    Resource(String name) {
+      this.name = name;
+      this.mask = 0;
+      this.setMask = 0;
     }
 
     boolean canLock(short lockSetVal) {
