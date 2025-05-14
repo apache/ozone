@@ -59,7 +59,11 @@ public class ContainerScanHelper {
     if (result.isDeleted()) {
       log.debug("Container [{}] has been deleted during the data scan.", containerId);
     } else {
-      controller.updateContainerChecksum(containerId, result.getDataTree());
+      try {
+        controller.updateContainerChecksum(containerId, result.getDataTree());
+      } catch (IOException ex) {
+        log.warn("Failed to update container checksum after scan of container {}", containerId, ex);
+      }
       if (!result.isHealthy()) {
         handleUnhealthyScanResult(containerId, result);
       }

@@ -158,8 +158,8 @@ public abstract class Handler {
    *
    * @param container The container to update
    * @param treeWriter The container merkle tree with the updated information about the container
-   * @throws IOException For errors sending an ICR. If updating the checksums on disk fails, the checksum information
-   *   will remain unchanged with no exception thrown.
+   * @throws IOException For errors sending an ICR or updating the container checksum on disk. If the disk update
+   * fails, the checksum in memory will not be updated.
    */
   public abstract void updateContainerChecksum(Container container, ContainerMerkleTreeWriter treeWriter)
       throws IOException;
