@@ -53,7 +53,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -260,7 +259,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             .build();
 
         try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
-          submitRequest(omRequest);
+          submitOMRequest(omRequest);
         }
       }
     }
@@ -298,14 +297,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           .setClientId(clientId.toString())
           .build();
       try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
-        submitRequest(omRequest);
+        submitOMRequest(omRequest);
       }
     }
 
-    private void submitRequest(OMRequest omRequest) {
+    private void submitOMRequest(OMRequest omRequest) {
       try {
-        Status status =
-            OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, getRunCount().get()).getStatus();
+        Status status = submitRequest(omRequest).getStatus();
         if (!Objects.equals(status, Status.OK)) {
           LOG.error("Request: {} failed with an status: {}. Will retry in the next run.", omRequest, status);
         }

@@ -442,7 +442,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     containerBalancer = new ContainerBalancer(this);
 
     // Emit initial safe mode status, as now handlers are registered.
-    scmSafeModeManager.emitSafeModeStatus();
+    scmSafeModeManager.start();
     scmHostName = HddsUtils.getHostName(conf);
 
     registerMXBean();
@@ -831,9 +831,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
-      scmSafeModeManager = new SCMSafeModeManager(conf,
-          containerManager, pipelineManager, scmNodeManager, eventQueue,
-          serviceManager, scmContext);
+      scmSafeModeManager = new SCMSafeModeManager(conf, scmNodeManager, pipelineManager,
+          containerManager, serviceManager, eventQueue, scmContext);
     }
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager, containerManager,
@@ -1971,7 +1970,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Force SCM out of safe mode.
    */
   public boolean exitSafeMode() {
-    scmSafeModeManager.exitSafeMode(eventQueue, true);
+    scmSafeModeManager.forceExitSafeMode();
     return true;
   }
 
