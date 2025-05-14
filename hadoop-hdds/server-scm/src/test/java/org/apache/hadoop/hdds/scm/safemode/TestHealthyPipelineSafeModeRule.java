@@ -256,7 +256,7 @@ public class TestHealthyPipelineSafeModeRule {
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline3.getId());
 
-      // Mark pipeline healthy
+      // Mark pipelines healthy
       pipeline1 = pipelineManager.getPipeline(pipeline1.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline1);
 
@@ -276,15 +276,10 @@ public class TestHealthyPipelineSafeModeRule {
       // No pipeline event have sent to SCMSafemodeManager
       assertFalse(healthyPipelineSafeModeRule.validate());
 
-      LogCapturer logCapturer = LogCapturer.captureLogs(SCMSafeModeManager.class);
-
       // fire event with pipeline create status with ratis type and factor 1
       // pipeline, validate() should return false
       firePipelineEvent(pipeline1, eventQueue);
 
-      GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
-          "replication factor isn't 3"),
-          1000, 5000);
       assertFalse(healthyPipelineSafeModeRule.validate());
 
       firePipelineEvent(pipeline2, eventQueue);
@@ -346,15 +341,15 @@ public class TestHealthyPipelineSafeModeRule {
       DatanodeDetails dnDead = pipeline.getNodes().get(0);
       nodeManager.setNodeState(dnDead, HddsProtos.NodeState.DEAD);
 
-      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, nodeManager, eventQueue,
-          serviceManager, scmContext);
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(config,
+          nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
+      scmSafeModeManager.start();
 
       LogCapturer logCapturer = LogCapturer.captureLogs(
           HealthyPipelineSafeModeRule.class);
 
-      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
-          scmSafeModeManager.getHealthyPipelineSafeModeRule();
+      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
+          .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
       // Fire the pipeline report
       firePipelineEvent(pipeline, eventQueue);
