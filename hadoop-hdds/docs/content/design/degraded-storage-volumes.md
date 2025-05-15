@@ -145,6 +145,27 @@ Ideally, volumes that are completely full should not be considered degraded or f
 
 In the future, we may want to handle completely full volumes by opening the RocksDB instance in read-only mode and only allowing read operations on the volume. While this may be a nice feature to have, it is more complicated to implement due to its effects on the delete path. This could have a ripple effect because SCM depends on replicas to ack deletes before it can proceed with operations like deleting empty containers. For simplicity the current proposal considers failure to obtain a DB write handle on startup a full volume failure and delegates read-only volumes as a separate feature.
 
+#### Identifying Volume Health with Metrics
+
+To identify degraded and failed volumes through metrics which can be plugged into an alerting system, we can expose counters for each volume health state per datanode: `NumHealthyVolumes`, `NumDegradedVolumes`, and `NumFailedVolumes`. When the counter for degraded or failed volumes goes above 0, it can be used to trigger an alert about an unhealthy volume on a datanode. This saves us from having to expose health state (which does not easily map to a numeric counter or gauge) as a per-volume metric in [VolumeInfoMetrics](https://github.com/apache/ozone/blob/536701649e1a3d5fa94e95888a566e213febb6ff/hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/common/volume/VolumeInfoMetrics.java#L64). Once the alert is raised, admins can use the command line to determine which volumes are concerning.
+
+#### Identifying Volume Health with the Command Line
+
+The `ozone admin datanode` command is currently lacking any specifc information about volumes. It is not clear where to put this information since the command's layout is atypical of other Ozone commands. Most commands follow the pattern of a `list` subcommand which gives a summary of each item, followed by an `info` command to get more detailed information. See `ozone admin container {info,list}` and `ozone sh {volume,bucket,key} {info,list}`. The datanode CLI instead provides two relevant subcommands:
+- `ozone admin datanode list` which provides very verbose information about each datanode, some of which could be saved for an `info` command
+- `ozone admin datanode usageinfo` which provides only information about total node capacity, in addition to verbose information about the original node when `--json` is used.
+    - This command adds further confusion because it seems to be intended to provide info on one node, but then provides options to obtain a list of most and least used nodes, changing it to a list type command.
+
+ This current CLI layout splits a dedicated `info` command between two commands that are each `list/info` hybrids. This makes it difficult to add new datanode information like we want for volumes. To improve the CLI in a compatible way we can take the following steps:
+ 1. Add sorting flags to `ozone admin datanode list` that allow sorting by node capacity.
+ 2. Add a counter for `totalVolumes` and `healthyVolumes` to each entry in `ozone admin datanode list`.
+     - This allows filtering for datanodes that have `healthyVolumes < totalVolumes` from a single place using `jq`.
+     - We could optionally add a flag to the `list` command to only give nodes with unhealthy volumes.
+ 3. Add an `ozone admin datanode info` command that gives all information about a datanode in a verbose json format.
+    - This includes its total usage info, per volume usage info, and volume health.
+ 4. Deprecate `ozone admin datanode usageinfo`.
+     - All its functionality should now be covered by `ozone admin datanode {list,info}`.
+ 
 ### Remediating Degraded Volumes
 
 Once degraded volumes can be reported to SCM, it is possible to take action for the affected data on that volume. When a degraded volume is encountered, we should:
