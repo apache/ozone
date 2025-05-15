@@ -59,7 +59,7 @@ Throttling is required so the Datanode doesn't cause a heartbeat storm on detect
 Instead of including the list of containers present on the full volume in the Storage Report, we could instead add the volume ID to the Container Replica proto. In the SCM, this would imply that we need to do a linear scan through all the Container Replica objects present in the system to figure out which containers are present on the full volume, which is slow. Alternatively we could build and maintain a map to do this, which is more complex than the proposed solution.
 
 ## Implementation Plan
-1. HDDS-12929: Initial code for including node report, triggering heartbeat, throttling.
+1. HDDS-13045: Initial code for including node report, triggering heartbeat, throttling.
 2. HDDS-12151: Fail a write call if it exceeds min free space boundary
 3. Future Jira: Handle full volume report on the SCM side - close containers.
 4. HDDS-12658: Try not to select full pipelines when allocating a block in SCM.
