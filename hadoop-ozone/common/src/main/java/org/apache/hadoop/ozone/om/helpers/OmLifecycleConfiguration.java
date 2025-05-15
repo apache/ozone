@@ -56,6 +56,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
   public static final int LC_MAX_RULES = 1000;
   private final String volume;
   private final String bucket;
+  private final BucketLayout bucketLayout;
   private final long creationTime;
   private final List<OmLCRule> rules;
 
@@ -69,6 +70,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     this.bucket = builder.bucket;
     this.rules = Collections.unmodifiableList(builder.rules);
     this.creationTime = builder.creationTime;
+    this.bucketLayout = builder.bucketLayout;
   }
 
   public List<OmLCRule> getRules() {
@@ -124,7 +126,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     }
 
     for (OmLCRule rule : rules) {
-      rule.valid();
+      rule.valid(bucketLayout);
     }
   }
 
@@ -158,10 +160,10 @@ public final class OmLifecycleConfiguration extends WithObjectID
    * Returns formatted key to be used as prevKey when listing lifecycle
    * configurations.
    *
-   * @return volume/bucket
+   * @return /volume/bucket
    */
   public String getFormattedKey() {
-    return volume + "/" + bucket;
+    return OzoneConsts.OM_KEY_PREFIX + volume + OzoneConsts.OM_KEY_PREFIX + bucket;
   }
 
   @Override
@@ -191,6 +193,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     LifecycleConfiguration.Builder b = LifecycleConfiguration.newBuilder()
         .setVolume(volume)
         .setBucket(bucket)
+        .setBucketLayout(bucketLayout.toProto())
         .setCreationTime(creationTime)
         .addAllRules(rulesProtoBuf)
         .setObjectID(getObjectID())
@@ -202,14 +205,16 @@ public final class OmLifecycleConfiguration extends WithObjectID
   public static OmLifecycleConfiguration getFromProtobuf(
       LifecycleConfiguration lifecycleConfiguration) throws OMException {
     List<OmLCRule> rulesList = new ArrayList<>();
+    BucketLayout layout = BucketLayout.fromProto(lifecycleConfiguration.getBucketLayout());
     for (LifecycleRule lifecycleRule : lifecycleConfiguration.getRulesList()) {
-      OmLCRule fromProtobuf = OmLCRule.getFromProtobuf(lifecycleRule);
+      OmLCRule fromProtobuf = OmLCRule.getFromProtobuf(lifecycleRule, layout);
       rulesList.add(fromProtobuf);
     }
 
     Builder builder = new Builder()
         .setVolume(lifecycleConfiguration.getVolume())
         .setBucket(lifecycleConfiguration.getBucket())
+        .setBucketLayout(layout)
         .setRules(rulesList);
 
     if (lifecycleConfiguration.hasCreationTime()) {
@@ -231,6 +236,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
   public static class Builder extends WithObjectID.Builder {
     private String volume = "";
     private String bucket = "";
+    private BucketLayout bucketLayout;
     private long creationTime;
     private List<OmLCRule> rules = new ArrayList<>();
 
@@ -248,6 +254,11 @@ public final class OmLifecycleConfiguration extends WithObjectID
 
     public Builder setBucket(String bucketName) {
       this.bucket = bucketName;
+      return this;
+    }
+
+    public Builder setBucketLayout(BucketLayout layout) {
+      this.bucketLayout = layout;
       return this;
     }
 

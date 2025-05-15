@@ -193,7 +193,7 @@ public class TestOmLifeCycleConfiguration {
         .build();
 
     assertFalse(rule.isEnabled());
-    assertDoesNotThrow(rule::valid);
+    assertDoesNotThrow(() -> rule.valid(BucketLayout.DEFAULT));
   }
 
   @Test

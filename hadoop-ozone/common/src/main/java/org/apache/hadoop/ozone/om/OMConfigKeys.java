@@ -175,6 +175,28 @@ public final class OMConfigKeys {
       OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT = false;
 
   /**
+   * Properties for Key/Object Lifecycle feature.
+   */
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL =
+      "ozone.lifecycle.service.interval";
+  public static final String
+      OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL_DEFAULT = "24h";
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT =
+      "ozone.lifecycle.service.timeout";
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT_DEFAULT
+      = "2h";
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_WORKERS =
+      "ozone.lifecycle.service.workers";
+  public static final int OZONE_KEY_LIFECYCLE_SERVICE_WORKERS_DEFAULT
+      = 5;
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_ENABLED =
+      "ozone.lifecycle.service.enabled";
+  public static final boolean OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT = false;
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE =
+      "ozone.lifecycle.service.delete.batch-size";
+  public static final int OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT = 1000000;
+
+  /**
    * OM Ratis related configurations.
    */
   public static final String OZONE_OM_RATIS_PORT_KEY

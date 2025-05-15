@@ -769,7 +769,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         addCacheMetrics);
 
     lifecycleConfigurationTable = this.store.getTable(LIFECYCLE_CONFIGURATION_TABLE,
-        String.class, OmLifecycleConfiguration.class);
+        String.class, OmLifecycleConfiguration.class, cacheType);
     checkTableStatus(lifecycleConfigurationTable, LIFECYCLE_CONFIGURATION_TABLE,
         addCacheMetrics);
   }
@@ -2084,6 +2084,32 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable() {
     return lifecycleConfigurationTable;
+  }
+
+  /**
+   * @return list all LifecycleConfigurations.
+   */
+  @Override
+  public List<OmLifecycleConfiguration> listLifecycleConfigurations() {
+    List<OmLifecycleConfiguration> result = Lists.newArrayList();
+
+    /* lifecycleConfigurationTable is full-cache, so we use cacheIterator. */
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmLifecycleConfiguration>>>
+        cacheIterator = getLifecycleConfigurationTable().cacheIterator();
+
+    OmLifecycleConfiguration lifecycleConfiguration;
+    while (cacheIterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmLifecycleConfiguration>> entry =
+          cacheIterator.next();
+      lifecycleConfiguration = entry.getValue().getCacheValue();
+      if (lifecycleConfiguration == null) {
+        // lifecycleConfiguration null means it's a deleted.
+        continue;
+      }
+      result.add(lifecycleConfiguration);
+    }
+
+    return result;
   }
 
   /**

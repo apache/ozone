@@ -82,6 +82,7 @@ public final class OMLCUtils {
     return new OmLifecycleConfiguration.Builder()
         .setVolume(volume)
         .setBucket(bucket)
+        .setBucketLayout(BucketLayout.DEFAULT)
         .setRules(rules);
   }
 

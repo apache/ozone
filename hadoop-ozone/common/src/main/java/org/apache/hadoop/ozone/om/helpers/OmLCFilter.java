@@ -18,9 +18,13 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.isValidKeyPath;
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.normalizePrefix;
+
 import jakarta.annotation.Nullable;
 import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilterTag;
@@ -33,6 +37,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
 public final class OmLCFilter {
 
   private final String prefix;
+  private final String canonicalPrefix;
+  private final boolean directoryStylePrefix;
   private final String tagKey;
   private final String tagValue;
   private final OmLifecycleRuleAndOperator andOperator;
@@ -43,10 +49,17 @@ public final class OmLCFilter {
 
   private OmLCFilter(Builder builder) {
     this.prefix = builder.prefix;
+    this.canonicalPrefix = builder.canonicalPrefix;
+    if (this.canonicalPrefix != null) {
+      this.directoryStylePrefix = this.canonicalPrefix.contains(OzoneConsts.OM_KEY_PREFIX);
+    } else {
+      this.directoryStylePrefix = false;
+    }
     this.andOperator = builder.andOperator;
     this.tagKey = builder.tagKey;
     this.tagValue = builder.tagValue;
   }
+
 
   /**
    * Validates the OmLCFilter.
@@ -58,7 +71,7 @@ public final class OmLCFilter {
    *
    * @throws OMException if the filter is invalid.
    */
-  public void valid() throws OMException {
+  public void valid(BucketLayout layout) throws OMException {
     boolean hasPrefix = prefix != null;
     boolean hasTag = hasTag();
     boolean hasAndOperator = andOperator != null;
@@ -69,8 +82,12 @@ public final class OmLCFilter {
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
+    if (hasPrefix && layout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      isValidKeyPath(normalizePrefix(prefix));
+    }
+
     if (andOperator != null) {
-      andOperator.valid();
+      andOperator.valid(layout);
     }
   }
 
@@ -84,11 +101,49 @@ public final class OmLCFilter {
   }
 
   @Nullable
+  public String getCanonicalPrefix() {
+    return canonicalPrefix;
+  }
+
+
+  @Nullable
   public Pair<String, String> getTag() {
     if (hasTag()) {
       return Pair.of(tagKey, tagValue);
     }
     return null;
+  }
+
+  public boolean verify(OmKeyInfo omKeyInfo) {
+    return verify(omKeyInfo, omKeyInfo.getKeyName());
+  }
+
+  public boolean verify(OmKeyInfo omKeyInfo, String keyPath) {
+    if (prefix != null) {
+      return keyPath.startsWith(canonicalPrefix);
+    } else if (hasTag()) {
+      String value = omKeyInfo.getTags().get(tagKey);
+      return (value != null && value.equals(tagValue));
+    } else if (andOperator != null) {
+      return andOperator.verify(omKeyInfo, keyPath);
+    } else {
+      // both prefix, tag, and andOperator are null
+      return true;
+    }
+  }
+
+  public boolean verify(OmDirectoryInfo dirInfo, String keyPath) {
+    if (prefix != null) {
+      return keyPath.startsWith(canonicalPrefix);
+    } else {
+      // directory(FSO bucket) doesn't support tag
+      // if prefix, tag, and andOperator are all null, means empty filter which covers all keys under bucket
+      return !(hasTag() || andOperator != null);
+    }
+  }
+
+  public boolean isDirectoryStylePrefix() {
+    return directoryStylePrefix || (andOperator != null ? andOperator.isDirectoryStylePrefix() : false);
   }
 
   public LifecycleFilter getProtobuf() {
@@ -110,18 +165,26 @@ public final class OmLCFilter {
     return filterBuilder.build();
   }
 
-  public static OmLCFilter getFromProtobuf(LifecycleFilter lifecycleFilter) throws OMException {
+  public static OmLCFilter getFromProtobuf(LifecycleFilter lifecycleFilter, BucketLayout layout) throws OMException {
     OmLCFilter.Builder builder = new Builder();
 
     if (lifecycleFilter.hasPrefix()) {
-      builder.setPrefix(lifecycleFilter.getPrefix());
+      String prefix = lifecycleFilter.getPrefix();
+      if (layout == BucketLayout.FILE_SYSTEM_OPTIMIZED && prefix.startsWith(OzoneConsts.OM_KEY_PREFIX)) {
+        String normalizedKeyName = normalizePrefix(prefix);
+        isValidKeyPath(normalizedKeyName);
+        builder.setCanonicalPrefix(normalizedKeyName);
+      } else {
+        builder.setCanonicalPrefix(prefix);
+      }
+      builder.setPrefix(prefix);
     }
     if (lifecycleFilter.hasTag()) {
       builder.setTag(lifecycleFilter.getTag().getKey(), lifecycleFilter.getTag().getValue());
     }
     if (lifecycleFilter.hasAndOperator()) {
       builder.setAndOperator(
-          OmLifecycleRuleAndOperator.getFromProtobuf(lifecycleFilter.getAndOperator()));
+          OmLifecycleRuleAndOperator.getFromProtobuf(lifecycleFilter.getAndOperator(), layout));
     }
 
     return builder.build();
@@ -146,12 +209,19 @@ public final class OmLCFilter {
    */
   public static class Builder {
     private String prefix = null;
+    private String canonicalPrefix = null;
     private String tagKey = null;
     private String tagValue = null;
     private OmLifecycleRuleAndOperator andOperator = null;
+    private BucketLayout bucketLayout;
 
     public Builder setPrefix(String lcPrefix) {
       this.prefix = lcPrefix;
+      return this;
+    }
+
+    public Builder setCanonicalPrefix(String canonicalPrefix) {
+      this.canonicalPrefix = canonicalPrefix;
       return this;
     }
 
@@ -166,11 +236,15 @@ public final class OmLCFilter {
       return this;
     }
 
+    public Builder setBucketLayout(BucketLayout layout) {
+      this.bucketLayout = layout;
+      return this;
+    }
+
     public OmLCFilter build() throws OMException {
       OmLCFilter omLCFilter = new OmLCFilter(this);
-      omLCFilter.valid();
+      omLCFilter.valid(bucketLayout);
       return omLCFilter;
     }
   }
-
 }
