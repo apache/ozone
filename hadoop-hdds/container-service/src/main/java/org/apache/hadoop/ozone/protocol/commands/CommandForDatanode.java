@@ -26,8 +26,7 @@ import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
 /**
  * Command for the datanode with the destination address.
  */
-public class CommandForDatanode<T extends Message> implements
-    IdentifiableEventPayload {
+public final class CommandForDatanode<T extends Message> implements IdentifiableEventPayload {
 
   private final DatanodeID datanodeId;
   private final SCMCommand<T> command;
@@ -53,5 +52,10 @@ public class CommandForDatanode<T extends Message> implements
   @Override
   public long getId() {
     return command.getId();
+  }
+
+  @Override
+  public String toString() {
+    return "CommandForDatanode{" + datanodeId + ", " + command + '}';
   }
 }
