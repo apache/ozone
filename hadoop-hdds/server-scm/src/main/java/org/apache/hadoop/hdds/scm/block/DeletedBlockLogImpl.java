@@ -30,7 +30,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -326,24 +325,20 @@ public class DeletedBlockLogImpl
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
   }
 
   private void getTransaction(DeletedBlocksTransaction tx,
       DatanodeDeletedBlockTransactions transactions,
       Set<DatanodeDetails> dnList, Set<ContainerReplica> replicas,
-      Map<UUID, Map<Long, CmdStatus>> commandStatus) {
-    DeletedBlocksTransaction updatedTxn =
-        DeletedBlocksTransaction.newBuilder(tx)
-            .setCount(transactionStatusManager.getOrDefaultRetryCount(
-              tx.getTxID(), 0))
-            .build();
-
+      Map<DatanodeID, Map<Long, CmdStatus>> commandStatus) {
     for (ContainerReplica replica : replicas) {
-      DatanodeDetails details = replica.getDatanodeDetails();
-      if (!transactionStatusManager.isDuplication(
-          details, updatedTxn.getTxID(), commandStatus)) {
-        transactions.addTransactionToDN(details.getID(), updatedTxn);
+      final DatanodeID datanodeID = replica.getDatanodeDetails().getID();
+      if (!transactionStatusManager.isDuplication(datanodeID, tx.getTxID(), commandStatus)) {
+        final DeletedBlocksTransaction updatedTxn = DeletedBlocksTransaction.newBuilder(tx)
+            .setCount(transactionStatusManager.getRetryCount(tx.getTxID()))
+            .build();
+        transactions.addTransactionToDN(datanodeID, updatedTxn);
         metrics.incrProcessedTransaction();
       }
     }
@@ -373,7 +368,7 @@ public class DeletedBlockLogImpl
       if (!dnList.contains(datanodeDetails)) {
         DatanodeDetails dnDetail = replica.getDatanodeDetails();
         LOG.debug("Skip Container = {}, because DN = {} is not in dnList.",
-            containerId, dnDetail.getUuid());
+            containerId, dnDetail);
         return true;
       }
     }
@@ -426,10 +421,10 @@ public class DeletedBlockLogImpl
 
         // Get the CmdStatus status of the aggregation, so that the current
         // status of the specified transaction can be found faster
-        Map<UUID, Map<Long, CmdStatus>> commandStatus =
+        final Map<DatanodeID, Map<Long, CmdStatus>> commandStatus =
             getSCMDeletedBlockTransactionStatusManager()
                 .getCommandStatusByTxId(dnList.stream().
-                map(DatanodeDetails::getUuid).collect(Collectors.toSet()));
+                map(DatanodeDetails::getID).collect(Collectors.toSet()));
         ArrayList<Long> txIDs = new ArrayList<>();
         metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
         Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = null;
@@ -510,7 +505,7 @@ public class DeletedBlockLogImpl
   public void recordTransactionCreated(DatanodeID dnId, long scmCmdId,
       Set<Long> dnTxSet) {
     getSCMDeletedBlockTransactionStatusManager()
-        .recordTransactionCreated(dnId.getUuid(), scmCmdId, dnTxSet);
+        .recordTransactionCreated(dnId, scmCmdId, dnTxSet);
   }
 
   @Override
@@ -520,7 +515,7 @@ public class DeletedBlockLogImpl
 
   @Override
   public void onDatanodeDead(DatanodeID dnId) {
-    getSCMDeletedBlockTransactionStatusManager().onDatanodeDead(dnId.getUuid());
+    getSCMDeletedBlockTransactionStatusManager().onDatanodeDead(dnId);
   }
 
   @Override
@@ -546,7 +541,7 @@ public class DeletedBlockLogImpl
           ContainerBlocksDeletionACKProto ackProto =
               commandStatus.getBlockDeletionAck();
           getSCMDeletedBlockTransactionStatusManager()
-              .commitTransactions(ackProto.getResultsList(), dnId.getUuid());
+              .commitTransactions(ackProto.getResultsList(), dnId);
           metrics.incrBlockDeletionCommandSuccess();
           metrics.incrDNCommandsSuccess(dnId, 1);
         } else if (status == CommandStatus.Status.FAILED) {
@@ -558,7 +553,7 @@ public class DeletedBlockLogImpl
         }
 
         getSCMDeletedBlockTransactionStatusManager()
-            .commitSCMCommandStatus(deleteBlockStatus.getCmdStatus(), dnId.getUuid());
+            .commitSCMCommandStatus(deleteBlockStatus.getCmdStatus(), dnId);
       } finally {
         lock.unlock();
       }

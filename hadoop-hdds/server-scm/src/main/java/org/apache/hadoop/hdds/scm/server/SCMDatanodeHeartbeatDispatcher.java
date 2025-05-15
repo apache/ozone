@@ -188,7 +188,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
       }
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Heartbeat dispatched: datanode=" + datanodeDetails.getUuid() + ", Commands= " + commands);
+      LOG.debug("Heartbeat dispatched: datanode {}, Commands: {}", datanodeDetails, commands);
     }
 
     return commands;
@@ -320,7 +320,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     @Override
     public int hashCode() {
-      return this.getDatanodeDetails().getUuid().hashCode();
+      return this.getDatanodeDetails().getID().hashCode();
     }
     
     @Override
@@ -368,7 +368,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     @Override
     public int hashCode() {
-      return this.getDatanodeDetails().getUuid().hashCode();
+      return this.getDatanodeDetails().getID().hashCode();
     }
 
     @Override
