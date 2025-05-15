@@ -47,7 +47,7 @@ that container. This is sent to the SCM in the next heartbeat and makes the SCM 
 ### Proposal
 This is the proposal, explained via a diagram.
 
-![img.png](../../static/img.png)
+![full-volume-handling.png](../../static/full-volume-handling.png)
 
 Throttling is required so the Datanode doesn't cause a heartbeat storm on detecting that some volumes are full in multiple write calls.
 
