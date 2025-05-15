@@ -314,7 +314,7 @@ public final class DBStoreBuilder {
 
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
-        tableConfigs.add(new TableConfig(name, defaultCfOptions));
+        tableConfigs.add(new TableConfig(name, getDefaultCFOptions()));
       } else {
         tableConfigs.add(new TableConfig(name, options));
       }
