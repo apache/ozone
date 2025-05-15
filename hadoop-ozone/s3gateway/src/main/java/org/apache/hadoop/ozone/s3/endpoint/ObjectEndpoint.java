@@ -405,16 +405,17 @@ public class ObjectEndpoint extends EndpointBase {
 
   /**
    * Validate S3 key path.
-   * disallows names containing ':'.
+   * disallows names containing "\", "{", "}", "<", ">", "^", "%", "~", "#", "|", "`", "[", "]", ":", Quotation marks
    * Throws OS3Exception if invalid.
    */
   public static void isValidKeyPath(String path) throws OS3Exception {
+    String checkValidKeyPathRegex = "^[^\\\\{}<>^%~#|`\\[\\]\"\\x80-\\xff:]+$";
 
     // Split path components
     String[] components = path.split("/");
 
     for (String component : components) {
-      if (component.contains(":")) {
+      if (!component.matches(checkValidKeyPathRegex)) {
         OS3Exception err = newError(S3ErrorTable.INVALID_REQUEST, path);
         err.setErrorMessage("Invalid key path: contains invalid characters.");
         throw err;
