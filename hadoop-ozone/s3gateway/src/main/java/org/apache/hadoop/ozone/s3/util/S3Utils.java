@@ -170,7 +170,9 @@ public final class S3Utils {
     }
     // Amazon S3 supports multiple content encoding values for example "Content-Encoding : aws-chunked,gzip"
     // We are only interested on "aws-chunked"
-    boolean containsAwsChunked = Arrays.asList(contentEncoding.split(",")).contains(AWS_CHUNKED);
+    boolean containsAwsChunked = Arrays.stream(contentEncoding.split(","))
+        .map(String::trim)
+        .anyMatch(AWS_CHUNKED::equals);
     if (!containsAwsChunked) {
       OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
       ex.setErrorMessage("An error occurred (InvalidArgument) for multi chunks upload: " +
