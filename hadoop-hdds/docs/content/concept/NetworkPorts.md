@@ -37,23 +37,23 @@ This document provides a comprehensive overview of the network ports utilized by
 | 9872                | `ozone.om.ratis.port.<service_id>.<node_id>`      | HTTP/2 | RPC endpoint for OM HA instances to form a RAFT consensus ring |
 | 8981                | `ozone.om.grpc.port`                          | HTTP/2 | gRPC endpoint for Ozone Manager clients |
 
-Note : except for `ozone.om.grpc.port`, all the above OM properties are suffixed with `service_id.node_id`.
+Note: except for `ozone.om.grpc.port`, all the above OM properties are suffixed with `service_id.node_id`.
 For example: `ozone.om.address.cluster1.om1`.
 
 # **Storage Container Manager (SCM)**
 
 | Default Port Number | Configuration Key | Endpoint Protocol | Purpose |
 | :---- | :---- | :---- | :---- |
-| 9860 | `ozone.scm.client.port.<service_id>.<node_id>` | Hadoop RPC | Communication with Ozone clients for namespace and container management. If ozone.scm.client.address is defined (default is empty), ozone.scm.client.address overrides it |
+| 9860 | `ozone.scm.client.port.<service_id>.<node_id>` | Hadoop RPC | Communication with Ozone clients for namespace and container management. `ozone.scm.client.address` overrides it, if defined (default is empty) |
 | 9863 | `ozone.scm.block.client.port.<service_id>.<node_id>` | Hadoop RPC | Communication with Datanodes for block-level operations |
-| 9861 | `ozone.scm.datanode.port.<service_id>.<node_id>` | Hadoop RPC | Port used by Datanodes to communicate with the SCM. If ozone.scm.datanode.address is defined (default is empty), ozone.scm.datanode.address overrides it |
+| 9861 | `ozone.scm.datanode.port.<service_id>.<node_id>` | Hadoop RPC | Port used by Datanodes to communicate with the SCM. `ozone.scm.datanode.address` overrides it, if defined (default is empty) |
 | 9961 | `ozone.scm.security.service.port.<service_id>.<node_id>`  | Hadoop RPC | SCM security server port |
 | 9876 | `ozone.scm.http-address.<service_id>.<node_id>` | HTTP | Web UI for monitoring SCM status |
 | 9877 | `ozone.scm.https-address.<service_id>.<node_id>` | HTTPS | Secure Web UI for monitoring SCM status |
 | 9894 | `ozone.scm.ratis.port.<service_id>.<node_id>`  | HTTP/2 | SCM Ratis HA |
 | 9895 | `ozone.scm.grpc.port.<service_id>.<node_id>`  | HTTP/2 | SCM GRPC server port |
 
-Note : all the above SCM properties are suffixed with `scm service_id.node_id`.
+Note: all the above SCM properties are suffixed with `service_id.node_id`.
 For example: `ozone.scm.client.port.scmservice.scm1`.
 
 # **Recon**
@@ -77,7 +77,7 @@ For example: `ozone.scm.client.port.scmservice.scm1`.
 
 | Default Port Number | Configuration Key | Endpoint Protocol | Purpose |
 | :---- | :---- | :---- | :---- |
-| 14000 | `httpfs.http.port` | HTTP or HTTPS | The HTTP port for HttpFS REST API. TLS is enabled if httpfs.ssl.enabled is true |
+| 14000 | `httpfs.http.port` | HTTP or HTTPS | The HTTP port for HttpFS REST API. TLS is enabled if `httpfs.ssl.enabled` is true |
 
 # **Datanode**
 
