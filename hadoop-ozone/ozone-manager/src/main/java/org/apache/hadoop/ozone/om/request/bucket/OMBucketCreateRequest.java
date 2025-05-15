@@ -53,8 +53,8 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator;
+import org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
@@ -397,10 +397,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+  @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CreateBucket
+      requestType = Type.CreateBucket,
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
   )
   public static OMRequest disallowCreateBucketWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -420,10 +420,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
     return req;
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+  @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CreateBucket
+      requestType = Type.CreateBucket,
+      applyBefore = OMLayoutFeature.BUCKET_LAYOUT_SUPPORT
   )
   public static OMRequest handleCreateBucketWithBucketLayoutDuringPreFinalize(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -461,10 +461,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
    * write to them, instead of using the server default which may be in a layout
    * they do not understand.
    */
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CreateBucket
+      requestType = Type.CreateBucket,
+      applyBefore =  ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
   public static OMRequest setDefaultBucketLayoutForOlderClients(OMRequest req,
       ValidationContext ctx) {
