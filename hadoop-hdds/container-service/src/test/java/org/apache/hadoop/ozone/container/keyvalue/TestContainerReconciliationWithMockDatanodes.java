@@ -312,6 +312,11 @@ public class TestContainerReconciliationWithMockDatanodes {
       this.conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, dataVolume.toString());
       conf.set(OZONE_METADATA_DIRS, metadataVolume.toString());
+      // This test triggers its own on-demand scans after reconciliation to retrieve the results. Scan gap must be
+      // disabled so that these checks run in addition to the on-demand scans triggered from inside reconciliation.
+      ContainerScannerConfiguration scanConf = conf.getObject(ContainerScannerConfiguration.class);
+      scanConf.setContainerScanMinGap(0);
+      conf.setFromObject(scanConf);
 
       containerSet = new ContainerSet(1000);
       MutableVolumeSet volumeSet = createVolumeSet();
