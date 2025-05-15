@@ -64,6 +64,19 @@ import picocli.CommandLine;
     name = "verify",
     description = "Run checks to verify data across replicas. By default prints only the keys with failed checks.")
 public class ReplicasVerify extends Handler {
+  static class Verification {
+    @CommandLine.Option(names = "--checksums",
+        description = "Do client side data checksum validation of all replicas.",
+        // value will be true only if the "--checksums" option was specified on the CLI
+        defaultValue = "false")
+    private boolean doExecuteChecksums;
+
+    @CommandLine.Option(names = "--block-existence",
+        description = "Check for block existence on datanodes.",
+        defaultValue = "false")
+    private boolean doExecuteBlockExistence;
+  }
+
   @CommandLine.Mixin
   private ScmOption scmOption;
 
@@ -82,19 +95,6 @@ public class ReplicasVerify extends Handler {
 
   @CommandLine.ArgGroup(exclusive = false, multiplicity = "1")
   private Verification verification;
-
-  static class Verification {
-    @CommandLine.Option(names = "--checksums",
-        description = "Do client side data checksum validation of all replicas.",
-        // value will be true only if the "--checksums" option was specified on the CLI
-        defaultValue = "false")
-    private boolean doExecuteChecksums;
-
-    @CommandLine.Option(names = "--block-existence",
-        description = "Check for block existence on datanodes.",
-        defaultValue = "false")
-    private boolean doExecuteBlockExistence;
-  }
 
   @CommandLine.Option(names = "--threads",
       description = "Number of threads to use for verification",
