@@ -23,9 +23,6 @@
   <name>Apache Ozone Dev Support</name>
   <description>Helper module for sharing resources among projects</description>
 
-  <properties>
-    <failIfNoTests>false</failIfNoTests>
-  </properties>
   <build>
     <resources>
       <resource>
