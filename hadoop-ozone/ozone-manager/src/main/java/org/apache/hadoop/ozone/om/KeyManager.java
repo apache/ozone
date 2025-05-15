@@ -146,8 +146,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   /**
    * Returns a list rename entries from the snapshotRenamedTable.
    *
-   * @param count max number of keys to return.
-   * @param filter filter to apply on the entries.
+   * @param size max number of keys to return.
    * @return a Pair of list of {@link org.apache.hadoop.hdds.utils.db.Table.KeyValue} representing the keys in the
    * underlying metadataManager.
    * @throws IOException
