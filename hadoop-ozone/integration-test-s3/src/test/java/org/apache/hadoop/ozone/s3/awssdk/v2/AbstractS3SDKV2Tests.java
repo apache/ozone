@@ -359,8 +359,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(fileContent));
 
     // Prepare a temp file for download
-    Path tempDownloadPath = Files.createTempFile("downloaded", ".txt");
-    File downloadFile = tempDownloadPath.toFile();
+    Path downloadPath = Files.createTempFile("downloaded", ".txt");
 
     // Set up S3TransferManager
     try (S3TransferManager transferManager =
@@ -369,7 +368,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       // First download
       DownloadFileRequest downloadRequest = DownloadFileRequest.builder()
           .getObjectRequest(b -> b.bucket(bucketName).key(keyName))
-          .destination(downloadFile.toPath())
+          .destination(downloadPath)
           .build();
       FileDownload download = transferManager.downloadFile(downloadRequest);
       ResumableFileDownload resumableFileDownload = download.pause();
@@ -382,8 +381,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       FileDownload resumedDownload = transferManager.resumeDownloadFile(resumableFileDownload);
       resumedDownload.completionFuture().get();
 
-      String downloadedContent = new String(Files.readAllBytes(downloadFile.toPath()), StandardCharsets.UTF_8);
+      String downloadedContent = new String(Files.readAllBytes(downloadPath), StandardCharsets.UTF_8);
       assertEquals(newContent, downloadedContent);
+
+      File downloadFile = downloadPath.toFile();
       assertTrue(downloadFile.delete());
     }
   }
