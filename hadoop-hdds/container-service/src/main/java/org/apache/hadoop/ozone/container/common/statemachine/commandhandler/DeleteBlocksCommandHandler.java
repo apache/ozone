@@ -375,8 +375,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       ContainerBlocksDeletionACKProto.Builder resultBuilder =
           ContainerBlocksDeletionACKProto.newBuilder().addAllResults(results);
-      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails()
-          .getUuid().toString());
+      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails().getUuidString());
       blockDeletionACK = resultBuilder.build();
 
       // Send ACK back to SCM as long as meta updated

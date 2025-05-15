@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT;
@@ -45,7 +46,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -79,6 +79,7 @@ public class TestReconWithOzoneManager {
   private static OMMetadataManager metadataManager;
   private static CloseableHttpClient httpClient;
   private static String taskStatusURL;
+  private static ReconService recon;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -109,17 +110,17 @@ public class TestReconWithOzoneManager {
         .setConnectionRequestTimeout(connectionTimeout)
         .setSocketTimeout(connectionRequestTimeout).build();
 
-    cluster =
-        MiniOzoneCluster.newBuilder(conf)
-            .setNumDatanodes(1)
-            .includeRecon(true)
-            .build();
+    recon = new ReconService(conf);
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .addService(recon)
+        .build();
     cluster.waitForClusterToBeReady();
     metadataManager = cluster.getOzoneManager().getMetadataManager();
 
     cluster.getStorageContainerManager().exitSafeMode();
 
-    String reconHTTPAddress = conf.get(ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY);
+    String reconHTTPAddress = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY);
     taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
 
     // initialize HTTPClient
@@ -179,7 +180,7 @@ public class TestReconWithOzoneManager {
     assertEquals("bucket0", keyInfo1.getBucketName());
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
+        recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
     OzoneManagerSyncMetrics metrics = impl.getMetrics();
 
@@ -221,10 +222,11 @@ public class TestReconWithOzoneManager {
         "lastUpdatedTimestamp");
 
     //restart Recon
-    cluster.restartReconServer();
+    recon.stop();
+    recon.start(cluster.getConf());
 
     impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
+        recon.getReconServer().getOzoneManagerServiceProvider();
 
     //add 5 more keys to OM
     addKeys(5, 10);
@@ -285,7 +287,7 @@ public class TestReconWithOzoneManager {
     assertEquals("bucket10", keyInfo1.getBucketName());
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
+        recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
     OzoneManagerSyncMetrics metrics = impl.getMetrics();
 
@@ -294,7 +296,7 @@ public class TestReconWithOzoneManager {
         .getDb().getLatestSequenceNumber();
 
     OMMetadataManager reconMetadataManagerInstance =
-        cluster.getReconServer().getOzoneManagerServiceProvider()
+        recon.getReconServer().getOzoneManagerServiceProvider()
             .getOMMetadataManagerInstance();
     long reconLatestSeqNumber =
         ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
