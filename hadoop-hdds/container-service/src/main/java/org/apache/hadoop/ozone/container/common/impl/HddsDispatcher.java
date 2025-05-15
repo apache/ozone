@@ -32,6 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -44,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
@@ -110,6 +112,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
   private long slowOpThresholdNs;
+  private AtomicLong fullVolumeLastHeartbeatTriggerMs;
+  private long fullVolumeHeartbeatThrottleIntervalMs;
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -130,6 +134,10 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     this.tokenVerifier = tokenVerifier != null ? tokenVerifier
         : new NoopTokenVerifier();
     this.slowOpThresholdNs = getSlowOpThresholdMs(conf) * 1000000;
+    fullVolumeLastHeartbeatTriggerMs = new AtomicLong(-1);
+    long heartbeatInterval =
+        config.getTimeDuration("hdds.heartbeat.interval", 30000, TimeUnit.MILLISECONDS);
+    fullVolumeHeartbeatThrottleIntervalMs = Math.min(heartbeatInterval, 30000);
 
     protocolMetrics =
         new ProtocolMessageMetrics<>(
@@ -335,7 +343,15 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     // Small performance optimization. We check if the operation is of type
     // write before trying to send CloseContainerAction.
     if (!HddsUtils.isReadOnly(msg)) {
-      sendCloseContainerActionIfNeeded(container);
+      boolean isFull = isVolumeFull(container);
+      sendCloseContainerActionIfNeeded(container, isFull);
+      if (isFull) {
+        try {
+          handleFullVolume(container.getContainerData().getVolume());
+        } catch (StorageContainerException e) {
+          ContainerUtils.logAndReturnError(LOG, e, msg);
+        }
+      }
     }
     Handler handler = getHandler(containerType);
     if (handler == null) {
@@ -403,7 +419,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // in any case, the in memory state of the container should be unhealthy
         Preconditions.checkArgument(
             container.getContainerData().getState() == State.UNHEALTHY);
-        sendCloseContainerActionIfNeeded(container);
+        sendCloseContainerActionIfNeeded(container, isVolumeFull(container));
       }
       if (cmdType == Type.CreateContainer
           && result == Result.SUCCESS && dispatcherContext != null) {
@@ -432,6 +448,36 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE,
           new Exception("UNSUPPORTED_REQUEST"));
       return unsupportedRequest(msg);
+    }
+  }
+
+  /**
+   * If the volume is full, we need to inform SCM about the latest volume usage stats and send the close container
+   * action for this container immediately. {@link HddsDispatcher#sendCloseContainerActionIfNeeded(Container, boolean)}
+   * just adds the action to the heartbeat. Here, we get the latest storage statistics for this node, add them to the
+   * heartbeat, and then send the heartbeat (including container close action) immediately.
+   * @param volume the volume being written to
+   */
+  private void handleFullVolume(HddsVolume volume) throws StorageContainerException {
+    long current = System.currentTimeMillis();
+    long last = fullVolumeLastHeartbeatTriggerMs.get();
+    boolean isFirstTrigger = last == -1;
+    boolean allowedToTrigger = (current - fullVolumeHeartbeatThrottleIntervalMs) >= last;
+    if (isFirstTrigger || allowedToTrigger) {
+      if (fullVolumeLastHeartbeatTriggerMs.compareAndSet(last, current)) {
+        StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReport;
+        try {
+          nodeReport = context.getParent().getContainer().getNodeReport();
+          context.refreshFullReport(nodeReport);
+          context.getParent().triggerHeartbeat();
+        } catch (IOException e) {
+          String volumePath = volume.getVolumeRootDir();
+          StorageLocationReport volumeReport = volume.getReport();
+          String error = String.format(
+              "Failed to create node report when handling full volume %s. Volume Report: %s", volumePath, volumeReport);
+          throw new StorageContainerException(error, e, Result.IO_EXCEPTION);
+        }
+      }
     }
   }
 
@@ -578,9 +624,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
    * marked unhealthy we send Close ContainerAction to SCM.
    * @param container current state of container
    */
-  private void sendCloseContainerActionIfNeeded(Container container) {
+  private void sendCloseContainerActionIfNeeded(Container container, boolean isVolumeFull) {
     // We have to find a more efficient way to close a container.
-    boolean isSpaceFull = isContainerFull(container) || isVolumeFull(container);
+    boolean isSpaceFull = isContainerFull(container) || isVolumeFull;
     boolean shouldClose = isSpaceFull || isContainerUnhealthy(container);
     if (shouldClose) {
       ContainerData containerData = container.getContainerData();
