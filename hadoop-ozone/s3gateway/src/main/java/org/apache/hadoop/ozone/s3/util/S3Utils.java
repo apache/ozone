@@ -165,19 +165,18 @@ public final class S3Utils {
     final String contentEncoding = headers.getHeaderString(HttpHeaders.CONTENT_ENCODING);
     // "Content-Encoding : aws-chunked" seems to only be sent for SDK V2, so ignore if there is no
     // Content-Encoding header
-    if (contentEncoding == null) {
-      return;
-    }
-    // Amazon S3 supports multiple content encoding values for example "Content-Encoding : aws-chunked,gzip"
-    // We are only interested on "aws-chunked"
-    boolean containsAwsChunked = Arrays.stream(contentEncoding.split(","))
-        .map(String::trim)
-        .anyMatch(AWS_CHUNKED::equals);
-    if (!containsAwsChunked) {
-      OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
-      ex.setErrorMessage("An error occurred (InvalidArgument) for multi chunks upload: " +
-          "The " + HttpHeaders.CONTENT_ENCODING + " header does not contain " + AWS_CHUNKED);
-      throw ex;
+    if (contentEncoding != null) {
+      // Amazon S3 supports multiple content encoding values for example "Content-Encoding : aws-chunked,gzip"
+      // We are only interested on "aws-chunked"
+      boolean containsAwsChunked = Arrays.stream(contentEncoding.split(","))
+          .map(String::trim)
+          .anyMatch(AWS_CHUNKED::equals);
+      if (!containsAwsChunked) {
+        OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
+        ex.setErrorMessage("An error occurred (InvalidArgument) for multi chunks upload: " +
+            "The " + HttpHeaders.CONTENT_ENCODING + " header does not contain " + AWS_CHUNKED);
+        throw ex;
+      }
     }
 
     if (amzDecodedContentLength == null) {
