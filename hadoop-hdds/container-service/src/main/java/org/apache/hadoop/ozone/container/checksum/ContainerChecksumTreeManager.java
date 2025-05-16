@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.checksum;
 
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -82,35 +83,46 @@ public class ContainerChecksumTreeManager {
    * The data merkle tree within the file is replaced with the {@code tree} parameter, but all other content of the
    * file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
+   * This method also updates the container's data checksum in the {@code data} parameter, which will be seen by SCM
+   * on container reports.
    */
   public ContainerProtos.ContainerChecksumInfo writeContainerDataTree(ContainerData data,
-                                                                      ContainerMerkleTreeWriter tree)
-      throws IOException {
+      ContainerMerkleTreeWriter tree) throws IOException {
     long containerID = data.getContainerID();
+    // If there is an error generating the tree and we cannot obtain a final checksum, use 0 to indicate a metadata
+    // failure.
+    long dataChecksum = 0;
+    ContainerProtos.ContainerChecksumInfo checksumInfo = null;
     Lock writeLock = getLock(containerID);
     writeLock.lock();
     try {
       ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
       try {
         // If the file is not present, we will create the data for the first time. This happens under a write lock.
-        checksumInfoBuilder = readBuilder(data)
-            .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
+        checksumInfoBuilder = readBuilder(data).orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
       } catch (IOException ex) {
-        LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
+        LOG.error("Failed to read container checksum tree file for container {}. Creating a new instance.",
             containerID, ex);
         checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
       }
 
-      ContainerProtos.ContainerChecksumInfo checksumInfo = checksumInfoBuilder
+      ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
+          tree::toProto);
+      checksumInfoBuilder
           .setContainerID(containerID)
-          .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto))
-          .build();
+          .setContainerMerkleTree(treeProto);
+      checksumInfo = checksumInfoBuilder.build();
       write(data, checksumInfo);
-      LOG.debug("Data merkle tree for container {} updated", containerID);
-      return checksumInfo;
+      // If write succeeds, update the checksum in memory. Otherwise 0 will be used to indicate the metadata failure.
+      dataChecksum = treeProto.getDataChecksum();
+      LOG.debug("Merkle tree for container {} updated with container data checksum {}", containerID,
+          checksumToString(dataChecksum));
     } finally {
+      // Even if persisting the tree fails, we should still update the data checksum in memory to report back to SCM.
+      data.setDataChecksum(dataChecksum);
       writeLock.unlock();
     }
+    return checksumInfo;
   }
 
   /**
@@ -297,6 +309,17 @@ public class ContainerChecksumTreeManager {
     // chunks from us when they reconcile.
   }
 
+  public static long getDataChecksum(ContainerProtos.ContainerChecksumInfo checksumInfo) {
+    return checksumInfo.getContainerMerkleTree().getDataChecksum();
+  }
+
+  /**
+   * Returns whether the container checksum tree file for the specified container exists without deserializing it.
+   */
+  public static boolean hasContainerChecksumFile(ContainerData data) {
+    return getContainerChecksumFile(data).exists();
+  }
+
   /**
    * Returns the container checksum tree file for the specified container without deserializing it.
    */
@@ -355,8 +378,6 @@ public class ContainerChecksumTreeManager {
       throw new IOException("Error occurred when writing container merkle tree for containerID "
           + data.getContainerID(), ex);
     }
-    // Set in-memory data checksum.
-    data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
   }
 
   /**
@@ -406,7 +427,7 @@ public class ContainerChecksumTreeManager {
     return this.metrics;
   }
 
-  public static boolean checksumFileExist(Container container) {
+  public static boolean checksumFileExist(Container<?> container) {
     File checksumFile = getContainerChecksumFile(container.getContainerData());
     return checksumFile.exists();
   }

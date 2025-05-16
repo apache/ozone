@@ -125,6 +125,7 @@ public class OzoneContainer {
   private final XceiverServerSpi readChannel;
   private final ContainerController controller;
   private BackgroundContainerMetadataScanner metadataScanner;
+  private OnDemandContainerDataScanner onDemandScanner;
   private List<BackgroundContainerDataScanner> dataScanners;
   private List<AbstractBackgroundContainerScanner> backgroundScanners;
   private final BlockDeletingService blockDeletingService;
@@ -439,7 +440,8 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    OnDemandContainerDataScanner.init(c, controller);
+    onDemandScanner = new OnDemandContainerDataScanner(c, controller);
+    containerSet.registerContainerScanHandler(onDemandScanner::scanContainer);
   }
 
   /**
@@ -458,7 +460,7 @@ public class OzoneContainer {
     for (BackgroundContainerDataScanner s : dataScanners) {
       s.shutdown();
     }
-    OnDemandContainerDataScanner.shutdown();
+    onDemandScanner.shutdown();
   }
 
   @VisibleForTesting

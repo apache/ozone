@@ -194,7 +194,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         + ", keyCount=" + keyCount
         + ", bytesUsed=" + bytesUsed
         + ", " + (isEmpty ? "empty" : "non-empty")
-        + ", dataChecksum=" + dataChecksum +
+        + ", dataChecksum=" + dataChecksum
         + '}';
   }
 

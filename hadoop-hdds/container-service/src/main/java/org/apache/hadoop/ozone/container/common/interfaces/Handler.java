@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Clock;
-import java.util.Set;
+import java.util.Collection;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -203,7 +203,7 @@ public abstract class Handler {
    * @param peers The other datanodes with a copy of this container whose data should be checked.
    */
   public abstract void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
-      Set<DatanodeDetails> peers) throws IOException;
+      Collection<DatanodeDetails> peers) throws IOException;
 
   /**
    * Deletes the given files associated with a block of the container.

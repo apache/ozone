@@ -23,22 +23,6 @@ import java.io.File;
  * This class is used to identify any error that may be seen while scanning a container.
  */
 public class ContainerScanError {
-  /**
-   * Represents the reason a container scan failed and a container should
-   * be marked unhealthy.
-   */
-  public enum FailureType {
-    MISSING_CONTAINER_DIR,
-    MISSING_METADATA_DIR,
-    MISSING_CONTAINER_FILE,
-    MISSING_CHUNKS_DIR,
-    MISSING_CHUNK_FILE,
-    CORRUPT_CONTAINER_FILE,
-    CORRUPT_CHUNK,
-    INCONSISTENT_CHUNK_LENGTH,
-    INACCESSIBLE_DB,
-    WRITE_FAILURE,
-  }
 
   private final File unhealthyFile;
   private final FailureType failureType;
@@ -65,5 +49,22 @@ public class ContainerScanError {
   @Override
   public String toString() {
     return failureType + " for file " + unhealthyFile + " with exception: " + exception;
+  }
+
+  /**
+   * Represents the reason a container scan failed and a container should
+   * be marked unhealthy.
+   */
+  public enum FailureType {
+    MISSING_CONTAINER_DIR,
+    MISSING_METADATA_DIR,
+    MISSING_CONTAINER_FILE,
+    MISSING_CHUNKS_DIR,
+    MISSING_CHUNK_FILE,
+    CORRUPT_CONTAINER_FILE,
+    CORRUPT_CHUNK,
+    INCONSISTENT_CHUNK_LENGTH,
+    INACCESSIBLE_DB,
+    WRITE_FAILURE,
   }
 }

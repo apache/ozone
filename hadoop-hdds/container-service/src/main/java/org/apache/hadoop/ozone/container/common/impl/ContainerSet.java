@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.ToLongFunction;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
@@ -67,6 +68,8 @@ public class ContainerSet implements Iterable<Container<?>> {
   private final Clock clock;
   private long recoveringTimeout;
   private final Table<ContainerID, String> containerIdsTable;
+  // Handler that will be invoked when a scan of a container in this set is requested.
+  private Consumer<Container<?>> containerScanHandler;
 
   public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
     return new ContainerSet(null, recoveringTimeout);
@@ -122,6 +125,29 @@ public class ContainerSet implements Iterable<Container<?>> {
       throw new StorageContainerException(String.format("Container with container Id %d with state : %s is missing in" +
           " the DN.", containerId, state),
           ContainerProtos.Result.CONTAINER_MISSING);
+    }
+  }
+
+  /**
+   * @param scanner A callback that will be invoked when a scan of a container in this set is requested.
+   */
+  public void registerContainerScanHandler(Consumer<Container<?>> scanner) {
+    this.containerScanHandler = scanner;
+  }
+
+  /**
+   * Triggers a scan of a container in this set using the registered scan handler. This is a no-op if no scan handler
+   * is registered or the container does not exist in the set.
+   * @param containerID The container in this set to scan.
+   */
+  public void scanContainer(long containerID) {
+    if (containerScanHandler != null) {
+      Container<?> container = getContainer(containerID);
+      if (container != null) {
+        containerScanHandler.accept(container);
+      } else {
+        LOG.warn("Request to scan container {} which was not found in the container set", containerID);
+      }
     }
   }
 
