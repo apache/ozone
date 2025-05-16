@@ -37,6 +37,7 @@
     <module>httpfsgateway</module>
     <module>insight</module>
     <module>integration-test</module>
+    <module>integration-test-recon</module>
     <module>integration-test-s3</module>
     <module>interface-client</module>
     <module>interface-storage</module>

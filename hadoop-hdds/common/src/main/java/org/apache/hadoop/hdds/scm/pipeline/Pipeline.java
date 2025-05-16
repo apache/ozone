@@ -573,6 +573,11 @@ public final class Pipeline {
       }
     }
 
+    public Builder setId(DatanodeID datanodeID) {
+      this.id = datanodeID.toPipelineID();
+      return this;
+    }
+
     public Builder setId(PipelineID id1) {
       this.id = id1;
       return this;

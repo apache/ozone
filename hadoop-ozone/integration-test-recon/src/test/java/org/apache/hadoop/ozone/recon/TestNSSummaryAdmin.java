@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.shell;
+package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,7 +59,9 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
     conf.set(OZONE_RECON_ADDRESS_KEY, "localhost:9888");
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .withoutDatanodes().includeRecon(true).build();
+        .withoutDatanodes()
+        .addService(new ReconService(conf))
+        .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     store = client.getObjectStore();
