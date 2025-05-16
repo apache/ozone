@@ -146,7 +146,6 @@ import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -154,7 +153,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Test class that exercises the StorageContainerManager.
  */
-@Timeout(900)
 public class TestStorageContainerManager {
   private static final int KEY_COUNT = 5;
   private static final String LOCALHOST_IP = "127.0.0.1";
@@ -632,7 +630,7 @@ public class TestStorageContainerManager {
    */
   private void testScmProcessDatanodeHeartbeat(MiniOzoneCluster cluster) {
     NodeManager nodeManager = cluster.getStorageContainerManager().getScmNodeManager();
-    List<DatanodeDetails> allNodes = nodeManager.getAllNodes();
+    List<? extends DatanodeDetails> allNodes = nodeManager.getAllNodes();
     assertEquals(cluster.getHddsDatanodes().size(), allNodes.size());
 
     for (DatanodeDetails node : allNodes) {

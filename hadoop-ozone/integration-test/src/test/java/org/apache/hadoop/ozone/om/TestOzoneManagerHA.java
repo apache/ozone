@@ -68,12 +68,10 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Base class for Ozone Manager HA tests.
  */
-@Timeout(300)
 public abstract class TestOzoneManagerHA {
 
   private static MiniOzoneHAClusterImpl cluster = null;

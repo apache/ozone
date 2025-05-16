@@ -28,7 +28,6 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Arrays;
 import javax.sql.DataSource;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
@@ -41,13 +40,13 @@ import org.slf4j.LoggerFactory;
  */
 @UpgradeActionRecon(feature = UNHEALTHY_CONTAINER_REPLICA_MISMATCH, type = FINALIZE)
 public class UnhealthyContainerReplicaMismatchAction implements ReconUpgradeAction {
-  private static final Logger LOG = LoggerFactory.getLogger(InitialConstraintUpgradeAction.class);
+  private static final Logger LOG = LoggerFactory.getLogger(UnhealthyContainerReplicaMismatchAction.class);
   private DataSource dataSource;
   private DSLContext dslContext;
 
   @Override
-  public void execute(ReconStorageContainerManagerFacade scmFacade) throws Exception {
-    this.dataSource = scmFacade.getDataSource();
+  public void execute(DataSource source) throws Exception {
+    this.dataSource = source;
     try (Connection conn = dataSource.getConnection()) {
       if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
         return;

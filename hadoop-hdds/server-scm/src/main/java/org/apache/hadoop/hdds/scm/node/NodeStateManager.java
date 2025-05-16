@@ -35,7 +35,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -84,13 +83,6 @@ import org.slf4j.LoggerFactory;
  * as soon as you read it.
  */
 public class NodeStateManager implements Runnable, Closeable {
-
-  /**
-   * Node's life cycle events.
-   */
-  private enum NodeLifeCycleEvent {
-    TIMEOUT, RESTORE, RESURRECT, LAYOUT_MISMATCH, LAYOUT_MATCH
-  }
 
   private static final Logger LOG = LoggerFactory
       .getLogger(NodeStateManager.class);
@@ -361,7 +353,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @return number of pipelines associated with it
    */
   public int getPipelinesCount(DatanodeDetails datanodeDetails) {
-    return node2PipelineMap.getPipelinesCount(datanodeDetails.getUuid());
+    return node2PipelineMap.getPipelinesCount(datanodeDetails.getID());
   }
 
   /**
@@ -552,6 +544,10 @@ public class NodeStateManager implements Runnable, Closeable {
     return nodeStateMap.getAllDatanodeInfos();
   }
 
+  int getAllNodeCount() {
+    return nodeStateMap.getNodeCount();
+  }
+
   /**
    * Sets the operational state of the given node. Intended to be called when
    * a node is being decommissioned etc.
@@ -602,7 +598,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @param dnId - Datanode ID
    * @return Set of PipelineID
    */
-  public Set<PipelineID> getPipelineByDnID(UUID dnId) {
+  public Set<PipelineID> getPipelineByDnID(DatanodeID dnId) {
     return node2PipelineMap.getPipelines(dnId);
   }
 
@@ -1075,5 +1071,12 @@ public class NodeStateManager implements Runnable, Closeable {
 
   protected void removeNode(DatanodeID datanodeID) {
     nodeStateMap.removeNode(datanodeID);
+  }
+
+  /**
+   * Node's life cycle events.
+   */
+  private enum NodeLifeCycleEvent {
+    TIMEOUT, RESTORE, RESURRECT, LAYOUT_MISMATCH, LAYOUT_MATCH
   }
 }

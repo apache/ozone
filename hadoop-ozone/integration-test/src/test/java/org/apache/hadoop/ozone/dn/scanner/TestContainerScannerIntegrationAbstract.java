@@ -54,12 +54,10 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * This class tests the data scanner functionality.
  */
-@Timeout(300)
 public abstract class TestContainerScannerIntegrationAbstract {
 
   private static MiniOzoneCluster cluster;

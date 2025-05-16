@@ -25,10 +25,10 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -46,11 +46,10 @@ import org.slf4j.LoggerFactory;
  */
 public final class ReplicationManagerUtil {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ReplicationManagerUtil.class);
+
   private ReplicationManagerUtil() {
   }
-
-  private static final Logger LOG = LoggerFactory.getLogger(
-      ReplicationManagerUtil.class);
 
   /**
    * Using the passed placement policy attempt to select a list of datanodes to
@@ -332,7 +331,7 @@ public final class ReplicationManagerUtil {
       Function<DatanodeDetails, NodeStatus> nodeStatusFn) {
     // Gather the origin node IDs of replicas which are not candidates for
     // deletion.
-    Set<UUID> existingOriginNodeIDs = allReplicas.stream()
+    final Set<DatanodeID> existingOriginNodeIDs = allReplicas.stream()
         .filter(r -> !deleteCandidates.contains(r))
         .filter(r -> {
           NodeStatus status = nodeStatusFn.apply(r.getDatanodeDetails());
@@ -375,7 +374,7 @@ public final class ReplicationManagerUtil {
     return nonUniqueDeleteCandidates;
   }
 
-  private static void checkUniqueness(Set<UUID> existingOriginNodeIDs,
+  private static void checkUniqueness(Set<DatanodeID> existingOriginNodeIDs,
       List<ContainerReplica> nonUniqueDeleteCandidates,
       ContainerReplica replica) {
     if (existingOriginNodeIDs.contains(replica.getOriginDatanodeId())) {

@@ -45,29 +45,28 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Ozone Recon.
  */
-@Timeout(300)
 public class TestReconWithOzoneManagerFSO {
 
   private static OzoneClient client;
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static ObjectStore store;
+  private static ReconService recon;
 
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
-    cluster =
-            MiniOzoneCluster.newBuilder(conf)
-                    .setNumDatanodes(3)
-                    .includeRecon(true)
-                    .build();
+    recon = new ReconService(conf);
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(3)
+        .addService(recon)
+        .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
@@ -100,16 +99,16 @@ public class TestReconWithOzoneManagerFSO {
     // add a vol, bucket and key
     addKeys(0, 10, "dir");
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-            cluster.getReconServer().getOzoneManagerServiceProvider();
+            recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
     ReconNamespaceSummaryManager namespaceSummaryManager =
-            cluster.getReconServer().getReconNamespaceSummaryManager();
+            recon.getReconServer().getReconNamespaceSummaryManager();
     ReconOMMetadataManager omMetadataManagerInstance =
             (ReconOMMetadataManager)
-                    cluster.getReconServer().getOzoneManagerServiceProvider()
+                    recon.getReconServer().getOzoneManagerServiceProvider()
                             .getOMMetadataManagerInstance();
     OzoneStorageContainerManager reconSCM =
-            cluster.getReconServer().getReconStorageContainerManager();
+            recon.getReconServer().getReconStorageContainerManager();
     NSSummaryEndpoint endpoint = new NSSummaryEndpoint(namespaceSummaryManager,
             omMetadataManagerInstance, reconSCM);
     Response basicInfo = endpoint.getBasicInfo("/vol1/bucket1/dir1");

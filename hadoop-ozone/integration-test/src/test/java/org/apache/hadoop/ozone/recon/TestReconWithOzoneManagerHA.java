@@ -48,12 +48,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * This class sets up a MiniOzoneOMHACluster to test with Recon.
  */
-@Timeout(300)
 public class TestReconWithOzoneManagerHA {
 
   private MiniOzoneHAClusterImpl cluster;
@@ -61,6 +59,7 @@ public class TestReconWithOzoneManagerHA {
   private static final String OM_SERVICE_ID = "omService1";
   private static final String VOL_NAME = "testrecon";
   private OzoneClient client;
+  private ReconService recon;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -72,10 +71,11 @@ public class TestReconWithOzoneManagerHA {
     conf.setFromObject(dbConf);
 
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    recon = new ReconService(conf);
     builder.setOMServiceId(OM_SERVICE_ID)
         .setNumOfOzoneManagers(3)
         .setNumDatanodes(1)
-        .includeRecon(true);
+        .addService(recon);
     cluster = builder.build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
@@ -110,7 +110,7 @@ public class TestReconWithOzoneManagerHA {
     assertTrue(ozoneManager.get().isLeaderReady(), "Should have gotten the leader!");
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
+        recon.getReconServer().getOzoneManagerServiceProvider();
 
     String hostname =
         ozoneManager.get().getHttpServer().getHttpAddress().getHostName();
@@ -133,7 +133,7 @@ public class TestReconWithOzoneManagerHA {
     impl.syncDataFromOM();
 
     ReconContainerMetadataManager reconContainerMetadataManager =
-        cluster.getReconServer().getReconContainerMetadataManager();
+        recon.getReconServer().getReconContainerMetadataManager();
     try (TableIterator iterator =
         reconContainerMetadataManager.getContainerTableIterator()) {
       String reconKeyPrefix = null;

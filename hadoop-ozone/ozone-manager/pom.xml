@@ -113,6 +113,18 @@
       <artifactId>commons-lang3</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-auth</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdfs-client</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.kerby</groupId>
       <artifactId>kerby-util</artifactId>
     </dependency>
@@ -131,10 +143,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-config</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-server</artifactId>
     </dependency>
     <!-- hdds.proto and generated files are required from there -->
     <dependency>
@@ -391,7 +399,8 @@
           </annotationProcessorPaths>
           <annotationProcessors>
             <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
-            <annotationProcessor>org.apache.ozone.annotations.RequestFeatureValidatorProcessor</annotationProcessor>
+            <annotationProcessor>org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor</annotationProcessor>
+            <annotationProcessor>org.apache.ozone.annotations.RegisterValidatorProcessor</annotationProcessor>
           </annotationProcessors>
         </configuration>
       </plugin>

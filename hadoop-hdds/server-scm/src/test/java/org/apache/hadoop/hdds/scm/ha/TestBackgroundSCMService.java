@@ -92,7 +92,7 @@ public class TestBackgroundSCMService {
 
     // go into safe mode, RUNNING -> PAUSING
     scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+        SCMSafeModeManager.SafeModeStatus.of(true, true));
     backgroundSCMService.notifyStatusChanged();
     assertFalse(backgroundSCMService.shouldRun());
   }

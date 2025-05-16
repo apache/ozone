@@ -22,7 +22,9 @@ import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
@@ -30,7 +32,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DIS
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
-import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -92,11 +95,16 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
@@ -116,7 +124,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -138,7 +146,9 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.CompactionNode;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Slow;
 import org.junit.jupiter.api.AfterAll;
@@ -214,9 +224,12 @@ public abstract class TestOmSnapshot {
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
-    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion());
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, KeyManagerImpl.DISABLE_VALUE);
+    if (!disableNativeDiff) {
+      conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 0, TimeUnit.SECONDS);
+    }
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .build();
@@ -1938,19 +1951,19 @@ public abstract class TestOmSnapshot {
       throws IOException {
     if (!bucketLayout.isFileSystemOptimized()) {
       return getRdbStore().getDb().getSstFileList().stream()
-          .filter(x -> StringUtils.bytes2String(x.columnFamilyName()).equals(OmMetadataManagerImpl.KEY_TABLE))
+          .filter(x -> StringUtils.bytes2String(x.columnFamilyName()).equals(KEY_TABLE))
           .collect(Collectors.toList());
     }
     return getRdbStore().getDb().getSstFileList().stream()
-        .filter(x -> StringUtils.bytes2String(x.columnFamilyName()).equals(OmMetadataManagerImpl.FILE_TABLE))
+        .filter(x -> StringUtils.bytes2String(x.columnFamilyName()).equals(FILE_TABLE))
         .collect(Collectors.toList());
   }
 
   private void flushKeyTable() throws IOException {
     if (!bucketLayout.isFileSystemOptimized()) {
-      getRdbStore().getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
+      getRdbStore().getDb().flush(KEY_TABLE);
     } else {
-      getRdbStore().getDb().flush(OmMetadataManagerImpl.FILE_TABLE);
+      getRdbStore().getDb().flush(FILE_TABLE);
     }
   }
 
@@ -2478,6 +2491,44 @@ public abstract class TestOmSnapshot {
     assertEquals(200,
         fetchReportPage(volume1, bucket3, "bucket3-snap1", "bucket3-snap3",
             null, 0).getDiffList().size());
+
+    if (!disableNativeDiff) {
+      // Prune SST files in compaction backup directory.
+      RocksDatabase db = getRdbStore().getDb();
+      RocksDBCheckpointDiffer differ = getRdbStore().getRocksDBCheckpointDiffer();
+      differ.pruneSstFileValues();
+
+      // Verify backup SST files are pruned on DB compactions.
+      java.nio.file.Path sstBackUpDir = java.nio.file.Paths.get(differ.getSSTBackupDir());
+      try (ManagedOptions managedOptions = new ManagedOptions();
+           ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
+               db.getManagedRocksDb().get().newIterator(db.getColumnFamily(COMPACTION_LOG_TABLE).getHandle()))) {
+        managedRocksIterator.get().seekToFirst();
+        while (managedRocksIterator.get().isValid()) {
+          byte[] value = managedRocksIterator.get().value();
+          CompactionLogEntry compactionLogEntry = CompactionLogEntry.getFromProtobuf(
+              CompactionLogEntryProto.parseFrom(value));
+          compactionLogEntry.getInputFileInfoList().forEach(
+              f -> {
+                java.nio.file.Path file = sstBackUpDir.resolve(f.getFileName() + ".sst");
+                if (COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(f.getColumnFamily()) && java.nio.file.Files.exists(file)) {
+                  assertTrue(f.isPruned());
+                  try (ManagedRawSSTFileReader<byte[]> sstFileReader = new ManagedRawSSTFileReader<>(
+                          managedOptions, file.toFile().getAbsolutePath(), 2 * 1024 * 1024);
+                       ManagedRawSSTFileIterator<byte[]> itr = sstFileReader.newIterator(
+                           keyValue -> keyValue.getValue(), null, null)) {
+                    while (itr.hasNext()) {
+                      assertEquals(0, itr.next().length);
+                    }
+                  }
+                } else {
+                  assertFalse(f.isPruned());
+                }
+              });
+          managedRocksIterator.get().next();
+        }
+      }
+    }
   }
 
   @Test

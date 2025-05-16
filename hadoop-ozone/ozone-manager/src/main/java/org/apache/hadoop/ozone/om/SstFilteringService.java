@@ -83,6 +83,8 @@ public class SstFilteringService extends BackgroundService
 
   private AtomicBoolean running;
 
+  private final BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock();
+
   public static boolean isSstFiltered(OzoneConfiguration ozoneConfiguration, SnapshotInfo snapshotInfo) {
     Path sstFilteredFile = Paths.get(OmSnapshotManager.getSnapshotPath(ozoneConfiguration,
         snapshotInfo), SST_FILTERED_FILE);
@@ -100,9 +102,6 @@ public class SstFilteringService extends BackgroundService
     snapshotFilteredCount = new AtomicLong(0);
     running = new AtomicBoolean(false);
   }
-
-  private final BootstrapStateHandler.Lock lock =
-      new BootstrapStateHandler.Lock();
 
   @Override
   public void start() {

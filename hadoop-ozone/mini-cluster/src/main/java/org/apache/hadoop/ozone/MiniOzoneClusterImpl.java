@@ -19,14 +19,6 @@ package org.apache.hadoop.ozone;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
@@ -62,7 +54,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeRuleFactory;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -81,10 +73,7 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.recon.ConfigurationProvider;
-import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,7 +100,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private StorageContainerManager scm;
   private OzoneManager ozoneManager;
   private final List<HddsDatanodeService> hddsDatanodes;
-  private ReconServer reconServer;
   private final List<Service> services;
 
   // Timeout for the cluster to be ready
@@ -120,20 +108,16 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
   private SecretKeyClient secretKeyClient;
 
-  /**
-   * Creates a new MiniOzoneCluster with Recon.
-   */
   private MiniOzoneClusterImpl(OzoneConfiguration conf,
       SCMConfigurator scmConfigurator,
       OzoneManager ozoneManager,
       StorageContainerManager scm,
       List<HddsDatanodeService> hddsDatanodes,
-      ReconServer reconServer, List<Service> services) {
+      List<Service> services) {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
     this.hddsDatanodes = hddsDatanodes;
-    this.reconServer = reconServer;
     this.scmConfigurator = scmConfigurator;
     this.services = services;
   }
@@ -145,11 +129,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    * OzoneManagers and StorageContainerManagers.
    */
   MiniOzoneClusterImpl(OzoneConfiguration conf, SCMConfigurator scmConfigurator,
-      List<HddsDatanodeService> hddsDatanodes, ReconServer reconServer, List<Service> services) {
+      List<HddsDatanodeService> hddsDatanodes, List<Service> services) {
     this.scmConfigurator = scmConfigurator;
     this.conf = conf;
     this.hddsDatanodes = hddsDatanodes;
-    this.reconServer = reconServer;
     this.services = services;
   }
 
@@ -256,11 +239,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   @Override
-  public ReconServer getReconServer() {
-    return this.reconServer;
-  }
-
-  @Override
   public int getHddsDatanodeIndex(DatanodeDetails dn) throws IOException {
     for (HddsDatanodeService service : hddsDatanodes) {
       if (service.getDatanodeDetails().equals(dn)) {
@@ -318,12 +296,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void restartOzoneManager() throws IOException {
     stopOM(ozoneManager);
     ozoneManager.restart();
-  }
-
-  @Override
-  public void restartReconServer() {
-    stopRecon(reconServer);
-    startRecon();
   }
 
   private void waitForHddsDatanodeToStop(DatanodeDetails dn)
@@ -410,7 +382,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopOM(ozoneManager);
     stopDatanodes(hddsDatanodes);
     stopSCM(scm);
-    stopRecon(reconServer);
     stopServices(services);
   }
 
@@ -438,17 +409,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         LOG.error("Exception while trying to shutdown datanodes:", e);
       }
     });
-  }
-
-  @Override
-  public void startRecon() {
-    reconServer = new ReconServer();
-    reconServer.execute(NO_ARGS);
-  }
-
-  @Override
-  public void stopRecon() {
-    stopRecon(reconServer);
   }
 
   public void startServices() throws Exception {
@@ -499,18 +459,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
   }
 
-  private static void stopRecon(ReconServer reconServer) {
-    try {
-      if (reconServer != null) {
-        LOG.info("Stopping Recon");
-        reconServer.stop();
-        reconServer.join();
-      }
-    } catch (Exception e) {
-      LOG.error("Exception while shutting down Recon.", e);
-    }
-  }
-
   private static void stopServices(List<Service> services) {
     // stop in reverse order
     List<Service> reverse = new ArrayList<>(services);
@@ -547,32 +495,27 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       initializeConfiguration();
       StorageContainerManager scm = null;
       OzoneManager om = null;
-      ReconServer reconServer = null;
       List<HddsDatanodeService> hddsDatanodes = Collections.emptyList();
       try {
         scm = createAndStartSingleSCM();
         om = createAndStartSingleOM();
-        reconServer = createRecon();
         hddsDatanodes = createHddsDatanodes();
 
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
             scmConfigurator, om, scm,
-            hddsDatanodes, reconServer, getServices());
+            hddsDatanodes, getServices());
+        cluster.startServices();
 
         cluster.setCAClient(certClient);
         cluster.setSecretKeyClient(secretKeyClient);
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }
-        cluster.startServices();
 
         prepareForNextBuild();
         return cluster;
       } catch (Exception ex) {
         stopOM(om);
-        if (includeRecon) {
-          stopRecon(reconServer);
-        }
         stopServices(getServices());
         if (startDataNodes) {
           stopDatanodes(hddsDatanodes);
@@ -646,8 +589,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       initializeScmStorage(scmStore);
       StorageContainerManager scm = HddsTestUtils.getScmSimple(conf,
           scmConfigurator);
-      HealthyPipelineSafeModeRule rule =
-          scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
+      HealthyPipelineSafeModeRule rule = SafeModeRuleFactory.getInstance()
+          .getSafeModeRule(HealthyPipelineSafeModeRule.class);
       if (rule != null) {
         // Set threshold to wait for safe mode exit - this is needed since a
         // pipeline is marked open only after leader election.
@@ -712,10 +655,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       while (iter.hasNext()) {
         StorageContainerManager scm = iter.next();
         stringBuilder.append(scm.getDatanodeRpcAddress().getHostString())
-            .append(":")
+            .append(':')
             .append(scm.getDatanodeRpcAddress().getPort());
         if (iter.hasNext()) {
-          stringBuilder.append(",");
+          stringBuilder.append(',');
         }
 
       }
@@ -724,22 +667,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     protected void configureScmDatanodeAddress(List<StorageContainerManager> scms) {
       conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, getSCMAddresses(scms));
-    }
-
-    protected ReconServer createRecon() {
-      ReconServer reconServer = null;
-      if (includeRecon) {
-        configureRecon();
-        reconServer = new ReconServer();
-        reconServer.execute(NO_ARGS);
-
-        OzoneStorageContainerManager reconScm =
-            reconServer.getReconStorageContainerManager();
-        conf.set(OZONE_RECON_ADDRESS_KEY,
-            reconScm.getDatanodeRpcAddress().getHostString() + ":" +
-                reconScm.getDatanodeRpcAddress().getPort());
-      }
-      return reconServer;
     }
 
     /**
@@ -785,27 +712,5 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.setInt(OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, getFreePort());
     }
 
-    protected void configureRecon() {
-      ConfigurationProvider.resetConfiguration();
-
-      File tempNewFolder = new File(path, "recon");
-      conf.set(OZONE_RECON_DB_DIR,
-          tempNewFolder.getAbsolutePath());
-      conf.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, tempNewFolder
-          .getAbsolutePath());
-      conf.set(OZONE_RECON_SCM_DB_DIR,
-          tempNewFolder.getAbsolutePath());
-
-      ReconSqlDbConfig dbConfig = conf.getObject(ReconSqlDbConfig.class);
-      dbConfig.setJdbcUrl("jdbc:derby:" + tempNewFolder.getAbsolutePath()
-          + "/ozone_recon_derby.db");
-      conf.setFromObject(dbConfig);
-
-      conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, anyHostWithFreePort());
-      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, anyHostWithFreePort());
-      conf.set(OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD, "10s");
-
-      ConfigurationProvider.setConfiguration(conf);
-    }
   }
 }
