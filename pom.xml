@@ -2174,6 +2174,38 @@
           <groupId>com.coderplus.maven.plugins</groupId>
           <artifactId>copy-rename-maven-plugin</artifactId>
           <version>${copy-rename-maven-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>rename-generated-config</id>
+              <goals>
+                <goal>rename</goal>
+              </goals>
+              <phase>none</phase>
+              <configuration>
+                <fileSets>
+                  <fileSet>
+                    <sourceFile>${project.build.outputDirectory}/ozone-default-generated.xml</sourceFile>
+                    <destinationFile>${project.build.outputDirectory}/${project.artifactId}-default.xml</destinationFile>
+                  </fileSet>
+                </fileSets>
+              </configuration>
+            </execution>
+            <execution>
+              <id>rename-generated-test-config</id>
+              <goals>
+                <goal>rename</goal>
+              </goals>
+              <phase>none</phase>
+              <configuration>
+                <fileSets>
+                  <fileSet>
+                    <sourceFile>${project.build.testOutputDirectory}/ozone-default-generated.xml</sourceFile>
+                    <destinationFile>${project.build.testOutputDirectory}/${project.artifactId}-default.xml</destinationFile>
+                  </fileSet>
+                </fileSets>
+              </configuration>
+            </execution>
+          </executions>
         </plugin>
       </plugins>
     </pluginManagement>
