@@ -39,9 +39,6 @@ public class DuplicateOpenContainersCommand implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     Path dbPath = parent.resolveDbPath();
-    if (dbPath == null) {
-      return null;
-    }
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(dbPath.toString());
     cdd.findDuplicateOpenContainer();

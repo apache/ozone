@@ -152,7 +152,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
-              repConfig, ozoneManager.getConfiguration());
+              repConfig, ozoneManager.getConfig());
 
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 

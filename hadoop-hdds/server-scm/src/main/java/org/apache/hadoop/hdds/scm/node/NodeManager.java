@@ -136,11 +136,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       NodeOperationalState opState, NodeState health);
 
   /**
-   * Get all datanodes known to SCM.
-   *
-   * @return List of DatanodeDetails known to SCM.
+   * @return all datanodes known to SCM.
    */
-  List<DatanodeDetails> getAllNodes();
+  List<? extends DatanodeDetails> getAllNodes();
+
+  /** @return the number of datanodes. */
+  default int getAllNodeCount() {
+    return getAllNodes().size();
+  }
 
   /**
    * Returns the aggregated node stats.

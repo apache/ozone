@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -184,18 +185,18 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
     List<DatanodeDetails> datanodes = new ArrayList<>();
 
     datanodes.add(DatanodeDetails.newBuilder()
-        .setUuid(UUID.fromString(serverId))
+        .setID(DatanodeID.fromUuidString(serverId))
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .addPort(DatanodeDetails.newPort(Name.RATIS, 9858))
         .build());
 
     Pipeline pipeline = Pipeline.newBuilder()
-        .setId(PipelineID.valueOf(UUID.fromString(pipelineId)))
+        .setId(PipelineID.valueOf(pipelineId))
         .setState(PipelineState.OPEN)
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
-        .setLeaderId(UUID.fromString(serverId))
+        .setLeaderId(DatanodeID.fromUuidString(serverId))
         .setNodes(datanodes)
         .build();
 

@@ -19,57 +19,27 @@ package org.apache.hadoop.ozone.shell;
 
 import picocli.CommandLine;
 
-/**
- * Common options for 'list' commands.
- */
-public class ListOptions {
+/** Options to provide pagination of lists.  Use with {@link CommandLine.Mixin}. */
+public class ListPaginationOptions {
 
-  @CommandLine.ArgGroup(exclusive = true)
-  private ExclusiveLimit exclusiveLimit = new ExclusiveLimit();
+  @CommandLine.Mixin
+  private ListLimitOptions limitOptions;
 
   @CommandLine.Option(names = {"--start", "-s"},
       description = "The item to start the listing from.\n" +
           "This will be excluded from the result.")
   private String startItem;
 
-  @CommandLine.Option(names = {"--prefix", "-p"},
-      description = "Prefix to filter the items")
-  private String prefix;
-
   public int getLimit() {
-    if (exclusiveLimit.all) {
-      return Integer.MAX_VALUE;
-    }
-    if (exclusiveLimit.limit < 1) {
-      throw new IllegalArgumentException(
-          "List length should be a positive number");
-    }
-
-    return exclusiveLimit.limit;
+    return limitOptions.getLimit();
   }
 
   public boolean isAll() {
-    return exclusiveLimit.all;
+    return limitOptions.isAll();
   }
 
   public String getStartItem() {
     return startItem;
   }
 
-  public String getPrefix() {
-    return prefix;
-  }
-
-  static class ExclusiveLimit {
-    @CommandLine.Option(names = {"--length", "-l"},
-        description = "Maximum number of items to list",
-        defaultValue = "100",
-        showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
-    private int limit;
-
-    @CommandLine.Option(names = {"--all", "-a"},
-        description = "List all results",
-        defaultValue = "false")
-    private boolean all;
-  }
 }

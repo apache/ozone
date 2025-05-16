@@ -33,7 +33,8 @@ import java.util.concurrent.Callable;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.server.JsonUtils;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListLimitOptions;
+import org.apache.hadoop.ozone.shell.PrefixFilterOption;
 import picocli.CommandLine;
 
 /**
@@ -67,7 +68,10 @@ public class DiskUsageSubCommand implements Callable {
   private boolean noHeader;
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
+  private ListLimitOptions listOptions;
+
+  @CommandLine.Mixin
+  private PrefixFilterOption prefixFilter;
 
   private static final String ENDPOINT = "/api/v1/namespace/du";
 
@@ -147,7 +151,7 @@ public class DiskUsageSubCommand implements Callable {
         printWithUnderline("DU", true);
         printDUHeader();
         int limit = listOptions.getLimit();
-        String seekStr = listOptions.getPrefix();
+        String seekStr = prefixFilter.getPrefix();
         if (seekStr == null) {
           seekStr = "";
         }

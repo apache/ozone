@@ -630,7 +630,7 @@ public class TestStorageContainerManager {
    */
   private void testScmProcessDatanodeHeartbeat(MiniOzoneCluster cluster) {
     NodeManager nodeManager = cluster.getStorageContainerManager().getScmNodeManager();
-    List<DatanodeDetails> allNodes = nodeManager.getAllNodes();
+    List<? extends DatanodeDetails> allNodes = nodeManager.getAllNodes();
     assertEquals(cluster.getHddsDatanodes().size(), allNodes.size());
 
     for (DatanodeDetails node : allNodes) {

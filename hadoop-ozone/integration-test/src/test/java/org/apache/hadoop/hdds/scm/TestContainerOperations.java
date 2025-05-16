@@ -188,7 +188,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
 
   @Test
   public void testDatanodeUsageInfoContainerCount() throws Exception {
-    List<DatanodeDetails> dnList = cluster().getStorageContainerManager()
+    List<? extends DatanodeDetails> dnList = cluster().getStorageContainerManager()
             .getScmNodeManager()
             .getAllNodes();
 

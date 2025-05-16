@@ -639,6 +639,17 @@ public final class OzoneConfigKeys {
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
       TimeUnit.HOURS.toMillis(1);
 
+  public static final String
+      OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE =
+      "ozone.om.snapshot.prune.compaction.backup.batch.size";
+
+  public static final int
+      OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT = 2000;
+
+  public static final String OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB =
+      "ozone.om.snapshot.load.native.lib";
+  public static final boolean OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT = true;
+
   public static final String OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT =
       "ozone.om.delta.update.data.size.max.limit";
   public static final String

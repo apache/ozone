@@ -60,6 +60,7 @@ import org.slf4j.event.Level;
 public class TestReconTasks {
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
+  private ReconService recon;
 
   @BeforeEach
   public void init() throws Exception {
@@ -73,8 +74,10 @@ public class TestReconTasks {
 
     conf.set("ozone.scm.stale.node.interval", "6s");
     conf.set("ozone.scm.dead.node.interval", "8s");
+    recon = new ReconService(conf);
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
-        .includeRecon(true).build();
+        .addService(recon)
+        .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(ONE, 30000);
     GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.class,
@@ -92,7 +95,7 @@ public class TestReconTasks {
   public void testSyncSCMContainerInfo() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
-            cluster.getReconServer().getReconStorageContainerManager();
+            recon.getReconServer().getReconStorageContainerManager();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     ContainerManager scmContainerManager = scm.getContainerManager();
     ContainerManager reconContainerManager = reconScm.getContainerManager();
@@ -124,9 +127,9 @@ public class TestReconTasks {
   public void testMissingContainerDownNode() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
-            cluster.getReconServer().getReconStorageContainerManager();
+            recon.getReconServer().getReconStorageContainerManager();
     ReconContainerMetadataManager reconContainerMetadataManager =
-        cluster.getReconServer().getReconContainerMetadataManager();
+        recon.getReconServer().getReconContainerMetadataManager();
 
     StorageContainerManager scm = cluster.getStorageContainerManager();
     PipelineManager reconPipelineManager = reconScm.getPipelineManager();
@@ -205,9 +208,9 @@ public class TestReconTasks {
   public void testEmptyMissingContainerDownNode() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
-            cluster.getReconServer().getReconStorageContainerManager();
+            recon.getReconServer().getReconStorageContainerManager();
     ReconContainerMetadataManager reconContainerMetadataManager =
-        cluster.getReconServer().getReconContainerMetadataManager();
+        recon.getReconServer().getReconContainerMetadataManager();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     PipelineManager reconPipelineManager = reconScm.getPipelineManager();
     PipelineManager scmPipelineManager = scm.getPipelineManager();

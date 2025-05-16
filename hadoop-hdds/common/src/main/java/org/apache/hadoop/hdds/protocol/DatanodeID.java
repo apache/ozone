@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeIDProto;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.util.StringWithByteString;
 
 /**
@@ -78,6 +79,10 @@ public final class DatanodeID implements Comparable<DatanodeID> {
     return uuidByteString.getBytes();
   }
 
+  public PipelineID toPipelineID() {
+    return PipelineID.valueOf(uuid);
+  }
+
   public DatanodeIDProto toProto() {
     return DatanodeIDProto.newBuilder().setUuid(toProto(uuid)).build();
   }
@@ -92,6 +97,10 @@ public final class DatanodeID implements Comparable<DatanodeID> {
 
   public static DatanodeID of(final UUID id) {
     return CACHE.computeIfAbsent(id, DatanodeID::new);
+  }
+
+  public static DatanodeID of(final HddsProtos.UUID uuid) {
+    return of(new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits()));
   }
 
   /**
@@ -114,7 +123,9 @@ public final class DatanodeID implements Comparable<DatanodeID> {
   }
 
   // TODO: Remove this in follow-up Jira. (HDDS-12015)
-  UUID getUuid() {
+  //   Exposing this temporarily to help with refactoring.
+  @Deprecated
+  public UUID getUuid() {
     return uuid;
   }
 }

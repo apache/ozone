@@ -127,7 +127,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       // remove DeleteBlocksCommand associated with the dead node unless it
       // is IN_MAINTENANCE
       if (deletedBlockLog != null && !isNodeInMaintenance) {
-        deletedBlockLog.onDatanodeDead(datanodeDetails.getUuid());
+        deletedBlockLog.onDatanodeDead(datanodeDetails.getID());
       }
 
       //move dead datanode out of ClusterNetworkTopology
