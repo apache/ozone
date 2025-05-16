@@ -764,10 +764,12 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       return (lockSetVal & setMask) == setMask;
     }
 
+    @Override
     public String getName() {
       return name;
     }
 
+    @Override
     public ResourceManager getResourceManager() {
       return resourceManager;
     }
