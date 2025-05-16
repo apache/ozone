@@ -89,6 +89,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
@@ -184,8 +185,7 @@ public class TestContainerReconciliationWithMockDatanodes {
     }
   }
 
-  // TODO HDDS-10374 once on-demand scanner can build merkle trees this test should pass.
-  // @ParameterizedTest
+  @ParameterizedTest
   @MethodSource("corruptionValues")
   public void testContainerReconciliation(int numBlocksToDelete, int numChunksToCorrupt) throws Exception {
     LOG.info("Healthy data checksum for container {} in this test is {}", CONTAINER_ID,
@@ -314,6 +314,11 @@ public class TestContainerReconciliationWithMockDatanodes {
       this.conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, dataVolume.toString());
       conf.set(OZONE_METADATA_DIRS, metadataVolume.toString());
+      // This test triggers its own on-demand scans after reconciliation to retrieve the results. Scan gap must be
+      // disabled so that these checks run in addition to the on-demand scans triggered from inside reconciliation.
+      ContainerScannerConfiguration scanConf = conf.getObject(ContainerScannerConfiguration.class);
+      scanConf.setContainerScanMinGap(0);
+      conf.setFromObject(scanConf);
 
       containerSet = newContainerSet();
       MutableVolumeSet volumeSet = createVolumeSet();
