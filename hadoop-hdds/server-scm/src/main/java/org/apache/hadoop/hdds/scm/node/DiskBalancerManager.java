@@ -367,7 +367,7 @@ public class DiskBalancerManager {
     }
     LOG.info("Sending {} to Datanode {}", command, dn);
     scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-        new CommandForDatanode<>(dn.getUuid(), command));
+        new CommandForDatanode<>(dn.getID(), command));
   }
 
   @VisibleForTesting

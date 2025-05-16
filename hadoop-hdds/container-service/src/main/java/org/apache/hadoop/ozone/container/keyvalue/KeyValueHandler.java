@@ -435,6 +435,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Container already exists. container Id {}", containerID);
       }
     } catch (StorageContainerException ex) {
+      newContainerData.releaseCommitSpace();
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } finally {
       containerIdLock.unlock();

@@ -36,7 +36,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -252,15 +251,14 @@ public class SCMNodeManager implements NodeManager {
         .map(node -> (DatanodeDetails)node).collect(Collectors.toList());
   }
 
-  /**
-   * Returns all datanodes that are known to SCM.
-   *
-   * @return List of DatanodeDetails
-   */
   @Override
-  public List<DatanodeDetails> getAllNodes() {
-    return nodeStateManager.getAllNodes().stream()
-        .map(node -> (DatanodeDetails) node).collect(Collectors.toList());
+  public List<DatanodeInfo> getAllNodes() {
+    return nodeStateManager.getAllNodes();
+  }
+
+  @Override
+  public int getAllNodeCount() {
+    return nodeStateManager.getAllNodeCount();
   }
 
   /**
@@ -449,9 +447,9 @@ public class SCMNodeManager implements NodeManager {
           LOG.info("Updated datanode to: {}", dn);
           scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
         } else if (isVersionChange(oldNode.getVersion(), datanodeDetails.getVersion())) {
-          LOG.info("Update the version for registered datanode = {}, " +
+          LOG.info("Update the version for registered datanode {}, " +
               "oldVersion = {}, newVersion = {}.",
-              datanodeDetails.getUuid(), oldNode.getVersion(), datanodeDetails.getVersion());
+              datanodeDetails, oldNode.getVersion(), datanodeDetails.getVersion());
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
         }
       } catch (NodeNotFoundException e) {
@@ -781,7 +779,7 @@ public class SCMNodeManager implements NodeManager {
             // Send Finalize command to the data node. Its OK to
             // send Finalize command multiple times.
             scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-                new CommandForDatanode<>(datanodeDetails.getUuid(),
+                new CommandForDatanode<>(datanodeDetails,
                     finalizeCmd));
           } catch (NotLeaderException ex) {
             LOG.warn("Skip sending finalize upgrade command since current SCM" +
@@ -1742,29 +1740,16 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public List<DatanodeDetails> getNodesByAddress(String address) {
-    List<DatanodeDetails> allNodes = getAllNodes();
-    List<DatanodeDetails> results = new LinkedList<>();
     if (Strings.isNullOrEmpty(address)) {
-      LOG.warn("address is null");
-      return results;
+      return Collections.emptyList();
     }
     Set<DatanodeID> datanodeIDS = dnsToDnIdMap.get(address);
     if (datanodeIDS == null) {
-      LOG.debug("Cannot find node for address {}", address);
-      return results;
+      return Collections.emptyList();
     }
-
-    datanodeIDS.forEach(datanodeID -> {
-      try {
-        List<DatanodeDetails> datanodeDetails = allNodes.stream().
-            filter(node -> node.getID().equals(datanodeID)).
-            collect(Collectors.toList());
-        results.addAll(datanodeDetails);
-      } catch (Exception e) {
-        LOG.warn("Error find node for DataNode ID {}", datanodeID);
-      }
-    });
-    return results;
+    return datanodeIDS.stream()
+        .map(this::getNode)
+        .collect(Collectors.toList());
   }
 
   /**

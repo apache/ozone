@@ -245,7 +245,7 @@ public class TestDeadNodeHandler {
     clearInvocations(publisher);
 
     verify(deletedBlockLog, times(0))
-        .onDatanodeDead(datanode1.getUuid());
+        .onDatanodeDead(datanode1.getID());
 
     // Verify DiskBalancer status is marked UNKNOWN for the dead datanode
     assertEquals(HddsProtos.DiskBalancerRunningStatus.UNKNOWN,
@@ -283,7 +283,7 @@ public class TestDeadNodeHandler {
     assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
 
     verify(publisher).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
-    verify(deletedBlockLog).onDatanodeDead(datanode1.getUuid());
+    verify(deletedBlockLog).onDatanodeDead(datanode1.getID());
 
     container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));

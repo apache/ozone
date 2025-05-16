@@ -55,15 +55,17 @@ public class TestReconContainerEndpoint {
   private MiniOzoneCluster cluster;
   private OzoneClient client;
   private ObjectStore store;
+  private ReconService recon;
 
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+    recon = new ReconService(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
-        .includeRecon(true)
+        .addService(recon)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -102,7 +104,7 @@ public class TestReconContainerEndpoint {
 
     // Synchronize data from OM to Recon
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
+        recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
 
     //Search for the bucket from the bucket table and verify its FSO
@@ -162,7 +164,7 @@ public class TestReconContainerEndpoint {
     writeTestData(volumeName, obsBucketName, obsSingleFileKey, "Hello OBS!");
 
     OzoneManagerServiceProviderImpl impl =
-        (OzoneManagerServiceProviderImpl) cluster.getReconServer()
+        (OzoneManagerServiceProviderImpl) recon.getReconServer()
             .getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
 
@@ -191,19 +193,19 @@ public class TestReconContainerEndpoint {
 
   private Response getContainerEndpointResponse(long containerId) {
     OzoneStorageContainerManager reconSCM =
-        cluster.getReconServer().getReconStorageContainerManager();
+        recon.getReconServer().getReconStorageContainerManager();
     ReconContainerManager reconContainerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     ContainerHealthSchemaManager containerHealthSchemaManager =
         reconContainerManager.getContainerSchemaManager();
     ReconOMMetadataManager omMetadataManagerInstance =
         (ReconOMMetadataManager)
-            cluster.getReconServer().getOzoneManagerServiceProvider()
+            recon.getReconServer().getOzoneManagerServiceProvider()
                 .getOMMetadataManagerInstance();
     ContainerEndpoint containerEndpoint =
         new ContainerEndpoint(reconSCM, containerHealthSchemaManager,
-            cluster.getReconServer().getReconNamespaceSummaryManager(),
-            cluster.getReconServer().getReconContainerMetadataManager(),
+            recon.getReconServer().getReconNamespaceSummaryManager(),
+            recon.getReconServer().getReconContainerMetadataManager(),
             omMetadataManagerInstance);
     return containerEndpoint.getKeysForContainer(containerId, 10, "");
   }
