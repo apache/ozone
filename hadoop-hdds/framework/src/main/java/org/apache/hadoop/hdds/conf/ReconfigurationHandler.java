@@ -57,8 +57,8 @@ public class ReconfigurationHandler extends ReconfigurableBase
   }
 
   public void setReconfigurationCompleteCallback(BiConsumer<ReconfigurationTaskStatus, Configuration>
-      reconfigurationStatusListener) {
-    this.reconfigurationStatusListener = reconfigurationStatusListener;
+      statusListener) {
+    this.reconfigurationStatusListener = statusListener;
   }
 
   private void triggerCompleteCallbacks(ReconfigurationTaskStatus status, Configuration newConf) {

@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import org.apache.hadoop.conf.Configuration;
 import java.util.Map;
+import org.apache.hadoop.conf.Configuration;
 
 /**
- * Define a Callback Interface
+ * Callback interface to handle configuration changes after a reconfiguration task completes.
  */
 @FunctionalInterface
 public interface ReconfigurationChangeCallback {

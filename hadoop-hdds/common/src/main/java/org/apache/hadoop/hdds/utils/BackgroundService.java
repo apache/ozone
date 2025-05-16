@@ -109,7 +109,7 @@ public abstract class BackgroundService {
     scheduledHandle = exec.scheduleWithFixedDelay(service, 0, interval, unit);
   }
 
-  protected void setInterval(long newInterval, TimeUnit newUnit) {
+  protected synchronized void setInterval(long newInterval, TimeUnit newUnit) {
     this.interval = newInterval;
     this.unit = newUnit;
   }
