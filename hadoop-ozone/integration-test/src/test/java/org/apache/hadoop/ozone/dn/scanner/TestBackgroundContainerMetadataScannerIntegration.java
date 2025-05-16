@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.dn.scanner;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CONTAINER_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -122,7 +124,14 @@ class TestBackgroundContainerMetadataScannerIntegration
     waitForScmToSeeReplicaState(closedContainerID, UNHEALTHY);
     assertEquals(initialClosedChecksum, getContainerReplica(closedContainerID).getDataChecksum());
     waitForScmToSeeReplicaState(openContainerID, UNHEALTHY);
-    assertEquals(0, getContainerReplica(openContainerID).getDataChecksum());
+    if (corruption == MISSING_METADATA_DIR || corruption == MISSING_CONTAINER_DIR) {
+      // In these cases the tree cannot be generated when the container is marked unhealthy and the checksum should
+      // remain at 0.
+      assertEquals(0, getContainerReplica(openContainerID).getDataChecksum());
+    } else {
+      // The checksum will be generated for the first time when the container is marked unhealthy.
+      assertNotEquals(0, getContainerReplica(openContainerID).getDataChecksum());
+    }
 
     // Once the unhealthy replica is reported, the open container's lifecycle
     // state in SCM should move to closed.

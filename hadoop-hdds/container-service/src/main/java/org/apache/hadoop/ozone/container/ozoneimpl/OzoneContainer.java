@@ -383,8 +383,6 @@ public class OzoneContainer {
       return;
     }
 
-    initOnDemandContainerScanner(c);
-
     backgroundScanners = new LinkedList<>();
     // This config is for testing the scanners in isolation.
     if (c.isMetadataScanEnabled()) {
@@ -394,6 +392,7 @@ public class OzoneContainer {
     // This config is for testing the scanners in isolation.
     if (c.isDataScanEnabled()) {
       initContainerScanner(c);
+      initOnDemandContainerScanner(c);
     }
   }
 
