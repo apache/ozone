@@ -357,8 +357,26 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public boolean acquireMultiUserLock(String firstUser, String secondUser) {
-    return acquireWriteLocks(LeveledResource.USER_LOCK, Arrays.asList(new String[] {firstUser},
-        new String[] {secondUser})).isLockAcquired();
+    LeveledResource resource = LeveledResource.USER_LOCK;
+    Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockManager> resourceLockPair =
+        resourcelockMap.get(resource.getClass());
+    ResourceLockManager<Resource> resourceLockManager = resourceLockPair.getRight();
+    if (!resourceLockManager.canLockResource(resource)) {
+      String errorMessage = getErrorMessage(resource);
+      LOG.error(errorMessage);
+      throw new RuntimeException(errorMessage);
+    } else {
+      Striped<ReadWriteLock> striped = resourceLockPair.getKey().get(resource);
+      // The result of bulkGet is always sorted in a consistent order.
+      // This prevents deadlocks.
+      Iterable<ReadWriteLock> locks =
+          striped.bulkGet(Arrays.asList(firstUser, secondUser));
+      for (ReadWriteLock lock : locks) {
+        lock.writeLock().lock();
+      }
+      resourceLockManager.lockResource(resource);
+      return true;
+    }
   }
 
   /**
@@ -368,8 +386,17 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public void releaseMultiUserLock(String firstUser, String secondUser) {
-    releaseWriteLocks(LeveledResource.USER_LOCK, Arrays.asList(new String[] {firstUser},
-        new String[] {secondUser}));
+    LeveledResource resource = LeveledResource.USER_LOCK;
+    Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockManager> resourceLockPair =
+        resourcelockMap.get(resource.getClass());
+    ResourceLockManager<Resource> resourceLockManager = resourceLockPair.getRight();
+    Striped<ReadWriteLock> striped = resourceLockPair.getKey().get(resource);
+    Iterable<ReadWriteLock> locks =
+        striped.bulkGet(Arrays.asList(firstUser, secondUser));
+    for (ReadWriteLock lock : locks) {
+      lock.writeLock().unlock();
+    }
+    resourceLockManager.unlockResource(resource);
   }
 
 
@@ -593,7 +620,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
 
     OMLockDetails unlockResource(T resource) {
-      return clearLockDetails();
+      return omLockDetails.get();
     }
 
     OMLockDetails lockResource(T resource) {
