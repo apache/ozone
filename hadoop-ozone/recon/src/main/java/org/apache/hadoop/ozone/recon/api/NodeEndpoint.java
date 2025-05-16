@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -108,9 +107,7 @@ public class NodeEndpoint {
   @GET
   public Response getDatanodes() {
     List<DatanodeMetadata> datanodes = new ArrayList<>();
-    List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
-
-    datanodeDetails.forEach(datanode -> {
+    nodeManager.getAllNodes().forEach(datanode -> {
       DatanodeStorageReport storageReport = getStorageReport(datanode);
       NodeState nodeState = null;
       try {
@@ -157,7 +154,6 @@ public class NodeEndpoint {
             datanode.getUuid(), ex);
       }
 
-      DatanodeInfo dnInfo = (DatanodeInfo) datanode;
       datanodes.add(builder.setHostname(nodeManager.getHostName(datanode))
           .setDatanodeStorageReport(storageReport)
           .setLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
@@ -169,8 +165,7 @@ public class NodeEndpoint {
           .setVersion(nodeManager.getVersion(datanode))
           .setSetupTime(nodeManager.getSetupTime(datanode))
           .setRevision(nodeManager.getRevision(datanode))
-          .setLayoutVersion(
-              dnInfo.getLastKnownLayoutVersion().getMetadataLayoutVersion())
+          .setLayoutVersion(datanode.getLastKnownLayoutVersion().getMetadataLayoutVersion())
           .setNetworkLocation(datanode.getNetworkLocation())
           .build());
     });

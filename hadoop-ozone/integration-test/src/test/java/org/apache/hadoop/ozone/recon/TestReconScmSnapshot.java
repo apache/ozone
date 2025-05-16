@@ -127,7 +127,7 @@ public class TestReconScmSnapshot {
     ReconNodeManager nodeManager = (ReconNodeManager) ozoneCluster.getReconServer()
         .getReconStorageContainerManager().getScmNodeManager();
     long nodeDBCountBefore = nodeManager.getNodeDBKeyCount();
-    List<DatanodeDetails> allNodes = nodeManager.getAllNodes();
+    List<? extends DatanodeDetails> allNodes = nodeManager.getAllNodes();
     assertEquals(nodeDBCountBefore, allNodes.size());
 
     DatanodeDetails datanodeDetails = allNodes.get(3);
@@ -137,7 +137,7 @@ public class TestReconScmSnapshot {
       try {
         return nodeManager.getNodeStatus(datanodeDetails).isDead();
       } catch (NodeNotFoundException e) {
-        fail("getNodeStatus() Failed for " + datanodeDetails.getUuid(), e);
+        fail("getNodeStatus() Failed for " + datanodeDetails, e);
         throw new RuntimeException(e);
       }
     }, 2000, 10000);

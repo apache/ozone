@@ -230,7 +230,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               .setOmKeyLocationInfos(Collections.singletonList(
                   new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
               .setAcls(getAclsForKey(keyArgs, omBucketInfo, pathInfoFSO,
-                  ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
+                  ozoneManager.getPrefixManager(), ozoneManager.getConfig()))
               .setObjectID(pathInfoFSO.getLeafNodeObjectId())
               .setUpdateID(trxnLogIndex)
               .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?

@@ -1828,7 +1828,7 @@ public class TestSCMNodeManager {
       assertEquals(nodeCount, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
-      List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
       nodeList.forEach(node -> assertTrue(
           node.getNetworkLocation().startsWith("/rack1/ng")));
       nodeList.forEach(node -> assertNotNull(node.getParent()));
@@ -1872,7 +1872,7 @@ public class TestSCMNodeManager {
           nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(3, clusterMap.getMaxLevel());
-      List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
       nodeList.forEach(node ->
           assertEquals("/rack1", node.getNetworkLocation()));
 
@@ -2019,7 +2019,7 @@ public class TestSCMNodeManager {
               nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(1, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
-      List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
       assertEquals(1, nodeList.size());
 
       DatanodeDetails returnedNode = nodeList.get(0);
@@ -2039,7 +2039,7 @@ public class TestSCMNodeManager {
       assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(1, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
-      List<DatanodeDetails> updatedNodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> updatedNodeList = nodeManager.getAllNodes();
       assertEquals(1, updatedNodeList.size());
 
       DatanodeDetails returnedUpdatedNode = updatedNodeList.get(0);
