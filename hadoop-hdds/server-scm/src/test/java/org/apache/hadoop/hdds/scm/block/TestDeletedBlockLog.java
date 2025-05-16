@@ -254,7 +254,7 @@ public class TestDeletedBlockLog {
       DatanodeDetails... dns) throws IOException {
     for (DatanodeDetails dnDetails : dns) {
       deletedBlockLog.getSCMDeletedBlockTransactionStatusManager()
-          .commitTransactions(transactionResults, dnDetails.getUuid());
+          .commitTransactions(transactionResults, dnDetails.getID());
     }
     scmHADBTransactionBuffer.flush();
   }
@@ -619,7 +619,7 @@ public class TestDeletedBlockLog {
         .getProtoBufMessage());
 
     deletedBlockLog.getSCMDeletedBlockTransactionStatusManager()
-        .commitSCMCommandStatus(deleteBlockStatus, dnID.getUuid());
+        .commitSCMCommandStatus(deleteBlockStatus, dnID);
   }
 
   private void createDeleteBlocksCommandAndAction(

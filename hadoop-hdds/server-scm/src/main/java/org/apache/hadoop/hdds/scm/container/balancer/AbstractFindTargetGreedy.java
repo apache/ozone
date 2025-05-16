@@ -22,10 +22,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -81,9 +81,9 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
     if (ret != 0) {
       return ret;
     }
-    UUID uuidA = a.getDatanodeDetails().getUuid();
-    UUID uuidB = b.getDatanodeDetails().getUuid();
-    return uuidA.compareTo(uuidB);
+    DatanodeID idA = a.getDatanodeDetails().getID();
+    DatanodeID idB = b.getDatanodeDetails().getID();
+    return idA.compareTo(idB);
   }
 
   private void setConfiguration(ContainerBalancerConfiguration conf) {
@@ -228,8 +228,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
       }
       return;
     }
-    logger.warn("Cannot find {} in the candidates target nodes",
-        target.getUuid());
+    logger.warn("Cannot find {} in the candidates target nodes", target.getID());
   }
 
   /**

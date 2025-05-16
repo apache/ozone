@@ -30,7 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,8 +41,8 @@ import org.junit.jupiter.api.Test;
 public class TestSCMDeleteBlocksCommandStatusManager {
 
   private SCMDeleteBlocksCommandStatusManager manager;
-  private UUID dnId1;
-  private UUID dnId2;
+  private DatanodeID dnId1;
+  private DatanodeID dnId2;
   private long scmCmdId1;
   private long scmCmdId2;
   private long scmCmdId3;
@@ -56,8 +56,8 @@ public class TestSCMDeleteBlocksCommandStatusManager {
   public void setup() throws Exception {
     manager = new SCMDeleteBlocksCommandStatusManager();
     // Create test data
-    dnId1 = UUID.randomUUID();
-    dnId2 = UUID.randomUUID();
+    dnId1 = DatanodeID.randomID();
+    dnId2 = DatanodeID.randomID();
     scmCmdId1 = 1L;
     scmCmdId2 = 2L;
     scmCmdId3 = 3L;
@@ -238,7 +238,7 @@ public class TestSCMDeleteBlocksCommandStatusManager {
 
   private void recordAndSentCommand(
       SCMDeleteBlocksCommandStatusManager statusManager,
-      UUID dnId, List<Long> scmCmdIds, List<Set<Long>> txIds) {
+      DatanodeID dnId, List<Long> scmCmdIds, List<Set<Long>> txIds) {
     assertEquals(scmCmdIds.size(), txIds.size());
     for (int i = 0; i < scmCmdIds.size(); i++) {
       long scmCmdId = scmCmdIds.get(i);
