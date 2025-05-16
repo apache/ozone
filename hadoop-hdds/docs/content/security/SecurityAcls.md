@@ -176,7 +176,7 @@ ACL user:testuser:r[DEFAULT] removed successfully.
 
 Ozone ACLs and S3 ACLs differ primarily in their scope and support.
 
-- **S3 ACLs**: Currently, only S3 Bucket ACL is supported in Ozone. S3 Object ACL is not yet implemented. Any `PutObjectAcl` request will result in a `501: Not Implemented` response code.
+- **S3 ACLs**: Currently, only S3 Bucket ACL is implemented in Ozone (a beta feature). S3 Object ACL is not yet implemented. Any `PutObjectAcl` request will result in a `501: Not Implemented` response code.
 - **Ozone ACLs**: Ozone ACLs provide a more comprehensive and flexible access control mechanism. They are designed to work seamlessly with Ozone's native architecture and support various rights and scopes as mentioned above.
 
 ## Ozone File System ACL API
