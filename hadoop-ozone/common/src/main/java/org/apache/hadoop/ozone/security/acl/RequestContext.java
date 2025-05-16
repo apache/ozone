@@ -165,7 +165,7 @@ public class RequestContext {
       ACLType aclType, String ownerName) {
     return getBuilder(ugi,
         ProtobufRpcEngine.Server.getRemoteIp(),
-        ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
+        ProtobufRpcEngine.Server.getRemoteIp().getHostAddress(),
         aclType, ownerName);
   }
 
