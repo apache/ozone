@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.conf;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -48,7 +49,7 @@ public abstract class ReconfigurableBase extends Configured implements Reconfigu
   private long startTime = 0L;
   private long endTime = 0L;
   private Map<ReconfigurationUtil.PropertyChange, Optional<String>> status = null;
-  private Consumer<ReconfigurationTaskStatus> reconfigurationCompleteCallback;
+  private final Collection<Consumer<ReconfigurationTaskStatus>> reconfigurationCompleteCallbacks = new ArrayList<>();
 
   public ReconfigurableBase(Configuration conf) {
     super(conf == null ? new Configuration() : conf);
@@ -190,10 +191,9 @@ public abstract class ReconfigurableBase extends Configured implements Reconfigu
 
         LOG.info("Reconfiguration completed. {} properties were updated.", results.size());
 
-        if (parent.reconfigurationCompleteCallback != null) {
+        for (Consumer<ReconfigurationTaskStatus> callback : parent.reconfigurationCompleteCallbacks) {
           try {
-            parent.reconfigurationCompleteCallback.accept(
-                parent.getReconfigurationTaskStatus());
+            callback.accept(parent.getReconfigurationTaskStatus());
           } catch (Exception e) {
             LOG.warn("Reconfiguration complete callback threw exception", e);
           }
@@ -202,9 +202,9 @@ public abstract class ReconfigurableBase extends Configured implements Reconfigu
     }
   }
 
-  public void setReconfigurationCompleteCallback(Consumer<ReconfigurationTaskStatus> callback) {
+  public void addReconfigurationCompleteCallback(Consumer<ReconfigurationTaskStatus> callback) {
     synchronized (reconfigLock) {
-      this.reconfigurationCompleteCallback = callback;
+      this.reconfigurationCompleteCallbacks.add(callback);
     }
   }
 

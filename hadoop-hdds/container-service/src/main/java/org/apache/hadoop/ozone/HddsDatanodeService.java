@@ -287,7 +287,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
               .register(REPLICATION_STREAMS_LIMIT_KEY,
                   this::reconfigReplicationStreamsLimit);
 
-      reconfigurationHandler.setReconfigurationCompleteCallback(status -> {
+      reconfigurationHandler.setReconfigurationCompleteCallback((status, newConf) -> {
         if (status.getStatus() != null && !status.getStatus().isEmpty()) {
           LOG.info("Reconfiguration completed. Properties are updated.");
         } else {

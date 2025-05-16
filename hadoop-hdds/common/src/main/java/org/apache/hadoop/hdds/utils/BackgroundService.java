@@ -22,6 +22,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -42,11 +43,12 @@ public abstract class BackgroundService {
 
   // Executor to launch child tasks
   private final ScheduledThreadPoolExecutor exec;
+  private volatile ScheduledFuture<?> scheduledHandle;
   private final ThreadGroup threadGroup;
   private final String serviceName;
-  private final long interval;
+  private long interval;
   private final long serviceTimeoutInNanos;
-  private final TimeUnit unit;
+  private TimeUnit unit;
   private final PeriodicalTask service;
 
   public BackgroundService(String serviceName, long interval,
@@ -103,8 +105,21 @@ public abstract class BackgroundService {
   }
 
   // start service
-  public void start() {
-    exec.scheduleWithFixedDelay(service, 0, interval, unit);
+  public synchronized void start() {
+    scheduledHandle = exec.scheduleWithFixedDelay(service, 0, interval, unit);
+  }
+
+  protected void setInterval(long newInterval, TimeUnit newUnit) {
+    this.interval = newInterval;
+    this.unit = newUnit;
+  }
+
+  public synchronized void stop() {
+    LOG.info("Stopping {}", serviceName);
+    if (scheduledHandle != null) {
+      scheduledHandle.cancel(false); // don't interrupt running tasks
+      scheduledHandle = null;
+    }
   }
 
   public abstract BackgroundTaskQueue getTasks();
