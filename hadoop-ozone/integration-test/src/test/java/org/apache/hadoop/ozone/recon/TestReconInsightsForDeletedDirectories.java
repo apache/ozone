@@ -59,8 +59,8 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.test.GenericTestUtils;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -82,6 +82,7 @@ public class TestReconInsightsForDeletedDirectories {
   private static String volumeName;
   private static String bucketName;
   private static OzoneClient client;
+  private static ReconService recon;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -90,9 +91,10 @@ public class TestReconInsightsForDeletedDirectories {
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 10000000,
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
+    recon = new ReconService(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
-        .includeRecon(true)
+        .addService(recon)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -174,7 +176,7 @@ public class TestReconInsightsForDeletedDirectories {
 
     // Retrieve tables from Recon's OM-DB.
     ReconOMMetadataManager reconOmMetadataManagerInstance =
-        (ReconOMMetadataManager) cluster.getReconServer()
+        (ReconOMMetadataManager) recon.getReconServer()
             .getOzoneManagerServiceProvider().getOMMetadataManagerInstance();
     Table<String, OmKeyInfo> reconFileTable =
         reconOmMetadataManagerInstance.getKeyTable(getFSOBucketLayout());
@@ -203,7 +205,7 @@ public class TestReconInsightsForDeletedDirectories {
     } else {
       // Retrieve Namespace Summary for dir1 from Recon.
       ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
-          (ReconNamespaceSummaryManagerImpl) cluster.getReconServer()
+          (ReconNamespaceSummaryManagerImpl) recon.getReconServer()
               .getReconNamespaceSummaryManager();
       NSSummary summary =
           namespaceSummaryManager.getNSSummary(directoryObjectId);
@@ -222,9 +224,9 @@ public class TestReconInsightsForDeletedDirectories {
 
     // Create an Instance of OMDBInsightEndpoint.
     OzoneStorageContainerManager reconSCM =
-        cluster.getReconServer().getReconStorageContainerManager();
+        recon.getReconServer().getReconStorageContainerManager();
     ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager =
-        (ReconNamespaceSummaryManagerImpl) cluster.getReconServer()
+        (ReconNamespaceSummaryManagerImpl) recon.getReconServer()
             .getReconNamespaceSummaryManager();
 
     OMDBInsightEndpoint omdbInsightEndpoint =
@@ -286,7 +288,7 @@ public class TestReconInsightsForDeletedDirectories {
 
     // Retrieve tables from Recon's OM-DB.
     ReconOMMetadataManager reconOmMetadataManagerInstance =
-        (ReconOMMetadataManager) cluster.getReconServer()
+        (ReconOMMetadataManager) recon.getReconServer()
             .getOzoneManagerServiceProvider().getOMMetadataManagerInstance();
     Table<String, OmKeyInfo> reconFileTable =
         reconOmMetadataManagerInstance.getKeyTable(getFSOBucketLayout());
@@ -302,9 +304,9 @@ public class TestReconInsightsForDeletedDirectories {
 
     // Create an Instance of OMDBInsightEndpoint.
     OzoneStorageContainerManager reconSCM =
-        cluster.getReconServer().getReconStorageContainerManager();
+        recon.getReconServer().getReconStorageContainerManager();
     ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
-        (ReconNamespaceSummaryManagerImpl) cluster.getReconServer()
+        (ReconNamespaceSummaryManagerImpl) recon.getReconServer()
             .getReconNamespaceSummaryManager();
 
     OMDBInsightEndpoint omdbInsightEndpoint =
@@ -373,12 +375,12 @@ public class TestReconInsightsForDeletedDirectories {
 
     // Fetch the deleted directory info from Recon OmDbInsightEndpoint.
     OzoneStorageContainerManager reconSCM =
-        cluster.getReconServer().getReconStorageContainerManager();
+        recon.getReconServer().getReconStorageContainerManager();
     ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
-        (ReconNamespaceSummaryManagerImpl) cluster.getReconServer()
+        (ReconNamespaceSummaryManagerImpl) recon.getReconServer()
             .getReconNamespaceSummaryManager();
     ReconOMMetadataManager reconOmMetadataManagerInstance =
-        (ReconOMMetadataManager) cluster.getReconServer()
+        (ReconOMMetadataManager) recon.getReconServer()
             .getOzoneManagerServiceProvider().getOMMetadataManagerInstance();
     OMDBInsightEndpoint omdbInsightEndpoint =
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
@@ -467,7 +469,7 @@ public class TestReconInsightsForDeletedDirectories {
     AtomicLong count = new AtomicLong(0L);
     assertDoesNotThrow(() -> {
       if (isRecon) {
-        count.set(cluster.getReconServer().getOzoneManagerServiceProvider()
+        count.set(recon.getReconServer().getOzoneManagerServiceProvider()
             .getOMMetadataManagerInstance().countRowsInTable(table));
       } else {
         count.set(cluster.getOzoneManager().getMetadataManager()
@@ -482,10 +484,9 @@ public class TestReconInsightsForDeletedDirectories {
   private void syncDataFromOM() throws IOException {
     // Sync data from Ozone Manager to Recon.
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
+        recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
   }
-
 
   private static BucketLayout getFSOBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;

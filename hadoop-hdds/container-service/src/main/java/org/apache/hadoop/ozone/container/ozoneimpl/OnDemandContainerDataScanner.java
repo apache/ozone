@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * Class for performing on demand scans of containers.
  */
 public final class OnDemandContainerDataScanner {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OnDemandContainerDataScanner.class);
 
   private final ExecutorService scanExecutor;

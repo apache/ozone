@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -103,6 +104,23 @@ import org.slf4j.LoggerFactory;
  * container for each datanode peer.
  */
 public class TestContainerReconciliationWithMockDatanodes {
+
+  public static final Logger LOG = LoggerFactory.getLogger(TestContainerReconciliationWithMockDatanodes.class);
+
+  // All container replicas will be placed in this directory, and the same replicas will be re-used for each test run.
+  @TempDir
+  private static Path containerDir;
+  private static DNContainerOperationClient dnClient;
+  private static MockedStatic<ContainerProtocolCalls> containerProtocolMock;
+  private static List<MockDatanode> datanodes;
+  private static long healthyDataChecksum;
+
+  private static final String CLUSTER_ID = UUID.randomUUID().toString();
+  private static final long CONTAINER_ID = 100L;
+  private static final int CHUNK_LEN = 3 * (int) OzoneConsts.KB;
+  private static final int CHUNKS_PER_BLOCK = 4;
+  private static final int NUM_DATANODES = 3;
+
   /**
    * Number of corrupt blocks and chunks.
    *
@@ -124,22 +142,6 @@ public class TestContainerReconciliationWithMockDatanodes {
         Arguments.of(9, 6)
     );
   }
-
-  public static final Logger LOG = LoggerFactory.getLogger(TestContainerReconciliationWithMockDatanodes.class);
-
-  // All container replicas will be placed in this directory, and the same replicas will be re-used for each test run.
-  @TempDir
-  private static Path containerDir;
-  private static DNContainerOperationClient dnClient;
-  private static MockedStatic<ContainerProtocolCalls> containerProtocolMock;
-  private static List<MockDatanode> datanodes;
-  private static long healthyDataChecksum;
-
-  private static final String CLUSTER_ID = UUID.randomUUID().toString();
-  private static final long CONTAINER_ID = 100L;
-  private static final int CHUNK_LEN = 3 * (int) OzoneConsts.KB;
-  private static final int CHUNKS_PER_BLOCK = 4;
-  private static final int NUM_DATANODES = 3;
 
   /**
    * Use the same container instances throughout the tests. Each reconciliation should make a full repair, resetting
@@ -318,7 +320,7 @@ public class TestContainerReconciliationWithMockDatanodes {
       scanConf.setContainerScanMinGap(0);
       conf.setFromObject(scanConf);
 
-      containerSet = new ContainerSet(1000);
+      containerSet = newContainerSet();
       MutableVolumeSet volumeSet = createVolumeSet();
       handler = ContainerTestUtils.getKeyValueHandler(conf, dnDetails.getUuidString(), containerSet, volumeSet);
       handler.setClusterID(CLUSTER_ID);

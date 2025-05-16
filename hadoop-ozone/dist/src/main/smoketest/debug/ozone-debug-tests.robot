@@ -36,20 +36,13 @@ Write keys
     Execute             ozone sh key put o3://om/${VOLUME}/${BUCKET}/${TESTFILE} ${TEMP_DIR}/${TESTFILE}
 
 *** Test Cases ***
-Test ozone debug read-replicas
-    ${directory} =                      Execute read-replicas CLI tool
-    Set Test Variable    ${DIR}         ${directory}
+Test ozone debug replicas verify checksums
+    ${output} =    Execute   ozone debug replicas verify --checksums o3://om/${VOLUME}/${BUCKET}/${TESTFILE} --output-dir ${TEMP_DIR}
+    ${json} =      Evaluate  json.loads('''${output}''')      json
 
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     7
-
-    ${json} =                           Read Replicas Manifest
-    ${md5sum} =                         Execute     md5sum ${TEMP_DIR}/${TESTFILE} | awk '{print $1}'
-
-    FOR    ${replica}    IN RANGE    3
-        Verify Healthy Replica   ${json}    ${replica}    ${md5sum}
-    END
-
+    # 'keys' array should be empty if all keys and their replicas passed checksum verification
+    Should Be Empty      ${json}[keys]
+    Should Be True       ${json}[pass]     ${True}
 
 Test ozone debug version
     ${output} =    Execute    ozone debug version

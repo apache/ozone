@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
@@ -27,8 +25,8 @@ import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTest
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -57,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -116,15 +115,16 @@ import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Tests to test block deleting service.
  */
-@Timeout(30)
 public class TestBlockDeletingService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TestBlockDeletingService.class);
 
   @TempDir
   private File testRoot;
@@ -173,11 +173,12 @@ public class TestBlockDeletingService {
       int numOfBlocksPerContainer, int numOfChunksPerBlock) throws IOException {
     ChunkManager chunkManager;
     if (layout == FILE_PER_BLOCK) {
-      chunkManager = new FilePerBlockStrategy(true, null, null);
+      chunkManager = new FilePerBlockStrategy(true, null);
     } else {
-      chunkManager = new FilePerChunkStrategy(true, null, null);
+      chunkManager = new FilePerChunkStrategy(true, null);
     }
-    byte[] arr = randomAlphanumeric(1048576).getBytes(UTF_8);
+    byte[] arr = new byte[1048576];
+    ThreadLocalRandom.current().nextBytes(arr);
     ChunkBuffer buffer = ChunkBuffer.wrap(ByteBuffer.wrap(arr));
     int txnID = 0;
     long containerID = ContainerTestHelper.getTestContainerID();
@@ -434,7 +435,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletionLimit(blockDeleteLimit);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
 
     // Create one container with no actual pending delete blocks, but an
     // incorrect metadata value indicating it has enough pending deletes to
@@ -540,7 +541,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletionLimit(2);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     createToDeleteBlocks(containerSet, 1, 3, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
@@ -669,7 +670,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletionLimit(2);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
 
     createToDeleteBlocks(containerSet, numOfContainers, numOfBlocksPerContainer,
         numOfChunksPerBlock);
@@ -775,7 +776,7 @@ public class TestBlockDeletingService {
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500,
         TimeUnit.MILLISECONDS);
 
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     // Create 1 container with 100 blocks
     createToDeleteBlocks(containerSet, 1, 100, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -804,7 +805,7 @@ public class TestBlockDeletingService {
     blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
 
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     createToDeleteBlocks(containerSet, 1, 3, 1);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
@@ -818,7 +819,7 @@ public class TestBlockDeletingService {
         10, conf);
     svc.start();
 
-    LogCapturer log = LogCapturer.captureLogs(BackgroundService.LOG);
+    LogCapturer log = LogCapturer.captureLogs(BackgroundService.class);
     GenericTestUtils.waitFor(() -> {
       if (log.getOutput().contains("Background task execution took")) {
         log.stopCapturing();
@@ -845,7 +846,7 @@ public class TestBlockDeletingService {
         (KeyValueContainer) containerSet.iterator().next();
     KeyValueContainerData data = container.getContainerData();
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
-      LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.LOG);
+      LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.class);
       GenericTestUtils.waitFor(() -> {
         try {
           return getUnderDeletionBlocksCount(meta, data) == 0;
@@ -904,7 +905,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletionLimit(1);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
 
     int containerCount = 2;
     int chunksPerBlock = 10;
@@ -952,9 +953,7 @@ public class TestBlockDeletingService {
   public void testContainerMaxLockHoldingTime(
       ContainerTestVersionInfo versionInfo) throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
-    GenericTestUtils.LogCapturer log =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(BlockDeletingTask.class));
+    LogCapturer log = LogCapturer.captureLogs(BlockDeletingTask.class);
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
 
     // Ensure that the lock holding timeout occurs every time a deletion
@@ -962,7 +961,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletingMaxLockHoldingTime(Duration.ofMillis(-1));
     dnConf.setBlockDeletionLimit(3);
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
 
     int containerCount = 1;
     int chunksPerBlock = 10;
@@ -1024,7 +1023,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletionLimit(10);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
@@ -1094,7 +1093,7 @@ public class TestBlockDeletingService {
     dnConf.setBlockDeletionLimit(4);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     KeyValueContainerData contData = createToDeleteBlocks(containerSet, numBlocks, 4);
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);

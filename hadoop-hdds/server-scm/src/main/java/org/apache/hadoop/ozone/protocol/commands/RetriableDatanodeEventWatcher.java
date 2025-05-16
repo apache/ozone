@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 public class RetriableDatanodeEventWatcher<T extends CommandStatusEvent>
     extends EventWatcher<CommandForDatanode, T> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(RetriableDatanodeEventWatcher.class);
 
   public RetriableDatanodeEventWatcher(Event<CommandForDatanode> startEvent,

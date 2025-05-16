@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static java.lang.Math.min;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getInitialReconHeartbeatInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReconHeartbeatInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmInitialHeartbeatInterval;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -102,7 +104,7 @@ public class StateContext {
 
   static final Logger LOG =
       LoggerFactory.getLogger(StateContext.class);
-  private final Queue<SCMCommand> commandQueue;
+  private final Queue<SCMCommand<?>> commandQueue;
   private final Map<Long, CommandStatus> cmdStatusMap;
   private final Lock lock;
   private final DatanodeStateMachine parentDatanodeStateMachine;
@@ -149,9 +151,9 @@ public class StateContext {
    * real HB frequency after scm registration. With this method the
    * initial registration could be significant faster.
    */
-  private final AtomicLong heartbeatFrequency = new AtomicLong(2000);
+  private final AtomicLong heartbeatFrequency;
 
-  private final AtomicLong reconHeartbeatFrequency = new AtomicLong(2000);
+  private final AtomicLong reconHeartbeatFrequency;
 
   private final int maxCommandQueueLimit;
 
@@ -192,6 +194,8 @@ public class StateContext {
     fullReportTypeList = new ArrayList<>();
     type2Reports = new HashMap<>();
     this.threadNamePrefix = threadNamePrefix;
+    heartbeatFrequency = new AtomicLong(getScmInitialHeartbeatInterval(conf));
+    reconHeartbeatFrequency = new AtomicLong(getInitialReconHeartbeatInterval(conf));
     initReportTypeCollection();
   }
 
@@ -528,12 +532,14 @@ public class StateContext {
    *
    * @param pipelineAction PipelineAction to be added
    */
-  public void addPipelineActionIfAbsent(PipelineAction pipelineAction) {
+  public boolean addPipelineActionIfAbsent(PipelineAction pipelineAction) {
     // Put only if the pipeline id with the same action is absent.
     final PipelineKey key = new PipelineKey(pipelineAction);
+    boolean added = false;
     for (InetSocketAddress endpoint : endpoints) {
-      pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction);
+      added = pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction) || added;
     }
+    return added;
   }
 
   /**
@@ -590,7 +596,7 @@ public class StateContext {
     }
 
     ThreadPoolExecutor ex = (ThreadPoolExecutor) executor;
-    if (ex.getQueue().size() == 0) {
+    if (ex.getQueue().isEmpty()) {
       return true;
     }
 
@@ -738,7 +744,7 @@ public class StateContext {
    *
    * @return SCMCommand or Null.
    */
-  public SCMCommand getNextCommand() {
+  public SCMCommand<?> getNextCommand() {
     lock.lock();
     try {
       initTermOfLeaderSCM();
@@ -772,7 +778,7 @@ public class StateContext {
    *
    * @param command - SCMCommand.
    */
-  public void addCommand(SCMCommand command) {
+  public void addCommand(SCMCommand<?> command) {
     lock.lock();
     try {
       if (commandQueue.size() >= maxCommandQueueLimit) {
@@ -792,7 +798,7 @@ public class StateContext {
     Map<SCMCommandProto.Type, Integer> summary = new HashMap<>();
     lock.lock();
     try {
-      for (SCMCommand cmd : commandQueue) {
+      for (SCMCommand<?> cmd : commandQueue) {
         summary.put(cmd.getType(), summary.getOrDefault(cmd.getType(), 0) + 1);
       }
     } finally {
@@ -832,7 +838,7 @@ public class StateContext {
    *
    * @param cmd - {@link SCMCommand}.
    */
-  public void addCmdStatus(SCMCommand cmd) {
+  public void addCmdStatus(SCMCommand<?> cmd) {
     if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
       addCmdStatus(cmd.getId(),
           DeleteBlockCommandStatusBuilder.newBuilder()
@@ -954,9 +960,9 @@ public class StateContext {
       return map.size();
     }
 
-    synchronized void putIfAbsent(PipelineKey key,
+    synchronized boolean putIfAbsent(PipelineKey key,
         PipelineAction pipelineAction) {
-      map.putIfAbsent(key, pipelineAction);
+      return map.putIfAbsent(key, pipelineAction) == null;
     }
 
     synchronized List<PipelineAction> getActions(List<PipelineReport> reports,

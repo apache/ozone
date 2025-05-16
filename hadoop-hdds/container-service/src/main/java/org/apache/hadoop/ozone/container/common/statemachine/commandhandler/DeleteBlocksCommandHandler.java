@@ -78,7 +78,7 @@ import org.slf4j.LoggerFactory;
  */
 public class DeleteBlocksCommandHandler implements CommandHandler {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeleteBlocksCommandHandler.class);
 
   private final ContainerSet containerSet;
@@ -123,7 +123,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   @Override
-  public void handle(SCMCommand command, OzoneContainer container,
+  public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
     if (command.getType() != SCMCommandProto.Type.deleteBlocksCommand) {
       LOG.warn("Skipping handling command, expected command "
@@ -188,15 +188,19 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       this.container = container;
       this.connectionManager = connectionManager;
     }
+
     public DeleteBlocksCommand getCmd() {
       return this.cmd;
     }
+
     public StateContext getContext() {
       return this.context;
     }
+
     public OzoneContainer getContainer() {
       return this.container;
     }
+
     public SCMConnectionManager getConnectionManager() {
       return this.connectionManager;
     }
@@ -208,6 +212,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   public static final class DeleteBlockTransactionExecutionResult {
     private final DeleteBlockTransactionResult result;
     private final boolean lockAcquisitionFailed;
+
     public DeleteBlockTransactionExecutionResult(
         DeleteBlockTransactionResult result, boolean lockAcquisitionFailed) {
       this.result = result;
@@ -370,8 +375,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       ContainerBlocksDeletionACKProto.Builder resultBuilder =
           ContainerBlocksDeletionACKProto.newBuilder().addAllResults(results);
-      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails()
-          .getUuid().toString());
+      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails().getUuidString());
       blockDeletionACK = resultBuilder.build();
 
       // Send ACK back to SCM as long as meta updated

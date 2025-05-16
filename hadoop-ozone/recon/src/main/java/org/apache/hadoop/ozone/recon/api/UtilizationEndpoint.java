@@ -21,8 +21,8 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_BUCKET;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_CONTAINER_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_FILE_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_VOLUME;
-import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
-import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
+import static org.apache.ozone.recon.schema.generated.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
+import static org.apache.ozone.recon.schema.generated.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 
 import java.util.Collections;
 import java.util.List;
@@ -35,11 +35,11 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
-import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ContainerCountBySize;
-import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
+import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
+import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize;
+import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
 import org.jooq.DSLContext;
 import org.jooq.Record1;
 import org.jooq.Record3;
@@ -58,6 +58,7 @@ public class UtilizationEndpoint {
   private ContainerCountBySizeDao containerCountBySizeDao;
   private static final Logger LOG = LoggerFactory
       .getLogger(UtilizationEndpoint.class);
+
   @Inject
   public UtilizationEndpoint(FileCountBySizeDao fileCountBySizeDao,
                              ContainerCountBySizeDao containerCountBySizeDao,

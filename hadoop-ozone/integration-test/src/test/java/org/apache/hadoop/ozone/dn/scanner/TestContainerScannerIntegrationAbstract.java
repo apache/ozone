@@ -55,12 +55,10 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * This class tests the data scanner functionality.
  */
-@Timeout(300)
 public abstract class TestContainerScannerIntegrationAbstract {
 
   private static MiniOzoneCluster cluster;
@@ -105,7 +103,6 @@ public abstract class TestContainerScannerIntegrationAbstract {
     getOzoneContainer().resumeContainerScrub();
   }
 
-
   @AfterAll
   static void shutdown() throws IOException {
     if (ozClient != null) {
@@ -126,7 +123,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
     ContainerManager cm = cluster.getStorageContainerManager()
         .getContainerManager();
     LambdaTestUtils.await(5000, 500,
-        () -> cm.getContainer(new ContainerID(containerID)).getState()
+        () -> cm.getContainer(ContainerID.valueOf(containerID)).getState()
             != HddsProtos.LifeCycleState.OPEN);
   }
 

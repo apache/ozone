@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT;
@@ -34,7 +35,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.slf4j.event.Level.INFO;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -49,8 +49,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -67,21 +65,21 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Ozone Recon.
  */
-@Timeout(300)
 public class TestReconWithOzoneManager {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
   private static CloseableHttpClient httpClient;
   private static String taskStatusURL;
+  private static ReconService recon;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -112,19 +110,17 @@ public class TestReconWithOzoneManager {
         .setConnectionRequestTimeout(connectionTimeout)
         .setSocketTimeout(connectionRequestTimeout).build();
 
-    cluster =
-        MiniOzoneCluster.newBuilder(conf)
-            .setNumDatanodes(1)
-            .includeRecon(true)
-            .build();
+    recon = new ReconService(conf);
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .addService(recon)
+        .build();
     cluster.waitForClusterToBeReady();
     metadataManager = cluster.getOzoneManager().getMetadataManager();
 
     cluster.getStorageContainerManager().exitSafeMode();
 
-    InetSocketAddress address =
-        cluster.getReconServer().getHttpServer().getHttpAddress();
-    String reconHTTPAddress = address.getHostName() + ":" + address.getPort();
+    String reconHTTPAddress = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY);
     taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
 
     // initialize HTTPClient
@@ -184,7 +180,7 @@ public class TestReconWithOzoneManager {
     assertEquals("bucket0", keyInfo1.getBucketName());
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
+        recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
     OzoneManagerSyncMetrics metrics = impl.getMetrics();
 
@@ -226,10 +222,11 @@ public class TestReconWithOzoneManager {
         "lastUpdatedTimestamp");
 
     //restart Recon
-    cluster.restartReconServer();
+    recon.stop();
+    recon.start(cluster.getConf());
 
     impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
+        recon.getReconServer().getOzoneManagerServiceProvider();
 
     //add 5 more keys to OM
     addKeys(5, 10);
@@ -270,15 +267,11 @@ public class TestReconWithOzoneManager {
   // And Recon should fall back on full snapshot and recover itself.
   @Test
   public void testOmDBSyncWithSeqNumberMismatch() throws Exception {
-    GenericTestUtils.LogCapturer
-        logs = GenericTestUtils.LogCapturer.captureLogs(RDBStore.getLogger());
-    GenericTestUtils.setLogLevel(RDBStore.getLogger(), INFO);
+    LogCapturer logs = LogCapturer.captureLogs(RDBStore.class);
+    GenericTestUtils.setLogLevel(RDBStore.class, INFO);
 
-    GenericTestUtils.LogCapturer
-        omServiceProviderImplLogs = GenericTestUtils.LogCapturer.captureLogs(
-        OzoneManagerServiceProviderImpl.getLogger());
-    GenericTestUtils.setLogLevel(OzoneManagerServiceProviderImpl.getLogger(),
-        INFO);
+    LogCapturer omServiceProviderImplLogs = LogCapturer.captureLogs(OzoneManagerServiceProviderImpl.class);
+    GenericTestUtils.setLogLevel(OzoneManagerServiceProviderImpl.class, INFO);
 
     // add a vol, bucket and key
     addKeys(10, 15);
@@ -294,7 +287,7 @@ public class TestReconWithOzoneManager {
     assertEquals("bucket10", keyInfo1.getBucketName());
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
+        recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
     OzoneManagerSyncMetrics metrics = impl.getMetrics();
 
@@ -303,7 +296,7 @@ public class TestReconWithOzoneManager {
         .getDb().getLatestSequenceNumber();
 
     OMMetadataManager reconMetadataManagerInstance =
-        cluster.getReconServer().getOzoneManagerServiceProvider()
+        recon.getReconServer().getOzoneManagerServiceProvider()
             .getOMMetadataManagerInstance();
     long reconLatestSeqNumber =
         ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
@@ -414,16 +407,6 @@ public class TestReconWithOzoneManager {
       writeDataToOm("key" + i, "bucket" + i, "vol" + i,
           Collections.singletonList(omKeyLocationInfoGroup));
     }
-  }
-
-  private long getTableKeyCount(TableIterator<String, ? extends
-      Table.KeyValue<String, OmKeyInfo>> iterator) {
-    long keyCount = 0;
-    while (iterator.hasNext()) {
-      keyCount++;
-      iterator.next();
-    }
-    return keyCount;
   }
 
   private static OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,

@@ -88,7 +88,7 @@ import picocli.CommandLine;
 )
 public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
-  public static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
   private static final String SCHEMA_V3 = "V3";
 
   @CommandLine.ParentCommand
@@ -215,7 +215,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     if (keyType.equals(String.class)) {
       return key.getBytes(UTF_8);
     } else if (keyType.equals(ContainerID.class)) {
-      return new ContainerID(Long.parseLong(key)).getBytes();
+      return ContainerID.getBytes(Long.parseLong(key));
     } else if (keyType.equals(Long.class)) {
       return LongCodec.get().toPersistedFormat(Long.parseLong(key));
     } else if (keyType.equals(PipelineID.class)) {
@@ -244,7 +244,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
       boolean flg = parentFile.mkdirs();
       if (!flg) {
         throw new IOException("An exception occurred while creating " +
-            "the directory. Directorys: " + parentFile.getAbsolutePath());
+            "the directory. Directory: " + parentFile.getAbsolutePath());
       }
     }
 
@@ -666,7 +666,6 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
       return WRITER;
     }
   }
-
 
   private class Task implements Callable<Void> {
 

@@ -38,13 +38,13 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -52,30 +52,20 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Test for XceiverClientManager caching and eviction.
  */
-@Timeout(300)
-public class TestXceiverClientManager {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestXceiverClientManager implements NonHATests.TestCase {
 
-  private static OzoneConfiguration config;
-  private static MiniOzoneCluster cluster;
-  private static StorageContainerLocationProtocolClientSideTranslatorPB
+  private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
   @BeforeAll
-  public static void init() throws Exception {
-    config = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(config)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
-    storageContainerLocationClient = cluster
+  void init() throws Exception {
+    storageContainerLocationClient = cluster()
         .getStorageContainerLocationClient();
   }
 
   @AfterAll
-  public static void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+  void shutdown() {
     IOUtils.cleanupWithLogger(null, storageContainerLocationClient);
   }
 

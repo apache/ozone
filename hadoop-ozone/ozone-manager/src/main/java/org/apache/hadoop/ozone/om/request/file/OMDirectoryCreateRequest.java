@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -58,6 +57,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -144,7 +144,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
     try {
       // Check if this is the root of the filesystem.
-      if (keyName.length() == 0) {
+      if (keyName.isEmpty()) {
         throw new OMException("Directory create failed. Cannot create " +
             "directory at root of the filesystem",
             OMException.ResultCodes.CANNOT_CREATE_DIRECTORY_AT_ROOT);
@@ -181,7 +181,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
         dirKeyInfo = createDirectoryKeyInfoWithACL(keyName, keyArgs, baseObjId,
             omBucketInfo, omPathInfo, trxnLogIndex,
-            ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfiguration());
+            ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfig());
 
         missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
             missingParents, omBucketInfo, omPathInfo, trxnLogIndex);

@@ -17,18 +17,13 @@
  */
 
 import React from 'react';
-import { vi } from 'vitest';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor
-} from '@testing-library/react';
+import {vi} from 'vitest';
+import {fireEvent, render, screen} from '@testing-library/react';
 
-import { DatanodeTableProps } from '@/v2/types/datanode.types';
+import {DatanodeTableProps} from '@/v2/types/datanode.types';
 import DatanodesTable from '@/v2/components/tables/datanodesTable';
-import { datanodeServer } from '@/__tests__/mocks/datanodeMocks/datanodeServer';
-import { waitForDNTable } from '@/__tests__/utils/datanodes.utils';
+import {datanodeServer} from '@tests/mocks/datanodeMocks/datanodeServer';
+import {waitForDNTable} from '@tests/utils/datanodes.utils';
 
 const defaultProps: DatanodeTableProps = {
   loading: false,

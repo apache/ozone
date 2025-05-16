@@ -35,7 +35,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -110,7 +110,7 @@ public class NodeDecommissionManager {
         }
       } catch (URISyntaxException e) {
         throw new InvalidHostStringException(
-            "Unable to parse the hoststring " + rawHostname, e);
+            "Unable to parse the host string " + rawHostname, e);
       }
     }
   }
@@ -273,24 +273,15 @@ public class NodeDecommissionManager {
     );
 
     useHostnames = config.getBoolean(
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
 
-    long monitorInterval = config.getTimeDuration(
+    long monitorIntervalMs = config.getOrFixDuration(
+        LOG,
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
-        TimeUnit.SECONDS);
-    if (monitorInterval <= 0) {
-      LOG.warn("{} must be greater than zero, defaulting to {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
-          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT);
-      config.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
-          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT);
-      monitorInterval = config.getTimeDuration(
-          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
-          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
-          TimeUnit.SECONDS);
-    }
+        TimeUnit.MILLISECONDS);
+
     setMaintenanceConfigs(config.getInt("hdds.scm.replication.maintenance.replica.minimum", 2),
         config.getInt("hdds.scm.replication.maintenance.remaining.redundancy", 1));
 
@@ -298,8 +289,8 @@ public class NodeDecommissionManager {
         rm);
     this.metrics = NodeDecommissionMetrics.create();
     monitor.setMetrics(this.metrics);
-    executor.scheduleAtFixedRate(monitor, monitorInterval, monitorInterval,
-        TimeUnit.SECONDS);
+    executor.scheduleAtFixedRate(monitor, monitorIntervalMs, monitorIntervalMs,
+        TimeUnit.MILLISECONDS);
   }
 
   public Map<String, List<ContainerID>> getContainersPendingReplication(DatanodeDetails dn)
@@ -432,7 +423,7 @@ public class NodeDecommissionManager {
           }
           int reqNodes = cif.getReplicationConfig().getRequiredNodes();
           if ((inServiceTotal - numDecom) < reqNodes) {
-            int unHealthyTotal = nodeManager.getAllNodes().size() - inServiceTotal;
+            final int unHealthyTotal = nodeManager.getAllNodeCount() - inServiceTotal;
             String errorMsg = "Insufficient nodes. Tried to decommission " + dns.size() +
                 " nodes out of " + inServiceTotal + " IN-SERVICE HEALTHY and " + unHealthyTotal +
                 " not IN-SERVICE or not HEALTHY nodes. Cannot decommission as a minimum of " + reqNodes +
@@ -600,7 +591,7 @@ public class NodeDecommissionManager {
             minInService = maintenanceReplicaMinimum;
           }
           if ((inServiceTotal - numMaintenance) < minInService) {
-            int unHealthyTotal = nodeManager.getAllNodes().size() - inServiceTotal;
+            final int unHealthyTotal = nodeManager.getAllNodeCount() - inServiceTotal;
             String errorMsg = "Insufficient nodes. Tried to start maintenance for " + dns.size() +
                 " nodes out of " + inServiceTotal + " IN-SERVICE HEALTHY and " + unHealthyTotal +
                 " not IN-SERVICE or not HEALTHY nodes. Cannot enter maintenance mode as a minimum of " + minInService +

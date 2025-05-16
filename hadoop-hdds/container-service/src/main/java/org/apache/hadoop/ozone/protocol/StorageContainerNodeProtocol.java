@@ -69,9 +69,9 @@ public interface StorageContainerNodeProtocol {
    * @param datanodeDetails - Datanode ID.
    * @return Commands to be sent to the datanode.
    */
-  default List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
+  default List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails) {
     return processHeartbeat(datanodeDetails, null);
-  };
+  }
 
   /**
    * Send heartbeat to indicate the datanode is alive and doing well.
@@ -80,7 +80,7 @@ public interface StorageContainerNodeProtocol {
    *                    heartbeating datanode.
    * @return Commands to be sent to the datanode.
    */
-  List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+  List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
       CommandQueueReportProto queueReport);
 
   /**

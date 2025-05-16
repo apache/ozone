@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.Collections.emptyMap;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
@@ -38,7 +37,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -84,14 +82,13 @@ import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -103,7 +100,6 @@ import org.slf4j.event.Level;
  * Integration tests for ensuring Recon's consistency
  * with the "ozone admin container" CLI.
  */
-@Timeout(300)
 class TestReconAndAdminContainerCLI {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestReconAndAdminContainerCLI.class);
@@ -116,6 +112,7 @@ class TestReconAndAdminContainerCLI {
   private static OzoneBucket ozoneBucket;
   private static ContainerManager scmContainerManager;
   private static ContainerManager reconContainerManager;
+  private static ReconService recon;
 
   private static Stream<Arguments> outOfServiceNodeStateArgs() {
     return Stream.of(
@@ -129,12 +126,13 @@ class TestReconAndAdminContainerCLI {
   @BeforeAll
   static void init() throws Exception {
     setupConfigKeys();
+    recon = new ReconService(CONF);
     cluster = MiniOzoneCluster.newBuilder(CONF)
-                  .setNumDatanodes(5)
-                  .includeRecon(true)
-                  .build();
+        .setNumDatanodes(5)
+        .addService(recon)
+        .build();
     cluster.waitForClusterToBeReady();
-    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ReconNodeManager.class, Level.DEBUG);
 
     scmClient = new ContainerOperationClient(CONF);
     StorageContainerManager scm = cluster.getStorageContainerManager();
@@ -144,12 +142,12 @@ class TestReconAndAdminContainerCLI {
 
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
-            cluster.getReconServer().getReconStorageContainerManager();
+            recon.getReconServer().getReconStorageContainerManager();
     PipelineManager reconPipelineManager = reconScm.getPipelineManager();
     reconContainerManager = reconScm.getContainerManager();
 
     LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() >= 4));
+        () -> (reconPipelineManager.getPipelines().size() >= scmPipelineManager.getPipelines().size()));
 
     // Verify that Recon has all the pipelines from SCM.
     scmPipelineManager.getPipelines().forEach(p -> {
@@ -172,7 +170,7 @@ class TestReconAndAdminContainerCLI {
         client, volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     String keyNameR3 = "key1";
-    containerIdR3 = setupRatisKey(keyNameR3,
+    containerIdR3 = setupRatisKey(recon, keyNameR3,
         HddsProtos.ReplicationFactor.THREE);
   }
 
@@ -190,7 +188,7 @@ class TestReconAndAdminContainerCLI {
   @Test
   void testMissingContainer() throws Exception {
     String keyNameR1 = "key2";
-    long containerID = setupRatisKey(keyNameR1,
+    long containerID = setupRatisKey(recon, keyNameR1,
         HddsProtos.ReplicationFactor.ONE);
 
     Pipeline pipeline =
@@ -381,7 +379,7 @@ class TestReconAndAdminContainerCLI {
     return true;
   }
 
-  private static long setupRatisKey(String keyName,
+  private static long setupRatisKey(ReconService reconService, String keyName,
       HddsProtos.ReplicationFactor replicationFactor) throws Exception {
     OmKeyInfo omKeyInfo = createTestKey(keyName,
         RatisReplicationConfig.getInstance(replicationFactor));
@@ -399,7 +397,7 @@ class TestReconAndAdminContainerCLI {
         reconContainerManager.getContainers());
 
     ReconContainerMetadataManager reconContainerMetadataManager =
-        cluster.getReconServer().getReconContainerMetadataManager();
+        reconService.getReconServer().getReconContainerMetadataManager();
 
     // Verify Recon picked up the new keys and
     // updated its container key mappings.
@@ -419,10 +417,7 @@ class TestReconAndAdminContainerCLI {
       ReplicationConfig replicationConfig)
       throws IOException {
     byte[] textBytes = "Testing".getBytes(UTF_8);
-    try (OutputStream out = ozoneBucket.createKey(keyName,
-        textBytes.length, replicationConfig, emptyMap())) {
-      out.write(textBytes);
-    }
+    TestDataUtil.createKey(ozoneBucket, keyName, replicationConfig, textBytes);
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
                             .setVolumeName(ozoneBucket.getVolumeName())

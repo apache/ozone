@@ -45,23 +45,22 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 /**
  * Integration Tests for Recon's tasks.
  */
-@Timeout(300)
 public class TestReconTasks {
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
+  private ReconService recon;
 
   @BeforeEach
   public void init() throws Exception {
@@ -75,11 +74,13 @@ public class TestReconTasks {
 
     conf.set("ozone.scm.stale.node.interval", "6s");
     conf.set("ozone.scm.dead.node.interval", "8s");
+    recon = new ReconService(conf);
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
-        .includeRecon(true).build();
+        .addService(recon)
+        .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(ONE, 30000);
-    GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.LOG,
+    GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.class,
         Level.DEBUG);
   }
 
@@ -94,7 +95,7 @@ public class TestReconTasks {
   public void testSyncSCMContainerInfo() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
-            cluster.getReconServer().getReconStorageContainerManager();
+            recon.getReconServer().getReconStorageContainerManager();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     ContainerManager scmContainerManager = scm.getContainerManager();
     ContainerManager reconContainerManager = reconScm.getContainerManager();
@@ -126,9 +127,9 @@ public class TestReconTasks {
   public void testMissingContainerDownNode() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
-            cluster.getReconServer().getReconStorageContainerManager();
+            recon.getReconServer().getReconStorageContainerManager();
     ReconContainerMetadataManager reconContainerMetadataManager =
-        cluster.getReconServer().getReconContainerMetadataManager();
+        recon.getReconServer().getReconContainerMetadataManager();
 
     StorageContainerManager scm = cluster.getStorageContainerManager();
     PipelineManager reconPipelineManager = reconScm.getPipelineManager();
@@ -136,7 +137,7 @@ public class TestReconTasks {
 
     // Make sure Recon's pipeline state is initialized.
     LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() >= 1));
+        () -> (!reconPipelineManager.getPipelines().isEmpty()));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
@@ -207,16 +208,16 @@ public class TestReconTasks {
   public void testEmptyMissingContainerDownNode() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
-            cluster.getReconServer().getReconStorageContainerManager();
+            recon.getReconServer().getReconStorageContainerManager();
     ReconContainerMetadataManager reconContainerMetadataManager =
-        cluster.getReconServer().getReconContainerMetadataManager();
+        recon.getReconServer().getReconContainerMetadataManager();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     PipelineManager reconPipelineManager = reconScm.getPipelineManager();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
 
     // Make sure Recon's pipeline state is initialized.
     LambdaTestUtils.await(60000, 1000,
-        () -> (reconPipelineManager.getPipelines().size() >= 1));
+        () -> (!reconPipelineManager.getPipelines().isEmpty()));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
@@ -254,7 +255,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 1;
@@ -292,7 +293,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 0 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 0;
@@ -321,7 +322,7 @@ public class TestReconTasks {
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
-      return allEmptyMissingContainers.size() == 0 &&
+      return allEmptyMissingContainers.isEmpty() &&
           unhealthyContainerStateStatsMap.get(
                   ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
               .getOrDefault(CONTAINER_COUNT, 0L) == 1;

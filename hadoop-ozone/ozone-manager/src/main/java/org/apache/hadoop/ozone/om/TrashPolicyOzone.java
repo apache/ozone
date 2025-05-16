@@ -80,7 +80,7 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
         * MSECS_PER_MINUTE);
     if (deletionInterval < 0) {
       LOG.warn("Invalid value {} for deletion interval,"
-          + " deletion interaval can not be negative."
+          + " deletion interval can not be negative."
           + "Changing to default value 0", deletionInterval);
       this.deletionInterval = 0;
     }
@@ -102,7 +102,6 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
     private Configuration conf;
     // same as checkpoint interval
     private long emptierInterval;
-
 
     private ThreadPoolExecutor executor;
 
@@ -215,6 +214,7 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
     private long ceiling(long time, long interval) {
       return floor(time, interval) + interval;
     }
+
     private long floor(long time, long interval) {
       return (time / interval) * interval;
     }
@@ -264,8 +264,8 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
     }
 
     long now = Time.now();
-    for (int i = 0; i < dirs.length; i++) {
-      Path path = dirs[i].getPath();
+    for (FileStatus fileStatus : dirs) {
+      Path path = fileStatus.getPath();
       String dir = path.toUri().getPath();
       String name = path.getName();
       if (name.equals(CURRENT.getName())) {         // skip current

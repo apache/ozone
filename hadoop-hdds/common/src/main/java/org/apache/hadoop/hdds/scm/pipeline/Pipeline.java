@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -31,9 +30,9 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -42,6 +41,7 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -68,10 +68,6 @@ public final class Pipeline {
       Pipeline.class,
       DelegatedCodec.CopyType.UNSUPPORTED);
 
-  public static Codec<Pipeline> getCodec() {
-    return CODEC;
-  }
-
   private static final Logger LOG = LoggerFactory.getLogger(Pipeline.class);
   private final PipelineID id;
   private final ReplicationConfig replicationConfig;
@@ -82,11 +78,11 @@ public final class Pipeline {
   // nodes with ordered distance to client
   private final ImmutableList<DatanodeDetails> nodesInOrder;
   // Current reported Leader for the pipeline
-  private UUID leaderId;
+  private DatanodeID leaderId;
   // Timestamp for pipeline upon creation
   private Instant creationTimestamp;
   // suggested leader id with high priority
-  private final UUID suggestedLeaderId;
+  private final DatanodeID suggestedLeaderId;
 
   private final Instant stateEnterTime;
 
@@ -115,6 +111,10 @@ public final class Pipeline {
     replicaIndexes = b.replicaIndexes;
     creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
     stateEnterTime = Instant.now();
+  }
+
+  public static Codec<Pipeline> getCodec() {
+    return CODEC;
   }
 
   /**
@@ -163,7 +163,7 @@ public final class Pipeline {
    *
    * @return Suggested LeaderId
    */
-  public UUID getSuggestedLeaderId() {
+  public DatanodeID getSuggestedLeaderId() {
     return suggestedLeaderId;
   }
 
@@ -175,18 +175,18 @@ public final class Pipeline {
   }
 
   /**
-   * Return the pipeline leader's UUID.
+   * Return the pipeline leader's DatanodeID.
    *
-   * @return DatanodeDetails.UUID.
+   * @return DatanodeDetails.DatanodeID.
    */
-  public UUID getLeaderId() {
+  public DatanodeID getLeaderId() {
     return leaderId;
   }
 
   /**
    * Pipeline object, outside of letting leader id to be set, is immutable.
    */
-  void setLeaderId(UUID leaderId) {
+  void setLeaderId(DatanodeID leaderId) {
     this.leaderId = leaderId;
   }
 
@@ -223,7 +223,6 @@ public final class Pipeline {
     return getNodeSet().equals(pipeline.getNodeSet());
   }
 
-
   /**
    * Return the replica index of the specific datanode in the datanode set.
    * <p>
@@ -257,7 +256,7 @@ public final class Pipeline {
     }
     Optional<DatanodeDetails> datanodeDetails =
         nodeStatus.keySet().stream().filter(d ->
-            d.getUuid().equals(leaderId)).findFirst();
+            d.getID().equals(leaderId)).findFirst();
     if (datanodeDetails.isPresent()) {
       return datanodeDetails.get();
     } else {
@@ -361,14 +360,11 @@ public final class Pipeline {
     return replicationConfig;
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion)
-      throws UnknownPipelineStateException {
+  public HddsProtos.Pipeline getProtobufMessage(int clientVersion) {
     return getProtobufMessage(clientVersion, Collections.emptySet());
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts)
-      throws UnknownPipelineStateException {
-
+  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts) {
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     List<Integer> memberReplicaIndexes = new ArrayList<>();
 
@@ -393,28 +389,20 @@ public final class Pipeline {
       builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
     }
     if (leaderId != null) {
-      HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
-          .setMostSigBits(leaderId.getMostSignificantBits())
-          .setLeastSigBits(leaderId.getLeastSignificantBits())
-          .build();
-      builder.setLeaderID128(uuid128);
+      builder.setLeaderDatanodeID(leaderId.toProto());
     }
 
     if (suggestedLeaderId != null) {
-      HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
-          .setMostSigBits(suggestedLeaderId.getMostSignificantBits())
-          .setLeastSigBits(suggestedLeaderId.getLeastSignificantBits())
-          .build();
-      builder.setSuggestedLeaderID(uuid128);
+      builder.setSuggestedLeaderDatanodeID(suggestedLeaderId.toProto());
     }
 
     // To save the message size on wire, only transfer the node order based on
     // network topology
     if (!nodesInOrder.isEmpty()) {
-      for (int i = 0; i < nodesInOrder.size(); i++) {
+      for (DatanodeDetails datanodeDetails : nodesInOrder) {
         Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
-        for (int j = 0; j < nodeStatus.keySet().size(); j++) {
-          if (it.next().equals(nodesInOrder.get(i))) {
+        for (int j = 0; j < nodeStatus.size(); j++) {
+          if (it.next().equals(datanodeDetails)) {
             builder.addMemberOrders(j);
             break;
           }
@@ -427,14 +415,13 @@ public final class Pipeline {
     return builder.build();
   }
 
-  private static Pipeline getFromProtobufSetCreationTimestamp(
-      HddsProtos.Pipeline proto) throws UnknownPipelineStateException {
+  private static Pipeline getFromProtobufSetCreationTimestamp(HddsProtos.Pipeline proto) {
     return toBuilder(proto)
         .setCreateTimestamp(Instant.now())
         .build();
   }
 
-  public Pipeline copyWithNodesInOrder(List<DatanodeDetails> nodes) {
+  public Pipeline copyWithNodesInOrder(List<? extends DatanodeDetails> nodes) {
     return toBuilder().setNodesInOrder(nodes).build();
   }
 
@@ -442,9 +429,8 @@ public final class Pipeline {
     return newBuilder(this);
   }
 
-  public static Builder toBuilder(HddsProtos.Pipeline pipeline)
-      throws UnknownPipelineStateException {
-    Preconditions.checkNotNull(pipeline, "Pipeline is null");
+  public static Builder toBuilder(HddsProtos.Pipeline pipeline) {
+    Objects.requireNonNull(pipeline, "pipeline == null");
 
     Map<DatanodeDetails, Integer> nodes = new LinkedHashMap<>();
     int index = 0;
@@ -457,20 +443,23 @@ public final class Pipeline {
       nodes.put(DatanodeDetails.getFromProtoBuf(member), repIndex);
       index++;
     }
-    UUID leaderId = null;
-    if (pipeline.hasLeaderID128()) {
+    DatanodeID leaderId = null;
+    if (pipeline.hasLeaderDatanodeID()) {
+      leaderId = DatanodeID.of(pipeline.getLeaderDatanodeID().getUuid());
+    } else if (pipeline.hasLeaderID128()) {
       HddsProtos.UUID uuid = pipeline.getLeaderID128();
-      leaderId = new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
+      leaderId = DatanodeID.of(uuid);
     } else if (pipeline.hasLeaderID() &&
         StringUtils.isNotEmpty(pipeline.getLeaderID())) {
-      leaderId = UUID.fromString(pipeline.getLeaderID());
+      leaderId = DatanodeID.fromUuidString(pipeline.getLeaderID());
     }
 
-    UUID suggestedLeaderId = null;
-    if (pipeline.hasSuggestedLeaderID()) {
+    DatanodeID suggestedLeaderId = null;
+    if (pipeline.hasSuggestedLeaderDatanodeID()) {
+      suggestedLeaderId = DatanodeID.of(pipeline.getSuggestedLeaderDatanodeID().getUuid());
+    } else if (pipeline.hasSuggestedLeaderID()) {
       HddsProtos.UUID uuid = pipeline.getSuggestedLeaderID();
-      suggestedLeaderId =
-          new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
+      suggestedLeaderId = DatanodeID.of(uuid);
     }
 
     final ReplicationConfig config = ReplicationConfig
@@ -487,8 +476,7 @@ public final class Pipeline {
         .setCreateTimestamp(pipeline.getCreationTimeStamp());
   }
 
-  public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline)
-      throws UnknownPipelineStateException {
+  public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline) {
     return toBuilder(pipeline).build();
   }
 
@@ -522,19 +510,20 @@ public final class Pipeline {
   @Override
   public String toString() {
     final StringBuilder b =
-        new StringBuilder(getClass().getSimpleName()).append("[");
+        new StringBuilder(getClass().getSimpleName()).append('{');
     b.append(" Id: ").append(id.getId());
-    b.append(", Nodes: ");
+    b.append(", Nodes: [");
     for (DatanodeDetails datanodeDetails : nodeStatus.keySet()) {
-      b.append(datanodeDetails);
-      b.append(" ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails));
+      b.append(" {").append(datanodeDetails);
+      b.append(", ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails)).append("},");
     }
+    b.append(']');
     b.append(", ReplicationConfig: ").append(replicationConfig);
     b.append(", State:").append(getPipelineState());
     b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");
     b.append(", CreationTimestamp").append(getCreationTimestamp()
         .atZone(ZoneId.systemDefault()));
-    b.append("]");
+    b.append('}');
     return b.toString();
   }
 
@@ -556,9 +545,9 @@ public final class Pipeline {
     private Map<DatanodeDetails, Long> nodeStatus = null;
     private List<Integer> nodeOrder = null;
     private List<DatanodeDetails> nodesInOrder = null;
-    private UUID leaderId = null;
+    private DatanodeID leaderId = null;
     private Instant creationTimestamp = null;
-    private UUID suggestedLeaderId = null;
+    private DatanodeID suggestedLeaderId = null;
     private Map<DatanodeDetails, Integer> replicaIndexes = ImmutableMap.of();
 
     public Builder() { }
@@ -584,6 +573,11 @@ public final class Pipeline {
       }
     }
 
+    public Builder setId(DatanodeID datanodeID) {
+      this.id = datanodeID.toPipelineID();
+      return this;
+    }
+
     public Builder setId(PipelineID id1) {
       this.id = id1;
       return this;
@@ -599,10 +593,11 @@ public final class Pipeline {
       return this;
     }
 
-    public Builder setLeaderId(UUID leaderId1) {
+    public Builder setLeaderId(DatanodeID leaderId1) {
       this.leaderId = leaderId1;
       return this;
     }
+
     public Builder setNodes(List<DatanodeDetails> nodes) {
       this.nodeStatus = new LinkedHashMap<>();
       nodes.forEach(node -> nodeStatus.put(node, -1L));
@@ -621,7 +616,7 @@ public final class Pipeline {
       return this;
     }
 
-    public Builder setNodesInOrder(List<DatanodeDetails> nodes) {
+    public Builder setNodesInOrder(List<? extends DatanodeDetails> nodes) {
       this.nodesInOrder = new LinkedList<>(nodes);
       return this;
     }
@@ -636,11 +631,10 @@ public final class Pipeline {
       return this;
     }
 
-    public Builder setSuggestedLeaderId(UUID uuid) {
-      this.suggestedLeaderId = uuid;
+    public Builder setSuggestedLeaderId(DatanodeID dnId) {
+      this.suggestedLeaderId = dnId;
       return this;
     }
-
 
     public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> indexes) {
       this.replicaIndexes = indexes == null ? ImmutableMap.of() : ImmutableMap.copyOf(indexes);
@@ -648,15 +642,14 @@ public final class Pipeline {
     }
 
     public Pipeline build() {
-      Preconditions.checkNotNull(id);
-      Preconditions.checkNotNull(replicationConfig);
-      Preconditions.checkNotNull(state);
-      Preconditions.checkNotNull(nodeStatus);
+      Objects.requireNonNull(id, "id == null");
+      Objects.requireNonNull(replicationConfig, "replicationConfig == null");
+      Objects.requireNonNull(state, "state == null");
+      Objects.requireNonNull(nodeStatus, "nodeStatus == null");
 
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         List<DatanodeDetails> nodesWithOrder = new ArrayList<>();
-        for (int i = 0; i < nodeOrder.size(); i++) {
-          int nodeIndex = nodeOrder.get(i);
+        for (int nodeIndex : nodeOrder) {
           Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
           while (it.hasNext() && nodeIndex >= 0) {
             DatanodeDetails node = it.next();
@@ -684,31 +677,29 @@ public final class Pipeline {
   public enum PipelineState {
     ALLOCATED, OPEN, DORMANT, CLOSED;
 
-    public static PipelineState fromProtobuf(HddsProtos.PipelineState state)
-        throws UnknownPipelineStateException {
-      Preconditions.checkNotNull(state, "Pipeline state is null");
+    public static PipelineState fromProtobuf(HddsProtos.PipelineState state) {
+      Objects.requireNonNull(state, "state == null");
       switch (state) {
       case PIPELINE_ALLOCATED: return ALLOCATED;
       case PIPELINE_OPEN: return OPEN;
       case PIPELINE_DORMANT: return DORMANT;
       case PIPELINE_CLOSED: return CLOSED;
       default:
-        throw new UnknownPipelineStateException(
-            "Pipeline state: " + state + " is not recognized.");
+        throw new IllegalArgumentException("Unexpected value " + state
+            + " from " + state.getClass());
       }
     }
 
-    public static HddsProtos.PipelineState getProtobuf(PipelineState state)
-        throws UnknownPipelineStateException {
-      Preconditions.checkNotNull(state, "Pipeline state is null");
+    public static HddsProtos.PipelineState getProtobuf(PipelineState state) {
+      Objects.requireNonNull(state, "state == null");
       switch (state) {
       case ALLOCATED: return HddsProtos.PipelineState.PIPELINE_ALLOCATED;
       case OPEN: return HddsProtos.PipelineState.PIPELINE_OPEN;
       case DORMANT: return HddsProtos.PipelineState.PIPELINE_DORMANT;
       case CLOSED: return HddsProtos.PipelineState.PIPELINE_CLOSED;
       default:
-        throw new UnknownPipelineStateException(
-            "Pipeline state: " + state + " is not recognized.");
+        throw new IllegalArgumentException("Unexpected value " + state
+            + " from " + state.getClass());
       }
     }
   }

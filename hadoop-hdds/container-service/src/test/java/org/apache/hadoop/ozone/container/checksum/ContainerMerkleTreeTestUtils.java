@@ -23,10 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -130,7 +131,7 @@ public final class ContainerMerkleTreeTestUtils {
    * and writers within a datanode.
    */
   public static ContainerProtos.ContainerChecksumInfo readChecksumFile(ContainerData data) throws IOException {
-    try (FileInputStream inStream = new FileInputStream(getContainerChecksumFile(data))) {
+    try (InputStream inStream = Files.newInputStream(getContainerChecksumFile(data).toPath())) {
       return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
     }
   }
@@ -344,7 +345,7 @@ public final class ContainerMerkleTreeTestUtils {
         .setContainerMerkleTree(tree).build();
     File checksumFile = getContainerChecksumFile(data);
 
-    try (FileOutputStream outputStream = new FileOutputStream(checksumFile)) {
+    try (OutputStream outputStream = Files.newOutputStream(checksumFile.toPath())) {
       checksumInfo.writeTo(outputStream);
     } catch (IOException ex) {
       throw new IOException("Error occurred when writing container merkle tree for containerID "

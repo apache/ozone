@@ -35,23 +35,23 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests OM related configurations.
  */
-@Timeout(300)
 public class TestOzoneManagerConfiguration {
 
   private OzoneConfiguration conf;
@@ -342,34 +342,35 @@ public class TestOzoneManagerConfiguration {
     conf.set(omNode2RpcAddrKey, "125.0.0.2:9862");
     conf.set(omNode3RpcAddrKey, "124.0.0.124:9862");
 
-    OzoneIllegalArgumentException exception = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
-    assertThat(exception).hasMessage(
-        "Configuration has no " + OZONE_OM_ADDRESS_KEY + " address that matches local node's address.");
+    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
+      Exception exception = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
+      assertThat(exception).hasMessage(
+          "Configuration has no " + OZONE_OM_ADDRESS_KEY + " address that matches local node's address.");
+    });
   }
 
   /**
    * A configuration with an empty node list while service ID is configured.
    * Cluster should fail to start during config check.
-   * @throws Exception
    */
   @Test
-  public void testNoOMNodes() throws Exception {
+  public void testNoOMNodes() {
     String omServiceId = "service1";
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     // Deliberately skip OZONE_OM_NODES_KEY and OZONE_OM_ADDRESS_KEY config
-    OzoneIllegalArgumentException e =
-        assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
-    // Expect error message
-    assertTrue(e.getMessage().contains("List of OM Node ID's should be specified"));
+    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
+      Exception e = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
+      // Expect error message
+      assertThat(e).hasMessageContaining("List of OM Node ID's should be specified");
+    });
   }
 
   /**
    * A configuration with no OM addresses while service ID is configured.
    * Cluster should fail to start during config check.
-   * @throws Exception
    */
   @Test
-  public void testNoOMAddrs() throws Exception {
+  public void testNoOMAddrs() {
     String omServiceId = "service1";
 
     String omNode1Id = "omNode1";
@@ -382,9 +383,11 @@ public class TestOzoneManagerConfiguration {
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     conf.set(omNodesKey, omNodesKeyValue);
     // Deliberately skip OZONE_OM_ADDRESS_KEY config
-    OzoneIllegalArgumentException e = assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
-    // Expect error message
-    assertTrue(e.getMessage().contains("OM RPC Address should be set for all node"));
+    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
+      Exception e = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
+      // Expect error message
+      assertThat(e).hasMessageContaining("OM RPC Address should be set for all node");
+    });
   }
 
   /**

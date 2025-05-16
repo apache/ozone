@@ -185,14 +185,14 @@ public class OmKeyLocationInfoGroup {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("version:").append(version).append(" ");
-    sb.append("isMultipartKey:").append(isMultipartKey).append(" ");
+    sb.append("version:").append(version).append(' ');
+    sb.append("isMultipartKey:").append(isMultipartKey).append(' ');
     for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
       for (OmKeyLocationInfo kli: kliList) {
         sb.append("conID ").append(kli.getContainerID());
-        sb.append(" ");
+        sb.append(' ');
         sb.append("locID ").append(kli.getLocalID());
-        sb.append(" ");
+        sb.append(' ');
         sb.append("bcsID ").append(kli.getBlockCommitSequenceId());
         sb.append(" || ");
       }

@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.isBlockLocationInfoSame;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
@@ -37,8 +37,6 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -49,6 +47,7 @@ import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -75,12 +74,14 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   private final OzoneManager ozoneManager;
   private final DeletingServiceMetrics metrics;
+  private final OMPerformanceMetrics perfMetrics;
   private final ScmBlockLocationProtocol scmClient;
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong deletedDirsCount;
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
   private final AtomicLong runCount;
+  private final AtomicLong callId;
   private final BootstrapStateHandler.Lock lock =
       new BootstrapStateHandler.Lock();
 
@@ -96,6 +97,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.movedFilesCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
     this.metrics = ozoneManager.getDeletionMetrics();
+    this.perfMetrics = ozoneManager.getPerfMetrics();
+    this.callId = new AtomicLong(0);
   }
 
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
@@ -121,47 +124,16 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
         keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
-      startTime = Time.monotonicNow();
+      long purgeStartTime = Time.monotonicNow();
       delCount = submitPurgeKeysRequest(blockDeletionResults,
           keysToModify, snapTableKey, expectedPreviousSnapshotId);
       int limit = ozoneManager.getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
-          delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime, limit);
+          delCount, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
     }
+    perfMetrics.setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
     return delCount;
-  }
-
-  /**
-   * Deletes all the keys that SCM has acknowledged and queued for delete.
-   *
-   * @param results DeleteBlockGroups returned by SCM.
-   * @throws IOException      on Error
-   */
-  private int deleteAllKeys(List<DeleteBlockGroupResult> results,
-      KeyManager manager) throws IOException {
-    Table<String, RepeatedOmKeyInfo> deletedTable =
-        manager.getMetadataManager().getDeletedTable();
-    DBStore store = manager.getMetadataManager().getStore();
-
-    // Put all keys to delete in a single transaction and call for delete.
-    int deletedCount = 0;
-    try (BatchOperation writeBatch = store.initBatchOperation()) {
-      for (DeleteBlockGroupResult result : results) {
-        if (result.isSuccess()) {
-          // Purge key from OM DB.
-          deletedTable.deleteWithBatch(writeBatch,
-              result.getObjectKey());
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Key {} deleted from OM DB", result.getObjectKey());
-          }
-          deletedCount++;
-        }
-      }
-      // Write a single transaction for delete.
-      store.commitBatchOperation(writeBatch);
-    }
-    return deletedCount;
   }
 
   /**
@@ -237,7 +209,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         keysToUpdateList.add(keyToUpdate.build());
       }
 
-      if (keysToUpdateList.size() > 0) {
+      if (!keysToUpdateList.isEmpty()) {
         purgeKeysRequest.addAllKeysToUpdate(keysToUpdateList);
       }
     }
@@ -250,13 +222,17 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit PurgeKeys request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+      submitRequest(omRequest);
     } catch (ServiceException e) {
       LOG.error("PurgeKey request failed. Will retry at next run.", e);
       return 0;
     }
 
     return deletedCount;
+  }
+
+  protected OzoneManagerProtocolProtos.OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
+    return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callId.incrementAndGet());
   }
 
   /**
@@ -280,7 +256,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   protected void submitPurgePaths(List<PurgePathRequest> requests,
                                   String snapTableKey,
-                                  UUID expectedPreviousSnapshotId, long rnCnt) {
+                                  UUID expectedPreviousSnapshotId) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -305,7 +281,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit Purge paths request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, rnCnt);
+      submitRequest(omRequest);
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.", e);
     }
@@ -433,7 +409,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, rnCnt);
+      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
@@ -450,6 +426,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
           timeTakenInIteration, rnCnt);
       metrics.incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
+      perfMetrics.setDirectoryDeletingServiceLatencyMs(timeTakenInIteration);
     }
   }
 
@@ -640,6 +617,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   @VisibleForTesting
   public AtomicLong getRunCount() {
     return runCount;
+  }
+
+  public AtomicLong getCallId() {
+    return callId;
   }
 
   /**

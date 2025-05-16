@@ -18,13 +18,15 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -51,24 +53,35 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithLegacy.class);
 
-  private boolean enableFileSystemPaths;
+  private final boolean enableFileSystemPaths;
+  private final long nsSummaryFlushToDBMaxThreshold;
 
   public NSSummaryTaskWithLegacy(ReconNamespaceSummaryManager
                                  reconNamespaceSummaryManager,
                                  ReconOMMetadataManager
                                  reconOMMetadataManager,
                                  OzoneConfiguration
-                                 ozoneConfiguration) {
+                                 ozoneConfiguration,
+                                 long nsSummaryFlushToDBMaxThreshold) {
     super(reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager);
     // true if FileSystemPaths enabled
     enableFileSystemPaths = ozoneConfiguration
         .getBoolean(OmConfig.Keys.ENABLE_FILESYSTEM_PATHS,
             OmConfig.Defaults.ENABLE_FILESYSTEM_PATHS);
+    this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
 
-  public boolean processWithLegacy(OMUpdateEventBatch events) {
+  public Pair<Integer, Boolean> processWithLegacy(OMUpdateEventBatch events,
+                                                  int seekPos) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+    int itrPos = 0;
+    while (eventIterator.hasNext() && itrPos < seekPos) {
+      eventIterator.next();
+      itrPos++;
+    }
+
+    int eventCounter = 0;
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
     ReconOMMetadataManager metadataManager = getReconOMMetadataManager();
 
@@ -76,6 +89,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent =
           eventIterator.next();
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+      eventCounter++;
 
       // we only process updates on OM's KeyTable
       String table = omdbUpdateEvent.getTable();
@@ -114,20 +128,24 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       } catch (IOException ioEx) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
             ioEx);
-        return false;
+        nsSummaryMap.clear();
+        return new ImmutablePair<>(seekPos, false);
       }
-      if (!checkAndCallFlushToDB(nsSummaryMap)) {
-        return false;
+      if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+        if (!flushAndCommitNSToDB(nsSummaryMap)) {
+          return new ImmutablePair<>(seekPos, false);
+        }
+        seekPos = eventCounter + 1;
       }
     }
 
     // flush and commit left out entries at end
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
-      return false;
+      return new ImmutablePair<>(seekPos, false);
     }
 
     LOG.debug("Completed a process run of NSSummaryTaskWithLegacy");
-    return true;
+    return new ImmutablePair<>(seekPos, true);
   }
 
   private void processWithFileSystemLayout(OmKeyInfo updatedKeyInfo,
@@ -278,14 +296,17 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
             setParentBucketId(keyInfo);
             handlePutKeyEvent(keyInfo, nsSummaryMap);
           }
-          if (!checkAndCallFlushToDB(nsSummaryMap)) {
-            return false;
+          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+            if (!flushAndCommitNSToDB(nsSummaryMap)) {
+              return false;
+            }
           }
         }
       }
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
           ioEx);
+      nsSummaryMap.clear();
       return false;
     }
 

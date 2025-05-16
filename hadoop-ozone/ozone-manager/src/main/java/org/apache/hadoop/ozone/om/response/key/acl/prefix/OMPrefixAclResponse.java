@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.key.acl.prefix;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.PREFIX_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -55,7 +55,7 @@ public class OMPrefixAclResponse extends OMClientResponse {
       BatchOperation batchOperation) throws IOException {
 
     if (getOMResponse().hasRemoveAclResponse() &&
-        prefixInfo.getAcls().size() == 0) {
+        prefixInfo.getAcls().isEmpty()) {
       // if acl list size is zero, delete the entry.
       omMetadataManager.getPrefixTable().deleteWithBatch(batchOperation,
           prefixInfo.getName());

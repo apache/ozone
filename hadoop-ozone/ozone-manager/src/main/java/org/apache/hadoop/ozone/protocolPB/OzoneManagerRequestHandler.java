@@ -95,7 +95,6 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -161,9 +160,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantG
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.slf4j.Logger;
@@ -178,12 +178,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
   private FaultInjector injector;
-  private long maxKeyListSize;
-
 
   public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
-    this.maxKeyListSize = om.getConfig().getMaxListSize();
   }
 
   //TODO simplify it to make it shorter
@@ -490,6 +487,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       return Status.INTERNAL_ERROR;
     }
   }
+
   /**
    * Validates that the incoming OM request has required parameters.
    * TODO: Add more validation checks before writing the request to Ratis log.
@@ -747,7 +745,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
-        (int)Math.min(this.maxKeyListSize, request.getCount()));
+        limitListSizeInt(request.getCount()));
     for (OmKeyInfo key : listKeysResult.getKeys()) {
       resp.addKeyInfo(key.getProtobuf(true, clientVersion));
     }
@@ -765,7 +763,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
-        (int)Math.min(this.maxKeyListSize, request.getCount()));
+        limitListSizeInt(request.getCount()));
     for (BasicOmKeyInfo key : listKeysLightResult.getKeys()) {
       resp.addBasicKeyInfo(key.getProtobuf());
     }
@@ -923,7 +921,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     ListOpenFilesResponse.Builder resp = ListOpenFilesResponse.newBuilder();
 
     ListOpenFilesResult res =
-        impl.listOpenFiles(req.getPath(), req.getCount(), req.getToken());
+        impl.listOpenFiles(req.getPath(), limitListSizeInt(req.getCount()), req.getToken());
     // TODO: Is there a clean way to avoid ser-de for responses:
     //  OM does: ListOpenFilesResult -> ListOpenFilesResponse
     //  Client : ListOpenFilesResponse -> ListOpenFilesResult
@@ -1116,7 +1114,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
-
   @RequestFeatureValidator(
       conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
@@ -1239,7 +1236,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatus> statuses =
         impl.listStatus(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), Math.min(this.maxKeyListSize, request.getNumEntries()),
+            request.getStartKey(), limitListSize(request.getNumEntries()),
             allowPartialPrefixes);
     ListStatusResponse.Builder
         listStatusResponseBuilder =
@@ -1265,7 +1262,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatusLight> statuses =
         impl.listStatusLight(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), Math.min(this.maxKeyListSize, request.getNumEntries()),
+            request.getStartKey(), limitListSize(request.getNumEntries()),
             allowPartialPrefixes);
     ListStatusLightResponse.Builder
         listStatusLightResponseBuilder =
@@ -1438,19 +1435,31 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private ListSnapshotDiffJobResponse listSnapshotDiffJobs(
-      ListSnapshotDiffJobRequest listSnapshotDiffJobRequest)
-      throws IOException {
-    List<SnapshotDiffJob> snapshotDiffJobs =
-        impl.listSnapshotDiffJobs(
-            listSnapshotDiffJobRequest.getVolumeName(),
-            listSnapshotDiffJobRequest.getBucketName(),
-            listSnapshotDiffJobRequest.getJobStatus(),
-            listSnapshotDiffJobRequest.getListAll());
-    ListSnapshotDiffJobResponse.Builder builder =
-        ListSnapshotDiffJobResponse.newBuilder();
-    for (SnapshotDiffJob diffJob : snapshotDiffJobs) {
+      ListSnapshotDiffJobRequest listSnapshotDiffJobRequest
+  ) throws IOException {
+    String prevSnapshotDiffJob = listSnapshotDiffJobRequest.hasPrevSnapshotDiffJob() ?
+        listSnapshotDiffJobRequest.getPrevSnapshotDiffJob() : null;
+    int maxListResult = listSnapshotDiffJobRequest.hasMaxListResult() ?
+        listSnapshotDiffJobRequest.getMaxListResult() : impl.getOmSnapshotManager().getMaxPageSize();
+
+    org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse response = impl.listSnapshotDiffJobs(
+        listSnapshotDiffJobRequest.getVolumeName(),
+        listSnapshotDiffJobRequest.getBucketName(),
+        listSnapshotDiffJobRequest.getJobStatus(),
+        listSnapshotDiffJobRequest.getListAll(),
+        prevSnapshotDiffJob,
+        maxListResult);
+
+    ListSnapshotDiffJobResponse.Builder builder = ListSnapshotDiffJobResponse.newBuilder();
+
+    for (SnapshotDiffJob diffJob : response.getSnapshotDiffJobs()) {
       builder.addSnapshotDiffJob(diffJob.toProtoBuf());
     }
+
+    if (StringUtils.isNotEmpty(response.getLastSnapshotDiffJob())) {
+      builder.setLastSnapshotDiffJob(response.getLastSnapshotDiffJob());
+    }
+
     return builder.build();
   }
 
@@ -1493,7 +1502,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       throws IOException {
     ListSnapshotResponse implResponse = impl.listSnapshot(
         request.getVolumeName(), request.getBucketName(), request.getPrefix(),
-        request.getPrevSnapshot(), (int)Math.min(request.getMaxListResult(), maxKeyListSize));
+        request.getPrevSnapshot(), limitListSizeInt(request.getMaxListResult()));
 
     List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList = implResponse.getSnapshotInfos()
         .stream().map(SnapshotInfo::getProtobuf).collect(Collectors.toList());
@@ -1563,9 +1572,19 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setStatus(impl.getQuotaRepairStatus())
         .build();
   }
+
   private OzoneManagerProtocolProtos.StartQuotaRepairResponse startQuotaRepair(
       OzoneManagerProtocolProtos.StartQuotaRepairRequest req) throws IOException {
     impl.startQuotaRepair(req.getBucketsList());
     return OzoneManagerProtocolProtos.StartQuotaRepairResponse.newBuilder().build();
   }
+
+  private int limitListSizeInt(int requestedSize) {
+    return Math.toIntExact(limitListSize(requestedSize));
+  }
+
+  private long limitListSize(long requestedSize) {
+    return Math.min(requestedSize, impl.getConfig().getMaxListSize());
+  }
+
 }

@@ -212,7 +212,6 @@ public final class ECStreamTestUtil {
     return map;
   }
 
-
   /**
    * A stream factory which can be used in tests to provide TestBlockStream
    * instances.
@@ -255,6 +254,7 @@ public final class ECStreamTestUtil {
       failIndexes.addAll(Arrays.asList(fail));
     }
 
+    @Override
     public synchronized BlockExtendedInputStream create(
         ReplicationConfig repConfig,
         BlockLocationInfo blockInfo, Pipeline pipeline,
@@ -356,7 +356,7 @@ public final class ECStreamTestUtil {
         buf.put(data.get());
       }
       return toRead;
-    };
+    }
 
     private void throwError() throws IOException {
       if (errorToThrow != null) {

@@ -46,12 +46,11 @@ import org.slf4j.LoggerFactory;
 public class HadoopRpcOMFailoverProxyProvider<T> extends
       OMFailoverProxyProviderBase<T> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(HadoopRpcOMFailoverProxyProvider.class);
 
   private final Text delegationTokenService;
   private Map<String, OMProxyInfo> omProxyInfos;
-  private List<String> retryExceptions = new ArrayList<>();
 
   // HadoopRpcOMFailoverProxyProvider, on encountering certain exception,
   // tries each OM once in a round robin fashion. After that it waits

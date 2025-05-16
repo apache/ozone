@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.listAllTables;
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
-import static org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition.SCHEMA_VERSION_TABLE_NAME;
-import static org.hadoop.ozone.recon.schema.StatsSchemaDefinition.GLOBAL_STATS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.SchemaVersionTableDefinition.SCHEMA_VERSION_TABLE_NAME;
+import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.apache.ozone.recon.schema.SqlDbUtils.listAllTables;
+import static org.apache.ozone.recon.schema.StatsSchemaDefinition.GLOBAL_STATS_TABLE_NAME;
 import static org.jooq.impl.DSL.name;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -34,12 +34,13 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
+import javax.sql.DataSource;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
 import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
-import org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition;
+import org.apache.ozone.recon.schema.SchemaVersionTableDefinition;
 import org.jooq.DSLContext;
 import org.jooq.Record1;
 import org.jooq.impl.DSL;
@@ -78,7 +79,6 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
     assertEquals(2, actualPairs.size(), "Unexpected number of columns");
     assertEquals(expectedPairs, actualPairs, "Column definitions do not match expected values.");
   }
-
 
   @Test
   public void testSchemaVersionCRUDOperations() throws SQLException {
@@ -162,8 +162,9 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize ReconSchemaVersionTableManager and ReconLayoutVersionManager
     ReconSchemaVersionTableManager schemaVersionTableManager = new ReconSchemaVersionTableManager(getDataSource());
+    DataSource mockDataSource = mock(DataSource.class);
     ReconLayoutVersionManager layoutVersionManager =
-        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
+        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class), mockDataSource);
 
     // Fetch and verify the current MLV
     int mlv = layoutVersionManager.getCurrentMLV();
@@ -201,8 +202,9 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize ReconSchemaVersionTableManager and ReconLayoutVersionManager
     ReconSchemaVersionTableManager schemaVersionTableManager = new ReconSchemaVersionTableManager(getDataSource());
+    DataSource mockDataSource = mock(DataSource.class);
     ReconLayoutVersionManager layoutVersionManager =
-        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
+        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class), mockDataSource);
 
     // Fetch and verify the current MLV
     int mlv = layoutVersionManager.getCurrentMLV();
@@ -249,8 +251,9 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize managers to interact with schema version framework
     ReconSchemaVersionTableManager schemaVersionTableManager = new ReconSchemaVersionTableManager(getDataSource());
+    DataSource mockDataSource = mock(DataSource.class);
     ReconLayoutVersionManager layoutVersionManager =
-        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
+        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class), mockDataSource);
 
     // Fetch and verify the current MLV stored in the database
     int mlv = layoutVersionManager.getCurrentMLV();

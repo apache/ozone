@@ -40,6 +40,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT;
@@ -79,8 +87,8 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -104,11 +112,12 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.Node;
@@ -132,7 +141,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
-import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -151,6 +159,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
+import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.MultipartUploadCleanupService;
@@ -165,6 +174,7 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -199,6 +209,7 @@ public class KeyManagerImpl implements KeyManager {
   private BackgroundService multipartUploadCleanupService;
   private SnapshotDirectoryCleaningService snapshotDirectoryCleaningService;
   private DNSToSwitchMapping dnsToSwitchMapping;
+  private CompactionService compactionService;
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OzoneConfiguration conf, OMPerformanceMetrics metrics) {
@@ -228,6 +239,10 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public void start(OzoneConfiguration configuration) {
+    boolean isCompactionEnabled = configuration.getBoolean(OZONE_OM_COMPACTION_SERVICE_ENABLED,
+        OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT);
+    startCompactionService(configuration, isCompactionEnabled);
+
     boolean isSnapshotDeepCleaningEnabled = configuration.getBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED,
         OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT);
     if (keyDeletingService == null) {
@@ -355,13 +370,34 @@ public class KeyManagerImpl implements KeyManager {
 
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
         configuration.getClass(
-            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
             TableMapping.class, DNSToSwitchMapping.class);
     DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
         dnsToSwitchMappingClass, configuration);
     dnsToSwitchMapping =
         ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
             : new CachedDNSToSwitchMapping(newInstance));
+  }
+
+  private void startCompactionService(OzoneConfiguration configuration,
+                                      boolean isCompactionServiceEnabled) {
+    if (compactionService == null && isCompactionServiceEnabled) {
+      long compactionInterval = configuration.getTimeDuration(
+          OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL,
+          OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = configuration.getTimeDuration(
+          OZONE_OM_COMPACTION_SERVICE_TIMEOUT,
+          OZONE_OM_COMPACTION_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      String compactionColumnFamilies = configuration.get(
+          OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES,
+          OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT);
+      String[] tables = compactionColumnFamilies.split(",");
+      compactionService = new CompactionService(ozoneManager, TimeUnit.MILLISECONDS,
+          compactionInterval, serviceTimeout, Arrays.asList(tables));
+      compactionService.start();
+    }
   }
 
   KeyProviderCryptoExtension getKMSProvider() {
@@ -398,6 +434,10 @@ public class KeyManagerImpl implements KeyManager {
       snapshotDirectoryCleaningService.shutdown();
       snapshotDirectoryCleaningService = null;
     }
+    if (compactionService != null) {
+      compactionService.shutdown();
+      compactionService = null;
+    }
   }
 
   private OmBucketInfo getBucketInfo(String volumeName, String bucketName)
@@ -428,6 +468,7 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(edek);
     return edek;
   }
+
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args, ResolvedBucket bucket,
       String clientAddress) throws IOException {
@@ -567,6 +608,7 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
   }
+
   /**
    * Refresh pipeline info in OM by asking SCM.
    * @param keyList a list of OmKeyInfo
@@ -697,6 +739,7 @@ public class KeyManagerImpl implements KeyManager {
     */
     if (startKey != null) {
       tableIterator.seek(startKey);
+    } else {
       tableIterator.seekToFirst();
     }
     int currentCount = 0;
@@ -730,6 +773,44 @@ public class KeyManagerImpl implements KeyManager {
              renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
       return getTableEntries(startKey, renamedKeyIter, Function.identity(), size);
     }
+  }
+
+  @Override
+  public CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmDirectoryInfo keyInfo) throws IOException {
+    String currentKeyPath = metadataManager.getOzonePathKey(volumeId, bucketInfo.getObjectID(),
+        keyInfo.getParentObjectID(), keyInfo.getName());
+    return getPreviousSnapshotOzonePathInfo(bucketInfo, keyInfo.getObjectID(), currentKeyPath,
+        (km) -> km.getMetadataManager().getDirectoryTable());
+  }
+
+  @Override
+  public CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmKeyInfo keyInfo) throws IOException {
+    String currentKeyPath = metadataManager.getOzonePathKey(volumeId, bucketInfo.getObjectID(),
+        keyInfo.getParentObjectID(), keyInfo.getFileName());
+    return getPreviousSnapshotOzonePathInfo(bucketInfo, keyInfo.getObjectID(), currentKeyPath,
+        (previousSnapshotKM) -> previousSnapshotKM.getMetadataManager().getDirectoryTable());
+  }
+
+  @Override
+  public CheckedFunction<KeyManager, OmKeyInfo, IOException> getPreviousSnapshotOzoneKeyInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmKeyInfo keyInfo) throws IOException {
+    String currentKeyPath = bucketInfo.getBucketLayout().isFileSystemOptimized()
+        ? metadataManager.getOzonePathKey(volumeId, bucketInfo.getObjectID(), keyInfo.getParentObjectID(),
+        keyInfo.getFileName()) : metadataManager.getOzoneKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName(),
+        keyInfo.getKeyName());
+    return getPreviousSnapshotOzonePathInfo(bucketInfo, keyInfo.getObjectID(), currentKeyPath,
+        (previousSnapshotKM) -> previousSnapshotKM.getMetadataManager().getKeyTable(bucketInfo.getBucketLayout()));
+  }
+
+  private <T> CheckedFunction<KeyManager, T, IOException> getPreviousSnapshotOzonePathInfo(
+      OmBucketInfo bucketInfo, long objectId, String currentKeyPath,
+      Function<KeyManager, Table<String, T>> table) throws IOException {
+    String renameKey = metadataManager.getRenameKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName(), objectId);
+    String renamedKey = metadataManager.getSnapshotRenamedTable().getIfExist(renameKey);
+    return (previousSnapshotKM) -> table.apply(previousSnapshotKM).get(
+        renamedKey != null ? renamedKey : currentKeyPath);
   }
 
   @Override
@@ -807,6 +888,11 @@ public class KeyManagerImpl implements KeyManager {
     return snapshotDirectoryCleaningService;
   }
 
+  @Override
+  public CompactionService getCompactionService() {
+    return compactionService;
+  }
+
   public boolean isSstFilteringSvcEnabled() {
     long serviceInterval = ozoneManager.getConfiguration()
         .getTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
@@ -826,38 +912,25 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-
-      MultipartUploadKeys multipartUploadKeys = metadataManager
+      List<OmMultipartUpload> multipartUploadKeys = metadataManager
           .getMultipartUploadKeys(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads,
               !withPagination);
+      OmMultipartUploadList.Builder resultBuilder = OmMultipartUploadList.newBuilder();
 
-      List<OmMultipartUpload> collect = multipartUploadKeys.getKeys().stream()
-          .map(OmMultipartUpload::from)
-          .peek(upload -> {
-            try {
-              Table<String, OmMultipartKeyInfo> keyInfoTable =
-                  metadataManager.getMultipartInfoTable();
+      if (withPagination && multipartUploadKeys.size() == maxUploads + 1) {
+        int lastIndex = multipartUploadKeys.size() - 1;
+        OmMultipartUpload lastUpload = multipartUploadKeys.get(lastIndex);
+        resultBuilder.setNextKeyMarker(lastUpload.getKeyName())
+            .setNextUploadIdMarker(lastUpload.getUploadId())
+            .setIsTruncated(true);
 
-              OmMultipartKeyInfo multipartKeyInfo =
-                  keyInfoTable.get(upload.getDbKey());
+        // remove next upload from the list
+        multipartUploadKeys.remove(lastIndex);
+      }
 
-              upload.setCreationTime(
-                  Instant.ofEpochMilli(multipartKeyInfo.getCreationTime()));
-              upload.setReplicationConfig(
-                      multipartKeyInfo.getReplicationConfig());
-            } catch (IOException e) {
-              LOG.warn(
-                  "Open key entry for multipart upload record can't be read  {}",
-                  metadataManager.getOzoneKey(upload.getVolumeName(),
-                          upload.getBucketName(), upload.getKeyName()));
-            }
-          })
-          .collect(Collectors.toList());
-
-      return new OmMultipartUploadList(collect,
-          multipartUploadKeys.getNextKeyMarker(),
-          multipartUploadKeys.getNextUploadIdMarker(),
-          multipartUploadKeys.isTruncated());
+      return resultBuilder
+          .setUploads(multipartUploadKeys)
+          .build();
 
     } catch (IOException ex) {
       LOG.error("List Multipart Uploads Failed: volume: " + volumeName +
@@ -1285,7 +1358,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     try {
       // Check if this is the root of the filesystem.
-      if (keyName.length() == 0) {
+      if (keyName.isEmpty()) {
         OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
         return new OzoneFileStatus();
       }
@@ -1430,7 +1503,7 @@ public class KeyManagerImpl implements KeyManager {
             bucketName);
     try {
       // Check if this is the root of the filesystem.
-      if (keyName.length() == 0) {
+      if (keyName.isEmpty()) {
         OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
         return new OzoneFileStatus();
       }
@@ -1509,6 +1582,7 @@ public class KeyManagerImpl implements KeyManager {
         .setOwnerName(keyInfo.getOwnerName())
         .build();
   }
+
   /**
    * OzoneFS api to lookup for a file.
    *
@@ -1759,7 +1833,7 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipelineFromCache(keyInfoList);
 
     if (args.getSortDatanodes()) {
-      sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
+      sortDatanodes(clientAddress, keyInfoList);
     }
     return fileStatusList;
   }
@@ -1888,7 +1962,7 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipelineFromCache(keyInfoList);
 
     if (omKeyArgs.getSortDatanodes()) {
-      sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
+      sortDatanodes(clientAddress, keyInfoList);
     }
 
     return fileStatusFinalList;
@@ -1927,9 +2001,13 @@ public class KeyManagerImpl implements KeyManager {
     return encInfo;
   }
 
-  private void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
+  private void sortDatanodes(String clientMachine, OmKeyInfo keyInfo) {
+    sortDatanodes(clientMachine, Collections.singletonList(keyInfo));
+  }
+
+  private void sortDatanodes(String clientMachine, List<OmKeyInfo> keyInfos) {
     if (keyInfos != null && clientMachine != null) {
-      Map<Set<String>, List<DatanodeDetails>> sortedPipelines = new HashMap<>();
+      final Map<Set<String>, List<? extends DatanodeDetails>> sortedPipelines = new HashMap<>();
       for (OmKeyInfo keyInfo : keyInfos) {
         OmKeyLocationInfoGroup key = keyInfo.getLatestVersionLocations();
         if (key == null) {
@@ -1939,14 +2017,16 @@ public class KeyManagerImpl implements KeyManager {
         for (OmKeyLocationInfo k : key.getLocationList()) {
           Pipeline pipeline = k.getPipeline();
           List<DatanodeDetails> nodes = pipeline.getNodes();
-          List<String> uuidList = toNodeUuid(nodes);
-          Set<String> uuidSet = new HashSet<>(uuidList);
-          List<DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
+          if (nodes.isEmpty()) {
+            LOG.warn("No datanodes in pipeline {}", pipeline.getId());
+            continue;
+          }
+
+          final Set<String> uuidSet = nodes.stream().map(DatanodeDetails::getUuidString)
+              .collect(Collectors.toSet());
+
+          List<? extends DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
           if (sortedNodes == null) {
-            if (nodes.isEmpty()) {
-              LOG.warn("No datanodes in pipeline {}", pipeline.getId());
-              continue;
-            }
             sortedNodes = sortDatanodes(nodes, clientMachine);
             if (sortedNodes != null) {
               sortedPipelines.put(uuidSet, sortedNodes);
@@ -1964,7 +2044,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @VisibleForTesting
-  public List<DatanodeDetails> sortDatanodes(List<DatanodeDetails> nodes,
+  public List<? extends DatanodeDetails> sortDatanodes(List<? extends DatanodeDetails> nodes,
                                              String clientMachine) {
     final Node client = getClientNode(clientMachine, nodes);
     return ozoneManager.getClusterMap()
@@ -1972,11 +2052,11 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private Node getClientNode(String clientMachine,
-                             List<DatanodeDetails> nodes) {
+                             List<? extends DatanodeDetails> nodes) {
     List<DatanodeDetails> matchingNodes = new ArrayList<>();
     boolean useHostname = ozoneManager.getConfiguration().getBoolean(
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     for (DatanodeDetails node : nodes) {
       if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(
           clientMachine)) {
@@ -2018,13 +2098,6 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
-  private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
-    List<String> nodeSet = new ArrayList<>(nodes.size());
-    for (DatanodeDetails node : nodes) {
-      nodeSet.add(node.getUuidString());
-    }
-    return nodeSet;
-  }
   private void slimLocationVersion(OmKeyInfo... keyInfos) {
     if (keyInfos != null) {
       for (OmKeyInfo keyInfo : keyInfos) {

@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -73,7 +74,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  */
 public interface NodeManager extends StorageContainerNodeProtocol,
     EventHandler<CommandForDatanode>, NodeManagerMXBean, Closeable {
-
 
   /**
    * Register API without a layout version info object passed in. Useful for
@@ -136,11 +136,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       NodeOperationalState opState, NodeState health);
 
   /**
-   * Get all datanodes known to SCM.
-   *
-   * @return List of DatanodeDetails known to SCM.
+   * @return all datanodes known to SCM.
    */
-  List<DatanodeDetails> getAllNodes();
+  List<? extends DatanodeDetails> getAllNodes();
+
+  /** @return the number of datanodes. */
+  default int getAllNodeCount() {
+    return getAllNodes().size();
+  }
 
   /**
    * Returns the aggregated node stats.
@@ -259,16 +262,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       ContainerID containerId) throws NodeNotFoundException;
 
   /**
-   * Remaps datanode to containers mapping to the new set of containers.
-   * @param datanodeDetails - DatanodeDetails
-   * @param containerIds - Set of containerIDs
-   * @throws NodeNotFoundException - if datanode is not known. For new datanode
-   *                        use addDatanodeInContainerMap call.
-   */
-  void setContainers(DatanodeDetails datanodeDetails,
-      Set<ContainerID> containerIds) throws NodeNotFoundException;
-
-  /**
    * Return set of containerIDs available on a datanode.
    * @param datanodeDetails DatanodeDetails
    * @return set of containerIDs
@@ -282,8 +275,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param dnId datanode uuid
    * @param command
    */
-  void addDatanodeCommand(UUID dnId, SCMCommand command);
-
+  void addDatanodeCommand(UUID dnId, SCMCommand<?> command);
 
   /**
    * send refresh command to all the healthy datanodes to refresh
@@ -368,19 +360,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @return list of commands
    */
   // TODO: We can give better name to this method!
-  List<SCMCommand> getCommandQueue(UUID dnID);
+  List<SCMCommand<?>> getCommandQueue(UUID dnID);
 
-  /**
-   * Given datanode uuid, returns the DatanodeDetails for the node.
-   *
-   * @param uuid datanode uuid
-   * @return the given datanode, or null if not found
-   */
-  @Nullable DatanodeDetails getNodeByUuid(@Nullable String uuid);
-
-  default @Nullable DatanodeDetails getNodeByUuid(@Nullable UUID uuid) {
-    return uuid != null ? getNodeByUuid(uuid.toString()) : null;
-  };
+  /** @return the datanode of the given id if it exists; otherwise, return null. */
+  @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of

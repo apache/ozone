@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.dn.checksum;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION;
@@ -229,7 +229,7 @@ public class TestContainerCommandReconciliation {
     StorageContainerException ex = assertThrows(StorageContainerException.class, () ->
         dnClient.getContainerChecksumInfo(containerID, targetDN.getDatanodeDetails()));
     assertEquals(ContainerProtos.Result.IO_EXCEPTION, ex.getResult());
-    assertTrue(ex.getMessage().contains("(No such file or directory"), ex.getMessage() +
+    assertTrue(ex.getMessage().contains("Checksum file does not exist"), ex.getMessage() +
         " did not contain the expected string");
   }
 
@@ -648,7 +648,7 @@ public class TestContainerCommandReconciliation {
     conf.set(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_SCM/" + hostAndRealm);
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
     conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_OM/" + hostAndRealm);
-    conf.set(DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
+    conf.set(HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
 
     ozoneKeytab = new File(workDir, "scm.keytab");
     spnegoKeytab = new File(workDir, "http.keytab");
@@ -659,7 +659,7 @@ public class TestContainerCommandReconciliation {
     conf.set(HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY, spnegoKeytab.getAbsolutePath());
     conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
     conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE, spnegoKeytab.getAbsolutePath());
-    conf.set(DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
+    conf.set(HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
   }
 
   private static void startCluster() throws Exception {

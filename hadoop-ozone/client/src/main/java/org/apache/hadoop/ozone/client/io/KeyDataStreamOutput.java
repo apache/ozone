@@ -58,18 +58,10 @@ import org.slf4j.LoggerFactory;
 public class KeyDataStreamOutput extends AbstractDataStreamOutput
     implements KeyMetadataAware {
 
-  private OzoneClientConfig config;
-
-  /**
-   * Defines stream action while calling handleFlushOrClose.
-   */
-  enum StreamAction {
-    FLUSH, HSYNC, CLOSE, FULL
-  }
-
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(KeyDataStreamOutput.class);
 
+  private OzoneClientConfig config;
   private boolean closed;
 
   // how much of data is actually written yet to underlying stream
@@ -128,7 +120,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
         new BlockDataStreamOutputEntryPool(
             config,
             omClient,
-            requestId, replicationConfig,
+            replicationConfig,
             uploadID, partNumber,
             isMultipart, info,
             unsafeByteBufferConversion,
@@ -520,7 +512,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       return this;
     }
 
-
     public Builder setReplicationConfig(ReplicationConfig replConfig) {
       this.replicationConfig = replConfig;
       return this;
@@ -560,5 +551,12 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
           ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "
               + blockDataStreamOutputEntryPool.getKeyName());
     }
+  }
+
+  /**
+   * Defines stream action while calling handleFlushOrClose.
+   */
+  enum StreamAction {
+    FLUSH, HSYNC, CLOSE, FULL
   }
 }

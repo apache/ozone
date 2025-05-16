@@ -63,9 +63,6 @@ public final class S3Acl {
     // Allows grantee above all permissions on the bucket
     FULL_CONTROL("FULL_CONTROL");
 
-    public String getValue() {
-      return value;
-    }
     /**
      * String value for this Enum.
      */
@@ -78,6 +75,9 @@ public final class S3Acl {
       value = val;
     }
 
+    public String getValue() {
+      return value;
+    }
 
     public static ACLType getType(String typeStr) {
       for (ACLType type: ACLType.values()) {
@@ -96,14 +96,6 @@ public final class S3Acl {
     USER("CanonicalUser", true, "id"),
     GROUP("Group", false, "url"),
     USER_BY_EMAIL("AmazonCustomerByEmail", false, "emailAddress");
-
-    public String getGranteeType() {
-      return granteeType;
-    }
-
-    public String getHeaderType() {
-      return granteeInHeader;
-    }
 
     /**
      *  Grantee type in body XML.
@@ -129,6 +121,14 @@ public final class S3Acl {
       granteeType = val;
       supported = support;
       granteeInHeader = headerType;
+    }
+
+    public String getGranteeType() {
+      return granteeType;
+    }
+
+    public String getHeaderType() {
+      return granteeInHeader;
     }
 
     boolean isSupported() {
@@ -226,11 +226,11 @@ public final class S3Acl {
       if (identityType != null && identityType.isSupported()) {
         String permission = grant.getPermission();
         EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnBucketFromS3Permission(permission);
-        OzoneAcl defaultOzoneAcl = new OzoneAcl(
+        OzoneAcl defaultOzoneAcl = OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.DEFAULT, acls
         );
-        OzoneAcl accessOzoneAcl = new OzoneAcl(
+        OzoneAcl accessOzoneAcl = OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
         );
@@ -290,7 +290,7 @@ public final class S3Acl {
       if (identityType != null && identityType.isSupported()) {
         String permission = grant.getPermission();
         EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnVolumeFromS3Permission(permission);
-        OzoneAcl accessOzoneAcl = new OzoneAcl(
+        OzoneAcl accessOzoneAcl = OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
         );

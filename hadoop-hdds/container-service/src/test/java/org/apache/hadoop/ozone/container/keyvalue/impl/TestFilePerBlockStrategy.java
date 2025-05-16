@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -158,7 +159,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
       ContainerProtos.ContainerDataProto.State state) throws IOException {
     KeyValueContainer keyValueContainer = getKeyValueContainer();
     keyValueContainer.getContainerData().setState(state);
-    ContainerSet containerSet = new ContainerSet(100);
+    ContainerSet containerSet = newContainerSet();
     containerSet.addContainer(keyValueContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
     ChunkBuffer.wrap(getData());
@@ -175,7 +176,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     KeyValueContainer kvContainer = getKeyValueContainer();
     KeyValueContainerData containerData = kvContainer.getContainerData();
     closedKeyValueContainer();
-    ContainerSet containerSet = new ContainerSet(100);
+    ContainerSet containerSet = newContainerSet();
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
     keyValueHandler.writeChunkForClosedContainer(getChunkInfo(), getBlockID(), writeChunkData, kvContainer);
@@ -221,7 +222,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     KeyValueContainer kvContainer = getKeyValueContainer();
     KeyValueContainerData containerData = kvContainer.getContainerData();
     closedKeyValueContainer();
-    ContainerSet containerSet = new ContainerSet(100);
+    ContainerSet containerSet = newContainerSet();
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
     List<ContainerProtos.ChunkInfo> chunkInfoList = new ArrayList<>();
@@ -299,7 +300,6 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
         Objects.equals(getBlockData.getMetadata(), putBlockData.getMetadata()) &&
         Objects.equals(getBlockData.getChunks(), putBlockData.getChunks());
   }
-
 
   private static Stream<Arguments> getNonClosedStates() {
     return Stream.of(

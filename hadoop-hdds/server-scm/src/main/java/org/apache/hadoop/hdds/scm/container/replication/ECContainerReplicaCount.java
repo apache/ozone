@@ -330,6 +330,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     distinct.addAll(maintenanceIndexes.keySet());
     return distinct;
   }
+
   /**
    * Returns an unsorted list of indexes which need additional copies to
    * ensure the container is sufficiently replicated. These missing indexes will
@@ -545,32 +546,30 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     return isSufficientlyReplicated(false);
   }
 
-
-
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("Container State: ").append(containerInfo.getState())
         .append(", Replicas: (Count: ").append(replicas.size());
-    if (healthyIndexes.size() > 0) {
+    if (!healthyIndexes.isEmpty()) {
       sb.append(", Healthy: ").append(healthyIndexes.size());
     }
-    if (unhealthyReplicaDNs.size() > 0) {
+    if (!unhealthyReplicaDNs.isEmpty()) {
       sb.append(", Unhealthy: ").append(unhealthyReplicaDNs.size());
     }
-    if (decommissionIndexes.size() > 0) {
+    if (!decommissionIndexes.isEmpty()) {
       sb.append(", Decommission: ").append(decommissionIndexes.size());
     }
-    if (maintenanceIndexes.size() > 0) {
+    if (!maintenanceIndexes.isEmpty()) {
       sb.append(", Maintenance: ").append(maintenanceIndexes.size());
     }
-    if (pendingAdd.size() > 0) {
+    if (!pendingAdd.isEmpty()) {
       sb.append(", PendingAdd: ").append(pendingAdd.size());
     }
-    if (pendingDelete.size() > 0) {
+    if (!pendingDelete.isEmpty()) {
       sb.append(", PendingDelete: ").append(pendingDelete.size());
     }
-    sb.append(")")
+    sb.append(')')
         .append(", ReplicationConfig: ").append(repConfig)
         .append(", RemainingMaintenanceRedundancy: ")
         .append(remainingMaintenanceRedundancy);

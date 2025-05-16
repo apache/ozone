@@ -24,6 +24,7 @@ import java.util.Arrays;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+
 /**
  * Test base of common utilities for tests not only raw coders but also block
  * coders.
@@ -172,12 +173,12 @@ public abstract class TestCoderBase {
 
     int idx = 0;
 
-    for (int i = 0; i < erasedDataIndexes.length; i++) {
-      erasedIndexesForDecoding[idx++] = erasedDataIndexes[i];
+    for (int erasedDataIndex : erasedDataIndexes) {
+      erasedIndexesForDecoding[idx++] = erasedDataIndex;
     }
 
-    for (int i = 0; i < erasedParityIndexes.length; i++) {
-      erasedIndexesForDecoding[idx++] = erasedParityIndexes[i] + numDataUnits;
+    for (int erasedParityIndex : erasedParityIndexes) {
+      erasedIndexesForDecoding[idx++] = erasedParityIndex + numDataUnits;
     }
 
     return erasedIndexesForDecoding;
@@ -223,14 +224,14 @@ public abstract class TestCoderBase {
 
     int idx = 0;
 
-    for (int i = 0; i < erasedDataIndexes.length; i++) {
-      toEraseChunks[idx++] = dataChunks[erasedDataIndexes[i]];
-      dataChunks[erasedDataIndexes[i]] = null;
+    for (int erasedDataIndex : erasedDataIndexes) {
+      toEraseChunks[idx++] = dataChunks[erasedDataIndex];
+      dataChunks[erasedDataIndex] = null;
     }
 
-    for (int i = 0; i < erasedParityIndexes.length; i++) {
-      toEraseChunks[idx++] = parityChunks[erasedParityIndexes[i]];
-      parityChunks[erasedParityIndexes[i]] = null;
+    for (int erasedParityIndex : erasedParityIndexes) {
+      toEraseChunks[idx++] = parityChunks[erasedParityIndex];
+      parityChunks[erasedParityIndex] = null;
     }
 
     return toEraseChunks;
@@ -241,23 +242,21 @@ public abstract class TestCoderBase {
    * @param chunks
    */
   protected void eraseDataFromChunks(ECChunk[] chunks) {
-    for (int i = 0; i < chunks.length; i++) {
-      chunks[i] = null;
-    }
+    Arrays.fill(chunks, null);
   }
 
   protected void markChunks(ECChunk[] chunks) {
-    for (int i = 0; i < chunks.length; i++) {
-      if (chunks[i] != null) {
-        chunks[i].getBuffer().mark();
+    for (ECChunk chunk : chunks) {
+      if (chunk != null) {
+        chunk.getBuffer().mark();
       }
     }
   }
 
   protected void restoreChunksFromMark(ECChunk[] chunks) {
-    for (int i = 0; i < chunks.length; i++) {
-      if (chunks[i] != null) {
-        chunks[i].getBuffer().reset();
+    for (ECChunk chunk : chunks) {
+      if (chunk != null) {
+        chunk.getBuffer().reset();
       }
     }
   }
@@ -483,7 +482,7 @@ public abstract class TestCoderBase {
       StringBuilder sb = new StringBuilder("Erasure coder test settings:\n");
       sb.append(" numDataUnits=").append(numDataUnits);
       sb.append(" numParityUnits=").append(numParityUnits);
-      sb.append(" chunkSize=").append(chunkSize).append("\n");
+      sb.append(" chunkSize=").append(chunkSize).append('\n');
 
       sb.append(" erasedDataIndexes=").
           append(Arrays.toString(erasedDataIndexes));
@@ -491,7 +490,7 @@ public abstract class TestCoderBase {
           append(Arrays.toString(erasedParityIndexes));
       sb.append(" usingDirectBuffer=").append(usingDirectBuffer);
       sb.append(" allowVerboseDump=").append(allowDump);
-      sb.append("\n");
+      sb.append('\n');
 
       System.out.println(sb.toString());
     }

@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BAT
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
@@ -76,13 +75,6 @@ public class SequenceIdGenerator {
   public static final String ROOT_CERTIFICATE_ID = "rootCertificateId";
 
   private static final long INVALID_SEQUENCE_ID = 0;
-
-  static class Batch {
-    // The upper bound of the batch.
-    private long lastId = INVALID_SEQUENCE_ID;
-    // The next id to be allocated in this batch.
-    private long nextId = lastId + 1;
-  }
 
   private final Map<String, Batch> sequenceIdToBatchMap;
 
@@ -330,13 +322,7 @@ public class SequenceIdGenerator {
 
         final StateManager impl = new StateManagerImpl(table, buffer);
 
-        final SCMHAInvocationHandler invocationHandler
-            = new SCMHAInvocationHandler(SEQUENCE_ID, impl, ratisServer);
-
-        return (StateManager) Proxy.newProxyInstance(
-            SCMHAInvocationHandler.class.getClassLoader(),
-            new Class<?>[]{StateManager.class},
-            invocationHandler);
+        return ratisServer.getProxyHandler(SEQUENCE_ID, StateManager.class, impl);
       }
     }
   }
@@ -439,5 +425,12 @@ public class SequenceIdGenerator {
     if (sequenceIdTable.get(ROOT_CERTIFICATE_ID) != null) {
       sequenceIdTable.delete(ROOT_CERTIFICATE_ID);
     }
+  }
+
+  static class Batch {
+    // The upper bound of the batch.
+    private long lastId = INVALID_SEQUENCE_ID;
+    // The next id to be allocated in this batch.
+    private long nextId = lastId + 1;
   }
 }

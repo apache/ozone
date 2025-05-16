@@ -63,7 +63,7 @@ import org.slf4j.LoggerFactory;
 public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
   @VisibleForTesting
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCommitRequestWithFSO.class);
 
   public OMKeyCommitRequestWithFSO(OMRequest omRequest,

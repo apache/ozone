@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -54,15 +53,11 @@ public abstract class BucketHandler {
 
   private final ReconOMMetadataManager omMetadataManager;
 
-  private final ContainerManager containerManager;
-
   public BucketHandler(
           ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-          ReconOMMetadataManager omMetadataManager,
-          OzoneStorageContainerManager reconSCM) {
+          ReconOMMetadataManager omMetadataManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
-    this.containerManager = reconSCM.getContainerManager();
   }
 
   public ReconOMMetadataManager getOmMetadataManager() {
@@ -174,22 +169,22 @@ public abstract class BucketHandler {
       if (bucketInfo.getBucketLayout()
           .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
         return new FSOBucketHandler(reconNamespaceSummaryManager,
-            omMetadataManager, reconSCM, bucketInfo);
+            omMetadataManager, bucketInfo);
       } else if (bucketInfo.getBucketLayout().equals(BucketLayout.LEGACY)) {
         // Choose handler based on enableFileSystemPaths flag for legacy layout.
         // If enableFileSystemPaths is false, then the legacy bucket is treated
         // as an OBS bucket.
         if (enableFileSystemPaths) {
           return new LegacyBucketHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketInfo);
+              omMetadataManager, bucketInfo);
         } else {
           return new OBSBucketHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketInfo);
+              omMetadataManager, bucketInfo);
         }
       } else if (bucketInfo.getBucketLayout()
           .equals(BucketLayout.OBJECT_STORE)) {
         return new OBSBucketHandler(reconNamespaceSummaryManager,
-            omMetadataManager, reconSCM, bucketInfo);
+            omMetadataManager, bucketInfo);
       } else {
         LOG.error("Unsupported bucket layout: " +
             bucketInfo.getBucketLayout());

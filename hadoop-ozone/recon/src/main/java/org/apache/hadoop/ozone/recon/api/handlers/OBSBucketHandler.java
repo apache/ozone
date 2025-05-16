@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import java.io.IOException;
 import java.util.List;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -46,10 +45,8 @@ public class OBSBucketHandler extends BucketHandler {
   public OBSBucketHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
       OmBucketInfo bucketInfo) {
-    super(reconNamespaceSummaryManager, omMetadataManager,
-        reconSCM);
+    super(reconNamespaceSummaryManager, omMetadataManager);
     this.omBucketInfo = bucketInfo;
     this.vol = omBucketInfo.getVolumeName();
     this.bucket = omBucketInfo.getBucketName();

@@ -90,7 +90,6 @@ public class PrefixManagerImpl implements PrefixManager {
     }
   }
 
-
   @Override
   public OMMetadataManager getMetadataManager() {
     return metadataManager;
@@ -297,7 +296,7 @@ public class PrefixManagerImpl implements PrefixManager {
     List<OmPrefixInfo> prefixList = getLongestPrefixPathHelper(
         prefixTree.getLongestPrefix(ozoneObj.getPath()));
 
-    if (prefixList.size() > 0) {
+    if (!prefixList.isEmpty()) {
       // Add all acls from direct parent to key.
       OmPrefixInfo parentPrefixInfo = prefixList.get(prefixList.size() - 1);
       if (parentPrefixInfo != null) {

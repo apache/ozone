@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
-import static org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import javax.sql.DataSource;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.jooq.DSLContext;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
@@ -34,13 +34,13 @@ import org.slf4j.LoggerFactory;
 /**
  * Upgrade action for TASK_STATUS_STATISTICS feature layout change, which adds
  * <code>last_task_run_status</code> and <code>current_task_run_status</code> columns to
- * {@link org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition} in case it is missing .
+ * {@link ReconTaskSchemaDefinition} in case it is missing .
  */
 @UpgradeActionRecon(feature = ReconLayoutFeature.TASK_STATUS_STATISTICS,
     type = ReconUpgradeAction.UpgradeActionType.FINALIZE)
 public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
 
-  public static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
 
   /**
    * Utility function to add provided column to RECON_TASK_STATUS table as INTEGER type.
@@ -60,12 +60,12 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
    */
   private void setColumnAsNonNullable(DSLContext dslContext, String columnName) {
     dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
-        .alterColumn(columnName).setNotNull().execute();
+        .alterColumn(DSL.name(columnName)).setNotNull()
+        .execute();
   }
 
   @Override
-  public void execute(ReconStorageContainerManagerFacade scmFacade) throws DataAccessException {
-    DataSource dataSource = scmFacade.getDataSource();
+  public void execute(DataSource dataSource) throws DataAccessException {
     try (Connection conn = dataSource.getConnection()) {
       if (!TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
         return;
@@ -81,8 +81,8 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
 
       //Handle previous table values with new columns default values
       int updatedRowCount = dslContext.update(DSL.table(RECON_TASK_STATUS_TABLE_NAME))
-          .set(DSL.field("last_task_run_status", SQLDataType.INTEGER), 0)
-          .set(DSL.field("is_current_task_running", SQLDataType.INTEGER), 0)
+          .set(DSL.field(DSL.name("last_task_run_status"), SQLDataType.INTEGER), 0)
+          .set(DSL.field(DSL.name("is_current_task_running"), SQLDataType.INTEGER), 0)
           .execute();
       LOG.info("Updated {} rows with default value for new columns", updatedRowCount);
 

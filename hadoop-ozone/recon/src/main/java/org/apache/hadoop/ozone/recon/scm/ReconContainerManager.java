@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -66,7 +67,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   private final PipelineManager pipelineManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ReconContainerMetadataManager cdbServiceProvider;
-  private final Table<UUID, DatanodeDetails> nodeDB;
+  private final Table<DatanodeID, DatanodeDetails> nodeDB;
   // Container ID -> Datanode UUID -> Timestamp
   private final Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
   // Pipeline -> # of open containers
@@ -378,7 +379,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       // Attempt to retrieve hostname from NODES table
       if (nodeDB != null) {
         try {
-          DatanodeDetails dnDetails = nodeDB.get(uuid);
+          final DatanodeDetails dnDetails = nodeDB.get(DatanodeID.of(uuid));
           if (dnDetails != null) {
             hostname = dnDetails.getHostName();
           }
@@ -450,7 +451,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     }
   }
 
-  public Table<UUID, DatanodeDetails> getNodeDB() {
+  public Table<DatanodeID, DatanodeDetails> getNodeDB() {
     return nodeDB;
   }
 

@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import static org.apache.ozone.test.GenericTestUtils.toLog4j;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -30,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -49,9 +49,11 @@ import org.apache.ozone.test.GenericTestUtils;
 /**
  * Tests for {@link KeyValueContainerMetadataInspector}.
  */
-public class TestKeyValueContainerMetadataInspector
-    extends TestKeyValueContainerIntegrityChecks {
+public class TestKeyValueContainerMetadataInspector extends TestKeyValueContainerIntegrityChecks {
   private static final long CONTAINER_ID = 102;
+
+  static final DeletedBlocksTransactionGeneratorForTesting GENERATOR =
+      new DeletedBlocksTransactionGeneratorForTesting();
 
   @ContainerTestVersionInfo.ContainerTest
   public void testRunDisabled(ContainerTestVersionInfo versionInfo)
@@ -192,9 +194,6 @@ public class TestKeyValueContainerMetadataInspector
       return transactions;
     }
   }
-
-  static final DeletedBlocksTransactionGeneratorForTesting GENERATOR
-      = new DeletedBlocksTransactionGeneratorForTesting();
 
   @ContainerTestVersionInfo.ContainerTest
   public void testCorrectDeleteWithTransaction(
@@ -413,7 +412,6 @@ public class TestKeyValueContainerMetadataInspector
     assertTrue(matchFound);
   }
 
-
   public void setDBBlockAndByteCounts(KeyValueContainerData containerData,
       long blockCount, long byteCount) throws Exception {
     setDB(containerData, blockCount, byteCount,
@@ -512,7 +510,7 @@ public class TestKeyValueContainerMetadataInspector
     String output = capturer.getOutput();
     capturer.clearOutput();
     // Check if the output is effectively empty
-    if (output.trim().isEmpty()) {
+    if (StringUtils.isBlank(output)) {
       return null;
     }
     return JsonTestUtils.readTree(output);
@@ -528,13 +526,5 @@ public class TestKeyValueContainerMetadataInspector
   private KeyValueContainer createOpenContainer(int normalBlocks)
       throws Exception {
     return super.createContainerWithBlocks(CONTAINER_ID, normalBlocks, 0, true);
-  }
-
-  private void containsAllStrings(String logOutput, String[] expectedMessages) {
-    for (String expectedMessage : expectedMessages) {
-      assertThat(logOutput)
-          .withFailMessage("Log output did not contain \"" + expectedMessage + "\"")
-          .contains(expectedMessage);
-    }
   }
 }

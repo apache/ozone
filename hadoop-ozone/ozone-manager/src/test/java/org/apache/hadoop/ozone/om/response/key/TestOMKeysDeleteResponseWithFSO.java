@@ -60,6 +60,7 @@ public class TestOMKeysDeleteResponseWithFSO
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
+  @Override
   protected void createPreRequisities() throws Exception {
     volId = omMetadataManager.getVolumeId(volumeName);
     long buckId = omMetadataManager.getBucketId(volumeName, bucketName);

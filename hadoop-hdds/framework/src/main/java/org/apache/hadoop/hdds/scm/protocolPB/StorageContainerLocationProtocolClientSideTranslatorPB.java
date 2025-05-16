@@ -27,7 +27,6 @@ import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -138,8 +137,8 @@ import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
 
@@ -159,12 +158,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private final StorageContainerLocationProtocolPB rpcProxy;
   private final SCMContainerLocationFailoverProxyProvider fpp;
-
-  /**
-   * This is used to check if 'leader' or 'follower' exists,
-   * in order to confirm whether we have enabled Ratis.
-   */
-  private final List<String> scmRatisRolesToCheck = Arrays.asList("leader", "follower");
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
@@ -377,12 +370,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .getContainerWithPipelinesList();
 
     for (HddsProtos.ContainerWithPipeline cp : protoCps) {
-      try {
-        cps.add(ContainerWithPipeline.fromProtobuf(cp));
-      } catch (IOException uex) {
-          // "fromProtobuf" may throw an exception
-          // do nothing , just go ahead
-      }
+      cps.add(ContainerWithPipeline.fromProtobuf(cp));
     }
     return cps;
   }
@@ -772,24 +760,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     ScmInfo.Builder builder = new ScmInfo.Builder()
         .setClusterId(resp.getClusterId())
         .setScmId(resp.getScmId())
-        .setRatisPeerRoles(resp.getPeerRolesList());
-
-    // By default, we assume that SCM Ratis is not enabled.
-
-    // If the response contains the `ScmRatisEnabled` field,
-    // we will set it directly; otherwise,
-    // we will determine if Ratis is enabled based on
-    // whether the `peerRolesList` contains the keywords 'leader' or 'follower'.
-    if (resp.hasScmRatisEnabled()) {
-      builder.setScmRatisEnabled(resp.getScmRatisEnabled());
-    } else {
-      List<String> peerRolesList = resp.getPeerRolesList();
-      if (!peerRolesList.isEmpty()) {
-        boolean containsScmRoles = peerRolesList.stream().map(String::toLowerCase)
-            .anyMatch(scmRatisRolesToCheck::contains);
-        builder.setScmRatisEnabled(containsScmRoles);
-      }
-    }
+        .setPeerRoles(resp.getPeerRolesList());
     return builder.build();
   }
 
@@ -1136,7 +1107,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     UpgradeFinalizationStatus status = response.getStatus();
     return new StatusAndMessages(
-        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        UpgradeFinalization.Status.valueOf(status.getStatus().name()),
         status.getMessagesList());
   }
 
@@ -1159,7 +1130,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     UpgradeFinalizationStatus status = response.getStatus();
     return new StatusAndMessages(
-        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        UpgradeFinalization.Status.valueOf(status.getStatus().name()),
         status.getMessagesList());
   }
 

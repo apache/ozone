@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -116,7 +117,7 @@ public class TestOMKeyRequest {
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
   protected ScmBlockLocationProtocol scmBlockLocationProtocol;
   protected StorageContainerLocationProtocol scmContainerLocationProtocol;
-  protected OMPerformanceMetrics metrics;
+  protected OMPerformanceMetrics perfMetrics;
   protected DeletingServiceMetrics delMetrics;
 
   protected static final long CONTAINER_ID = 1000L;
@@ -137,7 +138,7 @@ public class TestOMKeyRequest {
   public void setup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
-    metrics = OMPerformanceMetrics.register();
+    perfMetrics = OMPerformanceMetrics.register();
     delMetrics = DeletingServiceMetrics.create();
     OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
@@ -149,10 +150,11 @@ public class TestOMKeyRequest {
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
-    when(ozoneManager.getPerfMetrics()).thenReturn(metrics);
+    when(ozoneManager.getPerfMetrics()).thenReturn(perfMetrics);
     when(ozoneManager.getDeletionMetrics()).thenReturn(delMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+    when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.isAllowed(anyString())).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
@@ -170,9 +172,9 @@ public class TestOMKeyRequest {
     scmClient = mock(ScmClient.class);
     ozoneBlockTokenSecretManager = mock(OzoneBlockTokenSecretManager.class);
     scmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
-    metrics = mock(OMPerformanceMetrics.class);
+    perfMetrics = mock(OMPerformanceMetrics.class);
     keyManager = new KeyManagerImpl(ozoneManager, scmClient, ozoneConfiguration,
-        metrics);
+        perfMetrics);
     when(ozoneManager.getScmClient()).thenReturn(scmClient);
     when(ozoneManager.getBlockTokenSecretManager())
         .thenReturn(ozoneBlockTokenSecretManager);
@@ -254,16 +256,15 @@ public class TestOMKeyRequest {
         .thenReturn(omSnapshotManager);
 
     // Enable DEBUG level logging for relevant classes
-    GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyCommitRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.class, Level.DEBUG);
   }
 
   @Nonnull
   protected OzoneConfiguration getOzoneConfiguration() {
     return new OzoneConfiguration();
   }
-
 
   /**
    * Verify path in open key table. Also, it returns OMKeyInfo for the given

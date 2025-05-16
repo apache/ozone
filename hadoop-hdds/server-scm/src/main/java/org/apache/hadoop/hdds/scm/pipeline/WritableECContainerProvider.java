@@ -122,7 +122,7 @@ public class WritableECContainerProvider
         PipelineRequestInformation.Builder.getBuilder()
             .setSize(size)
             .build();
-    while (existingPipelines.size() > 0) {
+    while (!existingPipelines.isEmpty()) {
       int pipelineIndex =
           pipelineChoosePolicy.choosePipelineIndex(existingPipelines, pri);
       if (pipelineIndex < 0) {
@@ -137,7 +137,7 @@ public class WritableECContainerProvider
           if (containerInfo == null
               || !containerHasSpace(containerInfo, size)) {
             existingPipelines.remove(pipelineIndex);
-            pipelineManager.closePipeline(pipeline, true);
+            pipelineManager.closePipeline(pipeline.getId());
             openPipelineCount--;
           } else {
             if (pipelineIsExcluded(pipeline, containerInfo, excludeList)) {
@@ -151,7 +151,7 @@ public class WritableECContainerProvider
           LOG.warn("Pipeline or container not found when selecting a writable "
               + "container", e);
           existingPipelines.remove(pipelineIndex);
-          pipelineManager.closePipeline(pipeline, true);
+          pipelineManager.closePipeline(pipeline.getId());
           openPipelineCount--;
         }
       }
@@ -197,7 +197,7 @@ public class WritableECContainerProvider
       throws IOException {
 
     List<DatanodeDetails> excludedNodes = Collections.emptyList();
-    if (excludeList.getDatanodes().size() > 0) {
+    if (!excludeList.getDatanodes().isEmpty()) {
       excludedNodes = new ArrayList<>(excludeList.getDatanodes());
     }
 
@@ -248,7 +248,7 @@ public class WritableECContainerProvider
     NavigableSet<ContainerID> containers =
         pipelineManager.getContainersInPipeline(pipeline.getId());
     // Assume 1 container per pipeline for EC
-    if (containers.size() == 0) {
+    if (containers.isEmpty()) {
       return null;
     }
     ContainerID containerID = containers.first();
@@ -280,14 +280,6 @@ public class WritableECContainerProvider
         tags = ConfigTag.STORAGE)
     private int minimumPipelines = 5;
 
-    public int getMinimumPipelines() {
-      return minimumPipelines;
-    }
-
-    public void setMinimumPipelines(int minPipelines) {
-      this.minimumPipelines = minPipelines;
-    }
-
     private static final String PIPELINE_PER_VOLUME_FACTOR_KEY =
         "pipeline.per.volume.factor";
     private static final double PIPELINE_PER_VOLUME_FACTOR_DEFAULT = 1;
@@ -303,6 +295,14 @@ public class WritableECContainerProvider
         description = "TODO"
     )
     private double pipelinePerVolumeFactor = PIPELINE_PER_VOLUME_FACTOR_DEFAULT;
+
+    public int getMinimumPipelines() {
+      return minimumPipelines;
+    }
+
+    public void setMinimumPipelines(int minPipelines) {
+      this.minimumPipelines = minPipelines;
+    }
 
     public double getPipelinePerVolumeFactor() {
       return pipelinePerVolumeFactor;

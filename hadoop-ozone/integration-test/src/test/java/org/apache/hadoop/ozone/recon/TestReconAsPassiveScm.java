@@ -46,30 +46,33 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 /**
  * Recon's passive SCM integration tests.
  */
-@Timeout(180)
 public class TestReconAsPassiveScm {
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
+  private ReconService recon;
 
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
     conf.set(HDDS_PIPELINE_REPORT_INTERVAL, "5s");
-    cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
-        .includeRecon(true).build();
+    recon = new ReconService(conf);
+    cluster =  MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(3)
+        .addService(recon)
+        .build();
     cluster.waitForClusterToBeReady();
-    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ReconNodeManager.class, Level.DEBUG);
   }
 
   @AfterEach
@@ -83,7 +86,7 @@ public class TestReconAsPassiveScm {
   public void testDatanodeRegistrationAndReports() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
-        cluster.getReconServer().getReconStorageContainerManager();
+        recon.getReconServer().getReconStorageContainerManager();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     PipelineManager reconPipelineManager = reconScm.getPipelineManager();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
@@ -132,9 +135,8 @@ public class TestReconAsPassiveScm {
     assertEquals(scmContainerManager.getContainers(),
         reconContainerManager.getContainers());
 
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(ReconNodeManager.LOG);
-    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(ReconNodeManager.class);
+    GenericTestUtils.setLogLevel(ReconNodeManager.class, Level.DEBUG);
     reconScm.getEventQueue().fireEvent(CLOSE_CONTAINER,
         containerInfo.containerID());
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
@@ -145,7 +147,7 @@ public class TestReconAsPassiveScm {
   @Test
   public void testReconRestart() throws Exception {
     final OzoneStorageContainerManager reconScm =
-            cluster.getReconServer().getReconStorageContainerManager();
+            recon.getReconServer().getReconStorageContainerManager();
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
     // Stop Recon
@@ -157,7 +159,7 @@ public class TestReconAsPassiveScm {
     LambdaTestUtils.await(60000, 5000,
         () -> (reconScm.getScmNodeManager().getAllNodes().size() == 3));
 
-    cluster.stopRecon();
+    recon.stop();
 
     // Create container in SCM.
     ContainerInfo containerInfo =
@@ -182,7 +184,7 @@ public class TestReconAsPassiveScm {
     scmPipelineManager.deletePipeline(pipelineToClose.get().getId());
 
     // Start Recon
-    cluster.startRecon();
+    recon.start(cluster.getConf());
 
     // Verify if Recon has all the nodes on restart (even if heartbeats are
     // not yet received).
@@ -193,7 +195,7 @@ public class TestReconAsPassiveScm {
 
     // Verify Recon picks up new container, close pipeline SCM actions.
     OzoneStorageContainerManager newReconScm =
-        cluster.getReconServer().getReconStorageContainerManager();
+        recon.getReconServer().getReconStorageContainerManager();
     PipelineManager reconPipelineManager = newReconScm.getPipelineManager();
     assertFalse(
         reconPipelineManager.containsPipeline(pipelineToClose.get().getId()));

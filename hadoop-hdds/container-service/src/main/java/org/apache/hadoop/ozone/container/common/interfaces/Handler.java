@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Clock;
 import java.util.Collection;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -74,13 +75,14 @@ public abstract class Handler {
   public static Handler getHandlerForContainerType(
       final ContainerType containerType, final ConfigurationSource config,
       final String datanodeId, final ContainerSet contSet,
-      final VolumeSet volumeSet, final ContainerMetrics metrics,
+      final VolumeSet volumeSet, final VolumeChoosingPolicy volumeChoosingPolicy,
+      final ContainerMetrics metrics,
       IncrementalReportSender<Container> icrSender, ContainerChecksumTreeManager checksumManager) {
     switch (containerType) {
     case KeyValueContainer:
       return new KeyValueHandler(config,
-          datanodeId, contSet, volumeSet, metrics,
-          icrSender, checksumManager);
+          datanodeId, contSet, volumeSet, volumeChoosingPolicy, metrics,
+          icrSender, Clock.systemUTC(), checksumManager);
     default:
       throw new IllegalArgumentException("Handler for ContainerType: " +
           containerType + "doesn't exist.");

@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getDirectoryInfo;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getPreviousSnapshot;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -207,7 +206,7 @@ public class SnapshotDirectoryCleaningService
                   .getKeyTable(bucketInfo.getBucketLayout());
             }
 
-            String dbBucketKeyForDir = getOzonePathKeyForFso(metadataManager,
+            String dbBucketKeyForDir = metadataManager.getBucketKeyPrefixFSO(
                 currSnapInfo.getVolumeName(), currSnapInfo.getBucketName());
             try (ReferenceCounted<OmSnapshot>
                      rcCurrOmSnapshot = omSnapshotManager.getActiveSnapshot(
@@ -331,7 +330,7 @@ public class SnapshotDirectoryCleaningService
     }
   }
 
-  private void updateExclusiveSize(String prevSnapshotKeyTable) {
+  private void updateExclusiveSize(String prevSnapshotKeyTable) throws IOException {
     ClientId clientId = ClientId.randomId();
     SnapshotSize snapshotSize = SnapshotSize.newBuilder()
             .setExclusiveSize(
@@ -346,7 +345,7 @@ public class SnapshotDirectoryCleaningService
         setSnapshotPropertyRequest =
         SetSnapshotPropertyRequest.newBuilder()
             .setSnapshotKey(prevSnapshotKeyTable)
-            .setSnapshotSize(snapshotSize)
+            .setSnapshotSizeDeltaFromDirDeepCleaning(snapshotSize)
             .build();
 
     OMRequest omRequest = OMRequest.newBuilder()

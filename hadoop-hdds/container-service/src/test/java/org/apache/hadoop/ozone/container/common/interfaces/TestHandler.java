@@ -21,26 +21,29 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
+import com.google.common.collect.Maps;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
+import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests Handler interface.
  */
-@Timeout(300)
 public class TestHandler {
 
   private OzoneConfiguration conf;
@@ -53,10 +56,24 @@ public class TestHandler {
     this.conf = new OzoneConfiguration();
     this.containerSet = mock(ContainerSet.class);
     this.volumeSet = mock(MutableVolumeSet.class);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
     StateContext context = ContainerTestUtils.getMockContext(
         datanodeDetails, conf);
-    this.dispatcher = ContainerTestUtils.getHddsDispatcher(conf, containerSet, volumeSet, context);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
+    for (ContainerProtos.ContainerType containerType :
+        ContainerProtos.ContainerType.values()) {
+      handlers.put(containerType,
+          Handler.getHandlerForContainerType(
+              containerType, conf,
+              context.getParent().getDatanodeDetails().getUuidString(),
+              containerSet, volumeSet, volumeChoosingPolicy, metrics,
+              TestHddsDispatcher.NO_OP_ICR_SENDER,
+              new ContainerChecksumTreeManager(conf)));
+    }
+    this.dispatcher = new HddsDispatcher(
+        conf, containerSet, volumeSet, handlers, null, metrics, null);
   }
 
   @AfterEach

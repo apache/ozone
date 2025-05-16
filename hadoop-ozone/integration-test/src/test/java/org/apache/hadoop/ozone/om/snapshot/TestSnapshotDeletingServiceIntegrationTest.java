@@ -49,8 +49,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.commons.compress.utils.Lists;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -88,7 +86,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.Timeout;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,7 +94,6 @@ import org.slf4j.LoggerFactory;
  * Test Snapshot Deleting Service.
  */
 
-@Timeout(300)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestSnapshotDeletingServiceIntegrationTest {
@@ -201,10 +197,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     OzoneBucket bucket2 = TestDataUtil.createBucket(
         client, VOLUME_NAME, bucketArgs, BUCKET_NAME_TWO);
     // Create key1 and key2
-    TestDataUtil.createKey(bucket2, "bucket2key1", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket2, "bucket2key2", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket2, "bucket2key1", CONTENT.array());
+    TestDataUtil.createKey(bucket2, "bucket2key2", CONTENT.array());
 
     // Create Snapshot
     client.getObjectStore().createSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
@@ -264,14 +258,12 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Create 10 keys
     for (int i = 1; i <= 10; i++) {
-      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
-          ReplicationType.RATIS, CONTENT);
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
 
     // Create 5 keys to overwrite
     for (int i = 11; i <= 15; i++) {
-      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
-          ReplicationType.RATIS, CONTENT);
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
 
     // Create Directory and Sub
@@ -284,8 +276,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         String childDir = "/childDir" + j;
         client.getProxy().createDirectory(VOLUME_NAME,
             BUCKET_NAME_FSO, parent + childDir);
-        TestDataUtil.createKey(bucket2, parent + childFile,
-            ReplicationFactor.THREE, ReplicationType.RATIS, CONTENT);
+        TestDataUtil.createKey(bucket2, parent + childFile, CONTENT.array());
       }
     }
 
@@ -301,8 +292,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Overwrite 3 keys -> Moves previous version to deletedTable
     for (int i = 11; i <= 13; i++) {
-      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
-          ReplicationType.RATIS, CONTENT);
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
     assertTableRowCount(keyTable, 24);
 
@@ -366,8 +356,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Overwrite 2 keys
     for (int i = 14; i <= 15; i++) {
-      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
-          ReplicationType.RATIS, CONTENT);
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
 
     // Delete 2 more keys
@@ -723,10 +712,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         om.getMetadataManager();
 
-    TestDataUtil.createKey(bucket, bucket.getName() + "key0", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket, bucket.getName() + "key1", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket, bucket.getName() + "key0", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key1", CONTENT.array());
     assertTableRowCount(keyTable, 2);
 
     // Create Snapshot 1.
@@ -736,10 +723,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Overwrite bucket1key0, This is a newer version of the key which should
     // reclaimed as this is a different version of the key.
-    TestDataUtil.createKey(bucket, bucket.getName() + "key0", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket, bucket.getName() + "key2", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket, bucket.getName() + "key0", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key2", CONTENT.array());
 
     // Key 1 cannot be reclaimed as it is still referenced by Snapshot 1.
     client.getProxy().deleteKey(bucket.getVolumeName(), bucket.getName(),
@@ -763,10 +748,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     // deletedTable when Snapshot 2 is taken.
     assertTableRowCount(deletedTable, 0);
 
-    TestDataUtil.createKey(bucket, bucket.getName() + "key3", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket, bucket.getName() + "key4", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket, bucket.getName() + "key3", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key4", CONTENT.array());
     client.getProxy().deleteKey(bucket.getVolumeName(), bucket.getName(),
         bucket.getName() + "key4", false);
     assertTableRowCount(keyTable, 1);
@@ -787,7 +770,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     verifySnapshotChain(snapshotInfo, String.format("/%s/%s/%ssnap3", bucket.getVolumeName(), bucket.getName(),
         bucket.getName()));
   }
-
 
   /*
       Flow
@@ -826,19 +808,15 @@ public class TestSnapshotDeletingServiceIntegrationTest {
                 throw new RuntimeException(ex);
               }
             }));
-    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket, "dir1/" + bucket.getName() + "key1", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", CONTENT.array());
+    TestDataUtil.createKey(bucket, "dir1/" + bucket.getName() + "key1", CONTENT.array());
     assertTableRowCount(keyTable, countMap.get(keyTable.getName()) + 2);
     assertTableRowCount(dirTable, countMap.get(dirTable.getName()) + 2);
 
     // Overwrite bucket1key0, This is a newer version of the key which should
     // reclaimed as this is a different version of the key.
-    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket, "dir2/" + bucket.getName() + "key2", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", CONTENT.array());
+    TestDataUtil.createKey(bucket, "dir2/" + bucket.getName() + "key2", CONTENT.array());
     assertTableRowCount(keyTable, countMap.get(keyTable.getName()) + 3);
     assertTableRowCount(dirTable, countMap.get(dirTable.getName()) + 3);
     assertTableRowCount(deletedTable, countMap.get(deletedTable.getName()) + 1);
@@ -862,7 +840,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         bucket.getName() + "snap2");
     assertTableRowCount(snapshotInfoTable, countMap.get(snapshotInfoTable.getName()) +  2);
   }
-
 
   private void verifySnapshotChain(SnapshotInfo deletedSnapshot,
                                    String nextSnapshot)

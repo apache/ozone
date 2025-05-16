@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.api.DataStreamApi;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -70,28 +71,7 @@ import org.slf4j.LoggerFactory;
  * The underlying RPC mechanism can be chosen via the constructor.
  */
 public final class XceiverClientRatis extends XceiverClientSpi {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(XceiverClientRatis.class);
-
-  public static XceiverClientRatis newXceiverClientRatis(
-      org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
-      ConfigurationSource ozoneConf) {
-    return newXceiverClientRatis(pipeline, ozoneConf, null, null);
-  }
-
-  public static XceiverClientRatis newXceiverClientRatis(
-      org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
-      ConfigurationSource ozoneConf, ClientTrustManager trustManager, ErrorInjector errorInjector) {
-    final String rpcType = ozoneConf
-        .get(ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY,
-            ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
-    final RetryPolicy retryPolicy = RatisHelper.createRetryPolicy(ozoneConf);
-    final GrpcTlsConfig tlsConfig = RatisHelper.createTlsClientConfig(new
-        SecurityConfig(ozoneConf), trustManager);
-    return new XceiverClientRatis(pipeline,
-        SupportedRpcType.valueOfIgnoreCase(rpcType),
-        retryPolicy, tlsConfig, ozoneConf, errorInjector);
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(XceiverClientRatis.class);
 
   private final Pipeline pipeline;
   private final RpcType rpcType;
@@ -141,6 +121,26 @@ public final class XceiverClientRatis extends XceiverClientSpi {
           new Throwable("TRACE"));
     }
     this.errorInjector = errorInjector;
+  }
+
+  public static XceiverClientRatis newXceiverClientRatis(
+      org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
+      ConfigurationSource ozoneConf) {
+    return newXceiverClientRatis(pipeline, ozoneConf, null, null);
+  }
+
+  public static XceiverClientRatis newXceiverClientRatis(
+      org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
+      ConfigurationSource ozoneConf, ClientTrustManager trustManager, ErrorInjector errorInjector) {
+    final String rpcType = ozoneConf
+        .get(ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY,
+            ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
+    final RetryPolicy retryPolicy = RatisHelper.createRetryPolicy(ozoneConf);
+    final GrpcTlsConfig tlsConfig = RatisHelper.createTlsClientConfig(new
+        SecurityConfig(ozoneConf), trustManager);
+    return new XceiverClientRatis(pipeline,
+        SupportedRpcType.valueOfIgnoreCase(rpcType),
+        retryPolicy, tlsConfig, ozoneConf, errorInjector);
   }
 
   private long updateCommitInfosMap(RaftClientReply reply, RaftProtos.ReplicationLevel level) {
@@ -238,7 +238,6 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   private RaftClient getClient() {
     return Objects.requireNonNull(client.get(), "client is null");
   }
-
 
   @VisibleForTesting
   public ConcurrentMap<UUID, Long> getCommitInfoMap() {
@@ -364,7 +363,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request) {
     XceiverClientReply asyncReply = new XceiverClientReply(null);
-    long requestTime = System.currentTimeMillis();
+    long requestTime = Time.monotonicNow();
     CompletableFuture<RaftClientReply> raftClientReply =
         sendRequestAsync(request);
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
@@ -377,7 +376,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
           }
           metrics.decrPendingContainerOpsMetrics(request.getCmdType());
           metrics.addContainerOpsLatency(request.getCmdType(),
-              System.currentTimeMillis() - requestTime);
+              Time.monotonicNow() - requestTime);
         }).thenApply(reply -> {
           try {
             if (!reply.isSuccess()) {

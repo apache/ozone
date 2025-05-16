@@ -18,87 +18,60 @@
 package org.apache.hadoop.fs.ozone;
 
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
+import static org.apache.hadoop.hdds.utils.IOUtils.closeQuietly;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.ozone.ClientConfigForTesting;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.assertj.core.api.Assertions;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test OzoneFSInputStream by reading through multiple interfaces.
  */
-@Timeout(300)
-public class TestOzoneFSInputStream {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneClient client;
-  private static FileSystem fs;
-  private static FileSystem ecFs;
-  private static Path filePath = null;
-  private static byte[] data = null;
-  private static OzoneConfiguration conf = null;
+  private OzoneClient client;
+  private FileSystem fs;
+  private FileSystem ecFs;
+  private Path filePath = null;
+  private byte[] data = null;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
-
-    ClientConfigForTesting.newBuilder(StorageUnit.MB)
-        .setChunkSize(2)
-        .setBlockSize(8)
-        .setStreamBufferFlushSize(2)
-        .setStreamBufferMaxSize(4)
-        .applyTo(conf);
-
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
-        .build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+  void init() throws Exception {
+    client = cluster().newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
@@ -106,11 +79,10 @@ public class TestOzoneFSInputStream {
     // Set the fs.defaultFS and start the filesystem
     String uri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, uri);
-    fs =  FileSystem.get(conf);
+    fs =  FileSystem.get(URI.create(uri), cluster().getConf());
     int fileLen = 30 * 1024 * 1024;
-    data = string2Bytes(RandomStringUtils.randomAlphanumeric(fileLen));
-    filePath = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
+    data = string2Bytes(RandomStringUtils.secure().nextAlphanumeric(fileLen));
+    filePath = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
     try (FSDataOutputStream stream = fs.create(filePath)) {
       stream.write(data);
     }
@@ -129,19 +101,12 @@ public class TestOzoneFSInputStream {
         ecBucket);
     String ecUri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, ecUri);
-    ecFs =  FileSystem.get(conf);
+    ecFs =  FileSystem.get(URI.create(ecUri), cluster().getConf());
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
-  public static void shutdown() throws IOException {
-    IOUtils.cleanupWithLogger(null, client);
-    fs.close();
-    ecFs.close();
-    cluster.shutdown();
+  void shutdown() {
+    closeQuietly(client, fs, ecFs);
   }
 
   @Test
@@ -240,7 +205,7 @@ public class TestOzoneFSInputStream {
       // File position should not be changed after positional readFully
       assertEquals(currentPos, inputStream.getPos());
       // Make sure buffer is full after readFully
-      Assertions.assertThat((!buffer.hasRemaining()));
+      assertFalse(buffer.hasRemaining());
 
       byte[] value1 = new byte[bufferCapacity];
       System.arraycopy(buffer.array(), 0, value1, 0, bufferCapacity);
@@ -254,7 +219,7 @@ public class TestOzoneFSInputStream {
       position = 8;
       inputStream.readFully(position, buffer);
       assertEquals(currentPos, inputStream.getPos());
-      Assertions.assertThat((!buffer.hasRemaining()));
+      assertFalse(buffer.hasRemaining());
       byte[] value3 = new byte[bufferCapacity];
       System.arraycopy(buffer.array(), 0, value3, 0, bufferCapacity);
       byte[] value4 = new byte[bufferCapacity];
@@ -319,8 +284,8 @@ public class TestOzoneFSInputStream {
   @Test
   public void testSequenceFileReaderSync() throws IOException {
     File srcfile = new File("src/test/resources/testSequenceFile");
-    Path path = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
-    InputStream input = new BufferedInputStream(new FileInputStream(srcfile));
+    Path path = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
+    InputStream input = new BufferedInputStream(Files.newInputStream(srcfile.toPath()));
 
     // Upload test SequenceFile file
     FSDataOutputStream output = fs.create(path);
@@ -328,7 +293,7 @@ public class TestOzoneFSInputStream {
     input.close();
 
     // Start SequenceFile.Reader test
-    SequenceFile.Reader in = new SequenceFile.Reader(fs, path, conf);
+    SequenceFile.Reader in = new SequenceFile.Reader(fs, path, cluster().getConf());
     long blockStart = -1;
     // EOFException should not occur.
     in.sync(0);
@@ -341,8 +306,8 @@ public class TestOzoneFSInputStream {
   @Test
   public void testSequenceFileReaderSyncEC() throws IOException {
     File srcfile = new File("src/test/resources/testSequenceFile");
-    Path path = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
-    InputStream input = new BufferedInputStream(new FileInputStream(srcfile));
+    Path path = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
+    InputStream input = new BufferedInputStream(Files.newInputStream(srcfile.toPath()));
 
     // Upload test SequenceFile file
     FSDataOutputStream output = ecFs.create(path);
@@ -350,7 +315,7 @@ public class TestOzoneFSInputStream {
     input.close();
 
     // Start SequenceFile.Reader test
-    SequenceFile.Reader in = new SequenceFile.Reader(ecFs, path, conf);
+    SequenceFile.Reader in = new SequenceFile.Reader(ecFs, path, cluster().getConf());
     long blockStart = -1;
     // EOFException should not occur.
     in.sync(0);

@@ -21,6 +21,7 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
 /**
@@ -29,18 +30,6 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 public class OMPerformanceMetrics {
   private static final String SOURCE_NAME =
       OMPerformanceMetrics.class.getSimpleName();
-
-  public static OMPerformanceMetrics register() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-            "OzoneManager Request Performance",
-            new OMPerformanceMetrics());
-  }
-
-  public static void unregister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
-  }
 
   @Metric(about = "Overall lookupKey in nanoseconds")
   private MutableRate lookupLatencyNs;
@@ -59,7 +48,6 @@ public class OMPerformanceMetrics {
 
   @Metric(about = "resolveBucketLink latency nanoseconds")
   private MutableRate lookupResolveBucketLatencyNs;
-
 
   @Metric(about = "Overall getKeyInfo in nanoseconds")
   private MutableRate getKeyInfoLatencyNs;
@@ -151,6 +139,27 @@ public class OMPerformanceMetrics {
   @Metric(about = "ACLs check in getObjectTagging")
   private MutableRate getObjectTaggingAclCheckLatencyNs;
 
+  @Metric(about = "Latency of each iteration of DirectoryDeletingService in ms")
+  private MutableGaugeLong directoryDeletingServiceLatencyMs;
+
+  @Metric(about = "Latency of each iteration of KeyDeletingService in ms")
+  private MutableGaugeLong keyDeletingServiceLatencyMs;
+
+  @Metric(about = "Latency of each iteration of OpenKeyCleanupService in ms")
+  private MutableGaugeLong openKeyCleanupServiceLatencyMs;
+
+  public static OMPerformanceMetrics register() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    return ms.register(SOURCE_NAME,
+        "OzoneManager Request Performance",
+        new OMPerformanceMetrics());
+  }
+
+  public static void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(SOURCE_NAME);
+  }
+
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
   }
@@ -158,7 +167,6 @@ public class OMPerformanceMetrics {
   MutableRate getLookupRefreshLocationLatencyNs() {
     return lookupRefreshLocationLatencyNs;
   }
-
 
   MutableRate getLookupGenerateBlockTokenLatencyNs() {
     return lookupGenerateBlockTokenLatencyNs;
@@ -298,5 +306,17 @@ public class OMPerformanceMetrics {
 
   public void addGetObjectTaggingLatencyNs(long latencyInNs) {
     getObjectTaggingAclCheckLatencyNs.add(latencyInNs);
+  }
+
+  public void setDirectoryDeletingServiceLatencyMs(long latencyInMs) {
+    directoryDeletingServiceLatencyMs.set(latencyInMs);
+  }
+
+  public void setKeyDeletingServiceLatencyMs(long latencyInMs) {
+    keyDeletingServiceLatencyMs.set(latencyInMs);
+  }
+
+  public void setOpenKeyCleanupServiceLatencyMs(long latencyInMs) {
+    openKeyCleanupServiceLatencyMs.set(latencyInMs);
   }
 }

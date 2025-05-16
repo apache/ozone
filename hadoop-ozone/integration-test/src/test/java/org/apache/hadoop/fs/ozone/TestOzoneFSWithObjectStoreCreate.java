@@ -27,8 +27,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -39,90 +42,77 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Class tests create with object store and getFileStatus.
  */
-@Timeout(300)
-public class TestOzoneFSWithObjectStoreCreate {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.TestCase {
 
-  private String rootPath;
-
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneClient client;
-
+  private OzoneClient client;
   private OzoneFileSystem o3fs;
-
   private String volumeName;
-
   private String bucketName;
+  private OmConfig originalOmConfig;
 
   @BeforeAll
-  public static void initClass() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+  void initClass() throws IOException {
+    client = cluster().newClient();
 
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    originalOmConfig = omConfig.copy();
+    omConfig.setFileSystemPathEnabled(true);
+
   }
 
   @AfterAll
-  public static void teardownClass() {
+  void tearDownClass() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+    cluster().getOzoneManager().getConfig().setFrom(originalOmConfig);
   }
 
   @BeforeEach
   public void init() throws Exception {
-    volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-
-    OzoneConfiguration conf = cluster.getConf();
+    volumeName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
+    bucketName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
 
-    rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME, bucketName,
+    String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME, bucketName,
         volumeName);
-    o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath), conf);
+    o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath), cluster().getConf());
   }
 
   @AfterEach
-  public void teardown() {
+  void tearDown() {
     IOUtils.closeQuietly(o3fs);
   }
 
@@ -163,7 +153,6 @@ public class TestOzoneFSWithObjectStoreCreate {
     checkAncestors(p);
 
   }
-
 
   @Test
   public void testObjectStoreCreateWithO3fs() throws Exception {
@@ -248,7 +237,6 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   }
 
-
   @Test
   public void testKeyCreationFailDuetoDirectoryCreationBeforeCommit()
       throws Exception {
@@ -268,7 +256,6 @@ public class TestOzoneFSWithObjectStoreCreate {
     OMException ex = assertThrows(OMException.class, () -> ozoneOutputStream.close());
     assertEquals(NOT_A_FILE, ex.getResult());
   }
-
 
   @Test
   public void testMPUFailDuetoDirectoryCreationBeforeComplete()
@@ -342,7 +329,6 @@ public class TestOzoneFSWithObjectStoreCreate {
     assertEquals(NOT_A_FILE, ex.getResult());
   }
 
-
   @Test
   public void testListKeysWithNotNormalizedPath() throws Exception {
 
@@ -362,13 +348,9 @@ public class TestOzoneFSWithObjectStoreCreate {
     keys.add(OmUtils.normalizeKey(key2, false));
     keys.add(OmUtils.normalizeKey(key3, false));
 
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte)96);
-
-    createKey(ozoneBucket, key1, 10, input);
-    createKey(ozoneBucket, key2, 10, input);
-    createKey(ozoneBucket, key3, 10, input);
+    createAndAssertKey(ozoneBucket, key1, 10);
+    createAndAssertKey(ozoneBucket, key2, 10);
+    createAndAssertKey(ozoneBucket, key3, 10);
 
     // Iterator with key name as prefix.
 
@@ -401,6 +383,38 @@ public class TestOzoneFSWithObjectStoreCreate {
     checkKeyList(ozoneKeyIterator, keys);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {2, 3, 4})
+  public void testDoubleSlashPrefixPathNormalization(int slashCount) throws Exception {
+    OzoneVolume ozoneVolume = client.getObjectStore().getVolume(volumeName);
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    // Generate a path with the specified number of leading slashes
+    StringBuilder keyPrefix = new StringBuilder();
+    for (int i = 0; i < slashCount; i++) {
+      keyPrefix.append('/');
+    }
+    String dirPath = "dir" + slashCount + "/";
+    String keyName = "key" + slashCount;
+    String slashyKey = keyPrefix + dirPath + keyName;
+    String normalizedKey = dirPath + keyName;
+    byte[] data = new byte[10];
+    Arrays.fill(data, (byte)96);
+    ArrayList<String> expectedKeys = new ArrayList<>();
+    expectedKeys.add(dirPath);
+    expectedKeys.add(normalizedKey);
+    TestDataUtil.createKey(ozoneBucket, slashyKey, data);
+
+    try {
+      ozoneBucket.readKey(slashyKey).close();
+      ozoneBucket.readKey(normalizedKey).close();
+    } catch (Exception e) {
+      fail("Should be able to read key " + e.getMessage());
+    }
+
+    Iterator<? extends OzoneKey> it = ozoneBucket.listKeys(dirPath);
+    checkKeyList(it, expectedKeys);
+  }
+
   private void checkKeyList(Iterator<? extends OzoneKey > ozoneKeyIterator,
       List<String> keys) {
 
@@ -413,31 +427,30 @@ public class TestOzoneFSWithObjectStoreCreate {
     assertEquals(keys, outputKeys);
   }
 
-  private void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input)
+  private void createAndAssertKey(OzoneBucket ozoneBucket, String key, int length)
+      throws Exception {
+    
+    byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, length);
+    // Read the key with given key name.
+    readKey(ozoneBucket, key, length, input);
+
+  }
+
+  private void readKey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
       throws Exception {
 
-    OzoneOutputStream ozoneOutputStream =
-        ozoneBucket.createKey(key, length);
-
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
-
-    // Read the key with given key name.
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
     byte[] read = new byte[length];
-    ozoneInputStream.read(read, 0, length);
-    ozoneInputStream.close();
+    try (InputStream in = ozoneBucket.readKey(key)) {
+      IOUtils.readFully(in, read);
+    }
 
     String inputString = new String(input, UTF_8);
     assertEquals(inputString, new String(read, UTF_8));
 
     // Read using filesystem.
-    FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
-    read = new byte[length];
-    fsDataInputStream.read(read, 0, length);
-    fsDataInputStream.close();
+    try (InputStream in = o3fs.open(new Path(key))) {
+      IOUtils.readFully(in, read);
+    }
 
     assertEquals(inputString, new String(read, UTF_8));
   }

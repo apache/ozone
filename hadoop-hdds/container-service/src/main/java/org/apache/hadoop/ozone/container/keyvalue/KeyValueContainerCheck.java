@@ -25,6 +25,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -144,7 +145,7 @@ public class KeyValueContainerCheck {
     File containerFile = KeyValueContainer.getContainerFile(metadataPath, containerID);
     try {
       loadContainerData(containerFile);
-    } catch (FileNotFoundException ex) {
+    } catch (FileNotFoundException | NoSuchFileException ex) {
       metadataErrors.add(new ContainerScanError(FailureType.MISSING_CONTAINER_FILE, containerFile, ex));
       return metadataErrors;
     } catch (IOException ex) {

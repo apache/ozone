@@ -42,7 +42,6 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
     this.peerDatanodes = peerDatanodes;
   }
 
-
   @Override
   public SCMCommandProto.Type getType() {
     return SCMCommandProto.Type.reconcileContainerCommand;
