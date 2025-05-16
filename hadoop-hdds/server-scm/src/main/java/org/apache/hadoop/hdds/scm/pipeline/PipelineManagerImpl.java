@@ -903,7 +903,7 @@ public class PipelineManagerImpl implements PipelineManager {
         metrics.incNumPipelineContainSameDatanodes();
         //TODO remove until pipeline allocation is proved equally distributed.
         for (Pipeline overlapPipeline : overlapPipelines) {
-          LOG.info("{} and {} have exactly the same datanodes: {}",
+          LOG.info("{} and {} have exactly the same set of datanodes: {}",
               pipeline.getId(), overlapPipeline.getId(), pipeline.getNodeSet());
         }
       }

@@ -330,14 +330,16 @@ public class DeletedBlockLogImpl
 
   private void getTransaction(DeletedBlocksTransaction tx,
       DatanodeDeletedBlockTransactions transactions,
-      Set<DatanodeDetails> dnList, Set<ContainerReplica> replicas,
+      Set<ContainerReplica> replicas,
       Map<DatanodeID, Map<Long, CmdStatus>> commandStatus) {
-    for (ContainerReplica replica : replicas) {
-      final DatanodeID datanodeID = replica.getDatanodeDetails().getID();
-      if (!transactionStatusManager.isDuplication(datanodeID, tx.getTxID(), commandStatus)) {
-        final DeletedBlocksTransaction updatedTxn = DeletedBlocksTransaction.newBuilder(tx)
+    DeletedBlocksTransaction updatedTxn =
+        DeletedBlocksTransaction.newBuilder(tx)
             .setCount(transactionStatusManager.getRetryCount(tx.getTxID()))
             .build();
+    for (ContainerReplica replica : replicas) {
+      final DatanodeID datanodeID = replica.getDatanodeDetails().getID();
+      if (!transactionStatusManager.isDuplication(
+          datanodeID, tx.getTxID(), commandStatus)) {
         transactions.addTransactionToDN(datanodeID, updatedTxn);
         metrics.incrProcessedTransaction();
       }
@@ -453,8 +455,7 @@ public class DeletedBlockLogImpl
                 metrics.incrSkippedTransaction();
                 continue;
               }
-              getTransaction(
-                  txn, transactions, dnList, replicas, commandStatus);
+              getTransaction(txn, transactions, replicas, commandStatus);
             } else if (txn.getCount() >= maxRetry || containerManager.getContainer(id).isOpen()) {
               metrics.incrSkippedTransaction();
             }

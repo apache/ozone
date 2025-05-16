@@ -187,9 +187,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
         }
       }
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Heartbeat dispatched: datanode {}, Commands: {}", datanodeDetails, commands);
-    }
+    LOG.debug("Heartbeat dispatched for datanode {} with commands {}", datanodeDetails, commands);
 
     return commands;
   }
