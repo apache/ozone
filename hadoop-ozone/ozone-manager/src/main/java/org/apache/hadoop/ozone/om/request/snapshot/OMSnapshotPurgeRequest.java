@@ -101,9 +101,11 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
           continue;
         }
         SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
-
-        // Step 1: Update the deep clean flag for the next active snapshot
+        SnapshotInfo nextToNextSnapshot = nextSnapshot == null ? null : SnapshotUtils.getNextSnapshot(ozoneManager,
+            snapshotChainManager, nextSnapshot);
+        // Step 1: Update the deep clean flag for the next snapshot
         updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex);
+        updateSnapshotInfoAndCache(nextToNextSnapshot, omMetadataManager, trxnLogIndex);
         // Step 2: Update the snapshot chain.
         updateSnapshotChainAndCache(omMetadataManager, fromSnapshot, trxnLogIndex);
         // Step 3: Purge the snapshot from SnapshotInfoTable cache and also remove from the map.
@@ -140,6 +142,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       // current snapshot is deleted. We can potentially
       // reclaim more keys in the next snapshot.
       snapInfo.setDeepClean(false);
+      snapInfo.setDeepCleanedDeletedDir(false);
 
       // Update table cache first
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapInfo.getTableKey()),
