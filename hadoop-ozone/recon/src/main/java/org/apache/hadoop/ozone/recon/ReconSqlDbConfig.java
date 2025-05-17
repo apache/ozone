@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.recon.schema;
+package org.apache.hadoop.ozone.recon;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
