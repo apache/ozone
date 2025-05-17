@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.reconfig;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
@@ -51,6 +52,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
         .add(OZONE_KEY_DELETING_LIMIT_PER_TASK)
         .add(OZONE_OM_VOLUME_LISTALL_ALLOWED)
         .add(OZONE_READONLY_ADMINISTRATORS)
+        .add(OZONE_DIR_DELETING_SERVICE_INTERVAL)
         .addAll(new OmConfig().reconfigurableProperties())
         .build();
 
@@ -119,6 +121,15 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     getSubject().reconfigurePropertyImpl(OZONE_OM_VOLUME_LISTALL_ALLOWED, newValue);
 
     assertEquals(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT, cluster().getOzoneManager().getAllowListAllVolumes());
+  }
+
+  @Test
+  void dirDeletingServiceInterval() throws ReconfigurationException {
+    //Initial string is 1m
+    getSubject().reconfigurePropertyImpl(OZONE_DIR_DELETING_SERVICE_INTERVAL, "2m");
+
+    assertEquals("2m", cluster().getOzoneManager().
+        getKeyManager().getDirDeletingService().getDirDeletingServiceInterval());
   }
 
 }
