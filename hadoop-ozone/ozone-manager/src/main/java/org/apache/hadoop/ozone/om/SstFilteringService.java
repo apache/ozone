@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -190,7 +190,7 @@ public class SstFilteringService extends BackgroundService
                     snapshotInfo.getBucketName());
 
             try (
-                ReferenceCounted<OmSnapshot> snapshotMetadataReader =
+                UncheckedAutoCloseableSupplier<OmSnapshot> snapshotMetadataReader =
                     snapshotManager.get().getActiveSnapshot(
                         snapshotInfo.getVolumeName(),
                         snapshotInfo.getBucketName(),

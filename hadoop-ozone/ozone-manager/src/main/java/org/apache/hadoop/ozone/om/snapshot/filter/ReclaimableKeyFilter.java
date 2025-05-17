@@ -34,9 +34,9 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.ratis.util.MemoizedCheckedSupplier;
 import org.apache.ratis.util.function.CheckedSupplier;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Filter to return deleted keys which are reclaimable based on their presence in previous snapshot in
@@ -85,7 +85,7 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
    * @throws IOException If an error occurs while accessing snapshot data or key information.
    */
   protected Boolean isReclaimable(Table.KeyValue<String, OmKeyInfo> deletedKeyInfo) throws IOException {
-    ReferenceCounted<OmSnapshot> previousSnapshot = getPreviousOmSnapshot(1);
+    UncheckedAutoCloseableSupplier<OmSnapshot> previousSnapshot = getPreviousOmSnapshot(1);
 
 
     KeyManager previousKeyManager = Optional.ofNullable(previousSnapshot)
@@ -101,7 +101,7 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
       return true;
     }
 
-    ReferenceCounted<OmSnapshot> previousToPreviousSnapshot = getPreviousOmSnapshot(0);
+    UncheckedAutoCloseableSupplier<OmSnapshot> previousToPreviousSnapshot = getPreviousOmSnapshot(0);
     KeyManager previousToPreviousKeyManager = Optional.ofNullable(previousToPreviousSnapshot)
         .map(i -> i.get().getKeyManager()).orElse(null);
 

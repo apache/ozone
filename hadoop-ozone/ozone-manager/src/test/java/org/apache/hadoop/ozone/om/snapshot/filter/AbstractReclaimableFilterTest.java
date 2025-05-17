@@ -59,11 +59,11 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestInstance;
@@ -181,7 +181,7 @@ public abstract class AbstractReclaimableFilterTest {
                  doNothing().when(mock).close());
          MockedConstruction<SnapshotCache> mockedCache = Mockito.mockConstruction(SnapshotCache.class,
              (mock, context) -> {
-               Map<UUID, ReferenceCounted<OmSnapshot>> map = new HashMap<>();
+               Map<UUID, UncheckedAutoCloseableSupplier<OmSnapshot>> map = new HashMap<>();
                when(mock.get(any(UUID.class))).thenAnswer(i -> {
                  if (snapshotInfos.values().stream().flatMap(List::stream)
                      .map(SnapshotInfo::getSnapshotId)
@@ -189,7 +189,7 @@ public abstract class AbstractReclaimableFilterTest {
                    throw new IOException("Snapshot " + i.getArgument(0, UUID.class) + " not found");
                  }
                  return map.computeIfAbsent(i.getArgument(0, UUID.class), (k) -> {
-                   ReferenceCounted<OmSnapshot> ref = mock(ReferenceCounted.class);
+                   UncheckedAutoCloseableSupplier<OmSnapshot> ref = mock(UncheckedAutoCloseableSupplier.class);
                    OmSnapshot omSnapshot = mock(OmSnapshot.class);
                    when(omSnapshot.getSnapshotID()).thenReturn(k);
                    when(ref.get()).thenReturn(omSnapshot);

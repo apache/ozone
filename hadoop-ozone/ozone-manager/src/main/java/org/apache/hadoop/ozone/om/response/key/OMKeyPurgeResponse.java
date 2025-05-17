@@ -34,10 +34,10 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Response for {@link OMKeyPurgeRequest} request.
@@ -75,7 +75,7 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
       OmSnapshotManager omSnapshotManager =
           ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager();
 
-      try (ReferenceCounted<OmSnapshot> rcOmFromSnapshot =
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmFromSnapshot =
           omSnapshotManager.getSnapshot(fromSnapshot.getSnapshotId())) {
 
         OmSnapshot fromOmSnapshot = rcOmFromSnapshot.get();
