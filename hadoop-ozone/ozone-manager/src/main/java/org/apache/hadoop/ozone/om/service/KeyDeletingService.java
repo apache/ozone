@@ -61,13 +61,13 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -285,7 +285,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             continue;
           }
 
-          try (ReferenceCounted<OmSnapshot>
+          try (UncheckedAutoCloseableSupplier<OmSnapshot>
               rcCurrOmSnapshot = omSnapshotManager.getSnapshot(
                   currSnapInfo.getVolumeName(),
                   currSnapInfo.getBucketName(),
@@ -324,7 +324,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
             Table<String, OmKeyInfo> previousKeyTable = null;
             Table<String, String> prevRenamedTable = null;
-            ReferenceCounted<OmSnapshot> rcPrevOmSnapshot = null;
+            UncheckedAutoCloseableSupplier<OmSnapshot> rcPrevOmSnapshot = null;
 
             // Split RepeatedOmKeyInfo and update current snapshot
             // deletedKeyTable and next snapshot deletedKeyTable.
@@ -342,7 +342,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             }
 
             Table<String, OmKeyInfo> previousToPrevKeyTable = null;
-            ReferenceCounted<OmSnapshot> rcPrevToPrevOmSnapshot = null;
+            UncheckedAutoCloseableSupplier<OmSnapshot> rcPrevToPrevOmSnapshot = null;
             if (previousToPrevSnapshot != null) {
               rcPrevToPrevOmSnapshot = omSnapshotManager.getSnapshot(
                   previousToPrevSnapshot.getVolumeName(),

@@ -36,10 +36,10 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -107,9 +107,9 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
   public void testMoveTableKeysToNextSnapshot(boolean nextSnapshotExists) throws Exception {
     createSnapshots(nextSnapshotExists);
 
-    try (ReferenceCounted<OmSnapshot> snapshot1 = getOmSnapshotManager().getSnapshot(getVolumeName(), getBucketName(),
-        snapshotName1);
-         ReferenceCounted<OmSnapshot> snapshot2 = nextSnapshotExists ? getOmSnapshotManager().getSnapshot(
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot1 = getOmSnapshotManager().getSnapshot(
+        getVolumeName(), getBucketName(), snapshotName1);
+         UncheckedAutoCloseableSupplier<OmSnapshot> snapshot2 = nextSnapshotExists ? getOmSnapshotManager().getSnapshot(
              getVolumeName(), getBucketName(), snapshotName2) : null) {
       OmSnapshot snapshot = snapshot1.get();
       List<OzoneManagerProtocolProtos.SnapshotMoveKeyInfos> deletedTable = new ArrayList<>();
