@@ -519,6 +519,28 @@ public class TestBucketList {
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e.getCode());
   }
 
+  @Test
+  public void testListObjectsWithInvalidMaxKeys() throws Exception {
+    OzoneClient client = createClientWithKeys("file1");
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    // maxKeys < 0
+    OS3Exception e1 = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.get("bucket", null, null, null, -1, null,
+            null, null, null, null, null, null, 1000, null)
+    );
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e1.getCode());
+
+    // maxKeys == 0
+    OS3Exception e2 = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.get("bucket", null, null, null, 0, null,
+            null, null, null, null, null, null, 1000, null)
+    );
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e2.getCode());
+  }
+
   private void assertEncodingTypeObject(
       String exceptName, String exceptEncodingType, EncodingTypeObject object) {
     assertEquals(exceptName, object.getName());
