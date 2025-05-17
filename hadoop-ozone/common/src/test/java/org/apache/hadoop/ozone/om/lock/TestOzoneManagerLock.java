@@ -209,7 +209,7 @@ class TestOzoneManagerLock {
       return new String[]{UUID.randomUUID().toString(),
           UUID.randomUUID().toString()};
     } else if ((resource == LeveledResource.KEY_PATH_LOCK) ||
-        (resource == LeveledResource.SNAPSHOT_LOCK)) {
+        (resource == FlatResource.SNAPSHOT_LOCK)) {
       return new String[]{UUID.randomUUID().toString(),
           UUID.randomUUID().toString(), UUID.randomUUID().toString()};
     } else {

@@ -51,6 +51,11 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
   }
 
   @Override
+  public OMLockDetails acquireResourceWriteLock(Resource resource) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
   public boolean acquireMultiUserLock(String firstUser, String secondUser) {
     return false;
   }
@@ -68,6 +73,11 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
 
   @Override
   public OMLockDetails releaseWriteLocks(Resource resource, Collection<String[]> resources) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
+  public OMLockDetails releaseResourceWriteLock(Resource resource) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 

@@ -32,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
@@ -80,7 +81,8 @@ class TestSnapshotCache {
   void setUp() {
     // Reset cache for each test case
     omMetrics = OMMetrics.create();
-    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 50);
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 50,
+        new OmReadOnlyLock());
   }
 
   @AfterEach
