@@ -26,6 +26,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -183,6 +185,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
           OMException.ResultCodes.FILE_NOT_FOUND);
     }
     return new UncheckedAutoCloseableSupplier<OmSnapshot>() {
+      AtomicReference<Boolean> closed = new AtomicReference<>(false);
       @Override
       public OmSnapshot get() {
         return rcOmSnapshot.get();
@@ -190,7 +193,12 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
 
       @Override
       public void close() {
-        rcOmSnapshot.decrementRefCount();
+        closed.updateAndGet(alreadyClosed -> {
+          if (!alreadyClosed) {
+            rcOmSnapshot.decrementRefCount();
+          }
+          return true;
+        });
       }
     };
   }
