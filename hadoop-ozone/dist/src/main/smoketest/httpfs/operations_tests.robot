@@ -23,6 +23,7 @@ Resource            operations.robot
 Resource            ../lib/os.robot
 Resource            ../commonlib.robot
 Suite Setup         Generate volume
+Test Timeout        2 minutes
 
 *** Variables ***
 ${volume}                      generated
