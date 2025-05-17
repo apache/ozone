@@ -37,9 +37,9 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.util.function.CheckedFunction;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +60,7 @@ public abstract class ReclaimableFilter<V>
   private final List<SnapshotInfo> tmpValidationSnapshotInfos;
   private final List<UUID> lockedSnapshotIds;
   private final List<SnapshotInfo> previousSnapshotInfos;
-  private final List<ReferenceCounted<OmSnapshot>> previousOmSnapshots;
+  private final List<UncheckedAutoCloseableSupplier<OmSnapshot>> previousOmSnapshots;
   private final MultiSnapshotLocks snapshotIdLocks;
   private Long volumeId;
   private OmBucketInfo bucketInfo;
@@ -131,7 +131,7 @@ public abstract class ReclaimableFilter<V>
     }
     for (int i = 0; i < expectedLastNSnapshotsInChain.size(); i++) {
       SnapshotInfo snapshotInfo = expectedLastNSnapshotsInChain.get(i);
-      ReferenceCounted<OmSnapshot> omSnapshot = previousOmSnapshots.get(i);
+      UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = previousOmSnapshots.get(i);
       UUID snapshotId = snapshotInfo == null ? null : snapshotInfo.getSnapshotId();
       UUID existingOmSnapshotId = omSnapshot == null ? null : omSnapshot.get().getSnapshotID();
       if (!Objects.equals(snapshotId, existingOmSnapshotId)) {
@@ -212,7 +212,7 @@ public abstract class ReclaimableFilter<V>
     lockedSnapshotIds.clear();
   }
 
-  protected ReferenceCounted<OmSnapshot> getPreviousOmSnapshot(int index) {
+  protected UncheckedAutoCloseableSupplier<OmSnapshot> getPreviousOmSnapshot(int index) {
     return previousOmSnapshots.get(index);
   }
 
@@ -240,7 +240,7 @@ public abstract class ReclaimableFilter<V>
     return previousSnapshotInfos;
   }
 
-  List<ReferenceCounted<OmSnapshot>> getPreviousOmSnapshots() {
+  List<UncheckedAutoCloseableSupplier<OmSnapshot>> getPreviousOmSnapshots() {
     return previousOmSnapshots;
   }
 }
