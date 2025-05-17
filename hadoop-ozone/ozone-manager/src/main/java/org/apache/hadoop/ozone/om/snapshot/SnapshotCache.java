@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_DB_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
@@ -153,7 +153,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).",
           size(), cacheSizeLimit);
     }
-    lock.acquireReadLock(SNAPSHOT_LOCK, key.toString());
+    lock.acquireReadLock(SNAPSHOT_DB_LOCK, key.toString());
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist, and increment the reference count on the instance.
     ReferenceCounted<OmSnapshot> rcOmSnapshot =
@@ -185,7 +185,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     if (rcOmSnapshot == null) {
       // The only exception that would fall through the loader logic above
       // is OMException with FILE_NOT_FOUND.
-      lock.releaseReadLock(SNAPSHOT_LOCK, key.toString());
+      lock.releaseReadLock(SNAPSHOT_DB_LOCK, key.toString());
       throw new OMException("SnapshotId: '" + key + "' not found, or the snapshot is no longer active.",
           OMException.ResultCodes.FILE_NOT_FOUND);
     }
@@ -198,7 +198,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       @Override
       public void close() {
         rcOmSnapshot.decrementRefCount();
-        lock.releaseReadLock(SNAPSHOT_LOCK, key.toString());
+        lock.releaseReadLock(SNAPSHOT_DB_LOCK, key.toString());
       }
     };
   }
@@ -217,18 +217,18 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   }
 
   public OMLockDetails lock() {
-    OMLockDetails lockDetails = lock.acquireResourceWriteLock(SNAPSHOT_LOCK);
+    OMLockDetails lockDetails = lock.acquireResourceWriteLock(SNAPSHOT_DB_LOCK);
     if (lockDetails.isLockAcquired()) {
       cleanup(true);
       if (!dbMap.isEmpty()) {
-        return lock.releaseResourceWriteLock(SNAPSHOT_LOCK);
+        return lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK);
       }
     }
     return lockDetails;
   }
 
   public OMLockDetails unlock() {
-    return lock.releaseResourceWriteLock(SNAPSHOT_LOCK);
+    return lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK);
   }
 
   /**

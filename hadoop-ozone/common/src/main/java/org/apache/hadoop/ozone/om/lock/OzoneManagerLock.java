@@ -611,7 +611,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   public enum FlatResource implements Resource {
     SNAPSHOT_GC_LOCK("SNAPSHOT_GC_LOCK"),
-    SNAPSHOT_LOCK("SNAPSHOT_LOCK");
+    SNAPSHOT_DB_LOCK("SNAPSHOT_DB_LOCK");
 
     private String name;
     private ResourceManager resourceManager;
@@ -738,7 +738,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     S3_SECRET_LOCK((byte) 4, "S3_SECRET_LOCK"), // 31
     KEY_PATH_LOCK((byte) 5, "KEY_PATH_LOCK"), //63
-    PREFIX_LOCK((byte) 6, "PREFIX_LOCK"); //127
+    PREFIX_LOCK((byte) 6, "PREFIX_LOCK"), //127
+    SNAPSHOT_LOCK((byte) 7, "SNAPSHOT_LOCK"); //255
 
     // level of the resource
     private byte lockLevel;
