@@ -153,7 +153,11 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).",
           size(), cacheSizeLimit);
     }
-    lock.acquireReadLock(SNAPSHOT_DB_LOCK, key.toString());
+    OMLockDetails lockDetails = lock.acquireReadLock(SNAPSHOT_DB_LOCK, key.toString());
+    if (!lockDetails.isLockAcquired()) {
+      throw new OMException("Unable to acquire readlock on snapshot db with key " + key,
+          OMException.ResultCodes.INTERNAL_ERROR);
+    }
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist, and increment the reference count on the instance.
     ReferenceCounted<OmSnapshot> rcOmSnapshot =
