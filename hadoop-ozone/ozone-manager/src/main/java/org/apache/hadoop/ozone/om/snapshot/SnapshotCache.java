@@ -184,7 +184,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
           OMException.ResultCodes.FILE_NOT_FOUND);
     }
     return new UncheckedAutoCloseableSupplier<OmSnapshot>() {
-      AtomicReference<Boolean> closed = new AtomicReference<>(false);
+      private AtomicReference<Boolean> closed = new AtomicReference<>(false);
       @Override
       public OmSnapshot get() {
         return rcOmSnapshot.get();
