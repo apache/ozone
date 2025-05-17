@@ -5044,6 +5044,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.BUCKET, bucket);
     auditMap.put(OzoneConsts.FROM_SNAPSHOT, fromSnapshot);
     auditMap.put(OzoneConsts.TO_SNAPSHOT, toSnapshot);
+    metrics.incNumCancelSnapshotDiffs();
 
     try {
       ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
@@ -5054,6 +5055,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return omSnapshotManager.cancelSnapshotDiff(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
           fromSnapshot, toSnapshot);
     } catch (Exception ex) {
+      metrics.incNumCancelSnapshotDiffJobFails();
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.CANCEL_SNAPSHOT_DIFF_JOBS,
           auditMap, ex));
@@ -5079,6 +5081,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.VOLUME, volume);
     auditMap.put(OzoneConsts.BUCKET, bucket);
     auditMap.put(OzoneConsts.JOB_STATUS, jobStatus);
+    metrics.incNumListSnapshotDiffJobs();
 
     try {
       ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
@@ -5089,6 +5092,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return omSnapshotManager.getSnapshotDiffList(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
           jobStatus, listAllStatus, prevSnapshotDiffJob, maxListResult);
     } catch (Exception ex) {
+      metrics.incNumListSnapshotDiffJobFails();
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_SNAPSHOT_DIFF_JOBS,
           auditMap, ex));
