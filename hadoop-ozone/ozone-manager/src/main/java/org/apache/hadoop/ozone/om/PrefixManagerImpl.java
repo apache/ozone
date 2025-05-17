@@ -23,7 +23,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_PATH_IN_ACL_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PREFIX_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.PREFIX_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.PREFIX_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
