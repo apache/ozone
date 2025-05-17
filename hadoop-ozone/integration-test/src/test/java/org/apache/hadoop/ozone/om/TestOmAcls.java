@@ -209,10 +209,10 @@ public class TestOmAcls {
   }
 
   @Test
-  public void testSetlACLKeyPermissionDenied() throws Exception {
+  public void testKeyACLOpsPermissionDenied() throws Exception {
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
     String keyName = "testKey";
-    TestDataUtil.createKey(bucket, "testKey", "testcontent".getBytes(StandardCharsets.UTF_8));
+    TestDataUtil.createKey(bucket, keyName, "testcontent".getBytes(StandardCharsets.UTF_8));
 
     authorizer.keyAclAllow = false;
     ObjectStore objectStore = client.getObjectStore();
