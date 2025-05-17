@@ -75,6 +75,7 @@ import software.amazon.awssdk.http.SdkHttpRequest;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
 import software.amazon.awssdk.services.s3.model.CompletedPart;
@@ -417,6 +418,8 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
         RequestBody.fromString(content));
 
     try (S3Presigner presigner = S3Presigner.builder()
+        // TODO: Find a way to retrieve the path style configuration from S3Client instead
+        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .endpointOverride(s3Client.serviceClientConfiguration().endpointOverride().get())
         .region(s3Client.serviceClientConfiguration().region())
         .credentialsProvider(s3Client.serviceClientConfiguration().credentialsProvider()).build()) {
