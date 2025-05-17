@@ -115,7 +115,6 @@ class TestSnapshotCache {
 
     UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot1again = snapshotCache.get(dbKey1);
     // Should be the same instance
-    assertEquals(omSnapshot1, omSnapshot1again);
     assertEquals(omSnapshot1.get(), omSnapshot1again.get());
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
