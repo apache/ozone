@@ -1854,7 +1854,8 @@ public class RpcClient implements ClientProtocol {
     return keyInfoWithS3Context.getKeyInfo();
   }
 
-  private OmKeyInfo getKeyInfo(
+  @Override
+  public OmKeyInfo getKeyInfo(
       String volumeName, String bucketName, String keyName,
       boolean forceUpdateContainerCache) throws IOException {
     Preconditions.checkNotNull(volumeName);
@@ -2160,8 +2161,6 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneFileStatus getOzoneFileStatus(String volumeName,
       String bucketName, String keyName) throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
