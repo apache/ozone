@@ -40,12 +40,14 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Class for performing on demand scans of containers.
+ * Note: [OPEN] containers are scanned only for metadata,
+ *       [CLOSED, QUASI_CLOSED] containers are scanned for metadata and data.
  */
-public final class OnDemandContainerDataScanner {
+public final class OnDemandContainerScanner {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OnDemandContainerDataScanner.class);
+      LoggerFactory.getLogger(OnDemandContainerScanner.class);
 
-  private static volatile OnDemandContainerDataScanner instance;
+  private static volatile OnDemandContainerScanner instance;
 
   private final ExecutorService scanExecutor;
   private final ContainerController containerController;
@@ -56,7 +58,7 @@ public final class OnDemandContainerDataScanner {
   private final OnDemandScannerMetrics metrics;
   private final long minScanGap;
 
-  private OnDemandContainerDataScanner(
+  private OnDemandContainerScanner(
       ContainerScannerConfiguration conf, ContainerController controller) {
     containerController = controller;
     throttler = new DataTransferThrottler(
@@ -75,7 +77,7 @@ public final class OnDemandContainerDataScanner {
           " a second time on a datanode.");
       return;
     }
-    instance = new OnDemandContainerDataScanner(conf, controller);
+    instance = new OnDemandContainerScanner(conf, controller);
   }
 
   private static boolean shouldScan(Container<?> container) {
@@ -97,7 +99,7 @@ public final class OnDemandContainerDataScanner {
     }
 
     return !ContainerUtils.recentlyScanned(container, instance.minScanGap,
-        LOG) && container.shouldScanData();
+        LOG) && (container.shouldScanMetadata() || container.shouldScanData());
   }
 
   public static Optional<Future<?>> scanContainer(Container<?> container) {
@@ -135,13 +137,18 @@ public final class OnDemandContainerDataScanner {
       ContainerData containerData = container.getContainerData();
       logScanStart(containerData);
 
-      ScanResult result =
-          container.scanData(instance.throttler, instance.canceler);
-      // Metrics for skipped containers should not be updated.
-      if (result.getFailureType() == DELETED_CONTAINER) {
-        LOG.error("Container [{}] has been deleted.",
-            containerId, result.getException());
-        return;
+      ScanResult result = ScanResult.healthy();
+      // OPEN containers are scanned here for metadata only
+      if (container.shouldScanMetadata() && !container.shouldScanData()) {
+        result = container.scanMetaData();
+      } else if (container.shouldScanData()) {
+        result = container.scanData(instance.throttler, instance.canceler);
+        // Metrics for skipped containers should not be updated.
+        if (result.getFailureType() == DELETED_CONTAINER) {
+          LOG.error("Container [{}] has been deleted.",
+              containerId, result.getException());
+          return;
+        }
       }
       if (!result.isHealthy()) {
         LOG.error("Corruption detected in container [{}]." +
