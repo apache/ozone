@@ -42,8 +42,8 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -108,7 +108,7 @@ public class TestReclaimableFilter extends AbstractReclaimableFilterTest {
     Assertions.assertEquals(infos.size(), getReclaimableFilter().getPreviousOmSnapshots().size());
     Assertions.assertEquals(infos.stream().map(si -> si == null ? null : si.getSnapshotId())
         .collect(Collectors.toList()), getReclaimableFilter().getPreviousOmSnapshots().stream()
-        .map(i -> i == null ? null : ((ReferenceCounted<OmSnapshot>) i).get().getSnapshotID())
+        .map(i -> i == null ? null : ((UncheckedAutoCloseableSupplier<OmSnapshot>) i).get().getSnapshotID())
         .collect(Collectors.toList()));
     infos.add(currentSnapshotInfo);
     Assertions.assertEquals(infos.stream().filter(Objects::nonNull).map(SnapshotInfo::getSnapshotId).collect(

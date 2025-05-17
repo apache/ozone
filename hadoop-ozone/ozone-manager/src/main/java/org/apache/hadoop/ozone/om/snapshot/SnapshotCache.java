@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_DB_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
@@ -26,10 +27,14 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,22 +58,24 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   private final int cacheSizeLimit;
   private final Set<UUID> pendingEvictionQueue;
   private final Scheduler scheduler;
+  private final IOzoneManagerLock lock;
   private static final String SNAPSHOT_CACHE_CLEANUP_SERVICE =
       "SnapshotCacheCleanupService";
 
   private final OMMetrics omMetrics;
 
   public SnapshotCache(CacheLoader<UUID, OmSnapshot> cacheLoader, int cacheSizeLimit, OMMetrics omMetrics,
-                       long cleanupInterval) {
+                       long cleanupInterval, IOzoneManagerLock lock) {
     this.dbMap = new ConcurrentHashMap<>();
     this.cacheLoader = cacheLoader;
     this.cacheSizeLimit = cacheSizeLimit;
     this.omMetrics = omMetrics;
+    this.lock = lock;
     this.pendingEvictionQueue = ConcurrentHashMap.newKeySet();
     if (cleanupInterval > 0) {
       this.scheduler = new Scheduler(SNAPSHOT_CACHE_CLEANUP_SERVICE,
           true, 1);
-      this.scheduler.scheduleWithFixedDelay(this::cleanup, cleanupInterval,
+      this.scheduler.scheduleWithFixedDelay(() -> this.cleanup(false), cleanupInterval,
           cleanupInterval, TimeUnit.MILLISECONDS);
     } else {
       this.scheduler = null;
@@ -141,11 +148,16 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
    * @param key SnapshotId
    * @return an OmSnapshot instance, or null on error
    */
-  public ReferenceCounted<OmSnapshot> get(UUID key) throws IOException {
+  public UncheckedAutoCloseableSupplier<OmSnapshot> get(UUID key) throws IOException {
     // Warn if actual cache size exceeds the soft limit already.
     if (size() > cacheSizeLimit) {
       LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).",
           size(), cacheSizeLimit);
+    }
+    OMLockDetails lockDetails = lock.acquireReadLock(SNAPSHOT_DB_LOCK, key.toString());
+    if (!lockDetails.isLockAcquired()) {
+      throw new OMException("Unable to acquire readlock on snapshot db with key " + key,
+          OMException.ResultCodes.INTERNAL_ERROR);
     }
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist, and increment the reference count on the instance.
@@ -178,10 +190,28 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     if (rcOmSnapshot == null) {
       // The only exception that would fall through the loader logic above
       // is OMException with FILE_NOT_FOUND.
+      lock.releaseReadLock(SNAPSHOT_DB_LOCK, key.toString());
       throw new OMException("SnapshotId: '" + key + "' not found, or the snapshot is no longer active.",
           OMException.ResultCodes.FILE_NOT_FOUND);
     }
-    return rcOmSnapshot;
+    return new UncheckedAutoCloseableSupplier<OmSnapshot>() {
+      AtomicReference<Boolean> closed = new AtomicReference<>(false);
+      @Override
+      public OmSnapshot get() {
+        return rcOmSnapshot.get();
+      }
+
+      @Override
+      public void close() {
+        closed.updateAndGet(alreadyClosed -> {
+          if (!alreadyClosed) {
+            rcOmSnapshot.decrementRefCount();
+            lock.releaseReadLock(SNAPSHOT_DB_LOCK, key.toString());
+          }
+          return true;
+        });
+      }
+    };
   }
 
   /**
@@ -197,14 +227,28 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     val.decrementRefCount();
   }
 
+  public OMLockDetails lock() {
+    OMLockDetails lockDetails = lock.acquireResourceWriteLock(SNAPSHOT_DB_LOCK);
+    if (lockDetails.isLockAcquired()) {
+      cleanup(true);
+      if (!dbMap.isEmpty()) {
+        return lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK);
+      }
+    }
+    return lockDetails;
+  }
+
+  public OMLockDetails unlock() {
+    return lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK);
+  }
 
   /**
    * If cache size exceeds soft limit, attempt to clean up and close the
      instances that has zero reference count.
    */
   @VisibleForTesting
-  void cleanup() {
-    if (dbMap.size() > cacheSizeLimit) {
+  synchronized void cleanup(boolean force) {
+    if (force || dbMap.size() > cacheSizeLimit) {
       for (UUID evictionKey : pendingEvictionQueue) {
         dbMap.compute(evictionKey, (k, v) -> {
           pendingEvictionQueue.remove(k);
@@ -244,5 +288,9 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       pendingEvictionQueue.add(((OmSnapshot) referenceCounted.get())
           .getSnapshotID());
     }
+  }
+
+  long totalRefCount(UUID key) {
+    return dbMap.containsKey(key) ? dbMap.get(key).getTotalRefCount() : 0;
   }
 }
