@@ -43,12 +43,12 @@ execute_robot_test scm repair/bucket-encryption.robot
 execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-ofs-bucket ozonefs/ozonefs.robot
 
 ## Exclude virtual-host tests. This is tested separately as it requires additional config.
-exclude="--exclude virtual-host"
+exclude="--exclude virtual-host --exclude ec-storage-class"
 for bucket in encrypted; do
   execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
   # some tests are independent of the bucket type, only need to be run once
   ## Exclude virtual-host.robot
-  exclude="--exclude virtual-host --exclude no-bucket-type"
+  exclude="--exclude virtual-host --exclude ec-storage-class --exclude no-bucket-type"
 done
 
 #expects 4 pipelines, should be run before

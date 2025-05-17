@@ -49,12 +49,14 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.MP_PARTS_COUNT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
@@ -230,7 +232,7 @@ public class ObjectEndpoint extends EndpointBase {
     boolean auditSuccess = true;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
 
-    String copyHeader = null, storageType = null;
+    String copyHeader = null, storageType = null, storageConfig = null;
     DigestInputStream digestInputStream = null;
     try {
       if (aclMarker != null) {
@@ -256,12 +258,13 @@ public class ObjectEndpoint extends EndpointBase {
 
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
       storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
+      storageConfig = headers.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
       boolean storageTypeDefault = StringUtils.isEmpty(storageType);
 
       // Normal put object
       OzoneBucket bucket = volume.getBucket(bucketName);
       ReplicationConfig replicationConfig =
-          getReplicationConfig(bucket, storageType);
+          getReplicationConfig(bucket, storageType, storageConfig);
 
       boolean enableEC = false;
       if ((replicationConfig != null &&
@@ -817,6 +820,7 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
+      String storageConfig = headers.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
 
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
@@ -824,7 +828,7 @@ public class ObjectEndpoint extends EndpointBase {
       Map<String, String> tags = getTaggingFromHeaders(headers);
 
       ReplicationConfig replicationConfig =
-          getReplicationConfig(ozoneBucket, storageType);
+          getReplicationConfig(ozoneBucket, storageType, storageConfig);
 
       OmMultipartInfo multipartInfo =
           ozoneBucket.initiateMultipartUpload(key, replicationConfig, customMetadata, tags);
@@ -857,21 +861,20 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   private ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket,
-      String storageType) throws OS3Exception {
-    if (StringUtils.isEmpty(storageType)) {
-      S3StorageType defaultStorageType = S3StorageType.getDefault(ozoneConfiguration);
-      storageType = (defaultStorageType != null ? defaultStorageType.toString() : null);
-    }
+      String storageType, String storageConfig) throws OS3Exception {
 
     ReplicationConfig clientConfiguredReplicationConfig = null;
     String replication = ozoneConfiguration.get(OZONE_REPLICATION);
+
     if (replication != null) {
-      clientConfiguredReplicationConfig = ReplicationConfig.parse(
-          ReplicationType.valueOf(ozoneConfiguration
-              .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT)),
-          replication, ozoneConfiguration);
+      ReplicationType replicationType = ReplicationType.valueOf(
+          ozoneConfiguration.get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
+      clientConfiguredReplicationConfig =
+          (replicationType == ReplicationType.EC) ?
+              new ECReplicationConfig(replication) : ReplicationConfig.parse(
+              replicationType, replication, ozoneConfiguration);
     }
-    return S3Utils.resolveS3ClientSideReplicationConfig(storageType,
+    return S3Utils.resolveS3ClientSideReplicationConfig(storageType, storageConfig,
         clientConfiguredReplicationConfig, ozoneBucket.getReplicationConfig());
   }
 
@@ -974,9 +977,10 @@ public class ObjectEndpoint extends EndpointBase {
 
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
+      String storageConfig = headers.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
       final OzoneBucket ozoneBucket = volume.getBucket(bucket);
       ReplicationConfig replicationConfig =
-          getReplicationConfig(ozoneBucket, storageType);
+          getReplicationConfig(ozoneBucket, storageType, storageConfig);
 
       boolean enableEC = false;
       if ((replicationConfig != null &&
