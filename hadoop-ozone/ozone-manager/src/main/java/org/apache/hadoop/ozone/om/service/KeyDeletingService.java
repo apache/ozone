@@ -220,7 +220,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               .getKeyBlocksList();
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
             delCount = processKeyDeletes(keyBlocksList,
-                getOzoneManager().getKeyManager(),
                 pendingKeysDeletion.getKeysToModify(), null, expectedPreviousSnapshotId);
             deletedKeyCount.addAndGet(delCount);
             metrics.incrNumKeysProcessed(keyBlocksList.size());
@@ -447,7 +446,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               }
 
               if (!keysToPurge.isEmpty()) {
-                processKeyDeletes(keysToPurge, currOmSnapshot.getKeyManager(),
+                processKeyDeletes(keysToPurge,
                     keysToModify, currSnapInfo.getTableKey(),
                     Optional.ofNullable(previousSnapshot).map(SnapshotInfo::getSnapshotId).orElse(null));
               }
