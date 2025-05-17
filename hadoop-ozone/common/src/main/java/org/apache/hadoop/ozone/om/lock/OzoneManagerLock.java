@@ -357,26 +357,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public boolean acquireMultiUserLock(String firstUser, String secondUser) {
-    LeveledResource resource = LeveledResource.USER_LOCK;
-    Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockManager> resourceLockPair =
-        resourcelockMap.get(resource.getClass());
-    ResourceLockManager<Resource> resourceLockManager = resourceLockPair.getRight();
-    if (!resourceLockManager.canLockResource(resource)) {
-      String errorMessage = getErrorMessage(resource);
-      LOG.error(errorMessage);
-      throw new RuntimeException(errorMessage);
-    } else {
-      Striped<ReadWriteLock> striped = resourceLockPair.getKey().get(resource);
-      // The result of bulkGet is always sorted in a consistent order.
-      // This prevents deadlocks.
-      Iterable<ReadWriteLock> locks =
-          striped.bulkGet(Arrays.asList(firstUser, secondUser));
-      for (ReadWriteLock lock : locks) {
-        lock.writeLock().lock();
-      }
-      resourceLockManager.lockResource(resource);
-      return true;
-    }
+    return acquireWriteLocks(LeveledResource.USER_LOCK,
+        Arrays.asList(new String[] {firstUser}, new String[] {secondUser})).isLockAcquired();
   }
 
   /**
@@ -386,17 +368,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public void releaseMultiUserLock(String firstUser, String secondUser) {
-    LeveledResource resource = LeveledResource.USER_LOCK;
-    Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockManager> resourceLockPair =
-        resourcelockMap.get(resource.getClass());
-    ResourceLockManager<Resource> resourceLockManager = resourceLockPair.getRight();
-    Striped<ReadWriteLock> striped = resourceLockPair.getKey().get(resource);
-    Iterable<ReadWriteLock> locks =
-        striped.bulkGet(Arrays.asList(firstUser, secondUser));
-    for (ReadWriteLock lock : locks) {
-      lock.writeLock().unlock();
-    }
-    resourceLockManager.unlockResource(resource);
+    releaseWriteLocks(LeveledResource.USER_LOCK,
+        Arrays.asList(new String[] {firstUser}, new String[] {secondUser}));
   }
 
 
@@ -453,7 +426,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private OMLockDetails releaseLock(Resource resource, boolean isReadLock,
-                                    String... keys) {
+      String... keys) {
     Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockManager> resourceLockPair =
         resourcelockMap.get(resource.getClass());
     ResourceLockManager<Resource> resourceLockManager = resourceLockPair.getRight();
@@ -476,9 +449,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
         resourcelockMap.get(resource.getClass());
     ResourceLockManager<Resource> resourceLockManager = resourceLockPair.getRight();
     resourceLockManager.clearLockDetails();
-    List<ReadWriteLock> locks = StreamSupport.stream(
-        bulkGetLock(resourceLockPair.getKey(), resource, keys).spliterator(), false)
-            .collect(Collectors.toList());
+    List<ReadWriteLock> locks = StreamSupport.stream(bulkGetLock(resourceLockPair.getKey(), resource, keys)
+            .spliterator(), false).collect(Collectors.toList());
     // Release locks in reverse order.
     Collections.reverse(locks);
     for (ReadWriteLock lock : locks) {
@@ -495,7 +467,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private void updateReadUnlockMetrics(Resource resource,
-                                       ReentrantReadWriteLock lock) {
+      ReentrantReadWriteLock lock) {
     /*
      *  readHoldCount helps in metrics updation only once in case
      *  of reentrant locks.
@@ -513,7 +485,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private void updateWriteUnlockMetrics(Resource resource,
-                                        ReentrantReadWriteLock lock, boolean isWriteLocked) {
+      ReentrantReadWriteLock lock, boolean isWriteLocked) {
     /*
      *  writeHoldCount helps in metrics updation only once in case
      *  of reentrant locks. Metrics are updated only if the write lock is held
@@ -564,7 +536,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   @Override
   @VisibleForTesting
   public boolean isWriteLockedByCurrentThread(Resource resource,
-                                              String... keys) {
+      String... keys) {
     return getLock(resourcelockMap.get(resource.getClass()).getKey(), resource, keys).isWriteLockedByCurrentThread();
   }
 
@@ -817,7 +789,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * @param deltaNanos consumed time
    */
   private void updateProcessingDetails(ResourceLockManager<? extends Resource> resourceLockManager, Timing type,
-                                       long deltaNanos) {
+      long deltaNanos) {
     Server.Call call = Server.getCurCall().get();
     if (call != null) {
       call.getProcessingDetails().add(type, deltaNanos, TimeUnit.NANOSECONDS);

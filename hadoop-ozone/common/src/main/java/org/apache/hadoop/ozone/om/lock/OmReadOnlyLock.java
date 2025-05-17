@@ -41,7 +41,7 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
 
   @Override
   public OMLockDetails acquireWriteLock(Resource resource,
-                                        String... resources) {
+      String... resources) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
@@ -62,7 +62,7 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
 
   @Override
   public OMLockDetails releaseWriteLock(Resource resource,
-                                        String... resources) {
+      String... resources) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
@@ -93,7 +93,7 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
 
   @Override
   public boolean isWriteLockedByCurrentThread(Resource resource,
-                                              String... resources) {
+      String... resources) {
     return false;
   }
 
