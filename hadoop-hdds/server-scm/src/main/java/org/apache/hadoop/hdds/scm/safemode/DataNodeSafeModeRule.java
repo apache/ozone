@@ -18,9 +18,10 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.HashSet;
-import java.util.UUID;
+import java.util.Set;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -41,7 +42,7 @@ public class DataNodeSafeModeRule extends
   private int requiredDns;
   private int registeredDns = 0;
   // Set to track registered DataNodes.
-  private HashSet<UUID> registeredDnSet;
+  private final Set<DatanodeID> registeredDnSet;
   private NodeManager nodeManager;
 
   public DataNodeSafeModeRule(EventQueue eventQueue,
@@ -72,7 +73,7 @@ public class DataNodeSafeModeRule extends
   @Override
   protected void process(NodeRegistrationContainerReport reportsProto) {
 
-    registeredDnSet.add(reportsProto.getDatanodeDetails().getUuid());
+    registeredDnSet.add(reportsProto.getDatanodeDetails().getID());
     registeredDns = registeredDnSet.size();
 
     if (scmInSafeMode()) {
