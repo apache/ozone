@@ -104,39 +104,10 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
   }
 
   public OzoneConfiguration() {
-    OzoneConfiguration.activate();
-    loadDefaults();
   }
 
   public OzoneConfiguration(Configuration conf) {
     super(conf);
-    //load the configuration from the classloader of the original conf.
-    setClassLoader(conf.getClassLoader());
-    if (!(conf instanceof OzoneConfiguration)) {
-      loadDefaults();
-      addResource(conf);
-    }
-  }
-
-  private void loadDefaults() {
-    // One generated file per module
-    addDefaultResource("hdds-common-default.xml");
-    addDefaultResource("hdds-client-default.xml");
-    addDefaultResource("hdds-container-service-default.xml");
-    addDefaultResource("hdds-server-framework-default.xml");
-    addDefaultResource("hdds-server-scm-default.xml");
-    addDefaultResource("ozone-common-default.xml");
-    addDefaultResource("ozone-manager-default.xml");
-    addDefaultResource("ozone-recon-default.xml");
-    //
-    addDefaultResource("ozone-default.xml");
-    // Adding core-site here because properties from core-site are
-    // distributed to executors by spark driver. Ozone properties which are
-    // added to core-site, will be overridden by properties from adding Resource
-    // ozone-default.xml. So, adding core-site again will help to resolve
-    // this override issue.
-    addResource("core-site.xml");
-    addResource("ozone-site.xml");
   }
 
   public List<Property> readPropertyFromXml(URL url) throws JAXBException {
@@ -238,10 +209,25 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
     }
   }
 
+  /** Add default resources. */
   public static void activate() {
-    // adds the default resources
-    Configuration.addDefaultResource("hdfs-default.xml");
-    Configuration.addDefaultResource("hdfs-site.xml");
+    // core-default and core-site are added by parent class
+    addDefaultResource("hdfs-default.xml");
+    addDefaultResource("hdfs-site.xml");
+
+    // One generated file per module
+    addDefaultResource("hdds-common-default.xml");
+    addDefaultResource("hdds-client-default.xml");
+    addDefaultResource("hdds-container-service-default.xml");
+    addDefaultResource("hdds-server-framework-default.xml");
+    addDefaultResource("hdds-server-scm-default.xml");
+    addDefaultResource("ozone-common-default.xml");
+    addDefaultResource("ozone-manager-default.xml");
+    addDefaultResource("ozone-recon-default.xml");
+
+    // Non-generated configs
+    addDefaultResource("ozone-default.xml");
+    addDefaultResource("ozone-site.xml");
   }
 
   /**
