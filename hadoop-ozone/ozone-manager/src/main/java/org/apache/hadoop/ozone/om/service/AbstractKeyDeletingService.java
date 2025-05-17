@@ -619,6 +619,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return runCount;
   }
 
+  public AtomicLong getCallId() {
+    return callId;
+  }
+
   /**
    * Returns the number of dirs deleted by the background service.
    *

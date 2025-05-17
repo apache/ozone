@@ -34,7 +34,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -95,8 +94,6 @@ public class ClusterStateEndpoint {
   @GET
   public Response getClusterState() {
     ContainerStateCounts containerStateCounts = new ContainerStateCounts();
-    List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
-
     int pipelines = this.pipelineManager.getPipelines().size();
 
     List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
@@ -181,7 +178,7 @@ public class ClusterStateEndpoint {
         .setPipelines(pipelines)
         .setContainers(containerStateCounts.getTotalContainerCount())
         .setMissingContainers(containerStateCounts.getMissingContainerCount())
-        .setTotalDatanodes(datanodeDetails.size())
+        .setTotalDatanodes(nodeManager.getAllNodeCount())
         .setHealthyDatanodes(healthyDatanodes)
         .setOpenContainers(containerStateCounts.getOpenContainersCount())
         .setDeletedContainers(containerStateCounts.getDeletedContainersCount())
