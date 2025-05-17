@@ -34,7 +34,7 @@ public interface IOzoneManagerLock {
                                  String... resources);
 
   OMLockDetails acquireWriteLocks(Resource resource,
-                                  Collection<String[]> resources);
+                                 Collection<String[]> resources);
 
   OMLockDetails acquireResourceWriteLock(Resource resource);
 
@@ -43,10 +43,10 @@ public interface IOzoneManagerLock {
   void releaseMultiUserLock(String firstUser, String secondUser);
 
   OMLockDetails releaseWriteLock(Resource resource,
-                                 String... resources);
+                        String... resources);
 
   OMLockDetails releaseWriteLocks(Resource resource,
-                                  Collection<String[]> resources);
+                                 Collection<String[]> resources);
 
   OMLockDetails releaseResourceWriteLock(Resource resource);
 
@@ -54,19 +54,19 @@ public interface IOzoneManagerLock {
                                 String... resources);
 
   OMLockDetails releaseReadLocks(Resource resource,
-                                 Collection<String[]> resources);
+                                Collection<String[]> resources);
 
   @VisibleForTesting
   int getReadHoldCount(Resource resource,
-                       String... resources);
+      String... resources);
 
   @VisibleForTesting
   int getWriteHoldCount(Resource resource,
-                        String... resources);
+      String... resources);
 
   @VisibleForTesting
   boolean isWriteLockedByCurrentThread(Resource resource,
-                                       String... resources);
+      String... resources);
 
   void cleanup();
 

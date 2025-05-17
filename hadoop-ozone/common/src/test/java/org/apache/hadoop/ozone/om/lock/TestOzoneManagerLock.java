@@ -450,8 +450,8 @@ class TestOzoneManagerLock {
   }
 
   private void testWriteLockConcurrentStats(LeveledResource resource,
-                                            String[] resourceName,
-                                            int threadCount)
+                                           String[] resourceName,
+                                           int threadCount)
       throws InterruptedException {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
     Thread[] threads = new Thread[threadCount];
