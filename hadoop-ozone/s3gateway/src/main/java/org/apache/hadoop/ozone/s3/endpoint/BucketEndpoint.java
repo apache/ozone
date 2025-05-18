@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -764,6 +765,16 @@ public class BucketEndpoint extends EndpointBase {
     // Use ownerName to fill displayName
     keyMetadata.setOwner(new S3Owner(ownerName, displayName));
     response.addKey(keyMetadata);
+  }
+
+  @VisibleForTesting
+  public void setOzoneConfiguration(OzoneConfiguration config) {
+    this.ozoneConfiguration = config;
+  }
+
+  @VisibleForTesting
+  public OzoneConfiguration getOzoneConfiguration() {
+    return this.ozoneConfiguration;
   }
 
   @Override

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_KEYS_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.stream.IntStream;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -539,6 +542,39 @@ public class TestBucketList {
             null, null, null, null, null, null, 1000, null)
     );
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e2.getCode());
+  }
+
+  @Test
+  public void testListObjectsRespectsConfiguredMaxKeysLimit() throws Exception {
+    // Arrange: Create a bucket with 1001 keys
+    String[] keys = IntStream.range(0, 1001).mapToObj(i -> "file" + i).toArray(String[]::new);
+    OzoneClient client = createClientWithKeys(keys);
+
+    // Arrange: Set the max-keys limit in the configuration
+    OzoneConfiguration config = new OzoneConfiguration();
+    final String configuredMaxKeysLimit = "900";
+    config.set(OZONE_S3G_LIST_MAX_KEYS_LIMIT, configuredMaxKeysLimit);
+
+    // Arrange: Build and initialize the BucketEndpoint with the config
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .setConfig(config)
+        .build();
+    bucketEndpoint.init();
+
+    // Assert: Ensure the config value is correctly set in the endpoint
+    assertEquals(configuredMaxKeysLimit,
+        bucketEndpoint.getOzoneConfiguration().get(OZONE_S3G_LIST_MAX_KEYS_LIMIT));
+
+    // Act: Request more keys than the configured max-keys limit
+    final int requestedMaxKeys = Integer.parseInt(configuredMaxKeysLimit) + 1;
+    ListObjectResponse response = (ListObjectResponse)
+        bucketEndpoint.get("b1", null, null, null, requestedMaxKeys,
+            null, null, null, null, null, null, null,
+            1000, null).getEntity();
+
+    // Assert: The number of returned keys should be capped at the configured limit
+    assertEquals(Integer.parseInt(configuredMaxKeysLimit), response.getContents().size());
   }
 
   private void assertEncodingTypeObject(
