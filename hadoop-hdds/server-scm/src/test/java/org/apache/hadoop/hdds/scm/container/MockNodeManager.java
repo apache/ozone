@@ -519,7 +519,8 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand<?> command) {
+  public void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command) {
+    final UUID dnId = datanodeID.getUuid();
     if (commandMap.containsKey(dnId)) {
       List<SCMCommand<?>> commandList = commandMap.get(dnId);
       Preconditions.checkNotNull(commandList);
@@ -819,7 +820,7 @@ public class MockNodeManager implements NodeManager {
   @Override
   public void onMessage(CommandForDatanode commandForDatanode,
                         EventPublisher publisher) {
-    addDatanodeCommand(commandForDatanode.getDatanodeId(),
+    this.addDatanodeCommand(commandForDatanode.getDatanodeId(),
         commandForDatanode.getCommand());
   }
 

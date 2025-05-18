@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
@@ -27,8 +29,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THR
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_JOB_TABLE_NAME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_REPORT_TABLE_NAME;
@@ -1536,7 +1536,7 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testGetDeltaFilesWithFullDiff() throws IOException {
+  public void testGetDeltaFilesWithFullDiff() throws  IOException {
     SnapshotDiffManager spy = spy(snapshotDiffManager);
     UUID snap1 = UUID.randomUUID();
     OmSnapshot fromSnapshot = getMockedOmSnapshot(snap1);
@@ -1545,20 +1545,28 @@ public class TestSnapshotDiffManager {
     Mockito.doAnswer(invocation -> {
       OmSnapshot snapshot = invocation.getArgument(0);
       if (snapshot == fromSnapshot) {
-        return Sets.newHashSet("1", "2", "3");
+        Map<Integer, String> inodeToFileMap = new HashMap<>();
+        inodeToFileMap.put(1, "1.sst");
+        inodeToFileMap.put(2, "2.sst");
+        inodeToFileMap.put(3, "3.sst");
+        return inodeToFileMap;
       }
       if (snapshot == toSnapshot) {
-        return Sets.newHashSet("3", "4", "5");
+        Map<Integer, String> inodeToFileMap = new HashMap<>();
+        inodeToFileMap.put(1, "10.sst");
+        inodeToFileMap.put(2, "20.sst");
+        inodeToFileMap.put(4, "4.sst");
+        return inodeToFileMap;
       }
-      return Sets.newHashSet("6", "7", "8");
-    }).when(spy).getSSTFileListForSnapshot(Mockito.any(OmSnapshot.class),
+      return null;
+    }).when(spy).getSSTFileMapForSnapshot(Mockito.any(OmSnapshot.class),
         Mockito.anyList());
     doNothing().when(spy).recordActivity(any(), any());
     doNothing().when(spy).updateProgress(anyString(), anyDouble());
     String diffJobKey = snap1 + DELIMITER + snap2;
     Set<String> deltaFiles = spy.getDeltaFiles(fromSnapshot, toSnapshot, Collections.emptyList(), snapshotInfo,
         snapshotInfo, true, Collections.emptyMap(), null, diffJobKey);
-    Assertions.assertEquals(Sets.newHashSet("1", "2", "3", "4", "5"), deltaFiles);
+    Assertions.assertEquals(Sets.newHashSet("3.sst", "4.sst"), deltaFiles);
   }
 
   @Test

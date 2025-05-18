@@ -315,14 +315,12 @@ public class SnapshotDiffJob {
     }
 
     @Override
-    public byte[] toPersistedFormat(SnapshotDiffJob object)
-        throws IOException {
+    public byte[] toPersistedFormatImpl(SnapshotDiffJob object) throws IOException {
       return MAPPER.writeValueAsBytes(object);
     }
 
     @Override
-    public SnapshotDiffJob fromPersistedFormat(byte[] rawData)
-        throws IOException {
+    public SnapshotDiffJob fromPersistedFormatImpl(byte[] rawData) throws IOException {
       return MAPPER.readValue(rawData, SnapshotDiffJob.class);
     }
 

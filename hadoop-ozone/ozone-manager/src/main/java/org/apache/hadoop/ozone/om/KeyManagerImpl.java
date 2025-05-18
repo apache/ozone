@@ -1890,7 +1890,7 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipelineFromCache(keyInfoList);
 
     if (args.getSortDatanodes()) {
-      sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
+      sortDatanodes(clientAddress, keyInfoList);
     }
     return fileStatusList;
   }
@@ -2019,7 +2019,7 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipelineFromCache(keyInfoList);
 
     if (omKeyArgs.getSortDatanodes()) {
-      sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
+      sortDatanodes(clientAddress, keyInfoList);
     }
 
     return fileStatusFinalList;
@@ -2058,9 +2058,13 @@ public class KeyManagerImpl implements KeyManager {
     return encInfo;
   }
 
-  private void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
+  private void sortDatanodes(String clientMachine, OmKeyInfo keyInfo) {
+    sortDatanodes(clientMachine, Collections.singletonList(keyInfo));
+  }
+
+  private void sortDatanodes(String clientMachine, List<OmKeyInfo> keyInfos) {
     if (keyInfos != null && clientMachine != null) {
-      Map<Set<String>, List<DatanodeDetails>> sortedPipelines = new HashMap<>();
+      final Map<Set<String>, List<? extends DatanodeDetails>> sortedPipelines = new HashMap<>();
       for (OmKeyInfo keyInfo : keyInfos) {
         OmKeyLocationInfoGroup key = keyInfo.getLatestVersionLocations();
         if (key == null) {
@@ -2070,14 +2074,16 @@ public class KeyManagerImpl implements KeyManager {
         for (OmKeyLocationInfo k : key.getLocationList()) {
           Pipeline pipeline = k.getPipeline();
           List<DatanodeDetails> nodes = pipeline.getNodes();
-          List<String> uuidList = toNodeUuid(nodes);
-          Set<String> uuidSet = new HashSet<>(uuidList);
-          List<DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
+          if (nodes.isEmpty()) {
+            LOG.warn("No datanodes in pipeline {}", pipeline.getId());
+            continue;
+          }
+
+          final Set<String> uuidSet = nodes.stream().map(DatanodeDetails::getUuidString)
+              .collect(Collectors.toSet());
+
+          List<? extends DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
           if (sortedNodes == null) {
-            if (nodes.isEmpty()) {
-              LOG.warn("No datanodes in pipeline {}", pipeline.getId());
-              continue;
-            }
             sortedNodes = sortDatanodes(nodes, clientMachine);
             if (sortedNodes != null) {
               sortedPipelines.put(uuidSet, sortedNodes);
@@ -2095,7 +2101,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @VisibleForTesting
-  public List<DatanodeDetails> sortDatanodes(List<DatanodeDetails> nodes,
+  public List<? extends DatanodeDetails> sortDatanodes(List<? extends DatanodeDetails> nodes,
                                              String clientMachine) {
     final Node client = getClientNode(clientMachine, nodes);
     return ozoneManager.getClusterMap()
@@ -2103,7 +2109,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private Node getClientNode(String clientMachine,
-                             List<DatanodeDetails> nodes) {
+                             List<? extends DatanodeDetails> nodes) {
     List<DatanodeDetails> matchingNodes = new ArrayList<>();
     boolean useHostname = ozoneManager.getConfiguration().getBoolean(
         HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
@@ -2147,14 +2153,6 @@ public class KeyManagerImpl implements KeyManager {
       LOG.debug("Node resolution did not yield any result for {}", hostname);
       return null;
     }
-  }
-
-  private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
-    List<String> nodeSet = new ArrayList<>(nodes.size());
-    for (DatanodeDetails node : nodes) {
-      nodeSet.add(node.getUuidString());
-    }
-    return nodeSet;
   }
 
   private void slimLocationVersion(OmKeyInfo... keyInfos) {
