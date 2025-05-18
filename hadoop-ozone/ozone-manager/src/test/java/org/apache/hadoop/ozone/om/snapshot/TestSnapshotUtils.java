@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -51,15 +52,19 @@ public class TestSnapshotUtils {
   }
 
   private OmKeyInfo createOmKeyInfo(boolean hsync, OmKeyLocationInfoGroup group) {
-    return createOmKeyInfoWithObjectID(hsync, group, 0);
+    return createOmKeyInfo(hsync, group, 0);
   }
 
-  private OmKeyInfo createOmKeyInfoWithObjectID(boolean hsync, OmKeyLocationInfoGroup group, long objectId) {
+  private OmKeyInfo createOmKeyInfo(boolean hsync, OmKeyLocationInfoGroup group, long objectId) {
+    return createOmKeyInfo(hsync, Collections.singletonList(group), objectId);
+  }
+
+  private OmKeyInfo createOmKeyInfo(boolean hsync, List<OmKeyLocationInfoGroup> group, long objectId) {
     OmKeyInfo keyInfo = new OmKeyInfo.Builder()
         .setVolumeName("vol")
         .setBucketName("bucket")
         .setKeyName("key")
-        .setOmKeyLocationInfos(Collections.singletonList(group))
+        .setOmKeyLocationInfos(group)
         .setObjectID(objectId)
         .build();
     if (hsync) {
@@ -88,7 +93,7 @@ public class TestSnapshotUtils {
     OmKeyInfo del = createOmKeyInfo(true, group2);
     assertTrue(SnapshotUtils.isBlockLocationInfoSame(prev, del));
 
-    OmKeyInfo del2 = createOmKeyInfoWithObjectID(true, group2, 1);
+    OmKeyInfo del2 = createOmKeyInfo(true, group2, 1);
     assertFalse(SnapshotUtils.isBlockLocationInfoSame(del, del2));
   }
 
@@ -97,12 +102,7 @@ public class TestSnapshotUtils {
     OmKeyLocationInfoGroup group1 = createLocationGroup(createLocation(1, 100));
     OmKeyLocationInfoGroup group2 = createLocationGroup(createLocation(2, 200));
     OmKeyInfo prev = createOmKeyInfo(false, group1);
-    OmKeyInfo del = new OmKeyInfo.Builder()
-        .setVolumeName("vol")
-        .setBucketName("bucket")
-        .setKeyName("key")
-        .setOmKeyLocationInfos(Arrays.asList(group1, group2))
-        .build();
+    OmKeyInfo del = createOmKeyInfo(false, Arrays.asList(group1, group2), 0);
     assertFalse(SnapshotUtils.isBlockLocationInfoSame(prev, del));
   }
 
