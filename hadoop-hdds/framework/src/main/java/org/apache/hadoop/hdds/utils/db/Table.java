@@ -175,9 +175,8 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   /**
    * Returns the Name of this Table.
    * @return - Table Name.
-   * @throws IOException on failure.
    */
-  String getName() throws IOException;
+  String getName();
 
   /**
    * Returns the key count of this Table.  Note the result can be inaccurate.
