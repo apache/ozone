@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Spliterator;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -421,7 +423,18 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       extends TableIterator<KEY, KeyValue<KEY, VALUE>> {
   }
 
-  /** A {@link org.apache.hadoop.hdds.utils.db.TableSpliterator} to split iterate {@link KeyValue}s. */
-  interface KeyValueSpliterator<KEY, VALUE> extends TableSpliterator<KEY, KeyValue<KEY, VALUE>> {
+  /**
+   * A generic interface extending {@link Spliterator} and {@link Closeable},
+   * designed for iterating over and splitting key-value pairs.
+   *
+   * @param <KEY>   The type of keys in the key-value pairs.
+   * @param <VALUE> The type of values in the key-value pairs.
+   *
+   * This interface facilitates traversal and splitting of key-value pairs
+   * while also providing resource management capabilities via {@link Closeable}.
+   * Implementations must handle key-value pair splitting to enable parallel processing,
+   * and ensure proper resource management when the spliterator is closed.
+   */
+  interface KeyValueSpliterator<KEY, VALUE> extends Spliterator<KeyValue<KEY, VALUE>>, Closeable {
   }
 }

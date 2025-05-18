@@ -28,9 +28,19 @@ import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRaw
 import org.apache.ratis.util.ReferenceCountedObject;
 
 /**
- * A {@link Table.KeyValueIterator} backed by a raw iterator.
+ * An abstract implementation of {@link Table.KeyValueSpliterator} designed
+ * for iterating and splitting over raw key-value pairs retrieved via a
+ * {@link TableIterator}.
  *
- * @param <RAW> The raw type.
+ * <p>This class manages asynchronous raw iterator resources and provides
+ * functionality for converting raw key-value pairs into a structured
+ * {@link Table.KeyValue} representation. It also allows controlled splitting
+ * of the underlying iterator for parallel processing, while ensuring proper
+ * resource handling and thread safety.
+ *
+ * @param <RAW>   The raw representation type of the key-value pair.
+ * @param <KEY>   The type of key in the key-value pair.
+ * @param <VALUE> The type of value in the key-value pair.
  */
 abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSpliterator<KEY, VALUE> {
 
@@ -100,7 +110,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
   @Override
   public Spliterator<Table.KeyValue<KEY, VALUE>> trySplit() {
     int val = maxNumberOfAdditionalSplits.decrementAndGet();
-    if (val >= 1) {
+    if (val >= 0) {
       try {
         this.rawIterator.retain();
       } catch (Exception e) {
@@ -108,6 +118,8 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
         return null;
       }
       return this;
+    } else {
+      maxNumberOfAdditionalSplits.incrementAndGet();
     }
     return null;
   }
