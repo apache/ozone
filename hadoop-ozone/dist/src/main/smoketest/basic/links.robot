@@ -225,3 +225,13 @@ Setting bucket property on link not allowed
                         Should Contain              ${result}    NOT_SUPPORTED_OPERATION
     ${result} =         Execute                     ozone sh bucket info ${target}/link4
                         Should Contain              ${result}            sourceBucket
+
+Linked bucket creation - source volume and bucket do not exist
+    ${result} =         Execute And Ignore Error    ozone sh bucket link nonexistentvol/nonexistentbuck ${target}/link5
+                        Should Contain              ${result}    VOLUME_NOT_FOUND
+
+Linked bucket creation - source volume exists, source bucket does not exist
+                        Execute                     ozone sh volume create nonexistentvol
+    ${result} =         Execute And Ignore Error    ozone sh bucket link nonexistentvol/nonexistentbuck ${target}/link6
+                        Should Contain              ${result}    BUCKET_NOT_FOUND
+

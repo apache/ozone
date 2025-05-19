@@ -131,6 +131,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
+    if (hasSourceVolume) {
+      ozoneManager.getBucketInfo(bucketInfo.getSourceVolume(), bucketInfo.getSourceBucket());
+    }
+
     if (bucketInfo.hasDefaultReplicationConfig()) {
       DefaultReplicationConfig drc = DefaultReplicationConfig.fromProto(
           bucketInfo.getDefaultReplicationConfig());
