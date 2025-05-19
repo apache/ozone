@@ -197,7 +197,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
      * @param keyManager KeyManager of the underlying store.
      */
     private int processDeletedKeysForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
-                                           int remainNum) throws IOException {
+                                           int remainNum) throws IOException, InterruptedException {
       String volume = null, bucket = null, snapshotTableKey = null;
       if (currentSnapshotInfo != null) {
         volume = currentSnapshotInfo.getVolumeName();
@@ -271,8 +271,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             submitSetSnapshotRequest(setSnapshotPropertyRequests);
           }
         }
-      } catch (IOException e) {
-        throw e;
       } catch (UncheckedIOException e) {
         throw e.getCause();
       }
@@ -296,7 +294,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         try {
           remainNum = processDeletedKeysForStore(null, getOzoneManager().getKeyManager(),
               remainNum);
-        } catch (IOException e) {
+        } catch (IOException | InterruptedException e) {
           LOG.error("Error while running delete directories and files " +
               "background task. Will retry at next run. on active object store", e);
         } finally {
@@ -341,8 +339,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   snapInfo.getBucketName(), snapInfo.getName())) {
                 remainNum = processDeletedKeysForStore(snapInfo, omSnapshot.get().getKeyManager(), remainNum);
               }
-
-            } catch (IOException e) {
+            } catch (IOException | InterruptedException e) {
               LOG.error("Error while running delete directories and files " +
                   "background task for snapshot: {}. Will retry at next run. on active object store", snapshotId, e);
             }

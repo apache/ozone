@@ -104,7 +104,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   protected Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
       Map<String, RepeatedOmKeyInfo> keysToModify,
-      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException, InterruptedException {
 
     long startTime = Time.monotonicNow();
     Pair<Integer, Boolean> purgeResult = Pair.of(0, false);
@@ -143,7 +143,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
   private Pair<Integer, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-      Map<String, RepeatedOmKeyInfo> keysToModify, String snapTableKey, UUID expectedPreviousSnapshotId) {
+      Map<String, RepeatedOmKeyInfo> keysToModify, String snapTableKey, UUID expectedPreviousSnapshotId)
+      throws InterruptedException {
     List<String> purgeKeys = new ArrayList<>();
 
     // Put all keys to be purged in a list
@@ -222,7 +223,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         .build();
 
     // Submit PurgeKeys request to OM
-    try {
+    try (BootstrapStateHandler.Lock lock = snapTableKey != null ? getBootstrapStateLock().lock() : null) {
       OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
       if (omResponse != null) {
         purgeSuccess = purgeSuccess && omResponse.getSuccess();
