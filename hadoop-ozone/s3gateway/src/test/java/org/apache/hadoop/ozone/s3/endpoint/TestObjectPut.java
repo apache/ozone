@@ -762,6 +762,6 @@ class TestObjectPut {
     });
     
     assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), exception.getCode());
-    assertThat(exception.getErrorMessage()).contains("Invalid key path: contains invalid characters.");
+    assertThat(exception.getErrorMessage()).contains("Invalid key path");
   }
 }

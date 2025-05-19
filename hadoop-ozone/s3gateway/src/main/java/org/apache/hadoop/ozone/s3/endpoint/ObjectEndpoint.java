@@ -411,15 +411,11 @@ public class ObjectEndpoint extends EndpointBase {
   public static void isValidKeyPath(String path) throws OS3Exception {
     String checkValidKeyPathRegex = "^[^\\\\{}<>^%~#|`\\[\\]\"\\x80-\\xff:]+$";
 
-    // Split path components
-    String[] components = path.split("/");
-
-    for (String component : components) {
-      if (!component.matches(checkValidKeyPathRegex)) {
-        OS3Exception err = newError(S3ErrorTable.INVALID_REQUEST, path);
-        err.setErrorMessage("Invalid key path: contains invalid characters.");
-        throw err;
-      }
+    if (!path.matches(checkValidKeyPathRegex)) {
+      OS3Exception err = newError(S3ErrorTable.INVALID_REQUEST, path);
+      err.setErrorMessage("Invalid key path: key names cannot include: \\ { } < > ^ % ~ # | ` [ ] : \" " +
+          "or any non-ASCII characters.");
+      throw err;
     }
   }
 
