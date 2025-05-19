@@ -93,7 +93,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerLock.class);
 
-  private final Map<Resource, Striped<ReadWriteLock>> stripedLockByResource;
+  private final Map<LeveledResource, Striped<ReadWriteLock>> stripedLockByResource;
 
   private OMLockMetrics omLockMetrics;
   private final ThreadLocal<Short> lockSet = ThreadLocal.withInitial(
@@ -108,15 +108,15 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   public OzoneManagerLock(ConfigurationSource conf) {
     omLockMetrics = OMLockMetrics.create();
-    Map<Resource, Striped<ReadWriteLock>> stripedLockMap =
-        new EnumMap<>(Resource.class);
-    for (Resource r : Resource.values()) {
+    Map<LeveledResource, Striped<ReadWriteLock>> stripedLockMap =
+        new EnumMap<>(LeveledResource.class);
+    for (LeveledResource r : LeveledResource.values()) {
       stripedLockMap.put(r, createStripeLock(r, conf));
     }
     this.stripedLockByResource = Collections.unmodifiableMap(stripedLockMap);
   }
 
-  private Striped<ReadWriteLock> createStripeLock(Resource r,
+  private Striped<ReadWriteLock> createStripeLock(LeveledResource r,
       ConfigurationSource conf) {
     boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
         OZONE_MANAGER_FAIR_LOCK_DEFAULT);
@@ -127,7 +127,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return SimpleStriped.readWriteLock(size, fair);
   }
 
-  private Iterable<ReadWriteLock> bulkGetLock(Resource resource, Collection<String[]> keys) {
+  private Iterable<ReadWriteLock> bulkGetLock(LeveledResource resource, Collection<String[]> keys) {
     Striped<ReadWriteLock> striped = stripedLockByResource.get(resource);
     List<Object> lockKeys = new ArrayList<>(keys.size());
     for (String[] key : keys) {
@@ -138,7 +138,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return striped.bulkGet(lockKeys);
   }
 
-  private ReentrantReadWriteLock getLock(Resource resource, String... keys) {
+  private ReentrantReadWriteLock getLock(LeveledResource resource, String... keys) {
     Striped<ReadWriteLock> striped = stripedLockByResource.get(resource);
     Object key = combineKeys(keys);
     return (ReentrantReadWriteLock) striped.get(key);
@@ -162,7 +162,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public OMLockDetails acquireReadLock(Resource resource, String... keys) {
+  public OMLockDetails acquireReadLock(LeveledResource resource, String... keys) {
     return acquireLock(resource, true, keys);
   }
 
@@ -184,7 +184,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public OMLockDetails acquireReadLocks(Resource resource, Collection<String[]> keys) {
+  public OMLockDetails acquireReadLocks(LeveledResource resource, Collection<String[]> keys) {
     return acquireLocks(resource, true, keys);
   }
 
@@ -206,7 +206,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public OMLockDetails acquireWriteLock(Resource resource, String... keys) {
+  public OMLockDetails acquireWriteLock(LeveledResource resource, String... keys) {
     return acquireLock(resource, false, keys);
   }
 
@@ -228,11 +228,11 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public OMLockDetails acquireWriteLocks(Resource resource, Collection<String[]> keys) {
+  public OMLockDetails acquireWriteLocks(LeveledResource resource, Collection<String[]> keys) {
     return acquireLocks(resource, false, keys);
   }
 
-  private void acquireLock(Resource resource, boolean isReadLock, ReadWriteLock lock,
+  private void acquireLock(LeveledResource resource, boolean isReadLock, ReadWriteLock lock,
                            long startWaitingTimeNanos) {
     if (isReadLock) {
       lock.readLock().lock();
@@ -243,7 +243,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
   }
 
-  private OMLockDetails acquireLocks(Resource resource, boolean isReadLock,
+  private OMLockDetails acquireLocks(LeveledResource resource, boolean isReadLock,
                                     Collection<String[]> keys) {
     omLockDetails.get().clear();
     if (!resource.canLock(lockSet.get())) {
@@ -263,7 +263,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return omLockDetails.get();
   }
 
-  private OMLockDetails acquireLock(Resource resource, boolean isReadLock,
+  private OMLockDetails acquireLock(LeveledResource resource, boolean isReadLock,
       String... keys) {
     omLockDetails.get().clear();
     if (!resource.canLock(lockSet.get())) {
@@ -282,7 +282,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return omLockDetails.get();
   }
 
-  private void updateReadLockMetrics(Resource resource,
+  private void updateReadLockMetrics(LeveledResource resource,
       ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
 
     /*
@@ -302,7 +302,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
   }
 
-  private void updateWriteLockMetrics(Resource resource,
+  private void updateWriteLockMetrics(LeveledResource resource,
       ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
     /*
      *  writeHoldCount helps in metrics updation only once in case
@@ -323,7 +323,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
   }
 
-  private String getErrorMessage(Resource resource) {
+  private String getErrorMessage(LeveledResource resource) {
     return "Thread '" + Thread.currentThread().getName() + "' cannot " +
         "acquire " + resource.name + " lock while holding " +
         getCurrentLocks().toString() + " lock(s).";
@@ -334,7 +334,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   List<String> getCurrentLocks() {
     List<String> currentLocks = new ArrayList<>();
     short lockSetVal = lockSet.get();
-    for (Resource value : Resource.values()) {
+    for (LeveledResource value : LeveledResource.values()) {
       if (value.isLevelLocked(lockSetVal)) {
         currentLocks.add(value.getName());
       }
@@ -347,7 +347,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public boolean acquireMultiUserLock(String firstUser, String secondUser) {
-    Resource resource = Resource.USER_LOCK;
+    LeveledResource resource = LeveledResource.USER_LOCK;
 
     if (!resource.canLock(lockSet.get())) {
       String errorMessage = getErrorMessage(resource);
@@ -355,7 +355,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       throw new RuntimeException(errorMessage);
     } else {
       Striped<ReadWriteLock> striped =
-          stripedLockByResource.get(Resource.USER_LOCK);
+          stripedLockByResource.get(LeveledResource.USER_LOCK);
       // The result of bulkGet is always sorted in a consistent order.
       // This prevents deadlocks.
       Iterable<ReadWriteLock> locks =
@@ -378,14 +378,14 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   @Override
   public void releaseMultiUserLock(String firstUser, String secondUser) {
     Striped<ReadWriteLock> striped =
-        stripedLockByResource.get(Resource.USER_LOCK);
+        stripedLockByResource.get(LeveledResource.USER_LOCK);
     Iterable<ReadWriteLock> locks =
         striped.bulkGet(Arrays.asList(firstUser, secondUser));
     for (ReadWriteLock lock : locks) {
       lock.writeLock().unlock();
     }
 
-    lockSet.set(Resource.USER_LOCK.clearLock(lockSet.get()));
+    lockSet.set(LeveledResource.USER_LOCK.clearLock(lockSet.get()));
   }
 
 
@@ -398,7 +398,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public OMLockDetails releaseWriteLock(Resource resource, String... keys) {
+  public OMLockDetails releaseWriteLock(LeveledResource resource, String... keys) {
     return releaseLock(resource, false, keys);
   }
 
@@ -411,7 +411,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public OMLockDetails releaseWriteLocks(Resource resource, Collection<String[]> keys) {
+  public OMLockDetails releaseWriteLocks(LeveledResource resource, Collection<String[]> keys) {
     return releaseLocks(resource, false, keys);
   }
 
@@ -424,7 +424,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public OMLockDetails releaseReadLock(Resource resource, String... keys) {
+  public OMLockDetails releaseReadLock(LeveledResource resource, String... keys) {
     return releaseLock(resource, true, keys);
   }
 
@@ -437,11 +437,11 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public OMLockDetails releaseReadLocks(Resource resource, Collection<String[]> keys) {
+  public OMLockDetails releaseReadLocks(LeveledResource resource, Collection<String[]> keys) {
     return releaseLocks(resource, true, keys);
   }
 
-  private OMLockDetails releaseLock(Resource resource, boolean isReadLock,
+  private OMLockDetails releaseLock(LeveledResource resource, boolean isReadLock,
       String... keys) {
     omLockDetails.get().clear();
     ReentrantReadWriteLock lock = getLock(resource, keys);
@@ -458,7 +458,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return omLockDetails.get();
   }
 
-  private OMLockDetails releaseLocks(Resource resource, boolean isReadLock,
+  private OMLockDetails releaseLocks(LeveledResource resource, boolean isReadLock,
                                     Collection<String[]> keys) {
     omLockDetails.get().clear();
     List<ReadWriteLock> locks =
@@ -480,7 +480,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return omLockDetails.get();
   }
 
-  private void updateReadUnlockMetrics(Resource resource,
+  private void updateReadUnlockMetrics(LeveledResource resource,
       ReentrantReadWriteLock lock) {
     /*
      *  readHoldCount helps in metrics updation only once in case
@@ -497,7 +497,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
   }
 
-  private void updateWriteUnlockMetrics(Resource resource,
+  private void updateWriteUnlockMetrics(LeveledResource resource,
       ReentrantReadWriteLock lock, boolean isWriteLocked) {
     /*
      *  writeHoldCount helps in metrics updation only once in case
@@ -522,7 +522,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   @VisibleForTesting
-  public int getReadHoldCount(Resource resource, String... keys) {
+  public int getReadHoldCount(LeveledResource resource, String... keys) {
     return getLock(resource, keys).getReadHoldCount();
   }
 
@@ -534,7 +534,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   @VisibleForTesting
-  public int getWriteHoldCount(Resource resource, String... keys) {
+  public int getWriteHoldCount(LeveledResource resource, String... keys) {
     return getLock(resource, keys).getWriteHoldCount();
   }
 
@@ -547,7 +547,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   @VisibleForTesting
-  public boolean isWriteLockedByCurrentThread(Resource resource,
+  public boolean isWriteLockedByCurrentThread(LeveledResource resource,
       String... keys) {
     return getLock(resource, keys).isWriteLockedByCurrentThread();
   }
@@ -568,7 +568,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   /**
    * Resource defined in Ozone.
    */
-  public enum Resource {
+  public enum LeveledResource {
     // For S3 Bucket need to allow only for S3, that should be means only 1.
     S3_BUCKET_LOCK((byte) 0, "S3_BUCKET_LOCK"), // = 1
 
@@ -660,7 +660,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       return startWriteHeldTimeNanos;
     }
 
-    Resource(byte pos, String name) {
+    LeveledResource(byte pos, String name) {
       this.lockLevel = pos;
       this.mask = (short) (Math.pow(2, lockLevel + 1) - 1);
       this.setMask = (short) Math.pow(2, lockLevel);
