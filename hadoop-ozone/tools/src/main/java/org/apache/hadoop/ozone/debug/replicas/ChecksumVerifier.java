@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -60,6 +61,7 @@ public class ChecksumVerifier implements ReplicaVerifier {
   public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation,
                                              int replicaIndex) {
     Pipeline pipeline = Pipeline.newBuilder(keyLocation.getPipeline())
+        .setId(PipelineID.randomId())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setNodes(Collections.singletonList(datanode))
         .setReplicaIndexes(Collections.singletonMap(datanode, replicaIndex))
