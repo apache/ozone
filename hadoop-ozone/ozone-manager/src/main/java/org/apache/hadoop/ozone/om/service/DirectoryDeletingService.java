@@ -361,8 +361,4 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     return dirDeletingServiceInterval;
   }
 
-  public void setDirDeletingServiceInterval(String dirDeletingServiceInterval) {
-    this.dirDeletingServiceInterval = dirDeletingServiceInterval;
-  }
-
 }

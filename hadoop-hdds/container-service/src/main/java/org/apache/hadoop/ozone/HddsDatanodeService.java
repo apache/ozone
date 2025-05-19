@@ -289,7 +289,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
       reconfigurationHandler.setReconfigurationCompleteCallback((status, newConf) -> {
         if (status.getStatus() != null && !status.getStatus().isEmpty()) {
-          LOG.info("Reconfiguration completed. Properties are updated.");
+          LOG.info("Reconfiguration completed with {} updated properties.", status.getStatus().size());
         } else {
           LOG.info("Reconfiguration complete. No properties were changed.");
         }

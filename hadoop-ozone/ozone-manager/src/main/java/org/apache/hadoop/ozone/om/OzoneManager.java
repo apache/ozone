@@ -152,6 +152,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.StringUtils;
@@ -533,19 +534,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     reconfigurationHandler.setReconfigurationCompleteCallback((status, newConf) -> {
       if (status.getStatus() != null && !status.getStatus().isEmpty()) {
-        LOG.info("Reconfiguration completed. Properties are updated.");
+        LOG.info("Reconfiguration completed with {} updated properties.", status.getStatus().size());
       } else {
         LOG.info("Reconfiguration complete. No properties were changed.");
       }
     });
 
     reconfigurationHandler.registerCompleteCallback((changedKeys, newConf) -> {
-      Set<String> relevantKeys = new HashSet<>();
-      relevantKeys.add(OZONE_DIR_DELETING_SERVICE_INTERVAL);
-
-      boolean shouldRestart = changedKeys.keySet().stream().anyMatch(relevantKeys::contains);
-      if (shouldRestart) {
-        initOrUpdateDirDeletingService((OzoneConfiguration) newConf);
+      if (changedKeys.containsKey(OZONE_DIR_DELETING_SERVICE_INTERVAL)) {
+        initOrUpdateDirDeletingService(getConfiguration());
       }
     });
 
@@ -5123,9 +5120,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return String.valueOf(allowListAllVolumes);
   }
 
+  private static final Pattern TIME_DURATION_PATTERN =
+      Pattern.compile("^\\s*\\d+\\s*(ms|s|m|h|d)\\s*$", Pattern.CASE_INSENSITIVE);
+
   private String reconfOzoneDirDeletingServiceInterval(String newVal) {
+    if (!TIME_DURATION_PATTERN.matcher(newVal).matches()) {
+      throw new IllegalArgumentException("Invalid time duration format: " + newVal);
+    }
     getConfiguration().set(OZONE_DIR_DELETING_SERVICE_INTERVAL, newVal);
-    getKeyManager().getDirDeletingService().setDirDeletingServiceInterval(newVal);
     return newVal;
   }
 

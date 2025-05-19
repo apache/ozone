@@ -106,6 +106,10 @@ public abstract class BackgroundService {
 
   // start service
   public synchronized void start() {
+    if (scheduledHandle != null && !scheduledHandle.isCancelled()) {
+      LOG.warn("Background service {} is already running", serviceName);
+      return;
+    }
     scheduledHandle = exec.scheduleWithFixedDelay(service, 0, interval, unit);
   }
 

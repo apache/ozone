@@ -175,9 +175,10 @@ public abstract class ReconfigurableBase extends Configured implements Reconfigu
             } else {
               oldConf.unset(change.prop);
             }
-          } catch (ReconfigurationException var16) {
-            Throwable cause = var16.getCause();
-            errorMessage = cause == null ? var16.getMessage() : cause.getMessage();
+          } catch (ReconfigurationException reconfException) {
+            Throwable cause = reconfException.getCause();
+            errorMessage = cause == null ? reconfException.getMessage() : cause.getMessage();
+            LOG.error("Failed to reconfigure property {}: {}", change.prop, errorMessage, reconfException);
           }
 
           results.put(change, Optional.ofNullable(errorMessage));
