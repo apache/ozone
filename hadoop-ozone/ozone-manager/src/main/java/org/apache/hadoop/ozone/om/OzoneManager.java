@@ -504,6 +504,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private ReferenceCounted<IOmMetadataReader> rcOmMetadataReader;
   private OmSnapshotManager omSnapshotManager;
   private volatile DirectoryDeletingService dirDeletingService;
+  private static final Pattern TIME_DURATION_PATTERN =
+      Pattern.compile("^\\s*\\d+\\s*(ms|s|m|h|d)\\s*$", Pattern.CASE_INSENSITIVE);
 
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
@@ -5119,9 +5121,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     setAllowListAllVolumesFromConfig();
     return String.valueOf(allowListAllVolumes);
   }
-
-  private static final Pattern TIME_DURATION_PATTERN =
-      Pattern.compile("^\\s*\\d+\\s*(ms|s|m|h|d)\\s*$", Pattern.CASE_INSENSITIVE);
 
   private String reconfOzoneDirDeletingServiceInterval(String newVal) {
     if (!TIME_DURATION_PATTERN.matcher(newVal).matches()) {
