@@ -276,14 +276,14 @@ public class SCMDatanodeProtocolServer implements
 
   private String constructCommandAuditMap(List<SCMCommandProto> cmds) {
     StringBuilder auditMap = new StringBuilder();
-    auditMap.append("[");
+    auditMap.append('[');
     for (SCMCommandProto cmd : cmds) {
       if (cmd.getCommandType().equals(deleteBlocksCommand)) {
         auditMap.append("commandType: ").append(cmd.getCommandType());
         auditMap.append(" deleteTransactionsCount: ")
             .append(cmd.getDeleteBlocksCommandProto().getDeletedBlocksTransactionsCount());
         auditMap.append(" cmdID: ").append(cmd.getDeleteBlocksCommandProto().getCmdId());
-        auditMap.append(" encodedToken: \"").append(cmd.getEncodedToken()).append("\"");
+        auditMap.append(" encodedToken: \"").append(cmd.getEncodedToken()).append('"');
         auditMap.append(" deadlineMsSinceEpoch: ").append(cmd.getDeadlineMsSinceEpoch());
       } else {
         auditMap.append(TextFormat.shortDebugString(cmd));
@@ -294,7 +294,7 @@ public class SCMDatanodeProtocolServer implements
     if (len > 2) {
       auditMap.delete(len - 2, len);
     }
-    auditMap.append("]");
+    auditMap.append(']');
     return auditMap.toString();
   }
 
@@ -436,7 +436,6 @@ public class SCMDatanodeProtocolServer implements
           cmd.getType().toString() + " is not implemented");
     }
   }
-
 
   public void join() throws InterruptedException {
     LOG.trace("Join RPC server for DataNodes");

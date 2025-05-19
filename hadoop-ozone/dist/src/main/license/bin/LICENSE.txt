@@ -313,7 +313,6 @@ Apache License 2.0
    commons-httpclient:commons-httpclient
    commons-io:commons-io
    commons-lang:commons-lang
-   commons-logging:commons-logging
    commons-net:commons-net
    commons-validator:commons-validator
    commons-fileupload:commons-fileupload
@@ -364,6 +363,7 @@ Apache License 2.0
    jakarta.validation:jakarta.validation-api
    javax.enterprise:cdi-api
    javax.inject:javax.inject
+   log4j:apache-log4j-extras
    net.java.dev.jna:jna
    net.java.dev.jna:jna-platform
    org.apache.commons:commons-compress
@@ -464,6 +464,7 @@ MIT
    org.checkerframework:checker-qual
    org.codehaus.mojo:animal-sniffer-annotations
    org.kohsuke.metainf-services:metainf-services
+   org.slf4j:jcl-over-slf4j
    org.slf4j:slf4j-api
    org.slf4j:slf4j-reload4j
 

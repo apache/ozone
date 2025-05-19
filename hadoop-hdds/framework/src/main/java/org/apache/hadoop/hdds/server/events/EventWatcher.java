@@ -155,7 +155,6 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     return null;
   }
 
-
   /**
    * Check if a specific payload is in-progress.
    */

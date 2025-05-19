@@ -21,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
+import java.lang.annotation.Annotation;
+import java.util.Map;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.Versioned;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -28,6 +31,7 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -42,7 +46,6 @@ class TestVersionExtractor {
     when(context.versionManager()).thenReturn(layoutVersionManager);
     Versioned version = VersionExtractor.LAYOUT_VERSION_EXTRACTOR.extractVersion(null, context);
     assertEquals(layoutVersionValue, version);
-    assertEquals(OMLayoutFeature.class, VersionExtractor.LAYOUT_VERSION_EXTRACTOR.getVersionClass());
   }
 
   @ParameterizedTest
@@ -52,7 +55,6 @@ class TestVersionExtractor {
     when(request.getVersion()).thenReturn(expectedClientVersion.version());
     Versioned version = VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
     assertEquals(expectedClientVersion, version);
-    assertEquals(ClientVersion.class, VersionExtractor.CLIENT_VERSION_EXTRACTOR.getVersionClass());
   }
 
   @ParameterizedTest
@@ -62,6 +64,15 @@ class TestVersionExtractor {
     when(request.getVersion()).thenReturn(ClientVersion.CURRENT_VERSION + futureVersion);
     Versioned version = VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
     assertEquals(ClientVersion.FUTURE_VERSION, version);
-    assertEquals(ClientVersion.class, VersionExtractor.CLIENT_VERSION_EXTRACTOR.getVersionClass());
+  }
+
+  @Test
+  void testGetValidatorClass() {
+    Map<VersionExtractor, Class<? extends Annotation>> expectedValidatorClasses =
+        ImmutableMap.of(VersionExtractor.CLIENT_VERSION_EXTRACTOR, OMClientVersionValidator.class,
+            VersionExtractor.LAYOUT_VERSION_EXTRACTOR, OMLayoutVersionValidator.class);
+    for (VersionExtractor extractor : VersionExtractor.values()) {
+      assertEquals(expectedValidatorClasses.get(extractor), extractor.getValidatorClass());
+    }
   }
 }

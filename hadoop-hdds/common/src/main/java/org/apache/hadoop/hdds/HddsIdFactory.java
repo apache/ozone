@@ -23,11 +23,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * HDDS Id generator.
  */
 public final class HddsIdFactory {
+  private static final AtomicLong LONG_COUNTER = new AtomicLong(System.currentTimeMillis());
+
   private HddsIdFactory() {
   }
-
-  private static final AtomicLong LONG_COUNTER = new AtomicLong(
-      System.currentTimeMillis());
 
   /**
    * Returns an incrementing long. This class doesn't

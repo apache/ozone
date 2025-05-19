@@ -230,12 +230,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       TracingUtil.initTracing(
-          "HddsDatanodeService." + datanodeDetails.getUuidString()
-              .substring(0, 8), conf);
+          "HddsDatanodeService." + datanodeDetails.getID(), conf);
       LOG.info("HddsDatanodeService {}", datanodeDetails);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        component = "dn-" + datanodeDetails.getUuidString();
+        component = "dn-" + datanodeDetails.getID();
         secConf = new SecurityConfig(conf);
 
         if (SecurityUtil.getAuthenticationMethod(conf).equals(

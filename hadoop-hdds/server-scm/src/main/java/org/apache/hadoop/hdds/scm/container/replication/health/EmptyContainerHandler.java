@@ -134,7 +134,7 @@ public class EmptyContainerHandler extends AbstractCheck {
                 " {} on datanode {}",
             rp.getReplicaIndex(),
             containerInfo.containerID(),
-            rp.getDatanodeDetails().getUuidString(), e);
+            rp.getDatanodeDetails(), e);
       }
     }
   }

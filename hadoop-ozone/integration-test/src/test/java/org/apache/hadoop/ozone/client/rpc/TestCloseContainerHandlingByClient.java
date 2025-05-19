@@ -29,11 +29,11 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -52,13 +52,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests Close Container Exception handling by Ozone Client.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestCloseContainerHandlingByClient implements NonHATests.TestCase {
 
   private MiniOzoneCluster cluster;
@@ -298,7 +296,7 @@ public abstract class TestCloseContainerHandlingByClient implements NonHATests.T
     OzoneBucket bucket = volume.getBucket(bucketName);
     byte[] readData = new byte[keyLen];
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
-      inputStream.read(readData);
+      IOUtils.readFully(inputStream, readData);
     }
     assertArrayEquals(writtenData, readData);
 

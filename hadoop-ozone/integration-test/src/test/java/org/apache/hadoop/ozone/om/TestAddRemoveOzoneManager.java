@@ -64,13 +64,11 @@ import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.leader.FollowerInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 /**
  * Test for OM bootstrap process.
  */
-@Timeout(500)
 public class TestAddRemoveOzoneManager {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -84,8 +82,8 @@ public class TestAddRemoveOzoneManager {
   private static final String BUCKET_NAME;
 
   static {
-    VOLUME_NAME = "volume" + RandomStringUtils.randomNumeric(5);
-    BUCKET_NAME = "bucket" + RandomStringUtils.randomNumeric(5);
+    VOLUME_NAME = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    BUCKET_NAME = "bucket" + RandomStringUtils.secure().nextNumeric(5);
   }
 
   private OzoneClient client;

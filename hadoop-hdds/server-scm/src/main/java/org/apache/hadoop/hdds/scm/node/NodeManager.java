@@ -75,7 +75,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 public interface NodeManager extends StorageContainerNodeProtocol,
     EventHandler<CommandForDatanode>, NodeManagerMXBean, Closeable {
 
-
   /**
    * Register API without a layout version info object passed in. Useful for
    * tests.
@@ -137,11 +136,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       NodeOperationalState opState, NodeState health);
 
   /**
-   * Get all datanodes known to SCM.
-   *
-   * @return List of DatanodeDetails known to SCM.
+   * @return all datanodes known to SCM.
    */
-  List<DatanodeDetails> getAllNodes();
+  List<? extends DatanodeDetails> getAllNodes();
+
+  /** @return the number of datanodes. */
+  default int getAllNodeCount() {
+    return getAllNodes().size();
+  }
 
   /**
    * Returns the aggregated node stats.
@@ -268,13 +270,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       throws NodeNotFoundException;
 
   /**
-   * Add a {@link SCMCommand} to the command queue, which are
-   * handled by HB thread asynchronously.
-   * @param dnId datanode uuid
-   * @param command
+   * Add a {@link SCMCommand} to the command queue of the given datanode.
+   * The command will be handled by the HB thread asynchronously.
    */
-  void addDatanodeCommand(UUID dnId, SCMCommand<?> command);
-
+  void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command);
 
   /**
    * send refresh command to all the healthy datanodes to refresh

@@ -105,7 +105,7 @@ public class TestOzoneTokenIdentifier {
         new Text("rm"), new Text("client"));
     tokenId.setOmCertSerialId("123");
     LOG.info("Unsigned token {} is {}", tokenId,
-        verifyTokenAsymmetric(tokenId, RandomUtils.nextBytes(128), cert));
+        verifyTokenAsymmetric(tokenId, RandomUtils.secure().randomBytes(128), cert));
 
   }
 
@@ -142,9 +142,9 @@ public class TestOzoneTokenIdentifier {
 
   OzoneTokenIdentifier generateTestToken() {
     OzoneTokenIdentifier tokenIdentifier = new OzoneTokenIdentifier(
-        new Text(RandomStringUtils.randomAlphabetic(6)),
-        new Text(RandomStringUtils.randomAlphabetic(5)),
-        new Text(RandomStringUtils.randomAlphabetic(4)));
+        new Text(RandomStringUtils.secure().nextAlphabetic(6)),
+        new Text(RandomStringUtils.secure().nextAlphabetic(5)),
+        new Text(RandomStringUtils.secure().nextAlphabetic(4)));
     tokenIdentifier.setOmCertSerialId("123");
     return tokenIdentifier;
   }
@@ -193,7 +193,6 @@ public class TestOzoneTokenIdentifier {
     testSymmetricTokenPerfHelper(hmacSHA1, 64);
     testSymmetricTokenPerfHelper(hmacSHA256, 1024);
   }
-
 
   public void testSymmetricTokenPerfHelper(String hmacAlgorithm, int keyLen) {
     final int testTokenCount = 1000;
@@ -251,7 +250,6 @@ public class TestOzoneTokenIdentifier {
       assertEquals(id, id2);
     }
   }
-
 
   public OzoneTokenIdentifier getIdentifierInst() {
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();

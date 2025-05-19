@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 
 import java.util.List;
 import javax.inject.Inject;
@@ -34,7 +34,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -72,8 +71,6 @@ public class ClusterStateEndpoint {
   private OzoneConfiguration ozoneConfiguration;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
-
-
   @Inject
   ClusterStateEndpoint(OzoneStorageContainerManager reconSCM,
                        GlobalStatsDao globalStatsDao,
@@ -97,8 +94,6 @@ public class ClusterStateEndpoint {
   @GET
   public Response getClusterState() {
     ContainerStateCounts containerStateCounts = new ContainerStateCounts();
-    List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
-
     int pipelines = this.pipelineManager.getPipelines().size();
 
     List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
@@ -183,7 +178,7 @@ public class ClusterStateEndpoint {
         .setPipelines(pipelines)
         .setContainers(containerStateCounts.getTotalContainerCount())
         .setMissingContainers(containerStateCounts.getMissingContainerCount())
-        .setTotalDatanodes(datanodeDetails.size())
+        .setTotalDatanodes(nodeManager.getAllNodeCount())
         .setHealthyDatanodes(healthyDatanodes)
         .setOpenContainers(containerStateCounts.getOpenContainersCount())
         .setDeletedContainers(containerStateCounts.getDeletedContainersCount())

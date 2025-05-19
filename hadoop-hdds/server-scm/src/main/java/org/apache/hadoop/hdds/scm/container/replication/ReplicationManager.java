@@ -111,12 +111,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    */
   private final ContainerManager containerManager;
 
-
   /**
    * SCMContext from StorageContainerManager.
    */
   private SCMContext scmContext;
-
 
   /**
    * ReplicationManager specific configuration.
@@ -632,6 +630,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     command.setPriority(ReplicationCommandPriority.LOW);
     sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
   }
+
   /**
    * Sends a command to a datanode with the command deadline set to the default
    * in ReplicationManager config.
@@ -667,7 +666,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         scmDeadlineEpochMs);
     command.setTerm(getScmTerm());
     command.setDeadline(datanodeDeadline);
-    nodeManager.addDatanodeCommand(target.getUuid(), command);
+    nodeManager.addDatanodeCommand(target.getID(), command);
     adjustPendingOpsAndMetrics(containerInfo, command, target,
         scmDeadlineEpochMs);
   }
@@ -1132,13 +1131,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + "sent to datanodes. After this timeout the command will be "
             + "retried.")
     private long eventTimeout = Duration.ofMinutes(12).toMillis();
-    public void setInterval(Duration interval) {
-      this.interval = interval;
-    }
-
-    public void setEventTimeout(Duration timeout) {
-      this.eventTimeout = timeout.toMillis();
-    }
 
     /**
      * When a command has a deadline in SCM, the datanode timeout should be
@@ -1156,13 +1148,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + "the datanodes will not process a command after SCM believes it "
             + "should have expired.")
     private long datanodeTimeoutOffset = Duration.ofMinutes(6).toMillis();
-    public long getDatanodeTimeoutOffset() {
-      return datanodeTimeoutOffset;
-    }
-
-    public void setDatanodeTimeoutOffset(long val) {
-      datanodeTimeoutOffset = val;
-    }
 
     /**
      * The number of container replica which must be available for a node to
@@ -1179,10 +1164,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             " container below this level, the node will remain in the " +
             " entering maintenance state until a new replica is created.")
     private int maintenanceReplicaMinimum = 2;
-
-    public void setMaintenanceReplicaMinimum(int replicaCount) {
-      this.maintenanceReplicaMinimum = replicaCount;
-    }
 
     /**
      * Defines how many redundant replicas of a container must be online for a
@@ -1234,10 +1215,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int datanodeReplicationLimit = 20;
 
-    public int getDatanodeReplicationLimit() {
-      return datanodeReplicationLimit;
-    }
-
     @Config(key = "datanode.reconstruction.weight",
         type = ConfigType.INT,
         defaultValue = "3",
@@ -1250,10 +1227,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int reconstructionCommandWeight = 3;
 
-    public int getReconstructionCommandWeight() {
-      return reconstructionCommandWeight;
-    }
-
     @Config(key = "datanode.delete.container.limit",
         type = ConfigType.INT,
         defaultValue = "40",
@@ -1265,10 +1238,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             "limiting load"
     )
     private int datanodeDeleteLimit = 40;
-
-    public int getDatanodeDeleteLimit() {
-      return datanodeDeleteLimit;
-    }
 
     @Config(key = "inflight.limit.factor",
         type = ConfigType.DOUBLE,
@@ -1288,12 +1257,32 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private double inflightReplicationLimitFactor = 0.75;
 
+    public long getDatanodeTimeoutOffset() {
+      return datanodeTimeoutOffset;
+    }
+
+    public void setDatanodeTimeoutOffset(long val) {
+      datanodeTimeoutOffset = val;
+    }
+
+    public int getReconstructionCommandWeight() {
+      return reconstructionCommandWeight;
+    }
+
+    public int getDatanodeDeleteLimit() {
+      return datanodeDeleteLimit;
+    }
+
     public double getInflightReplicationLimitFactor() {
       return inflightReplicationLimitFactor;
     }
 
     public void setInflightReplicationLimitFactor(double factor) {
       this.inflightReplicationLimitFactor = factor;
+    }
+
+    public int getDatanodeReplicationLimit() {
+      return datanodeReplicationLimit;
     }
 
     public void setDatanodeReplicationLimit(int limit) {
@@ -1310,6 +1299,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     public Duration getInterval() {
       return interval;
+    }
+
+    public void setInterval(Duration interval) {
+      this.interval = interval;
     }
 
     public Duration getUnderReplicatedInterval() {
@@ -1332,8 +1325,16 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       return eventTimeout;
     }
 
+    public void setEventTimeout(Duration timeout) {
+      this.eventTimeout = timeout.toMillis();
+    }
+
     public int getMaintenanceReplicaMinimum() {
       return maintenanceReplicaMinimum;
+    }
+
+    public void setMaintenanceReplicaMinimum(int replicaCount) {
+      this.maintenanceReplicaMinimum = replicaCount;
     }
 
     public boolean isPush() {

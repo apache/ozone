@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.PRIMARY_SCM_NODE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CERT_SERIAL_ID;
@@ -41,13 +40,15 @@ import org.apache.hadoop.ozone.common.Storage;
  */
 public class SCMStorageConfig extends Storage {
 
+  public static final String TESTING_INIT_LAYOUT_VERSION_KEY = "testing.hdds.scm.init.layout.version";
+
   /**
    * Construct SCMStorageConfig.
    * @throws IOException if any directories are inaccessible.
    */
   public SCMStorageConfig(OzoneConfiguration conf) throws IOException {
     super(NodeType.SCM, ServerUtils.getScmDbDir(conf), STORAGE_DIR,
-        getInitLayoutVersion(conf, HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
+        getInitLayoutVersion(conf, TESTING_INIT_LAYOUT_VERSION_KEY,
             HDDSLayoutVersionManager::maxLayoutVersion));
   }
 

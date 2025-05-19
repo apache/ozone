@@ -434,6 +434,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Container already exists. container Id {}", containerID);
       }
     } catch (StorageContainerException ex) {
+      newContainerData.releaseCommitSpace();
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } finally {
       containerIdLock.unlock();
@@ -888,7 +889,8 @@ public class KeyValueHandler extends Handler {
           final ChunkBuffer b = (ChunkBuffer)data;
           Checksum.verifyChecksum(b.duplicate(b.position(), b.limit()), info.getChecksumData(), 0);
         } else {
-          Checksum.verifyChecksum(data.toByteString(byteBufferToByteString), info.getChecksumData(), 0);
+          Checksum.verifyChecksum(data.toByteString(byteBufferToByteString).asReadOnlyByteBuffer(),
+              info.getChecksumData(), 0);
         }
       } catch (OzoneChecksumException ex) {
         throw ChunkUtils.wrapInStorageContainerException(ex);
@@ -1427,7 +1429,7 @@ public class KeyValueHandler extends Handler {
       StringBuilder stringBuilder = new StringBuilder();
       for (Path block : dir) {
         if (notEmpty) {
-          stringBuilder.append(",");
+          stringBuilder.append(',');
         }
         stringBuilder.append(block);
         notEmpty = true;
@@ -1539,7 +1541,10 @@ public class KeyValueHandler extends Handler {
     }
     // Avoid holding write locks for disk operations
     sendICR(container);
+    long bytesUsed = container.getContainerData().getBytesUsed();
+    HddsVolume volume = container.getContainerData().getVolume();
     container.delete();
+    volume.decrementUsedSpace(bytesUsed);
   }
 
   private void triggerVolumeScanAndThrowException(Container container,

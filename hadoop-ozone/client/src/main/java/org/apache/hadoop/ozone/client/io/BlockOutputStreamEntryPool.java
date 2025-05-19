@@ -285,6 +285,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return streamEntries.stream()
         .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
   }
+
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
    * first block has index = 0, second has index = 1 etc.)

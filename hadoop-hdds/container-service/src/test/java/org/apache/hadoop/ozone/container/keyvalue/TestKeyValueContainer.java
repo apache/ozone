@@ -38,6 +38,8 @@ import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -492,7 +494,6 @@ public class TestKeyValueContainer {
     container.update(metadata, true);
   }
 
-
   /**
    * Set container state to CLOSED.
    */
@@ -626,7 +627,6 @@ public class TestKeyValueContainer {
     assertNotNull(keyValueContainer.getContainerReport());
   }
 
-
   @ContainerTestVersionInfo.ContainerTest
   public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -667,10 +667,8 @@ public class TestKeyValueContainer {
     });
 
     assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, exception.getResult());
-    assertThat(exception)
-        .hasMessageStartingWith("Updating a closed container without force option is not allowed. ContainerID: ");
+    assertThat(exception).hasMessageContaining(keyValueContainerData.toString());
   }
-
 
   @ContainerTestVersionInfo.ContainerTest
   public void testContainerRocksDB(ContainerTestVersionInfo versionInfo)
@@ -1100,5 +1098,20 @@ public class TestKeyValueContainer {
         importedContainer.getContainerData().getSchemaVersion());
     assertEquals(pendingDeleteBlockCount,
         importedContainer.getContainerData().getNumPendingDeletionBlocks());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerCreationCommitSpaceReserve(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    keyValueContainerData = spy(keyValueContainerData);
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
+    keyValueContainer = spy(keyValueContainer);
+
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    // verify that
+    verify(volumeChoosingPolicy).chooseVolume(anyList(), anyLong()); // this would reserve commit space
+    assertTrue(keyValueContainerData.isCommittedSpace());
   }
 }

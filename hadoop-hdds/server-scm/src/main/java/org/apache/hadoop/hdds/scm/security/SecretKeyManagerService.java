@@ -52,7 +52,6 @@ public class SecretKeyManagerService implements SCMService, Runnable {
   private final SecretKeyManager secretKeyManager;
   private final SecretKeyConfig secretKeyConfig;
 
-
   /**
    * SCMService related variables.
    */

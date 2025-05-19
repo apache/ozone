@@ -59,15 +59,14 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -350,7 +349,7 @@ public class TestPipelineManagerImpl {
       Pipeline pipeline = assertAllocate(pipelineManager);
       changeToFollower(pipelineManager);
       assertFailsNotLeader(
-          () -> pipelineManager.closePipeline(pipeline, false));
+          () -> pipelineManager.closePipeline(pipeline.getId()));
     }
   }
 
@@ -358,8 +357,8 @@ public class TestPipelineManagerImpl {
   public void testPipelineReport() throws Exception {
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(conf,
-          mock(ContainerManager.class), pipelineManager, mock(NodeManager.class),
-          new EventQueue(), serviceManager, scmContext);
+          mock(NodeManager.class), pipelineManager, mock(ContainerManager.class),
+          serviceManager, new EventQueue(), scmContext);
       Pipeline pipeline = pipelineManager
           .createPipeline(RatisReplicationConfig
               .getInstance(ReplicationFactor.THREE));
@@ -468,8 +467,8 @@ public class TestPipelineManagerImpl {
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
     SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(new OzoneConfiguration(),
-        mock(ContainerManager.class), pipelineManager, mock(NodeManager.class),
-        new EventQueue(), serviceManager, scmContext);
+        mock(NodeManager.class), pipelineManager, mock(ContainerManager.class),
+        serviceManager, new EventQueue(), scmContext);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,
             SCMContext.emptyContext(), conf);
@@ -521,7 +520,7 @@ public class TestPipelineManagerImpl {
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE));
     pipelineManager.openPipeline(closedPipeline.getId());
-    pipelineManager.closePipeline(closedPipeline, true);
+    pipelineManager.closePipeline(closedPipeline.getId());
 
     // pipeline should be seen in pipelineManager as CLOSED.
     assertTrue(pipelineManager
@@ -612,7 +611,7 @@ public class TestPipelineManagerImpl {
         TimeUnit.MILLISECONDS);
 
     scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, false));
+        SCMSafeModeManager.SafeModeStatus.of(true, false));
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     assertThrows(IOException.class,
@@ -633,7 +632,7 @@ public class TestPipelineManagerImpl {
 
     // Simulate safemode check exiting.
     scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+        SCMSafeModeManager.SafeModeStatus.of(true, true));
     GenericTestUtils.waitFor(() -> !pipelineManager.getPipelines().isEmpty(),
         100, 10000);
     pipelineManager.close();
@@ -649,20 +648,20 @@ public class TestPipelineManagerImpl {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
 
     scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, false));
+        SCMSafeModeManager.SafeModeStatus.of(true, false));
     assertTrue(pipelineManager.getSafeModeStatus());
     assertFalse(pipelineManager.isPipelineCreationAllowed());
 
     // First pass pre-check as true, but safemode still on
     // Simulate safemode check exiting.
     scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+        SCMSafeModeManager.SafeModeStatus.of(true, true));
     assertTrue(pipelineManager.getSafeModeStatus());
     assertTrue(pipelineManager.isPipelineCreationAllowed());
 
     // Then also turn safemode off
     scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(false, true));
+        SCMSafeModeManager.SafeModeStatus.of(false, true));
     assertFalse(pipelineManager.getSafeModeStatus());
     assertTrue(pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();
@@ -714,7 +713,7 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
-  public void testPipelineCloseFlow() throws IOException, TimeoutException {
+  public void testPipelineCloseFlow() throws IOException {
     LogCapturer logCapturer = LogCapturer.captureLogs(PipelineManagerImpl.class);
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(
@@ -753,17 +752,17 @@ public class TestPipelineManagerImpl {
 
     // For existing pipelines
     List<Pipeline> pipelines = new ArrayList<>();
-    UUID[] uuids = new UUID[3];
+    final DatanodeID[] ids = new DatanodeID[3];
     String[] ipAddresses = new String[3];
     String[] hostNames = new String[3];
     for (int i = 0; i < 3; i++) {
-      uuids[i] = UUID.randomUUID();
+      ids[i] = DatanodeID.randomID();
       ipAddresses[i] = "1.2.3." + (i + 1);
       hostNames[i] = "host" + i;
 
       Pipeline pipeline = mock(Pipeline.class);
       DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
-      when(datanodeDetails.getUuid()).thenReturn(uuids[i]);
+      when(datanodeDetails.getID()).thenReturn(ids[i]);
       when(datanodeDetails.getIpAddress()).thenReturn(ipAddresses[i]);
       when(datanodeDetails.getHostName()).thenReturn(hostNames[i]);
       List<DatanodeDetails> nodes = new ArrayList<>();
@@ -784,8 +783,8 @@ public class TestPipelineManagerImpl {
 
     // node with changed uuid
     DatanodeDetails node0 = mock(DatanodeDetails.class);
-    UUID changedUUID = UUID.randomUUID();
-    when(node0.getUuid()).thenReturn(changedUUID);
+    DatanodeID changedUUID = DatanodeID.randomID();
+    when(node0.getID()).thenReturn(changedUUID);
     when(node0.getIpAddress()).thenReturn(ipAddresses[0]);
     when(node0.getHostName()).thenReturn(hostNames[0]);
 
@@ -794,7 +793,7 @@ public class TestPipelineManagerImpl {
 
     // node with changed IP
     DatanodeDetails node1 = mock(DatanodeDetails.class);
-    when(node1.getUuid()).thenReturn(uuids[0]);
+    when(node1.getID()).thenReturn(ids[0]);
     when(node1.getIpAddress()).thenReturn("1.2.3.100");
     when(node1.getHostName()).thenReturn(hostNames[0]);
 
@@ -806,7 +805,7 @@ public class TestPipelineManagerImpl {
 
     // node with changed host name
     DatanodeDetails node2 = mock(DatanodeDetails.class);
-    when(node2.getUuid()).thenReturn(uuids[0]);
+    when(node2.getID()).thenReturn(ids[0]);
     when(node2.getIpAddress()).thenReturn(ipAddresses[0]);
     when(node2.getHostName()).thenReturn("host100");
 
@@ -818,7 +817,7 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
-  public void testCloseStalePipelines() throws IOException, TimeoutException {
+  public void testCloseStalePipelines() throws IOException {
     SCMHADBTransactionBuffer buffer =
             new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
@@ -841,8 +840,7 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
-  public void testWaitForAllocatedPipeline()
-      throws IOException, TimeoutException {
+  public void testWaitForAllocatedPipeline() throws IOException {
     SCMHADBTransactionBuffer buffer =
             new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
@@ -945,7 +943,7 @@ public class TestPipelineManagerImpl {
           .setContainerState(StorageContainerDatanodeProtocolProtos
               .ContainerReplicaProto.State.CLOSED)
           .setKeyCount(1)
-          .setOriginNodeId(UUID.randomUUID())
+          .setOriginNodeId(DatanodeID.randomID())
           .setSequenceId(1)
           .setReplicaIndex(0)
           .setDatanodeDetails(dn)

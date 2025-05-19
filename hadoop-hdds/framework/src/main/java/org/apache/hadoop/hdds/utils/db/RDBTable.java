@@ -39,7 +39,6 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 class RDBTable implements Table<byte[], byte[]> {
 
-
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBTable.class);
 
@@ -92,7 +91,6 @@ class RDBTable implements Table<byte[], byte[]> {
       throw new IllegalArgumentException("batch should be RDBBatchOperation");
     }
   }
-
 
   @Override
   public boolean isEmpty() throws IOException {
@@ -194,7 +192,6 @@ class RDBTable implements Table<byte[], byte[]> {
   public void delete(ByteBuffer key) throws IOException {
     db.delete(family, key);
   }
-
 
   @Override
   public void deleteRange(byte[] beginKey, byte[] endKey) throws IOException {

@@ -136,7 +136,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private static final int PATH_DEPTH_TO_BUCKET = 2;
   private OzoneConfiguration ozoneConfiguration;
 
-
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
@@ -611,6 +610,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     private final BasicRootedOzoneClientAdapterImpl adapterImpl;
     private boolean recursive;
     private Path f;
+
     DeleteIteratorWithFSO(Path f, boolean recursive)
         throws IOException {
       super(f, true);
@@ -665,7 +665,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return deleteIterator;
     }
   }
-
 
   /**
    * Deletes the children of the input dir path by iterating though the
@@ -933,7 +932,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return fileStatuses;
   }
 
-  
   private List<FileStatusAdapter> listStatusAdapter(Path f, boolean lite) throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
@@ -1419,7 +1417,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // non FSO implementation
       this(path, false);
     }
-
 
     /**
      * The output of processKey determines if further iteration through the
