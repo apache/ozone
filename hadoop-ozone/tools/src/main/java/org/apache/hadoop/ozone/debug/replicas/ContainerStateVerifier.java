@@ -136,7 +136,7 @@ public class ContainerStateVerifier implements ReplicaVerifier {
     return cachedData;
   }
 
-  private class ContainerInfoToken {
+  private static class ContainerInfoToken {
     private HddsProtos.LifeCycleState state;
     private final String encodedToken;
 
