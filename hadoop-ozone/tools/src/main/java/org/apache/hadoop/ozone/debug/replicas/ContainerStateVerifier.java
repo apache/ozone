@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
@@ -41,20 +42,16 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
  * Verifies the state of a replica from the DN.
  * [DELETED, UNHEALTHY, INVALID] are considered bad states.
  */
-public class ReplicaStateVerifier implements ReplicaVerifier {
+public class ContainerStateVerifier implements ReplicaVerifier {
   private static final String CHECK_TYPE = "replicaState";
   private final ContainerOperationClient containerOperationClient;
   private final XceiverClientManager xceiverClientManager;
-  // cache for replica details from the DNs
-  private final Cache<ReplicaKey, ContainerDataProto> containerDataCache = CacheBuilder.newBuilder()
-      .maximumSize(1000)
-      .build();
   // cache for container info and encodedToken from the SCM
   private final Cache<Long, ContainerInfoToken> encodedTokenCache = CacheBuilder.newBuilder()
-      .maximumSize(1000)
+      .maximumSize(1000000)
       .build();
 
-  public ReplicaStateVerifier(OzoneConfiguration conf) throws IOException {
+  public ContainerStateVerifier(OzoneConfiguration conf) throws IOException {
     containerOperationClient = new ContainerOperationClient(conf);
     xceiverClientManager = containerOperationClient.getXceiverClientManager();
   }
@@ -72,18 +69,19 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
       boolean pass = false;
 
       ContainerInfoToken containerInfoToken = getContainerInfoToken(keyLocation.getContainerID());
-      ContainerInfo containerInfo = containerInfoToken.getContainerInfo();
+      ContainerDataProto containerData = fetchContainerDataFromDatanode(datanode, keyLocation.getContainerID(),
+          keyLocation, replicaIndex, containerInfoToken);
 
-      ContainerDataProto containerData = getContainerData(datanode, keyLocation, replicaIndex, containerInfoToken);
       ContainerDataProto.State state = containerData.getState();
       if (state == ContainerDataProto.State.UNHEALTHY ||
           state == ContainerDataProto.State.INVALID ||
           state == ContainerDataProto.State.DELETED) {
         replicaCheckMsg.append(state.name());
-      } else {
+      } else if (containerInfoToken.getContainerState() != HddsProtos.LifeCycleState.DELETING &&
+          containerInfoToken.getContainerState() != HddsProtos.LifeCycleState.DELETED) {
         pass = true;
       }
-      replicaCheckMsg.append(", Container state in SCM is ").append(containerInfo.getState());
+      replicaCheckMsg.append(", Container state in SCM is ").append(containerInfoToken.getContainerState());
 
       if (pass) {
         return BlockVerificationResult.pass();
@@ -93,24 +91,6 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
     } catch (IOException e) {
       return BlockVerificationResult.failIncomplete(e.getMessage());
     }
-  }
-
-  public ContainerDataProto getContainerData(DatanodeDetails dn, OmKeyLocationInfo keyLocation,
-                                             int replicaIndex, ContainerInfoToken containerInfoToken)
-      throws IOException {
-    long containerId = containerInfoToken.getContainerInfo().getContainerID();
-    ReplicaKey key = new ReplicaKey(dn, containerId);
-    ContainerDataProto cachedData = containerDataCache.getIfPresent(key);
-    if (cachedData != null) {
-      return cachedData;
-    }
-    // Cache miss - fetch and store
-    ContainerDataProto data = fetchContainerDataFromDatanode(dn, containerId, keyLocation,
-        replicaIndex, containerInfoToken);
-    if (data != null) {
-      containerDataCache.put(key, data);
-    }
-    return data;
   }
 
   private ContainerDataProto fetchContainerDataFromDatanode(DatanodeDetails dn, long containerId,
@@ -142,7 +122,7 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
     return response.getContainerData();
   }
 
-  public ContainerInfoToken getContainerInfoToken(long containerId)
+  private ContainerInfoToken getContainerInfoToken(long containerId)
       throws IOException {
     ContainerInfoToken cachedData = encodedTokenCache.getIfPresent(containerId);
     if (cachedData != null) {
@@ -151,72 +131,45 @@ public class ReplicaStateVerifier implements ReplicaVerifier {
     // Cache miss - fetch and store
     ContainerInfo info = containerOperationClient.getContainer(containerId);
     String encodeToken = containerOperationClient.getEncodedContainerToken(containerId);
-    cachedData = new ContainerInfoToken(info, encodeToken);
+    cachedData = new ContainerInfoToken(info.getState(), encodeToken);
     encodedTokenCache.put(containerId, cachedData);
     return cachedData;
   }
-}
 
-class ReplicaKey {
-  private final DatanodeDetails datanode;
-  private final long containerID;
+  private class ContainerInfoToken {
+    private HddsProtos.LifeCycleState state;
+    private final String encodedToken;
 
-  ReplicaKey(DatanodeDetails datanode, long containerID) {
-    this.datanode = datanode;
-    this.containerID = containerID;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
+    ContainerInfoToken(HddsProtos.LifeCycleState lifeState, String token) {
+      this.state = lifeState;
+      this.encodedToken = token;
     }
-    if (!(o instanceof ReplicaKey)) {
-      return false;
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof ContainerInfoToken)) {
+        return false;
+      }
+      ContainerInfoToken key = (ContainerInfoToken) o;
+      return Objects.equals(state, key.state) &&
+          Objects.equals(encodedToken, key.encodedToken);
     }
-    ReplicaKey key = (ReplicaKey) o;
-    return Objects.equals(datanode, key.datanode) &&
-        Objects.equals(containerID, key.containerID);
-  }
 
-  @Override
-  public int hashCode() {
-    return Objects.hash(datanode, containerID);
-  }
-}
-
-class ContainerInfoToken {
-  private final ContainerInfo containerInfo;
-  private final String encodedToken;
-
-  ContainerInfoToken(ContainerInfo info, String token) {
-    this.containerInfo = info;
-    this.encodedToken = token;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
+    @Override
+    public int hashCode() {
+      return Objects.hash(state, encodedToken);
     }
-    if (!(o instanceof ContainerInfoToken)) {
-      return false;
+
+    public HddsProtos.LifeCycleState getContainerState() {
+      return state;
     }
-    ContainerInfoToken key = (ContainerInfoToken) o;
-    return Objects.equals(containerInfo, key.containerInfo) &&
-        Objects.equals(encodedToken, key.encodedToken);
+
+    public String getEncodedToken() {
+      return encodedToken;
+    }
   }
 
-  @Override
-  public int hashCode() {
-    return Objects.hash(containerInfo, encodedToken);
-  }
-
-  public ContainerInfo getContainerInfo() {
-    return containerInfo;
-  }
-
-  public String getEncodedToken() {
-    return encodedToken;
-  }
 }
