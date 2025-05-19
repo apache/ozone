@@ -529,7 +529,7 @@ public class BucketEndpoint extends EndpointBase {
       OzoneVolume volume = getVolume();
       // TODO: use bucket owner instead of volume owner here once bucket owner
       // TODO: is supported.
-      S3Owner owner = new S3Owner(volume.getOwner(), volume.getOwner());
+      S3Owner owner = S3Owner.of(volume.getOwner());
       result.setOwner(owner);
 
       // TODO: remove this duplication avoid logic when ACCESS and DEFAULT scope
@@ -745,10 +745,8 @@ public class BucketEndpoint extends EndpointBase {
       keyMetadata.setStorageClass(S3StorageType.STANDARD.toString());
     }
     keyMetadata.setLastModified(next.getModificationTime());
-    String ownerName = next.getOwner();
-    String displayName = ownerName;
-    // Use ownerName to fill displayName
-    keyMetadata.setOwner(new S3Owner(ownerName, displayName));
+    String displayName = next.getOwner();
+    keyMetadata.setOwner(S3Owner.of(displayName));
     response.addKey(keyMetadata);
   }
 

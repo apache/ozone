@@ -144,4 +144,10 @@ public class TestS3Utils {
             "INVALID", ratis3ReplicationConfig, ratis1ReplicationConfig));
   }
 
+  @Test
+  public void testGenerateCanonicalUserId() {
+    assertEquals("bb2bd7ca4a327f84e6cd3979f8fa3828a50a08893c1b68f9d6715352c8d07b93",
+        S3Utils.generateCanonicalUserId("ozone"));
+  }
+
 }
