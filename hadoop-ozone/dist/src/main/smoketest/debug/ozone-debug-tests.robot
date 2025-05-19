@@ -27,7 +27,6 @@ ${VOLUME}           cli-debug-volume${PREFIX}
 ${BUCKET}           cli-debug-bucket
 ${DEBUGKEY}         debugKey
 ${TESTFILE}         testfile
-${OM_SERVICE_ID}    %{OM_SERVICE_ID}
 
 *** Keywords ***
 Write keys
