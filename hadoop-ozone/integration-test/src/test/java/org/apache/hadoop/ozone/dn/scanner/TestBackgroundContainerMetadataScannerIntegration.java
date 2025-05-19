@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.dn.scanner;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CONTAINER_DIR;
 import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
@@ -103,6 +104,7 @@ class TestBackgroundContainerMetadataScannerIntegration
     long openContainerID = writeDataToOpenContainer();
     Container<?> openContainer = getDnContainer(openContainerID);
     assertEquals(State.OPEN, openContainer.getContainerState());
+    waitForScmToSeeReplicaState(openContainerID, OPEN);
     // Open containers should not yet have a checksum generated.
     assertEquals(0, getContainerReplica(openContainerID).getDataChecksum());
 
@@ -127,9 +129,11 @@ class TestBackgroundContainerMetadataScannerIntegration
     if (corruption == MISSING_METADATA_DIR || corruption == MISSING_CONTAINER_DIR) {
       // In these cases the tree cannot be generated when the container is marked unhealthy and the checksum should
       // remain at 0.
+      // The tree is generated from metadata by the container changing to unhealthy, not by the metadata scanner.
       assertEquals(0, getContainerReplica(openContainerID).getDataChecksum());
     } else {
       // The checksum will be generated for the first time when the container is marked unhealthy.
+      // The tree is generated from metadata by the container changing to unhealthy, not by the metadata scanner.
       assertNotEquals(0, getContainerReplica(openContainerID).getDataChecksum());
     }
 
