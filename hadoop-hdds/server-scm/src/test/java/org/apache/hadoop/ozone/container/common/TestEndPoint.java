@@ -41,6 +41,7 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CloseContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
@@ -394,9 +395,9 @@ public class TestEndPoint {
           .register(nodeToRegister.getExtendedProtoBufMessage(), HddsTestUtils
                   .createNodeReport(
                       Arrays.asList(getStorageReports(
-                          nodeToRegister.getUuid())),
+                          nodeToRegister.getID())),
                       Arrays.asList(getMetadataStorageReports(
-                          nodeToRegister.getUuid()))),
+                          nodeToRegister.getID()))),
               HddsTestUtils.getRandomContainerReports(10),
               HddsTestUtils.getRandomPipelineReports(),
               defaultLayoutVersionProto());
@@ -408,13 +409,13 @@ public class TestEndPoint {
     }
   }
 
-  private StorageReportProto getStorageReports(UUID id) {
+  private StorageReportProto getStorageReports(DatanodeID id) {
     String storagePath = testDir.getAbsolutePath() + "/data-" + id;
     return HddsTestUtils.createStorageReport(id, storagePath, 100, 10, 90,
         null);
   }
 
-  private MetadataStorageReportProto getMetadataStorageReports(UUID id) {
+  private MetadataStorageReportProto getMetadataStorageReports(DatanodeID id) {
     String storagePath = testDir.getAbsolutePath() + "/metadata-" + id;
     return HddsTestUtils.createMetadataStorageReport(storagePath, 100, 10, 90,
         null);
@@ -423,7 +424,7 @@ public class TestEndPoint {
   private RegisterEndpointTask getRegisterEndpointTask(boolean clearDatanodeDetails, OzoneConfiguration conf,
                                                        EndpointStateMachine rpcEndPoint) throws Exception {
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
-    UUID datanodeID = UUID.randomUUID();
+    DatanodeID datanodeID = DatanodeID.randomID();
     when(ozoneContainer.getNodeReport()).thenReturn(HddsTestUtils
         .createNodeReport(Arrays.asList(getStorageReports(datanodeID)),
             Arrays.asList(getMetadataStorageReports(datanodeID))));
@@ -519,8 +520,8 @@ public class TestEndPoint {
       SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(dataNode.getProtoBufMessage())
           .setNodeReport(HddsTestUtils.createNodeReport(
-              Arrays.asList(getStorageReports(dataNode.getUuid())),
-              Arrays.asList(getMetadataStorageReports(dataNode.getUuid()))))
+              Arrays.asList(getStorageReports(dataNode.getID())),
+              Arrays.asList(getMetadataStorageReports(dataNode.getID()))))
           .build();
 
       SCMHeartbeatResponseProto responseProto = rpcEndPoint.getEndPoint()
@@ -542,8 +543,8 @@ public class TestEndPoint {
       SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(dataNode.getProtoBufMessage())
           .setNodeReport(HddsTestUtils.createNodeReport(
-              Arrays.asList(getStorageReports(dataNode.getUuid())),
-              Arrays.asList(getMetadataStorageReports(dataNode.getUuid()))))
+              Arrays.asList(getStorageReports(dataNode.getID())),
+              Arrays.asList(getMetadataStorageReports(dataNode.getID()))))
           .build();
 
       SCMHeartbeatResponseProto responseProto = rpcEndPoint.getEndPoint()

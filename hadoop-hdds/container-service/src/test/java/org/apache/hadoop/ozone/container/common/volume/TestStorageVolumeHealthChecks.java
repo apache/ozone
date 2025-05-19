@@ -116,7 +116,6 @@ public class TestStorageVolumeHealthChecks {
     verifyFullVolumeHealthWithDiskReadWriteStatus(builder, true, false);
   }
 
-
   public void verifyFullVolumeHealthWithDiskReadWriteStatus(StorageVolume.Builder<?> builder, boolean... checkResult)
       throws Exception {
 

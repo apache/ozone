@@ -274,6 +274,8 @@ public final class OmUtils {
     case TransferLeadership:
     case SetSafeMode:
     case PrintCompactionLogDag:
+      // printCompactionLogDag is deprecated by HDDS-12053,
+      // keeping it here for compatibility
     case GetSnapshotInfo:
     case GetObjectTagging:
     case GetQuotaRepairStatus:
@@ -834,7 +836,6 @@ public final class OmUtils {
     return normalizedPath.toString();
   }
 
-
   /**
    * For a given service ID, return list of configured OM hosts.
    * @param conf configuration
@@ -920,10 +921,10 @@ public final class OmUtils {
     }
     printString.append(omList.get(0).getOMPrintInfo());
     for (int i = 1; i < omList.size(); i++) {
-      printString.append(",")
+      printString.append(',')
           .append(omList.get(i).getOMPrintInfo());
     }
-    printString.append("]");
+    printString.append(']');
     return printString.toString();
   }
 

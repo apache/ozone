@@ -74,6 +74,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
@@ -322,7 +323,7 @@ public class TestSCMNodeManager {
     DatanodeDetails details = MockDatanodeDetails.randomDatanodeDetails();
 
     StorageReportProto storageReport =
-        HddsTestUtils.createStorageReport(details.getUuid(),
+        HddsTestUtils.createStorageReport(details.getID(),
             details.getNetworkFullPath(), Long.MAX_VALUE);
     MetadataStorageReportProto metadataStorageReport =
         HddsTestUtils.createMetadataStorageReport(details.getNetworkFullPath(),
@@ -435,7 +436,7 @@ public class TestSCMNodeManager {
       // creation, they will fail with not enough healthy nodes for ratis 3
       // pipeline. Therefore we do not have to worry about this create call
       // failing due to datanodes reaching their maximum pipeline limit.
-      assertPipelineCreationFailsWithNotEnoughNodes(1);
+      assertPipelineCreationFailsWithExceedingLimit(2);
 
       // Heartbeat bad MLV nodes back to healthy.
       nodeManager.processLayoutVersionReport(badMlvNode1, CORRECT_LAYOUT_PROTO);
@@ -465,6 +466,19 @@ public class TestSCMNodeManager {
     }, "3 nodes should not have been found for a pipeline.");
     assertThat(ex.getMessage()).contains("Required 3. Found " +
         actualNodeCount);
+  }
+
+  private void assertPipelineCreationFailsWithExceedingLimit(int limit) {
+    // Build once, outside the assertion
+    ReplicationConfig config = ReplicationConfig.fromProtoTypeAndFactor(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.THREE);
+    SCMException ex = assertThrows(
+        SCMException.class,
+        () -> scm.getPipelineManager().createPipeline(config),
+        "3 nodes should not have been found for a pipeline.");
+    assertThat(ex.getMessage())
+        .contains("Cannot create pipeline as it would exceed the limit per datanode: " + limit);
   }
 
   private void assertPipelines(HddsProtos.ReplicationFactor factor,
@@ -932,7 +946,7 @@ public class TestSCMNodeManager {
       // should be instructed to finalize.
       verify(eventPublisher, times(1))
           .fireEvent(eq(DATANODE_COMMAND), captor.capture());
-      assertEquals(captor.getValue().getDatanodeId(), node1.getUuid());
+      assertEquals(captor.getValue().getDatanodeId(), node1.getID());
       assertEquals(captor.getValue().getCommand().getType(),
           finalizeNewLayoutVersionCommand);
     } else {
@@ -962,11 +976,11 @@ public class TestSCMNodeManager {
     verify(eventPublisher,
         times(1)).fireEvent(NEW_NODE, node1);
     for (int i = 0; i < 3; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(), ReplicateContainerCommand
+      nodeManager.addDatanodeCommand(node1.getID(), ReplicateContainerCommand
           .toTarget(1, MockDatanodeDetails.randomDatanodeDetails()));
     }
     for (int i = 0; i < 5; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(),
+      nodeManager.addDatanodeCommand(node1.getID(),
           new DeleteBlocksCommand(emptyList()));
     }
 
@@ -1022,7 +1036,7 @@ public class TestSCMNodeManager {
 
     // Add a a few more commands to the queue and check the counts are the sum.
     for (int i = 0; i < 5; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(),
+      nodeManager.addDatanodeCommand(node1.getID(),
           new CloseContainerCommand(1, PipelineID.randomId()));
     }
     assertEquals(0, nodeManager.getTotalDatanodeCommandCount(
@@ -1056,11 +1070,11 @@ public class TestSCMNodeManager {
             HddsProtos.ReplicationFactor.THREE, emptyList());
 
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, closeContainerCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), closeContainerCommand), null);
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, closeContainerCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), closeContainerCommand), null);
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, createPipelineCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), createPipelineCommand), null);
 
     assertEquals(2, nodeManager.getCommandQueueCount(
         datanode1, SCMCommandProto.Type.closeContainerCommand));
@@ -1487,7 +1501,7 @@ public class TestSCMNodeManager {
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
         dnList.add(dn);
-        UUID dnId = dn.getUuid();
+        DatanodeID dnId = dn.getID();
         long free = capacity - used;
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
         StorageReportProto report = HddsTestUtils
@@ -1509,7 +1523,7 @@ public class TestSCMNodeManager {
   }
 
   private List<StorageReportProto> generateStorageReportProto(
-      int volumeCount, UUID dnId, long capacity, long used, long remaining) {
+      int volumeCount, DatanodeID dnId, long capacity, long used, long remaining) {
     List<StorageReportProto> reports = new ArrayList<>(volumeCount);
     boolean failed = true;
     for (int x = 0; x < volumeCount; x++) {
@@ -1539,7 +1553,7 @@ public class TestSCMNodeManager {
       long used, long remaining, int volumeCount, String totalCapacity,
           String scmUsedPerc, String nonScmUsedPerc) {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-    UUID dnId = dn.getUuid();
+    DatanodeID dnId = dn.getID();
     List<StorageReportProto> reports = volumeCount > 0 ?
         generateStorageReportProto(volumeCount, dnId, perCapacity,
             used, remaining) : null;
@@ -1573,7 +1587,7 @@ public class TestSCMNodeManager {
       EventQueue eventQueue = (EventQueue) scm.getEventQueue();
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       dnList.add(dn);
-      UUID dnId = dn.getUuid();
+      DatanodeID dnId = dn.getID();
       long free = capacity - used;
       List<StorageReportProto> reports = new ArrayList<>(volumeCount);
       boolean failed = true;
@@ -1626,7 +1640,7 @@ public class TestSCMNodeManager {
       EventPublisher publisher = mock(EventPublisher.class);
       final long capacity = 2000;
       final long usedPerHeartbeat = 100;
-      UUID dnId = datanodeDetails.getUuid();
+      DatanodeID dnId = datanodeDetails.getID();
       for (int x = 0; x < heartbeatCount; x++) {
         long scmUsed = x * usedPerHeartbeat;
         long remaining = capacity - scmUsed;
@@ -1745,7 +1759,7 @@ public class TestSCMNodeManager {
         100, TimeUnit.MILLISECONDS);
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
-    UUID dnId = datanodeDetails.getUuid();
+    DatanodeID dnId = datanodeDetails.getID();
     String storagePath = testDir.getAbsolutePath() + "/" + dnId;
     StorageReportProto report =
         HddsTestUtils.createStorageReport(dnId, storagePath, 100, 10, 90, null);
@@ -1759,7 +1773,7 @@ public class TestSCMNodeManager {
               Arrays.asList(report), emptyList()),
                   HddsTestUtils.getRandomPipelineReports());
       eq.fireEvent(DATANODE_COMMAND,
-          new CommandForDatanode<>(datanodeDetails.getUuid(),
+          new CommandForDatanode<>(datanodeDetails,
               new CloseContainerCommand(1L,
                   PipelineID.randomId())));
 
@@ -1814,7 +1828,7 @@ public class TestSCMNodeManager {
       assertEquals(nodeCount, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
-      List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
       nodeList.forEach(node -> assertTrue(
           node.getNetworkLocation().startsWith("/rack1/ng")));
       nodeList.forEach(node -> assertNotNull(node.getParent()));
@@ -1858,7 +1872,7 @@ public class TestSCMNodeManager {
           nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(3, clusterMap.getMaxLevel());
-      List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
       nodeList.forEach(node ->
           assertEquals("/rack1", node.getNetworkLocation()));
 
@@ -1885,7 +1899,7 @@ public class TestSCMNodeManager {
       final long capacity = 2000;
       final long used = 100;
       final long remaining = 1900;
-      UUID dnId = datanodeDetails.getUuid();
+      DatanodeID dnId = datanodeDetails.getID();
       String storagePath = testDir.getAbsolutePath() + "/" + dnId;
       StorageReportProto report = HddsTestUtils
           .createStorageReport(dnId, storagePath, capacity, used,
@@ -2005,7 +2019,7 @@ public class TestSCMNodeManager {
               nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(1, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
-      List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
       assertEquals(1, nodeList.size());
 
       DatanodeDetails returnedNode = nodeList.get(0);
@@ -2025,7 +2039,7 @@ public class TestSCMNodeManager {
       assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(1, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
-      List<DatanodeDetails> updatedNodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> updatedNodeList = nodeManager.getAllNodes();
       assertEquals(1, updatedNodeList.size());
 
       DatanodeDetails returnedUpdatedNode = updatedNodeList.get(0);

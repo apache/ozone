@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
  */
 public final class SafeModeRuleFactory {
 
-
   private final ConfigurationSource config;
   private final SCMContext scmContext;
   private final EventQueue eventQueue;
@@ -83,7 +82,7 @@ public final class SafeModeRuleFactory {
 
     if (pipelineManager != null) {
       safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue, pipelineManager,
-          safeModeManager, config, scmContext));
+          safeModeManager, config, scmContext, nodeManager));
       safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
           safeModeManager, config));
     }
@@ -117,5 +116,13 @@ public final class SafeModeRuleFactory {
 
   public List<SafeModeExitRule<?>> getPreCheckRules() {
     return preCheckRules;
+  }
+
+  public <T extends SafeModeExitRule<?>> T getSafeModeRule(Class<T> ruleClass) {
+    return safeModeRules.stream()
+        .filter(r -> ruleClass.isAssignableFrom(r.getClass()))
+        .map(ruleClass::cast)
+        .findFirst()
+        .orElse(null);
   }
 }

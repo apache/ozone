@@ -19,15 +19,16 @@ package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.isBlockLocationInfoSame;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -63,7 +64,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.util.Preconditions;
 
 /**
  * Abstracts common code from KeyDeletingService and DirectoryDeletingService
@@ -81,6 +81,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
   private final AtomicLong runCount;
+  private final AtomicLong callId;
   private final BootstrapStateHandler.Lock lock =
       new BootstrapStateHandler.Lock();
 
@@ -97,11 +98,11 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.runCount = new AtomicLong(0);
     this.metrics = ozoneManager.getDeletionMetrics();
     this.perfMetrics = ozoneManager.getPerfMetrics();
+    this.callId = new AtomicLong(0);
   }
 
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
-      KeyManager manager,
-      HashMap<String, RepeatedOmKeyInfo> keysToModify,
+      Map<String, RepeatedOmKeyInfo> keysToModify,
       String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
 
     long startTime = Time.monotonicNow();
@@ -141,30 +142,33 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
   private int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-      HashMap<String, RepeatedOmKeyInfo> keysToModify, String snapTableKey, UUID expectedPreviousSnapshotId) {
-    Map<Pair<String, String>, List<String>> purgeKeysMapPerBucket =
-        new HashMap<>();
+      Map<String, RepeatedOmKeyInfo> keysToModify, String snapTableKey, UUID expectedPreviousSnapshotId) {
+    List<String> purgeKeys = new ArrayList<>();
 
     // Put all keys to be purged in a list
     int deletedCount = 0;
+    Set<String> failedDeletedKeys = new HashSet<>();
     for (DeleteBlockGroupResult result : results) {
+      String deletedKey = result.getObjectKey();
       if (result.isSuccess()) {
         // Add key to PurgeKeys list.
-        String deletedKey = result.getObjectKey();
         if (keysToModify != null && !keysToModify.containsKey(deletedKey)) {
           // Parse Volume and BucketName
-          addToMap(purgeKeysMapPerBucket, deletedKey);
+          purgeKeys.add(deletedKey);
           if (LOG.isDebugEnabled()) {
             LOG.debug("Key {} set to be updated in OM DB, Other versions " +
                 "of the key that are reclaimable are reclaimed.", deletedKey);
           }
         } else if (keysToModify == null) {
-          addToMap(purgeKeysMapPerBucket, deletedKey);
+          purgeKeys.add(deletedKey);
           if (LOG.isDebugEnabled()) {
             LOG.debug("Key {} set to be purged from OM DB", deletedKey);
           }
         }
         deletedCount++;
+      } else {
+        // If the block deletion failed, then the deleted keys should also not be modified.
+        failedDeletedKeys.add(deletedKey);
       }
     }
 
@@ -178,24 +182,20 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
     }
     purgeKeysRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
-
-    // Add keys to PurgeKeysRequest bucket wise.
-    for (Map.Entry<Pair<String, String>, List<String>> entry :
-        purgeKeysMapPerBucket.entrySet()) {
-      Pair<String, String> volumeBucketPair = entry.getKey();
-      DeletedKeys deletedKeysInBucket = DeletedKeys.newBuilder()
-          .setVolumeName(volumeBucketPair.getLeft())
-          .setBucketName(volumeBucketPair.getRight())
-          .addAllKeys(entry.getValue())
-          .build();
-      purgeKeysRequest.addDeletedKeys(deletedKeysInBucket);
-    }
+    DeletedKeys deletedKeys = DeletedKeys.newBuilder()
+        .setVolumeName("")
+        .setBucketName("")
+        .addAllKeys(purgeKeys)
+        .build();
+    purgeKeysRequest.addDeletedKeys(deletedKeys);
 
     List<SnapshotMoveKeyInfos> keysToUpdateList = new ArrayList<>();
     if (keysToModify != null) {
       for (Map.Entry<String, RepeatedOmKeyInfo> keyToModify :
           keysToModify.entrySet()) {
-
+        if (failedDeletedKeys.contains(keyToModify.getKey())) {
+          continue;
+        }
         SnapshotMoveKeyInfos.Builder keyToUpdate =
             SnapshotMoveKeyInfos.newBuilder();
         keyToUpdate.setKey(keyToModify.getKey());
@@ -220,7 +220,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit PurgeKeys request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+      submitRequest(omRequest);
     } catch (ServiceException e) {
       LOG.error("PurgeKey request failed. Will retry at next run.", e);
       return 0;
@@ -229,28 +229,13 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return deletedCount;
   }
 
-  /**
-   * Parse Volume and Bucket Name from ObjectKey and add it to given map of
-   * keys to be purged per bucket.
-   */
-  private void addToMap(Map<Pair<String, String>, List<String>> map, String objectKey) {
-    // Parse volume and bucket name
-    String[] split = objectKey.split(OM_KEY_PREFIX);
-    Preconditions.assertTrue(split.length >= 3, "Volume and/or Bucket Name " +
-        "missing from Key Name " + objectKey);
-    if (split.length == 3) {
-      LOG.warn("{} missing Key Name", objectKey);
-    }
-    Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
-    if (!map.containsKey(volumeBucketPair)) {
-      map.put(volumeBucketPair, new ArrayList<>());
-    }
-    map.get(volumeBucketPair).add(objectKey);
+  protected OzoneManagerProtocolProtos.OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
+    return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callId.incrementAndGet());
   }
 
   protected void submitPurgePaths(List<PurgePathRequest> requests,
                                   String snapTableKey,
-                                  UUID expectedPreviousSnapshotId, long rnCnt) {
+                                  UUID expectedPreviousSnapshotId) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -275,7 +260,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit Purge paths request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, rnCnt);
+      submitRequest(omRequest);
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.", e);
     }
@@ -403,7 +388,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, rnCnt);
+      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
@@ -611,6 +596,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   @VisibleForTesting
   public AtomicLong getRunCount() {
     return runCount;
+  }
+
+  public AtomicLong getCallId() {
+    return callId;
   }
 
   /**

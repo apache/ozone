@@ -316,7 +316,7 @@ public class TestDecommissionAndMaintenance {
     // Generate some data on the empty cluster to create some containers
     generateData(20, "key", ratisRepConfig);
 
-    final List<DatanodeDetails> toDecommission = nm.getAllNodes();
+    final List<? extends DatanodeDetails> toDecommission = nm.getAllNodes();
 
     // trying to decommission 5 nodes should leave the cluster with 2 nodes,
     // which is not sufficient for RATIS.THREE replication. It should not be allowed.
@@ -706,7 +706,7 @@ public class TestDecommissionAndMaintenance {
       throws Exception {
     // Generate some data on the empty cluster to create some containers
     generateData(20, "key", ratisRepConfig);
-    final List<DatanodeDetails> toMaintenance = nm.getAllNodes();
+    final List<? extends DatanodeDetails> toMaintenance = nm.getAllNodes();
 
     // trying to move 6 nodes to maintenance should leave the cluster with 1 node,
     // which is not sufficient for RATIS.THREE replication (3 - maintenanceReplicaMinimum = 2).

@@ -58,15 +58,6 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerSet.class);
 
-  public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
-    return new ContainerSet(null, recoveringTimeout);
-  }
-
-  public static ContainerSet newRwContainerSet(Table<ContainerID, String> containerIdsTable, long recoveringTimeout) {
-    Objects.requireNonNull(containerIdsTable, "containerIdsTable == null");
-    return new ContainerSet(containerIdsTable, recoveringTimeout);
-  }
-
   private final ConcurrentSkipListMap<Long, Container<?>> containerMap = new
       ConcurrentSkipListMap<>();
   private final ConcurrentSkipListSet<Long> missingContainerSet =
@@ -76,6 +67,15 @@ public class ContainerSet implements Iterable<Container<?>> {
   private final Clock clock;
   private long recoveringTimeout;
   private final Table<ContainerID, String> containerIdsTable;
+
+  public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
+    return new ContainerSet(null, recoveringTimeout);
+  }
+
+  public static ContainerSet newRwContainerSet(Table<ContainerID, String> containerIdsTable, long recoveringTimeout) {
+    Objects.requireNonNull(containerIdsTable, "containerIdsTable == null");
+    return new ContainerSet(containerIdsTable, recoveringTimeout);
+  }
 
   private ContainerSet(Table<ContainerID, String> continerIdsTable, long recoveringTimeout) {
     this(continerIdsTable, recoveringTimeout, null);
@@ -154,8 +154,6 @@ public class ContainerSet implements Iterable<Container<?>> {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }
       missingContainerSet.remove(containerId);
-      // wish we could have done this from ContainerData.setState
-      container.getContainerData().commitSpace();
       if (container.getContainerData().getState() == RECOVERING) {
         recoveringContainerMap.put(
             clock.millis() + recoveringTimeout, containerId);

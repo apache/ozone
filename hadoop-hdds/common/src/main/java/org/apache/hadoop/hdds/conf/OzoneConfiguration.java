@@ -60,8 +60,7 @@ import org.slf4j.Logger;
  * Configuration for ozone.
  */
 @InterfaceAudience.Private
-public class OzoneConfiguration extends Configuration
-    implements MutableConfigurationSource {
+public class OzoneConfiguration extends Configuration implements MutableConfigurationSource {
 
   public static final SortedSet<String> TAGS = unmodifiableSortedSet(
       Arrays.stream(ConfigTag.values())
@@ -73,6 +72,8 @@ public class OzoneConfiguration extends Configuration
 
     activate();
   }
+
+  private Properties delegatingProps;
 
   public static OzoneConfiguration of(ConfigurationSource source) {
     if (source instanceof LegacyHadoopConfigurationSource) {
@@ -408,6 +409,8 @@ public class OzoneConfiguration extends Configuration
             HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
         new DeprecationDelta("dfs.metrics.percentiles.intervals",
             HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY),
+        new DeprecationDelta("hdds.recon.heartbeat.interval",
+            HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL),
     });
   }
 
@@ -433,8 +436,6 @@ public class OzoneConfiguration extends Configuration
     }
     return Integer.parseInt(value);
   }
-
-  private Properties delegatingProps;
 
   @Override
   public synchronized void reloadConfiguration() {

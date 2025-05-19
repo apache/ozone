@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,19 +40,16 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.AclTests;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test recursive acl checks for delete and rename for FSO Buckets.
  */
-@Timeout(120)
 public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
 
   private static final String UNIQUE = UUID.randomUUID().toString();
@@ -127,8 +123,8 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       String keyf4 = "a/b2/d2/d21/f4";
       String keyf5 = "/a/b3/e1/f5";
       String keyf6 = "/a/b3/e2/f6";
-      String file1 = "a/" + "file" + RandomStringUtils.randomNumeric(5);
-      String file2 = "a/b2/d2/" + "file" + RandomStringUtils.randomNumeric(5);
+      String file1 = "a/" + "file" + RandomStringUtils.secure().nextNumeric(5);
+      String file2 = "a/b2/d2/" + "file" + RandomStringUtils.secure().nextNumeric(5);
 
       keys.add(keyf1);
       keys.add(keyf2);
@@ -215,12 +211,12 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       List<OzoneAcl> acls = objectStore.getAcl(obj);
       assertEquals(3, acls.size());
       assertEquals(AclTests.ADMIN_UGI.getShortUserName(), acls.get(0).getName());
-      OzoneAclConfig aclConfig = cluster().getConf().getObject(OzoneAclConfig.class);
-      assertArrayEquals(aclConfig.getUserDefaultRights(), acls.get(0).getAclList().toArray());
+      OmConfig omConfig = cluster().getOzoneManager().getConfig();
+      assertEquals(omConfig.getUserDefaultRights(), acls.get(0).getAclSet());
       assertEquals(AclTests.ADMIN_UGI.getPrimaryGroupName(), acls.get(1).getName());
-      assertArrayEquals(aclConfig.getGroupDefaultRights(), acls.get(1).getAclList().toArray());
+      assertEquals(omConfig.getGroupDefaultRights(), acls.get(1).getAclSet());
       assertEquals("WORLD", acls.get(2).getName());
-      assertArrayEquals(aclConfig.getUserDefaultRights(), acls.get(2).getAclList().toArray());
+      assertEquals(omConfig.getUserDefaultRights(), acls.get(2).getAclSet());
     }
 
     // set LoginUser as user3
@@ -241,10 +237,10 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       List<OzoneAcl> acls = objectStore.getAcl(obj);
       assertEquals(2, acls.size());
       assertEquals(user3.getShortUserName(), acls.get(0).getName());
-      OzoneAclConfig aclConfig = cluster().getConf().getObject(OzoneAclConfig.class);
-      assertArrayEquals(aclConfig.getUserDefaultRights(), acls.get(0).getAclList().toArray());
+      OmConfig omConfig = cluster().getOzoneManager().getConfig();
+      assertEquals(omConfig.getUserDefaultRights(), acls.get(0).getAclSet());
       assertEquals(user3.getPrimaryGroupName(), acls.get(1).getName());
-      assertArrayEquals(aclConfig.getGroupDefaultRights(), acls.get(1).getAclList().toArray());
+      assertEquals(omConfig.getGroupDefaultRights(), acls.get(1).getAclSet());
 
       // verify key default ACLs
       int length = 10;
@@ -258,9 +254,9 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       acls = objectStore.getAcl(obj);
       assertEquals(2, acls.size());
       assertEquals(user3.getShortUserName(), acls.get(0).getName());
-      assertArrayEquals(aclConfig.getUserDefaultRights(), acls.get(0).getAclList().toArray());
+      assertEquals(omConfig.getUserDefaultRights(), acls.get(0).getAclSet());
       assertEquals(user3.getPrimaryGroupName(), acls.get(1).getName());
-      assertArrayEquals(aclConfig.getGroupDefaultRights(), acls.get(1).getAclList().toArray());
+      assertEquals(omConfig.getGroupDefaultRights(), acls.get(1).getAclSet());
     }
   }
 

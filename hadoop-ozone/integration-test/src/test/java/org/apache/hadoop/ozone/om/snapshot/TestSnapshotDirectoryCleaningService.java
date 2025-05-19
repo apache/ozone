@@ -56,14 +56,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test Snapshot Directory Service.
  */
-@Timeout(300)
 public class TestSnapshotDirectoryCleaningService {
 
   private static final Logger LOG =
@@ -236,17 +234,18 @@ public class TestSnapshotDirectoryCleaningService {
         put("snap2", 5L);
         put("snap3", 0L);
       }};
-    Thread.sleep(500);
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
         iterator = snapshotInfoTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
         String snapshotName = snapshotEntry.getValue().getName();
-        assertEquals(expectedSize.get(snapshotName), snapshotEntry.getValue().
-            getExclusiveSize());
+        SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotEntry.getKey());
+        System.out.println(snapshotInfo.getName() + " " + snapshotInfo.getDeepCleanedDeletedDir());
+        assertEquals(expectedSize.get(snapshotName),
+            snapshotInfo.getExclusiveSize() + snapshotInfo.getExclusiveSizeDeltaFromDirDeepCleaning());
         // Since for the test we are using RATIS/THREE
         assertEquals(expectedSize.get(snapshotName) * 3,
-            snapshotEntry.getValue().getExclusiveReplicatedSize());
+            snapshotInfo.getExclusiveReplicatedSize() + snapshotInfo.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning());
 
       }
     }

@@ -2,6 +2,7 @@ share/ozone/lib/aircompressor.jar
 share/ozone/lib/animal-sniffer-annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/annotations.jar
+share/ozone/lib/apache-log4j-extras.jar
 share/ozone/lib/aopalliance.jar
 share/ozone/lib/aopalliance-repackaged.jar
 share/ozone/lib/asm-analysis.jar
@@ -32,7 +33,6 @@ share/ozone/lib/commons-digester.jar
 share/ozone/lib/commons-io.jar
 share/ozone/lib/commons-lang3.jar
 share/ozone/lib/commons-lang.jar
-share/ozone/lib/commons-logging.jar
 share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
@@ -73,8 +73,6 @@ share/ozone/lib/hdds-config.jar
 share/ozone/lib/hdds-container-service.jar
 share/ozone/lib/hdds-docs.jar
 share/ozone/lib/hdds-erasurecode.jar
-share/ozone/lib/hdds-hadoop-dependency-client.jar
-share/ozone/lib/hdds-hadoop-dependency-server.jar
 share/ozone/lib/hdds-interface-admin.jar
 share/ozone/lib/hdds-interface-client.jar
 share/ozone/lib/hdds-interface-server.jar
@@ -82,7 +80,6 @@ share/ozone/lib/hdds-rocks-native.jar
 share/ozone/lib/hdds-managed-rocksdb.jar
 share/ozone/lib/hdds-server-framework.jar
 share/ozone/lib/hdds-server-scm.jar
-share/ozone/lib/hdds-tools.jar
 share/ozone/lib/hk2-api.jar
 share/ozone/lib/hk2-locator.jar
 share/ozone/lib/hk2-utils.jar
@@ -123,6 +120,7 @@ share/ozone/lib/javax.interceptor-api.jar
 share/ozone/lib/javax.servlet-api.jar
 share/ozone/lib/jaxb-runtime.jar
 share/ozone/lib/jcip-annotations.jar
+share/ozone/lib/jcl-over-slf4j.jar
 share/ozone/lib/jersey-cdi1x.jar
 share/ozone/lib/jersey-client.jar
 share/ozone/lib/jersey-client.jar
@@ -219,6 +217,7 @@ share/ozone/lib/orc-core.jar
 share/ozone/lib/orc-shims.jar
 share/ozone/lib/osgi-resource-locator.jar
 share/ozone/lib/ozone-client.jar
+share/ozone/lib/ozone-cli-admin.jar
 share/ozone/lib/ozone-cli-shell.jar
 share/ozone/lib/ozone-common.jar
 share/ozone/lib/ozone-csi.jar
@@ -226,9 +225,10 @@ share/ozone/lib/ozone-datanode.jar
 share/ozone/lib/ozone-filesystem-common.jar
 share/ozone/lib/ozone-filesystem-hadoop2.jar
 share/ozone/lib/ozone-filesystem-hadoop3.jar
-share/ozone/lib/ozone-filesystem.jar
-share/ozone/lib/ozone-httpfsgateway.jar
 share/ozone/lib/ozone-filesystem-hadoop3-client.jar
+share/ozone/lib/ozone-filesystem.jar
+share/ozone/lib/ozone-freon.jar
+share/ozone/lib/ozone-httpfsgateway.jar
 share/ozone/lib/ozone-insight.jar
 share/ozone/lib/ozone-interface-client.jar
 share/ozone/lib/ozone-interface-storage.jar

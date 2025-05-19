@@ -105,9 +105,9 @@ public class TestRocksDiffUtils {
           validSSTFileStartRange.charAt(0)) / 2));
       Set<String> sstFile = Sets.newTreeSet(validSstFile, invalidSstFile, untrackedSstFile);
       RocksDiffUtils.filterRelevantSstFiles(sstFile, ImmutableMap.of(validSSTColumnFamilyName, expectedPrefix),
-          ImmutableMap.of("validSSTFile", new CompactionNode(validSstFile, 0, 0, validSSTFileStartRange,
+          ImmutableMap.of("validSSTFile", new CompactionNode(validSstFile, 0, validSSTFileStartRange,
                   validSSTFileEndRange, validSSTColumnFamilyName), "invalidSSTFile",
-              new CompactionNode(invalidSstFile, 0, 0, invalidSSTFileStartRange,
+              new CompactionNode(invalidSstFile, 0, invalidSSTFileStartRange,
                   invalidSSTFileEndRange, invalidColumnFamilyName)));
       Assertions.assertEquals(Sets.newTreeSet(validSstFile, untrackedSstFile), sstFile);
     }

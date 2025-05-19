@@ -244,7 +244,6 @@ public abstract class BaseHttpServer {
     return builder;
   }
 
-
   /**
    * Add a servlet to BaseHttpServer.
    *
@@ -355,19 +354,18 @@ public abstract class BaseHttpServer {
     int connIdx = 0;
     if (policy.isHttpEnabled()) {
       httpAddress = httpServer.getConnectorAddress(connIdx++);
-      String realAddress = NetUtils.getHostPortString(httpAddress);
+      String realAddress = NetUtils.getHostPortString(NetUtils.getConnectAddress(httpAddress));
       conf.set(getHttpAddressKey(), realAddress);
       LOG.info("HTTP server of {} listening at http://{}", name, realAddress);
     }
 
     if (policy.isHttpsEnabled()) {
       httpsAddress = httpServer.getConnectorAddress(connIdx);
-      String realAddress = NetUtils.getHostPortString(httpsAddress);
+      String realAddress = NetUtils.getHostPortString(NetUtils.getConnectAddress(httpsAddress));
       conf.set(getHttpsAddressKey(), realAddress);
       LOG.info("HTTPS server of {} listening at https://{}", name, realAddress);
     }
   }
-
 
   public static HttpServer2.Builder loadSslConfToHttpServerBuilder(
       HttpServer2.Builder builder, ConfigurationSource sslConf) {
@@ -412,6 +410,7 @@ public abstract class BaseHttpServer {
     }
     return password;
   }
+
   /**
    * Load HTTPS-related configuration.
    */

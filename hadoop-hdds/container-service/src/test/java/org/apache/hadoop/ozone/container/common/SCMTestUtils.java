@@ -83,7 +83,6 @@ public final class SCMTestUtils {
     return rpcServer;
   }
 
-
   /**
    * Start Datanode RPC server.
    */

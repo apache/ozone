@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.s3.awssdk.v2;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -28,19 +30,32 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -48,6 +63,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
@@ -57,11 +73,21 @@ import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
 import software.amazon.awssdk.services.s3.model.CreateMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.model.Tag;
 import software.amazon.awssdk.services.s3.model.Tagging;
 import software.amazon.awssdk.services.s3.model.UploadPartRequest;
 import software.amazon.awssdk.services.s3.model.UploadPartResponse;
+import software.amazon.awssdk.transfer.s3.S3TransferManager;
+import software.amazon.awssdk.transfer.s3.model.DownloadFileRequest;
+import software.amazon.awssdk.transfer.s3.model.FileDownload;
+import software.amazon.awssdk.transfer.s3.model.ResumableFileDownload;
 
 /**
  * This is an abstract class to test the AWS Java S3 SDK operations.
@@ -82,6 +108,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
   private static MiniOzoneCluster cluster = null;
   private static S3Client s3Client = null;
+  private static S3AsyncClient s3AsyncClient = null;
 
   /**
    * Create a MiniOzoneCluster with S3G enabled for testing.
@@ -95,7 +122,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    s3Client = new S3ClientFactory(s3g.getConf()).createS3ClientV2();
+
+    S3ClientFactory s3Factory = new S3ClientFactory(s3g.getConf());
+    s3Client = s3Factory.createS3ClientV2();
+    s3AsyncClient = s3Factory.createS3AsyncClientV2();
   }
 
   /**
@@ -108,6 +138,20 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  public void listBuckets() throws Exception {
+    final String bucketName = getBucketName();
+    final String expectedOwner = UserGroupInformation.getCurrentUser().getUserName();
+
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    ListBucketsResponse syncResponse = s3Client.listBuckets();
+    assertEquals(1, syncResponse.buckets().size());
+    assertEquals(bucketName, syncResponse.buckets().get(0).name());
+    assertEquals(expectedOwner, syncResponse.owner().displayName());
+    assertEquals(expectedOwner, syncResponse.owner().id());
   }
 
   @Test
@@ -131,6 +175,116 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
     assertEquals(content, objectBytes.asUtf8String());
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
+  }
+
+  @Test
+  public void testListObjectsMany() throws Exception {
+    testListObjectsMany(false);
+  }
+
+  @Test
+  public void testListObjectsManyV2() throws Exception {
+    testListObjectsMany(true);
+  }
+
+  private void testListObjectsMany(boolean isListV2) throws Exception {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    final List<String> keyNames = Arrays.asList(
+        getKeyName("1"),
+        getKeyName("2"),
+        getKeyName("3")
+    );
+    final List<String> keyNamesWithoutETag = Arrays.asList(
+        getKeyName("4"),
+        getKeyName("5")
+    );
+    final Map<String, String> keyToEtag = new HashMap<>();
+    for (String keyName: keyNames) {
+      PutObjectResponse putObjectResponse = s3Client.putObject(b -> b
+          .bucket(bucketName)
+          .key(keyName),
+          RequestBody.fromString(RandomStringUtils.secure().nextAlphanumeric(5)));
+      keyToEtag.put(keyName, putObjectResponse.eTag());
+    }
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+
+      for (String keyNameWithoutETag : keyNamesWithoutETag) {
+        byte[] valueBytes = RandomStringUtils.secure().nextAlphanumeric(5).getBytes(StandardCharsets.UTF_8);
+        try (OzoneOutputStream out = bucket.createKey(keyNameWithoutETag,
+            valueBytes.length,
+            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+            Collections.emptyMap())) {
+          out.write(valueBytes);
+        }
+      }
+    }
+
+    List<S3Object> s3Objects;
+    String continuationToken;
+    if (isListV2) {
+      ListObjectsV2Request listObjectsRequest = ListObjectsV2Request.builder()
+          .bucket(bucketName)
+          .maxKeys(2)
+          .build();
+      ListObjectsV2Response listObjectsResponse = s3Client.listObjectsV2(listObjectsRequest);
+      s3Objects = listObjectsResponse.contents();
+      assertEquals(bucketName, listObjectsResponse.name());
+      assertTrue(listObjectsResponse.isTruncated());
+      continuationToken = listObjectsResponse.nextContinuationToken();
+    } else {
+      ListObjectsRequest listObjectsRequest = ListObjectsRequest.builder()
+          .bucket(bucketName)
+          .maxKeys(2)
+          .build();
+      ListObjectsResponse listObjectsResponse = s3Client.listObjects(listObjectsRequest);
+      s3Objects = listObjectsResponse.contents();
+      assertEquals(bucketName, listObjectsResponse.name());
+      assertTrue(listObjectsResponse.isTruncated());
+      continuationToken = listObjectsResponse.nextMarker();
+    }
+    assertThat(s3Objects).hasSize(2);
+    assertEquals(s3Objects.stream()
+        .map(S3Object::key).collect(Collectors.toList()),
+        keyNames.subList(0, 2));
+    for (S3Object s3Object : s3Objects) {
+      assertEquals(keyToEtag.get(s3Object.key()), s3Object.eTag());
+    }
+
+    // Include both keys with and without ETag
+    if (isListV2) {
+      ListObjectsV2Request listObjectsRequest = ListObjectsV2Request.builder()
+          .bucket(bucketName)
+          .maxKeys(5)
+          .continuationToken(continuationToken)
+          .build();
+      ListObjectsV2Response listObjectsResponse = s3Client.listObjectsV2(listObjectsRequest);
+      s3Objects = listObjectsResponse.contents();
+      assertEquals(bucketName, listObjectsResponse.name());
+      assertFalse(listObjectsResponse.isTruncated());
+    } else {
+      ListObjectsRequest listObjectsRequest = ListObjectsRequest.builder()
+          .bucket(bucketName)
+          .maxKeys(5)
+          .marker(continuationToken)
+          .build();
+      ListObjectsResponse listObjectsResponse = s3Client.listObjects(listObjectsRequest);
+      s3Objects = listObjectsResponse.contents();
+      assertEquals(bucketName, listObjectsResponse.name());
+      assertFalse(listObjectsResponse.isTruncated());
+    }
+
+    assertThat(s3Objects).hasSize(3);
+    assertEquals(keyNames.get(2), s3Objects.get(0).key());
+    assertEquals(keyNamesWithoutETag.get(0), s3Objects.get(1).key());
+    assertEquals(keyNamesWithoutETag.get(1), s3Objects.get(2).key());
+    for (S3Object s3Object : s3Objects) {
+      assertEquals(keyToEtag.get(s3Object.key()), s3Object.eTag());
+    }
   }
 
   @Test
@@ -195,8 +349,48 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     assertEquals(userMetadata, headObjectResponse.metadata());
   }
 
+  @Test
+  public void testResumableDownloadWithEtagMismatch() throws Exception {
+    // Arrange
+    final String bucketName = getBucketName("resumable");
+    final String keyName = getKeyName("resumable");
+    final String fileContent = "This is a test file for resumable download.";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(fileContent));
+
+    // Prepare a temp file for download
+    Path downloadPath = Files.createTempFile("downloaded", ".txt");
+
+    // Set up S3TransferManager
+    try (S3TransferManager transferManager =
+             S3TransferManager.builder().s3Client(s3AsyncClient).build()) {
+
+      // First download
+      DownloadFileRequest downloadRequest = DownloadFileRequest.builder()
+          .getObjectRequest(b -> b.bucket(bucketName).key(keyName))
+          .destination(downloadPath)
+          .build();
+      FileDownload download = transferManager.downloadFile(downloadRequest);
+      ResumableFileDownload resumableFileDownload = download.pause();
+
+      // Simulate etag mismatch by modifying the file in S3
+      final String newContent = "This is new content to cause etag mismatch.";
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(newContent));
+
+      // Resume download
+      FileDownload resumedDownload = transferManager.resumeDownloadFile(resumableFileDownload);
+      resumedDownload.completionFuture().get();
+
+      String downloadedContent = new String(Files.readAllBytes(downloadPath), StandardCharsets.UTF_8);
+      assertEquals(newContent, downloadedContent);
+
+      File downloadFile = downloadPath.toFile();
+      assertTrue(downloadFile.delete());
+    }
+  }
+
   private String getBucketName() {
-    return getBucketName(null);
+    return getBucketName("");
   }
 
   private String getBucketName(String suffix) {
@@ -204,7 +398,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
   }
 
   private String getKeyName() {
-    return getKeyName(null);
+    return getKeyName("");
   }
 
   private String getKeyName(String suffix) {

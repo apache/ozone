@@ -42,7 +42,6 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -75,7 +74,7 @@ public class TestRatisPipelineLeader {
     }
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 120000)
+  @Test
   public void testLeaderIdUsedOnFirstCall() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines(RatisReplicationConfig.getInstance(
@@ -111,7 +110,7 @@ public class TestRatisPipelineLeader {
         .doesNotContain("org.apache.ratis.protocol.NotLeaderException");
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 120000)
+  @Test
   public void testLeaderIdAfterLeaderChange() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines(RatisReplicationConfig.getInstance(
@@ -124,7 +123,7 @@ public class TestRatisPipelineLeader {
     Pipeline ratisPipeline = optional.get();
     Optional<HddsDatanodeService> dnToStop =
         cluster.getHddsDatanodes().stream().filter(s ->
-            !s.getDatanodeStateMachine().getDatanodeDetails().getUuid().equals(
+            !s.getDatanodeStateMachine().getDatanodeDetails().getID().equals(
                 ratisPipeline.getLeaderId())).findAny();
     assertTrue(dnToStop.isPresent());
     dnToStop.get().stop();
@@ -146,7 +145,7 @@ public class TestRatisPipelineLeader {
   private boolean verifyLeaderInfo(Pipeline ratisPipeline) throws Exception {
     Optional<HddsDatanodeService> hddsDatanodeService =
         cluster.getHddsDatanodes().stream().filter(s ->
-            s.getDatanodeStateMachine().getDatanodeDetails().getUuid()
+            s.getDatanodeStateMachine().getDatanodeDetails().getID()
                 .equals(ratisPipeline.getLeaderId())).findFirst();
     assertTrue(hddsDatanodeService.isPresent());
 
