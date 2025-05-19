@@ -23,6 +23,11 @@ import java.io.File;
  * This class is used to identify any error that may be seen while scanning a container.
  */
 public class ContainerScanError {
+
+  private final File unhealthyFile;
+  private final FailureType failureType;
+  private final Throwable exception;
+
   /**
    * Represents the reason a container scan failed and a container should
    * be marked unhealthy.
@@ -40,10 +45,6 @@ public class ContainerScanError {
     INACCESSIBLE_DB,
     WRITE_FAILURE,
   }
-
-  private final File unhealthyFile;
-  private final FailureType failureType;
-  private final Throwable exception;
 
   public ContainerScanError(FailureType failure, File unhealthyFile, Exception exception) {
     this.unhealthyFile = unhealthyFile;
