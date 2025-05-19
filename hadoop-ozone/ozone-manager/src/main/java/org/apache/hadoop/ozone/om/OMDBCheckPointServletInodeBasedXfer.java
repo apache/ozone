@@ -20,6 +20,7 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import javax.servlet.http.HttpServletRequest;
 import java.io.File;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
 import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
@@ -78,11 +80,47 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
     }
   }
 
-  void writeFilesToArchive(Map<String, Path> copyFiles, Map<Object, Set<Path>> hardlinkFiles,
-      ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, boolean completed, Path checkpointLocation) {
+  private void writeFilesToArchive(Map<String, Path> copyFiles, Map<Object, Set<Path>> hardlinkFiles,
+      ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, boolean completed, Path checkpointLocation)
+      throws IOException {
     Map<String, Path> filteredCopyFiles = completed ? copyFiles :
         copyFiles.entrySet().stream().filter(e -> e.getValue().getFileName().toString().toLowerCase().endsWith(".sst"))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+    Path metaDirPath = getMetaDirPath(checkpointLocation);
+    long bytesWritten = 0L;
+    int filesWritten = 0;
+    long lastLoggedTime = Time.monotonicNow();
+
+    // Go through each of the files to be copied and add to archive.
+    for (Map.Entry<String, Path> entry : filteredCopyFiles.entrySet()) {
+      Path path = entry.getValue();
+      // Confirm the data is in the right place.
+      if (!path.toString().startsWith(metaDirPath.toString())) {
+        throw new IOException("tarball file not in metadata dir: "
+            + path + ": " + metaDirPath);
+      }
+
+      File file = path.toFile();
+      if (!file.isDirectory()) {
+        filesWritten++;
+      }
+      bytesWritten += includeFile(file, entry.getKey(), archiveOutputStream);
+      // Log progress every 30 seconds
+      if (Time.monotonicNow() - lastLoggedTime >= 30000) {
+        LOG.info("Transferred {} KB, #files {} to checkpoint tarball stream...",
+            bytesWritten / (1024), filesWritten);
+        lastLoggedTime = Time.monotonicNow();
+      }
+    }
+
+    if (completed) {
+      // TODO:
+      //  1. take an OM db checkpoint ,
+      //  2. hold a snapshotCache lock,
+      //  3. copy remaining files
+      //  4. create hardlink file
+    }
 
   }
 
@@ -95,13 +133,13 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
      maxTotalSstSize =
          OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 
-     // Tarball limits are not implemented for processes that don't
-     // include snapshots.  Currently, this is just for recon.
-     if (!includeSnapshotData) {
-       maxTotalSstSize = Long.MAX_VALUE;
-     }
+    // Tarball limits are not implemented for processes that don't
+    // include snapshots.  Currently, this is just for recon.
+    if (!includeSnapshotData) {
+      maxTotalSstSize = Long.MAX_VALUE;
+    }
 
-     AtomicLong copySize = new AtomicLong(0L);
+      AtomicLong copySize = new AtomicLong(0L);
 
      // Log estimated total data transferred on first request.
      if (sstFilesToExclude.isEmpty()) {
@@ -138,7 +176,7 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
      return true;
    }
 
-  protected boolean processDir(Path dir, Map<String,Path> copyFiles, Map<Object, Set<Path>> hardlinkFiles,
+  private boolean processDir(Path dir, Map<String,Path> copyFiles, Map<Object, Set<Path>> hardlinkFiles,
       Set<String> sstFilesToExclude, Set<Path> snapshotPaths, List<String> excluded, AtomicLong copySize,
       Path destDir) throws IOException {
 
@@ -199,7 +237,7 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
     return true;
   }
 
-  public long processFile(Path file, Map<String,Path> copyFiles, Map<Object, Set<Path>> hardlinkFiles,
+  private long processFile(Path file, Map<String,Path> copyFiles, Map<Object, Set<Path>> hardlinkFiles,
       Set<String> sstFilesToExclude, List<String> excluded, Path destDir) throws IOException{
     long fileSize = 0;
     Path destFile = file;
@@ -216,20 +254,16 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
     if (destDir != null) {
       destFile = Paths.get(destDir.toString(), fileName);
     }
-    if (fileName.endsWith(ROCKSDB_SST_SUFFIX)) {
-      // If same as existing excluded file, add a link for it.
-      if (sstFilesToExclude.contains(fileInode) || copyFiles.containsKey(fileInode)) {
-        hardlinkFiles.getOrDefault(fileInode, new HashSet<>()).add(destFile);
-      } else {
-        copyFiles.put(fileInode, destFile);
-        hardlinkFiles.getOrDefault(fileInode, new HashSet<>()).add(destFile);
-        fileSize = Files.size(file);
-      }
+    // If same as existing excluded file, add a link for it.
+    if (sstFilesToExclude.contains(fileInode) || copyFiles.containsKey(fileInode)) {
+      hardlinkFiles.getOrDefault(fileInode, new HashSet<>()).add(destFile);
     } else {
-      // handle for non sst files
-      copyFiles.put(destFile.toString(), destFile);
+      copyFiles.put(fileInode, destFile);
+      hardlinkFiles.getOrDefault(fileInode, new HashSet<>()).add(destFile);
+      fileSize = Files.size(file);
     }
-    if (sstFilesToExclude.contains(fileInode)){
+
+    if (sstFilesToExclude.contains(fileInode)) {
       excluded.add(fileInode);
     }
     return fileSize;

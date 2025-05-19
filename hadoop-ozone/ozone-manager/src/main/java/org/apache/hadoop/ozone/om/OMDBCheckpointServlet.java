@@ -654,7 +654,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   @Nonnull
-  private static Path getMetaDirPath(Path checkpointLocation) {
+  protected static Path getMetaDirPath(Path checkpointLocation) {
     // This check is done to take care of findbugs else below getParent()
     // should not be null.
     Path locationParent = checkpointLocation.getParent();
