@@ -130,7 +130,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private Striped<ReadWriteLock> createStripeLock(Resource r,
-                                                  ConfigurationSource conf) {
+      ConfigurationSource conf) {
     boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
         OZONE_MANAGER_FAIR_LOCK_DEFAULT);
     String stripeSizeKey = OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX +
@@ -141,7 +141,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private Iterable<ReadWriteLock> bulkGetLock(Map<Resource, Striped<ReadWriteLock>> lockMap, Resource resource,
-                                              Collection<String[]> keys) {
+      Collection<String[]> keys) {
     Striped<ReadWriteLock> striped = lockMap.get(resource);
     List<Object> lockKeys = new ArrayList<>(keys.size());
     for (String[] key : keys) {
@@ -153,7 +153,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private ReentrantReadWriteLock getLock(Map<Resource, Striped<ReadWriteLock>> lockMap, Resource resource,
-                                         String... keys) {
+      String... keys) {
     Striped<ReadWriteLock> striped = lockMap.get(resource);
     Object key = combineKeys(keys);
     return (ReentrantReadWriteLock) striped.get(key);
@@ -296,7 +296,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private void updateReadLockMetrics(Resource resource,
-                                     ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
+      ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
 
     /*
      *  readHoldCount helps in metrics updation only once in case
@@ -317,7 +317,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private void updateWriteLockMetrics(Resource resource,
-                                      ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
+      ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
     /*
      *  writeHoldCount helps in metrics updation only once in case
      *  of reentrant locks. Metrics are updated only if the write lock is held
@@ -342,6 +342,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return "Thread '" + Thread.currentThread().getName() + "' cannot " +
         "acquire " + resource.getName() + " lock while holding " +
         getCurrentLocks().toString() + " lock(s).";
+
   }
 
   @VisibleForTesting
@@ -444,7 +445,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private OMLockDetails releaseLocks(Resource resource, boolean isReadLock,
-                                     Collection<String[]> keys) {
+      Collection<String[]> keys) {
     Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockManager> resourceLockPair =
         resourcelockMap.get(resource.getClass());
     ResourceLockManager<Resource> resourceLockManager = resourceLockPair.getRight();
