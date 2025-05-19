@@ -25,8 +25,8 @@ container repairs, create and delete containers. The space is also required for 
 This is hard to capture exact usages and free available space. So, this is required to configure minimum free space
 so that datanode operation can perform without any corruption and environment being stuck and support read of data.
 
-This free space is used to ensure volume allocation if `required space < (volume available space - free space - reserved space)`
-Any container creation and import container need ensure this constrain is met. And block write need ensure that this space is available if new blocks are written.
+This free space is used to ensure volume allocation if `required space < (volume available space - free space - reserved space - committed space)`.
+Any container creation and import container need to ensure that this constraint is met. And block byte writes need ensure that `free space` space is available.
 Note: Any issue related to ensuring free space is tracked with separate JIRA.
 
 # Existing configuration (before HDDS-12928)
