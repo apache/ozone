@@ -25,43 +25,43 @@ import java.util.Collection;
  */
 public interface IOzoneManagerLock {
 
-  OMLockDetails acquireReadLock(OzoneManagerLock.Resource resource,
+  OMLockDetails acquireReadLock(OzoneManagerLock.LeveledResource resource,
                                 String... resources);
 
-  OMLockDetails acquireReadLocks(OzoneManagerLock.Resource resource, Collection<String[]> resources);
+  OMLockDetails acquireReadLocks(OzoneManagerLock.LeveledResource resource, Collection<String[]> resources);
 
-  OMLockDetails acquireWriteLock(OzoneManagerLock.Resource resource,
+  OMLockDetails acquireWriteLock(OzoneManagerLock.LeveledResource resource,
                                  String... resources);
 
-  OMLockDetails acquireWriteLocks(OzoneManagerLock.Resource resource,
+  OMLockDetails acquireWriteLocks(OzoneManagerLock.LeveledResource resource,
                                  Collection<String[]> resources);
 
   boolean acquireMultiUserLock(String firstUser, String secondUser);
 
   void releaseMultiUserLock(String firstUser, String secondUser);
 
-  OMLockDetails releaseWriteLock(OzoneManagerLock.Resource resource,
+  OMLockDetails releaseWriteLock(OzoneManagerLock.LeveledResource resource,
                         String... resources);
 
-  OMLockDetails releaseWriteLocks(OzoneManagerLock.Resource resource,
+  OMLockDetails releaseWriteLocks(OzoneManagerLock.LeveledResource resource,
                                  Collection<String[]> resources);
 
-  OMLockDetails releaseReadLock(OzoneManagerLock.Resource resource,
+  OMLockDetails releaseReadLock(OzoneManagerLock.LeveledResource resource,
                                 String... resources);
 
-  OMLockDetails releaseReadLocks(OzoneManagerLock.Resource resource,
+  OMLockDetails releaseReadLocks(OzoneManagerLock.LeveledResource resource,
                                 Collection<String[]> resources);
 
   @VisibleForTesting
-  int getReadHoldCount(OzoneManagerLock.Resource resource,
+  int getReadHoldCount(OzoneManagerLock.LeveledResource resource,
       String... resources);
 
   @VisibleForTesting
-  int getWriteHoldCount(OzoneManagerLock.Resource resource,
+  int getWriteHoldCount(OzoneManagerLock.LeveledResource resource,
       String... resources);
 
   @VisibleForTesting
-  boolean isWriteLockedByCurrentThread(OzoneManagerLock.Resource resource,
+  boolean isWriteLockedByCurrentThread(OzoneManagerLock.LeveledResource resource,
       String... resources);
 
   void cleanup();

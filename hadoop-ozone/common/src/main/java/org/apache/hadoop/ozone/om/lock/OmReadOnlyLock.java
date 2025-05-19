@@ -21,7 +21,7 @@ import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_A
 import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
 
 import java.util.Collection;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource;
 
 /**
  * Read only "lock" for snapshots
@@ -31,23 +31,23 @@ import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
 public class OmReadOnlyLock implements IOzoneManagerLock {
 
   @Override
-  public OMLockDetails acquireReadLock(Resource resource, String... resources) {
+  public OMLockDetails acquireReadLock(LeveledResource resource, String... resources) {
     return EMPTY_DETAILS_LOCK_ACQUIRED;
   }
 
   @Override
-  public OMLockDetails acquireReadLocks(Resource resource, Collection<String[]> resources) {
+  public OMLockDetails acquireReadLocks(LeveledResource resource, Collection<String[]> resources) {
     return EMPTY_DETAILS_LOCK_ACQUIRED;
   }
 
   @Override
-  public OMLockDetails acquireWriteLock(Resource resource,
+  public OMLockDetails acquireWriteLock(LeveledResource resource,
       String... resources) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
-  public OMLockDetails acquireWriteLocks(Resource resource, Collection<String[]> resources) {
+  public OMLockDetails acquireWriteLocks(LeveledResource resource, Collection<String[]> resources) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
@@ -62,38 +62,38 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
   }
 
   @Override
-  public OMLockDetails releaseWriteLock(Resource resource,
+  public OMLockDetails releaseWriteLock(LeveledResource resource,
       String... resources) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
-  public OMLockDetails releaseWriteLocks(Resource resource, Collection<String[]> resources) {
+  public OMLockDetails releaseWriteLocks(LeveledResource resource, Collection<String[]> resources) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
-  public OMLockDetails releaseReadLock(Resource resource, String... resources) {
+  public OMLockDetails releaseReadLock(LeveledResource resource, String... resources) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
-  public OMLockDetails releaseReadLocks(Resource resource, Collection<String[]> resources) {
+  public OMLockDetails releaseReadLocks(LeveledResource resource, Collection<String[]> resources) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
-  public int getReadHoldCount(Resource resource, String... resources) {
+  public int getReadHoldCount(LeveledResource resource, String... resources) {
     return 0;
   }
 
   @Override
-  public int getWriteHoldCount(Resource resource, String... resources) {
+  public int getWriteHoldCount(LeveledResource resource, String... resources) {
     return 0;
   }
 
   @Override
-  public boolean isWriteLockedByCurrentThread(Resource resource,
+  public boolean isWriteLockedByCurrentThread(LeveledResource resource,
       String... resources) {
     return false;
   }
