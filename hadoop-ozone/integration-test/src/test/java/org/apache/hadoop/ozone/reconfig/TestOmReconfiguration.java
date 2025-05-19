@@ -123,13 +123,4 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     assertEquals(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT, cluster().getOzoneManager().getAllowListAllVolumes());
   }
 
-  @Test
-  void dirDeletingServiceInterval() throws ReconfigurationException {
-    //Initial string is 1m
-    getSubject().reconfigurePropertyImpl(OZONE_DIR_DELETING_SERVICE_INTERVAL, "2m");
-
-    assertEquals("2m", cluster().getOzoneManager().
-        getKeyManager().getDirDeletingService().getDirDeletingServiceInterval());
-  }
-
 }

@@ -84,7 +84,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final DeletedDirSupplier deletedDirSupplier;
 
   private AtomicInteger taskCount = new AtomicInteger(0);
-  private String dirDeletingServiceInterval;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -100,9 +99,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.suspended = new AtomicBoolean(false);
     this.isRunningOnAOS = new AtomicBoolean(false);
     this.dirDeletingCorePoolSize = dirDeletingServiceCorePoolSize;
-    this.dirDeletingServiceInterval = configuration.get(
-        OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL,
-        OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT);
     deletedDirSupplier = new DeletedDirSupplier();
     taskCount.set(0);
   }
@@ -355,10 +351,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   public KeyValue<String, OmKeyInfo> getPendingDeletedDirInfo()
       throws IOException {
     return deletedDirSupplier.get();
-  }
-
-  public String getDirDeletingServiceInterval() {
-    return dirDeletingServiceInterval;
   }
 
 }
