@@ -143,4 +143,12 @@ public final class S3Utils {
         signingAlgorithm.equals(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD) ||
         signingAlgorithm.equals(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER);
   }
+
+  public static boolean isEtagMisMatch(String clientETag, String serverETag) {
+    if (clientETag == null) {
+      return false;
+    }
+
+    return !clientETag.equals(serverETag);
+  }
 }

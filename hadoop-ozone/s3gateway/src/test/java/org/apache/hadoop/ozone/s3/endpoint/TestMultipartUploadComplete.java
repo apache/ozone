@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -262,5 +264,91 @@ public class TestMultipartUploadComplete {
         assertThrows(OS3Exception.class,
             () -> completeMultipartUpload(key, completeMultipartUploadRequest, uploadID));
     assertEquals(ex.getCode(), S3ErrorTable.INVALID_PART.getCode());
+  }
+
+  @Test
+  public void testMultipartCompleteWithEtagMismatchShouldAbortAndThrow() throws Exception {
+    // Arrange
+    String key = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(key);
+    CompleteMultipartUploadRequest completeMultipartUploadRequest =
+        buildCompleteMultipartUploadRequest(key, uploadID);
+
+    // Mock headers to return a mismatched etag
+    HttpHeaders etagHeaders = mock(HttpHeaders.class);
+    when(etagHeaders.getHeaderString(S3Consts.CHECKSUM_HEADER)).thenReturn(
+        "wrong-etag");
+    rest.setHeaders(etagHeaders);
+
+    // Act & Assert
+    OS3Exception os3Exception = assertThrows(OS3Exception.class,
+        () -> rest.completeMultipartUpload(OzoneConsts.S3_BUCKET, key, uploadID, completeMultipartUploadRequest));
+    assertEquals(S3ErrorTable.BAD_DIGEST.getCode(), os3Exception.getCode());
+    assertEquals(HTTP_BAD_REQUEST, os3Exception.getHttpCode());
+  }
+
+  @Test
+  public void testMultipartCompleteWithEtagMatchShouldSucceed() throws Exception {
+    // Arrange
+    String key = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(key);
+    CompleteMultipartUploadRequest completeMultipartUploadRequest =
+        buildCompleteMultipartUploadRequest(key, uploadID);
+
+    // calculate correct etag
+    Response tempResp =
+        rest.completeMultipartUpload(OzoneConsts.S3_BUCKET, key, uploadID, completeMultipartUploadRequest);
+    String serverEtag = ((CompleteMultipartUploadResponse) tempResp.getEntity()).getETag();
+
+    // Mock headers to return correct etag
+    HttpHeaders etagHeaders = mock(HttpHeaders.class);
+    when(etagHeaders.getHeaderString(org.apache.hadoop.ozone.s3.util.S3Consts.CHECKSUM_HEADER)).
+        thenReturn(serverEtag.replaceAll("\"", ""));
+    rest.setHeaders(etagHeaders);
+
+    // Act
+    Response response = rest.completeMultipartUpload(
+        OzoneConsts.S3_BUCKET, key, uploadID, completeMultipartUploadRequest);
+
+    // Assert
+    assertEquals(200, response.getStatus());
+    CompleteMultipartUploadResponse resp = (CompleteMultipartUploadResponse) response.getEntity();
+    assertEquals(serverEtag, resp.getETag());
+  }
+
+  @Test
+  public void testMultipartCompleteWithoutChecksumHeaderShouldSucceed() throws Exception {
+    // Arrange
+    String key = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(key);
+    CompleteMultipartUploadRequest completeMultipartUploadRequest =
+        buildCompleteMultipartUploadRequest(key, uploadID);
+
+    // Mock headers to not return checksum
+    HttpHeaders etagHeaders = mock(HttpHeaders.class);
+    when(etagHeaders.getHeaderString(org.apache.hadoop.ozone.s3.util.S3Consts.CHECKSUM_HEADER)).thenReturn(null);
+    rest.setHeaders(etagHeaders);
+
+    // Act
+    Response response = rest.completeMultipartUpload(
+        OzoneConsts.S3_BUCKET, key, uploadID, completeMultipartUploadRequest);
+
+    // Assert
+    assertEquals(200, response.getStatus());
+    CompleteMultipartUploadResponse resp = (CompleteMultipartUploadResponse) response.getEntity();
+    assertNotNull(resp.getETag());
+  }
+
+  private CompleteMultipartUploadRequest buildCompleteMultipartUploadRequest(String key, String uploadID)
+      throws IOException, OS3Exception {
+    List<Part> partsList = new ArrayList<>();
+    String content = "Multipart Upload 1";
+    int partNumber = 1;
+    Part part1 = uploadPart(key, uploadID, partNumber, content);
+    partsList.add(part1);
+    CompleteMultipartUploadRequest completeMultipartUploadRequest = new CompleteMultipartUploadRequest();
+    completeMultipartUploadRequest.setPartList(partsList);
+
+    return completeMultipartUploadRequest;
   }
 }

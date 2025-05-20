@@ -87,6 +87,8 @@ public final class S3Consts {
   public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
   public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
 
+  public static final String CHECKSUM_HEADER = "Content-MD5";
+
   //Never Constructed
   private S3Consts() {
 

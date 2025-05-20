@@ -150,6 +150,10 @@ public final class S3ErrorTable {
       HTTP_FORBIDDEN
   );
 
+  public static final OS3Exception BAD_DIGEST = new OS3Exception(
+      "BadDigest", "The Content-MD5 or checksum value that you specified did not match what the server received.",
+      HTTP_BAD_REQUEST);
+
   private static Function<Exception, OS3Exception> generateInternalError =
       e -> new OS3Exception("InternalError", e.getMessage(), HTTP_INTERNAL_ERROR);
 
