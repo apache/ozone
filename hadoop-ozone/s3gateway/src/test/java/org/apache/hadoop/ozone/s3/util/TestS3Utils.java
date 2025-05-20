@@ -40,7 +40,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestS3Utils {
   private static final ReplicationConfig EC32REPLICATIONCONFIG =
-      new ECReplicationConfig(ECReplicationConfig.EcCodec.RS + "-3-2-1024k");
+      new ECReplicationConfig(3, 2);
   private static final ReplicationConfig RATIS3REPLICATIONCONFIG =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private static final ReplicationConfig RATIS1REPLICATIONCONFIG =

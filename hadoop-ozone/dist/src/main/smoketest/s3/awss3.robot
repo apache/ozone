@@ -48,8 +48,12 @@ File upload and directory list
                         Should contain            ${result}         file
                         # Verify S3 storage class if file is replicated or erasure coded.
     ${result} =         Execute AWSS3CliDebug   ls s3://${BUCKET}/dir1/dir2/file
-                        Run Keyword If      '${BUCKET}' == 'generated'    Should contain    ${result}    STANDARD
-                        Run Keyword If      '${BUCKET}' == 'erasure'      Should contain    ${result}    STANDARD_IA
+    IF    '${BUCKET}' == 'erasure'
+                        Should contain    ${result}    STANDARD_IA
+    ELSE
+                        Should contain    ${result}    STANDARD
+                        Should not contain    ${result}    STANDARD_IA
+    END
 
 File upload with special chars
                         Execute                   date > /tmp/testfile

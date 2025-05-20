@@ -27,9 +27,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATAS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
@@ -105,9 +102,9 @@ import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -863,17 +860,9 @@ public class ObjectEndpoint extends EndpointBase {
   private ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket,
       String storageType, String storageConfig) throws OS3Exception {
 
-    ReplicationConfig clientConfiguredReplicationConfig = null;
-    String replication = ozoneConfiguration.get(OZONE_REPLICATION);
+    ReplicationConfig clientConfiguredReplicationConfig =
+        OzoneClientUtils.getClientConfiguredReplicationConfig(ozoneConfiguration);
 
-    if (replication != null) {
-      ReplicationType replicationType = ReplicationType.valueOf(
-          ozoneConfiguration.get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
-      clientConfiguredReplicationConfig =
-          (replicationType == ReplicationType.EC) ?
-              new ECReplicationConfig(replication) : ReplicationConfig.parse(
-              replicationType, replication, ozoneConfiguration);
-    }
     return S3Utils.resolveS3ClientSideReplicationConfig(storageType, storageConfig,
         clientConfiguredReplicationConfig, ozoneBucket.getReplicationConfig());
   }
