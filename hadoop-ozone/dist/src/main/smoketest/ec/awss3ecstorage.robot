@@ -44,12 +44,12 @@ Put Object with STANDARD_IA storage class
     ${file_checksum} =  Execute                    md5sum /tmp/1mb | awk '{print $1}'
 
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/ecKey32 --body /tmp/1mb --storage-class STANDARD_IA
-    ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.ETag'  0
+    ${eTag} =           Execute                    echo '${result}' | jq -r '.ETag'
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
                         Verify Key EC Replication Config    /s3v/${BUCKET}/${PREFIX}/ecKey32    RS    3    2    1048576
 
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/ecKey63 --body /tmp/1mb --storage-class STANDARD_IA --metadata="storage-config=rs-6-3-1024k"
-    ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.ETag'  0
+    ${eTag} =           Execute                    echo '${result}' | jq -r '.ETag'
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
                         Verify Key EC Replication Config    /s3v/${BUCKET}/${PREFIX}/ecKey63    RS    6    3    1048576
 
@@ -57,7 +57,7 @@ Test multipart upload with STANDARD_IA storage
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey32     0     --storage-class STANDARD_IA
     ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/ecmultipartKey32    ${uploadID}    1    /tmp/1mb
     ${result} =         Execute AWSS3APICli   list-parts --bucket ${BUCKET} --key ${PREFIX}/ecmultipartKey32 --upload-id ${uploadID}
-    ${part1} =          Execute and checkrc    echo '${result}' | jq -r '.Parts[0].ETag'  0
+    ${part1} =          Execute               echo '${result}' | jq -r '.Parts[0].ETag'
                         Should Be equal       ${part1}    ${eTag1}
                         Should contain        ${result}    STANDARD_IA
                         Complete MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey32    ${uploadID}    {ETag=${eTag1},PartNumber=1}
@@ -66,7 +66,7 @@ Test multipart upload with STANDARD_IA storage
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey63     0     --storage-class STANDARD_IA --metadata="storage-config=rs-6-3-1024k"
     ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/ecmultipartKey63    ${uploadID}    1    /tmp/part1
     ${result} =         Execute AWSS3APICli   list-parts --bucket ${BUCKET} --key ${PREFIX}/ecmultipartKey63 --upload-id ${uploadID}
-    ${part1} =          Execute and checkrc    echo '${result}' | jq -r '.Parts[0].ETag'  0
+    ${part1} =          Execute               echo '${result}' | jq -r '.Parts[0].ETag'
                         Should Be equal       ${part1}    ${eTag1}
                         Should contain        ${result}    STANDARD_IA
                         Complete MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey63    ${uploadID}    {ETag=${eTag1},PartNumber=1}
@@ -75,16 +75,16 @@ Test multipart upload with STANDARD_IA storage
 Copy Object change storage class to STANDARD_IA
     ${file_checksum} =  Execute                    md5sum /tmp/1mb | awk '{print $1}'
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/copyobject/Key1 --body /tmp/1mb
-    ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.ETag'  0
+    ${eTag} =           Execute                    echo '${result}' | jq -r '.ETag'
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
 
      ${result} =         Execute AWSS3APICli        copy-object --storage-class STANDARD_IA --bucket ${BUCKET} --key ${PREFIX}/copyobject/Key1 --copy-source ${BUCKET}/${PREFIX}/copyobject/Key1
                          Should contain             ${result}        ETag
-     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.CopyObjectResult.ETag'  0
+     ${eTag} =           Execute                    echo '${result}' | jq -r '.CopyObjectResult.ETag'
                          Should Be Equal            ${eTag}           \"${file_checksum}\"
 
      ${result} =         Execute AWSS3APICli        copy-object --storage-class STANDARD_IA --metadata="storage-config=rs-6-3-1024k" --bucket ${BUCKET} --key ${PREFIX}/copyobject/Key1 --copy-source ${BUCKET}/${PREFIX}/copyobject/Key1
                          Should contain             ${result}        ETag
-     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.CopyObjectResult.ETag'  0
+     ${eTag} =           Execute                    echo '${result}' | jq -r '.CopyObjectResult.ETag'
                          Should Be Equal            ${eTag}           \"${file_checksum}\"
                          ## TODO: Verify Key EC Replication Config when we support changing storage class
