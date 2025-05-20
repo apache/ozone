@@ -270,13 +270,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       throws NodeNotFoundException;
 
   /**
-   * Add a {@link SCMCommand} to the command queue, which are
-   * handled by HB thread asynchronously.
-   * @param dnId datanode uuid
-   * @param command
+   * Add a {@link SCMCommand} to the command queue of the given datanode.
+   * The command will be handled by the HB thread asynchronously.
    */
-  void addDatanodeCommand(UUID dnId, SCMCommand<?> command);
-
+  void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command);
 
   /**
    * send refresh command to all the healthy datanodes to refresh

@@ -90,6 +90,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -2574,5 +2575,105 @@ public abstract class TestOmSnapshot {
 
     // Stop key manager after testcase executed
     stopKeyManager();
+  }
+
+  @Test
+  public void testSnapdiffWithUnsupportedFileSystemAPI() throws Exception {
+    assumeTrue(!bucketLayout.isObjectStore(enabledFileSystemPaths));
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket" + counter.incrementAndGet();
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    String rootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, testBucketName, testVolumeName);
+    try (FileSystem fs = FileSystem.get(new URI(rootPath), cluster.getConf())) {
+      String snap1 = "snap1";
+      String key = "/key1";
+      createFileKey(fs, key);
+      Path pathVal = new Path(key);
+      createSnapshot(testVolumeName, testBucketName, snap1);
+
+      // Future-proofing: if we implement these APIs some day, we should
+      // make sure snapshot diff report records diffs.
+
+      // TODO: if this test fails here, it means that the APIs are implemented,
+      // and we need to update the test to check that the diff report
+      // records the changes.
+      assertThrows(UnsupportedOperationException.class,
+          () -> fs.setAcl(pathVal, null));
+      assertThrows(UnsupportedOperationException.class,
+          () -> fs.modifyAclEntries(pathVal, null));
+      assertThrows(UnsupportedOperationException.class,
+          () -> fs.removeAclEntries(pathVal, null));
+      assertThrows(UnsupportedOperationException.class,
+          () -> fs.removeAcl(pathVal));
+      assertThrows(UnsupportedOperationException.class,
+          () -> fs.removeDefaultAcl(pathVal));
+      assertThrows(UnsupportedOperationException.class,
+          () -> fs.setXAttr(pathVal, null, null));
+      assertThrows(UnsupportedOperationException.class,
+          () -> fs.removeXAttr(pathVal, null));
+      assertThrows(UnsupportedOperationException.class,
+          () -> fs.append(pathVal));
+      assertThrows(UnsupportedOperationException.class,
+          () -> fs.truncate(pathVal, 0));
+      assertThrows(UnsupportedOperationException.class,
+          () -> fs.concat(pathVal, new Path[]{}));
+      assertThrows(UnsupportedOperationException.class,
+          () -> fs.createSymlink(pathVal, pathVal, false));
+
+      String snap2 = "snap2";
+      createSnapshot(testVolumeName, testBucketName, snap2);
+      SnapshotDiffReport diff = getSnapDiffReport(testVolumeName,
+          testBucketName, snap1, snap2);
+      // TODO: if any APIs are implemented the diff list should not be empty.
+      assertEquals(0, diff.getDiffList().size());
+    }
+  }
+
+  @Test
+  public void testSnapdiffWithNoOpAPI() throws Exception {
+    assumeTrue(!bucketLayout.isObjectStore(enabledFileSystemPaths));
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket" + counter.incrementAndGet();
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    String rootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, testBucketName, testVolumeName);
+    try (FileSystem fs = FileSystem.get(new URI(rootPath), cluster.getConf())) {
+      String snap1 = "snap1";
+      String key = "/key1";
+      createFileKey(fs, key);
+      // get file status object
+      FileStatus fileStatus = fs.getFileStatus(new Path(key));
+      // sleep 100 ms.
+      Thread.sleep(100);
+      Path pathVal = new Path(key);
+      createSnapshot(testVolumeName, testBucketName, snap1);
+
+      String newUserName = fileStatus.getOwner() + "new";
+
+      fs.setPermission(pathVal, new FsPermission("+rwx"));
+      fs.setOwner(pathVal, newUserName, null);
+      fs.setReplication(pathVal, (short) 1);
+
+      // TODO: if the test fails here, that means that the APIs are
+      // implemented, and we need to update the test to check that the
+      // diff report records the changes.
+      FileStatus fileStatusAfter = fs.getFileStatus(new Path(key));
+      assertEquals(fileStatus.getModificationTime(), fileStatusAfter.getModificationTime());
+      assertEquals(fileStatus.getPermission(), fileStatusAfter.getPermission());
+      assertEquals(fileStatus.getOwner(), fileStatusAfter.getOwner());
+      assertEquals(fileStatus.getReplication(), fileStatusAfter.getReplication());
+
+      String snap2 = "snap2";
+      createSnapshot(testVolumeName, testBucketName, snap2);
+      SnapshotDiffReport diff = getSnapDiffReport(testVolumeName,
+          testBucketName, snap1, snap2);
+      // TODO: if any APIs are implemented the diff list should not be empty.
+      assertEquals(0, diff.getDiffList().size());
+    }
   }
 }

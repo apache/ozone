@@ -248,7 +248,7 @@ public class TestContainerStateMachineFailures {
               .getScmContext()
               .getTermOfLeader());
       cluster.getStorageContainerManager().getScmNodeManager()
-          .addDatanodeCommand(dn.getDatanodeDetails().getUuid(), command);
+          .addDatanodeCommand(dn.getDatanodeDetails().getID(), command);
     }
 
 
