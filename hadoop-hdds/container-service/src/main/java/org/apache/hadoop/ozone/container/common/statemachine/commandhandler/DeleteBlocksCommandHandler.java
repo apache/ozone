@@ -381,18 +381,20 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // Send ACK back to SCM as long as meta updated
       // TODO Or we should wait until the blocks are actually deleted?
       if (!containerBlocks.isEmpty()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Sending following block deletion ACK to SCM");
-          for (DeleteBlockTransactionResult result : blockDeletionACK
-              .getResultsList()) {
-            boolean success = result.getSuccess();
-            LOG.debug("TxId = {} : ContainerId = {} : {}",
-                result.getTxID(), result.getContainerID(), success);
-            if (success) {
-              blockDeleteMetrics.incrProcessedTransactionSuccessCount(1);
-            } else {
-              blockDeleteMetrics.incrProcessedTransactionFailCount(1);
-            }
+        LOG.debug("Sending following block deletion ACK to SCM");
+
+        for (DeleteBlockTransactionResult result : blockDeletionACK.getResultsList()) {
+          boolean success = result.getSuccess();
+
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("TxId = {} : ContainerId = {} : {}", result.getTxID(),
+                result.getContainerID(), success);
+          }
+
+          if (success) {
+            blockDeleteMetrics.incrProcessedTransactionSuccessCount(1);
+          } else {
+            blockDeleteMetrics.incrProcessedTransactionFailCount(1);
           }
         }
       }

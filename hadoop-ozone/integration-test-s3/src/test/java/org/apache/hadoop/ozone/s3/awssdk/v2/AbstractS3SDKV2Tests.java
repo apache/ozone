@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
+import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
@@ -151,7 +152,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     assertEquals(1, syncResponse.buckets().size());
     assertEquals(bucketName, syncResponse.buckets().get(0).name());
     assertEquals(expectedOwner, syncResponse.owner().displayName());
-    assertEquals(expectedOwner, syncResponse.owner().id());
+    assertEquals(S3Owner.DEFAULT_S3OWNER_ID, syncResponse.owner().id());
   }
 
   @Test
