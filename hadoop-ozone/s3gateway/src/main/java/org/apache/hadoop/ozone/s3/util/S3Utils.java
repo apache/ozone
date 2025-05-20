@@ -199,6 +199,13 @@ public final class S3Utils {
     return xAmzContentSha256Header;
   }
 
+  /**
+   * Checks if the given pair of bytes represent the end-of-line sequence (\r\n).
+   *
+   * @param prev the previous byte value (should be 13 for '\r')
+   * @param curr the current byte value (should be 10 for '\n')
+   * @return true if the pair forms a CRLF sequence, false otherwise
+   */
   public static boolean eol(int prev, int curr) {
     return prev == 13 && curr == 10;
   }
