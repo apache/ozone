@@ -42,7 +42,7 @@ This document proposes adding a new volume state called **degraded**, which will
 
 This document is primarily focused on identification, and proposes handling remediation with a volume decommissioning feature that can be implemented independently of volume health state. 
 
-### Identification of Degraded Volumes
+### Tools to Identify Volume Health State
 
 Ozone has access to the following checks from the volume scanner to determine volume health. Most of these checks are already present.
 
@@ -95,7 +95,7 @@ Healthy is the default state for a volume. Volumes remain in this state until he
 
 - **Enter**:
     - **On Startup**: If permissions are valid and a RocksDB write handle is successsfully acquired.
-    - **While Running**: N/A. Volumes cannot transition into the healthy state after startup.
+    - **While Running**: If the volume was **degraded** but the failure threshold of the **degraded volume sliding window** is no longer crossed.
 - **Exit**: When tests for one of the other states fail.
 - **Actions**: None
 
@@ -104,7 +104,7 @@ Healthy is the default state for a volume. Volumes remain in this state until he
 Degraded volumes are still reachable, but are reporting numerous IO errors when interacting with them. For identification purposes, we can escalate this with SCM, Recon, and metrics which will allow admins to decide whether to leave the volume or remove it. Identification of degraded volumes will be based on errors reported by ongoing datanode IO. This includes the container scanner to ensure that degraded volumes can still be detected even on idle nodes. The container scanner will continue to determine whether individual containers are healthy or not, and the volume scanner will still run to determine if the volume needs to be moved to **failed**. **Degraded** volumes may move back to **healthy** if IO errors are no longer being reported. The historical moves of a volume from healthy to degraded and back can be tracked in a metrics database like Prometheus.
 
 - **Enter**:
-    - **On Startup**: N/A. Degraded state is not persisted to disk.
+    - **On Startup**: N/A. Degraded state is not persisted to disk or idnentified with startup checks.
     - **While Running**:
         - Failure threshold of the **degraded volume sliding window** is crossed.
 - **Exit**:
