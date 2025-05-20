@@ -83,7 +83,7 @@ public class SignedChunksInputStream extends InputStream {
   private int remainingData = 0;
 
   /**
-   * Every chunked uploads (multiple chunks) contains a final zero-byte final additional
+   * Every chunked uploads (multiple chunks) contains an additional final zero-byte
    * chunk. This can be used as the end-of-file marker.
    */
   private boolean isFinalChunkEncountered = false;
