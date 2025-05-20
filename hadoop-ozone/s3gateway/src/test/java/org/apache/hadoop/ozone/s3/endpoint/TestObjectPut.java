@@ -64,6 +64,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PR
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -128,6 +129,7 @@ class TestObjectPut {
     objectEndpoint.setOzoneConfiguration(config);
 
     headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     objectEndpoint.setHeaders(headers);
 
     String volumeName = config.get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
@@ -508,6 +510,7 @@ class TestObjectPut {
   @Test
   public void testPutEmptyObject() throws IOException, OS3Exception {
     HttpHeaders headersWithTags = mock(HttpHeaders.class);
+    when(headersWithTags.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     String emptyString = "";
     ByteArrayInputStream body = new ByteArrayInputStream(emptyString.getBytes(UTF_8));
     objectEndpoint.setHeaders(headersWithTags);
