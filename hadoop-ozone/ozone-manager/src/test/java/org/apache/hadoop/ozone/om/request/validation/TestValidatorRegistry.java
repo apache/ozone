@@ -173,12 +173,17 @@ public class TestValidatorRegistry {
         OMLayoutFeature.HSYNC);
     List<Method> oldClientValidators = getValidatorsForRequest(CreateVolume, POST_PROCESS, CLIENT_VERSION_EXTRACTOR,
         ClientVersion.ERASURE_CODING_SUPPORT);
+    List<Method> combinedValidators = getValidatorsForRequest(CreateVolume, POST_PROCESS,
+        ImmutableMap.of(LAYOUT_VERSION_EXTRACTOR, OMLayoutFeature.HSYNC,
+            CLIENT_VERSION_EXTRACTOR, ClientVersion.ERASURE_CODING_SUPPORT));
 
     assertEquals(1, preFinalizeValidators.size());
     assertEquals(1, oldClientValidators.size());
+    assertEquals(1, combinedValidators.size());
     String expectedMethodName = "multiPurposePostProcessCreateVolumeBucketLayoutCLientQuotaLayoutValidator";
     assertEquals(expectedMethodName, preFinalizeValidators.get(0).getName());
     assertEquals(expectedMethodName, oldClientValidators.get(0).getName());
+    assertEquals(expectedMethodName, combinedValidators.get(0).getName());
   }
 
   @Test

@@ -47,8 +47,8 @@
  * and the request processing phase in which we apply the validation and the maxVersion corresponding to which this
  * is supposed to run.
  *
- * One validator can be applied in multiple, E.g.
- * {@link org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator},
+ * One validator can be applied based on multiple trigger conditions, E.g.
+ * A validator registered can have both {@link org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator},
  * {@link org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator}
  *
  * The main reason to avoid validating multiple request types with the same

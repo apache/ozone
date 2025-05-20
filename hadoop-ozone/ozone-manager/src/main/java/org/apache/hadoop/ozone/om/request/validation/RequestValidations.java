@@ -75,8 +75,7 @@ public class RequestValidations {
   public OMRequest validateRequest(OMRequest request)
       throws Exception {
 
-    List<Method> validations = registry.validationsFor(request.getCmdType(), PRE_PROCESS,
-        this.getVersions(request));
+    List<Method> validations = registry.validationsFor(request.getCmdType(), PRE_PROCESS, getVersions(request));
     OMRequest validatedRequest = request;
     try {
       for (Method m : validations) {
