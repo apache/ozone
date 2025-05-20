@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -63,6 +64,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
@@ -79,6 +81,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.Op;
@@ -93,6 +96,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -176,6 +180,9 @@ public class TestHddsDispatcher {
           responseTwo.getResult());
       verify(context, times(1))
           .addContainerActionIfAbsent(any(ContainerAction.class));
+
+      // since the volume is not full, context.refreshFullReport(NodeReportProto) should not be called
+      verify(context, times(0)).refreshFullReport(any());
 
     } finally {
       volumeSet.shutdown();
@@ -276,6 +283,16 @@ public class TestHddsDispatcher {
       UUID scmId = UUID.randomUUID();
       ContainerSet containerSet = newContainerSet();
       StateContext context = ContainerTestUtils.getMockContext(dd, conf);
+
+      // empty report object for testing that an immediate heartbeat is triggered
+      StorageContainerDatanodeProtocolProtos.NodeReportProto.Builder nrb
+          = StorageContainerDatanodeProtocolProtos.
+          NodeReportProto.newBuilder();
+      StorageContainerDatanodeProtocolProtos.NodeReportProto reportProto = nrb.build();
+      DatanodeStateMachine stateMachine = context.getParent();
+      OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+      doReturn(ozoneContainer).when(stateMachine).getContainer();
+      doReturn(reportProto).when(ozoneContainer).getNodeReport();
       // create a 50 byte container
       // available (160) > 100 (min free space) + 50 (container size)
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
@@ -308,6 +325,15 @@ public class TestHddsDispatcher {
           response.getResult());
       verify(context, times(1))
           .addContainerActionIfAbsent(any(ContainerAction.class));
+      // verify that node report is refreshed and heartbeat is triggered
+      verify(context, times(1)).refreshFullReport(eq(reportProto));
+      verify(stateMachine, times(1)).triggerHeartbeat();
+
+      // the volume is past the min free space boundary but this time the heartbeat should not be triggered because
+      // of throttling
+      hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L), null);
+      verify(context, times(1)).refreshFullReport(eq(reportProto)); // was called once before
+      verify(stateMachine, times(1)).triggerHeartbeat(); // was called once before
 
       // try creating another container now as the volume used has crossed
       // threshold

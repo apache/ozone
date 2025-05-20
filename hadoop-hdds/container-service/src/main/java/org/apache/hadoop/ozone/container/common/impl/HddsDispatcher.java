@@ -470,6 +470,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           nodeReport = context.getParent().getContainer().getNodeReport();
           context.refreshFullReport(nodeReport);
           context.getParent().triggerHeartbeat();
+          LOG.info("Triggering heartbeat for full volume {}, with node report: {}.", volume, nodeReport);
         } catch (IOException e) {
           String volumePath = volume.getVolumeRootDir();
           StorageLocationReport volumeReport = volume.getReport();
