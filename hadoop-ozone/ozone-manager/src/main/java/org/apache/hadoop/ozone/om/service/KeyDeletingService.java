@@ -248,9 +248,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             // Validating if the previous snapshot is still the same before purging the blocks.
             SnapshotUtils.validatePreviousSnapshotId(currentSnapshotInfo, snapshotChainManager,
                 expectedPreviousSnapshotId);
-            Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, keyManager,
-                 pendingKeysDeletion.getKeysToModify(), renamedTableEntries, snapshotTableKey,
-                 expectedPreviousSnapshotId);
+            Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, pendingKeysDeletion.getKeysToModify(),
+                renamedTableEntries, snapshotTableKey, expectedPreviousSnapshotId);
             remainNum -= purgeResult.getKey();
             successStatus = purgeResult.getValue();
             if (successStatus) {

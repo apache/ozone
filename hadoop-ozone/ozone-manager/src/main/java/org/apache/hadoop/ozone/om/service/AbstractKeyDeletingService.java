@@ -143,8 +143,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
   private Pair<Integer, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-    Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntriesToBeDeleted,
-    String snapTableKey, UUID expectedPreviousSnapshotId) {
+      Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntriesToBeDeleted,
+      String snapTableKey, UUID expectedPreviousSnapshotId) {
     List<String> purgeKeys = new ArrayList<>();
 
     // Put all keys to be purged in a list
