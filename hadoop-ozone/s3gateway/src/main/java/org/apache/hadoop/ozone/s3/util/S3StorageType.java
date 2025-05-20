@@ -18,9 +18,8 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 /**
@@ -29,33 +28,19 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 public enum S3StorageType {
 
-  REDUCED_REDUNDANCY(ReplicationType.RATIS, ReplicationFactor.ONE, null),
-  STANDARD(ReplicationType.RATIS, ReplicationFactor.THREE, null),
-  STANDARD_IA(ReplicationType.EC, null, ECReplicationConfig.EcCodec.RS + "-3-2-1024k");
+  REDUCED_REDUNDANCY(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE)),
+  STANDARD(
+      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE)),
+  STANDARD_IA(new ECReplicationConfig(ECReplicationConfig.EcCodec.RS + "-3-2-1024k"));
 
-  private final ReplicationType type;
-  private final ReplicationFactor factor;
-  private final String ecReplicationString;
+  private final ReplicationConfig replicationConfig;
 
-  S3StorageType(
-      ReplicationType type,
-      ReplicationFactor factor,
-      String ecReplicationString) {
-    this.type = type;
-    this.factor = factor;
-    this.ecReplicationString = ecReplicationString;
+  S3StorageType(ReplicationConfig replicationConfig) {
+    this.replicationConfig = replicationConfig;
   }
 
-  public ReplicationFactor getFactor() {
-    return factor;
-  }
-
-  public ReplicationType getType() {
-    return type;
-  }
-
-  public String getEcReplicationString() {
-    return ecReplicationString;
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
   }
 
   public static S3StorageType fromReplicationConfig(ReplicationConfig config) {

@@ -39,8 +39,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Tests the S3Utils APIs.
  */
 public class TestS3Utils {
-  private static final ReplicationConfig ECREPLICATIONCONFIG =
-      new ECReplicationConfig(S3StorageType.STANDARD_IA.getEcReplicationString());
+  private static final ReplicationConfig EC32REPLICATIONCONFIG =
+      new ECReplicationConfig(ECReplicationConfig.EcCodec.RS + "-3-2-1024k");
   private static final ReplicationConfig RATIS3REPLICATIONCONFIG =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private static final ReplicationConfig RATIS1REPLICATIONCONFIG =
@@ -50,7 +50,7 @@ public class TestS3Utils {
       null,
       RATIS1REPLICATIONCONFIG,
       RATIS3REPLICATIONCONFIG,
-      ECREPLICATIONCONFIG
+      EC32REPLICATIONCONFIG
   );
 
   private static final List<String> S3STORAGETYPES = Arrays.asList(
@@ -96,7 +96,7 @@ public class TestS3Utils {
         if (!StringUtils.isEmpty(s3StorageConfig)) {
           expectedReplConfig = new ECReplicationConfig(s3StorageConfig);
         } else {
-          expectedReplConfig = ECREPLICATIONCONFIG;
+          expectedReplConfig = EC32REPLICATIONCONFIG;
         }
       } else if (S3StorageType.STANDARD.name().equals(s3StorageType)) {
         expectedReplConfig = RATIS3REPLICATIONCONFIG;

@@ -31,4 +31,4 @@ export COMPOSE_FILE=docker-compose.yaml:vault.yaml
 start_docker_env
 
 ## Exclude virtual-host tests. This is tested separately as it requires additional config.
-execute_robot_test scm --exclude virtual-host --exclude ec-storage-class s3
+execute_robot_test scm --exclude virtual-host s3

@@ -18,13 +18,13 @@ Documentation       S3 gateway test with aws cli with STANDARD_IA storage class
 Library             OperatingSystem
 Library             String
 Resource            ../commonlib.robot
-Resource            commonawslib.robot
-Resource            mpu_lib.robot
+Resource            ../s3/commonawslib.robot
+Resource            ../s3/mpu_lib.robot
+Resource            ../ozone-lib/shell.robot
 Test Timeout        5 minutes
 Suite Setup         Setup EC Multipart Tests
 Suite Teardown      Teardown EC Multipart Tests
 Test Setup          Generate random prefix
-Default Tags        ec-storage-class
 
 *** Keywords ***
 Setup EC Multipart Tests
@@ -46,10 +46,12 @@ Put Object with STANDARD_IA storage class
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/ecKey32 --body /tmp/1mb --storage-class STANDARD_IA
     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.ETag'  0
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
+                        Verify Key EC Replication Config    /s3v/${BUCKET}/${PREFIX}/ecKey32    RS    3    2    1048576
 
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/ecKey63 --body /tmp/1mb --storage-class STANDARD_IA --metadata="storage-config=rs-6-3-1024k"
     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.ETag'  0
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
+                        Verify Key EC Replication Config    /s3v/${BUCKET}/${PREFIX}/ecKey63    RS    6    3    1048576
 
 Test multipart upload with STANDARD_IA storage
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey32     0     --storage-class STANDARD_IA
@@ -58,7 +60,8 @@ Test multipart upload with STANDARD_IA storage
     ${part1} =          Execute and checkrc    echo '${result}' | jq -r '.Parts[0].ETag'  0
                         Should Be equal       ${part1}    ${eTag1}
                         Should contain        ${result}    STANDARD_IA
-    ${result} =         Abort MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey32    ${uploadID}    0
+                        Complete MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey32    ${uploadID}    {ETag=${eTag1},PartNumber=1}
+                        Verify Key EC Replication Config    /s3v/${BUCKET}/${PREFIX}/ecmultipartKey32    RS    3    2    1048576
 
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey63     0     --storage-class STANDARD_IA --metadata="storage-config=rs-6-3-1024k"
     ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/ecmultipartKey63    ${uploadID}    1    /tmp/part1
@@ -66,7 +69,8 @@ Test multipart upload with STANDARD_IA storage
     ${part1} =          Execute and checkrc    echo '${result}' | jq -r '.Parts[0].ETag'  0
                         Should Be equal       ${part1}    ${eTag1}
                         Should contain        ${result}    STANDARD_IA
-    ${result} =         Abort MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey63    ${uploadID}    0
+                        Complete MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey63    ${uploadID}    {ETag=${eTag1},PartNumber=1}
+                        Verify Key EC Replication Config    /s3v/${BUCKET}/${PREFIX}/ecmultipartKey63    RS    6    3    1048576
 
 Copy Object change storage class to STANDARD_IA
     ${file_checksum} =  Execute                    md5sum /tmp/1mb | awk '{print $1}'
@@ -83,3 +87,4 @@ Copy Object change storage class to STANDARD_IA
                          Should contain             ${result}        ETag
      ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.CopyObjectResult.ETag'  0
                          Should Be Equal            ${eTag}           \"${file_checksum}\"
+                         ## TODO: Verify Key EC Replication Config when we support changing storage class

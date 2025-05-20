@@ -53,7 +53,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.S3GAction;
@@ -738,12 +737,8 @@ public class BucketEndpoint extends EndpointBase {
     if (eTag != null) {
       keyMetadata.setETag(ObjectEndpoint.wrapInQuotes(eTag));
     }
-    if (next.getReplicationType().toString().equals(ReplicationType
-        .STAND_ALONE.toString())) {
-      keyMetadata.setStorageClass(S3StorageType.REDUCED_REDUNDANCY.toString());
-    } else {
-      keyMetadata.setStorageClass(S3StorageType.STANDARD.toString());
-    }
+    keyMetadata.setStorageClass(S3StorageType.fromReplicationConfig(
+        next.getReplicationConfig()).toString());
     keyMetadata.setLastModified(next.getModificationTime());
     String ownerName = next.getOwner();
     String displayName = ownerName;

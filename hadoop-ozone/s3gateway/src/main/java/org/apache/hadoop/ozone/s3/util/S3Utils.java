@@ -35,8 +35,6 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 /**
@@ -91,15 +89,12 @@ public final class S3Utils {
   public static ReplicationConfig toReplicationConfig(String s3StorageType, String s3StorageConfig)
       throws OS3Exception {
     try {
-      if (S3StorageType.STANDARD_IA.name().equals(s3StorageType)) {
-        return (!StringUtils.isEmpty(s3StorageConfig)) ? new ECReplicationConfig(s3StorageConfig) :
-            new ECReplicationConfig(S3StorageType.STANDARD_IA.getEcReplicationString());
-      } else {
-        S3StorageType storageType = S3StorageType.valueOf(s3StorageType);
-        return ReplicationConfig.fromProtoTypeAndFactor(
-            ReplicationType.toProto(storageType.getType()),
-            ReplicationFactor.toProto(storageType.getFactor()));
+      S3StorageType storageType = S3StorageType.valueOf(s3StorageType);
+      if (S3StorageType.STANDARD_IA.equals(storageType) &&
+          !StringUtils.isEmpty(s3StorageConfig)) {
+        return new ECReplicationConfig(s3StorageConfig);
       }
+      return storageType.getReplicationConfig();
     } catch (IllegalArgumentException ex) {
       throw newError(INVALID_STORAGE_CLASS, s3StorageType, ex);
     }
