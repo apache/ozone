@@ -53,7 +53,7 @@ import java.util.Objects;
  *
  * <p>
  * Note that there is not actual trailer checksum verification taking place. The InputStream only
- *  * returns the actual chunk payload from chunked signatures format.
+ * returns the actual chunk payload from chunked signatures format.
  * </p>
  *
  * Reference:
