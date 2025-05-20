@@ -26,20 +26,19 @@ x-debug-tools-config:
 x-volumes:
   - &keytabs ../_keytabs:/etc/security/keytabs
   - &krb5conf ./krb5.conf:/etc/krb5.conf
-  - &ozone-dir ../..:${OZONE_DIR}
+  - &ozone-dir ../..:/opt/hadoop
   - &transformation ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
 
 services:
   kdc:
     volumes:
       - *keytabs
-      - ../..:/opt/hadoop
+      - *ozone-dir
   kms:
     volumes:
       - ${OZONE_VOLUME}/kms:/data
       - *keytabs
       - *krb5conf
-      - ../..:/opt/ozone
       - *transformation
   datanode1:
     <<: *common-env-file
@@ -48,7 +47,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   datanode2:
     <<: *common-env-file
     volumes:
@@ -56,7 +54,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   datanode3:
     <<: *common-env-file
     volumes:
@@ -64,7 +61,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   datanode4:
     <<: *common-env-file
     ports:
@@ -86,7 +82,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   datanode5:
     <<: *common-env-file
     ports:
@@ -108,7 +103,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   om1:
     <<: *common-env-file
     volumes:
@@ -116,7 +110,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   om2:
     <<: *common-env-file
     volumes:
@@ -124,7 +117,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   om3:
     <<: *common-env-file
     volumes:
@@ -132,7 +124,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   s3g:
     <<: *common-env-file
     volumes:
@@ -140,7 +131,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   scm1.org:
     <<: *common-env-file
     volumes:
@@ -148,7 +138,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   scm2.org:
     <<: *common-env-file
     volumes:
@@ -156,7 +145,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   scm3.org:
     <<: *common-env-file
     volumes:
@@ -164,7 +152,6 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
   recon:
     <<: *common-env-file
     volumes:
@@ -172,6 +159,5 @@ services:
       - *keytabs
       - *krb5conf
       - *ozone-dir
-      - *transformation
 
 

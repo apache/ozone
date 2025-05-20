@@ -26,6 +26,7 @@ export SECURITY_ENABLED=true
 export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
 export COMPOSE_FILE=docker-compose.yaml:debug-tools.yaml
+export OZONE_DIR=/opt/hadoop
 
 : "${OZONE_VOLUME_OWNER:=}"
 : "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
@@ -43,8 +44,6 @@ if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
       || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
   fi
 fi
-
-: ${OZONE_BUCKET_KEY_NAME:=key1}
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
