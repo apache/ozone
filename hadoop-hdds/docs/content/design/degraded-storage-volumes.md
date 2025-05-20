@@ -28,7 +28,7 @@ Currently Ozone uses two health states for storage volumes: **healthy** and **fa
 
 This model only works for hard failures in volumes, but in practice most volume failures are soft failures. Disk issues manifest in a variety of ways and minor problems usually appear before a drive fails completely. The current approach to volume scanning and health classification does not account for this. If a volume is starting to exhibit signs of failure, the datanode only has two options:
 - Fail the volume
-    - In many cases the volume may still be mostly or partially readable. Containers on this volume that were still readable would be removed by the system and have their redundancy reduced unecessarily. This is not a safe operation.
+    - In many cases the volume may still be mostly or partially readable. Containers on this volume that were still readable would be removed by the system and have their redundancy reduced unnecessarily. This is not a safe operation.
 - Keep the volume healthy
     - Containers on this volume will not have extra copies made until the container scanner finds corruption and marks them unhealthy, after which we have already lost redundancy.
 
@@ -87,14 +87,14 @@ Once a sliding window crosses the threshold of errors over a period of time, the
 
 #### Summary of Volume Health States
 
-Above we have defined each type of check the volume scanner can do, mapped each one to a sliding window that corresponds to a volume health state. We can use this information to finish defining the reuqirements for each volume health state. This document does not propose adding persistence for volume health states, so all volumes will return to healthy on restart until checks move them to a different state.
+Above we have defined each type of check the volume scanner can do, mapped each one to a sliding window that corresponds to a volume health state. We can use this information to finish defining the requirements for each volume health state. This document does not propose adding persistence for volume health states, so all volumes will return to healthy on restart until checks move them to a different state.
 
 ##### Healthy 
 
 Healthy is the default state for a volume. Volumes remain in this state until health tests fail and move them to a lower health state.
 
 - **Enter**:
-    - **On Startup**: If permissions are valid and a RocksDB write handle is successsfully acquired.
+    - **On Startup**: If permissions are valid and a RocksDB write handle is successfully acquired.
     - **While Running**: If the volume was **degraded** but the failure threshold of the **degraded volume sliding window** is no longer crossed.
 - **Exit**: When tests for one of the other states fail.
 - **Actions**: None
@@ -104,7 +104,7 @@ Healthy is the default state for a volume. Volumes remain in this state until he
 Degraded volumes are still reachable, but are reporting numerous IO errors when interacting with them. For identification purposes, we can escalate this with SCM, Recon, and metrics which will allow admins to decide whether to leave the volume or remove it. Identification of degraded volumes will be based on errors reported by ongoing datanode IO. This includes the container scanner to ensure that degraded volumes can still be detected even on idle nodes. The container scanner will continue to determine whether individual containers are healthy or not, and the volume scanner will still run to determine if the volume needs to be moved to **failed**. **Degraded** volumes may move back to **healthy** if IO errors are no longer being reported. The historical moves of a volume from healthy to degraded and back can be tracked in a metrics database like Prometheus.
 
 - **Enter**:
-    - **On Startup**: N/A. Degraded state is not persisted to disk or idnentified with startup checks.
+    - **On Startup**: N/A. Degraded state is not persisted to disk or identified with startup checks.
     - **While Running**:
         - Failure threshold of the **degraded volume sliding window** is crossed.
 - **Exit**:
@@ -151,7 +151,7 @@ To identify degraded and failed volumes through metrics which can be plugged int
 
 #### Identifying Volume Health with the Command Line
 
-The `ozone admin datanode` command is currently lacking any specifc information about volumes. It is not clear where to put this information since the command's layout is atypical of other Ozone commands. Most commands follow the pattern of a `list` subcommand which gives a summary of each item, followed by an `info` command to get more detailed information. See `ozone admin container {info,list}` and `ozone sh {volume,bucket,key} {info,list}`. The datanode CLI instead provides two relevant subcommands:
+The `ozone admin datanode` command is currently lacking any specific information about volumes. It is not clear where to put this information since the command's layout is atypical of other Ozone commands. Most commands follow the pattern of a `list` subcommand which gives a summary of each item, followed by an `info` command to get more detailed information. See `ozone admin container {info,list}` and `ozone sh {volume,bucket,key} {info,list}`. The datanode CLI instead provides two relevant subcommands:
 - `ozone admin datanode list` which provides very verbose information about each datanode, some of which could be saved for an `info` command
 - `ozone admin datanode usageinfo` which provides only information about total node capacity, in addition to verbose information about the original node when `--json` is used.
     - This command adds further confusion because it seems to be intended to provide info on one node, but then provides options to obtain a list of most and least used nodes, changing it to a list type command.
