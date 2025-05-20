@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
@@ -145,6 +146,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -1626,6 +1628,51 @@ public class TestKeyManagerImpl {
 
   private String getRenameKey(String volume, String bucket, long objectId) {
     return volume + "/" + bucket + "/" + objectId;
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class)
+  public void testPreviousSnapshotOzoneKeyInfo(BucketLayout bucketLayout) throws IOException {
+    OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
+    if (bucketLayout.isFileSystemOptimized()) {
+      when(omMetadataManager.getOzonePathKey(anyLong(), anyLong(), anyLong(), anyString()))
+          .thenAnswer(i -> Arrays.stream(i.getArguments()).map(Object::toString)
+              .collect(Collectors.joining("/")));
+    } else {
+      when(omMetadataManager.getOzoneKey(anyString(), anyString(), anyString()))
+          .thenAnswer(i -> Arrays.stream(i.getArguments()).map(Object::toString)
+              .collect(Collectors.joining("/")));
+    }
+    when(omMetadataManager.getRenameKey(anyString(), anyString(), anyLong())).thenAnswer(
+        i -> getRenameKey(i.getArgument(0), i.getArgument(1), i.getArgument(2)));
+
+    OMMetadataManager previousMetadataManager = mock(OMMetadataManager.class);
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    KeyManagerImpl km = new KeyManagerImpl(null, null, omMetadataManager, configuration, null, null, null);
+    KeyManagerImpl prevKM = new KeyManagerImpl(null, null, previousMetadataManager, configuration, null, null, null);
+    long volumeId = 1L;
+    OmBucketInfo bucketInfo = OmBucketInfo.newBuilder().setBucketName(BUCKET_NAME).setVolumeName(VOLUME_NAME)
+        .setObjectID(2L).setBucketLayout(bucketLayout).build();
+    OmKeyInfo prevKey = getMockedOmKeyInfo(bucketInfo, 5, "key", 1);
+    OmKeyInfo prevKey2 = getMockedOmKeyInfo(bucketInfo, 7, "key2", 2);
+    OmKeyInfo currentKey = getMockedOmKeyInfo(bucketInfo, 6, "renamedKey", 1);
+    OmKeyInfo currentKey2 = getMockedOmKeyInfo(bucketInfo, 7, "key2", 2);
+    OmKeyInfo currentKey3 = getMockedOmKeyInfo(bucketInfo, 8, "key3", 3);
+    OmKeyInfo currentKey4 = getMockedOmKeyInfo(bucketInfo, 8, "key4", 4);
+    Table<String, OmKeyInfo> prevKeyTable =
+        new InMemoryTestTable<>(ImmutableMap.of(
+            getDirectoryKey(volumeId, bucketInfo, prevKey), prevKey,
+            getDirectoryKey(volumeId, bucketInfo, prevKey2), prevKey2));
+    Table<String, String> renameTable = new InMemoryTestTable<>(
+        ImmutableMap.of(getRenameKey(VOLUME_NAME, BUCKET_NAME, 1), getDirectoryKey(volumeId, bucketInfo, prevKey),
+            getRenameKey(VOLUME_NAME, BUCKET_NAME, 3), getDirectoryKey(volumeId, bucketInfo,
+                getMockedOmKeyInfo(bucketInfo, 6, "unknownKey", 9))));
+    when(previousMetadataManager.getKeyTable(eq(bucketLayout))).thenReturn(prevKeyTable);
+    when(omMetadataManager.getSnapshotRenamedTable()).thenReturn(renameTable);
+    assertEquals(prevKey, km.getPreviousSnapshotOzoneKeyInfo(volumeId, bucketInfo, currentKey).apply(prevKM));
+    assertEquals(prevKey2, km.getPreviousSnapshotOzoneKeyInfo(volumeId, bucketInfo, currentKey2).apply(prevKM));
+    assertNull(km.getPreviousSnapshotOzoneKeyInfo(volumeId, bucketInfo, currentKey3).apply(prevKM));
+    assertNull(km.getPreviousSnapshotOzoneKeyInfo(volumeId, bucketInfo, currentKey4).apply(prevKM));
   }
 
   @Test

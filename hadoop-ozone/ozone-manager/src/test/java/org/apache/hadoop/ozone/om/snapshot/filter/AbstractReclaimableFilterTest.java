@@ -80,7 +80,8 @@ import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 
 /**
- * Test class for ReclaimableFilter.
+ * <p>Class for having a common setup containing util functions to test out functionalities of various
+ * implementations of {@link ReclaimableFilter} class.</p>
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class AbstractReclaimableFilterTest {
@@ -124,14 +125,14 @@ public abstract class AbstractReclaimableFilterTest {
     this.snapshotChainManager = mock(SnapshotChainManager.class);
     this.keyManager = mock(KeyManager.class);
     IOzoneManagerLock ozoneManagerLock = mock(IOzoneManagerLock.class);
-    when(ozoneManagerLock.acquireReadLocks(eq(OzoneManagerLock.Resource.SNAPSHOT_GC_LOCK), anyList()))
+    when(ozoneManagerLock.acquireReadLocks(eq(OzoneManagerLock.LeveledResource.SNAPSHOT_GC_LOCK), anyList()))
         .thenAnswer(i -> {
           lockIds.set(
               (List<UUID>) i.getArgument(1, List.class).stream().map(val -> UUID.fromString(((String[]) val)[0]))
                   .collect(Collectors.toList()));
           return OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
         });
-    when(ozoneManagerLock.releaseReadLocks(eq(OzoneManagerLock.Resource.SNAPSHOT_GC_LOCK), anyList()))
+    when(ozoneManagerLock.releaseReadLocks(eq(OzoneManagerLock.LeveledResource.SNAPSHOT_GC_LOCK), anyList()))
         .thenAnswer(i -> {
           Assertions.assertEquals(lockIds.get(),
               i.getArgument(1, List.class).stream().map(val -> UUID.fromString(((String[]) val)[0]))

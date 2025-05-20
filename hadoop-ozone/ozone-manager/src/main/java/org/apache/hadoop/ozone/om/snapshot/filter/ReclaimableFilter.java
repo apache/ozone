@@ -88,7 +88,7 @@ public abstract class ReclaimableFilter<V>
     this.omSnapshotManager = omSnapshotManager;
     this.currentSnapshotInfo = currentSnapshotInfo;
     this.snapshotChainManager = snapshotChainManager;
-    this.snapshotIdLocks = new MultiSnapshotLocks(lock, OzoneManagerLock.Resource.SNAPSHOT_GC_LOCK, false);
+    this.snapshotIdLocks = new MultiSnapshotLocks(lock, OzoneManagerLock.LeveledResource.SNAPSHOT_GC_LOCK, false);
     this.keyManager = keyManager;
     this.numberOfPreviousSnapshotsFromChain = numberOfPreviousSnapshotsFromChain;
     this.previousOmSnapshots = new ArrayList<>(numberOfPreviousSnapshotsFromChain);

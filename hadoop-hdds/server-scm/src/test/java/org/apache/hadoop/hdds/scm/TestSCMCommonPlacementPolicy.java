@@ -68,7 +68,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestSCMCommonPlacementPolicy {
 
-  private NodeManager nodeManager;
+  private MockNodeManager nodeManager;
   private OzoneConfiguration conf;
 
   @BeforeEach
@@ -357,10 +357,10 @@ public class TestSCMCommonPlacementPolicy {
             ContainerID.valueOf(1), CLOSED, 0, 0, 0, list.subList(3, 6)));
     Set<ContainerReplica> replicasToBeRemoved = Sets.newHashSet(
             HddsTestUtils.getReplicaBuilder(ContainerID.valueOf(1), CLOSED, 0, 0, 0,
-                    list.get(7).getUuid(), list.get(7))
+                    list.get(7).getID(), list.get(7))
                     .setReplicaIndex(1).build(),
             HddsTestUtils.getReplicaBuilder(ContainerID.valueOf(1), CLOSED, 0, 0, 0,
-                    list.get(8).getUuid(), list.get(8)).setReplicaIndex(1)
+                    list.get(8).getID(), list.get(8)).setReplicaIndex(1)
                     .build());
     replicas.addAll(replicasToBeRemoved);
 
@@ -535,7 +535,7 @@ public class TestSCMCommonPlacementPolicy {
     DummyPlacementPolicy(NodeManager nodeManager, ConfigurationSource conf,
         int rackCnt) {
       this(nodeManager, conf,
-           IntStream.range(0, nodeManager.getAllNodes().size()).boxed()
+           IntStream.range(0, nodeManager.getAllNodeCount()).boxed()
            .collect(Collectors.toMap(Function.identity(),
                    idx -> idx % rackCnt)), rackCnt);
     }
@@ -552,7 +552,7 @@ public class TestSCMCommonPlacementPolicy {
       this.rackCnt = rackCnt;
       this.racks = IntStream.range(0, rackCnt)
       .mapToObj(i -> mock(Node.class)).collect(Collectors.toList());
-      List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
+      final List<? extends DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
       rackMap = datanodeRackMap.entrySet().stream()
               .collect(Collectors.toMap(
                       entry -> datanodeDetails.get(entry.getKey()),

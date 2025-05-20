@@ -32,6 +32,7 @@ import java.net.URLEncoder;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -143,4 +144,16 @@ public final class S3Utils {
         signingAlgorithm.equals(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD) ||
         signingAlgorithm.equals(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER);
   }
+
+  /**
+   * Generates a Canonical User ID compatible with S3 by returning the
+   * SHA-256 hexadecimal encoding of the input string.
+   *
+   * @param input the input string
+   * @return the SHA-256 hexadecimal encoded Canonical User ID
+   */
+  public static String generateCanonicalUserId(String input) {
+    return DigestUtils.sha256Hex(input);
+  }
+
 }

@@ -124,7 +124,7 @@ public class TestCloseContainerHandler {
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(), command);
+        .addDatanodeCommand(datanodeDetails.getID(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerClosed(cluster, containerId.getId()),

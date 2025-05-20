@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -231,7 +231,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               .setOmKeyLocationInfos(Collections.singletonList(
                   new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
               .setAcls(getAclsForKey(keyArgs, omBucketInfo, pathInfoFSO,
-                  ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
+                  ozoneManager.getPrefixManager(), ozoneManager.getConfig()))
               .setObjectID(pathInfoFSO.getLeafNodeObjectId())
               .setUpdateID(trxnLogIndex)
               .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
@@ -630,13 +630,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             OMException.ResultCodes.INVALID_PART);
       }
 
-      OmKeyInfo currentPartKeyInfo = null;
-      try {
-        currentPartKeyInfo =
-            OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-      } catch (IOException ioe) {
-        throw new OMException(ioe, OMException.ResultCodes.INTERNAL_ERROR);
-      }
+      final OmKeyInfo currentPartKeyInfo = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
 
       // Except for last part all parts should have minimum size.
       if (currentPartCount != partsListSize) {
