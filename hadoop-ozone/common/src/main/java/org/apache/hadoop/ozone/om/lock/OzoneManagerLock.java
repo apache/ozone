@@ -348,7 +348,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   @VisibleForTesting
   List<String> getCurrentLocks() {
     return resourcelockMap.values().stream().map(Pair::getValue)
-        .flatMap(i -> ((ResourceLockManager<? extends Resource>)i).getCurrentLockedResources())
+        .flatMap(rlm -> ((ResourceLockManager<? extends Resource>)rlm).getCurrentLockedResources())
         .map(Resource::getName)
         .collect(Collectors.toList());
   }
@@ -631,7 +631,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     @Override
     Stream<FlatResource> getCurrentLockedResources() {
-      return acquiredLocksMap.keySet().stream().filter(i -> acquiredLocksMap.get(i).get());
+      return acquiredLocksMap.keySet().stream().filter(flatResource -> acquiredLocksMap.get(flatResource).get());
     }
   }
 
