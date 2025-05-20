@@ -35,11 +35,11 @@ import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 public class MultiSnapshotLocks {
   private final List<String[]> objectLocks;
   private final IOzoneManagerLock lock;
-  private final OzoneManagerLock.Resource resource;
+  private final OzoneManagerLock.LeveledResource resource;
   private final boolean writeLock;
   private OMLockDetails lockDetails;
 
-  public MultiSnapshotLocks(IOzoneManagerLock lock, OzoneManagerLock.Resource resource, boolean writeLock) {
+  public MultiSnapshotLocks(IOzoneManagerLock lock, OzoneManagerLock.LeveledResource resource, boolean writeLock) {
     this.writeLock = writeLock;
     this.resource = resource;
     this.lock = lock;
