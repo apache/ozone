@@ -1,6 +1,7 @@
 ---
 title: PreAllocate and Cache Blocks in OM
 summary: Prefetch blocks from SCM asynchronously and cache them within OM to reduce dependency on SCM for every write.
+date: 2025-04-30
 jira: HDDS-11894
 status: draft
 ---
