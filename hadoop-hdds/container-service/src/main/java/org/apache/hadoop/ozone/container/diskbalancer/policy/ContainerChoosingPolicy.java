@@ -28,9 +28,16 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 public interface ContainerChoosingPolicy {
   /**
    * Choose a container for balancing.
-   *
+   * @param ozoneContainer the OzoneContainer instance to get all containers of a particular volume.
+   * @param volume the HddsVolume instance to choose containers from.
+   * @param inProgressContainerIDs containerIDs present in this set should be
+   - avoided as these containers are already under move by diskBalancer.
+   * @param replicationContainerIDs containerIDs present in this set should be
+   - avoided as these containers are in replication mode which has a chance
+   - to get deleted in the future.
    * @return a Container
    */
   ContainerData chooseContainer(OzoneContainer ozoneContainer,
-      HddsVolume volume, Set<Long> inProgressContainerIDs);
+      HddsVolume volume, Set<Long> inProgressContainerIDs,
+      Set<Long> replicationContainerIDs);
 }

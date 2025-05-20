@@ -57,6 +57,8 @@ import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPo
 import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -110,15 +112,18 @@ public class DiskBalancerService extends BackgroundService {
   private final File diskBalancerInfoFile;
 
   private DiskBalancerServiceMetrics metrics;
+  private ReplicationSupervisor replicationSupervisor;
   private long bytesToMove;
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
-      int workerSize, ConfigurationSource conf) throws IOException {
+      int workerSize, ConfigurationSource conf, ReplicationSupervisor replicationSupervisor)
+      throws IOException {
     super("DiskBalancerService", serviceCheckInterval, timeUnit, workerSize,
         serviceCheckTimeout);
     this.ozoneContainer = ozoneContainer;
     this.conf = conf;
+    this.replicationSupervisor = replicationSupervisor;
 
     String diskBalancerInfoPath = getDiskBalancerInfoPath();
     Preconditions.checkNotNull(diskBalancerInfoPath);
@@ -320,6 +325,16 @@ public class DiskBalancerService extends BackgroundService {
         .build();
   }
 
+  private Set<Long> getReplicationContainerIDs(ReplicationSupervisor supervisor) {
+    Set<Long> replicationContainerIDs = ConcurrentHashMap.newKeySet();
+    if (supervisor != null) {
+      for (AbstractReplicationTask task : supervisor.getInFlightTasks()) {
+        replicationContainerIDs.add(task.getContainerId());
+      }
+    }
+    return replicationContainerIDs;
+  }
+
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
@@ -349,7 +364,8 @@ public class DiskBalancerService extends BackgroundService {
       }
       HddsVolume sourceVolume = pair.getLeft(), destVolume = pair.getRight();
       ContainerData toBalanceContainer = containerChoosingPolicy
-          .chooseContainer(ozoneContainer, sourceVolume, inProgressContainers);
+          .chooseContainer(ozoneContainer, sourceVolume, inProgressContainers,
+              getReplicationContainerIDs(replicationSupervisor));
       if (toBalanceContainer != null) {
         queue.add(new DiskBalancerTask(toBalanceContainer, sourceVolume,
             destVolume));
