@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot.filter;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_GC_LOCK;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
@@ -58,7 +59,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
@@ -125,14 +125,14 @@ public abstract class AbstractReclaimableFilterTest {
     this.snapshotChainManager = mock(SnapshotChainManager.class);
     this.keyManager = mock(KeyManager.class);
     IOzoneManagerLock ozoneManagerLock = mock(IOzoneManagerLock.class);
-    when(ozoneManagerLock.acquireReadLocks(eq(OzoneManagerLock.LeveledResource.SNAPSHOT_GC_LOCK), anyList()))
+    when(ozoneManagerLock.acquireReadLocks(eq(SNAPSHOT_GC_LOCK), anyList()))
         .thenAnswer(i -> {
           lockIds.set(
               (List<UUID>) i.getArgument(1, List.class).stream().map(val -> UUID.fromString(((String[]) val)[0]))
                   .collect(Collectors.toList()));
           return OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
         });
-    when(ozoneManagerLock.releaseReadLocks(eq(OzoneManagerLock.LeveledResource.SNAPSHOT_GC_LOCK), anyList()))
+    when(ozoneManagerLock.releaseReadLocks(eq(SNAPSHOT_GC_LOCK), anyList()))
         .thenAnswer(i -> {
           Assertions.assertEquals(lockIds.get(),
               i.getArgument(1, List.class).stream().map(val -> UUID.fromString(((String[]) val)[0]))
