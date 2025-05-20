@@ -89,13 +89,26 @@ This design proposes a mechanism to preallocate blocks in OM and cache them for 
 
 #### Implementation Details
 
-- The OMBlockPrefetchClient implements a background thread for block prefetching and manages the cached queue of allocated blocks per replication configuration. It initializes with OM startup and stops during shutdown.
+- The `OMBlockPrefetchClient` implements a background thread for block prefetching and manages the cached queue of allocated blocks per replication configuration. It initializes with OM startup and stops during shutdown.
 - When a client machine's address is specified in the allocateBlock request, DNs in the pipelines are sorted by distance cost relative to the client. Since this logic has already been moved to OM as part of [HDDS-9343](https://issues.apache.org/jira/browse/HDDS-9343), it is utilized here while returning the block to the client.
 
 #### Advantages
 1. **Simplicity:** The cache requires minimal logic for management.
 2. **Efficiency:** Handles high-throughput scenarios efficiently with either no or significantly fewer calls to the SCM for block allocation.
 3. **Cleanup:** Time-based expiration removes the need for explicit invalidation logic.
+
+#### Percentage Improvement
+When the performance numbers were run using a pure write workload of 1 million zero-byte objects (`ockrw` tool) on an in-house cluster, the following improvement was seen:
+- **Single-threaded Scenario**: 
+  - **Before:** Write throughput was `368.61` calls/second.
+  - **After:** Write throughput is `449.23` calls/second.
+  - **Improvement:** ~`22%` improvement in performance.
+
+
+- **Multi-threaded Scenario (10 threads)**: 
+  - **Before:** Write throughput was `3831.86` calls/second.
+  - **After:** Write throughput is `4445.06` calls/second.
+  - **Improvement:** ~`16%` improvement in performance.
 
 #### Future Enhancements
 - Support adaptive prefetching based on metrics introduced.
