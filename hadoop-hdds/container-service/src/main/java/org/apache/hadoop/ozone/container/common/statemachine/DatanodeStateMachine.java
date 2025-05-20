@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Refr
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -133,6 +134,7 @@ public class DatanodeStateMachine implements Closeable {
 
   private final DatanodeQueueMetrics queueMetrics;
   private final ReconfigurationHandler reconfigurationHandler;
+  private Boolean isDiskBalancerEnabled = false;
 
   /**
    * Constructs a datanode state machine.
@@ -702,6 +704,39 @@ public class DatanodeStateMachine implements Closeable {
       getCommandHandlerThread(processCommandQueue).start();
     });
     return handlerThread;
+  }
+
+  public Boolean isDiskBalancerEnabled() {
+    return isDiskBalancerEnabled;
+  }
+
+  /**
+   * Stops the DiskBalancerService if it is running.
+   */
+  public void stopDiskBalancer() {
+    OzoneContainer ozoneContainer = getContainer();
+    if (ozoneContainer != null) {
+      DiskBalancerService diskBalancerService = ozoneContainer.getDiskBalancerService();
+      if (diskBalancerService != null) {
+        isDiskBalancerEnabled = diskBalancerService.getDiskBalancerInfo().isShouldRun();
+        LOG.info("Stopping DiskBalancerService as the DN state is set to DECOMMISSIONING/MAINTENANCE.");
+        diskBalancerService.setShouldRun(false);
+      }
+    }
+  }
+
+  /**
+   * Resume the DiskBalancerService if it was running previously.
+   */
+  public void resumeDiskBalancer() {
+    OzoneContainer ozoneContainer = getContainer();
+    if (ozoneContainer != null) {
+      DiskBalancerService diskBalancerService = ozoneContainer.getDiskBalancerService();
+      if (diskBalancerService != null) {
+        LOG.info("Resuming DiskBalancerService as the DN state is changed to IN_SERVICE.");
+        diskBalancerService.setShouldRun(true);
+      }
+    }
   }
 
   /**
