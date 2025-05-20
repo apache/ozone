@@ -71,10 +71,10 @@ services:
       - 9870:9999
     command: ["/opt/hadoop/bin/ozone","datanode"]
     extra_hosts:
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
-      - "recon: 172.25.0.115"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
+      - "recon=172.25.0.115"
     environment:
       WAITFOR: scm3.org:9894
       OZONE_OPTS:
@@ -93,10 +93,10 @@ services:
       - 9872:9999
     command: [ "/opt/hadoop/bin/ozone","datanode" ]
     extra_hosts:
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
-      - "recon: 172.25.0.115"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
+      - "recon=172.25.0.115"
     environment:
       WAITFOR: scm3.org:9894
       OZONE_OPTS:
