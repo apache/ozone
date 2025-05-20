@@ -17,12 +17,9 @@
 
 package org.apache.hadoop.ozone.scm.node;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
 import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,7 +46,6 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -72,14 +68,9 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
   @BeforeAll
   public static void setup() throws Exception {
-    final int interval = 100;
-
     conf = new OzoneConfiguration();
     conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
-    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-        interval, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration("hdds.datanode.disk.balancer.service.interval", 2, TimeUnit.SECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
@@ -165,20 +156,15 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     LogCapturer dnStateChangeLog = LogCapturer.captureLogs(
         SetNodeOperationalStateCommandHandler.class);
 
-    LogCapturer dnStopLog = LogCapturer.captureLogs(DatanodeStateMachine.class);
-
     // verify using logs that DiskBalancerService is stopped
     // on DN with state is DECOMMISSIONING or ENTERING_MAINTENANCE
     GenericTestUtils.waitFor(() -> {
       String dnLogs = dnStateChangeLog.getOutput();
-      String dnStopLogs = dnStopLog.getOutput();
-
       return
-          dnLogs.contains("Node state changed to DECOMMISSIONING." +
-          " Stopping DiskBalancerService.") && dnLogs.contains("Node state changed to ENTERING_MAINTENANCE." +
-          " Stopping DiskBalancerService.") && dnStopLogs.contains("Stopping DiskBalancerService as " +
-          "the DN state is set to DECOMMISSIONING/MAINTENANCE.");
-    }, 100, 5000); // Poll every 100ms, timeout after 5 seconds
+          dnLogs.contains("Node state changed to DECOMMISSIONING. Stopping DiskBalancerService.")
+              && dnLogs.contains("Node state changed to ENTERING_MAINTENANCE." +
+          " Stopping DiskBalancerService.");
+    }, 100, 5000);
 
     // Recommission DN1
     scmClient.recommissionNodes(
@@ -203,15 +189,15 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     assertTrue(isRecommissionedDnInReport);
     assertTrue(isRecommissionedDnInStatus);
 
-    // verify using logs that DiskBalancerService has
-    // resume when DN is recommissioned
+    //Verify using logs when DN is recommissioned
+    //if the DN was previously in stopped state it will not be resumed
+    //otherwise it will be resumed
     GenericTestUtils.waitFor(() -> {
       String dnLogs = dnStateChangeLog.getOutput();
-      String dnStopLogs = dnStopLog.getOutput();
-
-      return dnLogs.contains("Node state changed to IN_SERVICE. Resuming DiskBalancerService.")
-              && dnStopLogs.contains("Resuming DiskBalancerService as the DN state is changed to IN_SERVICE.");
-    }, 100, 5000); // Poll every 100ms, timeout after 5 seconds
+      return dnLogs.contains("Node state changed to IN_SERVICE. Resuming DiskBalancerService to running state.")
+          || dnLogs.contains("Node state changed to IN_SERVICE. DiskBalancerService will" +
+          " not be resumed as it was previously in stopped state");
+    }, 100, 5000);
   }
 }
 

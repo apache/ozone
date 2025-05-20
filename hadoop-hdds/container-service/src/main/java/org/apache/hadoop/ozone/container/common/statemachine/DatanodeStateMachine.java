@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -134,7 +135,10 @@ public class DatanodeStateMachine implements Closeable {
 
   private final DatanodeQueueMetrics queueMetrics;
   private final ReconfigurationHandler reconfigurationHandler;
-  private Boolean isDiskBalancerEnabled = false;
+  //global variable to track if diskBalancer was running before pause
+  private Boolean shouldRun = false;
+  //global variable to track paused state of diskBalancer
+  private final AtomicBoolean paused;
 
   /**
    * Constructs a datanode state machine.
@@ -159,6 +163,7 @@ public class DatanodeStateMachine implements Closeable {
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
+    this.paused = new AtomicBoolean(false);
 
     Clock clock = Clock.system(ZoneId.systemDefault());
     // Expected to be initialized already.
@@ -706,10 +711,6 @@ public class DatanodeStateMachine implements Closeable {
     return handlerThread;
   }
 
-  public Boolean isDiskBalancerEnabled() {
-    return isDiskBalancerEnabled;
-  }
-
   /**
    * Stops the DiskBalancerService if it is running.
    */
@@ -718,8 +719,8 @@ public class DatanodeStateMachine implements Closeable {
     if (ozoneContainer != null) {
       DiskBalancerService diskBalancerService = ozoneContainer.getDiskBalancerService();
       if (diskBalancerService != null) {
-        isDiskBalancerEnabled = diskBalancerService.getDiskBalancerInfo().isShouldRun();
-        LOG.info("Stopping DiskBalancerService as the DN state is set to DECOMMISSIONING/MAINTENANCE.");
+        shouldRun = diskBalancerService.getDiskBalancerInfo().isShouldRun();
+        paused.set(true); // Mark as paused
         diskBalancerService.setShouldRun(false);
       }
     }
@@ -732,11 +733,20 @@ public class DatanodeStateMachine implements Closeable {
     OzoneContainer ozoneContainer = getContainer();
     if (ozoneContainer != null) {
       DiskBalancerService diskBalancerService = ozoneContainer.getDiskBalancerService();
-      if (diskBalancerService != null) {
-        LOG.info("Resuming DiskBalancerService as the DN state is changed to IN_SERVICE.");
+      if (diskBalancerService != null && paused.get()) {
+        // Reset paused state
+        paused.set(false);
         diskBalancerService.setShouldRun(true);
       }
     }
+  }
+
+  /**
+   * Checks if DiskBalancerService should run based
+   * on its previous state and paused flag.
+   */
+  public boolean shouldRunDiskBalancer() {
+    return shouldRun && paused.get();
   }
 
   /**
