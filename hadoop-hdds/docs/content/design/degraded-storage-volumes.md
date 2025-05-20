@@ -101,7 +101,7 @@ Healthy is the default state for a volume. Volumes remain in this state until he
 
 ##### Degraded
 
-Degraded volumes are still reachable, but are reporting numerous IO errors when interacting with them. For identification purposes, we can escalate this with SCM, Recon, and metrics which will allow admins to decide whether to leave the volume or remove it. Identification of degraded volumes will be based on errors reported by ongoing datanode IO. This includes the container scanner to ensure that degraded volumes can still be detected even on idle nodes. The container scanner will continue to determine whether individual containers are healthy or not, and the volume scanner will still run to determine if the volume needs to be moved to **failed**. **Degraded** volumes may move back to **healthy** if IO errors are no longer being reported. The historical moves of a volume from healthy to degraded and back can be tracked in a metrics database like Prometheus.
+Degraded volumes are still reachable, but are reporting numerous IO errors when interacting with them. For identification purposes, we can escalate this with SCM, Recon, and metrics which will allow admins to decide whether to leave the volume or remove it. Identification of degraded volumes will be based on errors reported by ongoing datanode IO. This includes the container scanner to ensure that degraded volumes can still be detected even on idle nodes. The container scanner will continue to determine whether individual containers are healthy or not, and the volume scanner will still run to determine if the volume needs to be moved to **failed**. **Degraded** volumes may move back to **healthy** if IO errors are no longer being reported. Data can still be read from **degraded** volumes, the client's read checksums will verify whether the data is valid or not.
 
 - **Enter**:
     - **On Startup**: N/A. Degraded state is not persisted to disk or identified with startup checks.
@@ -147,7 +147,65 @@ In the future, we may want to handle completely full volumes by opening the Rock
 
 #### Identifying Volume Health with Metrics
 
-To identify degraded and failed volumes through metrics which can be plugged into an alerting system, we can expose counters for each volume health state per datanode: `NumHealthyVolumes`, `NumDegradedVolumes`, and `NumFailedVolumes`. When the counter for degraded or failed volumes goes above 0, it can be used to trigger an alert about an unhealthy volume on a datanode. This saves us from having to expose health state (which does not easily map to a numeric counter or gauge) as a per-volume metric in [VolumeInfoMetrics](https://github.com/apache/ozone/blob/536701649e1a3d5fa94e95888a566e213febb6ff/hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/common/volume/VolumeInfoMetrics.java#L64). Once the alert is raised, admins can use the command line to determine which volumes are concerning.
+##### Current State of Volume Metrics
+
+ Currently we track per-volume metrics for data volumes (`HddsVolumes`) in [VolumeInfoMetrics](https://github.com/apache/ozone/blob/536701649e1a3d5fa94e95888a566e213febb6ff/hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/common/volume/VolumeInfoMetrics.java#L64). There are currently no metrics tracked for metadata volumes. The per-volume metrics look like this:
+ ```json
+ {
+  "name": "Hadoop:service=HddsDatanode,name=VolumeInfoMetrics-/hadoop-ozone/datanode/data",
+  "modelerType": "VolumeInfoMetrics-/hadoop-ozone/datanode/data",
+  "tag.Context": "ozone",
+  "tag.StorageType": "DISK",
+  "tag.DatanodeUuid": "4362fd47-44ea-4eda-a796-65d1ebfce3cc",
+  "tag.StorageDirectory": "/hadoop-ozone/datanode/data/hdds",
+  "tag.VolumeType": "DATA_VOLUME",
+  "tag.VolumeState": "NORMAL",
+  "tag.Hostname": "example.com",
+  "Committed": 21474804287,
+  "TotalCapacity": 163778014236,
+  "Capacity": 163750977536,
+  "Available": 163595849728,
+  "LayoutVersion": 1,
+  "Used": 155127808,
+  "Reserved": 27036700
+}
+```
+
+Here `tag.VolumeState` corresponds to the [VolumeState](https://github.com/apache/ozone/blob/6d0a8306aba01483edfeab04e8b527985fa471b0/hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/common/volume/StorageVolume.java#L102) enum:
+```java
+public enum VolumeState {
+  NORMAL,
+  FAILED,
+  NON_EXISTENT,
+  INCONSISTENT,
+  NOT_FORMATTED,
+  NOT_INITIALIZED
+}
+```
+
+There is currently no counter of how many volumes are in each health state per datanode, unlike HDFS which has a `NumFailedVolumes` metric for each datanode.
+
+##### Improvements to Volume Metrics
+
+1. Add **degraded** as a state in the `VolumeState` enum.
+
+The string value will automatically get published in the metrics when the volume moves to this state. Depending how metrics are collected, this string may or may not be consumable since it is not a numeric value.
+
+2. Add per-datanode volume counters for alerting
+
+To identify degraded and failed volumes through metrics which can be plugged into an alerting system, we can expose counters on each datanode tracking the number of healthy volumes. The following metrics can be used:
+
+- `TotalVolumes`: The total number of volumes on the datanode regardless of health state.
+- `NumHealthyVolumes`: The total number of healthy volumes on the datanode.
+- `NumDegradedVolumes`: The total number of degraded volumes on the datanode.
+- `NumFailedVolumes`: The total number of failed volumes on the datanode.
+
+Some use cases these metrics enable are:
+- Identify mount issues on datanodes when `TotalVolumes` is less than expected.
+- Identify the presence of unhealthy volumes when `NumHealthyVolumes < TotalVolumes`
+- Raise low severity alerts when `NumDegradedVolumes > 0` and higher severity alerts when `NumFailedVolumes > 0`
+
+ Once the alert is raised, admins can use the command line to determine which volumes are concerning. The historical moves of a volume from healthy to degraded and back can be tracked in a metrics database like Prometheus.
 
 #### Identifying Volume Health with the Command Line
 
@@ -179,19 +237,15 @@ If automated decommissioning of degraded volumes is desired, the two features co
 
 ## Task Breakdown
 
-This is an approximate task breakdown of the work required to implement this feature. Tasks are listed in order and grouped by focus area.
+This is an approximate task breakdown of the work required to implement this feature. The initial set of tasks cover general scanner improvements that can be added regardless of the **degraded** state. The last set of tasks adds support for **degraded** volumes on top of these tasks.
 
 ### Improve Volume Scanner
 
 - Create a generic timer-based sliding window class that can be used for checks with intermittent failures.
-- Create a **degraded** volume health state which can be used by the volume scanner.
-    - Add volume health state to `StorageReportProto` so it is received at SCM
-    - Currently we only have a boolean that says whether the volume is healthy or not.
 - Determine default configurations for sliding windows and scan intervals
     - Sliding window timeouts and scan intervals need to be set accordingly so that background scanners alone have a chance to cross the check threshold even if no foreground load is triggering on-demand scans.
     - Minimum volume scan gap is currently 15 minutes. This value can likely be reduced since volume scans are cheap, which will give us a more accurate view of the volume's health.
-- Migrate existing volume scanner checks to put entries in either the **failed** or **degraded** sliding windows and move health state accordingly.
-- Add IO error count to on-demand volume scanner, which counts towards the **degraded** sliding window.
+- Migrate existing volume scanner checks to put entries in one **failed** sliding window and change volume state accordingly.
 - Trigger on-demand volume scan when the container scanner finds an unhealthy container.
 
 ### Improve CLI
@@ -204,9 +258,18 @@ This is an approximate task breakdown of the work required to implement this fea
 
 - Add metrics for volume scanners. They currently don't have any.
     - This includes metrics for the current counts in each health state sliding window.
-- Add metrics for volume health state (including the new degraded state), which can be used for alerting.
+- Add counter metrics for volume health states.
 
 ### Improve Recon Volume Overview
 
 - Support showing information about individual volumes within a node from Recon based on the existing storage reports received.
     - This would include capacity and health information.
+
+### Degraded Volume Support
+
+- Create a **degraded** [VolumeState](https://github.com/apache/ozone/blob/6d0a8306aba01483edfeab04e8b527985fa471b0/hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/common/volume/StorageVolume.java#L102) which can be used by the volume scanner.
+    - Add volume health state to `StorageReportProto` so it is received at SCM
+    - Currently we only have a boolean that says whether the volume is healthy or not.
+- Make volume scanner put corresponding checks into the **degraded** sliding window and change volume state accordingly.
+- Add IO error count to on-demand volume scanner, which counts towards the **degraded** sliding window.
+- Add new metric to count number of degraded volumes on a datanode.
