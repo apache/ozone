@@ -23,10 +23,13 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_KEYS_LIMIT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -37,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -91,6 +95,7 @@ public class BucketEndpoint extends EndpointBase {
       LoggerFactory.getLogger(BucketEndpoint.class);
 
   private boolean listKeysShallowEnabled;
+  private int maxKeysLimit = 1000;
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
@@ -141,6 +146,8 @@ public class BucketEndpoint extends EndpointBase {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
         return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
+
+      maxKeys = validateMaxKeys(maxKeys);
 
       if (prefix == null) {
         prefix = "";
@@ -290,6 +297,14 @@ public class BucketEndpoint extends EndpointBase {
         getAuditParameters(), perf));
     response.setKeyCount(keyCount);
     return Response.ok(response).build();
+  }
+
+  private int validateMaxKeys(int maxKeys) throws OS3Exception {
+    if (maxKeys <= 0) {
+      throw newError(S3ErrorTable.INVALID_ARGUMENT, "maxKeys must be > 0");
+    }
+
+    return Math.min(maxKeys, maxKeysLimit);
   }
 
   @PUT
@@ -750,10 +765,24 @@ public class BucketEndpoint extends EndpointBase {
     response.addKey(keyMetadata);
   }
 
+  @VisibleForTesting
+  public void setOzoneConfiguration(OzoneConfiguration config) {
+    this.ozoneConfiguration = config;
+  }
+
+  @VisibleForTesting
+  public OzoneConfiguration getOzoneConfiguration() {
+    return this.ozoneConfiguration;
+  }
+
   @Override
+  @PostConstruct
   public void init() {
     listKeysShallowEnabled = ozoneConfiguration.getBoolean(
         OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED,
         OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT);
+    maxKeysLimit = ozoneConfiguration.getInt(
+        OZONE_S3G_LIST_MAX_KEYS_LIMIT,
+        OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT);
   }
 }
