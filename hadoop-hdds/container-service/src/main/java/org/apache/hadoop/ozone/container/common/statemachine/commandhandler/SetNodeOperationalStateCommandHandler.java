@@ -110,11 +110,16 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
       context.getParent().stopDiskBalancer();
     }
 
-    Boolean isDiskBalancerEnabled = context.getParent().isDiskBalancerEnabled();
+    Boolean shouldRun = context.getParent().shouldRunDiskBalancer();
 
-    if (state == HddsProtos.NodeOperationalState.IN_SERVICE && isDiskBalancerEnabled) {
-      LOG.info("Node state changed to {}. Resuming DiskBalancerService.", state);
-      context.getParent().resumeDiskBalancer();
+    if (state == HddsProtos.NodeOperationalState.IN_SERVICE) {
+      if (shouldRun) {
+        LOG.info("Node state changed to {}. Resuming DiskBalancerService to running state.", state);
+        context.getParent().resumeDiskBalancer();
+      } else {
+        LOG.info("Node state changed to {}. DiskBalancerService will not be" +
+            " resumed as it was previously in stopped state", state);
+      }
     }
 
     replicationSupervisor.accept(state);
