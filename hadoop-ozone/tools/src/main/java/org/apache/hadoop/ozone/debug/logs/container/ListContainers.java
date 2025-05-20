@@ -21,8 +21,9 @@ import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListLimitOptions;
 import picocli.CommandLine;
 
 
@@ -36,28 +37,50 @@ import picocli.CommandLine;
 )
 public class ListContainers extends AbstractSubcommand implements Callable<Void> {
   
-  @CommandLine.Option(names = {"--state"},
-      description = "Life cycle state of the container.",
-      required = true)
-  private HddsProtos.LifeCycleState state;
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private ExclusiveOptions exclusiveOptions;
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
-
+  private ListLimitOptions listOptions;
+  
   @CommandLine.ParentCommand
   private ContainerLogController parent;
+
+  private static final class ExclusiveOptions {
+    @CommandLine.Option(names = {"--lifecycle"},
+        description = "Life cycle state of the container.")
+    private HddsProtos.LifeCycleState lifecycleState;
+
+    @CommandLine.Option(names = {"--health"},
+        description = "Health state of the container.")
+    private ReplicationManagerReport.HealthState healthState;
+  }
 
   @Override
   public Void call() throws Exception {
     
     Path dbPath = parent.resolveDbPath();
-    if (dbPath == null) {
-      return null;
-    }
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(dbPath.toString());
 
-    cdd.listContainersByState(state.name(), listOptions.getLimit());
+    if (exclusiveOptions.lifecycleState != null) {
+      cdd.listContainersByState(exclusiveOptions.lifecycleState.name(), listOptions.getLimit());
+    } else if (exclusiveOptions.healthState != null) {
+      switch (exclusiveOptions.healthState) {
+      case UNDER_REPLICATED:
+      case OVER_REPLICATED:
+        cdd.listReplicatedContainers(exclusiveOptions.healthState.name(), listOptions.getLimit());
+        break;
+      case UNHEALTHY:
+        cdd.listUnhealthyContainers(listOptions.getLimit());
+        break;
+      case QUASI_CLOSED_STUCK:
+        cdd.listQuasiClosedStuckContainers(listOptions.getLimit());
+        break;
+      default:
+        err().println("Unsupported health state: " + exclusiveOptions.healthState);
+      }
+    }
     
     return null;
   }

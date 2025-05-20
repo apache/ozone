@@ -128,7 +128,7 @@ public class TestOMSortDatanodes {
   public void sortDatanodesRelativeToDatanode() {
     for (DatanodeDetails dn : nodeManager.getAllNodes()) {
       assertEquals(ROOT_LEVEL + 2, dn.getLevel());
-      List<DatanodeDetails> sorted =
+      List<? extends DatanodeDetails> sorted =
           keyManager.sortDatanodes(nodeManager.getAllNodes(), nodeAddress(dn));
       assertEquals(dn, sorted.get(0),
           "Source node should be sorted very first");
@@ -146,12 +146,12 @@ public class TestOMSortDatanodes {
 
   @Test
   public void testSortDatanodes() {
-    List<DatanodeDetails> nodes = nodeManager.getAllNodes();
+    List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
 
     // sort normal datanodes
     String client;
     client = nodeManager.getAllNodes().get(0).getIpAddress();
-    List<DatanodeDetails> datanodeDetails =
+    List<? extends DatanodeDetails> datanodeDetails =
         keyManager.sortDatanodes(nodes, client);
     assertEquals(NODE_COUNT, datanodeDetails.size());
 
@@ -166,7 +166,7 @@ public class TestOMSortDatanodes {
     assertEquals(NODE_COUNT, datanodeDetails.size());
   }
 
-  private static void assertRackOrder(String rack, List<DatanodeDetails> list) {
+  private static void assertRackOrder(String rack, List<? extends DatanodeDetails> list) {
     int size = list.size();
     for (int i = 0; i < size / 2; i++) {
       assertEquals(rack, list.get(i).getNetworkLocation(),

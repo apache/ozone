@@ -92,3 +92,8 @@ Create EC key
     ${count_files} =                    Count Files In Directory    ${directory}
     ${sum_size_last_stripe} =           Evaluate     1048576 * 4 + ((1000000 * 8) % 1048576)
     Should Be Equal As Integers         ${count_files}     1
+
+Test ozone debug replicas chunk-info
+    Create EC key     1048576    6
+    ${count} =        Execute           ozone debug replicas chunk-info o3://om/${VOLUME}/${BUCKET}/testfile | jq '[.keyLocations[0][] | select(.file | test("\\\\.block$")) | .file] | length'
+    Should Be Equal As Integers         ${count}           9

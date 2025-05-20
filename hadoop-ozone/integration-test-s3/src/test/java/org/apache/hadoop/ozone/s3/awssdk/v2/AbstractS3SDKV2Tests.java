@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
@@ -71,6 +73,7 @@ import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
 import software.amazon.awssdk.services.s3.model.CreateMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
@@ -81,6 +84,10 @@ import software.amazon.awssdk.services.s3.model.Tag;
 import software.amazon.awssdk.services.s3.model.Tagging;
 import software.amazon.awssdk.services.s3.model.UploadPartRequest;
 import software.amazon.awssdk.services.s3.model.UploadPartResponse;
+import software.amazon.awssdk.transfer.s3.S3TransferManager;
+import software.amazon.awssdk.transfer.s3.model.DownloadFileRequest;
+import software.amazon.awssdk.transfer.s3.model.FileDownload;
+import software.amazon.awssdk.transfer.s3.model.ResumableFileDownload;
 
 /**
  * This is an abstract class to test the AWS Java S3 SDK operations.
@@ -101,6 +108,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
   private static MiniOzoneCluster cluster = null;
   private static S3Client s3Client = null;
+  private static S3AsyncClient s3AsyncClient = null;
 
   /**
    * Create a MiniOzoneCluster with S3G enabled for testing.
@@ -114,7 +122,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    s3Client = new S3ClientFactory(s3g.getConf()).createS3ClientV2();
+
+    S3ClientFactory s3Factory = new S3ClientFactory(s3g.getConf());
+    s3Client = s3Factory.createS3ClientV2();
+    s3AsyncClient = s3Factory.createS3AsyncClientV2();
   }
 
   /**
@@ -127,6 +138,20 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  public void listBuckets() throws Exception {
+    final String bucketName = getBucketName();
+    final String expectedOwner = UserGroupInformation.getCurrentUser().getUserName();
+
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    ListBucketsResponse syncResponse = s3Client.listBuckets();
+    assertEquals(1, syncResponse.buckets().size());
+    assertEquals(bucketName, syncResponse.buckets().get(0).name());
+    assertEquals(expectedOwner, syncResponse.owner().displayName());
+    assertEquals(expectedOwner, syncResponse.owner().id());
   }
 
   @Test
@@ -322,6 +347,46 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     HeadObjectResponse headObjectResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
     assertTrue(headObjectResponse.hasMetadata());
     assertEquals(userMetadata, headObjectResponse.metadata());
+  }
+
+  @Test
+  public void testResumableDownloadWithEtagMismatch() throws Exception {
+    // Arrange
+    final String bucketName = getBucketName("resumable");
+    final String keyName = getKeyName("resumable");
+    final String fileContent = "This is a test file for resumable download.";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(fileContent));
+
+    // Prepare a temp file for download
+    Path downloadPath = Files.createTempFile("downloaded", ".txt");
+
+    // Set up S3TransferManager
+    try (S3TransferManager transferManager =
+             S3TransferManager.builder().s3Client(s3AsyncClient).build()) {
+
+      // First download
+      DownloadFileRequest downloadRequest = DownloadFileRequest.builder()
+          .getObjectRequest(b -> b.bucket(bucketName).key(keyName))
+          .destination(downloadPath)
+          .build();
+      FileDownload download = transferManager.downloadFile(downloadRequest);
+      ResumableFileDownload resumableFileDownload = download.pause();
+
+      // Simulate etag mismatch by modifying the file in S3
+      final String newContent = "This is new content to cause etag mismatch.";
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(newContent));
+
+      // Resume download
+      FileDownload resumedDownload = transferManager.resumeDownloadFile(resumableFileDownload);
+      resumedDownload.completionFuture().get();
+
+      String downloadedContent = new String(Files.readAllBytes(downloadPath), StandardCharsets.UTF_8);
+      assertEquals(newContent, downloadedContent);
+
+      File downloadFile = downloadPath.toFile();
+      assertTrue(downloadFile.delete());
+    }
   }
 
   private String getBucketName() {

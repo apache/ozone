@@ -946,7 +946,7 @@ public class TestSCMNodeManager {
       // should be instructed to finalize.
       verify(eventPublisher, times(1))
           .fireEvent(eq(DATANODE_COMMAND), captor.capture());
-      assertEquals(captor.getValue().getDatanodeId(), node1.getUuid());
+      assertEquals(captor.getValue().getDatanodeId(), node1.getID());
       assertEquals(captor.getValue().getCommand().getType(),
           finalizeNewLayoutVersionCommand);
     } else {
@@ -976,11 +976,11 @@ public class TestSCMNodeManager {
     verify(eventPublisher,
         times(1)).fireEvent(NEW_NODE, node1);
     for (int i = 0; i < 3; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(), ReplicateContainerCommand
+      nodeManager.addDatanodeCommand(node1.getID(), ReplicateContainerCommand
           .toTarget(1, MockDatanodeDetails.randomDatanodeDetails()));
     }
     for (int i = 0; i < 5; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(),
+      nodeManager.addDatanodeCommand(node1.getID(),
           new DeleteBlocksCommand(emptyList()));
     }
 
@@ -1036,7 +1036,7 @@ public class TestSCMNodeManager {
 
     // Add a a few more commands to the queue and check the counts are the sum.
     for (int i = 0; i < 5; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(),
+      nodeManager.addDatanodeCommand(node1.getID(),
           new CloseContainerCommand(1, PipelineID.randomId()));
     }
     assertEquals(0, nodeManager.getTotalDatanodeCommandCount(
@@ -1070,11 +1070,11 @@ public class TestSCMNodeManager {
             HddsProtos.ReplicationFactor.THREE, emptyList());
 
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, closeContainerCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), closeContainerCommand), null);
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, closeContainerCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), closeContainerCommand), null);
     nodeManager.onMessage(
-        new CommandForDatanode<>(datanode1, createPipelineCommand), null);
+        new CommandForDatanode<>(DatanodeID.of(datanode1), createPipelineCommand), null);
 
     assertEquals(2, nodeManager.getCommandQueueCount(
         datanode1, SCMCommandProto.Type.closeContainerCommand));
@@ -1773,7 +1773,7 @@ public class TestSCMNodeManager {
               Arrays.asList(report), emptyList()),
                   HddsTestUtils.getRandomPipelineReports());
       eq.fireEvent(DATANODE_COMMAND,
-          new CommandForDatanode<>(datanodeDetails.getUuid(),
+          new CommandForDatanode<>(datanodeDetails,
               new CloseContainerCommand(1L,
                   PipelineID.randomId())));
 
@@ -1828,7 +1828,7 @@ public class TestSCMNodeManager {
       assertEquals(nodeCount, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
-      List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
       nodeList.forEach(node -> assertTrue(
           node.getNetworkLocation().startsWith("/rack1/ng")));
       nodeList.forEach(node -> assertNotNull(node.getParent()));
@@ -1872,7 +1872,7 @@ public class TestSCMNodeManager {
           nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(3, clusterMap.getMaxLevel());
-      List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
       nodeList.forEach(node ->
           assertEquals("/rack1", node.getNetworkLocation()));
 
@@ -2019,7 +2019,7 @@ public class TestSCMNodeManager {
               nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(1, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
-      List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
       assertEquals(1, nodeList.size());
 
       DatanodeDetails returnedNode = nodeList.get(0);
@@ -2039,7 +2039,7 @@ public class TestSCMNodeManager {
       assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(1, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
-      List<DatanodeDetails> updatedNodeList = nodeManager.getAllNodes();
+      final List<DatanodeInfo> updatedNodeList = nodeManager.getAllNodes();
       assertEquals(1, updatedNodeList.size());
 
       DatanodeDetails returnedUpdatedNode = updatedNodeList.get(0);
