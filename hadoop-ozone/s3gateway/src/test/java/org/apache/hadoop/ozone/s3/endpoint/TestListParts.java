@@ -35,6 +35,7 @@ import java.io.ByteArrayInputStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -57,6 +58,8 @@ public class TestListParts {
     client.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    Mockito.when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 

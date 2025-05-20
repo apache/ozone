@@ -43,6 +43,7 @@ import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.StreamingOutput;
 import javax.xml.bind.DatatypeConverter;
+import net.jcip.annotations.Immutable;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -69,6 +70,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
+import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
@@ -136,7 +138,11 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.hasMultiChunksPayload;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.hasUnsignedPayload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 
 /**
  * Key level rest endpoints.
@@ -288,16 +294,13 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
       // Normal put object
+      S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(body,
+          length, amzDecodedLength, keyPath);
+      digestInputStream = chunkInputStreamInfo.getDigestInputStream();
+      length = chunkInputStreamInfo.getEffectiveLength();
+
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
-
-      if (S3Utils.hasSignedPayloadHeader(headers)) {
-        digestInputStream = new DigestInputStream(new SignedChunksInputStream(body),
-            getMessageDigestInstance());
-        length = Long.parseLong(amzDecodedLength);
-      } else {
-        digestInputStream = new DigestInputStream(body, getMessageDigestInstance());
-      }
 
       long putLength;
       String eTag = null;
@@ -889,15 +892,11 @@ public class ObjectEndpoint extends EndpointBase {
     String copyHeader = null;
     DigestInputStream digestInputStream = null;
     try {
-
-      if (S3Utils.hasSignedPayloadHeader(headers)) {
-        digestInputStream = new DigestInputStream(new SignedChunksInputStream(body),
-            getMessageDigestInstance());
-        length = Long.parseLong(
-            headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER));
-      } else {
-        digestInputStream = new DigestInputStream(body, getMessageDigestInstance());
-      }
+      String amzDecodedLength = headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER);
+      S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(
+          body, length, amzDecodedLength, key);
+      digestInputStream = chunkInputStreamInfo.getDigestInputStream();
+      length = chunkInputStreamInfo.getEffectiveLength();
 
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
@@ -1369,6 +1368,56 @@ public class ObjectEndpoint extends EndpointBase {
       return bufferSize;
     } else {
       return fileLength < bufferSize ? (int) fileLength : bufferSize;
+    }
+  }
+
+  /**
+   * Create a {@link S3ChunkInputStreamInfo} that contains the necessary information to handle
+   * the S3 chunk upload.
+   */
+  private S3ChunkInputStreamInfo getS3ChunkInputStreamInfo(
+      InputStream body, long contentLength, String amzDecodedLength, String keyPath) throws OS3Exception {
+    final String amzContentSha256Header = validateSignatureHeader(headers, keyPath);
+    final InputStream chunkInputStream;
+    final long effectiveLength;
+    if (hasMultiChunksPayload(amzContentSha256Header)) {
+      validateMultiChunksUpload(headers, amzDecodedLength, keyPath);
+      if (hasUnsignedPayload(amzContentSha256Header)) {
+        chunkInputStream = new UnsignedChunksInputStream(body);
+      } else {
+        chunkInputStream = new SignedChunksInputStream(body);
+      }
+      effectiveLength = Long.parseLong(amzDecodedLength);
+    } else {
+      // Single chunk upload: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+      // Possible x-amz-content-sha256 header values
+      // - Actual payload checksum value: For signed payload
+      // - UNSIGNED-PAYLOAD: For unsigned payload
+      chunkInputStream = body;
+      effectiveLength = contentLength;
+    }
+
+    // DigestInputStream is used for ETag calculation
+    DigestInputStream digestInputStream = new DigestInputStream(chunkInputStream, getMessageDigestInstance());
+    return new S3ChunkInputStreamInfo(digestInputStream, effectiveLength);
+  }
+
+  @Immutable
+  static final class S3ChunkInputStreamInfo {
+    private final DigestInputStream digestInputStream;
+    private final long effectiveLength;
+
+    S3ChunkInputStreamInfo(DigestInputStream digestInputStream, long effectiveLength) {
+      this.digestInputStream = digestInputStream;
+      this.effectiveLength = effectiveLength;
+    }
+
+    public DigestInputStream getDigestInputStream() {
+      return digestInputStream;
+    }
+
+    public long getEffectiveLength() {
+      return effectiveLength;
     }
   }
 }
