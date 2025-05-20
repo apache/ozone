@@ -2161,8 +2161,6 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneFileStatus getOzoneFileStatus(String volumeName,
       String bucketName, String keyName) throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)

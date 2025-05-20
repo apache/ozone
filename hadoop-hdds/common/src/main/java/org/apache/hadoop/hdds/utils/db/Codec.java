@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
-import java.io.IOException;
+import java.util.Objects;
 
 /**
  * Codec interface to serialize/deserialize objects to/from bytes.
@@ -90,14 +90,46 @@ public interface Codec<T> {
    * Convert object to raw persisted format.
    * @param object The original java object. Should not be null.
    */
-  byte[] toPersistedFormat(T object) throws IOException;
+  default byte[] toPersistedFormat(T object) throws CodecException {
+    Objects.requireNonNull(object, "object == null");
+    try {
+      return toPersistedFormatImpl(object);
+    } catch (Exception e) {
+      throw new CodecException("Failed to serialize " + object
+          + " for " + object.getClass(), e);
+    }
+  }
+
+  /**
+   * The same as {@link #toPersistedFormat} except that this method throws {@link Exception}.
+   * A subclass must implement either {@link #toPersistedFormat} or this method.
+   */
+  default byte[] toPersistedFormatImpl(T object) throws Exception {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Convert object from raw persisted format.
    *
    * @param rawData Byte array from the key/value store. Should not be null.
    */
-  T fromPersistedFormat(byte[] rawData) throws IOException;
+  default T fromPersistedFormat(byte[] rawData) throws CodecException {
+    Objects.requireNonNull(rawData, "rawData == null");
+    try {
+      return fromPersistedFormatImpl(rawData);
+    } catch (Exception e) {
+      throw new CodecException("Failed to deserialize rawData (length=" + rawData.length
+          + ") for " + getTypeClass(), e);
+    }
+  }
+
+  /**
+   * The same as {@link #fromPersistedFormat} except that this method throws {@link Exception}.
+   * A subclass must implement either {@link #fromPersistedFormat} or this method.
+   */
+  default T fromPersistedFormatImpl(byte[] rawData) throws Exception {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Copy the given object.
