@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.s3.awssdk.v1;
 
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
-
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -33,7 +31,6 @@ public class TestS3SDKV1 extends AbstractS3SDKV1Tests {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, "5GB");
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     startCluster(conf);
   }
