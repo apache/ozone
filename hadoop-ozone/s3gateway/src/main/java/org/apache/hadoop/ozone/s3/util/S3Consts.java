@@ -37,8 +37,8 @@ public final class S3Consts {
   public static final String STORAGE_CLASS_HEADER = "x-amz-storage-class";
   public static final String ENCODING_TYPE = "url";
 
-  // Constants related to Signature calculation
-  // https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-auth-using-authorization-header.html
+  // Constants related to AWS Signature Version V4 calculation
+  // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
   public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
 
   public static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
@@ -50,6 +50,8 @@ public final class S3Consts {
   public static final String STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER =
       "STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER";
 
+  public static final String AWS_CHUNKED = "aws-chunked";
+  public static final String MULTI_CHUNKS_UPLOAD_PREFIX = "STREAMING";
 
   // Constants related to Range Header
   public static final String COPY_SOURCE_IF_PREFIX = "x-amz-copy-source-if-";
