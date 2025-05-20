@@ -31,13 +31,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.Versioned;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
-import org.jgrapht.alg.util.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,7 +121,7 @@ public class RequestValidations {
     return Arrays.stream(VersionExtractor.values())
         .map(versionExtractor -> Pair.of(versionExtractor.getValidatorClass(),
             versionExtractor.extractVersion(request, context)))
-        .filter(pair -> Objects.nonNull(pair.getSecond()))
-        .collect(Collectors.toMap(pair -> pair.getFirst(), pair -> pair.getSecond()));
+        .filter(pair -> Objects.nonNull(pair.getValue()))
+        .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
   }
 }

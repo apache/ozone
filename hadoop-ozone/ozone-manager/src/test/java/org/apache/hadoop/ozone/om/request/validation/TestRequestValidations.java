@@ -204,10 +204,9 @@ public class TestRequestValidations {
     validations.validateResponse(
         aCreateKeyRequest(ClientVersion.ERASURE_CODING_SUPPORT), aCreateKeyResponse());
 
-    validationListener.assertNumOfEvents(2);
+    validationListener.assertNumOfEvents(1);
     validationListener.assertExactListOfValidatorsCalled(
-        "postProcessCreateKeyBucketLayoutClientValidator",
-        "postProcessCreateKeyECReplicaIndexRequiredClientValidator");
+        "postProcessCreateKeyBucketLayoutClientValidator");
   }
 
   @Test
@@ -233,11 +232,10 @@ public class TestRequestValidations {
     validations.validateResponse(
         aCreateKeyRequest(ClientVersion.ERASURE_CODING_SUPPORT), aCreateKeyResponse());
 
-    validationListener.assertNumOfEvents(3);
+    validationListener.assertNumOfEvents(2);
     validationListener.assertExactListOfValidatorsCalled(
         "postProcessCreateKeyQuotaLayoutValidator",
-        "postProcessCreateKeyBucketLayoutClientValidator",
-        "postProcessCreateKeyECReplicaIndexRequiredClientValidator");
+        "postProcessCreateKeyBucketLayoutClientValidator");
   }
 
   /**

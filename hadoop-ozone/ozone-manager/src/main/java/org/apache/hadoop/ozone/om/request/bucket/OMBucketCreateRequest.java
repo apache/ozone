@@ -464,7 +464,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateBucket,
-      applyBefore =  ClientVersion.BUCKET_LAYOUT_SUPPORT
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
   public static OMRequest setDefaultBucketLayoutForOlderClients(OMRequest req,
       ValidationContext ctx) {
