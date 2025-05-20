@@ -23,7 +23,15 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 /**
- * Return class for OMMetadataManager#getPendingDeletionKeys.
+ * Tracks metadata for keys pending deletion and their associated blocks.
+ *
+ * This class maintains:
+ * <ul>
+ *   <li>A list of {@link BlockGroup} entries, where each entry contains
+ *       a key name and its associated block IDs</li>
+ *   <li>A key-value mapping that requires updating after the remaining
+ *       blocks are purged</li>
+ * </ul>
  */
 public class PendingKeysDeletion {
 
