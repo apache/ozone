@@ -320,7 +320,7 @@ public final class SnapshotUtils {
     // at the time of snapshot and key deletion as blocks can be appended.
     // If the objectId is same then the key is same.
     if (prevKeyInfo.isHsync() && deletedKeyInfo.isHsync()) {
-      return true;
+      return prevKeyInfo.getObjectID() == deletedKeyInfo.getObjectID();
     }
 
     if (prevKeyInfo.getKeyLocationVersions().size() !=
