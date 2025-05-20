@@ -98,7 +98,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    * @param allowedProcessingPhases set of request processing phases which would be allowed to be registered to
    *                                the registry.
    */
-   ValidatorRegistry(Class<RequestType> requestType, Collection<URL> searchUrls,
+  ValidatorRegistry(Class<RequestType> requestType, Collection<URL> searchUrls,
       Set<Class<? extends Annotation>> allowedValidators,
       Set<RequestProcessingPhase> allowedProcessingPhases) {
     Class<RequestType[]> requestArrayClass = (Class<RequestType[]>) Array.newInstance(requestType, 0)

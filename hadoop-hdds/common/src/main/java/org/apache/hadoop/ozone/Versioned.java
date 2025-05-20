@@ -23,7 +23,7 @@ import java.util.Comparator;
  * Base class defining the version in the entire system.
  */
 public interface Versioned {
-  static final Comparator<Versioned> VERSIONED_COMPARATOR = Comparator.comparingInt(Versioned::version);
+  Comparator<Versioned> VERSIONED_COMPARATOR = Comparator.comparingInt(Versioned::version);
 
   int version();
 
