@@ -2190,6 +2190,10 @@
             </goals>
             <configuration>
               <ignoreNonCompile>true</ignoreNonCompile>
+              <excludedClasses>
+                <!-- disabled test -->
+                <excludedClass>org.apache.hadoop.ozone.om.service.TestRangerBGSyncService</excludedClass>
+              </excludedClasses>
             </configuration>
           </execution>
           <execution>

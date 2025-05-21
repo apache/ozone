@@ -65,7 +65,7 @@ public class TestRootList {
     response = (ListBucketResponse) rootEndpoint.get().getEntity();
     assertEquals(10, response.getBucketsNum());
     assertEquals("root", response.getOwner().getDisplayName());
-    assertEquals("root", response.getOwner().getId());
+    assertEquals(S3Owner.DEFAULT_S3OWNER_ID, response.getOwner().getId());
   }
 
 }
