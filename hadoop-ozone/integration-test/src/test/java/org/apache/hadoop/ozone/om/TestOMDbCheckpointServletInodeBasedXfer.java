@@ -14,8 +14,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.WriteListener;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -25,6 +63,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -37,37 +76,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import javax.servlet.ServletContext;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.WriteListener;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
-import static org.apache.hadoop.ozone.OzoneConsts.*;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
+/**
+ * Class used for testing the OM DB Checkpoint provider servlet using inode based transfer logic.
+ */
 public class TestOMDbCheckpointServletInodeBasedXfer {
 
-  MiniOzoneCluster cluster;
+  private MiniOzoneCluster cluster;
   private OzoneClient client;
   private OzoneManager om;
   private OzoneConfiguration conf;
@@ -80,7 +95,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   private ServletOutputStream servletOutputStream;
   private File tempFile;
   private static final AtomicInteger COUNTER = new AtomicInteger();
-  private static Logger LOG = LoggerFactory.getLogger(TestOMDbCheckpointServletInodeBasedXfer.class);
 
   @BeforeEach
   void init() throws Exception {
@@ -157,7 +171,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         responseMock);
 
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .writeDbDataToStream(any(), any(), any(), any(), any(), any());
+        .writeDbDataToStream(any(), any(), any(), any(), any());
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
@@ -165,9 +179,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(),
         anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDir();
-    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any(),anyBoolean());
-    doCallRealMethod().when(omDbCheckpointServletMock).getFilesForArchive(any(),any(),any(),any(),anyBoolean(),
-        any(),any(),any());
+    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any(), anyBoolean());
+    doCallRealMethod().when(omDbCheckpointServletMock).getFilesForArchive(any(), any(), any(), any());
   }
 
   @Test
@@ -180,6 +193,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Create a "spy" dbstore keep track of the checkpoint.
     writeData();
     DBStore dbStore = om.getMetadataManager().getStore();
+    RDBStore rdbStore = (RDBStore) dbStore;
     DBStore spyDbStore = spy(dbStore);
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     when(spyDbStore.getCheckpoint(true)).thenAnswer(b -> {
@@ -201,21 +215,14 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
     dbCheckpoint = realCheckpoint.get();
-    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
-    LOG.info("checkpoint loc : " + checkpointLocation);
     String testDirName = folder.resolve("testDir").toString();
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
     File newDbDir = new File(newDbDirName);
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
-    List<String> inodesFromCheckpoint = new ArrayList<>();
-    try (Stream<Path> filesInCheckpoint = Files.list(checkpointLocation)) {
-      List<Path> files = filesInCheckpoint.collect(Collectors.toList());
-      for (Path p : files) {
-        inodesFromCheckpoint.add(OmSnapshotUtils.getINode(p).toString());
-      }
-    }
-    List<String> inodesFromTarball = new ArrayList<>();
+    Set<String> inodesFromOmDb = new HashSet<>();
+
+    Set<String> inodesFromTarball = new HashSet<>();
     try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
       List<Path> files = filesInTarball.collect(Collectors.toList());
       for (Path p : files) {
@@ -223,10 +230,18 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       }
     }
 
-    Collections.sort(inodesFromCheckpoint);
-    Collections.sort(inodesFromTarball);
+    try (Stream<Path> filesInOmDb = Files.walk(rdbStore.getDbLocation().toPath())) {
+      List<Path> files = filesInOmDb.collect(Collectors.toList());
+      for (Path p : files) {
+        if (Files.isDirectory(p)) {
+          continue;
+        }
+        inodesFromOmDb.add(OmSnapshotUtils.getInodeAndMtime(p));
+      }
+    }
 
-    assertEquals(inodesFromCheckpoint, inodesFromTarball);
+    assertEquals(inodesFromOmDb, inodesFromTarball);
+
   }
 
   private void writeData() throws Exception {

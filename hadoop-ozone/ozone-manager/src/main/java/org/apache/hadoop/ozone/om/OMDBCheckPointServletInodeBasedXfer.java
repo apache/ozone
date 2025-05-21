@@ -14,15 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
-import org.apache.hadoop.util.Time;
-import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
-import javax.servlet.http.HttpServletRequest;
+import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
+import static org.apache.hadoop.hdds.utils.Archiver.tar;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -31,48 +30,86 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.servlet.http.HttpServletRequest;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.util.Time;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
-import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
-import static org.apache.hadoop.hdds.utils.Archiver.tar;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
-
+/**
+ * Specialized OMDBCheckpointServlet implementation that transfers Ozone Manager
+ * database checkpoints using inode-based deduplication.
+ * <p>
+ * This servlet constructs checkpoint archives by examining file inodes,
+ * ensuring that files with the same inode (i.e., hardlinks or duplicates)
+ * are only transferred once. It maintains mappings from inode IDs to file
+ * paths, manages hardlink information, and enforces snapshot and SST file
+ * size constraints as needed.
+ * <p>
+ * This approach optimizes checkpoint streaming by reducing redundant data
+ * transfer, especially in environments where RocksDB and snapshotting result
+ * in multiple hardlinks to the same physical data.
+ */
 public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet {
 
   @Override
   public void writeDbDataToStream(DBCheckpoint checkpoint, HttpServletRequest request, OutputStream destination,
-      List<String> toExcludeList, List<String> excludedList, Path tmpdir) throws IOException, InterruptedException {
+      Set<String> sstFilesToExclude, Path tmpdir) throws IOException, InterruptedException {
 
     // Key is the InodeID and path is the first encountered file path with this inodeID
     // This will be later used to while writing to the tar.
     Map<String, Path> copyFiles = new HashMap<>();
+    Map<String, Set<Path>> hardlinkFiles = new HashMap<>();
+
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    OMMetadataManager omMetadataManager = om.getMetadataManager();
+    RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
+    boolean includeSnapshotData = includeSnapshotData(request);
 
     try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream = tar(destination)) {
-      RocksDBCheckpointDiffer differ =
-          getDbStore().getRocksDBCheckpointDiffer();
-      DirectoryData sstBackupDir = new DirectoryData(tmpdir,
-          differ.getSSTBackupDir());
-      DirectoryData compactionLogDir = new DirectoryData(tmpdir,
-          differ.getCompactionLogDir());
+      Set<Path> snapshotDbPaths = new HashSet<>();
+      if (includeSnapshotData) {
+        RocksDBCheckpointDiffer differ = getDbStore().getRocksDBCheckpointDiffer();
+        Path sstBackupDir = new File(differ.getSSTBackupDir()).toPath();
+        Path compactionLogDir = new File(differ.getCompactionLogDir()).toPath();
+        SnapshotChainManager snapshotChainManager = new SnapshotChainManager(omMetadataManager);
+        for (SnapshotChainInfo snapInfo : snapshotChainManager.getGlobalSnapshotChain().values()) {
+          String snapshotDir = OmSnapshotManager.getSnapshotPath(getConf(),
+              SnapshotInfo.getCheckpointDirName(snapInfo.getSnapshotId()));
+          Path path = Paths.get(snapshotDir);
+          snapshotDbPaths.add(path);
+        }
+        snapshotDbPaths.add(sstBackupDir);
+        snapshotDbPaths.add(compactionLogDir);
+      }
 
-      Set<String> sstFilesToExclude = new HashSet<>(toExcludeList);
+      boolean shouldContinue = true;
+      for (Path snapshotDbPath : snapshotDbPaths) {
+        if (!shouldContinue) {
+          break;
+        }
+        shouldContinue = getFilesForArchive(copyFiles, hardlinkFiles,
+            sstFilesToExclude, snapshotDbPath);
+      }
 
-      Map<Object, Set<Path>> hardlinkFiles = new HashMap<>();
+      if (shouldContinue) {
+        shouldContinue = getFilesForArchive(copyFiles, hardlinkFiles,
+            sstFilesToExclude, rdbStore.getDbLocation().toPath());
+      }
 
-      boolean completed = getFilesForArchive(checkpoint, copyFiles, hardlinkFiles,
-          sstFilesToExclude,
-          includeSnapshotData(request), excludedList,
-          sstBackupDir, compactionLogDir);
       writeFilesToArchive(copyFiles, hardlinkFiles, archiveOutputStream,
-          completed, checkpoint.getCheckpointLocation());
+          shouldContinue, checkpoint.getCheckpointLocation());
 
     } catch (Exception e) {
       LOG.error("got exception writing to archive " + e);
@@ -80,7 +117,13 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
     }
   }
 
-  private void writeFilesToArchive(Map<String, Path> copyFiles, Map<Object, Set<Path>> hardlinkFiles,
+  private OzoneConfiguration getConf() {
+    return ((OzoneManager) getServletContext()
+        .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
+        .getConfiguration();
+  }
+
+  private void writeFilesToArchive(Map<String, Path> copyFiles, Map<String, Set<Path>> hardlinkFiles,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, boolean completed, Path checkpointLocation)
       throws IOException {
     Map<String, Path> filteredCopyFiles = completed ? copyFiles :
@@ -105,6 +148,7 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
       if (!file.isDirectory()) {
         filesWritten++;
       }
+      LOG.info("Writing file = {} for inode {}", file.getAbsolutePath(), entry.getKey());
       bytesWritten += includeFile(file, entry.getKey(), archiveOutputStream);
       // Log progress every 30 seconds
       if (Time.monotonicNow() - lastLoggedTime >= 30000) {
@@ -114,6 +158,7 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
       }
     }
 
+    /*
     if (completed) {
       // TODO:
       //  1. take an OM db checkpoint ,
@@ -121,152 +166,36 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
       //  3. copy remaining files
       //  4. create hardlink file
     }
-
+    */
   }
 
-  boolean getFilesForArchive(DBCheckpoint checkpoint, Map<String,Path> copyFiles,
-       Map<Object, Set<Path>> hardlinkFiles,
-       Set<String> sstFilesToExclude,  boolean includeSnapshotData,
-       List<String> excluded,
-       DirectoryData sstBackupDir,
-       DirectoryData compactionLogDir) throws IOException {
-     maxTotalSstSize =
-         OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
-
-    // Tarball limits are not implemented for processes that don't
-    // include snapshots.  Currently, this is just for recon.
-    if (!includeSnapshotData) {
-      maxTotalSstSize = Long.MAX_VALUE;
-    }
-
-      AtomicLong copySize = new AtomicLong(0L);
-
-     // Log estimated total data transferred on first request.
-     if (sstFilesToExclude.isEmpty()) {
-       logEstimatedTarballSize(checkpoint, includeSnapshotData);
-     }
-
-     if (includeSnapshotData) {
-       Set<Path> snapshotPaths = getSnapshotDirs(checkpoint, true);
-       Path snapshotDir = getSnapshotDir();
-       if (!processDir(snapshotDir, copyFiles, hardlinkFiles, sstFilesToExclude, snapshotPaths, excluded, copySize,
-           null)) {
-         return false;
-       }
-
-       // Process the tmp sst compaction dir.
-       if (!processDir(sstBackupDir.getTmpDir().toPath(), copyFiles, hardlinkFiles, sstFilesToExclude, new HashSet<>(),
-           excluded, copySize, sstBackupDir.getOriginalDir().toPath())) {
-         return false;
-       }
-
-       if (!processDir(compactionLogDir.getTmpDir().toPath(), copyFiles, hardlinkFiles, sstFilesToExclude,
-           new HashSet<>(), excluded, copySize, compactionLogDir.getOriginalDir().toPath())) {
-         return false;
-       }
-     }
-
-     // Get the active fs files.
-     Path dir = checkpoint.getCheckpointLocation();
-     if (!processDir(dir, copyFiles, hardlinkFiles, sstFilesToExclude,
-         new HashSet<>(), excluded, copySize, null)) {
-       return false;
-     }
-
-     return true;
-   }
-
-  private boolean processDir(Path dir, Map<String,Path> copyFiles, Map<Object, Set<Path>> hardlinkFiles,
-      Set<String> sstFilesToExclude, Set<Path> snapshotPaths, List<String> excluded, AtomicLong copySize,
-      Path destDir) throws IOException {
-
-    try (Stream<Path> files = Files.list(dir)) {
-      for (Path file : files.collect(Collectors.toList())) {
-        File f = file.toFile();
-        if (f.isDirectory()) {
-          // Skip any unexpected snapshot files.
-          String parent = f.getParent();
-          if (parent != null && parent.contains(OM_SNAPSHOT_CHECKPOINT_DIR)
-              && !snapshotPaths.contains(file)) {
-            LOG.debug("Skipping unneeded file: " + file);
-            continue;
-          }
-
-          // Skip the real compaction log dir.
-          File compactionLogDir = new File(getDbStore().
-              getRocksDBCheckpointDiffer().getCompactionLogDir());
-          if (f.equals(compactionLogDir)) {
-            LOG.debug("Skipping compaction log dir");
-            continue;
-          }
-
-          // Skip the real compaction sst backup dir.
-          File sstBackupDir = new File(getDbStore().
-              getRocksDBCheckpointDiffer().getSSTBackupDir());
-          if (f.equals(sstBackupDir)) {
-            LOG.debug("Skipping sst backup dir");
-            continue;
-          }
-          // findbugs nonsense
-          Path filename = file.getFileName();
-          if (filename == null) {
-            throw new IOException("file has no filename:" + file);
-          }
-
-          // Update the dest dir to point to the sub dir
-          Path destSubDir = null;
-          if (destDir != null) {
-            destSubDir = Paths.get(destDir.toString(),
-                filename.toString());
-          }
-          if (!processDir(file, copyFiles, hardlinkFiles, sstFilesToExclude,
-              snapshotPaths, excluded, copySize, destSubDir)) {
-            return false;
-          }
+  boolean getFilesForArchive(Map<String, Path> copyFiles, Map<String, Set<Path>> hardlinkFiles,
+      Set<String> sstFilesToExclude, Path dbDir) throws IOException {
+    long maxTotalSstSize = getConf().getLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
+        OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT);
+    AtomicLong copySize = new AtomicLong(maxTotalSstSize);
+    try (Stream<Path> files = Files.list(dbDir)) {
+      Iterable<Path> iterable = files::iterator;
+      for (Path dbFile : iterable) {
+        if (Files.isDirectory(dbFile)) {
+          getFilesForArchive(copyFiles, hardlinkFiles, sstFilesToExclude, dbFile);
         } else {
-          long fileSize = processFile(file, copyFiles, hardlinkFiles,
-              sstFilesToExclude, excluded, destDir);
-          if (copySize.get() + fileSize > maxTotalSstSize) {
-            return false;
-          } else {
-            copySize.addAndGet(fileSize);
+          String fileId = OmSnapshotUtils.getInodeAndMtime(dbFile);
+          if (!sstFilesToExclude.contains(fileId)) {
+            if (!copyFiles.containsKey(fileId)) {
+              long fileSize = Files.size(dbFile);
+              if (copySize.get() - fileSize <= 0) {
+                return false;
+              }
+              copySize.addAndGet(-fileSize);
+              copyFiles.put(fileId, dbFile);
+            }
           }
+          hardlinkFiles.getOrDefault(fileId, new HashSet<>()).add(dbFile);
         }
       }
     }
     return true;
-  }
-
-  private long processFile(Path file, Map<String,Path> copyFiles, Map<Object, Set<Path>> hardlinkFiles,
-      Set<String> sstFilesToExclude, List<String> excluded, Path destDir) throws IOException{
-    long fileSize = 0;
-    Path destFile = file;
-
-    // findbugs nonsense
-    Path fileNamePath = file.getFileName();
-    String fileInode = OmSnapshotUtils.getINode(file).toString();
-    if (fileNamePath == null) {
-      throw new IOException("file has no filename:" + file);
-    }
-    String fileName = fileNamePath.toString();
-    // if the dest dir is not null then the file needs to be copied/linked
-    // to the dest dir on the follower.
-    if (destDir != null) {
-      destFile = Paths.get(destDir.toString(), fileName);
-    }
-    // If same as existing excluded file, add a link for it.
-    if (sstFilesToExclude.contains(fileInode) || copyFiles.containsKey(fileInode)) {
-      hardlinkFiles.getOrDefault(fileInode, new HashSet<>()).add(destFile);
-    } else {
-      copyFiles.put(fileInode, destFile);
-      hardlinkFiles.getOrDefault(fileInode, new HashSet<>()).add(destFile);
-      fileSize = Files.size(file);
-    }
-
-    if (sstFilesToExclude.contains(fileInode)) {
-      excluded.add(fileInode);
-    }
-    return fileSize;
   }
 
 }

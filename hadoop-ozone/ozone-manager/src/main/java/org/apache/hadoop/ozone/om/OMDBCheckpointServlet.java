@@ -100,7 +100,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
   private transient BootstrapStateHandler.Lock lock;
-  protected long maxTotalSstSize = 0;
+  private long maxTotalSstSize = 0;
   private static final PathFilter SST_FILE_FILTER =
       new SuffixFileFilter(ROCKSDB_SST_SUFFIX, IOCase.INSENSITIVE);
 

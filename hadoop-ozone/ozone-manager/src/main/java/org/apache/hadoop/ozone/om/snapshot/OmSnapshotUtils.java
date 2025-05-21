@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -63,6 +64,12 @@ public final class OmSnapshotUtils {
   @VisibleForTesting
   public static Object getINode(Path file) throws IOException {
     return Files.readAttributes(file, BasicFileAttributes.class).fileKey();
+  }
+
+  public static String getInodeAndMtime(Path file) throws IOException {
+    Object inode = Files.readAttributes(file, BasicFileAttributes.class).fileKey();
+    FileTime mTime = Files.getLastModifiedTime(file);
+    return String.format("%s-%s", inode, mTime.toMillis());
   }
 
   /**
