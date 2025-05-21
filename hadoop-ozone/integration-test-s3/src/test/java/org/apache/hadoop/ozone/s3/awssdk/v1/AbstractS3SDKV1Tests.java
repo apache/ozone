@@ -105,6 +105,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
+import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
@@ -270,7 +271,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     Owner s3AccountOwner = s3Client.getS3AccountOwner();
 
     assertThat(s3AccountOwner.getDisplayName()).isEqualTo(expectOwner);
-    assertThat(s3AccountOwner.getId()).isEqualTo(expectOwner);
+    assertThat(s3AccountOwner.getId()).isEqualTo(S3Owner.DEFAULT_S3OWNER_ID);
   }
 
   @Test
