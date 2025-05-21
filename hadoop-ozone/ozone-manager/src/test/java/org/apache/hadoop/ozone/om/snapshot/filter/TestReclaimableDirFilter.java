@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -76,7 +76,7 @@ public class TestReclaimableDirFilter extends AbstractReclaimableFilterTest {
     long volumeId = getOzoneManager().getMetadataManager().getVolumeId(volume);
     KeyManager keyManager = getKeyManager();
     if (prevSnapshotInfo != null) {
-      ReferenceCounted<OmSnapshot> prevSnap = Optional.ofNullable(prevSnapshotInfo)
+      UncheckedAutoCloseableSupplier<OmSnapshot> prevSnap = Optional.ofNullable(prevSnapshotInfo)
           .map(info -> {
             try {
               return getOmSnapshotManager().getActiveSnapshot(volume, bucket, info.getName());
@@ -106,7 +106,7 @@ public class TestReclaimableDirFilter extends AbstractReclaimableFilterTest {
     return keyInfo;
   }
 
-  private KeyManager mockOmSnapshot(ReferenceCounted<OmSnapshot> snapshot) {
+  private KeyManager mockOmSnapshot(UncheckedAutoCloseableSupplier<OmSnapshot> snapshot) {
     if (snapshot != null) {
       OmSnapshot omSnapshot = snapshot.get();
       KeyManager keyManager = mock(KeyManager.class);

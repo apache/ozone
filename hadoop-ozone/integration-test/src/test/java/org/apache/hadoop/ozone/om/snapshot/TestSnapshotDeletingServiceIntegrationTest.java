@@ -79,6 +79,7 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -422,7 +423,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     assertTableRowCount(renamedTable, 4);
     assertTableRowCount(deletedDirTable, 3);
 
-    ReferenceCounted<OmSnapshot> rcSnap1 =
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap1 =
         om.getOmSnapshotManager().getSnapshot(
             VOLUME_NAME, BUCKET_NAME_FSO, "snap1");
     OmSnapshot snap1 = rcSnap1.get();
@@ -614,8 +615,9 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     List<Table.KeyValue<String, String>> renamesKeyEntries;
     List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries;
     List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries;
-    try (ReferenceCounted<OmSnapshot> snapshot = om.getOmSnapshotManager().getSnapshot(testBucket.getVolumeName(),
-        testBucket.getName(), testBucket.getName() + "snap2")) {
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
+             om.getOmSnapshotManager().getSnapshot(testBucket.getVolumeName(), testBucket.getName(),
+                 testBucket.getName() + "snap2")) {
       renamesKeyEntries = snapshot.get().getKeyManager().getRenamesKeyEntries(testBucket.getVolumeName(),
           testBucket.getName(), "", 1000);
       deletedKeyEntries = snapshot.get().getKeyManager().getDeletedKeyEntries(testBucket.getVolumeName(),
@@ -650,8 +652,9 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     Future<?> future = snapshotDeletingThread.submit(snapshotDeletionRunnable);
     GenericTestUtils.waitFor(snapshotDeletionStarted::get, 1000, 30000);
     future.get();
-    try (ReferenceCounted<OmSnapshot> snapshot = om.getOmSnapshotManager().getSnapshot(testBucket.getVolumeName(),
-        testBucket.getName(), testBucket.getName() + "snap2")) {
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
+             om.getOmSnapshotManager().getSnapshot(testBucket.getVolumeName(), testBucket.getName(),
+                 testBucket.getName() + "snap2")) {
       Assertions.assertEquals(Collections.emptyList(),
           snapshot.get().getKeyManager().getRenamesKeyEntries(testBucket.getVolumeName(),
           testBucket.getName(), "", 1000));
