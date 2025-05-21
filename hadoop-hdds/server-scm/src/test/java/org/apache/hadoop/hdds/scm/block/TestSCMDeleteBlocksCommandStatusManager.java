@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusM
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.Test;
 public class TestSCMDeleteBlocksCommandStatusManager {
 
   private SCMDeleteBlocksCommandStatusManager manager;
+  private ScmBlockDeletingServiceMetrics metrics;
   private UUID dnId1;
   private UUID dnId2;
   private long scmCmdId1;
@@ -54,7 +56,8 @@ public class TestSCMDeleteBlocksCommandStatusManager {
 
   @BeforeEach
   public void setup() throws Exception {
-    manager = new SCMDeleteBlocksCommandStatusManager();
+    metrics = mock(ScmBlockDeletingServiceMetrics.class);
+    manager = new SCMDeleteBlocksCommandStatusManager(metrics);
     // Create test data
     dnId1 = UUID.randomUUID();
     dnId2 = UUID.randomUUID();

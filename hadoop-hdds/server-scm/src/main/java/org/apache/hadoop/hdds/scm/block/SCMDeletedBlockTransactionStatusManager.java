@@ -39,6 +39,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -90,7 +91,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     this.transactionToDNsCommitMap = new ConcurrentHashMap<>();
     this.transactionToRetryCountMap = new ConcurrentHashMap<>();
     this.scmDeleteBlocksCommandStatusManager =
-        new SCMDeleteBlocksCommandStatusManager();
+        new SCMDeleteBlocksCommandStatusManager(metrics);
   }
 
   /**
@@ -106,8 +107,11 @@ public class SCMDeletedBlockTransactionStatusManager {
     private static final Set<CmdStatus> STATUSES_REQUIRING_TIMEOUT =
         new HashSet<>(Arrays.asList(SENT));
 
-    public SCMDeleteBlocksCommandStatusManager() {
+    private ScmBlockDeletingServiceMetrics metrics;
+
+    public SCMDeleteBlocksCommandStatusManager(ScmBlockDeletingServiceMetrics metrics) {
       this.scmCmdStatusRecord = new ConcurrentHashMap<>();
+      this.metrics = metrics;
     }
 
     /**
@@ -317,6 +321,7 @@ public class SCMDeletedBlockTransactionStatusManager {
         if (updateTime != null &&
             Duration.between(updateTime, now).toMillis() > timeoutMs) {
           CmdStatusData state = removeScmCommand(dnId, scmCmdId);
+          metrics.incrDNCommandsTimeout(DatanodeID.of(dnId), 1);
           LOG.warn("SCM BlockDeletionCommand {} for Datanode: {} was removed after {}ms without update",
               state, dnId, timeoutMs);
         }
