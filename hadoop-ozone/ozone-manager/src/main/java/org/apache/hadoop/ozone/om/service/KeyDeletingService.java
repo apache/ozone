@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -319,8 +320,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               return EmptyTaskResult.newResult();
             }
           }
-          try (ReferenceCounted<OmSnapshot> omSnapshot = snapInfo == null ? null : omSnapshotManager.getActiveSnapshot(
-              snapInfo.getVolumeName(), snapInfo.getBucketName(), snapInfo.getName())) {
+          try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = snapInfo == null ? null :
+              omSnapshotManager.getActiveSnapshot(snapInfo.getVolumeName(), snapInfo.getBucketName(),
+                  snapInfo.getName())) {
             KeyManager keyManager = snapInfo == null ? getOzoneManager().getKeyManager()
                 : omSnapshot.get().getKeyManager();
             processDeletedKeysForStore(snapInfo, keyManager, remainNum);
