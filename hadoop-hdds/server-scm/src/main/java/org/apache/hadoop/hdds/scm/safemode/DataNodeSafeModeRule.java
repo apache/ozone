@@ -27,8 +27,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Class defining Safe mode exit criteria according to number of DataNodes
@@ -38,7 +36,6 @@ public class DataNodeSafeModeRule extends
     SafeModeExitRule<NodeRegistrationContainerReport> {
 
   private static final String NAME = "DataNodeSafeModeRule";
-  private static final Logger LOG = LoggerFactory.getLogger(DataNodeSafeModeRule.class);
 
   // Min DataNodes required to exit safe mode.
   private int requiredDns;
