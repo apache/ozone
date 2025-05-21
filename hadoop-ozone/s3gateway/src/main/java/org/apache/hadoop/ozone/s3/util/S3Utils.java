@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_STORAGE_CLASS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_CHUNKED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
@@ -37,10 +37,9 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -69,64 +68,41 @@ public final class S3Utils {
    *
    * @param s3StorageTypeHeader        - s3 user passed storage type
    *                                   header.
-   * @param clientConfiguredReplConfig - Client side configured replication
-   *                                   config.
    * @param bucketReplConfig           - server side bucket default replication
+   *                                   config.
+   * @param clientConfiguredReplConfig - Client side configured replication
    *                                   config.
    * @return client resolved replication config.
    */
   public static ReplicationConfig resolveS3ClientSideReplicationConfig(
-      String s3StorageTypeHeader, ReplicationConfig clientConfiguredReplConfig,
+      String s3StorageTypeHeader, String s3StorageConfigHeader,
+      ReplicationConfig clientConfiguredReplConfig,
       ReplicationConfig bucketReplConfig)
       throws OS3Exception {
-    ReplicationConfig clientDeterminedReplConfig = null;
 
-    // Let's map the user provided s3 storage type header to ozone s3 storage
-    // type.
-    S3StorageType s3StorageType = null;
-    if (s3StorageTypeHeader != null && !s3StorageTypeHeader.equals("")) {
-      s3StorageType = toS3StorageType(s3StorageTypeHeader);
+    // If user provided s3 storage type header is not null then map it
+    // to ozone replication config
+    if (!StringUtils.isEmpty(s3StorageTypeHeader)) {
+      return toReplicationConfig(s3StorageTypeHeader, s3StorageConfigHeader);
     }
 
-    boolean isECBucket = bucketReplConfig != null && bucketReplConfig
-        .getReplicationType() == HddsProtos.ReplicationType.EC;
-
-    // if bucket replication config configured with EC, we will give high
-    // preference to server side bucket defaults.
-    // Why we give high preference to EC is, there is no way for file system
-    // interfaces to pass EC replication. So, if one configures EC at bucket,
-    // we consider EC to take preference. in short, keys created from file
-    // system under EC bucket will always be EC'd.
-    if (isECBucket) {
-      // if bucket is EC, don't bother client provided configs, let's pass
-      // bucket config.
-      clientDeterminedReplConfig = bucketReplConfig;
-    } else {
-      // Let's validate the client side available replication configs.
-      boolean isUserPassedReplicationInSupportedList =
-          s3StorageType != null && (s3StorageType.getFactor()
-              .getValue() == ReplicationFactor.ONE.getValue() || s3StorageType
-              .getFactor().getValue() == ReplicationFactor.THREE.getValue());
-      if (isUserPassedReplicationInSupportedList) {
-        clientDeterminedReplConfig = ReplicationConfig.fromProtoTypeAndFactor(
-            ReplicationType.toProto(s3StorageType.getType()),
-            ReplicationFactor.toProto(s3StorageType.getFactor()));
-      } else {
-        // API passed replication number is not in supported replication list.
-        // So, let's use whatever available in client side configured.
-        // By default it will be null, so server will use server defaults.
-        clientDeterminedReplConfig = clientConfiguredReplConfig;
-      }
-    }
-    return clientDeterminedReplConfig;
+    // If client configured replication config is null then default to bucket replication
+    // otherwise default to server side default replication config.
+    return (clientConfiguredReplConfig != null) ?
+        clientConfiguredReplConfig : bucketReplConfig;
   }
 
-  public static S3StorageType toS3StorageType(String storageType)
+  public static ReplicationConfig toReplicationConfig(String s3StorageType, String s3StorageConfig)
       throws OS3Exception {
     try {
-      return S3StorageType.valueOf(storageType);
+      S3StorageType storageType = S3StorageType.valueOf(s3StorageType);
+      if (S3StorageType.STANDARD_IA.equals(storageType) &&
+          !StringUtils.isEmpty(s3StorageConfig)) {
+        return new ECReplicationConfig(s3StorageConfig);
+      }
+      return storageType.getReplicationConfig();
     } catch (IllegalArgumentException ex) {
-      throw newError(INVALID_ARGUMENT, storageType, ex);
+      throw newError(INVALID_STORAGE_CLASS, s3StorageType, ex);
     }
   }
 
