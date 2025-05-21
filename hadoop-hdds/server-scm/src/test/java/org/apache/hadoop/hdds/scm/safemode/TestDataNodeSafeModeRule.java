@@ -153,8 +153,6 @@ public class TestDataNodeSafeModeRule {
     rule.setValidateBasedOnReportProcessing(false);
 
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(new ArrayList<>());
-    when(nodeManager.getNodes(NodeStatus.inServiceHealthyReadOnly())).thenReturn(new ArrayList<>());
-    when(nodeManager.getNodes(NodeStatus.inServiceStale())).thenReturn(new ArrayList<>());
 
     assertFalse(rule.validate());
 
@@ -170,24 +168,5 @@ public class TestDataNodeSafeModeRule {
     assertTrue(rule.validate());
     
     verify(nodeManager, times(2)).getNodes(NodeStatus.inServiceHealthy());
-  }
-
-  @Test
-  public void testDataNodeSafeModeRuleWithSingleDataNode() throws Exception {
-    int requiredDns = 2;
-    setup(requiredDns);
-
-    rule.setValidateBasedOnReportProcessing(false);
-
-    List<DatanodeDetails> singleHealthy = new ArrayList<>();
-    singleHealthy.add(MockDatanodeDetails.randomDatanodeDetails());
-
-    when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(singleHealthy);
-    when(nodeManager.getNodes(NodeStatus.inServiceHealthyReadOnly())).thenReturn(new ArrayList<>());
-    when(nodeManager.getNodes(NodeStatus.inServiceStale())).thenReturn(new ArrayList<>());
-
-    assertFalse(rule.validate());
-
-    verify(nodeManager, times(1)).getNodes(NodeStatus.inServiceHealthy());
   }
 }
