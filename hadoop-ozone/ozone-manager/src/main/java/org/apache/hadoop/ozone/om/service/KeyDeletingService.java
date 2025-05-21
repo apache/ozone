@@ -76,7 +76,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   // times.
   private static final int KEY_DELETING_CORE_POOL_SIZE = 1;
 
-  private final KeyManager manager;
   private int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
   private final AtomicBoolean suspended;
@@ -93,7 +92,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     super(KeyDeletingService.class.getSimpleName(), serviceInterval,
         TimeUnit.MILLISECONDS, KEY_DELETING_CORE_POOL_SIZE,
         serviceTimeout, ozoneManager, scmClient);
-    this.manager = manager;
     this.keyLimitPerTask = conf.getInt(OZONE_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
     Preconditions.checkArgument(keyLimitPerTask >= 0,
@@ -197,7 +195,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
      * @param keyManager KeyManager of the underlying store.
      */
     private int processDeletedKeysForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
-                                           int remainNum) throws IOException, InterruptedException {
+        int remainNum) throws IOException, InterruptedException {
       String volume = null, bucket = null, snapshotTableKey = null;
       if (currentSnapshotInfo != null) {
         volume = currentSnapshotInfo.getVolumeName();
@@ -242,6 +240,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                  expectedPreviousSnapshotId);
             remainNum -= purgeResult.getKey();
             successStatus = purgeResult.getValue();
+            metrics.incrNumKeysProcessed(keyBlocksList.size());
+            metrics.incrNumKeysSentForPurge(purgeResult.getKey());
             if (successStatus) {
               deletedKeyCount.addAndGet(purgeResult.getKey());
             }
@@ -306,7 +306,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           Iterator<UUID> iterator = null;
           try {
             iterator = snapshotChainManager.iterator(true);
-
           } catch (IOException e) {
             LOG.error("Error while initializing snapshot chain iterator.");
             return BackgroundTaskResult.EmptyTaskResult.newResult();
