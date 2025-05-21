@@ -29,18 +29,6 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 public class OMBlockPrefetchMetrics {
   private static final String SOURCE_NAME = OMBlockPrefetchMetrics.class.getSimpleName();
 
-  public static OMBlockPrefetchMetrics register() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-        "Ozone Manager Block Prefetch Client Metrics",
-        new OMBlockPrefetchMetrics());
-  }
-
-  public static void unregister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
-  }
-
   @Metric(about = "Latency of reading from the prefetch queue in nanoseconds")
   private MutableRate readFromQueueLatencyNs;
 
@@ -55,6 +43,18 @@ public class OMBlockPrefetchMetrics {
 
   @Metric(about = "Number of cache misses")
   private MutableCounterLong cacheMisses;
+
+  public static OMBlockPrefetchMetrics register() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    return ms.register(SOURCE_NAME,
+        "Ozone Manager Block Prefetch Client Metrics",
+        new OMBlockPrefetchMetrics());
+  }
+
+  public static void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(SOURCE_NAME);
+  }
 
   public void addReadFromQueueLatency(long latencyInNs) {
     readFromQueueLatencyNs.add(latencyInNs);
