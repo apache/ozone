@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FL
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -180,7 +181,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDir();
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any(), anyBoolean());
-    doCallRealMethod().when(omDbCheckpointServletMock).getFilesForArchive(any(), any(), any(), any());
+    doCallRealMethod().when(omDbCheckpointServletMock).getFilesForArchive(any(), any(), any(), any(),
+        anyLong());
   }
 
   @Test

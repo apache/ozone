@@ -77,6 +77,14 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
     boolean includeSnapshotData = includeSnapshotData(request);
 
+    long maxTotalSstSize = getConf().getLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
+        OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT);
+    // Tarball limits are not implemented for processes that don't
+    // include snapshots.  Currently, this is just for recon.
+    if (!includeSnapshotData) {
+      maxTotalSstSize = Long.MAX_VALUE;
+    }
+
     try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream = tar(destination)) {
       Set<Path> snapshotDbPaths = new HashSet<>();
       if (includeSnapshotData) {
@@ -100,12 +108,12 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
           break;
         }
         shouldContinue = getFilesForArchive(copyFiles, hardlinkFiles,
-            sstFilesToExclude, snapshotDbPath);
+            sstFilesToExclude, snapshotDbPath, maxTotalSstSize);
       }
 
       if (shouldContinue) {
         shouldContinue = getFilesForArchive(copyFiles, hardlinkFiles,
-            sstFilesToExclude, rdbStore.getDbLocation().toPath());
+            sstFilesToExclude, rdbStore.getDbLocation().toPath(), maxTotalSstSize);
       }
 
       writeFilesToArchive(copyFiles, hardlinkFiles, archiveOutputStream,
@@ -170,15 +178,13 @@ public class OMDBCheckPointServletInodeBasedXfer  extends OMDBCheckpointServlet 
   }
 
   boolean getFilesForArchive(Map<String, Path> copyFiles, Map<String, Set<Path>> hardlinkFiles,
-      Set<String> sstFilesToExclude, Path dbDir) throws IOException {
-    long maxTotalSstSize = getConf().getLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
-        OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT);
+      Set<String> sstFilesToExclude, Path dbDir, long maxTotalSstSize) throws IOException {
     AtomicLong copySize = new AtomicLong(maxTotalSstSize);
     try (Stream<Path> files = Files.list(dbDir)) {
       Iterable<Path> iterable = files::iterator;
       for (Path dbFile : iterable) {
         if (Files.isDirectory(dbFile)) {
-          getFilesForArchive(copyFiles, hardlinkFiles, sstFilesToExclude, dbFile);
+          getFilesForArchive(copyFiles, hardlinkFiles, sstFilesToExclude, dbFile, maxTotalSstSize);
         } else {
           String fileId = OmSnapshotUtils.getInodeAndMtime(dbFile);
           if (!sstFilesToExclude.contains(fileId)) {
