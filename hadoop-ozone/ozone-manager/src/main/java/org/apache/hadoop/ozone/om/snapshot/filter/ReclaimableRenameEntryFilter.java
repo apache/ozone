@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Class to filter out rename table entries which are reclaimable based on the key presence in previous snapshot's
@@ -53,7 +53,7 @@ public class ReclaimableRenameEntryFilter extends ReclaimableFilter<String> {
    */
   @Override
   protected Boolean isReclaimable(Table.KeyValue<String, String> renameEntry) throws IOException {
-    ReferenceCounted<OmSnapshot> previousSnapshot = getPreviousOmSnapshot(0);
+    UncheckedAutoCloseableSupplier<OmSnapshot> previousSnapshot = getPreviousOmSnapshot(0);
     Table<String, OmKeyInfo> previousKeyTable = null;
     Table<String, OmDirectoryInfo> prevDirTable = null;
     if (previousSnapshot != null) {
