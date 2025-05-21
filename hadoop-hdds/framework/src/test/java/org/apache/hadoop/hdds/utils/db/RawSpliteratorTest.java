@@ -116,7 +116,8 @@ class RawSpliteratorTest {
     when(rawIteratorMock.hasNext()).thenReturn(true);
     when(rawIteratorMock.next()).thenReturn(rawKeyValueMock);
 
-    RawSpliterator<String, String, String> rawSpliterator = new RawSpliterator<String, String, String>(null, null, 1) {
+    RawSpliterator<String, String, String> rawSpliterator = new RawSpliterator<String, String, String>(null, null, 1,
+        true) {
 
       @Override
       Table.KeyValue<String, String> convert(RawKeyValue<String> kv) throws IOException {
@@ -167,7 +168,7 @@ class RawSpliteratorTest {
   private abstract static class MockRawSpliterator extends RawSpliterator<String, String, String> {
 
     MockRawSpliterator(int maxParallelism) throws IOException {
-      super(null, null, maxParallelism);
+      super(null, null, maxParallelism, true);
 
     }
 

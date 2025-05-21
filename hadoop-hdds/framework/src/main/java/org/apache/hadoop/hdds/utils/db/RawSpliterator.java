@@ -48,58 +48,61 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
   private final AtomicInteger maxNumberOfAdditionalSplits;
   private final Lock lock;
   private final AtomicReference<IOException> closeException = new AtomicReference<>();
+  private boolean closed;
+  private final boolean closeOnException;
 
   abstract Table.KeyValue<KEY, VALUE> convert(RawKeyValue<RAW> kv) throws IOException;
 
   abstract TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> getRawIterator(
       KEY prefix, KEY startKey, int maxParallelism) throws IOException;
 
-  RawSpliterator(KEY prefix, KEY startKey, int maxParallelism) throws IOException {
+  RawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException) throws IOException {
     TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> itr = getRawIterator(prefix,
         startKey, maxParallelism);
-    this.lock = new ReentrantLock();
-    this.maxNumberOfAdditionalSplits = new AtomicInteger(maxParallelism - 1);
-    this.rawIterator = ReferenceCountedObject.wrap(itr, () -> { },
-        (completelyReleased) -> {
-          if (completelyReleased) {
-            lock.lock();
-            try {
-              itr.close();
-            } catch (IOException e) {
-              closeException.set(e);
-            } finally {
-              lock.unlock();
+    try {
+      this.closeOnException = closeOnException;
+      this.lock = new ReentrantLock();
+      this.maxNumberOfAdditionalSplits = new AtomicInteger(maxParallelism - 1);
+      this.rawIterator = ReferenceCountedObject.wrap(itr, () -> { },
+          (completelyReleased) -> {
+            if (completelyReleased) {
+              closeRawIterator(true);
             }
-          }
-          this.maxNumberOfAdditionalSplits.incrementAndGet();
-        });
-    this.rawIterator.retain();
+            this.maxNumberOfAdditionalSplits.incrementAndGet();
+          });
+      this.rawIterator.retain();
+    } catch (Throwable e) {
+      itr.close();
+      throw e;
+    }
   }
 
   @Override
   public boolean tryAdvance(Consumer<? super Table.KeyValue<KEY, VALUE>> action) {
     lock.lock();
-    AutoCloseableRawKeyValue<RAW> kv = null;
+    AutoCloseableRawKeyValue<RAW> kv;
     try {
-      if (this.rawIterator.get().hasNext()) {
+      if (!closed && this.rawIterator.get().hasNext()) {
         kv = rawIterator.get().next();
+      } else {
+        closeRawIterator(false);
+        return false;
       }
     } finally {
       lock.unlock();
     }
-    try {
-      if (kv != null) {
-        action.accept(convert(kv));
+    try (AutoCloseableRawKeyValue<RAW> keyValue = kv) {
+      if (keyValue != null) {
+        action.accept(convert(keyValue));
         return true;
       }
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed next()", e);
-    } finally {
-      if (kv != null) {
-        kv.close();
+      return false;
+    } catch (Throwable e) {
+      if (closeOnException) {
+        closeRawIterator(true);
       }
+      throw new IllegalStateException("Failed next()", e);
     }
-    return false;
   }
 
   @Override
@@ -122,6 +125,24 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
       maxNumberOfAdditionalSplits.incrementAndGet();
     }
     return null;
+  }
+
+  private void closeRawIterator(boolean acquireLock) {
+    if (!closed) {
+      if (acquireLock) {
+        this.lock.lock();
+      }
+      try {
+        closed = true;
+        this.rawIterator.get().close();
+      } catch (IOException e) {
+        closeException.set(e);
+      } finally {
+        if (acquireLock) {
+          this.lock.unlock();
+        }
+      }
+    }
   }
 
   @Override

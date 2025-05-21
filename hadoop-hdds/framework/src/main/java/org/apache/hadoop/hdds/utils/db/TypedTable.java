@@ -400,16 +400,18 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return iterator(null);
   }
 
-  public Table.KeyValueSpliterator<KEY, VALUE> spliterator(int maxParallelism) throws IOException {
-    return spliterator(null, null, maxParallelism);
+  public Table.KeyValueSpliterator<KEY, VALUE> spliterator(int maxParallelism, boolean closeOnException)
+      throws IOException {
+    return spliterator(null, null, maxParallelism, closeOnException);
   }
 
-  public Table.KeyValueSpliterator<KEY, VALUE> spliterator(KEY startKey, KEY prefix, int maxParallelism)
+  public Table.KeyValueSpliterator<KEY, VALUE> spliterator(KEY startKey, KEY prefix, int maxParallelism,
+      boolean closeOnException)
       throws IOException {
     if (supportCodecBuffer) {
-      return newCodecBufferSpliterator(prefix, startKey, maxParallelism);
+      return newCodecBufferSpliterator(prefix, startKey, maxParallelism, closeOnException);
     }
-    return newByteArraySpliterator(prefix, startKey, maxParallelism);
+    return newByteArraySpliterator(prefix, startKey, maxParallelism, closeOnException);
   }
 
   @Override
@@ -598,8 +600,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   private RawSpliterator<CodecBuffer, KEY, VALUE> newCodecBufferSpliterator(
-      KEY prefix, KEY startKey, int maxParallelism) throws IOException {
-    return new RawSpliterator<CodecBuffer, KEY, VALUE>(prefix, startKey, maxParallelism) {
+      KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException) throws IOException {
+    return new RawSpliterator<CodecBuffer, KEY, VALUE>(prefix, startKey, maxParallelism, closeOnException) {
 
       @Override
       KeyValue<KEY, VALUE> convert(RawKeyValue<CodecBuffer> kv) throws IOException {
@@ -636,9 +638,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     };
   }
 
-  private RawSpliterator<byte[], KEY, VALUE> newByteArraySpliterator(KEY prefix, KEY startKey, int maxParallelism)
-      throws IOException {
-    return new RawSpliterator<byte[], KEY, VALUE>(prefix, startKey, maxParallelism) {
+  private RawSpliterator<byte[], KEY, VALUE> newByteArraySpliterator(KEY prefix, KEY startKey, int maxParallelism,
+      boolean closeOnException) throws IOException {
+    return new RawSpliterator<byte[], KEY, VALUE>(prefix, startKey, maxParallelism, closeOnException) {
 
       @Override
       KeyValue<KEY, VALUE> convert(RawKeyValue<byte[]> kv) throws IOException {
