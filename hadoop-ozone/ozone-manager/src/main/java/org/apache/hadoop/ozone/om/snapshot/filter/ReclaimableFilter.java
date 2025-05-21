@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.snapshot.filter;
 
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_GC_LOCK;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -34,7 +36,6 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -88,7 +89,7 @@ public abstract class ReclaimableFilter<V>
     this.omSnapshotManager = omSnapshotManager;
     this.currentSnapshotInfo = currentSnapshotInfo;
     this.snapshotChainManager = snapshotChainManager;
-    this.snapshotIdLocks = new MultiSnapshotLocks(lock, OzoneManagerLock.Resource.SNAPSHOT_GC_LOCK, false);
+    this.snapshotIdLocks = new MultiSnapshotLocks(lock, SNAPSHOT_GC_LOCK, false);
     this.keyManager = keyManager;
     this.numberOfPreviousSnapshotsFromChain = numberOfPreviousSnapshotsFromChain;
     this.previousOmSnapshots = new ArrayList<>(numberOfPreviousSnapshotsFromChain);
