@@ -784,7 +784,7 @@ public class KeyManagerImpl implements KeyManager {
           List<OmKeyInfo> notReclaimableKeyInfoList = notReclaimableKeyInfo.getOmKeyInfoList();
 
           // If all the versions are not reclaimable, then modify key by just purging the key that can be purged.
-          if (notReclaimableKeyInfoList.size() > 0 &&
+          if (!notReclaimableKeyInfoList.isEmpty() &&
               notReclaimableKeyInfoList.size() != infoList.getOmKeyInfoList().size()) {
             keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
           }
