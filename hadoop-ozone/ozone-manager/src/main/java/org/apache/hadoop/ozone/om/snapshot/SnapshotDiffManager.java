@@ -92,6 +92,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.file.PathUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -372,6 +373,14 @@ public class SnapshotDiffManager implements AutoCloseable {
                                                   List<String> tablesToLookUp) {
     return RdbUtil.getSSTFilesForComparison(((RDBStore)snapshot
         .getMetadataManager().getStore()).getDb().getManagedRocksDb(),
+        tablesToLookUp);
+  }
+
+  @VisibleForTesting
+  protected Map<Object, String> getSSTFileMapForSnapshot(OmSnapshot snapshot,
+      List<String> tablesToLookUp) throws IOException {
+    return RdbUtil.getSSTFilesWithInodesForComparison(((RDBStore)snapshot
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb(),
         tablesToLookUp);
   }
 
@@ -1203,11 +1212,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           .getDb().getManagedRocksDb();
       ManagedRocksDB toDB = ((RDBStore)toSnapshot.getMetadataManager().getStore())
           .getDb().getManagedRocksDb();
-      Set<String> fromSnapshotFiles = getSSTFileListForSnapshot(fromSnapshot, tablesToLookUp);
-      Set<String> toSnapshotFiles = getSSTFileListForSnapshot(toSnapshot, tablesToLookUp);
-      Set<String> diffFiles = new HashSet<>();
-      diffFiles.addAll(fromSnapshotFiles);
-      diffFiles.addAll(toSnapshotFiles);
+      Set<String> diffFiles = getDiffFiles(fromSnapshot, toSnapshot, tablesToLookUp);
       RocksDiffUtils.filterRelevantSstFiles(diffFiles, tablePrefixes, fromDB, toDB);
       deltaFiles = Optional.of(diffFiles);
     }
@@ -1215,6 +1220,29 @@ public class SnapshotDiffManager implements AutoCloseable {
     return deltaFiles.orElseThrow(() ->
         new IOException("Error getting diff files b/w " + fromSnapshot.getSnapshotTableKey() + " and " +
             toSnapshot.getSnapshotTableKey()));
+  }
+
+  private Set<String> getDiffFiles(OmSnapshot fromSnapshot, OmSnapshot toSnapshot, List<String> tablesToLookUp) {
+    Set<String> diffFiles;
+    try {
+      Map<Object, String> fromSnapshotFiles = getSSTFileMapForSnapshot(fromSnapshot, tablesToLookUp);
+      Map<Object, String> toSnapshotFiles = getSSTFileMapForSnapshot(toSnapshot, tablesToLookUp);
+      diffFiles = Stream.concat(
+          fromSnapshotFiles.entrySet().stream()
+              .filter(e -> !toSnapshotFiles.containsKey(e.getKey())),
+          toSnapshotFiles.entrySet().stream()
+              .filter(e -> !fromSnapshotFiles.containsKey(e.getKey())))
+              .map(Map.Entry::getValue)
+          .collect(Collectors.toSet());
+    } catch (IOException e) {
+      // In case of exception during inode read use all files
+      LOG.error("Exception occurred while populating delta files for snapDiff", e);
+      LOG.warn("Falling back to full file list comparison, inode-based optimization skipped.");
+      diffFiles = new HashSet<>();
+      diffFiles.addAll(getSSTFileListForSnapshot(fromSnapshot, tablesToLookUp));
+      diffFiles.addAll(getSSTFileListForSnapshot(toSnapshot, tablesToLookUp));
+    }
+    return diffFiles;
   }
 
   private void validateEstimatedKeyChangesAreInLimits(

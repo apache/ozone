@@ -41,6 +41,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.PostConstruct;
@@ -237,11 +238,12 @@ public abstract class EndpointBase implements Auditor {
    * buckets if bucket prefix is null.
    *
    * @param prefix Bucket prefix to match
+   * @param volumeProcessor Volume processor to operate on volume
    * @return {@code Iterator<OzoneBucket>}
    */
-  protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix)
+  protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix, Consumer<OzoneVolume> volumeProcessor)
       throws IOException, OS3Exception {
-    return iterateBuckets(volume -> volume.listBuckets(prefix));
+    return iterateBuckets(volume -> volume.listBuckets(prefix), volumeProcessor);
   }
 
   /**
@@ -255,15 +257,18 @@ public abstract class EndpointBase implements Auditor {
    * @return {@code Iterator<OzoneBucket>}
    */
   protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix,
-      String previousBucket) throws IOException, OS3Exception {
-    return iterateBuckets(volume -> volume.listBuckets(prefix, previousBucket));
+      String previousBucket, Consumer<OzoneVolume> volumeProcessor) throws IOException, OS3Exception {
+    return iterateBuckets(volume -> volume.listBuckets(prefix, previousBucket), volumeProcessor);
   }
 
   private Iterator<? extends OzoneBucket> iterateBuckets(
-      Function<OzoneVolume, Iterator<? extends OzoneBucket>> query)
+      Function<OzoneVolume, Iterator<? extends OzoneBucket>> query,
+      Consumer<OzoneVolume> ownerSetter)
       throws IOException, OS3Exception {
     try {
-      return query.apply(getVolume());
+      OzoneVolume volume = getVolume();
+      ownerSetter.accept(volume);
+      return query.apply(volume);
     } catch (OMException e) {
       if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         return Collections.emptyIterator();

@@ -29,8 +29,10 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -139,6 +141,11 @@ public class TestS3Utils {
         resolveS3ClientSideReplicationConfig(
             s3StorageType, s3StorageConfig, clientConfiguredReplConfig, bucketReplConfig));
     assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getCode(), exception.getCode());
+  }
+
+  @Test
+  public void testGenerateCanonicalUserId() {
+    assertEquals(S3Owner.DEFAULT_S3OWNER_ID, S3Utils.generateCanonicalUserId("ozone"));
   }
 
 }
