@@ -156,7 +156,6 @@ public final class S3Utils {
     return DigestUtils.sha256Hex(input);
   }
 
-
   public static boolean isEtagMisMatch(String clientETag, String serverETag) {
     if (clientETag == null) {
       return false;
