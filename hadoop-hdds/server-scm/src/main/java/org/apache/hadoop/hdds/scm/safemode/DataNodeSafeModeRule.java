@@ -69,17 +69,7 @@ public class DataNodeSafeModeRule extends
     if (validateBasedOnReportProcessing()) {
       return registeredDns >= requiredDns;
     }
-
-    int healthyCount = nodeManager.getNodes(NodeStatus.inServiceHealthy()).size();
-    int healthyReadOnlyCount = nodeManager.getNodes(NodeStatus.inServiceHealthyReadOnly()).size();
-    int staleCount = nodeManager.getNodes(NodeStatus.inServiceStale()).size();
-
-    if (healthyCount + healthyReadOnlyCount + staleCount == 1) {
-      LOG.warn("Only one Datanode is available in the cluster. " +
-          "Consider setting 'hdds.scm.safemode.min.datanode=1' in the configuration.");
-    }
-
-    return healthyCount >= requiredDns;
+    return nodeManager.getNodes(NodeStatus.inServiceHealthy()).size() >= requiredDns;
   }
 
   @Override
