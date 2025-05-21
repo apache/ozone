@@ -38,6 +38,7 @@ import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResu
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
@@ -48,6 +49,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -78,6 +80,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests for the MoveManager class.
@@ -494,6 +497,44 @@ public class TestMoveManager {
 
     verify(replicationManager, times(0))
         .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true));
+  }
+
+  @Test
+  public void testDeleteNotSentWithExpirationTimeInPast() throws Exception {
+    containerInfo = ReplicationTestUtil.createContainer(
+        HddsProtos.LifeCycleState.CLOSED, new ECReplicationConfig(3, 2));
+    setupMocks();
+
+    replicas.addAll(ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(), 1, 2, 3, 4, 5));
+    Iterator<ContainerReplica> iterator = replicas.iterator();
+    ContainerReplica srcReplica = iterator.next();
+    src = srcReplica.getDatanodeDetails();
+    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    nodes.put(src, NodeStatus.inServiceHealthy());
+    nodes.put(tgt, NodeStatus.inServiceHealthy());
+
+    CompletableFuture<MoveManager.MoveResult> res =
+        moveManager.move(containerInfo.containerID(), src, tgt);
+    ContainerReplicaOp op = new ContainerReplicaOp(
+        ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000);
+    moveManager.opCompleted(op, containerInfo.containerID(), false);
+
+    ArgumentCaptor<Long> longCaptor = ArgumentCaptor.forClass(Long.class);
+    verify(replicationManager).sendDeleteCommand(
+        eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
+        eq(true), longCaptor.capture());
+
+    // 6 minutes is the datanodeTimeoutOffset set for datanodeCommands sent by replicationManager by default
+    assertTrue((Duration.ofMillis(longCaptor.getValue()).toMillis()
+        - Duration.ofMinutes(6).toMillis()) > clock.millis());
+
+    op = new ContainerReplicaOp(
+        DELETE, src, srcReplica.getReplicaIndex(), null, clock.millis() + 1000);
+    moveManager.opCompleted(op, containerInfo.containerID(), false);
+
+    MoveManager.MoveResult finalResult = res.get();
+    assertEquals(COMPLETED, finalResult);
   }
 
   private CompletableFuture<MoveManager.MoveResult> setupSuccessfulMove()

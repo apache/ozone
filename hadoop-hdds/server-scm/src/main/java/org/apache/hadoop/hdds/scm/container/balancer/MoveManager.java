@@ -259,9 +259,9 @@ public final class MoveManager implements
    */
   private void notifyContainerOpCompleted(ContainerReplicaOp containerReplicaOp,
       ContainerID containerID) {
-    MoveOperation pair = pendingMoves.get(containerID);
-    if (pair != null) {
-      MoveDataNodePair mdnp = pair.getMoveDataNodePair();
+    MoveOperation move = pendingMoves.get(containerID);
+    if (move != null) {
+      MoveDataNodePair mdnp = move.getMoveDataNodePair();
       PendingOpType opType = containerReplicaOp.getOpType();
       DatanodeDetails dn = containerReplicaOp.getTarget();
       if (opType.equals(PendingOpType.ADD) && mdnp.getTgt().equals(dn)) {
@@ -272,7 +272,7 @@ public final class MoveManager implements
           LOG.warn("Failed to handle successful Add for container {} being " +
               "moved from source {} to target {}.", containerID,
               mdnp.getSrc(), mdnp.getTgt(), e);
-          pair.getResult().complete(MoveResult.FAIL_UNEXPECTED_ERROR);
+          move.getResult().complete(MoveResult.FAIL_UNEXPECTED_ERROR);
         }
       } else if (
             opType.equals(PendingOpType.DELETE) && mdnp.getSrc().equals(dn)) {
@@ -348,7 +348,7 @@ public final class MoveManager implements
 
       if (healthResult.getHealthState() ==
           ContainerHealthResult.HealthState.HEALTHY) {
-        sendDeleteCommand(containerInfo, src, moveOp.getReplicateScheduledTime());
+        sendDeleteCommand(containerInfo, src, moveOp.getMoveStartTime());
       } else {
         LOG.info("Cannot remove source replica as the container health would " +
             "be {}", healthResult.getHealthState());
@@ -395,7 +395,7 @@ public final class MoveManager implements
     long now = clock.millis();
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
         replicaIndex, src, tgt, now + replicationTimeout);
-    pendingMoves.get(containerInfo.containerID()).setReplicateScheduledTime(now);
+    pendingMoves.get(containerInfo.containerID()).setMoveStartTime(now);
   }
 
   /**
@@ -404,18 +404,17 @@ public final class MoveManager implements
    *
    * @param containerInfo Container to be deleted
    * @param datanode The datanode on which the replica should be deleted
-   * @param scheduledTime The time at which the replicate command for the container was scheduled
+   * @param moveStartTime The time at which the replicate command for the container was scheduled
    */
   private void sendDeleteCommand(
       final ContainerInfo containerInfo, final DatanodeDetails datanode,
-      long scheduledTime)
+      long moveStartTime)
       throws ContainerReplicaNotFoundException, ContainerNotFoundException,
       NotLeaderException {
     int replicaIndex = getContainerReplicaIndex(
         containerInfo.containerID(), datanode);
-    long deleteTimeout = moveTimeout - replicationTimeout;
     replicationManager.sendDeleteCommand(
-        containerInfo, replicaIndex, datanode, true, scheduledTime + deleteTimeout);
+        containerInfo, replicaIndex, datanode, true, moveStartTime + moveTimeout);
   }
 
   private int getContainerReplicaIndex(
@@ -451,10 +450,10 @@ public final class MoveManager implements
   /**
    * All details about a move operation.
    */
-  private static class MoveOperation {
+  static class MoveOperation {
     private CompletableFuture<MoveResult> result;
     private MoveDataNodePair moveDataNodePair;
-    private long replicateScheduledTime;
+    private long moveStartTime;
 
     MoveOperation(CompletableFuture<MoveResult> result, MoveDataNodePair srcTgt) {
       this.result = result;
@@ -469,8 +468,8 @@ public final class MoveManager implements
       return moveDataNodePair;
     }
 
-    public long getReplicateScheduledTime() {
-      return replicateScheduledTime;
+    public long getMoveStartTime() {
+      return moveStartTime;
     }
 
     public void setResult(
@@ -482,8 +481,8 @@ public final class MoveManager implements
       this.moveDataNodePair = srcTgt;
     }
 
-    public void setReplicateScheduledTime(long replicatescheduledTime) {
-      this.replicateScheduledTime = replicatescheduledTime;
+    public void setMoveStartTime(long time) {
+      this.moveStartTime = time;
     }
   }
 
