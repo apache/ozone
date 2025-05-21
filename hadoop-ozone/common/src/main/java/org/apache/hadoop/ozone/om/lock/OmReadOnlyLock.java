@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_A
 import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
 
 import java.util.Collection;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
 
 /**
  * Read only "lock" for snapshots

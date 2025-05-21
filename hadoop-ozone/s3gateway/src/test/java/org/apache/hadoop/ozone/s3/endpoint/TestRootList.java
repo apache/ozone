@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +33,8 @@ public class TestRootList {
   private OzoneClient clientStub;
   private RootEndpoint rootEndpoint;
 
+  private static final String DEFAULT_VOLUME = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+
   @BeforeEach
   public void setup() throws Exception {
 
@@ -43,6 +46,7 @@ public class TestRootList {
         .setClient(clientStub)
         .build();
 
+    clientStub.getObjectStore().createVolume(DEFAULT_VOLUME);
 
   }
 
@@ -60,6 +64,8 @@ public class TestRootList {
     }
     response = (ListBucketResponse) rootEndpoint.get().getEntity();
     assertEquals(10, response.getBucketsNum());
+    assertEquals("root", response.getOwner().getDisplayName());
+    assertEquals(S3Owner.DEFAULT_S3OWNER_ID, response.getOwner().getId());
   }
 
 }
