@@ -192,7 +192,7 @@
         <module name="Indentation">
             <property name="basicOffset" value="2"/>
             <property name="caseIndent" value="0"/>
-            <property name="lineWrappingIndentation" value="2"/>
+            <property name="lineWrappingIndentation" value="4"/>
         </module>
 
         <module name="UpperEll"/>
