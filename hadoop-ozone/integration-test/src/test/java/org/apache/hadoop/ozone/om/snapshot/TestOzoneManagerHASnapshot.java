@@ -283,6 +283,19 @@ public class TestOzoneManagerHASnapshot {
     cluster.waitForLeaderOM();
     assertNotNull(cluster.getOMLeader());
 
+    // wait until the snapshots complete deletion
+    for (int j = 0; j < 10; j++) {
+      String snapshotToDelete = snapshotNamesList.get(j).get(2);
+      String tableKey = SnapshotInfo.getTableKey(volumeNames.get(j), bucketNames.get(j), snapshotToDelete);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return cluster.getOMLeader().getMetadataManager().getSnapshotInfoTable().get(tableKey) == null;
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }, 1000, 60000);
+    }
+
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl) cluster.getOMLeader().getMetadataManager();
     // Verify that the snapshot chain is not corrupted even after deletions.
     assertFalse(metadataManager.getSnapshotChainManager().isSnapshotChainCorrupted());
