@@ -93,6 +93,11 @@ public final class SnapshotUtils {
                                              SnapshotChainManager chainManager,
                                              UUID snapshotId) throws IOException {
     String tableKey = chainManager.getTableKey(snapshotId);
+    if (tableKey == null) {
+      LOG.error("Snapshot with ID: '{}' is not found.", snapshotId);
+      throw new OMException("Snapshot with ID: '" + snapshotId + "' is not found.",
+          FILE_NOT_FOUND);
+    }
     return SnapshotUtils.getSnapshotInfo(ozoneManager, tableKey);
   }
 

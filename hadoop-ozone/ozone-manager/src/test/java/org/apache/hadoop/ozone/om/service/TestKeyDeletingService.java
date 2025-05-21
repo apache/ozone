@@ -346,8 +346,9 @@ class TestKeyDeletingService extends OzoneTestBase {
       when(ozoneManager.getOmSnapshotManager()).thenAnswer(i -> {
         return omSnapshotManager;
       });
-      KeyDeletingService service = new KeyDeletingService(ozoneManager, scmBlockTestingClient, km, 10000,
-          100000, conf, false);
+      when(ozoneManager.getKeyManager()).thenReturn(km);
+      KeyDeletingService service = new KeyDeletingService(ozoneManager, scmBlockTestingClient, 10000,
+          100000, conf, 10, false);
       service.shutdown();
       final long initialSnapshotCount = metadataManager.countRowsInTable(snapshotInfoTable);
       final long initialDeletedCount = metadataManager.countRowsInTable(deletedTable);
