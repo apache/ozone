@@ -21,8 +21,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -31,6 +33,7 @@ import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
+import org.apache.hadoop.ozone.container.common.utils.SlidingWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
@@ -309,8 +312,19 @@ public class TestStorageVolumeHealthChecks {
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
+    // Sliding window protocol transitioned from count-based to a time-based system
+    // Update the default failure duration of the window from 1 hour to a shorter duration for the test
+    long eventRate = 1L;
+    Field expiryDuration = SlidingWindow.class.getDeclaredField("expiryDuration");
+    Field expiryDurationMillis = SlidingWindow.class.getDeclaredField("expiryDurationMillis");
+    expiryDuration.setAccessible(true);
+    expiryDurationMillis.setAccessible(true);
+    expiryDuration.set(volume.getIoTestSlidingWindow(), Duration.ofMillis(eventRate * ioTestCount));
+    expiryDurationMillis.set(volume.getIoTestSlidingWindow(), Duration.ofMillis(eventRate * ioTestCount).toMillis());
 
     for (int i = 0; i < checkResults.length; i++) {
+      // Sleep to allow entries in the sliding window to eventually timeout
+      Thread.sleep(eventRate);
       final boolean result = checkResults[i];
       final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
             @Override
