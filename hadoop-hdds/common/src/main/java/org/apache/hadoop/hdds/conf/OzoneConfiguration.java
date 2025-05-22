@@ -215,15 +215,21 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
     addDefaultResource("hdfs-default.xml");
     addDefaultResource("hdfs-site.xml");
 
-    // One generated file per module
-    addDefaultResource("hdds-common-default.xml");
-    addDefaultResource("hdds-client-default.xml");
-    addDefaultResource("hdds-container-service-default.xml");
-    addDefaultResource("hdds-server-framework-default.xml");
-    addDefaultResource("hdds-server-scm-default.xml");
-    addDefaultResource("ozone-common-default.xml");
-    addDefaultResource("ozone-manager-default.xml");
-    addDefaultResource("ozone-recon-default.xml");
+    // Modules with @Config annotations.  If new one is introduced, add it to this list.
+    String[] modules = new String[] {
+        "hdds-common",
+        "hdds-client",
+        "hdds-container-service",
+        "hdds-server-framework",
+        "hdds-server-scm",
+        "ozone-common",
+        "ozone-csi",
+        "ozone-manager",
+        "ozone-recon",
+    };
+    for (String module : modules) {
+      addDefaultResource(module + "-default.xml");
+    }
 
     // Non-generated configs
     addDefaultResource("ozone-default.xml");

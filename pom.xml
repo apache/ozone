@@ -2175,11 +2175,20 @@
           <artifactId>copy-rename-maven-plugin</artifactId>
           <version>${copy-rename-maven-plugin.version}</version>
           <executions>
+            <!--
+              If a new module is introduced with generated config:
+              - override ban-annotations execution of maven-enforcer-plugin
+              - configure maven-compiler-plugin with the ConfigFileGenerator annotationProcessor
+              - bind one or both of these rename executions
+              - add the module's name in OzoneConfiguration#activate
+              See hadoop-hdds/common/pom.xml for example.
+            -->
             <execution>
               <id>rename-generated-config</id>
               <goals>
                 <goal>rename</goal>
               </goals>
+              <!-- bind to process-classes in modules where needed -->
               <phase>none</phase>
               <configuration>
                 <fileSets>
@@ -2195,6 +2204,7 @@
               <goals>
                 <goal>rename</goal>
               </goals>
+              <!-- bind to process-test-classes in modules where needed -->
               <phase>none</phase>
               <configuration>
                 <fileSets>
