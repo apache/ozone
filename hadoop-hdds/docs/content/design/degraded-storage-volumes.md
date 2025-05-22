@@ -245,7 +245,7 @@ This is an approximate task breakdown of the work required to implement this fea
 - Determine default configurations for sliding windows and scan intervals
     - Sliding window timeouts and scan intervals need to be set accordingly so that background scanners alone have a chance to cross the check threshold even if no foreground load is triggering on-demand scans.
     - Minimum volume scan gap is currently 15 minutes. This value can likely be reduced since volume scans are cheap, which will give us a more accurate view of the volume's health.
-- Migrate existing volume scanner checks to put entries in one **failed** sliding window and change volume state accordingly.
+- Migrate existing volume scanner checks to put entries in one **failed state** sliding window and change volume state accordingly.
 - Trigger on-demand volume scan when the container scanner finds an unhealthy container.
 
 ### Improve CLI
