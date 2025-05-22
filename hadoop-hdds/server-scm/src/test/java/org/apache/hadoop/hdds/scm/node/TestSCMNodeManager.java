@@ -946,7 +946,7 @@ public class TestSCMNodeManager {
       // should be instructed to finalize.
       verify(eventPublisher, times(1))
           .fireEvent(eq(DATANODE_COMMAND), captor.capture());
-      assertEquals(captor.getValue().getDatanodeId(), node1.getUuid());
+      assertEquals(captor.getValue().getDatanodeId(), node1.getID());
       assertEquals(captor.getValue().getCommand().getType(),
           finalizeNewLayoutVersionCommand);
     } else {
@@ -976,11 +976,11 @@ public class TestSCMNodeManager {
     verify(eventPublisher,
         times(1)).fireEvent(NEW_NODE, node1);
     for (int i = 0; i < 3; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(), ReplicateContainerCommand
+      nodeManager.addDatanodeCommand(node1.getID(), ReplicateContainerCommand
           .toTarget(1, MockDatanodeDetails.randomDatanodeDetails()));
     }
     for (int i = 0; i < 5; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(),
+      nodeManager.addDatanodeCommand(node1.getID(),
           new DeleteBlocksCommand(emptyList()));
     }
 
@@ -1036,7 +1036,7 @@ public class TestSCMNodeManager {
 
     // Add a a few more commands to the queue and check the counts are the sum.
     for (int i = 0; i < 5; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(),
+      nodeManager.addDatanodeCommand(node1.getID(),
           new CloseContainerCommand(1, PipelineID.randomId()));
     }
     assertEquals(0, nodeManager.getTotalDatanodeCommandCount(

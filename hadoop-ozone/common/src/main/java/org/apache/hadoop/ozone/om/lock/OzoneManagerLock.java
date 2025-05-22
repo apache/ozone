@@ -41,6 +41,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -132,7 +133,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private Striped<ReadWriteLock> createStripeLock(Resource r,
-                                                  ConfigurationSource conf) {
+      ConfigurationSource conf) {
     boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
         OZONE_MANAGER_FAIR_LOCK_DEFAULT);
     String stripeSizeKey = OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX +
@@ -146,7 +147,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return IntStream.range(0, striped.size()).mapToObj(striped::getAt).collect(Collectors.toList());
   }
 
-  private Iterable<ReadWriteLock> bulkGetLock(Striped<ReadWriteLock> striped, Collection<String[]> keys) {
+  private Iterable<ReadWriteLock> bulkGetLock(Map<Resource, Striped<ReadWriteLock>> lockMap, Resource resource,
+      Collection<String[]> keys) {
+    Striped<ReadWriteLock> striped = lockMap.get(resource);
     List<Object> lockKeys = new ArrayList<>(keys.size());
     for (String[] key : keys) {
       if (Objects.nonNull(key)) {
@@ -157,7 +160,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private ReentrantReadWriteLock getLock(Map<Resource, Striped<ReadWriteLock>> lockMap, Resource resource,
-                                         String... keys) {
+      String... keys) {
     Striped<ReadWriteLock> striped = lockMap.get(resource);
     Object key = combineKeys(keys);
     return (ReentrantReadWriteLock) striped.get(key);
@@ -311,7 +314,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private void updateReadLockMetrics(Resource resource,
-                                     ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
+      ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
 
     /*
      *  readHoldCount helps in metrics updation only once in case
@@ -332,7 +335,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private void updateWriteLockMetrics(Resource resource,
-                                      ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
+      ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
     /*
      *  writeHoldCount helps in metrics updation only once in case
      *  of reentrant locks. Metrics are updated only if the write lock is held
@@ -362,7 +365,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   @VisibleForTesting
   List<String> getCurrentLocks() {
     return resourcelockMap.values().stream().map(Pair::getValue)
-        .flatMap(i -> ((ResourceLockManager<? extends Resource>)i).getCurrentLockedResources())
+        .flatMap(rlm -> ((ResourceLockManager<? extends Resource>)rlm).getCurrentLockedResources())
         .map(Resource::getName)
         .collect(Collectors.toList());
   }
@@ -469,12 +472,12 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private OMLockDetails releaseLocks(Resource resource, boolean isReadLock,
-                                     Function<Striped<ReadWriteLock>, Iterable<ReadWriteLock>> lockListProvider) {
+      Function<Striped<ReadWriteLock>, Iterable<ReadWriteLock>> lockListProvider) {
     Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockManager> resourceLockPair =
         resourcelockMap.get(resource.getClass());
     ResourceLockManager<Resource> resourceLockManager = resourceLockPair.getRight();
     resourceLockManager.clearLockDetails();
-    List<ReadWriteLock> locks = StreamSupport.stream(lockListProvider.apply(resourceLockPair.getKey().get(resource))
+    List<ReadWriteLock> locks = StreamSupport.stream(bulkGetLock(resourceLockPair.getKey(), resource, keys)
             .spliterator(), false).collect(Collectors.toList());
     // Release locks in reverse order.
     Collections.reverse(locks);
@@ -656,7 +659,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     @Override
     Stream<FlatResource> getCurrentLockedResources() {
-      return acquiredLocksMap.keySet().stream().filter(i -> acquiredLocksMap.get(i).get());
+      return acquiredLocksMap.keySet().stream().filter(flatResource -> acquiredLocksMap.get(flatResource).get());
     }
   }
 
