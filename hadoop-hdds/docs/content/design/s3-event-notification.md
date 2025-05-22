@@ -97,7 +97,7 @@ Here is the mapping between OM audit actions and S3 event types.
 
 ### Overview
 
-A callback is introduced post-Ratis commit and pre-client response to handle event notification logic.
+A callback is introduced after the Ratis request is completed and before the response is returned to the client, to handle event notification logic.
 
 #### Component
 
@@ -152,22 +152,22 @@ This is the structure to determine which event should be sent and where to send.
 
 ```protobuf
 message NotificationInfo {
-required string targetId = 1;
-required Event event = 2;
+  required string targetId = 1;
+  required Event event = 2;
 }
 
 
 enum Event {
-S3TEST = 1;
-S3ObjectCreate = 2;
-S3ObjectCreatePut = 3;
-S3ObjectCreatePost = 4;
-S3ObjectCreateCopy = 5;
-S3ObjectCreateCompleteMultipartUpload = 6;
-S3ObjectRemovedDelete = 7;
-S3ObjectTagging = 8;
-S3ObjectTaggingPut = 9;
-S3ObjectTaggingDelete = 10;
+  S3TEST = 1;
+  S3ObjectCreate = 2;
+  S3ObjectCreatePut = 3;
+  S3ObjectCreatePost = 4;
+  S3ObjectCreateCopy = 5;
+  S3ObjectCreateCompleteMultipartUpload = 6;
+  S3ObjectRemovedDelete = 7;
+  S3ObjectTagging = 8;
+  S3ObjectTaggingPut = 9;
+  S3ObjectTaggingDelete = 10;
 }
 ```
 
@@ -175,37 +175,38 @@ S3ObjectTaggingDelete = 10;
 This is the structure to store the details of the target.
 ```protobuf
 message TargetConfig {
-required Target target = 1;
-optional KafkaNotificationConfig kafkaNotificationConfig = 3;
-optional RabbitMQNotificationConfig rabbitMQNotificationConfig = 4;
+  required Target target = 1;
+  oneof config {
+    optional KafkaNotificationConfig kafkaNotificationConfig = 2;
+    optional RabbitMQNotificationConfig rabbitMQNotificationConfig = 3;
+  }
 }
 
-
 enum Target {
-Kafka = 1;
-RabbitMQ = 2;
+    Kafka = 1;
+    RabbitMQ = 2;
 }
 
 
 message KafkaNotificationConfig {
-repeated string endpoints = 1;
-required string topic = 2;
-optional string saslUsername = 3;
-optional string saslPassword = 4;
-optional string saslMechanism = 5;
-optional string tlsSkipVerify = 6;
-optional string clientTlsCert = 7;
-optional string clientTlsKey = 8;
-
-
+  repeated string endpoints = 1;
+  required string topic = 2;
+  optional string saslUsername = 3;
+  optional string saslPassword = 4;
+  optional string saslMechanism = 5;
+  optional string tlsSkipVerify = 6;
+  optional string clientTlsCert = 7;
+  optional string clientTlsKey = 8;
 }
 
 
-message RabbitMQNotificationConfig {
-required string url = 1;
-required string exchange = 2;
-required string exchangeType = 3;
-required string routingKey = 4;
+message AMQPNotificationConfig {
+  required string amqpVersion = 1;
+  required string url = 2;
+  optional string exchange = 3;
+  optional string exchangeType = 4;
+  optional string routingKey = 5;
+  optional string queue = 6;
 }
 ```
 
@@ -235,7 +236,10 @@ OM Metadata Read Metrics:
 Latency of reading notification configuration from the BucketTable.
 - **Target config lookup latency**:
 Latency of reading target configuration from the TargetTable.
-- **Total number of notification evaluations**
+- **Total number of notification events triggered**
+Total number of notification events generated.
+- **Total number of notification events push failed**
+  Number of events that failed to be delivered to a target.
 
 Senders Metrics:
 Each client implementation for the supported targets (e.g., Kafka, RabbitMQ) will expose a set of metrics to monitor, debug, and tune. These metrics will help users understand the behavior and efficiency of the notification system under various conditions. 
