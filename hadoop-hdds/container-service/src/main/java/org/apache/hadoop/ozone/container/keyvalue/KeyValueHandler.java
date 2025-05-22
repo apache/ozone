@@ -1668,7 +1668,7 @@ public class KeyValueHandler extends Handler {
       // Based on repaired done with this peer, write the updated merkle tree to the container.
       // This updated tree will be used when we reconcile with the next peer.
       ContainerProtos.ContainerChecksumInfo previousChecksumInfo = latestChecksumInfo;
-      latestChecksumInfo = checksumManager.writeContainerDataTree(containerData, updatedTreeWriter);
+      latestChecksumInfo = updateAndGetContainerChecksum(container, updatedTreeWriter, false);
 
       // Log the results of reconciliation with this peer.
       long duration = Instant.now().toEpochMilli() - start;
