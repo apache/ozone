@@ -649,7 +649,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * Submits SetSnapsnapshotPropertyRequest to OM.
    * @param setSnapshotPropertyRequests request to be sent to OM
    */
-  protected void submitSetSnapshotRequest(
+  protected void submitSetSnapshotRequests(
       List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests) {
     if (setSnapshotPropertyRequests.isEmpty()) {
       return;
@@ -659,16 +659,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         .addAllSetSnapshotPropertyRequests(setSnapshotPropertyRequests)
         .setClientId(clientId.toString())
         .build();
-    Map<String, SnapshotInfo> val = new HashMap<>();
-    setSnapshotPropertyRequests
-        .forEach(i -> {
-          try {
-            val.put(i.getSnapshotKey(),
-                ozoneManager.getMetadataManager().getSnapshotInfoTable().get(i.getSnapshotKey()));
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        });
     try {
       submitRequest(omRequest);
     } catch (ServiceException e) {

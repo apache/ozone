@@ -189,8 +189,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               exclusiveReplicatedSizeMap.getOrDefault(
                   snapshotID, 0L))
           .build();
-      exclusiveSizeMap.remove(snapshotID);
-      exclusiveReplicatedSizeMap.remove(snapshotID);
 
       return OzoneManagerProtocolProtos.SetSnapshotPropertyRequest.newBuilder()
           .setSnapshotKey(snapshotChainManager.getTableKey(snapshotID))
@@ -277,7 +275,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   .setDeepCleanedDeletedKey(true)
                   .build());
             }
-            submitSetSnapshotRequest(setSnapshotPropertyRequests);
+            submitSetSnapshotRequests(setSnapshotPropertyRequests);
           }
         }
       } catch (UncheckedIOException e) {
