@@ -210,7 +210,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         snapshotTableKey = currentSnapshotInfo.getTableKey();
       }
 
-      String startKey = null;
       boolean successStatus = true;
       try {
         // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
@@ -235,7 +234,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           // Get pending keys that can be deleted
           PendingKeysDeletion pendingKeysDeletion = currentSnapshotInfo == null
               ? keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum)
-              : keyManager.getPendingDeletionKeys(volume, bucket, startKey, reclaimableKeyFilter, remainNum);
+              : keyManager.getPendingDeletionKeys(volume, bucket, null, reclaimableKeyFilter, remainNum);
           List<BlockGroup> keyBlocksList = pendingKeysDeletion.getKeyBlocksList();
           //submit purge requests if there are renamed entries to be purged or keys to be purged.
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
