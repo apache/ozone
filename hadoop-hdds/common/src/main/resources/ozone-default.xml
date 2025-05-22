@@ -1689,7 +1689,7 @@
 
   <property>
     <name>hdds.scm.safemode.min.datanode</name>
-    <value>1</value>
+    <value>3</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description>Minimum DataNodes which should be registered to get SCM out of
       safe mode.
@@ -1974,6 +1974,15 @@
     <description>If this is true, there will be efficiency optimization effects
       when calling s3g list interface with delimiter '/' parameter, especially
       when there are a large number of keys.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.list.max.keys.limit</name>
+    <value>1000</value>
+    <description>
+      Maximum number of keys returned by S3 ListObjects/ListObjectsV2 API.
+      AWS default is 1000. Can be overridden per deployment in ozone-site.xml.
     </description>
   </property>
 

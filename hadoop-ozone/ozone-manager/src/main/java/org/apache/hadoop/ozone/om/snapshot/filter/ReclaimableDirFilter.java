@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Class to filter out deleted directories which are reclaimable based on their presence in previous snapshot in
@@ -56,7 +56,7 @@ public class ReclaimableDirFilter extends ReclaimableFilter<OmKeyInfo> {
 
   @Override
   protected Boolean isReclaimable(Table.KeyValue<String, OmKeyInfo> deletedDirInfo) throws IOException {
-    ReferenceCounted<OmSnapshot> previousSnapshot = getPreviousOmSnapshot(0);
+    UncheckedAutoCloseableSupplier<OmSnapshot> previousSnapshot = getPreviousOmSnapshot(0);
     KeyManager prevKeyManager = previousSnapshot == null ? null : previousSnapshot.get().getKeyManager();
     return isDirReclaimable(getVolumeId(), getBucketInfo(), deletedDirInfo.getValue(), getKeyManager(), prevKeyManager);
   }
