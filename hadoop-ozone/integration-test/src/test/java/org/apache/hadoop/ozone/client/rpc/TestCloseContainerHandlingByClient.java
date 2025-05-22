@@ -73,7 +73,6 @@ public abstract class TestCloseContainerHandlingByClient implements NonHATests.T
   void init() throws Exception {
     chunkSize = (int) cluster().getConf().getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 1024 * 1024, StorageUnit.BYTES);
     blockSize = (int) cluster().getConf().getStorageSize(OZONE_SCM_BLOCK_SIZE, 4 * chunkSize, StorageUnit.BYTES);
-    cluster().getConf().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, false);
 
     cluster = cluster();
     client = cluster().newClient();

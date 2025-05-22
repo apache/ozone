@@ -98,7 +98,6 @@ class TestBlockOutputStream {
     conf.setQuietMode(false);
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE, 4, StorageUnit.MB);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 3);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, false);
 
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
