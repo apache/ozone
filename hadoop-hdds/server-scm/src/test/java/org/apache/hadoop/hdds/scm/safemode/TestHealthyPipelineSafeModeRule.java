@@ -74,6 +74,7 @@ public class TestHealthyPipelineSafeModeRule {
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
+    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 0);
     // enable pipeline check
     config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);

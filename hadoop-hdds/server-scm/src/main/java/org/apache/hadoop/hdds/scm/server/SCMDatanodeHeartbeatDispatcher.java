@@ -91,7 +91,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
       LOG.info("SCM received heartbeat from an unregistered datanode {}. " +
           "Asking datanode to re-register.", datanodeDetails);
       UUID dnID = datanodeDetails.getUuid();
-      nodeManager.addDatanodeCommand(dnID, new ReregisterCommand());
+      nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
 
       commands = nodeManager.getCommandQueue(dnID);
 

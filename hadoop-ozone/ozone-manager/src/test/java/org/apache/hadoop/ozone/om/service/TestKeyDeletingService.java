@@ -28,8 +28,13 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -46,7 +51,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -78,20 +85,24 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentMatchers;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -472,7 +483,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       keyDeletingService.resume();
 
-      try (ReferenceCounted<OmSnapshot> rcOmSnapshot =
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot =
                om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snap3)) {
         OmSnapshot snapshot3 = rcOmSnapshot.get();
 
@@ -631,6 +642,38 @@ class TestKeyDeletingService extends OzoneTestBase {
     void cleanup() {
       if (om.stop()) {
         om.join();
+      }
+    }
+
+    @Test
+    @DisplayName("Should not update keys when purge request times out during key deletion")
+    public void testFailingModifiedKeyPurge() throws IOException {
+
+      try (MockedStatic<OzoneManagerRatisUtils> mocked =  mockStatic(OzoneManagerRatisUtils.class,
+          CALLS_REAL_METHODS)) {
+        AtomicReference<OzoneManagerProtocolProtos.OMRequest> purgeRequest = new AtomicReference<>();
+        mocked.when(() -> OzoneManagerRatisUtils.submitRequest(any(), any(), any(), anyLong()))
+            .thenAnswer(i -> {
+              purgeRequest.set(i.getArgument(1));
+              return OzoneManagerProtocolProtos.OMResponse.newBuilder().setCmdType(purgeRequest.get().getCmdType())
+                  .setStatus(OzoneManagerProtocolProtos.Status.TIMEOUT).build();
+            });
+        List<BlockGroup> blockGroups = Collections.singletonList(BlockGroup.newBuilder().setKeyName("key1")
+            .addAllBlockIDs(Collections.singletonList(new BlockID(1, 1))).build());
+        OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
+            .setBucketName("buck")
+            .setVolumeName("vol")
+            .setKeyName("key1")
+            .setDataSize(10)
+            .setOmKeyLocationInfos(null)
+            .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+            .setObjectID(1)
+            .setParentObjectID(2)
+            .build();
+        Map<String, RepeatedOmKeyInfo> keysToModify = Collections.singletonMap("key1",
+            new RepeatedOmKeyInfo(Collections.singletonList(omKeyInfo)));
+        keyDeletingService.processKeyDeletes(blockGroups, keysToModify, null, null);
+        assertTrue(purgeRequest.get().getPurgeKeysRequest().getKeysToUpdateList().isEmpty());
       }
     }
 

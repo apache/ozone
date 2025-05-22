@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.AmazonServiceException.ErrorType;
+import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
 import com.amazonaws.services.s3.model.AccessControlList;
@@ -37,6 +38,7 @@ import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
@@ -69,17 +71,22 @@ import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.TransferManagerBuilder;
 import com.amazonaws.services.s3.transfer.Upload;
 import com.amazonaws.services.s3.transfer.model.UploadResult;
+import com.amazonaws.util.IOUtils;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -105,6 +112,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
+import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
@@ -270,7 +278,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     Owner s3AccountOwner = s3Client.getS3AccountOwner();
 
     assertThat(s3AccountOwner.getDisplayName()).isEqualTo(expectOwner);
-    assertThat(s3AccountOwner.getId()).isEqualTo(expectOwner);
+    assertThat(s3AccountOwner.getId()).isEqualTo(S3Owner.DEFAULT_S3OWNER_ID);
   }
 
   @Test
@@ -986,6 +994,98 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(403, ase.getStatusCode());
     assertEquals("QuotaExceeded", ase.getErrorCode());
+  }
+
+  @Test
+  public void testPresignedUrlGet() throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+
+    s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+
+    // Set the presigned URL to expire after one hour.
+    Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
+
+    // Generate the presigned URL
+    GeneratePresignedUrlRequest generatePresignedUrlRequest =
+        new GeneratePresignedUrlRequest(bucketName, keyName)
+            .withMethod(HttpMethod.GET)
+            .withExpiration(expiration);
+    generatePresignedUrlRequest.addRequestParameter("x-custom-parameter", "custom-value");
+    URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+    // Download the object using HttpUrlConnection (since v1.1)
+    // Capture the response body to a byte array.
+    URL presignedUrl = new URL(url.toExternalForm());
+    HttpURLConnection connection = (HttpURLConnection) presignedUrl.openConnection();
+    connection.setRequestMethod("GET");
+    // Download the result of executing the request.
+    try (InputStream s3is = connection.getInputStream();
+         ByteArrayOutputStream bos = new ByteArrayOutputStream(
+             content.getBytes(StandardCharsets.UTF_8).length)) {
+      IOUtils.copy(s3is, bos);
+      assertEquals(content, bos.toString("UTF-8"));
+    }
+  }
+
+  /**
+   * Tests the functionality to create a snapshot of an Ozone bucket and then read files
+   * from the snapshot directory using the S3 SDK.
+   *
+   * <p>The test follows these steps:
+   * <ol>
+   *   <li>Create a bucket and upload a file via the S3 client.</li>
+   *   <li>Create a snapshot on the bucket using the Ozone client.</li>
+   *   <li>Construct the snapshot object key using the ".snapshot" directory format.</li>
+   *   <li>Retrieve the object from the snapshot and verify that its content matches
+   *       the originally uploaded content.</li>
+   * </ol>
+   * </p>
+   *
+   * @throws Exception if the test fails due to any errors during bucket creation, snapshot creation,
+   *         file upload, or retrieval.
+   */
+  @Test
+  public void testReadSnapshotDirectoryUsingS3SDK() throws Exception {
+    final String bucketName = getBucketName("snapshot");
+    final String keyName = getKeyName("snapshotfile");
+    final String content = "snapshot test content";
+    final byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+
+    // Create the bucket and upload an object using S3 SDK.
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName,
+        is, new ObjectMetadata());
+
+    String snapshotName = "snap1";
+    // Create a snapshot using the Ozone client.
+    // Snapshots in Ozone are created on the bucket and are exposed via the ".snapshot" directory.
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+
+      store.createSnapshot(volume.getName(), bucketName, snapshotName);
+    }
+
+    // Use the S3 SDK to read the file from the snapshot directory.
+    // The key in the snapshot is constructed using the special ".snapshot" prefix.
+    String snapshotKey = ".snapshot/" + snapshotName + "/" + keyName;
+
+    S3Object s3Object = s3Client.getObject(bucketName, snapshotKey);
+    try (S3ObjectInputStream s3is = s3Object.getObjectContent();
+         ByteArrayOutputStream bos = new ByteArrayOutputStream(contentBytes.length)) {
+      byte[] readBuf = new byte[1024];
+      int readLen = 0;
+      while ((readLen = s3is.read(readBuf)) > 0) {
+        bos.write(readBuf, 0, readLen);
+      }
+      assertEquals(content, bos.toString("UTF-8"));
+    }
   }
 
   private boolean isBucketEmpty(Bucket bucket) {

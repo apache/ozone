@@ -111,7 +111,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
     if (json) {
       List<DatanodeWithAttributes> datanodeList = allNodes.collect(
               Collectors.toList());
-      System.out.print(
+      System.out.println(
               JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
     } else {
       allNodes.forEach(this::printDatanodeInfo);

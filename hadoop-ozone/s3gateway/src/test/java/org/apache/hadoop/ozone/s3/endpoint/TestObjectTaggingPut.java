@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doThrow;
@@ -75,6 +76,7 @@ public class TestObjectTaggingPut {
     clientStub.getObjectStore().createS3Bucket(BUCKET_NAME);
 
     HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
 
     // Create PutObject and setClient to OzoneClientStub
     objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -83,7 +85,7 @@ public class TestObjectTaggingPut {
         .setHeaders(headers)
         .build();
 
-    
+
     ByteArrayInputStream body =
         new ByteArrayInputStream("".getBytes(UTF_8));
 

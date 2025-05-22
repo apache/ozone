@@ -43,9 +43,9 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -224,7 +224,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
     String snapshotName = "snap1";
     SnapshotInfo snapshotInfo = createSnapshot(snapshotName);
-    ReferenceCounted<OmSnapshot> rcOmSnapshot = ozoneManager.getOmSnapshotManager()
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot = ozoneManager.getOmSnapshotManager()
         .getSnapshot(snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), snapshotInfo.getName());
     // Keys should be present in snapshot
     validateDeletedKeysTable(rcOmSnapshot.get().getMetadataManager(), deletedKeyInfos, true);
