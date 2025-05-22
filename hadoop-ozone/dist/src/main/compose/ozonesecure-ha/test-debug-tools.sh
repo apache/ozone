@@ -21,9 +21,9 @@ set -u -o pipefail
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
-
+§
 export SECURITY_ENABLED=true
-export OM_SERVICE_ID="omservice"
+export OM_SERVICE_ID=omservice
 export SCM=scm1.org
 export COMPOSE_FILE=docker-compose.yaml:debug-tools.yaml
 export OZONE_DIR=/opt/hadoop
@@ -49,5 +49,7 @@ fi
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
+
+execute_robot_test ${SCM} kinit.robot
 
 source "$COMPOSE_DIR/../common/replicas-test.sh"
