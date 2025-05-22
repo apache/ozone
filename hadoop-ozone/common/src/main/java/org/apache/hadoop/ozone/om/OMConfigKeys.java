@@ -435,7 +435,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED =
       "ozone.om.allocate.block.cache_enabled";
   public static final boolean OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED_DEFAULT =
-      true;
+      false;
 
   public static final String OZONE_OM_NAMESPACE_STRICT_S3 =
       "ozone.om.namespace.s3.strict";
