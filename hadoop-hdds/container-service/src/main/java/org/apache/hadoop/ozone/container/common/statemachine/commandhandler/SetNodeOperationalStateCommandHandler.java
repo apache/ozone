@@ -110,7 +110,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
       context.getParent().stopDiskBalancer();
     }
 
-    Boolean shouldRun = context.getParent().shouldRunDiskBalancer();
+    Boolean shouldRun = context.getParent().isPaused();
 
     if (state == HddsProtos.NodeOperationalState.IN_SERVICE) {
       if (shouldRun) {

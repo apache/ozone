@@ -135,9 +135,8 @@ public class DatanodeStateMachine implements Closeable {
 
   private final DatanodeQueueMetrics queueMetrics;
   private final ReconfigurationHandler reconfigurationHandler;
-  //global variable to track if diskBalancer was running before pause
-  private Boolean shouldRun = false;
-  //global variable to track paused state of diskBalancer
+
+  //tracks paused state of diskBalancer if it was running before pause
   private final AtomicBoolean paused;
 
   /**
@@ -719,8 +718,7 @@ public class DatanodeStateMachine implements Closeable {
     if (ozoneContainer != null) {
       DiskBalancerService diskBalancerService = ozoneContainer.getDiskBalancerService();
       if (diskBalancerService != null) {
-        shouldRun = diskBalancerService.getDiskBalancerInfo().isShouldRun();
-        paused.set(true); // Mark as paused
+        paused.set(diskBalancerService.getDiskBalancerInfo().isShouldRun());
         diskBalancerService.setShouldRun(false);
       }
     }
@@ -733,20 +731,18 @@ public class DatanodeStateMachine implements Closeable {
     OzoneContainer ozoneContainer = getContainer();
     if (ozoneContainer != null) {
       DiskBalancerService diskBalancerService = ozoneContainer.getDiskBalancerService();
-      if (diskBalancerService != null && paused.get()) {
-        // Reset paused state
-        paused.set(false);
+      if (diskBalancerService != null && paused.getAndSet(false)) {
         diskBalancerService.setShouldRun(true);
       }
     }
   }
 
   /**
-   * Checks if DiskBalancerService should run based
-   * on its previous state and paused flag.
+   * @return true, if diskBalancer was running before pause.
+   * else false if it was already stopped before pause.
    */
-  public boolean shouldRunDiskBalancer() {
-    return shouldRun && paused.get();
+  public boolean isPaused() {
+    return paused.get();
   }
 
   /**
