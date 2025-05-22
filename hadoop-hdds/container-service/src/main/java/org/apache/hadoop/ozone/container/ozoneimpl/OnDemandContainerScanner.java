@@ -138,10 +138,8 @@ public final class OnDemandContainerScanner {
       logScanStart(containerData);
 
       ScanResult result = ScanResult.healthy();
-      // OPEN containers are scanned here for metadata only
-      if (container.shouldScanMetadata() && !container.shouldScanData()) {
-        result = container.scanMetaData();
-      } else if (container.shouldScanData()) {
+      if (container.shouldScanData()) {
+        LOG.debug("Performing data scan for container {}", container.getContainerData().getContainerID());
         result = container.scanData(instance.throttler, instance.canceler);
         // Metrics for skipped containers should not be updated.
         if (result.getFailureType() == DELETED_CONTAINER) {
@@ -149,6 +147,10 @@ public final class OnDemandContainerScanner {
               containerId, result.getException());
           return;
         }
+      } else if (container.shouldScanMetadata()) {
+        // OPEN containers are scanned here for metadata only
+        LOG.debug("Performing metadata-only scan for open container {}", container.getContainerData().getContainerID());
+        result = container.scanMetaData();
       }
       if (!result.isHealthy()) {
         LOG.error("Corruption detected in container [{}]." +

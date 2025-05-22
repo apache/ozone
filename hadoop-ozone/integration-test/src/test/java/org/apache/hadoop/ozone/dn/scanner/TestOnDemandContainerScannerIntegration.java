@@ -123,7 +123,7 @@ class TestOnDemandContainerScannerIntegration
 
   /**
    * {@link OnDemandContainerScanner} should detect corrupted blocks
-   * in a open container when a client reads from it.
+   * in an open container when a client reads from it.
    */
   @ParameterizedTest
   @MethodSource("supportedCorruptionTypesForOpen")
