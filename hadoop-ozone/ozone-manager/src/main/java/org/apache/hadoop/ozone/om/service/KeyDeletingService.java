@@ -255,7 +255,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           }
 
           // Checking remainNum is greater than zero and not equal to the initial value if there were some keys to
-          // reclaim. This is to check if
+          // reclaim. This is to check if all keys have been iterated over and all the keys necessary have been
+          // reclaimed.
           if (remainNum > 0 && successStatus) {
             List<SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
             Map<UUID, Long> exclusiveReplicatedSizeMap = reclaimableKeyFilter.getExclusiveReplicatedSizeMap();
@@ -268,7 +269,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   exclusiveReplicatedSizeMap, snapshot));
             }
 
-            //Updating directory deep clean flag of snapshot.
+            // Updating directory deep clean flag of snapshot.
             if (currentSnapshotInfo != null) {
               setSnapshotPropertyRequests.add(OzoneManagerProtocolProtos.SetSnapshotPropertyRequest.newBuilder()
                   .setSnapshotKey(snapshotTableKey)
