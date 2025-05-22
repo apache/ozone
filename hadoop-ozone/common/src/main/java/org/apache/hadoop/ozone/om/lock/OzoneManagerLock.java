@@ -41,7 +41,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -147,9 +146,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return IntStream.range(0, striped.size()).mapToObj(striped::getAt).collect(Collectors.toList());
   }
 
-  private Iterable<ReadWriteLock> bulkGetLock(Map<Resource, Striped<ReadWriteLock>> lockMap, Resource resource,
-      Collection<String[]> keys) {
-    Striped<ReadWriteLock> striped = lockMap.get(resource);
+  private Iterable<ReadWriteLock> bulkGetLock(Striped<ReadWriteLock> striped, Collection<String[]> keys) {
     List<Object> lockKeys = new ArrayList<>(keys.size());
     for (String[] key : keys) {
       if (Objects.nonNull(key)) {
@@ -477,7 +474,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
         resourcelockMap.get(resource.getClass());
     ResourceLockManager<Resource> resourceLockManager = resourceLockPair.getRight();
     resourceLockManager.clearLockDetails();
-    List<ReadWriteLock> locks = StreamSupport.stream(bulkGetLock(resourceLockPair.getKey(), resource, keys)
+    List<ReadWriteLock> locks = StreamSupport.stream(lockListProvider.apply(resourceLockPair.getKey().get(resource))
             .spliterator(), false).collect(Collectors.toList());
     // Release locks in reverse order.
     Collections.reverse(locks);
