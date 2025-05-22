@@ -49,6 +49,8 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -58,11 +60,13 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
@@ -88,7 +92,9 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -114,6 +120,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
+import org.apache.hadoop.ozone.utils.MemoryPageUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -1632,5 +1639,103 @@ public class SCMClientProtocolServer implements
           SCMAction.GET_METRICS, auditMap, ex));
       throw ex;
     }
+  }
+
+  /**
+   * Get getVolumeInfos based on query conditions.
+   *
+   * @param displayMode Represents the mode for displaying volumes.
+   * Options include "all" for all volumes, "failed" for failed volumes,
+   * and "normal" for normal volumes.
+   * @param uuid datanode uuid String.
+   * @param hostName datanode hostName String.
+   * @param pageSize Records displayed per page.
+   * @param currentPage The current page number.
+   * @return Volume Information List.
+   * @throws IOException
+   * I/O exceptions that may occur during the process of querying the volume.
+   */
+  @Override
+  public GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid,
+      String hostName, int pageSize, int currentPage) throws IOException {
+
+    GetVolumeInfosResponseProto.Builder getVolumeInfosResponseBuilder =
+        GetVolumeInfosResponseProto.newBuilder();
+    getVolumeInfosResponseBuilder.
+        setCurrentPage(currentPage);
+
+    NodeManager scmNodeManager = scm.getScmNodeManager();
+    List<? extends DatanodeDetails> allNodes = scmNodeManager.getAllNodes();
+
+    // If the UUID is not empty,
+    // we will filter the DNs that meet the UUID requirements.
+    if (StringUtils.isNotBlank(uuid)) {
+      allNodes = allNodes.stream().filter(filter ->
+                      StringUtils.equals(filter.getUuid().toString(), uuid)).
+              collect(Collectors.toList());
+    }
+
+    // If the hostName is not empty,
+    // we will filter the DNs that meet the hostName requirements.
+    if (StringUtils.isNotBlank(hostName)) {
+      allNodes = allNodes.stream().filter(filter ->
+                      StringUtils.equals(filter.getHostName(), hostName)).
+              collect(Collectors.toList());
+    }
+
+    // If the filtered list is empty, we will return directly.
+    if (CollectionUtils.isEmpty(allNodes)) {
+      getVolumeInfosResponseBuilder.
+              setTotal(0).
+              setPages(0);
+      return getVolumeInfosResponseBuilder.build();
+    }
+
+    // We convert it to a list of VolumeInfoProto.
+    List<VolumeInfoProto> volumeInfos = convertToVolumeInfos(allNodes);
+    switch (displayMode.toUpperCase()) {
+    case "FAILED":
+      // Display only failed volumes
+      volumeInfos = volumeInfos.stream().filter(filter -> filter.getFailed()).
+          collect(Collectors.toList());
+      break;
+    case "NORMAL":
+      // Display only normal volumes
+      volumeInfos = volumeInfos.stream().filter(filter -> !filter.getFailed()).
+          collect(Collectors.toList());
+      break;
+    case "ALL":
+    default:
+      break;
+    }
+
+    // Perform memory paging.
+    MemoryPageUtils<VolumeInfoProto> memoryPageUtils = new MemoryPageUtils<>(pageSize);
+    volumeInfos.forEach(volumeInfo -> memoryPageUtils.addToMemory(volumeInfo));
+    int pages = memoryPageUtils.getPages();
+    List<VolumeInfoProto> currentVolumeInfos =
+        memoryPageUtils.readFromMemory(currentPage);
+
+    getVolumeInfosResponseBuilder.
+            setPages(pages).
+            setTotal(volumeInfos.size());
+
+    if (CollectionUtils.isNotEmpty(currentVolumeInfos)) {
+      getVolumeInfosResponseBuilder.addAllVolumeInfos(currentVolumeInfos);
+    }
+
+    return getVolumeInfosResponseBuilder.build();
+  }
+
+  private List<VolumeInfoProto> convertToVolumeInfos(List<? extends DatanodeDetails> allNodes) {
+    List<VolumeInfoProto> result = new ArrayList<>();
+    for (DatanodeDetails datanode : allNodes) {
+      DatanodeInfo detail = (DatanodeInfo) datanode;
+      List<VolumeInfoProto> volumeInfos = detail.getVolumeInfos();
+      if (CollectionUtils.isNotEmpty(volumeInfos)) {
+        result.addAll(volumeInfos);
+      }
+    }
+    return result;
   }
 }
