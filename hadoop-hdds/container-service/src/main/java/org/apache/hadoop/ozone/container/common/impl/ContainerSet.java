@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +70,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   private long recoveringTimeout;
   private final Table<ContainerID, String> containerIdsTable;
   // Handler that will be invoked when a scan of a container in this set is requested.
-  private Consumer<Container<?>> containerScanHandler;
+  private OnDemandContainerDataScanner containerScanner;
 
   public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
     return new ContainerSet(null, recoveringTimeout);
@@ -129,22 +130,38 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
-   * @param scanner A callback that will be invoked when a scan of a container in this set is requested.
+   * @param scanner The scanner instance will be invoked when a scan of a container in this set is requested.
    */
-  public void registerContainerScanHandler(Consumer<Container<?>> scanner) {
-    this.containerScanHandler = scanner;
+  public void registerOnDemandScanner(OnDemandContainerDataScanner scanner) {
+    this.containerScanner = scanner;
   }
 
   /**
-   * Triggers a scan of a container in this set using the registered scan handler. This is a no-op if no scan handler
-   * is registered or the container does not exist in the set.
+   * Triggers a scan of a container in this set. This is a no-op if no scanner is registered or the container does not
+   * exist in the set.
    * @param containerID The container in this set to scan.
    */
   public void scanContainer(long containerID) {
-    if (containerScanHandler != null) {
+    if (containerScanner != null) {
       Container<?> container = getContainer(containerID);
       if (container != null) {
-        containerScanHandler.accept(container);
+        containerScanner.scanContainer(container);
+      } else {
+        LOG.warn("Request to scan container {} which was not found in the container set", containerID);
+      }
+    }
+  }
+
+  /**
+   * Triggers a scan of a container in this set regardless of whether it was recently scanned.
+   * This is a no-op if no scanner is registered or the container does not exist in the set.
+   * @param containerID The container in this set to scan.
+   */
+  public void scanContainerWithoutGap(long containerID) {
+    if (containerScanner != null) {
+      Container<?> container = getContainer(containerID);
+      if (container != null) {
+        containerScanner.scanContainerWithoutGap(container);
       } else {
         LOG.warn("Request to scan container {} which was not found in the container set", containerID);
       }

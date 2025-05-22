@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -121,6 +122,24 @@ public class ContainerController {
     } else {
       getHandler(container).markContainerUnhealthy(container, reason);
       return true;
+    }
+  }
+
+  /**
+   * Updates the container checksum information on disk and in memory.
+   *
+   * @param containerId The ID of the container to update
+   * @param treeWriter The container merkle tree with the updated information about the container
+   * @throws IOException For errors sending an ICR or updating the container checksum on disk. If the disk update
+   * fails, the checksum in memory will not be updated.
+   */
+  public void updateContainerChecksum(long containerId, ContainerMerkleTreeWriter treeWriter)
+      throws IOException {
+    Container container = getContainer(containerId);
+    if (container == null) {
+      LOG.warn("Container {} not found, may be deleted, skip updating checksums", containerId);
+    } else {
+      getHandler(container).updateContainerChecksum(container, treeWriter);
     }
   }
 
