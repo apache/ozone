@@ -102,6 +102,26 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
       // TODO - this should probably be raised, but it will break the command
       //      handler interface.
     }
+
+    // Stop DiskBalancerService if the state is DECOMMISSIONING or ENTERING_MAINTENANCE
+    if (state == HddsProtos.NodeOperationalState.DECOMMISSIONING ||
+        state == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE) {
+      LOG.info("Node state changed to {}. Stopping DiskBalancerService.", state);
+      context.getParent().stopDiskBalancer();
+    }
+
+    Boolean shouldRun = context.getParent().isPaused();
+
+    if (state == HddsProtos.NodeOperationalState.IN_SERVICE) {
+      if (shouldRun) {
+        LOG.info("Node state changed to {}. Resuming DiskBalancerService to running state.", state);
+        context.getParent().resumeDiskBalancer();
+      } else {
+        LOG.info("Node state changed to {}. DiskBalancerService will not be" +
+            " resumed as it was previously in stopped state", state);
+      }
+    }
+
     replicationSupervisor.accept(state);
     this.opsLatencyMs.add(Time.monotonicNow() - startTime);
   }
