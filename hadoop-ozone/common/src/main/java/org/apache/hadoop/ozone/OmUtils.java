@@ -44,6 +44,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.file.FileStore;
+import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -983,4 +985,40 @@ public final class OmUtils {
       throw e;
     }
   }
+
+  /**
+   * Return true if both File inputs are under the same mount point.
+   * @param file1 First File
+   * @param file2 Second File
+   * @return true if both File inputs are under the same mount point, false otherwise.
+   * @throws IOException
+   */
+  public static boolean isUnderSameMountPoint(File file1, File file2) throws IOException {
+    if (file1 == null || file2 == null) {
+      return false;
+    }
+    // Get and compare mount points of file1 and file2
+    java.nio.file.Path mountPoint1 = mountOf(file1.toPath());
+    java.nio.file.Path mountPoint2 = mountOf(file2.toPath());
+    return mountPoint1.equals(mountPoint2);
+  }
+
+  /**
+   * Get top level mount point for the given path.
+   * From https://stackoverflow.com/a/64169740
+   * @param p java.nio.file.Path
+   * @return Top level mount point for p.
+   * @throws IOException
+   */
+  private static java.nio.file.Path mountOf(java.nio.file.Path p) throws IOException {
+    FileStore fs = Files.getFileStore(p);
+    java.nio.file.Path temp = p.toAbsolutePath();
+    java.nio.file.Path mountp = temp;
+
+    while( (temp = temp.getParent()) != null && fs.equals(Files.getFileStore(temp)) ) {
+      mountp = temp;
+    }
+    return mountp;
+  }
+
 }

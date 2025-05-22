@@ -218,5 +218,14 @@ public class TestOmUtils {
     assertEquals("0.0.0.0", addr.getHostString());
     assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT, addr.getPort());
   }
-}
 
+  @Test
+  void testIsUnderSameMountPoint() throws IOException {
+    // Note: This test assumes that /tmp/ is under a different mount point as /etc/, which should usually be the case
+    File testFile1 = File.createTempFile("testIsSameMountPoint", ".tmp");
+    assertFalse(OmUtils.isUnderSameMountPoint(testFile1, new File("/etc/")));
+
+    File testFile2 = File.createTempFile("testIsSameMountPoint", ".tmp");
+    assertTrue(OmUtils.isUnderSameMountPoint(testFile1, testFile2));
+  }
+}
