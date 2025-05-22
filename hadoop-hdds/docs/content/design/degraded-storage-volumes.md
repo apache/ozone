@@ -270,6 +270,6 @@ This is an approximate task breakdown of the work required to implement this fea
 - Create a **degraded** [VolumeState](https://github.com/apache/ozone/blob/6d0a8306aba01483edfeab04e8b527985fa471b0/hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/common/volume/StorageVolume.java#L102) which can be used by the volume scanner.
     - Add volume health state to `StorageReportProto` so it is received at SCM
     - Currently we only have a boolean that says whether the volume is healthy or not.
-- Make volume scanner put corresponding checks into the **degraded** sliding window and change volume state accordingly.
+- Make volume scanner put corresponding checks into the **degraded state** sliding window and change volume state accordingly.
 - Add IO error count to on-demand volume scanner, which counts towards the **degraded** sliding window.
 - Add new metric to count number of degraded volumes on a datanode.
