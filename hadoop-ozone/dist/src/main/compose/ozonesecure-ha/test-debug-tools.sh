@@ -21,7 +21,7 @@ set -u -o pipefail
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
-§
+
 export SECURITY_ENABLED=true
 export OM_SERVICE_ID=omservice
 export SCM=scm1.org
