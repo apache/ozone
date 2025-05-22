@@ -99,7 +99,7 @@ public class SnapshotGenerator extends BaseFreonGenerator implements Callable<Vo
         for (int dirIndex = 1; dirIndex <= numDirs; dirIndex++) {
           String dirName = String.format("dir-%d", dirIndex);
           // Append "/" to denote a directory.
-          bucket.createKey(dirName + "/", 0).close();
+          bucket.createDirectory(dirName);
         }
       }
     }
