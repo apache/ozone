@@ -38,12 +38,22 @@ public class ContainerScanHelper {
   private final AbstractContainerScannerMetrics metrics;
   private final long minScanGap;
 
-  public ContainerScanHelper(Logger log, ContainerController controller,
-                             AbstractContainerScannerMetrics metrics, ContainerScannerConfiguration conf) {
+  public static ContainerScanHelper withoutScanGap(Logger log, ContainerController controller,
+      AbstractContainerScannerMetrics metrics) {
+    return new ContainerScanHelper(log, controller, metrics, 0);
+  }
+
+  public static ContainerScanHelper withScanGap(Logger log, ContainerController controller,
+      AbstractContainerScannerMetrics metrics, ContainerScannerConfiguration conf) {
+    return new ContainerScanHelper(log, controller, metrics, conf.getContainerScanMinGap());
+  }
+
+  private ContainerScanHelper(Logger log, ContainerController controller,
+                             AbstractContainerScannerMetrics metrics, long minScanGap) {
     this.log = log;
     this.controller = controller;
     this.metrics = metrics;
-    this.minScanGap = conf.getContainerScanMinGap();
+    this.minScanGap = minScanGap;
   }
 
   public void scanData(Container<?> container, DataTransferThrottler throttler, Canceler canceler)

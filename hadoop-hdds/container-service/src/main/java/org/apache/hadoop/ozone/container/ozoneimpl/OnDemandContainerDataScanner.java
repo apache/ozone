@@ -44,6 +44,7 @@ public final class OnDemandContainerDataScanner {
       .KeySetView<Long, Boolean> containerRescheduleCheckSet;
   private final OnDemandScannerMetrics metrics;
   private final ContainerScanHelper scannerHelper;
+  private final ContainerScanHelper scannerHelperWithoutGap;
 
   public OnDemandContainerDataScanner(
       ContainerScannerConfiguration conf, ContainerController controller) {
@@ -53,11 +54,30 @@ public final class OnDemandContainerDataScanner {
     metrics = OnDemandScannerMetrics.create();
     scanExecutor = Executors.newSingleThreadExecutor();
     containerRescheduleCheckSet = ConcurrentHashMap.newKeySet();
-    this.scannerHelper = new ContainerScanHelper(LOG, controller, metrics, conf);
+    this.scannerHelper = ContainerScanHelper.withScanGap(LOG, controller, metrics, conf);
+    this.scannerHelperWithoutGap = ContainerScanHelper.withoutScanGap(LOG, controller, metrics);
   }
 
+  /**
+   * Triggers an on-demand scan of this container.
+   * @return An Optional containing a Future representing the pending scan task if the task is queued.
+   *   The optional is empty if the task is not queued due to an ongoing scan.
+   */
   public Optional<Future<?>> scanContainer(Container<?> container) {
-    if (!scannerHelper.shouldScanData(container)) {
+    return scanContainer(container, scannerHelper);
+  }
+
+  /**
+   * Triggers an on-demand scan of this container regardless of whether it was recently scanned.
+   * @return An Optional containing a Future representing the pending scan task if the task is queued.
+   *   The optional is empty if the task is not queued due to an ongoing scan.
+   */
+  public Optional<Future<?>> scanContainerWithoutGap(Container<?> container) {
+    return scanContainer(container, scannerHelperWithoutGap);
+  }
+
+  private Optional<Future<?>> scanContainer(Container<?> container, ContainerScanHelper helper) {
+    if (!helper.shouldScanData(container)) {
       return Optional.empty();
     }
 

@@ -85,6 +85,17 @@ public class TestOnDemandContainerDataScanner extends
   }
 
   @Test
+  public void testBypassScanGap() throws Exception {
+    setScannedTimestampRecent(healthy);
+
+    Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(healthy);
+    if (scanFuture.isPresent()) {
+      scanFuture.get().get();
+    }
+    verify(healthy, times(1)).scanData(any(), any());
+  }
+
+  @Test
   @Override
   public void testPreviouslyScannedContainerIsScanned() throws Exception {
     // If the last scan time is before than the configured gap, the container

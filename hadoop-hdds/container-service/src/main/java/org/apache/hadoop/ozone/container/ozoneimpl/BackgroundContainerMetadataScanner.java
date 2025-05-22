@@ -42,7 +42,7 @@ public class BackgroundContainerMetadataScanner extends
     super("ContainerMetadataScanner", conf.getMetadataScanInterval());
     this.controller = controller;
     this.metrics = ContainerMetadataScannerMetrics.create();
-    this.scanHelper = new ContainerScanHelper(LOG, controller, metrics, conf);
+    this.scanHelper = ContainerScanHelper.withScanGap(LOG, controller, metrics, conf);
   }
 
   @Override

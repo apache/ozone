@@ -225,13 +225,13 @@ public class TestContainerReconciliationWithMockDatanodes {
    * Uses the on-demand container scanner metrics to wait for the expected number of on-demand scans to complete on
    * every datanode.
    */
-  private void waitForExpectedScanCount(int expectedCount) throws Exception {
+  private void waitForExpectedScanCount(int expectedCountPerDatanode) throws Exception {
     for (MockDatanode datanode: datanodes) {
       try {
-        GenericTestUtils.waitFor(() -> datanode.getOnDemandScanCount() == expectedCount, 100, 10_000);
+        GenericTestUtils.waitFor(() -> datanode.getOnDemandScanCount() == expectedCountPerDatanode, 100, 10_000);
       } catch (TimeoutException ex) {
         LOG.error("Timed out waiting for on-demand scan count {} to reach expected count {} on datanode {}",
-            datanode.getOnDemandScanCount(), expectedCount, datanode);
+            datanode.getOnDemandScanCount(), expectedCountPerDatanode, datanode);
         throw ex;
       }
     }
@@ -314,11 +314,6 @@ public class TestContainerReconciliationWithMockDatanodes {
       this.conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, dataVolume.toString());
       conf.set(OZONE_METADATA_DIRS, metadataVolume.toString());
-      // This test triggers its own on-demand scans after reconciliation to retrieve the results. Scan gap must be
-      // disabled so that these checks run in addition to the on-demand scans triggered from inside reconciliation.
-      ContainerScannerConfiguration scanConf = conf.getObject(ContainerScannerConfiguration.class);
-      scanConf.setContainerScanMinGap(0);
-      conf.setFromObject(scanConf);
 
       containerSet = newContainerSet();
       MutableVolumeSet volumeSet = createVolumeSet();
@@ -330,7 +325,7 @@ public class TestContainerReconciliationWithMockDatanodes {
       onDemandScanner = new OnDemandContainerDataScanner(
           conf.getObject(ContainerScannerConfiguration.class), controller);
       // Register the on-demand container scanner with the container set used by the KeyValueHandler.
-      containerSet.registerContainerScanHandler(onDemandScanner::scanContainer);
+      containerSet.registerOnDemandScanner(onDemandScanner);
     }
 
     public DatanodeDetails getDnDetails() {
@@ -425,7 +420,7 @@ public class TestContainerReconciliationWithMockDatanodes {
      * Triggers a synchronous scan of the container. This method will block until the scan completes.
      */
     public void scanContainer(long containerID) {
-      Optional<Future<?>> scanFuture = onDemandScanner.scanContainer(containerSet.getContainer(containerID));
+      Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID));
       assertTrue(scanFuture.isPresent());
 
       try {

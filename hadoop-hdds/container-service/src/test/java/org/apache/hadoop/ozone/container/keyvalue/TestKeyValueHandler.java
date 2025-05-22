@@ -820,7 +820,7 @@ public class TestKeyValueHandler {
         Collections.singletonMap(ContainerType.KeyValueContainer, kvHandler));
     OnDemandContainerDataScanner onDemandScanner = new OnDemandContainerDataScanner(
         conf.getObject(ContainerScannerConfiguration.class), controller);
-    containerSet.registerContainerScanHandler(onDemandScanner::scanContainer);
+    containerSet.registerOnDemandScanner(onDemandScanner);
 
     return kvHandler;
   }

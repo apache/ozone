@@ -56,7 +56,7 @@ public class BackgroundContainerDataScanner extends
     canceler = new Canceler();
     this.metrics = ContainerDataScannerMetrics.create(volume.toString());
     this.metrics.setStorageDirectory(volume.toString());
-    this.scanHelper = new ContainerScanHelper(LOG, controller, metrics, conf);
+    this.scanHelper = ContainerScanHelper.withScanGap(LOG, controller, metrics, conf);
   }
 
   @Override

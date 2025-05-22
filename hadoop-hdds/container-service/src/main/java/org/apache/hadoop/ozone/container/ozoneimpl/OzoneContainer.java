@@ -440,7 +440,7 @@ public class OzoneContainer {
       return;
     }
     onDemandScanner = new OnDemandContainerDataScanner(c, controller);
-    containerSet.registerContainerScanHandler(onDemandScanner::scanContainer);
+    containerSet.registerOnDemandScanner(onDemandScanner);
   }
 
   /**
