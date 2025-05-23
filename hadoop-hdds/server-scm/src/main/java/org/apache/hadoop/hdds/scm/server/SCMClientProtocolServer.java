@@ -120,7 +120,6 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
-import org.apache.hadoop.ozone.utils.MemoryPageUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -1641,28 +1640,12 @@ public class SCMClientProtocolServer implements
     }
   }
 
-  /**
-   * Get getVolumeInfos based on query conditions.
-   *
-   * @param displayMode Represents the mode for displaying volumes.
-   * Options include "all" for all volumes, "failed" for failed volumes,
-   * and "normal" for normal volumes.
-   * @param uuid datanode uuid String.
-   * @param hostName datanode hostName String.
-   * @param pageSize Records displayed per page.
-   * @param currentPage The current page number.
-   * @return Volume Information List.
-   * @throws IOException
-   * I/O exceptions that may occur during the process of querying the volume.
-   */
   @Override
   public GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid,
-      String hostName, int pageSize, int currentPage) throws IOException {
+      String hostName, int pageSize, String startItem) throws IOException {
 
     GetVolumeInfosResponseProto.Builder getVolumeInfosResponseBuilder =
         GetVolumeInfosResponseProto.newBuilder();
-    getVolumeInfosResponseBuilder.
-        setCurrentPage(currentPage);
 
     NodeManager scmNodeManager = scm.getScmNodeManager();
     List<? extends DatanodeDetails> allNodes = scmNodeManager.getAllNodes();
@@ -1685,9 +1668,6 @@ public class SCMClientProtocolServer implements
 
     // If the filtered list is empty, we will return directly.
     if (CollectionUtils.isEmpty(allNodes)) {
-      getVolumeInfosResponseBuilder.
-              setTotal(0).
-              setPages(0);
       return getVolumeInfosResponseBuilder.build();
     }
 
@@ -1709,16 +1689,20 @@ public class SCMClientProtocolServer implements
       break;
     }
 
-    // Perform memory paging.
-    MemoryPageUtils<VolumeInfoProto> memoryPageUtils = new MemoryPageUtils<>(pageSize);
-    volumeInfos.forEach(volumeInfo -> memoryPageUtils.addToMemory(volumeInfo));
-    int pages = memoryPageUtils.getPages();
-    List<VolumeInfoProto> currentVolumeInfos =
-        memoryPageUtils.readFromMemory(currentPage);
+    // If startItem is specified, find its position in the volumeInfos list
+    int startIndex = 0;
+    if (StringUtils.isNotBlank(startItem)) {
+      for (int i = 0; i < volumeInfos.size(); i++) {
+        if (volumeInfos.get(i).getUuid().equals(startItem) ||
+            volumeInfos.get(i).getHostName().equals(startItem)) {
+          startIndex = i + 1; // skip the startItem itself
+          break;
+        }
+      }
+    }
 
-    getVolumeInfosResponseBuilder.
-            setPages(pages).
-            setTotal(volumeInfos.size());
+    int endIndex = Math.min(startIndex + pageSize, volumeInfos.size());
+    List<VolumeInfoProto> currentVolumeInfos = volumeInfos.subList(startIndex, endIndex);
 
     if (CollectionUtils.isNotEmpty(currentVolumeInfos)) {
       getVolumeInfosResponseBuilder.addAllVolumeInfos(currentVolumeInfos);

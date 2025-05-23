@@ -682,14 +682,11 @@ message GetVolumeInfosRequestProto {
   optional string uuid = 2;
   optional string hostName = 3;
   optional int32 pageSize = 4;
-  optional int32 currentPage = 5;
+  optional string startItem = 5;
 }
 
 message GetVolumeInfosResponseProto {
   repeated VolumeInfoProto volumeInfos = 1;
-  optional int32 pages = 2;
-  optional int32 currentPage = 3;
-  optional int32 total = 4;
 }
 
 /**

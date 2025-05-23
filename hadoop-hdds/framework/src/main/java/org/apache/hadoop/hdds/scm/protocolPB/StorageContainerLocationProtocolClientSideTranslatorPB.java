@@ -1219,7 +1219,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid,
-      String hostName, int pageSize, int currentPage) throws IOException {
+      String hostName, int pageSize, String startItem) throws IOException {
 
     // Prepare parameters.
     GetVolumeInfosRequestProto.Builder requestBuilder =
@@ -1237,7 +1237,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       requestBuilder.setHostName(hostName);
     }
 
-    requestBuilder.setCurrentPage(currentPage);
+    if (StringUtils.isNotBlank(startItem)) {
+      requestBuilder.setStartItem(startItem);
+    }
+
     requestBuilder.setPageSize(pageSize);
 
     // Submit request.

@@ -476,11 +476,12 @@ public interface ScmClient extends Closeable {
    * @param uuid datanode uuid String.
    * @param hostName datanode hostName String.
    * @param pageSize Records displayed per page.
-   * @param currentPage The current page number.
+   * @param startItem the starting item for pagination,
+   *                  used to fetch the next set of results.
    * @return Volume Information List.
    * @throws IOException
    * I/O exceptions that may occur during the process of querying the volume.
    */
   GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid,
-      String hostName, int pageSize, int currentPage) throws IOException;
+      String hostName, int pageSize, String startItem) throws IOException;
 }

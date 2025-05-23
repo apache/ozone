@@ -31,8 +31,10 @@ import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.datanode.VolumeInfo;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.shell.ListPaginationOptions;
 import org.apache.hadoop.ozone.utils.FormattingCLIUtils;
 import org.apache.hadoop.util.StringUtils;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -58,18 +60,11 @@ public class VolumeSubCommand extends ScmSubcommand {
        description = "Format output as Table.")
   private boolean table;
 
-  // PageSize refers to the number of items displayed per page
-  // in a paginated view.
-  @Option(names = { "--pageSize" },
-       defaultValue = "20",
-       description = "The number of volume information items displayed per page.")
-  private int pageSize;
+  // Mixin command-line pagination options to support paginated query functionality
+  @CommandLine.Mixin
+  private ListPaginationOptions listOptions;
 
-  // The current page.
-  @Option(names = { "--currentPage" },
-       defaultValue = "1",
-       description = "The current page.")
-  private int currentPage;
+  enum DISPLAYMODE { all, normal, failed }
 
   /**
    * We have designed a new option called 'show',
@@ -79,22 +74,20 @@ public class VolumeSubCommand extends ScmSubcommand {
    */
   @Option(names = { "--displayMode" },
       defaultValue = "all",
-      description = "failed is used to display failed disks, " +
-      "normal is used to display normal disks.")
-  private String displayMode;
+      description = "Display mode for disks: 'failed' shows failed disks, " +
+      "'normal' shows healthy disks, 'all' shows all disks.")
+  private DISPLAYMODE displayMode;
 
   // The UUID identifier of the DataNode.
   @Option(names = { "--uuid" },
       defaultValue = "",
-      description = "failed is used to display failed disks, " +
-      "normal is used to display normal disks.")
+      description = "Filter disks by the UUID of the DataNode.")
   private String uuid;
 
   // The HostName identifier of the DataNode.
   @Option(names = { "--hostName" },
       defaultValue = "",
-      description = "failed is used to display failed disks, " +
-      "normal is used to display normal disks.")
+      description = "Filter disks by the host name of the DataNode.")
   private String hostName;
 
   private SimpleDateFormat sdf = new SimpleDateFormat(
@@ -106,16 +99,19 @@ public class VolumeSubCommand extends ScmSubcommand {
       "UUID", "Host Name", "Volume Name", "Volume Status", "Capacity / Capacity Lost",
       "Failure Time");
 
-  private final String[] validModes = {"all", "normal", "failed"};
-
   @Override
   public void execute(ScmClient client) throws IOException {
 
-    validateDisplayMode(displayMode);
-
     // Retrieve the volume data based on the conditions.
+    // Normally, pageSize is derived from listOptions.getLimit().
+    // However, if the user requests to display all results,
+    // pageSize is set to -1 to indicate no pagination.
+    int pageSize = listOptions.getLimit();
+    if (listOptions.isAll()) {
+      pageSize = -1;
+    }
     GetVolumeInfosResponseProto response =
-        client.getVolumeInfos(displayMode, uuid, hostName, pageSize, currentPage);
+        client.getVolumeInfos(displayMode.name(), uuid, hostName, pageSize, listOptions.getStartItem());
 
     // Print the relevant information if the return value is empty.
     if (response == null || CollectionUtils.isEmpty(response.getVolumeInfosList())) {
@@ -180,32 +176,6 @@ public class VolumeSubCommand extends ScmSubcommand {
       volumeInfoList.add(volumeInfo);
     }
     return volumeInfoList;
-  }
-
-  /**
-   * Validate whether the displayMode meets the expected values,
-   * where displayMode must be one of the following: all, normal, or failed.
-   *
-   * @param pDisplayMode
-   * The displayMode parameter determines how the volume is displayed.
-   *
-   * @throws IOException
-   * If the parameter is invalid, we will throw an exception.
-   */
-  private void validateDisplayMode(String pDisplayMode) throws IOException {
-
-    boolean isValid = false;
-    for (String validMode : validModes) {
-      if (validMode.equals(pDisplayMode)) {
-        isValid = true;
-        break;
-      }
-    }
-
-    if (!isValid) {
-      throw new IOException("Invalid displayMode. " +
-          "It must be one of the following: 'all', 'normal', or 'failed'.");
-    }
   }
 
   /**

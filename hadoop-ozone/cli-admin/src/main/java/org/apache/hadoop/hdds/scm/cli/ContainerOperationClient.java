@@ -608,16 +608,17 @@ public class ContainerOperationClient implements ScmClient {
    * @param uuid datanode uuid String.
    * @param hostName datanode hostName String.
    * @param pageSize Records displayed per page.
-   * @param currentPage The current page number.
+   * @param startItem the starting item for pagination,
+   *                  used to fetch the next set of results.
    * @return Volume Information List.
    * @throws IOException
    * I/O exceptions that may occur during the process of querying the volume.
    */
   @Override
   public GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid, String hostName, int pageSize,
-      int currentPage) throws IOException {
+      String startItem) throws IOException {
     GetVolumeInfosResponseProto response = storageContainerLocationClient.getVolumeInfos(
-        displayMode, uuid, hostName, pageSize, currentPage);
+        displayMode, uuid, hostName, pageSize, startItem);
     return response;
   }
 }

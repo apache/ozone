@@ -1376,10 +1376,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     String uuid = request.getUuid();
     String hostName = request.getHostName();
     String displayMode = request.getDisplayMode();
-    int currentPage = request.getCurrentPage();
+    String startItem = request.getStartItem();
     int pageSize = request.getPageSize();
 
     // Invoke method and return result
-    return impl.getVolumeInfos(displayMode, uuid, hostName, pageSize, currentPage);
+    return impl.getVolumeInfos(displayMode, uuid, hostName, pageSize, startItem);
   }
 }

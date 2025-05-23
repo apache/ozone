@@ -500,11 +500,12 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @param uuid datanode uuid String.
    * @param hostName datanode hostName String.
    * @param pageSize Records displayed per page.
-   * @param currentPage The current page number.
+   * @param startItem The starting point for pagination.
    * @return Volume Information List.
    * @throws IOException
    * I/O exceptions that may occur during the process of querying the volume.
    */
-  StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid,
-      String hostName, int pageSize, int currentPage) throws IOException;
+  StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto getVolumeInfos(
+      String displayMode, String uuid, String hostName, int pageSize, String startItem)
+      throws IOException;
 }
