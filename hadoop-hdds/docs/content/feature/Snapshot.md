@@ -23,7 +23,7 @@ summary: Ozone Snapshot
   limitations under the License.
 -->
 
-## **Introduction**
+## Introduction
 
 Snapshot feature for Apache Ozone object store allows users to take a point-in-time consistent image of a given bucket. The snapshot is a read-only, frozen image of the bucket’s state at the time of creation. Snapshot feature enables various use cases, including:
 
