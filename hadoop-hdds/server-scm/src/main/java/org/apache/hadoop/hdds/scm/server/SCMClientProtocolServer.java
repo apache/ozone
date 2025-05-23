@@ -1700,9 +1700,11 @@ public class SCMClientProtocolServer implements
         }
       }
     }
-
-    int endIndex = Math.min(startIndex + pageSize, volumeInfos.size());
-    List<VolumeInfoProto> currentVolumeInfos = volumeInfos.subList(startIndex, endIndex);
+    List<VolumeInfoProto> currentVolumeInfos = volumeInfos;
+    if (pageSize > 0) {
+      int endIndex = Math.min(startIndex + pageSize, volumeInfos.size());
+      currentVolumeInfos = volumeInfos.subList(startIndex, endIndex);
+    }
 
     if (CollectionUtils.isNotEmpty(currentVolumeInfos)) {
       getVolumeInfosResponseBuilder.addAllVolumeInfos(currentVolumeInfos);
