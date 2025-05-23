@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -273,8 +274,18 @@ public class MutableVolumeSet implements VolumeSet {
         });
   }
 
+  public void startAllVolume() throws IOException {
+    for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
+      entry.getValue().start();
+    }
+  }
+
   public void refreshAllVolumeUsage() {
     volumeMap.forEach((k, v) -> v.refreshVolumeUsage());
+  }
+
+  public void setGatherContainerUsages(Function<HddsVolume, Long> gatherContainerUsages) {
+    volumeMap.forEach((k, v) -> v.setGatherContainerUsages(gatherContainerUsages));
   }
 
   /**
