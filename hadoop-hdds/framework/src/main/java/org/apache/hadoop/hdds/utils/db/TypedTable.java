@@ -400,14 +400,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return iterator(null);
   }
 
+  @Override
   public Table.KeyValueSpliterator<KEY, VALUE> spliterator(int maxParallelism, boolean closeOnException)
       throws IOException {
     return spliterator(null, null, maxParallelism, closeOnException);
   }
 
+  @Override
   public Table.KeyValueSpliterator<KEY, VALUE> spliterator(KEY startKey, KEY prefix, int maxParallelism,
-      boolean closeOnException)
-      throws IOException {
+      boolean closeOnException) throws IOException {
     if (supportCodecBuffer) {
       return newCodecBufferSpliterator(prefix, startKey, maxParallelism, closeOnException);
     }

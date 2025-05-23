@@ -173,6 +173,34 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       throws IOException;
 
   /**
+   * Creates a spliterator over the key-value pairs in the table with the specified
+   * maximum parallelism and exception handling behavior.
+   *
+   * @param maxParallelism the maximum number of threads that can be used for parallel processing.
+   * @param closeOnException if true, the spliterator will automatically close resources
+   *                         if an exception occurs during processing.
+   * @return a {@code Table.KeyValueSpliterator} instance for iterating over the key-value pairs.
+   * @throws IOException if an I/O error occurs during spliterator creation.
+   */
+  Table.KeyValueSpliterator<KEY, VALUE> spliterator(int maxParallelism, boolean closeOnException)
+      throws IOException;
+
+  /**
+   * Returns a spliterator that iterates over the key-value pairs starting from a given key
+   * and within a specified key prefix. The spliterator can be parallelized up to a given level
+   * of parallelism and may optionally close resources in case of exceptions.
+   *
+   * @param startKey the starting key from which iteration begins
+   * @param prefix the key prefix used to limit the keys being iterated
+   * @param maxParallelism the maximum level of parallelism allowed for the iteration
+   * @param closeOnException if true, closes resources when an exception occurs during iteration
+   * @return a spliterator that supports parallel iteration over the key-value pairs
+   * @throws IOException if an I/O error occurs during the creation of the spliterator
+   */
+  Table.KeyValueSpliterator<KEY, VALUE> spliterator(KEY startKey, KEY prefix, int maxParallelism,
+      boolean closeOnException) throws IOException;
+
+  /**
    * Returns the Name of this Table.
    * @return - Table Name.
    */
