@@ -54,8 +54,6 @@ public class VolumeSubCommand extends ScmSubcommand {
   private SimpleDateFormat sdf = new SimpleDateFormat(
       "EEE MMM dd HH:mm:ss Z yyyy", Locale.ENGLISH);
 
-  enum DISPLAYMODE { all, normal, failed }
-
   /**
    * We have designed a new option called 'show',
    * which includes two selectable configurations:
@@ -95,6 +93,8 @@ public class VolumeSubCommand extends ScmSubcommand {
   // Mixin command-line pagination options to support paginated query functionality
   @CommandLine.Mixin
   private ListPaginationOptions listOptions;
+
+  enum DISPLAYMODE { all, normal, failed }
 
   @Override
   public void execute(ScmClient client) throws IOException {
