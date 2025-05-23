@@ -314,7 +314,6 @@ class TestContainerReplication {
   }
 
   @Test
-  @Flaky("HDDS-11087")
   public void testECContainerReplication() throws Exception {
     OzoneConfiguration conf = createConfiguration(false);
     final Map<Integer, Integer> failedReadChunkCountMap = new ConcurrentHashMap<>();
