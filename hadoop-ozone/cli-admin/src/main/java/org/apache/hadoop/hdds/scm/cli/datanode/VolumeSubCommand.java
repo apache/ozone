@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
@@ -47,6 +46,13 @@ import picocli.CommandLine.Option;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class VolumeSubCommand extends ScmSubcommand {
+
+  private static final String DATANODE_VOLUME_FAILURES_TITLE = "Datanode Volume";
+  private static final List<String> DATANODE_VOLUME_FAILURES_HEADER = Arrays.asList(
+      "UUID", "Host Name", "Volume Name", "Volume Status", "Capacity / Capacity Lost", "Failure Time");
+
+  private SimpleDateFormat sdf = new SimpleDateFormat(
+      "EEE MMM dd HH:mm:ss Z yyyy", Locale.ENGLISH);
 
   // Display it in JSON format.
   @Option(names = { "--json" },
@@ -89,15 +95,6 @@ public class VolumeSubCommand extends ScmSubcommand {
       defaultValue = "",
       description = "Filter disks by the host name of the DataNode.")
   private String hostName;
-
-  private SimpleDateFormat sdf = new SimpleDateFormat(
-      "EEE MMM dd HH:mm:ss Z yyyy", Locale.ENGLISH);
-
-  private static final String DATANODE_VOLUME_FAILURES_TITLE = "Datanode Volume";
-
-  private static final List<String>  DATANODE_VOLUME_FAILURES_HEADER = Arrays.asList(
-      "UUID", "Host Name", "Volume Name", "Volume Status", "Capacity / Capacity Lost",
-      "Failure Time");
 
   @Override
   public void execute(ScmClient client) throws IOException {
