@@ -32,13 +32,13 @@ Snapshot feature for Apache Ozone object store allows users to take a point-in-t
 * **Replication and Disaster Recovery (DR)** – Snapshots provide frozen, immutable images of the bucket on the source Ozone cluster. These can be used for replicating bucket images to remote DR sites.
 * **Incremental Replication** – DistCp with SnapshotDiff offers an efficient way to incrementally sync up source and destination buckets.
 
-## **Architecture**
+## Architecture
 
 Ozone Snapshot architecture leverages the immutability of data blocks in Ozone. Data blocks, once written, remain immutable for their lifetime and are only reclaimed when the corresponding key metadata is removed from the namespace. All Ozone metadata (volume, bucket, keys, directories) is stored in the Ozone Manager (OM) metadata store (RocksDB). When a user takes a snapshot of a bucket, the system internally creates a point-in-time copy of the bucket’s namespace metadata on the OM. Since Ozone doesn’t allow in-place updates to DataNode blocks, the integrity of data referenced by the snapshot is preserved. The OM’s key deletion service is aware of snapshots: it will not permanently delete any key as long as that key is still referenced by the active bucket or any existing snapshot. A background KeyDeletingService and DirectoryDeleting Service (garbage collectors) identify keys that are no longer referenced by any snapshot or the live bucket, and reclaim those blocks.
 
 Ozone also provides a SnapshotDiff feature. When a user issues a SnapshotDiff between two snapshots, the OM efficiently computes all the differences (added, deleted, modified, or renamed keys) between the two snapshots and returns a paginated list of changes. Snapshot diff results are cached to speed up subsequent requests for the same snapshot pair.
 
-## **System Architecture Deep Dive**
+## System Architecture Deep Dive
 
 Internally, Ozone implements snapshots by **versioning the OM metadata for each bucket** snapshot. The OM maintains a snapshot metadata table that records the state of the bucket’s key directory tree at the moment of snapshot creation. No data is physically copied at snapshot creation – the operation simply marks a consistent snapshot of the OM’s RocksDB state (hence snapshots are created instantaneously). Under the hood, Ozone relies on RocksDB’s abilities (like checkpoint) to preserve point-in-time views of the metadata. Each snapshot is identified by a unique ID and name, and each key entry in the OM DB carries information about which snapshots (if any) it belongs to. This approach ensures that **common data is not duplicated** across snapshots: if a key has not changed between two snapshots, both snapshots reference the same underlying data blocks.
 
@@ -50,11 +50,11 @@ When keys are modified or deleted in the active bucket, Ozone checks for snapsho
 
 For a more in-depth discussion of the snapshot design and its evolution, refer to Prashant Pogde’s introduction of Apache Ozone snapshots (the first in a series of blog posts). This Medium post covers the motivation and high-level design of Ozone snapshots, and subsequent posts delve further into the technical implementation.
 
-## **User Tutorial**
+## User Tutorial
 
 In this section, we demonstrate how to create and use Ozone snapshots via command-line and programmatically.
 
-### **Using Snapshots via CLI**
+### Using Snapshots via CLI
 
 The Ozone shell provides convenient commands to manage snapshots. Snapshots can be created and manipulated either through the **`ozone sh`** subcommands or the **`ozone fs`** Hadoop-compatible filesystem commands:
 
@@ -118,7 +118,7 @@ ozone sh snapshot info /vol1/bucket1 finance_backup_Q1
 
 All the above CLI operations correspond to underlying RPC calls to Ozone Manager. They enforce the same security checks described in the **Authorization** section.
 
-### **Programmatic Access via Java**
+### Programmatic Access via Java
 
 In addition to the CLI, Ozone snapshots can be managed and accessed using Java APIs:
 
@@ -214,7 +214,7 @@ The above code snippet demonstrates the Ozone ObjectStore Client Java API for sn
 
 **HTTP REST API Access:** For applications that cannot use the Java API directly, Ozone offers an HttpFS Gateway which exposes a WebHDFS-compatible REST API. Through HttpFS, you can perform filesystem operations (including reading from `.snapshot` paths) over HTTP. This can be useful for remote access to snapshot data. Snapshot management operations like create/delete/rename via HttpFS are supported, but getSnapshotDiff is not yet supported.
 
-## **System Administration How-To**
+## System Administration How-To
 
 This section summarizes the configuration parameters and administrative considerations for Ozone snapshots. Administrators can tune these settings in **ozone-site.xml** to control snapshot behavior and resource usage.
 
@@ -233,7 +233,7 @@ In addition to the above, snapshot operations will consume memory proportional t
 
 **Monitoring Snapshots:** Ozone exposes metrics and JMX information for snapshot operations. For example, there are OM metrics for the number of snapshots, SnapshotDiff operation counts, etc., and these can be observed via the OM’s Prometheus metrics or RPC metrics. Administrators should also pay attention to the OM logs for snapshot-related messages – e.g., when a SnapshotDiff job starts or finishes, or if a snapshot delete triggers a large number of keys to be purged, etc.
 
-## **Authorization**
+## Authorization
 
 Snapshot operations in Ozone are subject to access control checks. Not all users can create or delete snapshots by default, to prevent abuse or unintended usage. Below are the requirements and ACLs for each operation:
 
@@ -243,7 +243,7 @@ Snapshot operations in Ozone are subject to access control checks. Not all users
 
 It’s worth noting that Ozone supports two kinds of authorization models for snapshots: **Ozone native ACLs** and optionally **Ranger policies** (if Ranger is integrated). The above describes native ACL behavior. If using Ranger or a similar authorizer, ensure that appropriate permissions are granted for the `snapshot` operations (Ranger defines separate permissions for volume, bucket, and key actions, and snapshot create/delete would fall under bucket admin operations).
 
-## **Comparison to HDFS Snapshots**
+## Comparison to HDFS Snapshots
 
 Apache Ozone’s snapshot feature is conceptually similar to HDFS snapshots, but there are important differences:
 
@@ -254,7 +254,7 @@ Apache Ozone’s snapshot feature is conceptually similar to HDFS snapshots, but
 
 In summary, Ozone snapshots give similar benefits for Ozone buckets as HDFS snapshots do for directories, but Ozone’s approach is bucket-scoped and oriented toward object store semantics. If coming from HDFS, just note that you cannot snapshot volumes or the entire namespace at once (you snapshot each bucket individually), and you cannot snapshot sub-folders of a bucket.
 
-## **Known Issues and Limitations**
+## Known Issues and Limitations
 
 While Apache Ozone’s snapshot feature is powerful, there are a few current limitations and caveats to be aware of:
 
@@ -262,18 +262,18 @@ While Apache Ozone’s snapshot feature is powerful, there are a few current lim
 * **Ratis & EC Buckets:** Snapshots are supported on both replication (Ratis) and erasure-coded buckets in Ozone. There is no limitation in using snapshots on an EC-enabled bucket – the snapshot will preserve the keys regardless of the underlying replication scheme. However, as noted above, you must use the Ozone interfaces (RPC/HCFS) to manage these snapshots, not S3. All snapshots behave consistently in terms of data retention whether the data is Ratis-replicated or EC-coded.
 * **Snapshots During Ongoing Deletes:** If a large recursive delete is executed on a bucket and a snapshot is taken concurrently (or just before the delete), it’s possible that the space will not be reclaimed until the snapshot is removed. In simpler terms, if you delete a large directory (with many keys) from the active bucket but you had created a snapshot right before that delete (or during the deletion process), all those deleted keys remain protected by the snapshot. They will consume space on disk until the snapshot that references them is deleted. This is expected (since snapshots preserve data), but the caveat is that if an admin is not aware a snapshot was taken, it may appear that a delete did not free up space. The space will be freed only after deleting the snapshot and allowing the background cleaner to run. In practice, avoid scheduling snapshots at exactly the same time as massive deletes, or be mindful that snapshots will “lock” data from deletion.
 * **Reserved Namespace Name `.snapshot`:** The name `.snapshot` is reserved by Ozone. Users cannot create keys or directories with the exact name `.snapshot` at the root of a bucket (and similarly, `.snapshot` cannot be used as a volume or bucket name). This is because `.snapshot` is used as the special entry to access snapshots. For example, if a user tries to create a directory literally named `.snapshot` in a bucket, the system will prevent it or treat it as the snapshot namespace. This is analogous to HDFS where `.snapshot` is a reserved directory name in snapshottable directories. The reservation is case-sensitive (only `.snapshot` in all lowercase is reserved). As a best practice, avoid naming any key or folder in Ozone starting with “.snapshot” to prevent any ambiguity.
-* **Snapshot Performance and Scale:** Creating snapshots is instantaneous and cheap in Ozone; however, maintaining a very large number of snapshots (thousands per bucket) can increase the size of OM metadata and slow down operations like listing snapshots or performing snapshot diff (especially if many snapshots are being diffed). Recent improvements have raised the supported snapshot limit (default max 10k per OM as noted above) and optimized diff performance. Nevertheless, if you have an extremely high snapshot count, monitor the OM for any memory or performance impact. Likewise, snapshot diff operations that produce extremely large outputs (e.g., millions of differences) may be resource-intensive to serve; they are paginated and cached to mitigate this.
+* **Snapshot Performance and Scale:** Creating snapshots is instantaneous and cheap in Ozone; however, maintaining a very large number of snapshots (thousands per bucket) can increase the size of OM metadata and may slow down operations like listing snapshots. Snapshot diff performance, however, is not directly impacted by the number of snapshots; only the number of concurrent snapshot diff operations affects diff performance, due to throttling mechanisms in place. Recent improvements have raised the supported snapshot limit (default max 10k per OM as noted above) and optimized diff performance. Nevertheless, if you have an extremely high snapshot count, monitor the OM for any memory or performance impact. Likewise, snapshot diff operations that produce extremely large outputs (e.g., millions of differences) may be resource-intensive to serve; they are paginated and cached to mitigate this.
 * **Space Utilization Reporting:** The space occupied by snapshots is essentially the space used by data that is no longer in the active bucket but still referenced by snapshots. Ozone currently provides metrics for snapshot “exclusive” vs “shared” size in the snapshot info. However, tools and commands that report bucket usage might not immediately make it obvious how much space is tied up in snapshots. Admins should use `ozone sh snapshot info` to see how much data each snapshot is holding (exclusively) to understand storage usage. Additionally, deleting a snapshot does not instantly free space; it queues keys for deletion and actual block deletion happens asynchronously via the OM and SCM’s normal cleanup processes.
 
 By keeping these limitations and behaviors in mind, administrators and users can effectively use snapshots while avoiding surprises. Ozone’s snapshot feature is evolving, and future versions may address some of these limitations or add new capabilities (refer to the project release notes for updates).
 
-## **Linux System Configuration**
+## Linux System Configuration
 
 Proper Linux system configuration and hardware provisioning are important for running Ozone with snapshots in production. The snapshot feature, due to its additional metadata and potential large number of file handles, may require tuning the operating system limits and using high-performance storage for metadata:
 
 * **Open File Descriptors Limit:** It is recommended to raise the maximum number of open file descriptors (ulimit) for the Ozone Manager process. Each RocksDB instance (and each snapshot and diff job) can open many files. In production deployments, consider setting the per-process file descriptor limit to **at least 32,000**, and in many cases 64k or 128k is advisable. Ensure the Linux `nofile` ulimit is configured accordingly (via `/etc/security/limits.conf` or systemd service unit limits for ozone).
 * **Use NVMe SSDs for Metadata:** Ozone Manager’s metadata (which includes the RocksDB key tables and snapshot info) should be placed on fast storage. It is highly recommended to use NVMe SSD drives for the OM metadata directories. Snapshots put additional I/O load on OM’s RocksDB (for maintaining multiple snapshot tables and for scanning during diffs). Fast disk (NVMe) improves OM throughput significantly. If NVMe is not available, use the fastest disks possible (SSD over HDD). Additionally, consider RAID1 or RAID10 for OM metadata for reliability, but prioritize random read/write performance.
-* **Memory and CPU for Ozone Manager:** Snapshots consume OM memory proportional to how many are being accessed concurrently. Each active SnapshotDiff job, for example, will load snapshot metadata into memory. By default, OM allows 10 concurrent diff jobs – if each diff is large, this can use considerable memory. Ensure the Ozone Manager is allocated sufficient heap. For a production cluster with snapshots, a larger heap (e.g., 16-32 GB or more) for OM may be warranted, depending on the number of keys and snapshots. Monitor GC and adjust the heap size as needed.
+* **Memory and CPU for Ozone Manager:** The size of a snapshot diff does not necessarily translate to increased memory usage. Ozone computes snapshot diffs by spilling intermediate results to disk, so memory consumption generally remains modest. Only in the case of File System Optimized (FSO) buckets with a very large number of directory objects might there be a noticeable increase in memory usage, but even then, it is usually not significant. Ensure the Ozone Manager is allocated sufficient heap for your workload (e.g., 16–32 GB or more for large clusters with many snapshots and concurrent diff jobs), and monitor GC to adjust the heap size as needed.
 * **Disk Space for Snapshots:** Plan for additional disk usage on DataNodes. Each snapshot retains data blocks that might otherwise have been deleted. For example, if a bucket has 100 GB of data and you take a snapshot, then later an additional 10 GB is added to the bucket, the total physical storage used will be \~110 GB (before replication). Common data between the active bucket and snapshots is not duplicated, but any data that gets deleted from the active bucket remains stored as long as a snapshot references it. Therefore, if users keep many snapshots or long retention, the storage can grow significantly. Administrators should factor this into capacity planning – e.g., if expecting N days of snapshots with X change rate per day, ensure DataNodes have X\*N extra space (plus replication overhead).
 * **Kernel and Filesystem Settings:** There are no Ozone-specific kernel tweaks required beyond what HDFS would typically need. Ensure the filesystem hosting OM metadata is formatted with a filesystem that can handle a large number of small files efficiently (ext4, xfs are common choices – xfs is often preferred for RocksDB workloads). Ensure disk scheduler and RAID controller settings favor low latency.
 * **Networking:** Snapshot operations (like diff) can result in large data transfers between OM and clients (for diff results). Ensure the network link to OM is robust. If using HttpFS to retrieve snapshot data, consider that as well in network planning.
