@@ -54,22 +54,6 @@ public class VolumeSubCommand extends ScmSubcommand {
   private SimpleDateFormat sdf = new SimpleDateFormat(
       "EEE MMM dd HH:mm:ss Z yyyy", Locale.ENGLISH);
 
-  // Display it in JSON format.
-  @Option(names = { "--json" },
-       defaultValue = "false",
-       description = "Format output as JSON.")
-  private boolean json;
-
-  // Display it in TABLE format.
-  @Option(names = { "--table" },
-       defaultValue = "false",
-       description = "Format output as Table.")
-  private boolean table;
-
-  // Mixin command-line pagination options to support paginated query functionality
-  @CommandLine.Mixin
-  private ListPaginationOptions listOptions;
-
   enum DISPLAYMODE { all, normal, failed }
 
   /**
@@ -95,6 +79,22 @@ public class VolumeSubCommand extends ScmSubcommand {
       defaultValue = "",
       description = "Filter disks by the host name of the DataNode.")
   private String hostName;
+
+  // Display it in JSON format.
+  @Option(names = { "--json" },
+       defaultValue = "false",
+       description = "Format output as JSON.")
+  private boolean json;
+
+  // Display it in TABLE format.
+  @Option(names = { "--table" },
+       defaultValue = "false",
+       description = "Format output as Table.")
+  private boolean table;
+
+  // Mixin command-line pagination options to support paginated query functionality
+  @CommandLine.Mixin
+  private ListPaginationOptions listOptions;
 
   @Override
   public void execute(ScmClient client) throws IOException {
