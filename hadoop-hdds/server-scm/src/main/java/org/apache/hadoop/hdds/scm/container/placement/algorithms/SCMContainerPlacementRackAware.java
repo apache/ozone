@@ -502,6 +502,11 @@ public final class SCMContainerPlacementRackAware
             " excludedNodes and affinityNode constrains.", null);
       }
 
+      if (usedNodes != null && usedNodes.contains(node)) {
+        excludedNodesForCapacity.add(node.getNetworkFullPath());
+        continue;
+      }
+
       if (isValidNode(node, metadataSizeRequired, dataSizeRequired)) {
         metrics.incrDatanodeChooseSuccessCount();
         if (isFallbacked) {
