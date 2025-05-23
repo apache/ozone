@@ -48,7 +48,7 @@ When keys are modified or deleted in the active bucket, Ozone checks for snapsho
 
 **Snapshot Data Storage:** Snapshot metadata resides on the OM in the same RocksDB as the live metadata, but separated by snapshot-specific prefixes or tables. The OM persists snapshots such that each snapshot’s metadata can be treated as a read-only view. Additionally, OM stores snapshot-related info such as the mapping of snapshot names to snapshot IDs and the list of snapshot diff jobs. By default, temporary data for snapshot diff computations is stored under the OM metadata directory, but this location can be configured via `ozone.om.snapshot.diff.db.dir` (a dedicated directory for snapshot diff scratch space).
 
-For a more in-depth discussion of the snapshot design and its evolution, refer to Prashant Pogde’s introduction of Apache Ozone snapshots (the first in a series of blog posts). This Medium post covers the motivation and high-level design of Ozone snapshots, and subsequent posts delve further into the technical implementation.
+For a more in-depth discussion of the snapshot design and its evolution, refer to Prashant Pogde’s [Introducing Apache Ozone Snapshots](https://medium.com/@prashantpogde/introducing-apache-ozone-snapshots-af82e976142f) (the first in a series of blog posts). This Medium post covers the motivation and high-level design of Ozone snapshots, and subsequent posts dive further into the technical implementation.
 
 ## User Tutorial
 
@@ -68,6 +68,14 @@ ozone sh snapshot create /vol1/bucket1 finance_backup_2025
 ozone fs -createSnapshot ofs://om-service/vol1/bucket1 finance_backup_2025
 ```
   (Here, `ofs://om-service/vol1/bucket1` is the URI of the bucket in the Ozone FileSystem; see the *Ozone File System API* reference.)
+* **Delete snapshot**: Delete a given snapshot for a given bucket
+```shell
+ozone sh snapshot delete [-hV] <bucket> <snapshotName>
+```
+You can achieve the same via the filesystem interface API:
+```shell
+ozone fs -deleteSnapshot ofs://om-service/vol1/bucket1 finance_backup_2025
+```
 * **Listing Snapshots:** To list all snapshots of a bucket, use:
 ```shell
 ozone sh snapshot list /vol1/bucket1
