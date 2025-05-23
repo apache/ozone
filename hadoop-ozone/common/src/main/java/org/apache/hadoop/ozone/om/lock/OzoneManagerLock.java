@@ -582,7 +582,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * Flat Resource defined in Ozone. Locks can be acquired on a resource independent of one another.
    */
   public enum FlatResource implements Resource {
+    // Background services lock on a Snapshot.
     SNAPSHOT_GC_LOCK("SNAPSHOT_GC_LOCK"),
+    // Lock acquired on a Snapshot's RocksDB Handle.
     SNAPSHOT_DB_LOCK("SNAPSHOT_DB_LOCK");
 
     private String name;

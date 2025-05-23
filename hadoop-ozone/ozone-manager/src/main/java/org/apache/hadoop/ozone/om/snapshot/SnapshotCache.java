@@ -28,6 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -143,7 +144,8 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   }
 
   /**
-   * Get or load OmSnapshot. Shall be close()d after use.
+   * Get or load OmSnapshot. Shall be close()d after use. This would acquire a read lock on the Snapshot Database
+   * during the entire lifecycle of the returned OmSnapshot instance.
    * TODO: [SNAPSHOT] Can add reason enum to param list later.
    * @param key SnapshotId
    * @return an OmSnapshot instance, or null on error
@@ -195,7 +197,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
           OMException.ResultCodes.FILE_NOT_FOUND);
     }
     return new UncheckedAutoCloseableSupplier<OmSnapshot>() {
-      private AtomicReference<Boolean> closed = new AtomicReference<>(false);
+      private final AtomicReference<Boolean> closed = new AtomicReference<>(false);
       @Override
       public OmSnapshot get() {
         return rcOmSnapshot.get();
@@ -227,19 +229,44 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     val.decrementRefCount();
   }
 
-  public OMLockDetails lock() {
-    OMLockDetails lockDetails = lock.acquireResourceWriteLock(SNAPSHOT_DB_LOCK);
-    if (lockDetails.isLockAcquired()) {
-      cleanup(true);
-      if (!dbMap.isEmpty()) {
-        return lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK);
-      }
-    }
-    return lockDetails;
+  /**
+   * Acquires a write lock on the snapshot database and returns an auto-closeable supplier
+   * for lock details. The lock ensures that the operations accessing the snapshot database
+   * are performed in a thread-safe manner. The returned supplier automatically releases the
+   * lock when closed, preventing potential resource contention or deadlocks.
+   */
+  public UncheckedAutoCloseableSupplier<OMLockDetails> lock() {
+    return lock(() -> lock.acquireResourceWriteLock(SNAPSHOT_DB_LOCK),
+        () -> lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK));
   }
 
-  public OMLockDetails unlock() {
-    return lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK);
+  private UncheckedAutoCloseableSupplier<OMLockDetails> lock(
+      Supplier<OMLockDetails> lockFunction, Supplier<OMLockDetails> unlockFunction) {
+    AtomicReference<OMLockDetails> lockDetails = new AtomicReference<>(lockFunction.get());
+    if (lockDetails.get().isLockAcquired()) {
+      cleanup(true);
+      if (!dbMap.isEmpty()) {
+        lockDetails.set(unlockFunction.get());
+      }
+    }
+
+    return new UncheckedAutoCloseableSupplier<OMLockDetails>() {
+
+      @Override
+      public void close() {
+        lockDetails.updateAndGet((prevLock) -> {
+          if (prevLock != null && prevLock.isLockAcquired()) {
+            return unlockFunction.get();
+          }
+          return prevLock;
+        });
+      }
+
+      @Override
+      public OMLockDetails get() {
+        return lockDetails.get();
+      }
+    };
   }
 
   /**
