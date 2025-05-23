@@ -49,7 +49,6 @@ import picocli.CommandLine;
  */
 public class TestVolumeCommand {
   private VolumeSubCommand cmd;
-  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {

@@ -113,12 +113,6 @@ public class VolumeSubCommand extends ScmSubcommand {
     GetVolumeInfosResponseProto response =
         client.getVolumeInfos(displayMode.name(), uuid, hostName, pageSize, listOptions.getStartItem());
 
-    // Print the relevant information if the return value is empty.
-    if (response == null || CollectionUtils.isEmpty(response.getVolumeInfosList())) {
-      System.out.println("No volume data was retrieved.");
-      return;
-    }
-
     List<VolumeInfoProto> volumeInfosList = response.getVolumeInfosList();
     List<VolumeInfo> volumeInfos = convertToVolumeInfos(volumeInfosList);
 
