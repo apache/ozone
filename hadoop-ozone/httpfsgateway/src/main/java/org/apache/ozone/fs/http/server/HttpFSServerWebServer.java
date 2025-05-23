@@ -17,7 +17,8 @@
 
 package org.apache.ozone.fs.http.server;
 
-import static org.apache.hadoop.util.StringUtils.startupShutdownMessage;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.startupShutdownMessage;
+import static org.apache.hadoop.ozone.util.OzoneVersionInfo.OZONE_VERSION_INFO;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -177,8 +178,8 @@ public class HttpFSServerWebServer {
   }
 
   public static void main(String[] args) throws Exception {
-    startupShutdownMessage(HttpFSServerWebServer.class, args, LOG);
     OzoneConfiguration conf = new OzoneConfiguration();
+    startupShutdownMessage(OZONE_VERSION_INFO, HttpFSServerWebServer.class, args, LOG, conf);
     Configuration sslConf = SSLFactory.readSSLConfiguration(conf,
         SSLFactory.Mode.SERVER);
     HttpFSServerWebServer webServer =

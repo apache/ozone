@@ -1032,6 +1032,62 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     }
   }
 
+  /**
+   * Tests the functionality to create a snapshot of an Ozone bucket and then read files
+   * from the snapshot directory using the S3 SDK.
+   *
+   * <p>The test follows these steps:
+   * <ol>
+   *   <li>Create a bucket and upload a file via the S3 client.</li>
+   *   <li>Create a snapshot on the bucket using the Ozone client.</li>
+   *   <li>Construct the snapshot object key using the ".snapshot" directory format.</li>
+   *   <li>Retrieve the object from the snapshot and verify that its content matches
+   *       the originally uploaded content.</li>
+   * </ol>
+   * </p>
+   *
+   * @throws Exception if the test fails due to any errors during bucket creation, snapshot creation,
+   *         file upload, or retrieval.
+   */
+  @Test
+  public void testReadSnapshotDirectoryUsingS3SDK() throws Exception {
+    final String bucketName = getBucketName("snapshot");
+    final String keyName = getKeyName("snapshotfile");
+    final String content = "snapshot test content";
+    final byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+
+    // Create the bucket and upload an object using S3 SDK.
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName,
+        is, new ObjectMetadata());
+
+    String snapshotName = "snap1";
+    // Create a snapshot using the Ozone client.
+    // Snapshots in Ozone are created on the bucket and are exposed via the ".snapshot" directory.
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+
+      store.createSnapshot(volume.getName(), bucketName, snapshotName);
+    }
+
+    // Use the S3 SDK to read the file from the snapshot directory.
+    // The key in the snapshot is constructed using the special ".snapshot" prefix.
+    String snapshotKey = ".snapshot/" + snapshotName + "/" + keyName;
+
+    S3Object s3Object = s3Client.getObject(bucketName, snapshotKey);
+    try (S3ObjectInputStream s3is = s3Object.getObjectContent();
+         ByteArrayOutputStream bos = new ByteArrayOutputStream(contentBytes.length)) {
+      byte[] readBuf = new byte[1024];
+      int readLen = 0;
+      while ((readLen = s3is.read(readBuf)) > 0) {
+        bos.write(readBuf, 0, readLen);
+      }
+      assertEquals(content, bos.toString("UTF-8"));
+    }
+  }
+
   private boolean isBucketEmpty(Bucket bucket) {
     ObjectListing objectListing = s3Client.listObjects(bucket.getName());
     return objectListing.getObjectSummaries().isEmpty();
