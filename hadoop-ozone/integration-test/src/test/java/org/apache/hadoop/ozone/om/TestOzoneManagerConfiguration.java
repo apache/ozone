@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
@@ -450,5 +451,48 @@ public class TestOzoneManagerConfiguration {
   private String getOMAddrKeyWithSuffix(String serviceId, String nodeId) {
     return ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
         serviceId, nodeId);
+  }
+
+  @Test
+  public void testMetadataDBMountPointsSame() throws Exception {
+    // Backup original config values
+    final String ratisDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
+    final String metadataDirs = conf.get(HddsConfigKeys.OZONE_METADATA_DIRS);
+    final String omDbDirs = conf.get(OMConfigKeys.OZONE_OM_DB_DIRS);
+
+    // Under the same mount
+    conf.unset(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, Files.createTempDirectory("tempdir1-").toString());
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, Files.createTempDirectory("tempdir2-").toString());
+
+    // Expect OM to start successfully
+    startCluster();
+
+    // Restore config values
+    conf.set(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR, ratisDir);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metadataDirs);
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, omDbDirs);
+  }
+
+  @Test
+  public void testMetadataDBMountPointsDifferent() throws Exception {
+    // Backup original config values
+    final String ratisDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
+    final String metadataDirs = conf.get(HddsConfigKeys.OZONE_METADATA_DIRS);
+    final String omDbDirs = conf.get(OMConfigKeys.OZONE_OM_DB_DIRS);
+
+    // Under the same mount
+    conf.unset(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, "/opt/test-metadata-dir");
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, Files.createTempDirectory("tempdir4-").toString());
+
+    // Expect OM to throw IOException during startup
+    Exception e = assertThrows(IOException.class, this::startCluster);
+    assertThat(e).hasMessageContaining("must be on the same mount point");
+
+    // Restore config values
+    conf.set(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR, ratisDir);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metadataDirs);
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, omDbDirs);
   }
 }
