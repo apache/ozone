@@ -32,6 +32,8 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
@@ -52,6 +54,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
@@ -81,6 +84,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
@@ -146,6 +151,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.StringUtils;
@@ -280,6 +286,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.CompactDBService;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
@@ -494,6 +501,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // instance creation every single time.
   private UncheckedAutoCloseableSupplier<IOmMetadataReader> rcOmMetadataReader;
   private OmSnapshotManager omSnapshotManager;
+  private volatile DirectoryDeletingService dirDeletingService;
+  private static final Pattern TIME_DURATION_PATTERN =
+      Pattern.compile("^\\s*\\d+\\s*(ms|s|m|h|d)\\s*$", Pattern.CASE_INSENSITIVE);
 
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
@@ -519,7 +529,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 this::reconfOzoneReadOnlyAdmins)
             .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
-                this::reconfOzoneKeyDeletingLimitPerTask);
+                this::reconfOzoneKeyDeletingLimitPerTask)
+            .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval);
+
+    reconfigurationHandler.setReconfigurationCompleteCallback((status, newConf) -> {
+      if (status.getStatus() != null && !status.getStatus().isEmpty()) {
+        LOG.info("Reconfiguration completed with {} updated properties.", status.getStatus().size());
+      } else {
+        LOG.info("Reconfiguration complete. No properties were changed.");
+      }
+    });
+
+    reconfigurationHandler.registerCompleteCallback((changedKeys, newConf) -> {
+      if (changedKeys.containsKey(OZONE_DIR_DELETING_SERVICE_INTERVAL)) {
+        initOrUpdateDirDeletingService(getConfiguration());
+      }
+    });
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
@@ -5148,6 +5173,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return String.valueOf(allowListAllVolumes);
   }
 
+  private String reconfOzoneDirDeletingServiceInterval(String newVal) {
+    if (!TIME_DURATION_PATTERN.matcher(newVal).matches()) {
+      throw new IllegalArgumentException("Invalid time duration format: " + newVal);
+    }
+    getConfiguration().set(OZONE_DIR_DELETING_SERVICE_INTERVAL, newVal);
+    return newVal;
+  }
+
   public void validateReplicationConfig(ReplicationConfig replicationConfig)
       throws OMException {
     try {
@@ -5155,6 +5188,37 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (IllegalArgumentException e) {
       throw new OMException("Invalid replication config: " + replicationConfig,
           OMException.ResultCodes.INVALID_REQUEST);
+    }
+  }
+
+  private void initOrUpdateDirDeletingService(OzoneConfiguration conf) {
+    long newInterval = conf.getTimeDuration(
+        OZONE_DIR_DELETING_SERVICE_INTERVAL, 60, TimeUnit.SECONDS);
+
+    if (dirDeletingService == null) {
+      long serviceTimeout = conf.getTimeDuration(
+          OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+          OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+
+      int dirDeletingServiceCorePoolSize = conf.getInt(
+          OZONE_THREAD_NUMBER_DIR_DELETION,
+          OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT);
+      if (dirDeletingServiceCorePoolSize <= 0) {
+        dirDeletingServiceCorePoolSize = 1;
+      }
+
+      LOG.info("Initializing DirectoryDeletingService with interval: {}s", newInterval);
+
+      dirDeletingService = new DirectoryDeletingService(
+          newInterval, TimeUnit.SECONDS,
+          serviceTimeout,
+          this,
+          conf,
+          dirDeletingServiceCorePoolSize);
+    } else {
+      LOG.info("Restarting DirectoryDeletingService with new interval: {}s", newInterval);
+      dirDeletingService.updateAndRestart(newInterval, TimeUnit.SECONDS);
     }
   }
 

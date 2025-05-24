@@ -103,6 +103,13 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     taskCount.set(0);
   }
 
+  public synchronized void updateAndRestart(long newInterval, TimeUnit newUnit) {
+    LOG.info("Updating and restarting DirectoryDeletingService with interval: {} {}", newInterval, newUnit);
+    stop();
+    setInterval(newInterval, newUnit);
+    start();
+  }
+
   private boolean shouldRun() {
     if (getOzoneManager() == null) {
       // OzoneManager can be null for testing
