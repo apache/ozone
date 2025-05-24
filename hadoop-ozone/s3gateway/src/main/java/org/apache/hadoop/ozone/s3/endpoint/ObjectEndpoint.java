@@ -344,7 +344,8 @@ public class ObjectEndpoint extends EndpointBase {
         }
       }
 
-      if (S3Utils.isEtagMisMatch(headers.getHeaderString(CHECKSUM_HEADER), eTag)) {
+      String encodedClientETag = headers.getHeaderString(CHECKSUM_HEADER);
+      if (S3Utils.isEtagMisMatch(encodedClientETag, eTag)) {
         delete(bucketName, keyPath, uploadID, null);
         throw newError(S3ErrorTable.BAD_DIGEST, eTag);
       }
@@ -906,7 +907,8 @@ public class ObjectEndpoint extends EndpointBase {
           .completeMultipartUpload(volume.getName(), bucket, key, uploadID,
               partsMap);
       String serverEtag = omMultipartUploadCompleteInfo.getHash();
-      if (S3Utils.isEtagMisMatch(headers.getHeaderString(CHECKSUM_HEADER), serverEtag)) {
+      String encodedClientETag = headers.getHeaderString(CHECKSUM_HEADER);
+      if (S3Utils.isEtagMisMatch(encodedClientETag, serverEtag)) {
         abortMultipartUpload(volume, bucket, key, uploadID);
         throw newError(S3ErrorTable.BAD_DIGEST, serverEtag);
       }

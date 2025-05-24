@@ -32,10 +32,12 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Objects;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -198,11 +200,11 @@ public final class S3Utils {
     return DigestUtils.sha256Hex(input);
   }
 
-  public static boolean isEtagMisMatch(String clientETag, String serverETag) {
-    if (clientETag == null) {
+  public static boolean isEtagMisMatch(String encodedClientETag, String serverETag) {
+    if (encodedClientETag == null) {
       return false;
     }
 
-    return !clientETag.equals(serverETag);
+    return !Hex.encodeHexString(Base64.getDecoder().decode(encodedClientETag)).equals(serverETag);
   }
 }
