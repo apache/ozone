@@ -18,18 +18,27 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.any;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.cache.CacheLoader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.ozone.test.GenericTestUtils;
@@ -68,6 +77,23 @@ class TestSnapshotCache {
           when(omSnapshot.getSnapshotTableKey()).thenReturn(snapshotID.toString());
           when(omSnapshot.getSnapshotID()).thenReturn(snapshotID);
 
+          OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+          org.apache.hadoop.hdds.utils.db.DBStore store = mock(org.apache.hadoop.hdds.utils.db.DBStore.class);
+          when(omSnapshot.getMetadataManager()).thenReturn(metadataManager);
+          when(metadataManager.getStore()).thenReturn(store);
+
+          Table<?, ?> table1 = mock(Table.class);
+          Table<?, ?> table2 = mock(Table.class);
+          Table<?, ?> keyTable = mock(Table.class);
+          when(table1.getName()).thenReturn("table1");
+          when(table2.getName()).thenReturn("table2");
+          when(keyTable.getName()).thenReturn("keyTable"); // This is in COLUMN_FAMILIES_TO_TRACK_IN_DAG
+          ArrayList tables = new ArrayList();
+          tables.add(table1);
+          tables.add(table2);
+          tables.add(keyTable);
+          when(store.listTables()).thenReturn(tables);
+          
           return omSnapshot;
         }
     );
@@ -80,7 +106,7 @@ class TestSnapshotCache {
   void setUp() {
     // Reset cache for each test case
     omMetrics = OMMetrics.create();
-    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 50);
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 50, true);
   }
 
   @AfterEach
@@ -209,7 +235,7 @@ class TestSnapshotCache {
   void testEviction1() throws IOException, InterruptedException, TimeoutException {
 
     final UUID dbKey1 = UUID.randomUUID();
-    snapshotCache.get(dbKey1);
+    UncheckedAutoCloseableSupplier<OmSnapshot> snapshot1 = snapshotCache.get(dbKey1);
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
     snapshotCache.release(dbKey1);
@@ -240,6 +266,13 @@ class TestSnapshotCache {
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
     assertEntryExistence(dbKey1, false);
+    
+    // Verify compaction was called on the tables
+    org.apache.hadoop.hdds.utils.db.DBStore store1 = snapshot1.get().getMetadataManager().getStore();
+    verify(store1, times(1)).compactTable("table1");
+    verify(store1, times(1)).compactTable("table2");
+    // Verify compaction was NOT called on the reserved table
+    verify(store1, times(0)).compactTable("keyTable");
   }
 
   @Test
@@ -332,5 +365,55 @@ class TestSnapshotCache {
     assertEquals(0L, snapshotCache.getDbMap().get(dbKey4).getTotalRefCount());
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
+  }
+
+  @Test
+  @DisplayName("Snapshot operations not blocked during compaction")
+  void testSnapshotOperationsNotBlockedDuringCompaction() throws IOException, InterruptedException, TimeoutException {
+    omMetrics = OMMetrics.create();
+    snapshotCache = new SnapshotCache(cacheLoader, 1, omMetrics, 50, true);
+    final UUID dbKey1 = UUID.randomUUID();
+    UncheckedAutoCloseableSupplier<OmSnapshot> snapshot1 = snapshotCache.get(dbKey1);
+    assertEquals(1, snapshotCache.size());
+    assertEquals(1, omMetrics.getNumSnapshotCacheSize());
+    snapshotCache.release(dbKey1);
+    assertEquals(1, snapshotCache.size());
+    assertEquals(1, omMetrics.getNumSnapshotCacheSize());
+
+    // Simulate compaction blocking
+    final Semaphore compactionLock = new Semaphore(1);
+    final AtomicBoolean table1Compacting = new AtomicBoolean(false);
+    final AtomicBoolean table1CompactedFinish = new AtomicBoolean(false);
+    org.apache.hadoop.hdds.utils.db.DBStore store1 = snapshot1.get().getMetadataManager().getStore();
+    doAnswer(invocation -> {
+      table1Compacting.set(true);
+      // Simulate compaction lock
+      compactionLock.acquire();
+      table1CompactedFinish.set(true);
+      return null;
+    }).when(store1).compactTable("table1");
+    compactionLock.acquire();
+
+    final UUID dbKey2 = UUID.randomUUID();
+    snapshotCache.get(dbKey2);
+    assertEquals(2, snapshotCache.size());
+    assertEquals(2, omMetrics.getNumSnapshotCacheSize());
+    snapshotCache.release(dbKey2);
+    assertEquals(2, snapshotCache.size());
+    assertEquals(2, omMetrics.getNumSnapshotCacheSize());
+
+    // wait for compaction to start
+    GenericTestUtils.waitFor(() -> table1Compacting.get(), 50, 3000);
+
+    snapshotCache.get(dbKey1); // this should not be blocked
+
+    // wait for compaction to finish
+    assertFalse(table1CompactedFinish.get());
+    compactionLock.release();
+    GenericTestUtils.waitFor(() -> table1CompactedFinish.get(), 50, 3000);
+
+    verify(store1, times(1)).compactTable("table1");
+    verify(store1, times(1)).compactTable("table2");
+    verify(store1, times(0)).compactTable("keyTable");
   }
 }
