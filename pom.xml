@@ -2236,6 +2236,21 @@
                 <!-- disabled test -->
                 <excludedClass>org.apache.hadoop.ozone.om.service.TestRangerBGSyncService</excludedClass>
               </excludedClasses>
+              <ignoredNonTestScopedDependencies>
+                <!--
+                  Ignore false positive "Non-test scoped test only dependencies": these are test-only in some module, compile scope transitively.
+                  See:
+                  - https://issues.apache.org/jira/browse/MDEP-791
+                  - https://issues.apache.org/jira/browse/MNG-6058
+                -->
+                <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-databind:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.commons:commons-compress:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.ozone:hdds-client:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.ozone:ozone-interface-client:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.glassfish.jersey.core:jersey-common:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.rocksdb:rocksdbjni:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.springframework:spring-core:jar</ignoredNonTestScopedDependency>
+              </ignoredNonTestScopedDependencies>
             </configuration>
           </execution>
           <execution>
