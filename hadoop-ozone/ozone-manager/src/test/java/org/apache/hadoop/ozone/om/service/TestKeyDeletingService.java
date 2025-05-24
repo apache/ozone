@@ -471,6 +471,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           snapshot = om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snapshotName);
           snapshotRenamedTable = snapshot.get().getMetadataManager().getSnapshotRenamedTable();
         }
+        assertTableRowCount(snapshotRenamedTable, initialRenamedCount + 2, metadataManager);
         keyDeletingService.resume();
         assertTableRowCount(snapshotRenamedTable, initialRenamedCount + 1, metadataManager);
         try (TableIterator<String, ? extends Table.KeyValue<String, String>> itr = snapshotRenamedTable.iterator()) {
