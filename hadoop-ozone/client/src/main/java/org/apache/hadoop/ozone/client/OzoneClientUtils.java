@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.ozone;
+package org.apache.hadoop.ozone.client;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
@@ -36,9 +36,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.checksum.BaseFileChecksumHelper;
 import org.apache.hadoop.ozone.client.checksum.ChecksumHelperFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
