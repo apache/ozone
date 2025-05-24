@@ -245,6 +245,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                     }
                   }).collect(Collectors.toList());
           remainNum -= renamedTableEntries.size();
+
           // Get pending keys that can be deleted
           PendingKeysDeletion pendingKeysDeletion = currentSnapshotInfo == null
               ? keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum)
