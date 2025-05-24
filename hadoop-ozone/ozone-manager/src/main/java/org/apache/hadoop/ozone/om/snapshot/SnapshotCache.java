@@ -68,6 +68,14 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     return !COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(tableName);
   }
 
+  /**
+   * Compacts the RocksDB tables in the given snapshot that are not part of the snapshot diff DAG.
+   * This operation is performed outside of the main snapshot operations to avoid blocking reads.
+   * Only tables that are not tracked in the DAG (determined by {@link #shouldCompactTable}) will be compacted.
+   *
+   * @param snapshot The OmSnapshot instance whose tables need to be compacted
+   * @throws IOException if there is an error accessing the metadata manager
+   */
   private void compactSnapshotDB(OmSnapshot snapshot) throws IOException {
     if (!compactNonSnapshotDiffTables) {
       return;
@@ -250,6 +258,16 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   void cleanup() {
     if (dbMap.size() > cacheSizeLimit) {
       for (UUID evictionKey : pendingEvictionQueue) {
+        ReferenceCounted<OmSnapshot> snapshot = dbMap.get(evictionKey);
+        if (snapshot != null && snapshot.getTotalRefCount() == 0) {
+          try {
+            compactSnapshotDB(snapshot.get());
+          } catch (IOException e) {
+            LOG.warn("Failed to compact snapshot DB for snapshotId {}: {}", 
+                evictionKey, e.getMessage());
+          }
+        }
+
         dbMap.compute(evictionKey, (k, v) -> {
           pendingEvictionQueue.remove(k);
           if (v == null) {
@@ -264,8 +282,6 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
             LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
             // Close the instance, which also closes its DB handle.
             try {
-              compactSnapshotDB(v.get());
-              // Close the instance, which also closes its DB handle.
               v.get().close();
             } catch (IOException ex) {
               throw new IllegalStateException("Error while closing snapshot DB.", ex);

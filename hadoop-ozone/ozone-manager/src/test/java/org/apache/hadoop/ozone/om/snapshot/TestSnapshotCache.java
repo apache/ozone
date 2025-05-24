@@ -18,11 +18,13 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.any;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -32,7 +34,9 @@ import com.google.common.cache.CacheLoader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -231,7 +235,7 @@ class TestSnapshotCache {
   void testEviction1() throws IOException, InterruptedException, TimeoutException {
 
     final UUID dbKey1 = UUID.randomUUID();
-    ReferenceCounted<OmSnapshot> snapshot1 = snapshotCache.get(dbKey1);
+    UncheckedAutoCloseableSupplier<OmSnapshot> snapshot1 = snapshotCache.get(dbKey1);
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
     snapshotCache.release(dbKey1);
@@ -264,8 +268,7 @@ class TestSnapshotCache {
     assertEntryExistence(dbKey1, false);
     
     // Verify compaction was called on the tables
-    OMMetadataManager metadataManager1 = snapshot1.get().getMetadataManager();
-    org.apache.hadoop.hdds.utils.db.DBStore store1 = metadataManager1.getStore();
+    org.apache.hadoop.hdds.utils.db.DBStore store1 = snapshot1.get().getMetadataManager().getStore();
     verify(store1, times(1)).compactTable("table1");
     verify(store1, times(1)).compactTable("table2");
     // Verify compaction was NOT called on the reserved table
@@ -362,5 +365,55 @@ class TestSnapshotCache {
     assertEquals(0L, snapshotCache.getDbMap().get(dbKey4).getTotalRefCount());
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
+  }
+
+  @Test
+  @DisplayName("Snapshot operations not blocked during compaction")
+  void testSnapshotOperationsNotBlockedDuringCompaction() throws IOException, InterruptedException, TimeoutException {
+    omMetrics = OMMetrics.create();
+    snapshotCache = new SnapshotCache(cacheLoader, 1, omMetrics, 50, true);
+    final UUID dbKey1 = UUID.randomUUID();
+    UncheckedAutoCloseableSupplier<OmSnapshot> snapshot1 = snapshotCache.get(dbKey1);
+    assertEquals(1, snapshotCache.size());
+    assertEquals(1, omMetrics.getNumSnapshotCacheSize());
+    snapshotCache.release(dbKey1);
+    assertEquals(1, snapshotCache.size());
+    assertEquals(1, omMetrics.getNumSnapshotCacheSize());
+
+    // Simulate compaction blocking
+    final Semaphore compactionLock = new Semaphore(1);
+    final AtomicBoolean table1Compacting = new AtomicBoolean(false);
+    final AtomicBoolean table1CompactedFinish = new AtomicBoolean(false);
+    org.apache.hadoop.hdds.utils.db.DBStore store1 = snapshot1.get().getMetadataManager().getStore();
+    doAnswer(invocation -> {
+      table1Compacting.set(true);
+      // Simulate compaction lock
+      compactionLock.acquire();
+      table1CompactedFinish.set(true);
+      return null;
+    }).when(store1).compactTable("table1");
+    compactionLock.acquire();
+
+    final UUID dbKey2 = UUID.randomUUID();
+    snapshotCache.get(dbKey2);
+    assertEquals(2, snapshotCache.size());
+    assertEquals(2, omMetrics.getNumSnapshotCacheSize());
+    snapshotCache.release(dbKey2);
+    assertEquals(2, snapshotCache.size());
+    assertEquals(2, omMetrics.getNumSnapshotCacheSize());
+
+    // wait for compaction to start
+    GenericTestUtils.waitFor(() -> table1Compacting.get(), 50, 3000);
+
+    snapshotCache.get(dbKey1); // this should not be blocked
+
+    // wait for compaction to finish
+    assertFalse(table1CompactedFinish.get());
+    compactionLock.release();
+    GenericTestUtils.waitFor(() -> table1CompactedFinish.get(), 50, 3000);
+
+    verify(store1, times(1)).compactTable("table1");
+    verify(store1, times(1)).compactTable("table2");
+    verify(store1, times(0)).compactTable("keyTable");
   }
 }
