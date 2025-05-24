@@ -66,6 +66,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_KEY_DELETION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_KEY_DELETION_DEFAULT;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -257,9 +259,15 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
           OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
+      int keyDeletingServiceCorePoolSize =
+          configuration.getInt(OZONE_THREAD_NUMBER_KEY_DELETION,
+              OZONE_THREAD_NUMBER_KEY_DELETION_DEFAULT);
+      if (keyDeletingServiceCorePoolSize <= 0) {
+        keyDeletingServiceCorePoolSize = 1;
+      }
       keyDeletingService = new KeyDeletingService(ozoneManager,
-          scmClient.getBlockClient(), this, blockDeleteInterval,
-          serviceTimeout, configuration, isSnapshotDeepCleaningEnabled);
+          scmClient.getBlockClient(), blockDeleteInterval,
+          serviceTimeout, configuration, keyDeletingServiceCorePoolSize, isSnapshotDeepCleaningEnabled);
       keyDeletingService.start();
     }
 
@@ -757,7 +765,7 @@ public class KeyManagerImpl implements KeyManager {
           List<BlockGroup> blockGroupList = Lists.newArrayList();
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
-          for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
+          for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
@@ -776,7 +784,7 @@ public class KeyManagerImpl implements KeyManager {
           List<OmKeyInfo> notReclaimableKeyInfoList = notReclaimableKeyInfo.getOmKeyInfoList();
 
           // If all the versions are not reclaimable, then modify key by just purging the key that can be purged.
-          if (notReclaimableKeyInfoList.size() > 0 &&
+          if (!notReclaimableKeyInfoList.isEmpty() &&
               notReclaimableKeyInfoList.size() != infoList.getOmKeyInfoList().size()) {
             keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
           }

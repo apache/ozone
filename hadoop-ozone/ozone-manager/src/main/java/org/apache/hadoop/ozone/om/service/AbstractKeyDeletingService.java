@@ -25,7 +25,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -104,7 +103,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   protected Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
       Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
-      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException, InterruptedException {
 
     long startTime = Time.monotonicNow();
     Pair<Integer, Boolean> purgeResult = Pair.of(0, false);
@@ -143,8 +142,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
   private Pair<Integer, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-      Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntriesToBeDeleted,
-      String snapTableKey, UUID expectedPreviousSnapshotId) {
+      Map<String, RepeatedOmKeyInfo> keysToModify,  List<String> renameEntriesToBeDeleted,
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws InterruptedException {
     List<String> purgeKeys = new ArrayList<>();
 
     // Put all keys to be purged in a list
@@ -226,7 +225,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         .build();
 
     // Submit PurgeKeys request to OM
-    try {
+    try (BootstrapStateHandler.Lock lock = snapTableKey != null ? getBootstrapStateLock().lock() : null) {
       OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
       if (omResponse != null) {
         purgeSuccess = purgeSuccess && omResponse.getSuccess();
@@ -652,7 +651,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * Submits SetSnapsnapshotPropertyRequest to OM.
    * @param setSnapshotPropertyRequests request to be sent to OM
    */
-  protected void submitSetSnapshotRequest(
+  protected void submitSetSnapshotRequests(
       List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests) {
     if (setSnapshotPropertyRequests.isEmpty()) {
       return;
@@ -662,16 +661,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         .addAllSetSnapshotPropertyRequests(setSnapshotPropertyRequests)
         .setClientId(clientId.toString())
         .build();
-    Map<String, SnapshotInfo> val = new HashMap<>();
-    setSnapshotPropertyRequests
-        .forEach(i -> {
-          try {
-            val.put(i.getSnapshotKey(),
-                ozoneManager.getMetadataManager().getSnapshotInfoTable().get(i.getSnapshotKey()));
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        });
     try {
       submitRequest(omRequest);
     } catch (ServiceException e) {

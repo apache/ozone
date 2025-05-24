@@ -91,10 +91,12 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -346,8 +348,9 @@ class TestKeyDeletingService extends OzoneTestBase {
       when(ozoneManager.getOmSnapshotManager()).thenAnswer(i -> {
         return omSnapshotManager;
       });
-      KeyDeletingService service = new KeyDeletingService(ozoneManager, scmBlockTestingClient, km, 10000,
-          100000, conf, false);
+      when(ozoneManager.getKeyManager()).thenReturn(km);
+      KeyDeletingService service = new KeyDeletingService(ozoneManager, scmBlockTestingClient, 10000,
+          100000, conf, 10, false);
       service.shutdown();
       final long initialSnapshotCount = metadataManager.countRowsInTable(snapshotInfoTable);
       final long initialDeletedCount = metadataManager.countRowsInTable(deletedTable);
@@ -495,7 +498,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       keyDeletingService.resume();
 
-      try (ReferenceCounted<OmSnapshot> rcOmSnapshot =
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot =
                om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snap3)) {
         OmSnapshot snapshot3 = rcOmSnapshot.get();
 
@@ -666,7 +669,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
     @Test
     @DisplayName("Should not update keys when purge request times out during key deletion")
-    public void testFailingModifiedKeyPurge() throws IOException {
+    public void testFailingModifiedKeyPurge() throws IOException, InterruptedException {
 
       try (MockedStatic<OzoneManagerRatisUtils> mocked =  mockStatic(OzoneManagerRatisUtils.class,
           CALLS_REAL_METHODS)) {
