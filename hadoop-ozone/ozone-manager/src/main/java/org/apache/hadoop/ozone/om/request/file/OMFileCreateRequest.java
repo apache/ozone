@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
@@ -244,7 +244,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), omBucketInfo, pathInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
-          repConfig, ozoneManager.getConfiguration());
+          repConfig, ozoneManager.getConfig());
       validateEncryptionKeyInfo(omBucketInfo, keyArgs);
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();

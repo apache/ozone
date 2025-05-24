@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,7 +116,7 @@ class TestSnapshotCache {
   void testGet() throws IOException {
     final UUID dbKey1 = UUID.randomUUID();
     assertEquals(0, omMetrics.getNumSnapshotCacheSize());
-    ReferenceCounted<OmSnapshot> omSnapshot = snapshotCache.get(dbKey1);
+    UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot);
     assertNotNull(omSnapshot.get());
     assertInstanceOf(OmSnapshot.class, omSnapshot.get());
@@ -127,14 +128,13 @@ class TestSnapshotCache {
   @DisplayName("get() same entry twice yields one cache entry only")
   void testGetTwice() throws IOException {
     final UUID dbKey1 = UUID.randomUUID();
-    ReferenceCounted<OmSnapshot> omSnapshot1 = snapshotCache.get(dbKey1);
+    UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot1 = snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot1);
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
 
-    ReferenceCounted<OmSnapshot> omSnapshot1again = snapshotCache.get(dbKey1);
+    UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot1again = snapshotCache.get(dbKey1);
     // Should be the same instance
-    assertEquals(omSnapshot1, omSnapshot1again);
     assertEquals(omSnapshot1.get(), omSnapshot1again.get());
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
@@ -144,7 +144,7 @@ class TestSnapshotCache {
   @DisplayName("release(String)")
   void testReleaseByDbKey() throws IOException {
     final UUID dbKey1 = UUID.randomUUID();
-    ReferenceCounted<OmSnapshot> omSnapshot1 = snapshotCache.get(dbKey1);
+    UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot1 = snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot1);
     assertNotNull(omSnapshot1.get());
     assertEquals(1, snapshotCache.size());
@@ -160,7 +160,7 @@ class TestSnapshotCache {
   @DisplayName("invalidate()")
   void testInvalidate() throws IOException {
     final UUID dbKey1 = UUID.randomUUID();
-    ReferenceCounted<OmSnapshot> omSnapshot = snapshotCache.get(dbKey1);
+    UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot);
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
@@ -179,13 +179,13 @@ class TestSnapshotCache {
   @DisplayName("invalidateAll()")
   void testInvalidateAll() throws IOException {
     final UUID dbKey1 = UUID.randomUUID();
-    ReferenceCounted<OmSnapshot> omSnapshot1 = snapshotCache.get(dbKey1);
+    UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot1 = snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot1);
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
 
     final UUID dbKey2 = UUID.randomUUID();
-    ReferenceCounted<OmSnapshot> omSnapshot2 = snapshotCache.get(dbKey2);
+    UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot2 = snapshotCache.get(dbKey2);
     assertNotNull(omSnapshot2);
     assertEquals(2, snapshotCache.size());
     assertEquals(2, omMetrics.getNumSnapshotCacheSize());
@@ -193,7 +193,7 @@ class TestSnapshotCache {
     assertNotEquals(omSnapshot1, omSnapshot2);
 
     final UUID dbKey3 = UUID.randomUUID();
-    ReferenceCounted<OmSnapshot> omSnapshot3 = snapshotCache.get(dbKey3);
+    UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot3 = snapshotCache.get(dbKey3);
     assertNotNull(omSnapshot3);
     assertEquals(3, snapshotCache.size());
     assertEquals(3, omMetrics.getNumSnapshotCacheSize());
@@ -313,8 +313,8 @@ class TestSnapshotCache {
   void testEviction3WithClose() throws IOException, InterruptedException, TimeoutException {
 
     final UUID dbKey1 = UUID.randomUUID();
-    try (ReferenceCounted<OmSnapshot> rcOmSnapshot = snapshotCache.get(dbKey1)) {
-      assertEquals(1L, rcOmSnapshot.getTotalRefCount());
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot = snapshotCache.get(dbKey1)) {
+      assertEquals(1L, snapshotCache.totalRefCount(rcOmSnapshot.get().getSnapshotID()));
       assertEquals(1, snapshotCache.size());
       assertEquals(1, omMetrics.getNumSnapshotCacheSize());
     }
@@ -325,26 +325,26 @@ class TestSnapshotCache {
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
 
     final UUID dbKey2 = UUID.randomUUID();
-    try (ReferenceCounted<OmSnapshot> rcOmSnapshot = snapshotCache.get(dbKey2)) {
-      assertEquals(1L, rcOmSnapshot.getTotalRefCount());
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot = snapshotCache.get(dbKey2)) {
+      assertEquals(1L, snapshotCache.totalRefCount(rcOmSnapshot.get().getSnapshotID()));
       assertEquals(2, snapshotCache.size());
       assertEquals(2, omMetrics.getNumSnapshotCacheSize());
       // Get dbKey2 entry a second time
-      try (ReferenceCounted<OmSnapshot> rcOmSnapshot2 = snapshotCache.get(dbKey2)) {
-        assertEquals(2L, rcOmSnapshot.getTotalRefCount());
-        assertEquals(2L, rcOmSnapshot2.getTotalRefCount());
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot2 = snapshotCache.get(dbKey2)) {
+        assertEquals(2L, snapshotCache.totalRefCount(rcOmSnapshot.get().getSnapshotID()));
+        assertEquals(2L, snapshotCache.totalRefCount(rcOmSnapshot2.get().getSnapshotID()));
         assertEquals(2, snapshotCache.size());
         assertEquals(2, omMetrics.getNumSnapshotCacheSize());
       }
-      assertEquals(1L, rcOmSnapshot.getTotalRefCount());
+      assertEquals(1L, snapshotCache.totalRefCount(rcOmSnapshot.get().getSnapshotID()));
     }
     assertEquals(0L, snapshotCache.getDbMap().get(dbKey2).getTotalRefCount());
     assertEquals(2, snapshotCache.size());
     assertEquals(2, omMetrics.getNumSnapshotCacheSize());
 
     final UUID dbKey3 = UUID.randomUUID();
-    try (ReferenceCounted<OmSnapshot> rcOmSnapshot = snapshotCache.get(dbKey3)) {
-      assertEquals(1L, rcOmSnapshot.getTotalRefCount());
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot = snapshotCache.get(dbKey3)) {
+      assertEquals(1L, snapshotCache.totalRefCount(rcOmSnapshot.get().getSnapshotID()));
       assertEquals(3, snapshotCache.size());
       assertEquals(3, omMetrics.getNumSnapshotCacheSize());
     }
@@ -353,9 +353,9 @@ class TestSnapshotCache {
     assertEquals(3, omMetrics.getNumSnapshotCacheSize());
 
     final UUID dbKey4 = UUID.randomUUID();
-    try (ReferenceCounted<OmSnapshot> rcOmSnapshot = snapshotCache.get(dbKey4)) {
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot = snapshotCache.get(dbKey4)) {
       GenericTestUtils.waitFor(() -> snapshotCache.size() == 1, 50, 3000);
-      assertEquals(1L, rcOmSnapshot.getTotalRefCount());
+      assertEquals(1L, snapshotCache.totalRefCount(rcOmSnapshot.get().getSnapshotID()));
       assertEquals(1, snapshotCache.size());
       assertEquals(1, omMetrics.getNumSnapshotCacheSize());
     }

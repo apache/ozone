@@ -36,7 +36,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.3</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.31.25</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.31.40</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.80</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
@@ -2174,6 +2174,48 @@
           <groupId>com.coderplus.maven.plugins</groupId>
           <artifactId>copy-rename-maven-plugin</artifactId>
           <version>${copy-rename-maven-plugin.version}</version>
+          <executions>
+            <!--
+              If a new module is introduced with generated config:
+              - override ban-annotations execution of maven-enforcer-plugin
+              - configure maven-compiler-plugin with the ConfigFileGenerator annotationProcessor
+              - bind one or both of these rename executions
+              - add the module's name in OzoneConfiguration#activate
+              See hadoop-hdds/common/pom.xml for example.
+            -->
+            <execution>
+              <id>rename-generated-config</id>
+              <goals>
+                <goal>rename</goal>
+              </goals>
+              <!-- bind to process-classes in modules where needed -->
+              <phase>none</phase>
+              <configuration>
+                <fileSets>
+                  <fileSet>
+                    <sourceFile>${project.build.outputDirectory}/ozone-default-generated.xml</sourceFile>
+                    <destinationFile>${project.build.outputDirectory}/${project.artifactId}-default.xml</destinationFile>
+                  </fileSet>
+                </fileSets>
+              </configuration>
+            </execution>
+            <execution>
+              <id>rename-generated-test-config</id>
+              <goals>
+                <goal>rename</goal>
+              </goals>
+              <!-- bind to process-test-classes in modules where needed -->
+              <phase>none</phase>
+              <configuration>
+                <fileSets>
+                  <fileSet>
+                    <sourceFile>${project.build.testOutputDirectory}/ozone-default-generated.xml</sourceFile>
+                    <destinationFile>${project.build.testOutputDirectory}/${project.artifactId}-default.xml</destinationFile>
+                  </fileSet>
+                </fileSets>
+              </configuration>
+            </execution>
+          </executions>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -2190,6 +2232,10 @@
             </goals>
             <configuration>
               <ignoreNonCompile>true</ignoreNonCompile>
+              <excludedClasses>
+                <!-- disabled test -->
+                <excludedClass>org.apache.hadoop.ozone.om.service.TestRangerBGSyncService</excludedClass>
+              </excludedClasses>
             </configuration>
           </execution>
           <execution>
