@@ -797,7 +797,9 @@ public class KeyManagerImpl implements KeyManager {
 
   private <V, R> List<Table.KeyValue<String, R>> getTableEntries(String startKey,
           TableIterator<String, ? extends Table.KeyValue<String, V>> tableIterator,
-          Function<V, R> valueFunction, int size) throws IOException {
+          Function<V, R> valueFunction,
+          CheckedFunction<Table.KeyValue<String, V>, Boolean, IOException> filter,
+          int size) throws IOException {
     List<Table.KeyValue<String, R>> entries = new ArrayList<>();
     /* Seek to the start key if it's not null. The next key in queue is ensured to start with the bucket
          prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
@@ -810,7 +812,7 @@ public class KeyManagerImpl implements KeyManager {
     int currentCount = 0;
     while (tableIterator.hasNext() && currentCount < size) {
       Table.KeyValue<String, V> kv = tableIterator.next();
-      if (kv != null) {
+      if (kv != null && filter.apply(kv)) {
         entries.add(Table.newKeyValue(kv.getKey(), valueFunction.apply(kv.getValue())));
         currentCount++;
       }
@@ -832,11 +834,12 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public List<Table.KeyValue<String, String>> getRenamesKeyEntries(
-      String volume, String bucket, String startKey, int size) throws IOException {
+      String volume, String bucket, String startKey,
+      CheckedFunction<Table.KeyValue<String, String>, Boolean, IOException> filter, int size) throws IOException {
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends Table.KeyValue<String, String>>
              renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, renamedKeyIter, Function.identity(), size);
+      return getTableEntries(startKey, renamedKeyIter, Function.identity(), filter, size);
     }
   }
 
@@ -880,11 +883,13 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
-      String volume, String bucket, String startKey, int size) throws IOException {
+      String volume, String bucket, String startKey,
+      CheckedFunction<Table.KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter,
+      int size) throws IOException {
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, size);
+      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, filter, size);
     }
   }
 

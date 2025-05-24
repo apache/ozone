@@ -1392,6 +1392,7 @@ message PurgeKeysRequest {
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
     // previous snapshotID can also be null & this field would be absent in older requests.
     optional NullableUUID expectedPreviousSnapshotID = 4;
+    repeated string renamedKeys = 5;
 }
 
 message PurgeKeysResponse {

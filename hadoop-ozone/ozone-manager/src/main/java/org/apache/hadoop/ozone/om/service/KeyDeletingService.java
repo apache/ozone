@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableRenameEntryFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -230,20 +231,33 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         // Purge deleted Keys in the deletedTable && rename entries in the snapshotRenamedTable which doesn't have a
         // reference in the previous snapshot.
         try (ReclaimableKeyFilter reclaimableKeyFilter = new ReclaimableKeyFilter(getOzoneManager(),
-            omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock)) {
+            omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock);
+             ReclaimableRenameEntryFilter renameEntryFilter = new ReclaimableRenameEntryFilter(
+                 getOzoneManager(), omSnapshotManager, snapshotChainManager, currentSnapshotInfo,
+                 keyManager, lock)) {
+          List<String> renamedTableEntries =
+              keyManager.getRenamesKeyEntries(volume, bucket, null, renameEntryFilter, remainNum).stream()
+                  .map(entry -> {
+                    try {
+                      return entry.getKey();
+                    } catch (IOException e) {
+                      throw new UncheckedIOException(e);
+                    }
+                  }).collect(Collectors.toList());
+          remainNum -= renamedTableEntries.size();
+
           // Get pending keys that can be deleted
           PendingKeysDeletion pendingKeysDeletion = currentSnapshotInfo == null
               ? keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum)
               : keyManager.getPendingDeletionKeys(volume, bucket, null, reclaimableKeyFilter, remainNum);
           List<BlockGroup> keyBlocksList = pendingKeysDeletion.getKeyBlocksList();
           //submit purge requests if there are renamed entries to be purged or keys to be purged.
-          if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
+          if (!renamedTableEntries.isEmpty() || keyBlocksList != null && !keyBlocksList.isEmpty()) {
             // Validating if the previous snapshot is still the same before purging the blocks.
             SnapshotUtils.validatePreviousSnapshotId(currentSnapshotInfo, snapshotChainManager,
                 expectedPreviousSnapshotId);
-            Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList,
-                 pendingKeysDeletion.getKeysToModify(), snapshotTableKey,
-                 expectedPreviousSnapshotId);
+            Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, pendingKeysDeletion.getKeysToModify(),
+                renamedTableEntries, snapshotTableKey, expectedPreviousSnapshotId);
             remainNum -= purgeResult.getKey();
             successStatus = purgeResult.getValue();
             metrics.incrNumKeysProcessed(keyBlocksList.size());
