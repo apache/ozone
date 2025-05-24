@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.nio.file.Path;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.StringUtils;
@@ -37,18 +38,18 @@ public class TableConfig implements AutoCloseable {
 
   /**
    * Constructs a Table Config.
-   * @param name - Name of the Table.
+   *
+   * @param name                - Name of the Table.
    * @param columnFamilyOptions - Column Family options.
    */
-  public TableConfig(String name,
-                     ManagedColumnFamilyOptions columnFamilyOptions) {
+  public TableConfig(String name, ManagedColumnFamilyOptions columnFamilyOptions) {
     this.name = name;
     this.columnFamilyOptions = columnFamilyOptions;
   }
 
-  static TableConfig newTableConfig(String name) {
+  static TableConfig newTableConfig(Path dbPath, String name) {
     return new TableConfig(name,
-        DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions());
+        DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions(dbPath, name));
   }
 
   /**
