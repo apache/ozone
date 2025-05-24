@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CHECKSUM_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -40,13 +42,13 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -279,8 +281,11 @@ public class TestMultipartUploadComplete {
 
     // Mock headers to return a mismatched etag
     HttpHeaders etagHeaders = mock(HttpHeaders.class);
-    when(etagHeaders.getHeaderString(S3Consts.CHECKSUM_HEADER)).thenReturn(
-        "wrong-etag");
+    String fakeMd5Hex = "deadbeefdeadbeefdeadbeefdeadbeef";
+    byte[] fakeMd5Bytes = Hex.decodeHex(fakeMd5Hex);
+    String encodedEtag = Base64.getEncoder().encodeToString(fakeMd5Bytes);
+    when(etagHeaders.getHeaderString(CHECKSUM_HEADER)).thenReturn(
+        encodedEtag);
     rest.setHeaders(etagHeaders);
 
     // Act & Assert
@@ -301,12 +306,15 @@ public class TestMultipartUploadComplete {
     // calculate correct etag
     Response tempResp =
         rest.completeMultipartUpload(OzoneConsts.S3_BUCKET, key, uploadID, completeMultipartUploadRequest);
-    String serverEtag = ((CompleteMultipartUploadResponse) tempResp.getEntity()).getETag();
+    String serverEtag = ((CompleteMultipartUploadResponse) tempResp.getEntity()).getETag()
+        .replaceAll("\"", "");
 
     // Mock headers to return correct etag
+    byte[] etagBytes = Hex.decodeHex(serverEtag);
+    String encodedEtag = Base64.getEncoder().encodeToString(etagBytes);
     HttpHeaders etagHeaders = mock(HttpHeaders.class);
-    when(etagHeaders.getHeaderString(org.apache.hadoop.ozone.s3.util.S3Consts.CHECKSUM_HEADER)).
-        thenReturn(serverEtag.replaceAll("\"", ""));
+    when(etagHeaders.getHeaderString(CHECKSUM_HEADER)).
+        thenReturn(encodedEtag);
     rest.setHeaders(etagHeaders);
 
     // Act
@@ -316,7 +324,7 @@ public class TestMultipartUploadComplete {
     // Assert
     assertEquals(200, response.getStatus());
     CompleteMultipartUploadResponse resp = (CompleteMultipartUploadResponse) response.getEntity();
-    assertEquals(serverEtag, resp.getETag());
+    assertEquals(serverEtag, resp.getETag().replaceAll("\"", ""));
   }
 
   @Test
@@ -329,7 +337,7 @@ public class TestMultipartUploadComplete {
 
     // Mock headers to not return checksum
     HttpHeaders etagHeaders = mock(HttpHeaders.class);
-    when(etagHeaders.getHeaderString(org.apache.hadoop.ozone.s3.util.S3Consts.CHECKSUM_HEADER)).thenReturn(null);
+    when(etagHeaders.getHeaderString(CHECKSUM_HEADER)).thenReturn(null);
     rest.setHeaders(etagHeaders);
 
     // Act
