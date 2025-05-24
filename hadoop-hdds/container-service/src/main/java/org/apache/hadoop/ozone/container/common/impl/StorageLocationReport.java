@@ -43,6 +43,14 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
   private final StorageType storageType;
   private final String storageLocation;
 
+  // If the disk is not faulty, this value will be 0.
+  // If the disk is faulty, we will try to obtain the time of the disk failure
+  // as accurately as possible.
+  // - If the disk fault is detected at startup, the time will be the DN startup time.
+  // - If the disk fault is detected by the health check,
+  // the time will be the earliest health check time.
+  private final long failureTime;
+
   private StorageLocationReport(Builder builder) {
     this.id = builder.id;
     this.failed = builder.failed;
@@ -53,6 +61,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     this.freeSpaceToSpare = builder.freeSpaceToSpare;
     this.storageType = builder.storageType;
     this.storageLocation = builder.storageLocation;
+    this.failureTime = builder.failureTime;
   }
 
   public long getUsableSpace() {
@@ -106,6 +115,10 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
 
   public StorageType getStorageType() {
     return storageType;
+  }
+
+  public long getFailureTime() {
+    return failureTime;
   }
 
   private StorageTypeProto getStorageTypeProto() throws IOException {
@@ -178,6 +191,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
         .setStorageType(getStorageTypeProto())
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
+        .setFailureTime(getFailureTime())
         .setFreeSpaceToSpare(getFreeSpaceToSpare())
         .build();
   }
@@ -198,6 +212,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
         .setStorageType(getStorageTypeProto())
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
+        .setFailureTime(getFailureTime())
         .build();
   }
 
@@ -229,6 +244,11 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     if (report.hasFailed()) {
       builder.setFailed(report.getFailed());
     }
+
+    if (report.hasFailureTime()) {
+      builder.setFailureTime(report.getFailureTime());
+    }
+
     return builder.build();
   }
 
@@ -241,7 +261,8 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
         .append(" type=").append(storageType);
 
     if (failed) {
-      sb.append(" failed");
+      sb.append(" failed")
+          .append(" at=").append(failureTime);
     } else {
       sb.append(" capacity=").append(capacity)
           .append(" used=").append(scmUsed)
@@ -275,6 +296,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     private long freeSpaceToSpare;
     private StorageType storageType;
     private String storageLocation;
+    private long failureTime;
 
     /**
      * Sets the storageId.
@@ -385,6 +407,17 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     }
 
     /**
+     * Sets the lastVolumeFailureDate.
+     *
+     * @param failureTime The last failure time of the disk.
+     * @return StorageLocationReport.Builder
+     */
+    public Builder setFailureTime(long failureTime) {
+      this.failureTime = failureTime;
+      return this;
+    }
+
+    /**
      * Builds and returns StorageLocationReport instance.
      *
      * @return StorageLocationReport
@@ -392,7 +425,6 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     public StorageLocationReport build() {
       return new StorageLocationReport(this);
     }
-
   }
 
 }
