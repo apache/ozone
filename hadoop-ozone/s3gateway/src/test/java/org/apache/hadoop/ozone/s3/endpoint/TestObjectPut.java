@@ -17,9 +17,13 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static javax.ws.rs.core.HttpHeaders.ETAG;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BAD_DIGEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CHECKSUM_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
@@ -30,6 +34,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,8 +44,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -51,12 +58,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
+import java.util.Base64;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -757,5 +767,90 @@ class TestObjectPut {
     assertEquals(200, putResponse.getStatus());
     OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
     assertEquals(0, keyDetails.getDataSize());
+  }
+
+  @Test
+  void testPutObjectWithEtagMismatchShouldCleanupAndThrow() throws IOException, OS3Exception, DecoderException {
+    // Arrange
+    String content = "test-content";
+    ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8));
+    bucket.setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+
+    // Mock headers to return a mismatched checksum
+    HttpHeaders etagHeaders = mock(HttpHeaders.class);
+    String fakeMd5Hex = "deadbeefdeadbeefdeadbeefdeadbeef";
+    byte[] fakeMd5Bytes = Hex.decodeHex(fakeMd5Hex);
+    String encodedEtag = Base64.getEncoder().encodeToString(fakeMd5Bytes);
+    when(etagHeaders.getHeaderString(CHECKSUM_HEADER)).thenReturn(encodedEtag);
+    when(etagHeaders.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
+    objectEndpoint.setHeaders(etagHeaders);
+
+    // Spy on objectEndpoint.delete to verify cleanup is called
+    ObjectEndpoint spyEndpoint = spy(objectEndpoint);
+    doReturn(Response.ok().build()).when(spyEndpoint).delete(any(), any(), any(), any());
+
+    // Act
+    OS3Exception os3Exception = assertThrows(OS3Exception.class, () ->
+        spyEndpoint.put(BUCKET_NAME, KEY_NAME, content.length(), 1,
+        null, null, null, body));
+
+    // Assert
+    verify(spyEndpoint, times(1)).delete(any(), any(), any(), any());
+    assertEquals(BAD_DIGEST.getCode(), os3Exception.getCode());
+    assertEquals(HTTP_BAD_REQUEST, os3Exception.getHttpCode());
+  }
+
+  @Test
+  void testPutObjectWithEtagMatchShouldNotCleanupOrThrow() throws IOException, OS3Exception, DecoderException {
+    // Arrange
+    String content = "test-content-match";
+    ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8));
+    bucket.setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+
+    // get server etag
+    ObjectEndpoint spyEndpoint = spy(objectEndpoint);
+    doReturn(Response.ok().build()).when(spyEndpoint).delete(any(), any(), any(), any());
+    Response tempResp = spyEndpoint.put(BUCKET_NAME, KEY_NAME, content.length(), 1, null,
+        null, null, body);
+    String serverEtag = tempResp.getHeaderString(ETAG).replaceAll("\"", "");
+
+    // Mock header: hex decode → base64 encode
+    byte[] etagBytes = Hex.decodeHex(serverEtag);
+    String encodedEtag = Base64.getEncoder().encodeToString(etagBytes);
+    HttpHeaders etagHeaders = mock(HttpHeaders.class);
+    when(etagHeaders.getHeaderString(CHECKSUM_HEADER)).thenReturn(encodedEtag);
+    when(etagHeaders.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
+    spyEndpoint.setHeaders(etagHeaders);
+
+    // Act
+    ByteArrayInputStream body2 = new ByteArrayInputStream(content.getBytes(UTF_8));
+    Response response = spyEndpoint.put(BUCKET_NAME, KEY_NAME, content.length(), 1, null,
+        null, null, body2);
+
+    // Assert
+    verify(spyEndpoint, never()).delete(any(), any(), any(), any());
+    assertEquals(200, response.getStatus());
+  }
+
+  @Test
+  void testPutObjectWithoutChecksumHeaderShouldNotCleanupOrThrow() throws IOException, OS3Exception {
+    // Arrange
+    String content = "test-content-no-header";
+    ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8));
+    bucket.setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+
+    HttpHeaders noEtagHeader = mock(HttpHeaders.class);
+    when(noEtagHeader.getHeaderString(CHECKSUM_HEADER)).thenReturn(null);
+    when(noEtagHeader.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
+    ObjectEndpoint spyEndpoint = spy(objectEndpoint);
+    spyEndpoint.setHeaders(noEtagHeader);
+
+    // Act
+    Response response = spyEndpoint.put(BUCKET_NAME, KEY_NAME, content.length(), 1,
+        null, null, null, body);
+
+    // Assert
+    verify(spyEndpoint, never()).delete(any(), any(), any(), any());
+    assertEquals(200, response.getStatus());
   }
 }
