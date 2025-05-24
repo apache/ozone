@@ -1,0 +1,120 @@
+---
+title: Full Volume Handling
+summary: Immediately trigger Datanode heartbeat on detecting full volume
+date: 2025-05-12
+jira: HDDS-12929
+status: Design 
+author: Siddhant Sangwan, Sumit Agrawal
+---
+
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+
+## Summary
+On detecting a full Datanode volume during write, immediately trigger a heartbeat containing the latest storage report.
+
+## Problem
+When a Datanode volume is close to full, the SCM may not be immediately aware because storage reports are only sent 
+to it every thirty seconds. This can lead to the SCM allocating multiple blocks to containers on a full DN volume, 
+causing performance issues when the write fails. The proposal will partly solve this problem.
+
+### The definition of a full volume
+A volume is considered full if the following (existing) method returns true.
+```java
+  private boolean isVolumeFull(Container container) {
+    boolean isOpen = Optional.ofNullable(container)
+        .map(cont -> cont.getContainerState() == ContainerDataProto.State.OPEN)
+        .orElse(Boolean.FALSE);
+    if (isOpen) {
+      HddsVolume volume = container.getContainerData().getVolume();
+      StorageLocationReport volumeReport = volume.getReport();
+      boolean full = volumeReport.getUsableSpace() <= 0;
+      if (full) {
+        LOG.info("Container {} volume is full: {}", container.getContainerData().getContainerID(), volumeReport);
+      }
+      return full;
+    }
+    return false;
+  }
+```
+
+It accounts for available space, committed space, min free space and reserved space:
+```java
+  private static long getUsableSpace(
+      long available, long committed, long minFreeSpace) {
+    return available - committed - minFreeSpace;
+  }
+```
+
+In the future (https://issues.apache.org/jira/browse/HDDS-12151) we plan to fail a write if it's going to exceed the min free space boundary in a volume. To prevent this from happening often, SCM needs to stop allocating blocks to containers on such volumes in the first place.
+
+## Non Goals
+The proposed solution describes the complete solution at a high level, however HDDS-12929 will only add the initial Datanode side code for triggering a heartbeat on detecting a full volume + throttling logic.
+
+Failing the write if it exceeds the min free space boundary is not discussed here.
+
+## Proposed Solution
+
+### What does the Datanode do currently?
+
+In HddsDispatcher, on detecting that the volume being written to is close to full, we add a CloseContainerAction for
+that container. This is sent to the SCM in the next heartbeat and makes the SCM close that container. This reaction time
+ is OK for a container that is close to full, but not if the volume is close to full.
+
+### Proposal
+This is the proposal, explained via a diagram.
+
+![full-volume-handling.png](../../static/full-volume-handling.png)
+
+#### Throttling
+Throttling is required so the Datanode doesn't cause a heartbeat storm on detecting that some volumes are full in multiple write calls.
+The Datanode can throttle by ensuring that only one unplanned heartbeat is sent every heartbeat interval or 30 seconds,
+whichever is lower. Throttling should be enforced across multiple threads and different volumes.
+
+Here's a visualisation to explain this. The letters (A, B, C etc.) denote events and timestamp is the time at which 
+an event occurs.
+```
+Write Call 1:
+/ A, timestamp: 0/-------------/B, timestamp: 5/
+
+Write Call 2, in-parallel with 1:
+------------------------------ /C, timestamp: 5/
+
+Write Call 3, in-parallel with 1 and 2:
+---------------------------------------/D, timestamp: 7/
+
+Write Call 4:
+------------------------------------------------------------------------/E, timestamp: 35/
+
+Events:
+A: Last, regular heartbeat
+B: Volume 1 detected as full, heartbeat triggered
+C: Volume 1 again detected as full, heartbeat throttled
+D: Volume 2 detected as full, heartbeat throttled
+E: Volume 3 detected as full, heartbeat triggered (30 seconds after B) 
+```
+For code implementation, see https://github.com/apache/ozone/pull/8492.
+
+## Benefits
+1.  SCM will not include a Datanode in a new pipeline if all the volumes on it are full. The logic to do this already exists, we just update the volume stats in the SCM faster.
+2. Close to full volumes won't cause frequent write failures.
+
+## Alternatives
+Instead of including the list of containers present on the full volume in the Storage Report, we could instead add the volume ID to the Container Replica proto. In the SCM, this would imply that we need to do a linear scan through all the Container Replica objects present in the system to figure out which containers are present on the full volume, which is slow. Alternatively we could build and maintain a map to do this, which is more complex than the proposed solution.
+
+## Implementation Plan
+1. HDDS-13045: Initial code for including node report, triggering heartbeat, throttling.
+2. HDDS-12151: Fail a write call if it exceeds min free space boundary
+3. Future Jira: Handle full volume report on the SCM side - close containers.
+4. HDDS-12658: Try not to select full pipelines when allocating a block in SCM.
