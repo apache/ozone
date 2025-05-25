@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.Config;
@@ -58,7 +59,7 @@ public interface SpaceUsageCheckFactory {
    *
    * @throws UncheckedIOException if canonical path for {@code dir} cannot be resolved
    */
-  default SpaceUsageCheckParams paramsFor(File dir, File excludeDirPath) {
+  default SpaceUsageCheckParams paramsFor(File dir, Supplier<File> exclusionProvider) {
     return paramsFor(dir);
   }
 

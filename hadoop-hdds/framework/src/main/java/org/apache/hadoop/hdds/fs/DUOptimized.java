@@ -34,8 +34,8 @@ public class DUOptimized implements SpaceUsageSource {
   private final DU metaPathDU;
   private Supplier<Supplier<Long>> containerUsedSpaceProvider;
 
-  public DUOptimized(File path, String excludePattern) {
-    metaPathDU = new DU(path, excludePattern);
+  public DUOptimized(File path, Supplier<File> exclusionProvider) {
+    metaPathDU = new DU(path, exclusionProvider);
   }
 
   @Override

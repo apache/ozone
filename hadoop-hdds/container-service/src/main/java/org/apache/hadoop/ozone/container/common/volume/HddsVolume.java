@@ -384,6 +384,9 @@ public class HddsVolume extends StorageVolume {
 
   @Override
   public File getContainerDirsPath() {
+    if (getStorageState() != VolumeState.NORMAL) {
+      return null;
+    }
     File hddsVolumeRootDir = getHddsRootDir();
     //filtering storage directory
     File[] storageDirs = hddsVolumeRootDir.listFiles(File::isDirectory);

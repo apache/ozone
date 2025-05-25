@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.fs;
 
 import java.io.File;
 import java.time.Duration;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 /**
@@ -44,10 +45,9 @@ public class DUOptimizedFactory implements SpaceUsageCheckFactory {
   }
 
   @Override
-  public SpaceUsageCheckParams paramsFor(File dir, File storageDir) {
-    String excludePattern = null != storageDir ? storageDir.getAbsolutePath() : null;
+  public SpaceUsageCheckParams paramsFor(File dir, Supplier<File> exclusionProvider) {
     Duration refreshPeriod = conf.getRefreshPeriod();
-    DUOptimized source = new DUOptimized(dir, excludePattern);
+    DUOptimized source = new DUOptimized(dir, exclusionProvider);
     SpaceUsagePersistence persistence = new SaveSpaceUsageToFile(
         new File(dir, DU_CACHE_FILE), refreshPeriod);
 
