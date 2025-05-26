@@ -35,10 +35,10 @@ public class TestOmSnapshotDiffJobCodec {
     );
 
     // Step 2: Serialize using the old Jackson-based codec
-    byte[] oldFormatData = oldCodec.toPersistedFormat(original);
+    byte[] oldFormatData = oldCodec.toPersistedFormatImpl(original);
 
     // Step 3: Deserialize using the new default codec (with Protobuf + JSON fallback)
-    SnapshotDiffJob parsed = newCodec.fromPersistedFormat(oldFormatData);
+    SnapshotDiffJob parsed = newCodec.fromPersistedFormatImpl(oldFormatData);
 
     // Step 4: Verify critical fields remain consistent after round-trip
     assertEquals(original.getJobId(), parsed.getJobId());
