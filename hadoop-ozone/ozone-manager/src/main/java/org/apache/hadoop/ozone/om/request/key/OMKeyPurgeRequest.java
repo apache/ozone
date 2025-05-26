@@ -99,6 +99,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
     DeletingServiceMetrics deletingServiceMetrics = ozoneManager.getDeletionMetrics();
     deletingServiceMetrics.incrNumKeysPurged(numKeysDeleted);
+    deletingServiceMetrics.incrNumRenameEntriesPurged(renamedKeysToBePurged.size());
 
     if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
