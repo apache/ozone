@@ -240,7 +240,6 @@ public class TestSnapshotDirectoryCleaningService {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
         String snapshotName = snapshotEntry.getValue().getName();
         SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotEntry.getKey());
-        System.out.println(snapshotInfo.getName() + " " + snapshotInfo.getDeepCleanedDeletedDir());
         assertEquals(expectedSize.get(snapshotName),
             snapshotInfo.getExclusiveSize() + snapshotInfo.getExclusiveSizeDeltaFromDirDeepCleaning());
         // Since for the test we are using RATIS/THREE
