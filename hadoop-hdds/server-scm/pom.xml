@@ -41,6 +41,7 @@
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
+      <!-- <scope>test</scope> but transitive via hdds-server-framework -->
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -77,6 +78,7 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-compress</artifactId>
+      <!-- <scope>test</scope> but transitive via hdds-server-framework -->
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -97,6 +99,7 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-client</artifactId>
+      <!-- <scope>test</scope> but transitive via hdds-container-service -->
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>

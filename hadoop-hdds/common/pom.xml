@@ -179,10 +179,6 @@
       <artifactId>bcprov-jdk18on</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcutil-jdk18on</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.jetbrains.kotlin</groupId>
       <artifactId>kotlin-stdlib</artifactId>
     </dependency>
@@ -219,6 +215,11 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
       <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcutil-jdk18on</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
