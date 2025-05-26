@@ -316,8 +316,6 @@ public class TestOMKeyRequest {
     when(ozoneManager.isAdmin(any())).thenReturn(true);
     BatchOperation batchOperation = omMetadataManager.getStore()
         .initBatchOperation();
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
-    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     OzoneManagerProtocolProtos.OMRequest omRequest = OMRequestTestUtils
         .createSnapshotRequest(volume, bucket, snapshotName);
     // Pre-Execute OMSnapshotCreateRequest.

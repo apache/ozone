@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getOmKeyInfo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -219,6 +220,8 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
         1L, omMetadataManager);
     List<OmKeyInfo> subFiles = new ArrayList<>();
     List<OmKeyInfo> subDirs = new ArrayList<>();
+    List<String> subFileKeys = new ArrayList<>();
+    List<String> subDirKeys = new ArrayList<>();
     List<String> deletedSubDirKeys = new ArrayList<>();
     List<String> deletedSubFiles = new ArrayList<>();
     for (int id = 1; id < 10; id++) {
@@ -232,15 +235,16 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
           .build();
       String subDirectoryPath = OMRequestTestUtils.addDirKeyToDirTable(false, subdir, volumeName, bucket,
           2 * id, omMetadataManager);
-      System.out.println("Swaminathan " + subDirectoryPath);
+      subDirKeys.add(subDirectoryPath);
       OmKeyInfo subFile =
           OMRequestTestUtils.createOmKeyInfo(volumeName, bucket, "file" + id, RatisReplicationConfig.getInstance(ONE))
               .setObjectID(2 * id + 1)
               .setParentObjectID(dir1.getObjectID())
               .setUpdateID(100L)
               .build();
-      String subFilePath = OMRequestTestUtils.addFileToKeyTable(false, true, keyName,
+      String subFilePath = OMRequestTestUtils.addFileToKeyTable(false, true, subFile.getKeyName(),
           subFile, 1234L, 2 * id + 1, omMetadataManager);
+      subFileKeys.add(subFilePath);
       subFile.setKeyName("dir1/" + subFile.getKeyName());
       subFiles.add(subFile);
       subDirs.add(getOmKeyInfo(volumeName, bucket, subdir,
@@ -250,6 +254,13 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
           omMetadataManager.getOzoneKey(volumeName, bucket, subFile.getKeyName())));
     }
     String deletedDirKey = OMRequestTestUtils.deleteDir(dirKey, volumeName, bucket, omMetadataManager);
+    for (String subDirKey : subDirKeys) {
+      assertTrue(omMetadataManager.getDirectoryTable().isExist(subDirKey));
+    }
+    for (String subFileKey : subFileKeys) {
+      assertTrue(omMetadataManager.getFileTable().isExist(subFileKey));
+    }
+    assertFalse(omMetadataManager.getDirectoryTable().isExist(dirKey));
     SnapshotInfo snapshotInfo = null;
     if (fromSnapshot) {
       snapshotInfo = createSnapshot(volumeName, bucket, "snapshot");
@@ -273,6 +284,12 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
         deletedDirs.add(deletedDirKey);
       }
       validateDeletedDirs(metadataManager, deletedDirs);
+    }
+    for (String subDirKey : subDirKeys) {
+      assertFalse(omMetadataManager.getDirectoryTable().isExist(subDirKey));
+    }
+    for (String subFileKey : subFileKeys) {
+      assertFalse(omMetadataManager.getFileTable().isExist(subFileKey));
     }
   }
 
@@ -436,15 +453,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
   private void validateDeletedDirs(OMMetadataManager omMetadataManager,
       List<String> deletedDirs) throws IOException {
-    omMetadataManager.getDeletedDirTable().iterator().forEachRemaining(i -> {
-      try {
-        System.out.println("Swami " + i.getKey());
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    });
     for (String deletedDir : deletedDirs) {
-      System.out.println("Rishi " + deletedDir);
       assertTrue(omMetadataManager.getDeletedDirTable().isExist(
           deletedDir));
     }

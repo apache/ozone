@@ -1002,7 +1002,7 @@ public final class OMRequestTestUtils {
     OmKeyInfo omKeyInfo = getOmKeyInfo(volume, bucket, omDirectoryInfo,
         omDirectoryInfo.getName());
     omMetadataManager.getDeletedDirTable().put(ozoneKey, omKeyInfo);
-
+    omMetadataManager.getDirectoryTable().delete(ozoneKey);
     return ozoneKey;
   }
 
