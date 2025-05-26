@@ -676,7 +676,6 @@ public class TestEndPoint {
     // VolumeSet for this test, contains only 1 volume
     assertEquals(1, volumeSet.getVolumesList().size());
     StorageVolume volume = volumeSet.getVolumesList().get(0);
-    volumeSet.startAllVolume();
 
     // Check instanceof and typecast
     assertInstanceOf(HddsVolume.class, volume);

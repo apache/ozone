@@ -244,6 +244,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     assertEquals(initialUsedSpace, savedUsedSpace.get());
     assertEquals(expectedUsedSpace, volume.getCurrentUsage().getUsedSpace());
@@ -299,6 +300,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
     assertEquals(400, usage.getCapacity());
@@ -354,6 +356,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
     assertEquals(400, usage.getCapacity());
@@ -381,6 +384,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
     assertEquals(400, usage.getCapacity());

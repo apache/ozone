@@ -160,7 +160,6 @@ public class TestContainerPersistence {
           conf, null, null);
       assertTrue(success);
     }
-    volumeSet.startAllVolume();
     blockManager = new BlockManagerImpl(conf);
     chunkManager = ChunkManagerFactory.createChunkManager(conf, blockManager,
         null);
