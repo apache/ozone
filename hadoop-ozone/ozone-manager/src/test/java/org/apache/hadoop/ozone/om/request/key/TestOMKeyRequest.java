@@ -248,7 +248,13 @@ public class TestOMKeyRequest {
         .thenReturn(bucket);
     when(ozoneManager.resolveBucketLink(any(Pair.class),
         any(OMClientRequest.class)))
-        .thenReturn(bucket);
+        .thenAnswer(i -> {
+          Pair<String, String> bucketLink = i.getArgument(0);
+          OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+              omMetadataManager.getBucketKey(bucketLink.getKey(), bucketLink.getValue()));
+          return new ResolvedBucket(bucketLink.getKey(), bucketLink.getValue(),
+              bucketLink.getKey(), bucketLink.getValue(), bucketInfo.getOwner(), bucketInfo.getBucketLayout());
+        });
     when(ozoneManager.resolveBucketLink(any(Pair.class)))
         .thenReturn(bucket);
     OmSnapshotManager omSnapshotManager = Mockito.spy(new OmSnapshotManager(ozoneManager));
@@ -299,15 +305,21 @@ public class TestOMKeyRequest {
     framework().clearInlineMocks();
   }
 
+  protected SnapshotInfo createSnapshot(String snapshot) throws Exception {
+    return createSnapshot(volumeName, bucketName, snapshot);
+  }
+
   /**
    * Create snapshot and checkpoint directory.
    */
-  protected SnapshotInfo createSnapshot(String snapshotName) throws Exception {
+  protected SnapshotInfo createSnapshot(String volume, String bucket, String snapshotName) throws Exception {
     when(ozoneManager.isAdmin(any())).thenReturn(true);
     BatchOperation batchOperation = omMetadataManager.getStore()
         .initBatchOperation();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     OzoneManagerProtocolProtos.OMRequest omRequest = OMRequestTestUtils
-        .createSnapshotRequest(volumeName, bucketName, snapshotName);
+        .createSnapshotRequest(volume, bucket, snapshotName);
     // Pre-Execute OMSnapshotCreateRequest.
     OMSnapshotCreateRequest omSnapshotCreateRequest =
         TestOMSnapshotCreateRequest.doPreExecute(omRequest, ozoneManager);
@@ -320,8 +332,8 @@ public class TestOMKeyRequest {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
     batchOperation.close();
 
-    String key = SnapshotInfo.getTableKey(volumeName,
-        bucketName, snapshotName);
+    String key = SnapshotInfo.getTableKey(volume,
+        bucket, snapshotName);
     SnapshotInfo snapshotInfo =
         omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfo);
