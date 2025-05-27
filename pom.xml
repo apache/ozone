@@ -36,7 +36,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.3</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.31.40</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.31.50</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.80</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
@@ -127,7 +127,7 @@
     <jetty.version>9.4.57.v20241219</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.0</jline.version>
+    <jline.version>3.30.3</jline.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
@@ -2174,6 +2174,48 @@
           <groupId>com.coderplus.maven.plugins</groupId>
           <artifactId>copy-rename-maven-plugin</artifactId>
           <version>${copy-rename-maven-plugin.version}</version>
+          <executions>
+            <!--
+              If a new module is introduced with generated config:
+              - override ban-annotations execution of maven-enforcer-plugin
+              - configure maven-compiler-plugin with the ConfigFileGenerator annotationProcessor
+              - bind one or both of these rename executions
+              - add the module's name in OzoneConfiguration#activate
+              See hadoop-hdds/common/pom.xml for example.
+            -->
+            <execution>
+              <id>rename-generated-config</id>
+              <goals>
+                <goal>rename</goal>
+              </goals>
+              <!-- bind to process-classes in modules where needed -->
+              <phase>none</phase>
+              <configuration>
+                <fileSets>
+                  <fileSet>
+                    <sourceFile>${project.build.outputDirectory}/ozone-default-generated.xml</sourceFile>
+                    <destinationFile>${project.build.outputDirectory}/${project.artifactId}-default.xml</destinationFile>
+                  </fileSet>
+                </fileSets>
+              </configuration>
+            </execution>
+            <execution>
+              <id>rename-generated-test-config</id>
+              <goals>
+                <goal>rename</goal>
+              </goals>
+              <!-- bind to process-test-classes in modules where needed -->
+              <phase>none</phase>
+              <configuration>
+                <fileSets>
+                  <fileSet>
+                    <sourceFile>${project.build.testOutputDirectory}/ozone-default-generated.xml</sourceFile>
+                    <destinationFile>${project.build.testOutputDirectory}/${project.artifactId}-default.xml</destinationFile>
+                  </fileSet>
+                </fileSets>
+              </configuration>
+            </execution>
+          </executions>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -2190,6 +2232,25 @@
             </goals>
             <configuration>
               <ignoreNonCompile>true</ignoreNonCompile>
+              <excludedClasses>
+                <!-- disabled test -->
+                <excludedClass>org.apache.hadoop.ozone.om.service.TestRangerBGSyncService</excludedClass>
+              </excludedClasses>
+              <ignoredNonTestScopedDependencies>
+                <!--
+                  Ignore false positive "Non-test scoped test only dependencies": these are test-only in some module, compile scope transitively.
+                  See:
+                  - https://issues.apache.org/jira/browse/MDEP-791
+                  - https://issues.apache.org/jira/browse/MNG-6058
+                -->
+                <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-databind:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.commons:commons-compress:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.ozone:hdds-client:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.ozone:ozone-interface-client:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.glassfish.jersey.core:jersey-common:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.rocksdb:rocksdbjni:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.springframework:spring-core:jar</ignoredNonTestScopedDependency>
+              </ignoredNonTestScopedDependencies>
             </configuration>
           </execution>
           <execution>
