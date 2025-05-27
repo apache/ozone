@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -78,6 +79,7 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -126,6 +128,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     conf.setBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED, true);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT,
         10000, TimeUnit.MILLISECONDS);
+    conf.setInt(OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL, 500);
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 500);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500,
         TimeUnit.MILLISECONDS);
@@ -421,7 +424,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     assertTableRowCount(renamedTable, 4);
     assertTableRowCount(deletedDirTable, 3);
 
-    ReferenceCounted<OmSnapshot> rcSnap1 =
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap1 =
         om.getOmSnapshotManager().getSnapshot(
             VOLUME_NAME, BUCKET_NAME_FSO, "snap1");
     OmSnapshot snap1 = rcSnap1.get();
@@ -492,12 +495,12 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     KeyManager keyManager = Mockito.spy(om.getKeyManager());
     when(ozoneManager.getKeyManager()).thenReturn(keyManager);
     KeyDeletingService keyDeletingService = Mockito.spy(new KeyDeletingService(ozoneManager,
-        ozoneManager.getScmClient().getBlockClient(), keyManager, 10000,
-        100000, cluster.getConf(), false));
+        ozoneManager.getScmClient().getBlockClient(), 10000,
+        100000, cluster.getConf(), 10, false));
     keyDeletingService.shutdown();
     GenericTestUtils.waitFor(() -> keyDeletingService.getThreadCount() == 0, 1000,
         100000);
-    when(keyManager.getPendingDeletionKeys(anyInt())).thenAnswer(i -> {
+    when(keyManager.getPendingDeletionKeys(any(), anyInt())).thenAnswer(i -> {
       // wait for SDS to reach the KDS wait block before processing any key.
       GenericTestUtils.waitFor(keyDeletionWaitStarted::get, 1000, 100000);
       keyDeletionStarted.set(true);
@@ -613,8 +616,9 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     List<Table.KeyValue<String, String>> renamesKeyEntries;
     List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries;
     List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries;
-    try (ReferenceCounted<OmSnapshot> snapshot = om.getOmSnapshotManager().getSnapshot(testBucket.getVolumeName(),
-        testBucket.getName(), testBucket.getName() + "snap2")) {
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
+             om.getOmSnapshotManager().getSnapshot(testBucket.getVolumeName(), testBucket.getName(),
+                 testBucket.getName() + "snap2")) {
       renamesKeyEntries = snapshot.get().getKeyManager().getRenamesKeyEntries(testBucket.getVolumeName(),
           testBucket.getName(), "", 1000);
       deletedKeyEntries = snapshot.get().getKeyManager().getDeletedKeyEntries(testBucket.getVolumeName(),
@@ -649,8 +653,9 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     Future<?> future = snapshotDeletingThread.submit(snapshotDeletionRunnable);
     GenericTestUtils.waitFor(snapshotDeletionStarted::get, 1000, 30000);
     future.get();
-    try (ReferenceCounted<OmSnapshot> snapshot = om.getOmSnapshotManager().getSnapshot(testBucket.getVolumeName(),
-        testBucket.getName(), testBucket.getName() + "snap2")) {
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
+             om.getOmSnapshotManager().getSnapshot(testBucket.getVolumeName(), testBucket.getName(),
+                 testBucket.getName() + "snap2")) {
       Assertions.assertEquals(Collections.emptyList(),
           snapshot.get().getKeyManager().getRenamesKeyEntries(testBucket.getVolumeName(),
           testBucket.getName(), "", 1000));

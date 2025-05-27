@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.shell.keys;
 
-import static org.apache.hadoop.fs.ozone.OzoneClientUtils.getFileChecksumWithCombineMode;
+import static org.apache.hadoop.ozone.client.OzoneClientUtils.getFileChecksumWithCombineMode;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import java.io.IOException;

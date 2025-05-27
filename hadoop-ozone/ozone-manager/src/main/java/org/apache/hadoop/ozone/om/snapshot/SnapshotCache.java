@@ -26,10 +26,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -141,7 +143,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
    * @param key SnapshotId
    * @return an OmSnapshot instance, or null on error
    */
-  public ReferenceCounted<OmSnapshot> get(UUID key) throws IOException {
+  public UncheckedAutoCloseableSupplier<OmSnapshot> get(UUID key) throws IOException {
     // Warn if actual cache size exceeds the soft limit already.
     if (size() > cacheSizeLimit) {
       LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).",
@@ -181,7 +183,23 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       throw new OMException("SnapshotId: '" + key + "' not found, or the snapshot is no longer active.",
           OMException.ResultCodes.FILE_NOT_FOUND);
     }
-    return rcOmSnapshot;
+    return new UncheckedAutoCloseableSupplier<OmSnapshot>() {
+      private AtomicReference<Boolean> closed = new AtomicReference<>(false);
+      @Override
+      public OmSnapshot get() {
+        return rcOmSnapshot.get();
+      }
+
+      @Override
+      public void close() {
+        closed.updateAndGet(alreadyClosed -> {
+          if (!alreadyClosed) {
+            rcOmSnapshot.decrementRefCount();
+          }
+          return true;
+        });
+      }
+    };
   }
 
   /**
@@ -244,5 +262,9 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       pendingEvictionQueue.add(((OmSnapshot) referenceCounted.get())
           .getSnapshotID());
     }
+  }
+
+  long totalRefCount(UUID key) {
+    return dbMap.containsKey(key) ? dbMap.get(key).getTotalRefCount() : 0;
   }
 }
