@@ -146,10 +146,6 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
-      <artifactId>ratis-metrics-dropwizard3</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-netty</artifactId>
     </dependency>
     <dependency>
@@ -197,6 +193,11 @@
       <groupId>org.glassfish.jaxb</groupId>
       <artifactId>jaxb-runtime</artifactId>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-metrics-dropwizard3</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
