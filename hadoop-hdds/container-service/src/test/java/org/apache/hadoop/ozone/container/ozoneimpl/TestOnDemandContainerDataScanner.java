@@ -88,10 +88,10 @@ public class TestOnDemandContainerDataScanner extends
   public void testBypassScanGap() throws Exception {
     setScannedTimestampRecent(healthy);
 
-    Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(healthy);
-    if (scanFuture.isPresent()) {
-      scanFuture.get().get();
-    }
+    Optional<Future<?>> scanFutureOptional = onDemandScanner.scanContainerWithoutGap(healthy);
+    assertTrue(scanFutureOptional.isPresent());
+    Future<?> scanFuture = scanFutureOptional.get();
+    scanFuture.get();
     verify(healthy, times(1)).scanData(any(), any());
   }
 

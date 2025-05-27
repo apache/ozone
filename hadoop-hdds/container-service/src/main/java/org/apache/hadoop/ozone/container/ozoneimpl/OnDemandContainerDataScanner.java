@@ -85,7 +85,7 @@ public final class OnDemandContainerDataScanner {
     long containerId = container.getContainerData().getContainerID();
     if (addContainerToScheduledContainers(containerId)) {
       resultFuture = scanExecutor.submit(() -> {
-        performOnDemandScan(container);
+        performOnDemandScan(container, helper);
         removeContainerFromScheduledContainers(containerId);
       });
     }
@@ -101,9 +101,9 @@ public final class OnDemandContainerDataScanner {
     containerRescheduleCheckSet.remove(containerId);
   }
 
-  private void performOnDemandScan(Container<?> container) {
+  private void performOnDemandScan(Container<?> container, ContainerScanHelper helper) {
     try {
-      scannerHelper.scanData(container, throttler, canceler);
+      helper.scanData(container, throttler, canceler);
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
           + container.getContainerData().getContainerID(), e);
