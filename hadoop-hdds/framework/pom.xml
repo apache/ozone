@@ -249,6 +249,12 @@
       <artifactId>slf4j-reload4j</artifactId>
     </dependency>
     <dependency>
+      <!-- required for HttpServer2 -->
+      <groupId>org.slf4j</groupId>
+      <artifactId>jcl-over-slf4j</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <!-- required for async logging in Log4j2 -->
       <groupId>com.lmax</groupId>
       <artifactId>disruptor</artifactId>
