@@ -66,7 +66,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
       this.rawIterator = ReferenceCountedObject.wrap(itr, () -> { },
           (completelyReleased) -> {
             if (completelyReleased) {
-              closeRawIterator(true);
+              closeRawIteratorWithLock();
             }
             this.maxNumberOfAdditionalSplits.incrementAndGet();
           });
@@ -85,7 +85,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
       if (!closed && this.rawIterator.get().hasNext()) {
         kv = rawIterator.get().next();
       } else {
-        closeRawIterator(false);
+        closeRawIterator();
         return false;
       }
     } finally {
@@ -99,7 +99,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
       return false;
     } catch (Throwable e) {
       if (closeOnException) {
-        closeRawIterator(true);
+        closeRawIteratorWithLock();
       }
       throw new IllegalStateException("Failed next()", e);
     }
@@ -127,20 +127,24 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
     return null;
   }
 
-  private void closeRawIterator(boolean acquireLock) {
+  private void closeRawIterator() {
     if (!closed) {
-      if (acquireLock) {
-        this.lock.lock();
-      }
       try {
         closed = true;
         this.rawIterator.get().close();
       } catch (IOException e) {
         closeException.set(e);
+      }
+    }
+  }
+
+  private void closeRawIteratorWithLock() {
+    if (!closed) {
+      this.lock.lock();
+      try {
+        closeRawIterator();
       } finally {
-        if (acquireLock) {
-          this.lock.unlock();
-        }
+        this.lock.unlock();
       }
     }
   }
