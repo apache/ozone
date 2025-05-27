@@ -46,7 +46,7 @@ public class DU extends AbstractSpaceUsageSource {
   private final Supplier<File> exclusionProvider;
 
   public DU(File path) {
-    this(path, (String) null);
+    this(path, null);
   }
 
   public DU(File path, String excludePattern) {
@@ -58,7 +58,7 @@ public class DU extends AbstractSpaceUsageSource {
     exclusionProvider = null;
   }
 
-  public DU(File path, Supplier<File> exclusionProvider) {
+  public DU(Supplier<File> exclusionProvider, File path) {
     super(path);
 
     this.exclusionProvider = exclusionProvider;
