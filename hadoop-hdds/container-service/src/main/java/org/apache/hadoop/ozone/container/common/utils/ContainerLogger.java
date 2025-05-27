@@ -149,6 +149,18 @@ public final class ContainerLogger {
   }
 
   /**
+   * Logged when a container's checksum is updated.
+   *
+   * @param containerData The container which has the updated data checksum.
+   * @param oldDataChecksum The old data checksum.
+   */
+  public static void logChecksumUpdated(ContainerData containerData, long oldDataChecksum) {
+    LOG.warn(getMessage(containerData,
+        "Container data checksum updated from " + checksumToString(oldDataChecksum) + " to "
+            + checksumToString(containerData.getDataChecksum())));
+  }
+
+  /**
    * Logged when a container is reconciled.
    *
    * @param containerData The container that was reconciled on this datanode.

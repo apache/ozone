@@ -383,8 +383,6 @@ public class OzoneContainer {
       return;
     }
 
-    initOnDemandContainerScanner(c);
-
     backgroundScanners = new LinkedList<>();
     // This config is for testing the scanners in isolation.
     if (c.isMetadataScanEnabled()) {
@@ -394,6 +392,7 @@ public class OzoneContainer {
     // This config is for testing the scanners in isolation.
     if (c.isDataScanEnabled()) {
       initContainerScanner(c);
+      initOnDemandContainerScanner(c);
     }
   }
 
@@ -406,7 +405,7 @@ public class OzoneContainer {
     dataScanners = new ArrayList<>();
     for (StorageVolume v : volumeSet.getVolumesList()) {
       BackgroundContainerDataScanner s =
-          new BackgroundContainerDataScanner(c, controller, (HddsVolume) v, checksumTreeManager);
+          new BackgroundContainerDataScanner(c, controller, (HddsVolume) v);
       s.start();
       dataScanners.add(s);
       backgroundScanners.add(s);
@@ -441,7 +440,7 @@ public class OzoneContainer {
       return;
     }
     onDemandScanner = new OnDemandContainerDataScanner(c, controller);
-    containerSet.registerContainerScanHandler(onDemandScanner::scanContainer);
+    containerSet.registerOnDemandScanner(onDemandScanner);
   }
 
   /**

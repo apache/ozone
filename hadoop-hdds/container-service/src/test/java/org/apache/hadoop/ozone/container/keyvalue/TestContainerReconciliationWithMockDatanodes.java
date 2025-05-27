@@ -89,6 +89,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
@@ -184,8 +185,7 @@ public class TestContainerReconciliationWithMockDatanodes {
     }
   }
 
-  // TODO HDDS-10374 once on-demand scanner can build merkle trees this test should pass.
-  // @ParameterizedTest
+  @ParameterizedTest
   @MethodSource("corruptionValues")
   public void testContainerReconciliation(int numBlocksToDelete, int numChunksToCorrupt) throws Exception {
     LOG.info("Healthy data checksum for container {} in this test is {}", CONTAINER_ID,
@@ -225,13 +225,13 @@ public class TestContainerReconciliationWithMockDatanodes {
    * Uses the on-demand container scanner metrics to wait for the expected number of on-demand scans to complete on
    * every datanode.
    */
-  private void waitForExpectedScanCount(int expectedCount) throws Exception {
+  private void waitForExpectedScanCount(int expectedCountPerDatanode) throws Exception {
     for (MockDatanode datanode: datanodes) {
       try {
-        GenericTestUtils.waitFor(() -> datanode.getOnDemandScanCount() == expectedCount, 100, 10_000);
+        GenericTestUtils.waitFor(() -> datanode.getOnDemandScanCount() == expectedCountPerDatanode, 100, 10_000);
       } catch (TimeoutException ex) {
         LOG.error("Timed out waiting for on-demand scan count {} to reach expected count {} on datanode {}",
-            datanode.getOnDemandScanCount(), expectedCount, datanode);
+            datanode.getOnDemandScanCount(), expectedCountPerDatanode, datanode);
         throw ex;
       }
     }
@@ -325,7 +325,7 @@ public class TestContainerReconciliationWithMockDatanodes {
       onDemandScanner = new OnDemandContainerDataScanner(
           conf.getObject(ContainerScannerConfiguration.class), controller);
       // Register the on-demand container scanner with the container set used by the KeyValueHandler.
-      containerSet.registerContainerScanHandler(onDemandScanner::scanContainer);
+      containerSet.registerOnDemandScanner(onDemandScanner);
     }
 
     public DatanodeDetails getDnDetails() {
@@ -420,7 +420,7 @@ public class TestContainerReconciliationWithMockDatanodes {
      * Triggers a synchronous scan of the container. This method will block until the scan completes.
      */
     public void scanContainer(long containerID) {
-      Optional<Future<?>> scanFuture = onDemandScanner.scanContainer(containerSet.getContainer(containerID));
+      Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID));
       assertTrue(scanFuture.isPresent());
 
       try {
