@@ -32,7 +32,7 @@ import org.slf4j.Logger;
 /**
  * Mixin to handle common data and metadata scan operations among background and on-demand scanners.
  */
-public class ContainerScanHelper {
+public final class ContainerScanHelper {
   private final Logger log;
   private final ContainerController controller;
   private final AbstractContainerScannerMetrics metrics;
