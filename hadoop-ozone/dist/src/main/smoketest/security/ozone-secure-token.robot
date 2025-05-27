@@ -83,6 +83,7 @@ Token Test in Unsecure Cluster
 
 *** Test Cases ***
 Token Test
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if    '${SECURITY_ENABLED}' == 'false'   Token Test in Unsecure Cluster
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Token Test in Secure Cluster
     Print Nonexistent Token File

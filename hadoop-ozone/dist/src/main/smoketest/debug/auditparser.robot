@@ -46,6 +46,7 @@ Testing audit parser
     ${result} =        Execute              ozone debug auditparser "${auditworkdir}/audit.db" template top5cmds
                        Should Contain       ${result}  ALLOCATE_KEY
     ${result} =        Execute              ozone debug auditparser "${auditworkdir}/audit.db" template top5users
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword If     '${SECURITY_ENABLED}' == 'true'      Set username
                        Should Contain       ${result}  ${user}
     ${result} =        Execute              ozone debug auditparser "${auditworkdir}/audit.db" query "select count(*) from audit where op='CREATE_VOLUME' and RESULT='SUCCESS'"

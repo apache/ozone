@@ -40,6 +40,7 @@ List buckets
 
 
 Get bucket info with Ozone Shell to check the owner field
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
     ${result} =         Execute             ozone sh bucket info /s3v/${BUCKET} | jq -r '.owner'
                         Should Be Equal     ${result}       testuser

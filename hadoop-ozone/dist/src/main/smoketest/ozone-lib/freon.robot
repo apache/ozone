@@ -14,21 +14,22 @@
 # limitations under the License.
 
 *** Settings ***
-Resource            ../lib/os.robot
+Resource            ../commonlib.robot
 
 *** Variables ***
 ${OM_HA_PARAM}         ${EMPTY}
-${SECURITY_ENABLED}    false
 
 *** Keywords ***
 Freon DCG
     [arguments]    ${prefix}=dcg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
+    ${SECURITY_ENABLED} =     Get Security Enabled From Config
     Return From Keyword If    '${SECURITY_ENABLED}' == 'true'
     ${result} =        Execute          ozone freon dcg -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}
 
 Freon DCV
     [arguments]    ${prefix}=dcg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
+    ${SECURITY_ENABLED} =     Get Security Enabled From Config
     Return From Keyword If    '${SECURITY_ENABLED}' == 'true'
     ${result} =        Execute          ozone freon dcv -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}

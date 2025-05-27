@@ -33,24 +33,28 @@ ${SECURITY_ENABLED}   true
 *** Test Cases ***
 
 S3 Gateway Revoke Secret
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
                         Execute                             ozone s3 getsecret ${OM_HA_PARAM}
     ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret
                         Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
 
 S3 Gateway Revoke Secret By Username
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
                         Execute                             ozone s3 getsecret -u testuser ${OM_HA_PARAM}
     ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser
                         Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
 
 S3 Gateway Revoke Secret By Username For Other User
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
                         Execute                             ozone s3 getsecret -u testuser2 ${OM_HA_PARAM}
     ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser2
                         Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
 
 S3 Gateway Reject Secret Revoke By Non-admin User
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
     Run Keyword                                             Kinit test user   testuser2   testuser2.keytab
     ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser

@@ -24,7 +24,6 @@ Resource            ../ozone-lib/shell.robot
 Test Timeout        20 minutes
 
 *** Variables ***
-${SECURITY_ENABLED}                 false
 ${HOST}                             datanode1
 ${VOLUME}                           volume1
 ${BUCKET}                           bucket1
@@ -34,6 +33,7 @@ ${SIZE}                             104857600
 ** Keywords ***
 Prepare For Tests
     Execute             dd if=/dev/urandom of=/tmp/100mb bs=1048576 count=100
+    ${SECURITY_ENABLED} =   Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user    testuser    testuser.keytab
     Execute                 ozone sh volume create /${VOLUME}
     Execute                 ozone sh bucket create --replication ${REPLICATION} --type ${TYPE} /${VOLUME}/${BUCKET}

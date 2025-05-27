@@ -50,6 +50,7 @@ Get object from s3
 
 #This test depends on the previous test case. Can't be executed alone
 Get object with wrong signature
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If          '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
     ${result} =                 Execute and Ignore Error   curl -i -H 'Authorization: AWS scm/scm@EXAMPLE.COM:asdfqwerty' ${ENDPOINT_URL}/${BUCKET}/${PREFIX}/putobject/key=value/f1
                                 Should contain             ${result}        403 Forbidden

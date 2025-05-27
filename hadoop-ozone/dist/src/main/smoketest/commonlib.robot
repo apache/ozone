@@ -31,6 +31,16 @@ Get test user principal
     ${instance} =       Execute                    hostname | sed 's/scm[0-9].org/scm/;s/scm[0-9]/scm/;s/om[0-9]/om/'
     [return]            ${user}/${instance}@EXAMPLE.COM
 
+Get Security Enabled From Config
+    ${conf_dir} =    Get Environment Variable    OZONE_CONF_DIR
+    ${file} =     Set Variable    ${conf_dir}/ozone-site.xml
+    ${value} =    Execute    sed -n "/<name>ozone.security.enabled<\\/name>/,/<\\/property>/s|.*<value>\\(.*\\)</value>.*|\\1|p" ${file} | head -n1 | xargs
+    IF    '${value}' != 'true' and '${value}' != 'false'
+           ${value} =    Set Variable    false
+    END
+    Set Global Variable      ${SECURITY_ENABLED}     ${value}
+    [return]                 ${SECURITY_ENABLED}
+
 Kinit HTTP user
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
     ${principal} =      Get test user principal    HTTP
@@ -50,6 +60,7 @@ Access should be denied
 
 Requires admin privilege
     [arguments]    ${command}
-    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip privilege check in unsecure cluster
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'   Skip privilege check in unsecure cluster
     Kinit test user     testuser2     testuser2.keytab
     Access should be denied    ${command}

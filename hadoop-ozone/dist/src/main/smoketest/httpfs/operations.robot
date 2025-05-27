@@ -24,6 +24,7 @@ ${URL}                  http://httpfs:14000/webhdfs/v1/
 *** Keywords ***
 Execute curl command
     [Arguments]       ${path}           ${operation}    ${extra_commands}
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     ${user.name} =    Set Variable If   '${SECURITY_ENABLED}'=='false'   &user.name=${USERNAME}      ${EMPTY}
     ${final_url} =    Catenate          SEPARATOR=      ${URL}  ${path}  ?op=  ${operation}     ${user.name}
     ${curl_extra_commands} =            Set Variable If     '${SECURITY_ENABLED}'=='true'       --negotiate -u :    ${EMPTY}
@@ -33,6 +34,7 @@ Execute curl command
 
 Execute create file command
     [Arguments]       ${path}           ${file_name}
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     ${user.name} =    Set Variable If   '${SECURITY_ENABLED}'=='false'   &user.name=${USERNAME}      ${EMPTY}
     ${curl_extra_commands} =            Set Variable If     '${SECURITY_ENABLED}'=='true'       --negotiate -u :    ${EMPTY}
     ${final_url} =    Catenate          SEPARATOR=      ${URL}  ${path}  ?op=CREATE     ${user.name}

@@ -26,6 +26,7 @@ ${SCM}       scm
 
 *** Keywords ***
 Create test data
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
                         Execute          ozone freon ockg -n1 -t1 -p container
 
@@ -170,4 +171,5 @@ Cannot create container without admin privilege
     Requires admin privilege    ozone admin container create
 
 Reset user
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab

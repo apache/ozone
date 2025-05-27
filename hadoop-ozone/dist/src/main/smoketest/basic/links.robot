@@ -33,6 +33,7 @@ Create volumes
     Set Suite Variable  ${target}  ${random}-target
     Ozone Shell Batch   volume create ${source}
     ...                 volume create ${target}
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'    Setup ACL tests
 
 Setup ACL tests
@@ -77,6 +78,7 @@ ACL verified on source and target bucket
                         Should Contain              ${result}         PERMISSION_DENIED
 
 Create link loop
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
                         Ozone Shell Batch   bucket link ${target}/loop1 ${target}/loop2
                         ...                 bucket link ${target}/loop2 ${target}/loop3
@@ -193,12 +195,15 @@ Buckets and links share namespace
                         Should Contain              ${result}    BUCKET_ALREADY_EXISTS
 
 Can follow link with read access
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Can follow link with read access
 
 Cannot follow link without read access
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Cannot follow link without read access
 
 ACL verified on source and target bucket
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    ACL verified on source and target bucket
 
 Loop in link chain is detected

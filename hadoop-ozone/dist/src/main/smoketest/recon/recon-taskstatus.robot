@@ -36,6 +36,7 @@ ${KEYPATH}                ${VOLUME}/${BUCKET}/testkey
 *** Keywords ***
 
 Kinit as ozone admin
+    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
 
 Sync OM Data
