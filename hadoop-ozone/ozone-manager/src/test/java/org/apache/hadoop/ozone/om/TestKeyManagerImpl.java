@@ -176,7 +176,7 @@ public class TestKeyManagerImpl {
     Table<String, String> mockedRenameTable = Mockito.mock(Table.class);
     when(metadataManager.getSnapshotRenamedTable()).thenReturn(mockedRenameTable);
     CheckedFunction<Table.KeyValue<String, String>, Boolean, IOException> filter =
-        (kv) -> Long.parseLong(kv.getKey().split(keyPrefix)[1]) % 2 == 0;
+        (kv) -> Long.parseLong(kv.getKey().split("/")[3]) % 2 == 0;
     List<Table.KeyValue<String, String>> expectedEntries = mockTableIterator(
         String.class, mockedRenameTable, numberOfVolumes, numberOfBucketsPerVolume, numberOfKeysPerBucket,
         volumeNamePrefix, bucketNamePrefix, keyPrefix, volumeNumber, bucketNumber, startVolumeNumber, startBucketNumber,
