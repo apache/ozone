@@ -279,7 +279,7 @@ public final class OMRequestTestUtils {
    * Add key entry to SnapshotRenamedTable.
    */
   public static String addRenamedEntryToTable(long trxnLogIndex, String volumeName, String bucketName, String key,
-                                            OMMetadataManager omMetadataManager) throws Exception {
+      OMMetadataManager omMetadataManager) throws Exception {
     String renameKey = omMetadataManager.getRenameKey(volumeName, bucketName, trxnLogIndex);
     omMetadataManager.getSnapshotRenamedTable().put(renameKey, key);
     return renameKey;
