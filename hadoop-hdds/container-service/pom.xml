@@ -191,10 +191,6 @@
       <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.glassfish.jaxb</groupId>
-      <artifactId>jaxb-runtime</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.rocksdb</groupId>
       <artifactId>rocksdbjni</artifactId>
     </dependency>
@@ -225,6 +221,11 @@
       <!-- StorageLocation in hadoop-hdfs requires HdfsConfiguration from hadoop-hdfs-client -->
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs-client</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
       <scope>runtime</scope>
     </dependency>
 

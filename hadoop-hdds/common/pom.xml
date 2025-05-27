@@ -97,6 +97,7 @@
       <artifactId>jakarta.annotation-api</artifactId>
     </dependency>
     <dependency>
+      <!-- for the annotations in OzoneConfiguration -->
       <groupId>jakarta.xml.bind</groupId>
       <artifactId>jakarta.xml.bind-api</artifactId>
     </dependency>
@@ -179,12 +180,6 @@
     <dependency>
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>
-    </dependency>
-    <!-- for the annotations in OzoneConfiguration -->
-    <dependency>
-      <groupId>org.glassfish.jaxb</groupId>
-      <artifactId>jaxb-runtime</artifactId>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>io.jaegertracing</groupId>
