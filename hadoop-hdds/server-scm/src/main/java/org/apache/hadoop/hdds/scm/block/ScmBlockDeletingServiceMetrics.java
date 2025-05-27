@@ -179,6 +179,11 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
         .incrCommandsFailure(delta);
   }
 
+  public void incrDNCommandsTimeout(DatanodeID id, long delta) {
+    numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
+        .incrCommandsTimeout(delta);
+  }
+
   public long getNumBlockDeletionCommandSent() {
     return numBlockDeletionCommandSent.value();
   }
@@ -248,7 +253,9 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
           .addGauge(DatanodeCommandCounts.COMMANDS_SUCCESSFUL_EXECUTION_BY_DN,
               e.getValue().getCommandsSuccess())
           .addGauge(DatanodeCommandCounts.COMMANDS_FAILED_EXECUTION_BY_DN,
-              e.getValue().getCommandsFailure());
+              e.getValue().getCommandsFailure())
+          .addGauge(DatanodeCommandCounts.COMMANDS_TIMEOUT_BY_DN, 
+              e.getValue().getCommandsTimeout());
     }
     recordBuilder.endRecord();
   }
@@ -260,6 +267,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     private long commandsSent;
     private long commandsSuccess;
     private long commandsFailure;
+    private long commandsTimeout;
 
     private static final MetricsInfo COMMANDS_SENT_TO_DN = Interns.info(
         "CommandsSent",
@@ -270,11 +278,17 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     private static final MetricsInfo COMMANDS_FAILED_EXECUTION_BY_DN = Interns.info(
         "CommandsFailed",
         "Number of commands sent from SCM to the datanode for deletion for which execution failed.");
+    
+    private static final MetricsInfo COMMANDS_TIMEOUT_BY_DN = Interns.info(
+        "CommandsTimeout",
+        "Number of commands timeout from SCM to DN"
+    );
 
     public DatanodeCommandCounts() {
       this.commandsSent = 0;
       this.commandsSuccess = 0;
       this.commandsFailure = 0;
+      this.commandsTimeout = 0;
     }
 
     public void incrCommandsSent(long delta) {
@@ -288,6 +302,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     public void incrCommandsFailure(long delta) {
       this.commandsFailure += delta;
     }
+    
+    public void incrCommandsTimeout(long delta) {
+      this.commandsTimeout += delta;
+    }
 
     public long getCommandsSent() {
       return commandsSent;
@@ -300,10 +318,15 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     public long getCommandsFailure() {
       return commandsFailure;
     }
+    
+    public long getCommandsTimeout() {
+      return commandsTimeout;
+    }
 
     @Override
     public String toString() {
-      return "Sent=" + commandsSent + ", Success=" + commandsSuccess + ", Failed=" + commandsFailure;
+      return "Sent=" + commandsSent + ", Success=" + commandsSuccess + ", Failed=" + commandsFailure + 
+          ", Timeout=" + commandsTimeout;
     }
   }
 
