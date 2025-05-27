@@ -21,7 +21,6 @@ x-debug-tools-config:
   image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
   env_file:
     - ./docker-config
- #   - ./docker-config-debug-tools
 
 x-volumes:
   - &keytabs ../_keytabs:/etc/security/keytabs
