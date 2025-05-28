@@ -241,7 +241,6 @@ share/ozone/lib/picocli.jar
 share/ozone/lib/picocli-shell-jline3.jar
 share/ozone/lib/protobuf-java.jar
 share/ozone/lib/protobuf-java.jar
-share/ozone/lib/protobuf-java-util.jar
 share/ozone/lib/proto-google-common-protos.jar
 share/ozone/lib/ranger-intg.jar
 share/ozone/lib/ranger-plugin-classloader.jar

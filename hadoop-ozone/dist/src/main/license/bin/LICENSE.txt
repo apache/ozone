@@ -479,7 +479,6 @@ BSD 3-Clause
 
    com.github.vlsi.mxgraph:jgraphx
    com.google.protobuf:protobuf-java
-   com.google.protobuf:protobuf-java-util
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer
