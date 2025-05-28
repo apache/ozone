@@ -131,7 +131,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
     try {
       if (!closed && this.rawIterator.get().hasNext()) {
         kv = rawIterator.get().next();
-        if (boundaryKeys.get(boundIndex) != null && compare(kv.getKey(), boundaryKeys.get(boundIndex)) >= 0) {
+        while (boundaryKeys.get(boundIndex) != null && compare(kv.getKey(), boundaryKeys.get(boundIndex)) >= 0) {
           boundIndex++;
           if (boundIndex >= boundaryKeys.size()) {
             closeRawIterator();
