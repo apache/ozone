@@ -91,4 +91,5 @@ export type ContainerState = {
   underReplicatedContainerData: Container[];
   overReplicatedContainerData: Container[];
   misReplicatedContainerData: Container[];
+  mismatchedReplicaContainerData: Container[];
 }
