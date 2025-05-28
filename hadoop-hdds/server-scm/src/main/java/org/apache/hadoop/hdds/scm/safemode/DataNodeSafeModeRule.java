@@ -17,12 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import java.util.HashSet;
-import java.util.Set;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
@@ -40,9 +36,6 @@ public class DataNodeSafeModeRule extends
 
   // Min DataNodes required to exit safe mode.
   private int requiredDns;
-  private int registeredDns = 0;
-  // Set to track registered DataNodes.
-  private final Set<DatanodeID> registeredDnSet;
   private NodeManager nodeManager;
 
   public DataNodeSafeModeRule(EventQueue eventQueue,
@@ -53,47 +46,29 @@ public class DataNodeSafeModeRule extends
     requiredDns = conf.getInt(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);
-    registeredDnSet = new HashSet<>(requiredDns * 2);
     this.nodeManager = nodeManager;
   }
 
   @Override
   protected TypedEvent<NodeRegistrationContainerReport> getEventType() {
-    return SCMEvents.NODE_REGISTRATION_CONT_REPORT;
+    return null;
   }
 
   @Override
   protected boolean validate() {
-    if (validateBasedOnReportProcessing()) {
-      return registeredDns >= requiredDns;
-    }
     return nodeManager.getNodes(NodeStatus.inServiceHealthy()).size() >= requiredDns;
   }
 
   @Override
-  protected void process(NodeRegistrationContainerReport reportsProto) {
-
-    registeredDnSet.add(reportsProto.getDatanodeDetails().getID());
-    registeredDns = registeredDnSet.size();
-
-    if (scmInSafeMode()) {
-      SCMSafeModeManager.getLogger().info(
-          "SCM in safe mode. {} DataNodes registered, {} required.",
-          registeredDns, requiredDns);
-    }
-
-  }
-
-  @Override
   protected void cleanup() {
-    registeredDnSet.clear();
+    // No longer needed as registeredDnSet is removed.
   }
 
   @Override
   public String getStatusText() {
-    return String
-        .format("registered datanodes (=%d) >= required datanodes (=%d)",
-            this.registeredDns, this.requiredDns);
+    return String.format(
+        "healthy in-service datanodes (=%d) >= required datanodes (=%d)",
+        nodeManager.getNodes(NodeStatus.inServiceHealthy()).size(), this.requiredDns);
   }
 
   @Override

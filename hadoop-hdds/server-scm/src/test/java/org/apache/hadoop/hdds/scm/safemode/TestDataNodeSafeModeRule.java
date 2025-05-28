@@ -32,17 +32,9 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
@@ -56,8 +48,8 @@ public class TestDataNodeSafeModeRule {
   private Path tempDir;
   private DataNodeSafeModeRule rule;
   private EventQueue eventQueue;
-  private SCMServiceManager serviceManager;
-  private SCMContext scmContext;
+  // private SCMServiceManager serviceManager; // Removed
+  // private SCMContext scmContext; // Removed
   private NodeManager nodeManager;
 
   private void setup(int requiredDns) throws Exception {
@@ -67,23 +59,29 @@ public class TestDataNodeSafeModeRule {
     ozoneConfiguration.setInt(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, requiredDns);
 
-    List<ContainerInfo> containers =
-        new ArrayList<>(HddsTestUtils.getContainerInfo(1));
+    // List<ContainerInfo> containers = // Removed
+    //     new ArrayList<>(HddsTestUtils.getContainerInfo(1)); // Removed
     nodeManager = mock(NodeManager.class);
-    ContainerManager containerManager = mock(ContainerManager.class);
-    when(containerManager.getContainers()).thenReturn(containers);
+    // ContainerManager containerManager = mock(ContainerManager.class); // Removed
+    // when(containerManager.getContainers()).thenReturn(containers); // Removed
     eventQueue = new EventQueue();
-    serviceManager = new SCMServiceManager();
-    scmContext = SCMContext.emptyContext();
+    // serviceManager = new SCMServiceManager(); // Removed
+    // scmContext = SCMContext.emptyContext(); // Removed
 
-    SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(ozoneConfiguration,
-        nodeManager, null, containerManager, serviceManager, eventQueue, scmContext);
-    scmSafeModeManager.start();
+    // SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(ozoneConfiguration, // Original line
+    //     nodeManager, null, containerManager, serviceManager, eventQueue, scmContext); // Original line
+    // scmSafeModeManager.start(); // Original line
 
-    rule = SafeModeRuleFactory.getInstance().getSafeModeRule(DataNodeSafeModeRule.class);
+    // Mock SCMSafeModeManager as it's a dependency for SafeModeExitRule (parent of DataNodeSafeModeRule)
+    // for the scmInSafeMode() method.
+    SCMSafeModeManager mockScmSafeModeManager = mock(SCMSafeModeManager.class);
+    when(mockScmSafeModeManager.getLogger()).thenReturn(LoggerFactory.getLogger(SCMSafeModeManager.class)); // if getLogger() is called
+
+    // rule = SafeModeRuleFactory.getInstance().getSafeModeRule(DataNodeSafeModeRule.class); // Original line
+    rule = new DataNodeSafeModeRule(eventQueue, ozoneConfiguration, nodeManager, mockScmSafeModeManager);
     assertNotNull(rule);
 
-    rule.setValidateBasedOnReportProcessing(true);
+    // rule.setValidateBasedOnReportProcessing(true); // Removed
   }
 
   @Test
@@ -91,22 +89,22 @@ public class TestDataNodeSafeModeRule {
     int requiredDns = 1;
     setup(requiredDns);
 
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(SCMSafeModeManager.class));
+    // Initial state: no healthy nodes
+    when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(new ArrayList<>());
+    assertFalse(rule.validate(), "Should not validate when no nodes are healthy.");
 
-    assertFalse(rule.validate());
+    // Simulate one node becoming healthy
+    List<DatanodeDetails> healthyNodes = new ArrayList<>();
+    healthyNodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(healthyNodes);
+    assertTrue(rule.validate(), "Should validate when enough nodes are healthy.");
 
-    DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
-    NodeRegistrationContainerReport nodeReg = 
-        new NodeRegistrationContainerReport(dd, null);
-    
-    eventQueue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeReg);
-
-    GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
-        "SCM in safe mode. 1 DataNodes registered, 1 required."), 1000, 5000);
-
-    assertTrue(rule.validate());
+    // Verify getNodes was called (getStatusText also calls it)
+    // Exact number of times depends on how many times validate() and getStatusText() are called by other parts if any.
+    // For this specific test structure, validate() is called twice.
+    // If SCMSafeModeManager was fully active, getStatusText might be called too.
+    // Let's assume at least 2 calls for the two rule.validate() calls.
+    verify(nodeManager, times(2)).getNodes(NodeStatus.inServiceHealthy());
   }
 
   @Test
@@ -114,59 +112,49 @@ public class TestDataNodeSafeModeRule {
     int requiredDns = 3;
     setup(requiredDns);
 
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(SCMSafeModeManager.class));
+    List<DatanodeDetails> healthyNodes = new ArrayList<>();
 
-    assertFalse(rule.validate());
+    // Initial state: no healthy nodes
+    when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(healthyNodes);
+    assertFalse(rule.validate(), "Should not validate with 0 healthy nodes.");
 
-    for (int i = 0; i < 2; i++) {
-      DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
-      NodeRegistrationContainerReport nodeReg = 
-          new NodeRegistrationContainerReport(dd, null);
-      
-      eventQueue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeReg);
-    }
+    // Simulate 1 node becoming healthy
+    healthyNodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(new ArrayList<>(healthyNodes)); // Return a copy
+    assertFalse(rule.validate(), "Should not validate with 1 healthy node, 3 required.");
 
-    GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
-        "SCM in safe mode. 2 DataNodes registered, 3 required."), 1000, 5000);
+    // Simulate 2 nodes becoming healthy
+    healthyNodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(new ArrayList<>(healthyNodes)); // Return a copy
+    assertFalse(rule.validate(), "Should not validate with 2 healthy nodes, 3 required.");
 
-    assertFalse(rule.validate());
-
-    DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
-    NodeRegistrationContainerReport nodeReg = 
-        new NodeRegistrationContainerReport(dd, null);
+    // Simulate 3 nodes becoming healthy
+    healthyNodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(new ArrayList<>(healthyNodes)); // Return a copy
+    assertTrue(rule.validate(), "Should validate with 3 healthy nodes.");
     
-    eventQueue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeReg);
-
-    GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
-        "SCM in safe mode. 3 DataNodes registered, 3 required."), 1000, 5000);
-
-    assertTrue(rule.validate());
+    // Called 4 times (once for each validate call)
+    verify(nodeManager, times(4)).getNodes(NodeStatus.inServiceHealthy());
   }
 
   @Test
   public void testDataNodeSafeModeRuleWithNodeManager() throws Exception {
     int requiredDns = 2;
     setup(requiredDns);
-    
-    rule.setValidateBasedOnReportProcessing(false);
 
+    // Initial state: no healthy nodes
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(new ArrayList<>());
-
     assertFalse(rule.validate());
 
-    List<DatanodeDetails> healthyNodes = new ArrayList<>();
+    // Simulate enough nodes becoming healthy
+    List<DatanodeDetails> healthyNodesList = new ArrayList<>();
     for (int i = 0; i < requiredDns; i++) {
-      DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
-      healthyNodes.add(dd);
+      healthyNodesList.add(MockDatanodeDetails.randomDatanodeDetails());
     }
-    
-    when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
-        .thenReturn(healthyNodes);
-
+    when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(healthyNodesList);
     assertTrue(rule.validate());
-    
+
+    // verify it was called for each validate()
     verify(nodeManager, times(2)).getNodes(NodeStatus.inServiceHealthy());
   }
 }
