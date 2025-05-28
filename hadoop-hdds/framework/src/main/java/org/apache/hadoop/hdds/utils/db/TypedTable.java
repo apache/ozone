@@ -793,7 +793,8 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
     @Override
     Spliterator<KeyValue<KEY, VALUE>> createNewSpliterator(KEY prefix, byte[] startKey, int maxParallelism,
         boolean closeOnException, List<byte[]> boundaryKeys) throws IOException {
-      return new CodecBufferRawSpliterator(prefix, decodeKey(startKey), maxParallelism, closeOnException, boundaryKeys);
+      return new CodecBufferTypedRawSpliterator(prefix, decodeKey(startKey), maxParallelism, closeOnException,
+          boundaryKeys);
     }
   }
 
@@ -844,7 +845,8 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
     @Override
     Spliterator<KeyValue<KEY, VALUE>> createNewSpliterator(KEY prefix, byte[] startKey, int maxParallelism,
         boolean closeOnException, List<byte[]> boundaryKeys) throws IOException {
-      return new ByteArrayRawSpliterator(prefix, decodeKey(startKey), maxParallelism, closeOnException, boundaryKeys);
+      return new ByteArrayTypedRawSpliterator(prefix, decodeKey(startKey), maxParallelism, closeOnException,
+          boundaryKeys);
     }
   }
 }

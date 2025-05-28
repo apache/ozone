@@ -57,7 +57,6 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
   private boolean initialized;
   private List<byte[]> boundaryKeys;
   private int boundIndex;
-  private KEY prefix;
 
   abstract Table.KeyValue<KEY, VALUE> convert(RawKeyValue<RAW> kv) throws IOException;
 
@@ -65,20 +64,20 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
    * Retrieves a list of boundary keys based on the provided prefix and start key.
    * These boundary keys can be used to split data into smaller ranges when processing.
    *
-   * @param keyPrefix   the prefix key that logically groups the keys of interest
-   * @param startKey the key from which to start retrieving boundary keys
+   * @param prefix   the prefix key that logically groups the keys of interest
+   * @param start the key from which to start retrieving boundary keys
    * @return a list of byte arrays representing the boundary keys.
    * @throws IOException if an I/O error occurs while retrieving the boundary keys
    */
-  abstract List<byte[]> getBoundaryKeys(KEY keyPrefix, KEY startKey) throws IOException;
+  abstract List<byte[]> getBoundaryKeys(KEY prefix, KEY start) throws IOException;
 
   abstract int compare(RAW value1, byte[] value2);
 
   abstract TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> getRawIterator(
       KEY prefix, KEY start, int maxParallelism) throws IOException;
 
-  abstract Spliterator<Table.KeyValue<KEY, VALUE>> createNewSpliterator(KEY prefix, byte[] startKey, int maxParallelism,
-      boolean closeOnException, List<byte[]> boundaryKeys) throws IOException;
+  abstract Spliterator<Table.KeyValue<KEY, VALUE>> createNewSpliterator(KEY prefix, byte[] start, int maxParallelism,
+      boolean closeOnEx, List<byte[]> boundKeys) throws IOException;
 
   RawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException) throws IOException {
     this(prefix, startKey, maxParallelism, closeOnException, null);
