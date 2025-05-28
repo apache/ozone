@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRawKeyValue;
+import org.apache.hadoop.hdds.utils.db.ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -219,7 +219,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> iterator(byte[] prefix)
       throws IOException {
-    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
+    return new ReferenceCountedRDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
   }
 
   @Override
@@ -241,7 +241,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
   TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
       CodecBuffer prefix, int maxNumberOfBuffers) throws IOException {
-    return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
+    return new ReferenceCountedRDBStoreCodecBufferIterator(db.newIterator(family, false),
         this, prefix, maxNumberOfBuffers);
   }
 

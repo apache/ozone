@@ -37,7 +37,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
-import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRawKeyValue;
+import org.apache.hadoop.hdds.utils.db.ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.log4j.Level;
@@ -50,7 +50,7 @@ import org.rocksdb.RocksIterator;
 
 /**
  * This test prescribe expected behaviour
- * from {@link RDBStoreByteArrayIterator} which wraps
+ * from {@link ReferenceCountedRDBStoreByteArrayIterator} which wraps
  * RocksDB's own iterator. Ozone internally in TypedTableIterator uses, the
  * RDBStoreIterator to provide iteration over table elements in a typed manner.
  * The tests are to ensure we access RocksDB via the iterator properly.
@@ -69,12 +69,12 @@ public class TestRDBStoreByteArrayIterator {
     Logger.getLogger(ManagedRocksObjectUtils.class).setLevel(Level.DEBUG);
   }
 
-  RDBStoreByteArrayIterator newIterator() {
-    return new RDBStoreByteArrayIterator(managedRocksIterator, null, null);
+  ReferenceCountedRDBStoreByteArrayIterator newIterator() {
+    return new ReferenceCountedRDBStoreByteArrayIterator(managedRocksIterator, null, null);
   }
 
-  RDBStoreByteArrayIterator newIterator(byte[] prefix) {
-    return new RDBStoreByteArrayIterator(
+  ReferenceCountedRDBStoreByteArrayIterator newIterator(byte[] prefix) {
+    return new ReferenceCountedRDBStoreByteArrayIterator(
         managedRocksIterator, rocksTableMock, prefix);
   }
 
@@ -93,7 +93,7 @@ public class TestRDBStoreByteArrayIterator {
     final Consumer<AutoCloseableRawKeyValue<byte[]>> consumerStub
         = mock(Consumer.class);
 
-    try (RDBStoreByteArrayIterator iter = newIterator()) {
+    try (ReferenceCountedRDBStoreByteArrayIterator iter = newIterator()) {
       iter.forEachRemaining(consumerStub);
       ArgumentCaptor<AutoCloseableRawKeyValue<byte[]>> capture = forClass(AutoCloseableRawKeyValue.class);
       verify(consumerStub, times(3)).accept(capture.capture());
@@ -117,7 +117,7 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.isValid()).thenReturn(true, false);
     when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x00});
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x00f});
-    try (RDBStoreByteArrayIterator iter = newIterator()) {
+    try (ReferenceCountedRDBStoreByteArrayIterator iter = newIterator()) {
       assertTrue(iter.hasNext());
       assertTrue(iter.hasNext());
       iter.next();
@@ -133,7 +133,7 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
     when(rocksDBIteratorMock.key()).thenReturn(testKey);
     when(rocksDBIteratorMock.value()).thenReturn(testKey);
-    RDBStoreByteArrayIterator iter = newIterator();
+    ReferenceCountedRDBStoreByteArrayIterator iter = newIterator();
 
     InOrder verifier = inOrder(rocksDBIteratorMock);
 
@@ -154,7 +154,7 @@ public class TestRDBStoreByteArrayIterator {
 
   @Test
   public void testSeekToFirstSeeks() {
-    RDBStoreByteArrayIterator iter = newIterator();
+    ReferenceCountedRDBStoreByteArrayIterator iter = newIterator();
 
     iter.seekToFirst();
 
@@ -163,7 +163,7 @@ public class TestRDBStoreByteArrayIterator {
 
   @Test
   public void testSeekToLastSeeks() {
-    RDBStoreByteArrayIterator iter = newIterator();
+    ReferenceCountedRDBStoreByteArrayIterator iter = newIterator();
 
     iter.seekToLast();
 
@@ -174,7 +174,7 @@ public class TestRDBStoreByteArrayIterator {
   public void testSeekWithInvalidValue() {
     when(rocksDBIteratorMock.isValid()).thenReturn(false);
 
-    try (RDBStoreByteArrayIterator iter = newIterator()) {
+    try (ReferenceCountedRDBStoreByteArrayIterator iter = newIterator()) {
       final AutoCloseableRawKeyValue<byte[]> val = iter.seek(new byte[] {0x55});
       assertFalse(iter.hasNext());
       InOrder verifier = inOrder(rocksDBIteratorMock);
@@ -194,7 +194,7 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x00});
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x7f});
 
-    RDBStoreByteArrayIterator iter = newIterator();
+    ReferenceCountedRDBStoreByteArrayIterator iter = newIterator();
     final AutoCloseableRawKeyValue<byte[]> val = iter.seek(new byte[]{0x55});
     assertTrue(iter.hasNext());
     InOrder verifier = inOrder(rocksDBIteratorMock);
@@ -214,7 +214,7 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
     when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x00});
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x00});
-    RDBStoreByteArrayIterator iter = newIterator();
+    ReferenceCountedRDBStoreByteArrayIterator iter = newIterator();
     byte[] key = null;
     if (iter.hasNext()) {
       try (AutoCloseableRawKeyValue<byte[]> entry = iter.next()) {
@@ -235,7 +235,7 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x00});
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x7f});
 
-    try (RDBStoreByteArrayIterator iter = newIterator()) {
+    try (ReferenceCountedRDBStoreByteArrayIterator iter = newIterator()) {
       AutoCloseableRawKeyValue<byte[]> entry;
       byte[] key = null;
       byte[] value = null;
@@ -260,7 +260,7 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.key()).thenReturn(testKey);
     when(rocksDBIteratorMock.value()).thenReturn(testKey);
 
-    RDBStoreByteArrayIterator iter = newIterator(null);
+    ReferenceCountedRDBStoreByteArrayIterator iter = newIterator(null);
     iter.next();
     iter.removeFromDB();
 
@@ -272,14 +272,14 @@ public class TestRDBStoreByteArrayIterator {
 
   @Test
   public void testRemoveFromDBWithoutDBTableSet() {
-    RDBStoreByteArrayIterator iter = newIterator();
+    ReferenceCountedRDBStoreByteArrayIterator iter = newIterator();
     assertThrows(UnsupportedOperationException.class,
         iter::removeFromDB);
   }
 
   @Test
   public void testCloseCloses() throws Exception {
-    RDBStoreByteArrayIterator iter = newIterator();
+    ReferenceCountedRDBStoreByteArrayIterator iter = newIterator();
     iter.close();
 
     verify(rocksDBIteratorMock, times(1)).close();
@@ -287,7 +287,7 @@ public class TestRDBStoreByteArrayIterator {
 
   @Test
   public void testNullPrefixedIterator() throws IOException {
-    RDBStoreByteArrayIterator iter = newIterator(null);
+    ReferenceCountedRDBStoreByteArrayIterator iter = newIterator(null);
     verify(rocksDBIteratorMock, times(1)).seekToFirst();
     clearInvocations(rocksDBIteratorMock);
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
@@ -314,7 +314,7 @@ public class TestRDBStoreByteArrayIterator {
   @Test
   public void testNormalPrefixedIterator() throws IOException {
     byte[] testPrefix = "sample".getBytes(StandardCharsets.UTF_8);
-    RDBStoreByteArrayIterator iter = newIterator(testPrefix);
+    ReferenceCountedRDBStoreByteArrayIterator iter = newIterator(testPrefix);
     verify(rocksDBIteratorMock, times(1)).seek(testPrefix);
     clearInvocations(rocksDBIteratorMock);
     when(rocksDBIteratorMock.isValid()).thenReturn(true);

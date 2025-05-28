@@ -46,17 +46,17 @@ class RawSpliteratorTest {
   @Test
   void testTryAdvanceWithValidElement() throws IOException {
     // Mock dependencies
-    TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> rawIteratorMock =
+    TableIterator<String, ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> rawIteratorMock =
         mock(TableIterator.class);
-    RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String> rawKeyValueMock =
-        mock(RDBStoreAbstractIterator.AutoCloseableRawKeyValue.class);
+    ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue<String> rawKeyValueMock =
+        mock(ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue.class);
 
     when(rawIteratorMock.hasNext()).thenReturn(true);
     when(rawIteratorMock.next()).thenReturn(rawKeyValueMock);
 
     RawSpliterator<String, String, String> rawSpliterator = new MockRawSpliterator(1) {
       @Override
-      TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
+      TableIterator<String, ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
           String startKey, int maxParallelism) {
         return rawIteratorMock;
       }
@@ -84,14 +84,14 @@ class RawSpliteratorTest {
 
   @Test
   void testTryAdvanceWithNoElement() throws IOException {
-    TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> rawIteratorMock =
+    TableIterator<String, ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> rawIteratorMock =
         mock(TableIterator.class);
 
     when(rawIteratorMock.hasNext()).thenReturn(false);
 
     RawSpliterator<String, String, String> rawSpliterator = new MockRawSpliterator(1) {
       @Override
-      TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
+      TableIterator<String, ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
           String startKey, int maxParallelism) {
         return rawIteratorMock;
       }
@@ -108,10 +108,10 @@ class RawSpliteratorTest {
 
   @Test
   void testTryAdvanceWhenConvertThrowsIOException() throws IOException {
-    TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> rawIteratorMock =
+    TableIterator<String, ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> rawIteratorMock =
         mock(TableIterator.class);
-    RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String> rawKeyValueMock =
-        mock(RDBStoreAbstractIterator.AutoCloseableRawKeyValue.class);
+    ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue<String> rawKeyValueMock =
+        mock(ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue.class);
 
     when(rawIteratorMock.hasNext()).thenReturn(true);
     when(rawIteratorMock.next()).thenReturn(rawKeyValueMock);
@@ -125,7 +125,7 @@ class RawSpliteratorTest {
       }
 
       @Override
-      TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
+      TableIterator<String, ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
           String startKey, int maxParallelism) {
         return rawIteratorMock;
       }
@@ -147,12 +147,12 @@ class RawSpliteratorTest {
 
   @Test
   void testTrySplits() throws IOException {
-    TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> rawIteratorMock =
+    TableIterator<String, ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> rawIteratorMock =
         mock(TableIterator.class);
 
     RawSpliterator<String, String, String> rawSpliterator = new MockRawSpliterator(2) {
       @Override
-      TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
+      TableIterator<String, ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
           String startKey, int maxParallelism) {
         return rawIteratorMock;
       }
