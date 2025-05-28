@@ -17,12 +17,17 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
@@ -49,6 +54,7 @@ public class TestListInfoSubcommand {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
+  private final ObjectMapper mapper = new ObjectMapper();
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
   @BeforeEach
@@ -125,6 +131,150 @@ public class TestListInfoSubcommand {
         Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
+  }
+
+  @Test
+  public void testMostUsedOrderingAndOutput() throws Exception {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.DatanodeUsageInfoProto> usageList = new ArrayList<>();
+    List<HddsProtos.Node> nodeList = getNodeDetails();
+
+    // Decreasing usage: 400, 300, 200, 100
+    for (int i = 0; i < 4; i++) {
+      usageList.add(HddsProtos.DatanodeUsageInfoProto.newBuilder()
+          .setNode(nodeList.get(i).getNodeID())
+          .setUsed(100L * (4 - i))
+          .setCapacity(1000)
+          .build());
+
+      when(scmClient.queryNode(UUID.fromString(nodeList.get(i).getNodeID().getUuid())))
+          .thenReturn(nodeList.get(i));
+    }
+
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE)).thenReturn(usageList);
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    // ----- with JSON flag -----
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--most-used", "--json");
+    cmd.execute(scmClient);
+
+    String jsonOutput = outContent.toString(DEFAULT_ENCODING);
+    JsonNode root;
+    try {
+      root = mapper.readTree(jsonOutput);
+    } catch (IOException e) {
+      fail("Invalid JSON output:\n" + jsonOutput + "\nError: " + e.getMessage());
+      return;
+    }
+
+    assertTrue(root.isArray(), "JSON output should be an array");
+    assertEquals(4, root.size(), "Expected 4 nodes in JSON output");
+
+    // Check that each contains used, capacity, percentUsed
+    for (JsonNode node : root) {
+      assertTrue(node.has("used"), "JSON missing 'used'");
+      assertTrue(node.has("capacity"), "JSON missing 'capacity'");
+      assertTrue(node.has("percentUsed"), "JSON missing 'percentUsed'");
+    }
+
+    // Check order
+    for (int i = 0; i < root.size() - 1; i++) {
+      long usedCurrent = root.get(i).get("used").asLong();
+      long usedNext = root.get(i + 1).get("used").asLong();
+      assertTrue(usedCurrent >= usedNext,
+          "JSON used values not in descending order at index " + i + ": " +
+              usedCurrent + " < " + usedNext);
+    }
+
+    outContent.reset();
+    // ----- without JSON flag -----
+    c = new CommandLine(cmd);
+    c.parseArgs("--most-used");
+    cmd.execute(scmClient);
+
+    String textOutput = outContent.toString(DEFAULT_ENCODING);
+    long[] expectedUsedValues = {400L, 300L, 200L, 100L};
+    // Check that used value appears and order is correct
+    int lastIndex = -1;
+    for (long used : expectedUsedValues) {
+      int currentIndex = textOutput.indexOf("Used: " + used);
+      assertTrue(currentIndex >= 0, "Missing 'Used: " + used + "'");
+      assertTrue(currentIndex > lastIndex, "Used values out of order: " + used);
+      lastIndex = currentIndex;
+    }
+  }
+
+  @Test
+  public void testLeastUsedOrderingAndOutput() throws Exception {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.DatanodeUsageInfoProto> usageList = new ArrayList<>();
+    List<HddsProtos.Node> nodeList = getNodeDetails();
+
+    // Increasing usage: 100, 200, 300, 400
+    for (int i = 0; i < 4; i++) {
+      usageList.add(HddsProtos.DatanodeUsageInfoProto.newBuilder()
+          .setNode(nodeList.get(i).getNodeID())
+          .setUsed(100L * (i + 1))
+          .setCapacity(1000)
+          .build());
+
+      when(scmClient.queryNode(UUID.fromString(nodeList.get(i).getNodeID().getUuid())))
+          .thenReturn(nodeList.get(i));
+    }
+
+    when(scmClient.getDatanodeUsageInfo(false, Integer.MAX_VALUE)).thenReturn(usageList);
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    // ----- with JSON flag -----
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--least-used", "--json");
+    cmd.execute(scmClient);
+
+    String jsonOutput = outContent.toString(DEFAULT_ENCODING);
+    JsonNode root;
+    try {
+      root = mapper.readTree(jsonOutput);
+    } catch (IOException e) {
+      fail("Invalid JSON output:\n" + jsonOutput + "\nError: " + e.getMessage());
+      return;
+    }
+
+    assertTrue(root.isArray(), "JSON output should be an array");
+    assertEquals(4, root.size(), "Expected 4 nodes in JSON output");
+
+    // Check that each contains used, capacity, percentUsed
+    for (JsonNode node : root) {
+      assertTrue(node.has("used"), "JSON missing 'used'");
+      assertTrue(node.has("capacity"), "JSON missing 'capacity'");
+      assertTrue(node.has("percentUsed"), "JSON missing 'percentUsed'");
+    }
+
+    // Check order
+    for (int i = 0; i < root.size() - 1; i++) {
+      long usedCurrent = root.get(i).get("used").asLong();
+      long usedNext = root.get(i + 1).get("used").asLong();
+      assertTrue(usedCurrent <= usedNext,
+          "JSON used values not in ascending order at index " + i + ": " +
+              usedCurrent + " > " + usedNext);
+    }
+
+    outContent.reset();
+    // ----- without JSON flag -----
+    c = new CommandLine(cmd);
+    c.parseArgs("--least-used");
+    cmd.execute(scmClient);
+
+    String textOutput = outContent.toString(DEFAULT_ENCODING);
+    long[] expectedUsedValues = {100L, 200L, 300L, 400L};
+    // Check that used value appears and order is correct
+    int lastIndex = -1;
+    for (long used : expectedUsedValues) {
+      int currentIndex = textOutput.indexOf("Used: " + used);
+      assertTrue(currentIndex >= 0, "Missing 'Used: " + used + "'");
+      assertTrue(currentIndex > lastIndex, "Used values out of order: " + used);
+      lastIndex = currentIndex;
+    }
   }
 
   private List<HddsProtos.Node> getNodeDetails() {
