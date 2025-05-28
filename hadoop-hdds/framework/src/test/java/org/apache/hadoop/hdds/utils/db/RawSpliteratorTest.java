@@ -31,6 +31,8 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Collections;
+import java.util.List;
 import java.util.Spliterator;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
@@ -56,9 +58,25 @@ class RawSpliteratorTest {
 
     RawSpliterator<String, String, String> rawSpliterator = new MockRawSpliterator(1) {
       @Override
+      List<byte[]> getBoundaryKeys(String prefix, String startKey) {
+        return Collections.emptyList();
+      }
+
+      @Override
+      int compare(String value1, byte[] value2) {
+        return 0;
+      }
+
+      @Override
       TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
           String startKey, int maxParallelism) {
         return rawIteratorMock;
+      }
+
+      @Override
+      Spliterator<Table.KeyValue<String, String>> createNewSpliterator(String prefix, byte[] startKey,
+          int maxParallelism, boolean closeOnException, List<byte[]> boundaryKeys) throws IOException {
+        return null;
       }
     };
 
@@ -91,9 +109,25 @@ class RawSpliteratorTest {
 
     RawSpliterator<String, String, String> rawSpliterator = new MockRawSpliterator(1) {
       @Override
+      List<byte[]> getBoundaryKeys(String prefix, String startKey) {
+        return Collections.emptyList();
+      }
+
+      @Override
+      int compare(String value1, byte[] value2) {
+        return 0;
+      }
+
+      @Override
       TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
           String startKey, int maxParallelism) {
         return rawIteratorMock;
+      }
+
+      @Override
+      Spliterator<Table.KeyValue<String, String>> createNewSpliterator(String prefix, byte[] startKey,
+          int maxParallelism, boolean closeOnException, List<byte[]> boundaryKeys) throws IOException {
+        return null;
       }
     };
 
@@ -125,9 +159,25 @@ class RawSpliteratorTest {
       }
 
       @Override
+      List<byte[]> getBoundaryKeys(String prefix, String startKey) {
+        return Collections.emptyList();
+      }
+
+      @Override
+      int compare(String value1, byte[] value2) {
+        return 0;
+      }
+
+      @Override
       TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
           String startKey, int maxParallelism) {
         return rawIteratorMock;
+      }
+
+      @Override
+      Spliterator<Table.KeyValue<String, String>> createNewSpliterator(String prefix, byte[] startKey,
+          int maxParallelism, boolean closeOnException, List<byte[]> boundaryKeys) throws IOException {
+        return null;
       }
     };
 
@@ -145,15 +195,31 @@ class RawSpliteratorTest {
   }
 
   @Test
-  void testTrySplits() throws IOException {
+  void testTrySplitsWithNoBoundaryKeys() throws IOException {
     TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> rawIteratorMock =
         mock(TableIterator.class);
 
     RawSpliterator<String, String, String> rawSpliterator = new MockRawSpliterator(2) {
       @Override
+      List<byte[]> getBoundaryKeys(String prefix, String startKey) {
+        return Collections.emptyList();
+      }
+
+      @Override
+      int compare(String value1, byte[] value2) {
+        return 0;
+      }
+
+      @Override
       TableIterator<String, RDBStoreAbstractIterator.AutoCloseableRawKeyValue<String>> getRawIterator(String prefix,
           String startKey, int maxParallelism) {
         return rawIteratorMock;
+      }
+
+      @Override
+      Spliterator<Table.KeyValue<String, String>> createNewSpliterator(String prefix, byte[] startKey,
+          int maxParallelism, boolean closeOnException, List<byte[]> boundaryKeys) throws IOException {
+        return null;
       }
     };
     Spliterator<Table.KeyValue<String, String>> split1 = rawSpliterator.trySplit();

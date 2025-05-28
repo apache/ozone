@@ -17,18 +17,24 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.utils.db.RocksDatabase.bytes2String;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Spliterator;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRawKeyValue;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.util.Time;
+import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +44,7 @@ import org.slf4j.LoggerFactory;
  * metadata store content. All other user's using Table should use TypedTable.
  */
 @InterfaceAudience.Private
-class RDBTable implements Table<byte[], byte[]> {
+class RDBTable implements BaseRDBTable<byte[], byte[]> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBTable.class);
@@ -377,23 +383,71 @@ class RDBTable implements Table<byte[], byte[]> {
 
   private RawSpliterator<byte[], byte[], byte[]> newByteArraySpliterator(byte[] prefix, byte[] startKey,
       int maxParallelism, boolean closeOnException) throws IOException {
-    return new RawSpliterator<byte[], byte[], byte[]>(prefix, startKey, maxParallelism, closeOnException) {
+    return new ByteArrayRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
+  }
 
-      @Override
-      KeyValue<byte[], byte[]> convert(RawKeyValue<byte[]> kv) {
-        final int rawSize = kv.getValue().length;
-        return Table.newKeyValue(kv.getKey(), kv.getValue(), rawSize);
-      }
+  @Override
+  public List<LiveFileMetaData> getTableSstFiles() throws IOException {
+    return this.db.getSstFileList().stream()
+        .filter(liveFileMetaData -> getName().equals(bytes2String(liveFileMetaData.columnFamilyName())))
+        .collect(Collectors.toList());
+  }
 
-      @Override
-      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> getRawIterator(
-          byte[] prefix, byte[] startKey, int maxParallelism) throws IOException {
-        TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = iterator(prefix);
-        if (startKey != null) {
-          itr.seek(startKey);
-        }
-        return itr;
+  private final class ByteArrayRawSpliterator extends RawSpliterator<byte[], byte[], byte[]> {
+
+    private ByteArrayRawSpliterator(byte[] prefix, byte[] startKey, int maxParallelism, boolean closeOnException)
+        throws IOException {
+      super(prefix, startKey, maxParallelism, closeOnException);
+    }
+
+    private ByteArrayRawSpliterator(byte[] prefix, byte[] startKey, int maxParallelism, boolean closeOnException,
+        List<byte[]> boundKeys) throws IOException {
+      super(prefix, startKey, maxParallelism, closeOnException, boundKeys);
+    }
+
+    @Override
+    KeyValue<byte[], byte[]> convert(RawKeyValue<byte[]> kv) {
+      final int rawSize = kv.getValue().length;
+      return Table.newKeyValue(kv.getKey(), kv.getValue(), rawSize);
+    }
+
+    @Override
+    List<byte[]> getBoundaryKeys(byte[] prefix, byte[] startKey) throws IOException {
+      return getTableSstFiles().stream()
+          .flatMap(liveFileMetaData -> Stream.of(liveFileMetaData.smallestKey(), liveFileMetaData.largestKey()))
+          .filter(value -> {
+            if (value.length < prefix.length) {
+              return false;
+            }
+            for (int i = 0; i < prefix.length; i++) {
+              if (value[i] != prefix[i]) {
+                return false;
+              }
+            }
+            return true;
+          }).filter(value -> ByteArrayCodec.getComparator().compare(value, startKey) >= 0)
+          .collect(Collectors.toList());
+    }
+
+    @Override
+    int compare(byte[] value1, byte[] value2) {
+      return ByteArrayCodec.getComparator().compare(value1, value2);
+    }
+
+    @Override
+    TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> getRawIterator(
+        byte[] prefix, byte[] startKey, int maxParallelism) throws IOException {
+      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = iterator(prefix);
+      if (startKey != null) {
+        itr.seek(startKey);
       }
-    };
+      return itr;
+    }
+
+    @Override
+    Spliterator<KeyValue<byte[], byte[]>> createNewSpliterator(byte[] prefix, byte[] startKey, int maxParallelism,
+        boolean closeOnException, List<byte[]> boundaryKeys) throws IOException {
+      return new ByteArrayRawSpliterator(prefix, startKey, maxParallelism, closeOnException, boundaryKeys);
+    }
   }
 }
