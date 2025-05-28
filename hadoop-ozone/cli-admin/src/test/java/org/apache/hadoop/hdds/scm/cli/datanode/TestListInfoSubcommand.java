@@ -161,7 +161,6 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String jsonOutput = outContent.toString(DEFAULT_ENCODING);
-    originalOut.println(jsonOutput);
     JsonNode root;
     try {
       root = mapper.readTree(jsonOutput);
@@ -196,7 +195,6 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String textOutput = outContent.toString(DEFAULT_ENCODING);
-    originalOut.println(textOutput);
     Pattern pattern = Pattern.compile("Used: (\\d+)");
     Matcher matcher = pattern.matcher(textOutput);
     List<Long> usedValues = new ArrayList<>();
@@ -239,7 +237,6 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String jsonOutput = outContent.toString(DEFAULT_ENCODING);
-    originalOut.println(jsonOutput);
     JsonNode root;
     try {
       root = mapper.readTree(jsonOutput);
@@ -274,7 +271,6 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String textOutput = outContent.toString(DEFAULT_ENCODING);
-    originalOut.println(textOutput);
     Pattern pattern = Pattern.compile("Used: (\\d+)");
     Matcher matcher = pattern.matcher(textOutput);
     List<Long> usedValues = new ArrayList<>();
