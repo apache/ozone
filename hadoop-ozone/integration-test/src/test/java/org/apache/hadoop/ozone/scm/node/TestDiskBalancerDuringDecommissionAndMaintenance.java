@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
@@ -154,7 +154,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     assertFalse(isMaintenanceDnInStatus);
 
     LogCapturer dnStateChangeLog = LogCapturer.captureLogs(
-        SetNodeOperationalStateCommandHandler.class);
+        DiskBalancerService.class);
 
     // verify using logs that DiskBalancerService is stopped
     // on DN with state is DECOMMISSIONING or ENTERING_MAINTENANCE

@@ -28,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -65,7 +64,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Refr
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -136,9 +134,6 @@ public class DatanodeStateMachine implements Closeable {
   private final DatanodeQueueMetrics queueMetrics;
   private final ReconfigurationHandler reconfigurationHandler;
 
-  //tracks paused state of diskBalancer if it was running before pause
-  private final AtomicBoolean paused;
-
   /**
    * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
@@ -162,7 +157,6 @@ public class DatanodeStateMachine implements Closeable {
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
-    this.paused = new AtomicBoolean(false);
 
     Clock clock = Clock.system(ZoneId.systemDefault());
     // Expected to be initialized already.
@@ -708,41 +702,6 @@ public class DatanodeStateMachine implements Closeable {
       getCommandHandlerThread(processCommandQueue).start();
     });
     return handlerThread;
-  }
-
-  /**
-   * Stops the DiskBalancerService if it is running.
-   */
-  public void stopDiskBalancer() {
-    OzoneContainer ozoneContainer = getContainer();
-    if (ozoneContainer != null) {
-      DiskBalancerService diskBalancerService = ozoneContainer.getDiskBalancerService();
-      if (diskBalancerService != null) {
-        paused.set(diskBalancerService.getDiskBalancerInfo().isShouldRun());
-        diskBalancerService.setShouldRun(false);
-      }
-    }
-  }
-
-  /**
-   * Resume the DiskBalancerService if it was running previously.
-   */
-  public void resumeDiskBalancer() {
-    OzoneContainer ozoneContainer = getContainer();
-    if (ozoneContainer != null) {
-      DiskBalancerService diskBalancerService = ozoneContainer.getDiskBalancerService();
-      if (diskBalancerService != null && paused.getAndSet(false)) {
-        diskBalancerService.setShouldRun(true);
-      }
-    }
-  }
-
-  /**
-   * @return true, if diskBalancer was running before pause.
-   * else false if it was already stopped before pause.
-   */
-  public boolean isPaused() {
-    return paused.get();
   }
 
   /**
