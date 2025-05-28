@@ -377,23 +377,31 @@ class RDBTable implements Table<byte[], byte[]> {
 
   private RawSpliterator<byte[], byte[], byte[]> newByteArraySpliterator(byte[] prefix, byte[] startKey,
       int maxParallelism, boolean closeOnException) throws IOException {
-    return new RawSpliterator<byte[], byte[], byte[]>(prefix, startKey, maxParallelism, closeOnException) {
+    return new ByteArrayRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
+  }
 
-      @Override
-      KeyValue<byte[], byte[]> convert(RawKeyValue<byte[]> kv) {
-        final int rawSize = kv.getValue().length;
-        return Table.newKeyValue(kv.getKey(), kv.getValue(), rawSize);
-      }
+  private class ByteArrayRawSpliterator extends RawSpliterator<byte[], byte[], byte[]> {
 
-      @Override
-      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> getRawIterator(
-          byte[] prefix, byte[] startKey, int maxParallelism) throws IOException {
-        TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = iterator(prefix);
-        if (startKey != null) {
-          itr.seek(startKey);
-        }
-        return itr;
+    public ByteArrayRawSpliterator(byte[] prefix, byte[] startKey, int maxParallelism, boolean closeOnException)
+        throws IOException {
+      super(prefix, startKey, maxParallelism, closeOnException);
+      initializeIterator();
+    }
+
+    @Override
+    KeyValue<byte[], byte[]> convert(RawKeyValue<byte[]> kv) {
+      final int rawSize = kv.getValue().length;
+      return Table.newKeyValue(kv.getKey(), kv.getValue(), rawSize);
+    }
+
+    @Override
+    TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> getRawIterator(
+        byte[] prefix, byte[] startKey, int maxParallelism) throws IOException {
+      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = iterator(prefix);
+      if (startKey != null) {
+        itr.seek(startKey);
       }
-    };
+      return itr;
+    }
   }
 }

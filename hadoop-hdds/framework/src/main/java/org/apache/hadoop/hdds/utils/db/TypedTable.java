@@ -602,67 +602,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   private RawSpliterator<CodecBuffer, KEY, VALUE> newCodecBufferSpliterator(
       KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException) throws IOException {
-    return new RawSpliterator<CodecBuffer, KEY, VALUE>(prefix, startKey, maxParallelism, closeOnException) {
-
-      @Override
-      KeyValue<KEY, VALUE> convert(RawKeyValue<CodecBuffer> kv) throws IOException {
-        final int rawSize = kv.getValue().readableBytes();
-        final KEY key = keyCodec.fromCodecBuffer(kv.getKey());
-        final VALUE value = valueCodec.fromCodecBuffer(kv.getValue());
-        return Table.newKeyValue(key, value, rawSize);
-      }
-
-      @Override
-      TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> getRawIterator(
-          KEY prefix, KEY startKey, int maxParallelism) throws IOException {
-
-        CodecBuffer prefixBuffer = encodeKeyCodecBuffer(prefix);
-        CodecBuffer startKeyBuffer = encodeKeyCodecBuffer(startKey);
-        try {
-          TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> itr =
-              rawTable.iterator(prefixBuffer, maxParallelism);
-          if (startKeyBuffer != null) {
-            itr.seek(startKeyBuffer);
-          }
-          return itr;
-        } catch (Throwable t) {
-          if (prefixBuffer != null) {
-            prefixBuffer.release();
-          }
-          throw t;
-        } finally {
-          if (startKeyBuffer != null) {
-            startKeyBuffer.release();
-          }
-        }
-      }
-    };
+    return new CodecBufferTypedRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
   }
 
   private RawSpliterator<byte[], KEY, VALUE> newByteArraySpliterator(KEY prefix, KEY startKey, int maxParallelism,
       boolean closeOnException) throws IOException {
-    return new RawSpliterator<byte[], KEY, VALUE>(prefix, startKey, maxParallelism, closeOnException) {
-
-      @Override
-      KeyValue<KEY, VALUE> convert(RawKeyValue<byte[]> kv) throws IOException {
-        final int rawSize = kv.getValue().length;
-        final KEY key = keyCodec.fromPersistedFormat(kv.getKey());
-        final VALUE value = valueCodec.fromPersistedFormat(kv.getValue());
-        return Table.newKeyValue(key, value, rawSize);
-      }
-
-      @Override
-      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> getRawIterator(
-          KEY prefix, KEY startKey, int maxParallelism) throws IOException {
-        byte[] prefixBytes = encodeKey(prefix);
-        byte[] startKeyBytes = encodeKey(startKey);
-        TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = rawTable.iterator(prefixBytes);
-        if (startKeyBytes != null) {
-          itr.seek(startKeyBytes);
-        }
-        return itr;
-      }
-    };
+    return new ByteArrayTypedRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
   }
 
   /**
@@ -749,6 +694,77 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     @Override
     public void removeFromDB() throws IOException {
       rawIterator.removeFromDB();
+    }
+  }
+
+  private class CodecBufferTypedRawSpliterator extends RawSpliterator<CodecBuffer, KEY, VALUE> {
+
+    public CodecBufferTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
+        throws IOException {
+      super(prefix, startKey, maxParallelism, closeOnException);
+      initializeIterator();
+    }
+
+    @Override
+    KeyValue<KEY, VALUE> convert(RawKeyValue<CodecBuffer> kv) throws IOException {
+      final int rawSize = kv.getValue().readableBytes();
+      final KEY key = keyCodec.fromCodecBuffer(kv.getKey());
+      final VALUE value = valueCodec.fromCodecBuffer(kv.getValue());
+      return Table.newKeyValue(key, value, rawSize);
+    }
+
+    @Override
+    TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> getRawIterator(
+        KEY prefix, KEY startKey, int maxParallelism) throws IOException {
+
+      CodecBuffer prefixBuffer = encodeKeyCodecBuffer(prefix);
+      CodecBuffer startKeyBuffer = encodeKeyCodecBuffer(startKey);
+      try {
+        TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> itr =
+            rawTable.iterator(prefixBuffer, maxParallelism);
+        if (startKeyBuffer != null) {
+          itr.seek(startKeyBuffer);
+        }
+        return itr;
+      } catch (Throwable t) {
+        if (prefixBuffer != null) {
+          prefixBuffer.release();
+        }
+        throw t;
+      } finally {
+        if (startKeyBuffer != null) {
+          startKeyBuffer.release();
+        }
+      }
+    }
+  }
+
+  private class ByteArrayTypedRawSpliterator extends RawSpliterator<byte[], KEY, VALUE> {
+
+    public ByteArrayTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
+        throws IOException {
+      super(prefix, startKey, maxParallelism, closeOnException);
+      initializeIterator();
+    }
+
+    @Override
+    KeyValue<KEY, VALUE> convert(RawKeyValue<byte[]> kv) throws IOException {
+      final int rawSize = kv.getValue().length;
+      final KEY key = keyCodec.fromPersistedFormat(kv.getKey());
+      final VALUE value = valueCodec.fromPersistedFormat(kv.getValue());
+      return Table.newKeyValue(key, value, rawSize);
+    }
+
+    @Override
+    TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> getRawIterator(
+        KEY prefix, KEY startKey, int maxParallelism) throws IOException {
+      byte[] prefixBytes = encodeKey(prefix);
+      byte[] startKeyBytes = encodeKey(startKey);
+      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = rawTable.iterator(prefixBytes);
+      if (startKeyBytes != null) {
+        itr.seek(startKeyBytes);
+      }
+      return itr;
     }
   }
 }

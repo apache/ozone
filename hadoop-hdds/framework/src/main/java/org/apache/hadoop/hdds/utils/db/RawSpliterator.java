@@ -44,25 +44,38 @@ import org.apache.ratis.util.ReferenceCountedObject;
  */
 abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSpliterator<KEY, VALUE> {
 
-  private final ReferenceCountedObject<TableIterator<RAW, AutoCloseableRawKeyValue<RAW>>> rawIterator;
+  private ReferenceCountedObject<TableIterator<RAW, AutoCloseableRawKeyValue<RAW>>> rawIterator;
+  private final KEY prefix;
+  private final KEY startKey;
   private final AtomicInteger maxNumberOfAdditionalSplits;
   private final Lock lock;
   private final AtomicReference<IOException> closeException = new AtomicReference<>();
   private boolean closed;
   private final boolean closeOnException;
+  private boolean initialized;
 
   abstract Table.KeyValue<KEY, VALUE> convert(RawKeyValue<RAW> kv) throws IOException;
 
   abstract TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> getRawIterator(
       KEY prefix, KEY startKey, int maxParallelism) throws IOException;
 
-  RawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException) throws IOException {
+  RawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException) {
+    this.prefix = prefix;
+    this.startKey = startKey;
+    this.closeOnException = closeOnException;
+    this.lock = new ReentrantLock();
+    this.maxNumberOfAdditionalSplits = new AtomicInteger(maxParallelism);
+    this.initialized = false;
+    this.closed = false;
+  }
+
+  synchronized void initializeIterator() throws IOException {
+    if (initialized) {
+      return;
+    }
     TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> itr = getRawIterator(prefix,
-        startKey, maxParallelism);
+        startKey, maxNumberOfAdditionalSplits.decrementAndGet());
     try {
-      this.closeOnException = closeOnException;
-      this.lock = new ReentrantLock();
-      this.maxNumberOfAdditionalSplits = new AtomicInteger(maxParallelism - 1);
       this.rawIterator = ReferenceCountedObject.wrap(itr, () -> { },
           (completelyReleased) -> {
             if (completelyReleased) {
@@ -75,6 +88,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
       itr.close();
       throw e;
     }
+    initialized = true;
   }
 
   @Override
