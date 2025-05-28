@@ -380,9 +380,9 @@ class RDBTable implements Table<byte[], byte[]> {
     return new ByteArrayRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
   }
 
-  private class ByteArrayRawSpliterator extends RawSpliterator<byte[], byte[], byte[]> {
+  private final class ByteArrayRawSpliterator extends RawSpliterator<byte[], byte[], byte[]> {
 
-    public ByteArrayRawSpliterator(byte[] prefix, byte[] startKey, int maxParallelism, boolean closeOnException)
+    private ByteArrayRawSpliterator(byte[] prefix, byte[] startKey, int maxParallelism, boolean closeOnException)
         throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException);
       initializeIterator();

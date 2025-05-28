@@ -697,9 +697,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
-  private class CodecBufferTypedRawSpliterator extends RawSpliterator<CodecBuffer, KEY, VALUE> {
+  private final class CodecBufferTypedRawSpliterator extends RawSpliterator<CodecBuffer, KEY, VALUE> {
 
-    public CodecBufferTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
+    private CodecBufferTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
         throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException);
       initializeIterator();
@@ -739,9 +739,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
-  private class ByteArrayTypedRawSpliterator extends RawSpliterator<byte[], KEY, VALUE> {
+  private final class ByteArrayTypedRawSpliterator extends RawSpliterator<byte[], KEY, VALUE> {
 
-    public ByteArrayTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
+    private ByteArrayTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
         throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException);
       initializeIterator();

@@ -45,7 +45,7 @@ import org.apache.ratis.util.ReferenceCountedObject;
 abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSpliterator<KEY, VALUE> {
 
   private ReferenceCountedObject<TableIterator<RAW, AutoCloseableRawKeyValue<RAW>>> rawIterator;
-  private final KEY prefix;
+  private final KEY keyPrefix;
   private final KEY startKey;
   private final AtomicInteger maxNumberOfAdditionalSplits;
   private final Lock lock;
@@ -57,10 +57,10 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
   abstract Table.KeyValue<KEY, VALUE> convert(RawKeyValue<RAW> kv) throws IOException;
 
   abstract TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> getRawIterator(
-      KEY prefix, KEY startKey, int maxParallelism) throws IOException;
+      KEY prefix, KEY start, int maxParallelism) throws IOException;
 
-  RawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException) {
-    this.prefix = prefix;
+  RawSpliterator(KEY keyPrefix, KEY startKey, int maxParallelism, boolean closeOnException) {
+    this.keyPrefix = keyPrefix;
     this.startKey = startKey;
     this.closeOnException = closeOnException;
     this.lock = new ReentrantLock();
@@ -73,7 +73,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
     if (initialized) {
       return;
     }
-    TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> itr = getRawIterator(prefix,
+    TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> itr = getRawIterator(keyPrefix,
         startKey, maxNumberOfAdditionalSplits.decrementAndGet());
     try {
       this.rawIterator = ReferenceCountedObject.wrap(itr, () -> { },
