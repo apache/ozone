@@ -176,7 +176,5 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     } finally {
       dbHandleLock.writeLock().unlock();
     }
-
-
   }
 }

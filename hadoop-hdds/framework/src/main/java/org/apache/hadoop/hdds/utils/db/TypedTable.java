@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
 import org.rocksdb.LiveFileMetaData;
@@ -401,7 +402,7 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
 
   @Override
   public Table.KeyValueIterator<KEY, VALUE> iterator() throws IOException {
-    return iterator(null);
+    return iterator((KEY) null);
   }
 
   @Override
@@ -422,10 +423,23 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
   @Override
   public Table.KeyValueIterator<KEY, VALUE> iterator(KEY prefix)
       throws IOException {
+    return iterator(prefix, null);
+  }
+
+  @Override
+  public Table.KeyValueIterator<KEY, VALUE> iterator(ManagedSnapshot snapshot) throws IOException {
+    return iterator(null, snapshot);
+  }
+
+  @Override
+  public Table.KeyValueIterator<KEY, VALUE> iterator(KEY prefix, ManagedSnapshot snapshot)
+      throws IOException {
     if (supportCodecBuffer) {
       final CodecBuffer prefixBuffer = encodeKeyCodecBuffer(prefix);
       try {
-        return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer));
+        TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> itr = snapshot == null ?
+            rawTable.iterator(prefixBuffer) : rawTable.iterator(prefixBuffer, snapshot);
+        return newCodecBufferTableIterator(itr);
       } catch (Throwable t) {
         if (prefixBuffer != null) {
           prefixBuffer.release();
@@ -555,6 +569,11 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
   @Override
   public List<LiveFileMetaData> getTableSstFiles() throws IOException {
     return rawTable.getTableSstFiles();
+  }
+
+  @Override
+  public ManagedSnapshot takeTableSnapshot() throws IOException {
+    return rawTable.takeTableSnapshot();
   }
 
   private List<byte[]> getBoundaryKeys(KEY prefix, KEY startKey) throws IOException {
@@ -735,7 +754,8 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
 
   private final class CodecBufferRawSpliterator extends RawSpliterator<CodecBuffer, KEY, VALUE> {
 
-    private CodecBufferRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
+    private CodecBufferRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException,
+        ManagedSnapshot snapshot)
         throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException);
     }

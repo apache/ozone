@@ -55,6 +55,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
   private List<byte[]> boundaryKeys;
   private int boundIndex;
   private KEY prefix;
+  private boolean initialized;
 
   abstract Table.KeyValue<KEY, VALUE> convert(RawKeyValue<RAW> kv) throws IOException;
 
@@ -91,27 +92,38 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
 
   private void init(KEY prfx, KEY startKey, int maxParallelism, boolean closeOnEx,
       List<byte[]> boundKeys) throws IOException {
-    TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> itr = getRawIterator(prfx, startKey, maxParallelism);
     try {
       this.prefix = prfx;
       this.boundaryKeys = boundKeys;
       this.boundIndex = 0;
       this.closeOnException = closeOnEx;
       this.lock = new ReentrantLock();
-      this.maxNumberOfAdditionalSplits = new AtomicInteger(maxParallelism - 1);
-      this.rawIterator = ReferenceCountedObject.wrap(itr, () -> { },
-          (completelyReleased) -> {
-            if (completelyReleased) {
-              closeRawIteratorWithLock();
-            }
-            this.maxNumberOfAdditionalSplits.incrementAndGet();
-          });
-      this.rawIterator.retain();
+      this.maxNumberOfAdditionalSplits = new AtomicInteger(maxParallelism);
+      this.initialized = false;
     } catch (Throwable e) {
-      itr.close();
       throw e;
     }
   }
+
+  public synchronized void initializeIterator() throws IOException {
+    if (initialized) {
+      TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> itr = getRawIterator(this.prefix, start, maxParallelism);
+      try {
+        this.rawIterator = ReferenceCountedObject.wrap(itr, () -> { },
+            (completelyReleased) -> {
+              if (completelyReleased) {
+                closeRawIteratorWithLock();
+              }
+              this.maxNumberOfAdditionalSplits.incrementAndGet();
+            });
+        this.rawIterator.retain();
+      } catch (Throwable e) {
+        itr.close();
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
 
   @Override
   public boolean tryAdvance(Consumer<? super Table.KeyValue<KEY, VALUE>> action) {

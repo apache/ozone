@@ -242,6 +242,17 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
   }
 
   TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
+      CodecBuffer prefix, ManagedSnapshot snapshot) throws IOException {
+    return iterator(prefix, 1, snapshot);
+  }
+
+  TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
+      CodecBuffer prefix, int maxNumberOfBuffers, ManagedSnapshot snapshot) throws IOException {
+    return new RDBStoreCodecBufferIterator(db.newIterator(family, false, snapshot),
+        this, prefix, maxNumberOfBuffers);
+  }
+
+  TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
       CodecBuffer prefix) throws IOException {
     return iterator(prefix, 1);
   }
@@ -396,7 +407,19 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
 
   @Override
   public ManagedSnapshot takeTableSnapshot() throws IOException {
-    return this.db.takeSnapshot();
+    return db.takeSnapshot();
+  }
+
+  @Override
+  public TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator(ManagedSnapshot snapshot)
+      throws IOException {
+    return iterator((byte[])null, snapshot);
+  }
+
+  @Override
+  public TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator(byte[] prefix, ManagedSnapshot snapshot)
+      throws IOException {
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false, snapshot), this, prefix);
   }
 
   private final class ByteArrayRawSpliterator extends RawSpliterator<byte[], byte[], byte[]> {
