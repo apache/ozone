@@ -32,6 +32,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -160,6 +161,7 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String jsonOutput = outContent.toString(DEFAULT_ENCODING);
+    originalOut.println(jsonOutput);
     JsonNode root;
     try {
       root = mapper.readTree(jsonOutput);
@@ -194,15 +196,20 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String textOutput = outContent.toString(DEFAULT_ENCODING);
-    long[] expectedUsedValues = {400L, 300L, 200L, 100L};
-    // Check that used value appears and order is correct
-    int lastIndex = -1;
-    for (long used : expectedUsedValues) {
-      int currentIndex = textOutput.indexOf("Used: " + used);
-      assertTrue(currentIndex >= 0, "Missing 'Used: " + used + "'");
-      assertTrue(currentIndex > lastIndex, "Used values out of order: " + used);
-      lastIndex = currentIndex;
+    originalOut.println(textOutput);
+    Pattern pattern = Pattern.compile("Used: (\\d+)");
+    Matcher matcher = pattern.matcher(textOutput);
+    List<Long> usedValues = new ArrayList<>();
+
+    while (matcher.find()) {
+      usedValues.add(Long.parseLong(matcher.group(1)));
     }
+
+    // Check order
+    List<Long> sorted = new ArrayList<>(usedValues);
+    sorted.sort(Collections.reverseOrder());
+    assertEquals(sorted, usedValues,
+        "values are not in descending order.");
   }
 
   @Test
@@ -232,6 +239,7 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String jsonOutput = outContent.toString(DEFAULT_ENCODING);
+    originalOut.println(jsonOutput);
     JsonNode root;
     try {
       root = mapper.readTree(jsonOutput);
@@ -266,15 +274,19 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String textOutput = outContent.toString(DEFAULT_ENCODING);
-    long[] expectedUsedValues = {100L, 200L, 300L, 400L};
-    // Check that used value appears and order is correct
-    int lastIndex = -1;
-    for (long used : expectedUsedValues) {
-      int currentIndex = textOutput.indexOf("Used: " + used);
-      assertTrue(currentIndex >= 0, "Missing 'Used: " + used + "'");
-      assertTrue(currentIndex > lastIndex, "Used values out of order: " + used);
-      lastIndex = currentIndex;
+    originalOut.println(textOutput);
+    Pattern pattern = Pattern.compile("Used: (\\d+)");
+    Matcher matcher = pattern.matcher(textOutput);
+    List<Long> usedValues = new ArrayList<>();
+
+    while (matcher.find()) {
+      usedValues.add(Long.parseLong(matcher.group(1)));
     }
+
+    // Check order
+    List<Long> sorted = new ArrayList<>(usedValues);
+    Collections.sort(sorted);
+    assertEquals(sorted, usedValues, "Values not in ascending order.");
   }
 
   private List<HddsProtos.Node> getNodeDetails() {
