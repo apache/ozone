@@ -116,6 +116,12 @@
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
+      <!-- required for @MetaInfServices at compile-time, but not at runtime -->
+      <groupId>org.kohsuke.metainf-services</groupId>
+      <artifactId>metainf-services</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-filesystem</artifactId>
       <scope>runtime</scope>

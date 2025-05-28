@@ -463,7 +463,6 @@ MIT
    org.bouncycastle:bcutil-jdk18on
    org.checkerframework:checker-qual
    org.codehaus.mojo:animal-sniffer-annotations
-   org.kohsuke.metainf-services:metainf-services
    org.slf4j:jcl-over-slf4j
    org.slf4j:slf4j-api
    org.slf4j:slf4j-reload4j
