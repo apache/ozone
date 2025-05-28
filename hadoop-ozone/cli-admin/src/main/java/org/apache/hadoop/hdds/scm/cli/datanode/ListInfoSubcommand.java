@@ -80,6 +80,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
   @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
   private UsageSortingOptions usageSortingOptions;
 
+  private List<Pipeline> pipelines;
+
   static class UsageSortingOptions {
     @CommandLine.Option(names = {"--most-used"},
         description = "Show datanodes sorted by highest usage.")
@@ -89,8 +91,6 @@ public class ListInfoSubcommand extends ScmSubcommand {
         description = "Show datanodes sorted by lowest usage.")
     private boolean leastUsed;
   }
-
-  private List<Pipeline> pipelines;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
