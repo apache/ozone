@@ -107,7 +107,7 @@ public class DU extends AbstractSpaceUsageSource {
     @Override
     public String toString() {
       if (exclusionProvider != null) {
-        return String.join(" ", constructCommand(getPath(), exclusionProvider.get().getAbsolutePath()));
+        return String.join(" ", getExecString()) + "\n" + value.get() + "\t" + getPath();
       }
       return commandString + "\n" + value.get() + "\t" + getPath();
     }
@@ -115,7 +115,11 @@ public class DU extends AbstractSpaceUsageSource {
     @Override
     protected String[] getExecString() {
       if (exclusionProvider != null) {
-        return constructCommand(getPath(), exclusionProvider.get().getAbsolutePath());
+        File exclusionFile = exclusionProvider.get();
+        if (null == exclusionFile) {
+          return constructCommand(getPath(), null);
+        }
+        return constructCommand(getPath(), exclusionFile.getAbsolutePath());
       }
       return command;
     }
