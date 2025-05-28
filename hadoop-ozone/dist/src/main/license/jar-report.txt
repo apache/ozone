@@ -125,7 +125,6 @@ share/ozone/lib/jersey-client.jar
 share/ozone/lib/jersey-client.jar
 share/ozone/lib/jersey-common.jar
 share/ozone/lib/jersey-container-servlet-core.jar
-share/ozone/lib/jersey-container-servlet.jar
 share/ozone/lib/jersey-core.jar
 share/ozone/lib/jersey-entity-filtering.jar
 share/ozone/lib/jersey-hk2.jar
