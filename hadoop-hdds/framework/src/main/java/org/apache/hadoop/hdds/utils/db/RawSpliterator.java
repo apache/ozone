@@ -93,7 +93,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
     this.initialized = false;
     this.closed = false;
     if (boundaryKeys == null) {
-      this.boundaryKeys = getBoundaryKeys(prefix, startKey).stream().sorted(ByteArrayCodec.getComparator()).collect(
+      this.boundaryKeys = getBoundaryKeys(keyPrefix, startKey).stream().sorted(ByteArrayCodec.getComparator()).collect(
           Collectors.toList());
       this.boundaryKeys.add(null);
     } else {
@@ -175,7 +175,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
           int splitIndex = boundIndex + totalNumberOfElements / 2;
           this.boundaryKeys = boundaryKeysTmp.subList(0, splitIndex);
           List<byte[]> nextSplitBoundaryKeys = boundaryKeysTmp.subList(splitIndex, boundaryKeysTmp.size());
-          return createNewSpliterator(this.prefix, this.boundaryKeys.get(this.boundaryKeys.size() - 1),
+          return createNewSpliterator(this.keyPrefix, this.boundaryKeys.get(this.boundaryKeys.size() - 1),
               maxNumberOfAdditionalSplits.get() + 1, closeOnException, nextSplitBoundaryKeys);
         }
       } catch (IOException ignored) {
