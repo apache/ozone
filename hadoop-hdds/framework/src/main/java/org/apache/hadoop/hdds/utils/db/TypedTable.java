@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
 import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.ReferenceCountedObject;
 import org.apache.ratis.util.function.CheckedBiFunction;
 import org.rocksdb.LiveFileMetaData;
 
@@ -752,23 +753,21 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
     }
   }
 
-  private final class CodecBufferTypedRawSpliterator extends RawSpliterator<CodecBuffer, KEY, VALUE> {
+  private final class CodecBufferTypedRawSpliterator extends RDBRawSpliterator<CodecBuffer, KEY, VALUE> {
 
-    private final ManagedSnapshot snapshot;
-
-    private CodecBufferTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException,
-        ManagedSnapshot snapshot)
+    private CodecBufferTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
         throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException);
-      this.snapshot = snapshot;
-      initializeIterator();
+    }
+
+    @Override
+    ManagedSnapshot getNewSnapshot() throws IOException {
+      return takeTableSnapshot();
     }
 
     private CodecBufferTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException,
-        List<byte[]> boundKeys, ManagedSnapshot snapshot) throws IOException {
-      super(prefix, startKey, maxParallelism, closeOnException, boundKeys);
-      this.snapshot = snapshot;
-      initializeIterator();
+        List<byte[]> boundKeys, ReferenceCountedObject<ManagedSnapshot> snapshot) throws IOException {
+      super(prefix, startKey, maxParallelism, closeOnException, boundKeys, snapshot);
     }
 
     @Override
@@ -797,7 +796,7 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
       CodecBuffer startKeyBuffer = encodeKeyCodecBuffer(startKey);
       try {
         TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> itr =
-            rawTable.iterator(prefixBuffer, maxParallelism);
+            rawTable.iterator(prefixBuffer, maxParallelism, getSnapshot().get());
         if (startKeyBuffer != null) {
           itr.seek(startKeyBuffer);
         }
@@ -818,25 +817,25 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
     Spliterator<KeyValue<KEY, VALUE>> createNewSpliterator(KEY prefix, byte[] startKey, int maxParallelism,
         boolean closeOnException, List<byte[]> boundaryKeys) throws IOException {
       return new CodecBufferTypedRawSpliterator(prefix, decodeKey(startKey), maxParallelism, closeOnException,
-          boundaryKeys, this.snapshot);
+          boundaryKeys, this.getSnapshot());
     }
   }
 
-  private final class ByteArrayTypedRawSpliterator extends RawSpliterator<byte[], KEY, VALUE> {
-    private final ManagedSnapshot snapshot;
+  private final class ByteArrayTypedRawSpliterator extends RDBRawSpliterator<byte[], KEY, VALUE> {
 
-    private ByteArrayTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException,
-        ManagedSnapshot snapshot) throws IOException {
+    private ByteArrayTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
+        throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException);
-      this.snapshot = snapshot;
-      initializeIterator();
+    }
+
+    @Override
+    ManagedSnapshot getNewSnapshot() throws IOException {
+      return takeTableSnapshot();
     }
 
     private ByteArrayTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException,
-        List<byte[]> boundKeys, ManagedSnapshot snapshot) throws IOException {
-      super(prefix, startKey, maxParallelism, closeOnException, boundKeys);
-      this.snapshot = snapshot;
-      initializeIterator();
+        List<byte[]> boundKeys, ReferenceCountedObject<ManagedSnapshot> snapshot) throws IOException {
+      super(prefix, startKey, maxParallelism, closeOnException, boundKeys, snapshot);
     }
 
     @Override
@@ -862,7 +861,8 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
         KEY prefix, KEY startKey, int maxParallelism) throws IOException {
       byte[] prefixBytes = encodeKey(prefix);
       byte[] startKeyBytes = encodeKey(startKey);
-      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = rawTable.iterator(prefixBytes);
+      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = prefixBytes == null ?
+          rawTable.iterator(getSnapshot().get()) : rawTable.iterator(prefixBytes, getSnapshot().get());
       if (startKeyBytes != null) {
         itr.seek(startKeyBytes);
       }
@@ -873,7 +873,7 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
     Spliterator<KeyValue<KEY, VALUE>> createNewSpliterator(KEY prefix, byte[] startKey, int maxParallelism,
         boolean closeOnException, List<byte[]> boundaryKeys) throws IOException {
       return new ByteArrayTypedRawSpliterator(prefix, decodeKey(startKey), maxParallelism, closeOnException,
-          boundaryKeys, this.snapshot);
+          boundaryKeys, getSnapshot());
     }
   }
 }

@@ -79,6 +79,9 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
   abstract Spliterator<Table.KeyValue<KEY, VALUE>> createNewSpliterator(KEY prefix, byte[] start, int maxParallelism,
       boolean closeOnEx, List<byte[]> boundKeys) throws IOException;
 
+  void closeCallBack() throws IOException {
+  }
+
   RawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException) throws IOException {
     this(prefix, startKey, maxParallelism, closeOnException, null);
   }
@@ -204,6 +207,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
       try {
         closed = true;
         this.rawIterator.get().close();
+        closeCallBack();
       } catch (IOException e) {
         closeException.set(e);
       }

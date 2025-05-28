@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRaw
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.ReferenceCountedObject;
 import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -411,29 +412,32 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
   }
 
   @Override
-  public TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator(ManagedSnapshot snapshot)
+  public TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> iterator(ManagedSnapshot snapshot)
       throws IOException {
     return iterator((byte[])null, snapshot);
   }
 
   @Override
-  public TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator(byte[] prefix, ManagedSnapshot snapshot)
+  public TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> iterator(byte[] prefix, ManagedSnapshot snapshot)
       throws IOException {
     return new RDBStoreByteArrayIterator(db.newIterator(family, false, snapshot), this, prefix);
   }
 
-  private final class ByteArrayRawSpliterator extends RawSpliterator<byte[], byte[], byte[]> {
+  private final class ByteArrayRawSpliterator extends RDBRawSpliterator<byte[], byte[], byte[]> {
+
+    @Override
+    ManagedSnapshot getNewSnapshot() throws IOException {
+      return takeTableSnapshot();
+    }
 
     private ByteArrayRawSpliterator(byte[] prefix, byte[] startKey, int maxParallelism, boolean closeOnException)
         throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException);
-      initializeIterator();
     }
 
     private ByteArrayRawSpliterator(byte[] prefix, byte[] startKey, int maxParallelism, boolean closeOnException,
-        List<byte[]> boundKeys) throws IOException {
-      super(prefix, startKey, maxParallelism, closeOnException, boundKeys);
-      initializeIterator();
+        List<byte[]> boundKeys, ReferenceCountedObject<ManagedSnapshot> snapshot) throws IOException {
+      super(prefix, startKey, maxParallelism, closeOnException, boundKeys, snapshot);
     }
 
     @Override
@@ -468,7 +472,8 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
     @Override
     TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> getRawIterator(
         byte[] prefix, byte[] startKey, int maxParallelism) throws IOException {
-      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = iterator(prefix);
+      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = prefix == null ? iterator(getSnapshot().get()) :
+          iterator(prefix, getSnapshot().get());
       if (startKey != null) {
         itr.seek(startKey);
       }
@@ -478,7 +483,8 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
     @Override
     Spliterator<KeyValue<byte[], byte[]>> createNewSpliterator(byte[] prefix, byte[] startKey, int maxParallelism,
         boolean closeOnException, List<byte[]> boundaryKeys) throws IOException {
-      return new ByteArrayRawSpliterator(prefix, startKey, maxParallelism, closeOnException, boundaryKeys);
+      return new ByteArrayRawSpliterator(prefix, startKey, maxParallelism, closeOnException, boundaryKeys,
+          getSnapshot());
     }
   }
 }

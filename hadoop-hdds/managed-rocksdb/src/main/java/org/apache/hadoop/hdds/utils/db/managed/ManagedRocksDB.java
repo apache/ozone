@@ -124,7 +124,6 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
   }
 
-
   /**
    * Get a point in time view of the rocksdb based on the Sequence number of rocksdb.
    * @return Handle to the Snapshot taken which can be used to view at a consistent view of the db.
@@ -137,7 +136,7 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
         return null;
       }
       Consumer<ManagedSnapshot> snapshotCloseHandler = managedSnapshot -> {
-        dbHandleLock.readLock().unlock();
+        dbHandleLock.readLock().lock();
         try {
           if (!isClosed() && !managedSnapshot.isClosed()) {
             this.get().releaseSnapshot(managedSnapshot.get());

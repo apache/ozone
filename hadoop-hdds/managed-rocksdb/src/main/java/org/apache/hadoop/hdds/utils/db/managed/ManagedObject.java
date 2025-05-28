@@ -19,9 +19,6 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksObject;
 

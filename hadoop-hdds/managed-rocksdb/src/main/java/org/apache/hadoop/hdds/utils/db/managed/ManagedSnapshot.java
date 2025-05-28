@@ -20,7 +20,18 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import java.util.function.Consumer;
 import org.rocksdb.Snapshot;
 
-public class ManagedSnapshot extends ManagedObject<Snapshot> {
+/**
+ * A managed wrapper class for RocksDB's {@link Snapshot} that helps ensure
+ * proper resource management and closure to prevent native resource leaks.
+ * This class extends {@link ManagedObject} and implements {@link AutoCloseable}.
+ *
+ * The purpose of this class is to provide managed operations for a RocksDB
+ * {@link Snapshot}, leveraging a custom handler invoked during closure.
+ *
+ * This class is final and cannot be extended. Instances of this class can
+ * only be created using the static factory method provided.
+ */
+public final class ManagedSnapshot extends ManagedObject<Snapshot> {
 
   private Consumer<ManagedSnapshot> snapshotCloseHandler;
 
@@ -32,6 +43,7 @@ public class ManagedSnapshot extends ManagedObject<Snapshot> {
   public static ManagedSnapshot newManagedSnapshots(Snapshot snapshot, Consumer<ManagedSnapshot> snapshotCloseHandler) {
     return new ManagedSnapshot(snapshot, snapshotCloseHandler);
   }
+
   @Override
   public void close() {
     this.snapshotCloseHandler.accept(this);
