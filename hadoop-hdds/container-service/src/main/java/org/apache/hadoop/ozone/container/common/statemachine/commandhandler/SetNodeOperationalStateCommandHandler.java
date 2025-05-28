@@ -102,6 +102,10 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
       // TODO - this should probably be raised, but it will break the command
       //      handler interface.
     }
+
+    // Handle DiskBalancerService state changes
+    container.getDiskBalancerService().nodeStateChange(state);
+
     replicationSupervisor.accept(state);
     this.opsLatencyMs.add(Time.monotonicNow() - startTime);
   }

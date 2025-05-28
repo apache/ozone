@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -111,6 +112,8 @@ public class DiskBalancerService extends BackgroundService {
 
   private DiskBalancerServiceMetrics metrics;
   private long bytesToMove;
+
+  private final AtomicBoolean paused = new AtomicBoolean(false);
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
@@ -598,6 +601,51 @@ public class DiskBalancerService extends BackgroundService {
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
+  }
+
+  /**
+   * Stops the DiskBalancerService if it is running.
+   */
+  public void stopDiskBalancer() {
+    paused.set(shouldRun);
+    setShouldRun(false);
+    LOG.info("DiskBalancerService stopped.");
+  }
+
+  /**
+   * Resume the DiskBalancerService if it was running previously.
+   */
+  public void resumeDiskBalancer() {
+    if (paused.getAndSet(false)) {
+      setShouldRun(true);
+      LOG.info("DiskBalancerService resumed.");
+    }
+  }
+
+  /**
+   * @return true, if DiskBalancerService was running before pause.
+   */
+  public boolean isPaused() {
+    return paused.get();
+  }
+
+  /**
+   * Handle state changes for DiskBalancerService.
+   */
+  public void nodeStateChange(HddsProtos.NodeOperationalState state) {
+    if (state == HddsProtos.NodeOperationalState.DECOMMISSIONING ||
+        state == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE) {
+      LOG.info("Node state changed to {}. Stopping DiskBalancerService.", state);
+      stopDiskBalancer();
+    } else if (state == HddsProtos.NodeOperationalState.IN_SERVICE) {
+      if (isPaused()) {
+        LOG.info("Node state changed to {}. Resuming DiskBalancerService to running state.", state);
+        resumeDiskBalancer();
+      } else {
+        LOG.info("Node state changed to {}. DiskBalancerService will not" +
+            " be resumed as it was previously in stopped state.", state);
+      }
+    }
   }
 
   @Override
