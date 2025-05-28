@@ -180,6 +180,7 @@ class RawSpliteratorTest {
         return null;
       }
     };
+    rawSpliterator.initializeIterator();
 
     Consumer<Table.KeyValue<String, String>> action = keyValue -> {
     };
@@ -235,7 +236,7 @@ class RawSpliteratorTest {
 
     MockRawSpliterator(int maxParallelism) throws IOException {
       super(null, null, maxParallelism, true);
-
+      super.initializeIterator();
     }
 
     @Override

@@ -638,12 +638,12 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
 
   private RawSpliterator<CodecBuffer, KEY, VALUE> newCodecBufferSpliterator(
       KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException) throws IOException {
-    return new CodecBufferRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
+    return new CodecBufferTypedRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
   }
 
   private RawSpliterator<byte[], KEY, VALUE> newByteArraySpliterator(KEY prefix, KEY startKey, int maxParallelism,
       boolean closeOnException) throws IOException {
-    return new ByteArrayRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
+    return new ByteArrayTypedRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
   }
 
   /**
@@ -733,16 +733,18 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
     }
   }
 
-  private final class CodecBufferRawSpliterator extends RawSpliterator<CodecBuffer, KEY, VALUE> {
+  private final class CodecBufferTypedRawSpliterator extends RawSpliterator<CodecBuffer, KEY, VALUE> {
 
-    private CodecBufferRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
+    private CodecBufferTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
         throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException);
+      initializeIterator();
     }
 
-    private CodecBufferRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException,
+    private CodecBufferTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException,
         List<byte[]> boundKeys) throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException, boundKeys);
+      initializeIterator();
     }
 
     @Override
@@ -795,16 +797,18 @@ public class TypedTable<KEY, VALUE> implements BaseRDBTable<KEY, VALUE> {
     }
   }
 
-  private final class ByteArrayRawSpliterator extends RawSpliterator<byte[], KEY, VALUE> {
+  private final class ByteArrayTypedRawSpliterator extends RawSpliterator<byte[], KEY, VALUE> {
 
-    private ByteArrayRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
+    private ByteArrayTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException)
         throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException);
+      initializeIterator();
     }
 
-    private ByteArrayRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException,
+    private ByteArrayTypedRawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException,
         List<byte[]> boundKeys) throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException, boundKeys);
+      initializeIterator();
     }
 
     @Override

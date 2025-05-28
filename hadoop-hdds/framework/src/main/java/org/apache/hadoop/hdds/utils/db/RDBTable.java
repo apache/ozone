@@ -398,11 +398,13 @@ class RDBTable implements BaseRDBTable<byte[], byte[]> {
     private ByteArrayRawSpliterator(byte[] prefix, byte[] startKey, int maxParallelism, boolean closeOnException)
         throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException);
+      initializeIterator();
     }
 
     private ByteArrayRawSpliterator(byte[] prefix, byte[] startKey, int maxParallelism, boolean closeOnException,
         List<byte[]> boundKeys) throws IOException {
       super(prefix, startKey, maxParallelism, closeOnException, boundKeys);
+      initializeIterator();
     }
 
     @Override
