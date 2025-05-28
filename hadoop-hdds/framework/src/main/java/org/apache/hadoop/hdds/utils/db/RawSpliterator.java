@@ -47,15 +47,16 @@ import org.apache.ratis.util.ReferenceCountedObject;
 abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSpliterator<KEY, VALUE> {
 
   private ReferenceCountedObject<TableIterator<RAW, AutoCloseableRawKeyValue<RAW>>> rawIterator;
-  private AtomicInteger maxNumberOfAdditionalSplits;
-  private Lock lock;
+  private final KEY keyPrefix;
+  private final KEY startKey;
+  private final AtomicInteger maxNumberOfAdditionalSplits;
+  private final Lock lock;
   private final AtomicReference<IOException> closeException = new AtomicReference<>();
   private boolean closed;
-  private boolean closeOnException;
+  private final boolean closeOnException;
+  private boolean initialized;
   private List<byte[]> boundaryKeys;
   private int boundIndex;
-  private KEY prefix;
-  private boolean initialized;
 
   abstract Table.KeyValue<KEY, VALUE> convert(RawKeyValue<RAW> kv) throws IOException;
 
@@ -63,67 +64,65 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
    * Retrieves a list of boundary keys based on the provided prefix and start key.
    * These boundary keys can be used to split data into smaller ranges when processing.
    *
-   * @param keyPrefix   the prefix key that logically groups the keys of interest
-   * @param startKey the key from which to start retrieving boundary keys
+   * @param prefix   the prefix key that logically groups the keys of interest
+   * @param start the key from which to start retrieving boundary keys
    * @return a list of byte arrays representing the boundary keys.
    * @throws IOException if an I/O error occurs while retrieving the boundary keys
    */
-  abstract List<byte[]> getBoundaryKeys(KEY keyPrefix, KEY startKey) throws IOException;
+  abstract List<byte[]> getBoundaryKeys(KEY prefix, KEY start) throws IOException;
 
   abstract int compare(RAW value1, byte[] value2);
 
   abstract TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> getRawIterator(
-      KEY keyPrefix, KEY startKey, int maxParallelism) throws IOException;
+      KEY prefix, KEY start, int maxParallelism) throws IOException;
 
-  abstract Spliterator<Table.KeyValue<KEY, VALUE>> createNewSpliterator(KEY prfx, byte[] startKey, int maxParallelism,
+  abstract Spliterator<Table.KeyValue<KEY, VALUE>> createNewSpliterator(KEY prefix, byte[] start, int maxParallelism,
       boolean closeOnEx, List<byte[]> boundKeys) throws IOException;
 
   RawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException) throws IOException {
-    List<byte[]> boundKeys = getBoundaryKeys(prefix, startKey).stream()
-        .sorted(ByteArrayCodec.getComparator()).collect(Collectors.toList());
-    boundKeys.add(null);
-    init(prefix, startKey, maxParallelism, closeOnException, boundKeys);
+    this(prefix, startKey, maxParallelism, closeOnException, null);
   }
 
-  RawSpliterator(KEY prefix, KEY startKey, int maxParallelism, boolean closeOnException,
+  RawSpliterator(KEY keyPrefix, KEY startKey, int maxParallelism, boolean closeOnException,
       List<byte[]> boundaryKeys) throws IOException {
-    init(prefix, startKey, maxParallelism, closeOnException, boundaryKeys);
+    this.keyPrefix = keyPrefix;
+    this.startKey = startKey;
+    this.closeOnException = closeOnException;
+    this.lock = new ReentrantLock();
+    this.maxNumberOfAdditionalSplits = new AtomicInteger(maxParallelism);
+    this.initialized = false;
+    this.closed = false;
+    if (boundaryKeys == null) {
+      this.boundaryKeys = getBoundaryKeys(prefix, startKey).stream().sorted(ByteArrayCodec.getComparator()).collect(
+          Collectors.toList());
+      this.boundaryKeys.add(null);
+    } else {
+      this.boundaryKeys = boundaryKeys;
+    }
+    this.boundIndex = 0;
   }
 
-  private void init(KEY prfx, KEY startKey, int maxParallelism, boolean closeOnEx,
-      List<byte[]> boundKeys) throws IOException {
+  synchronized void initializeIterator() throws IOException {
+    if (initialized) {
+      return;
+    }
+    TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> itr = getRawIterator(keyPrefix,
+        startKey, maxNumberOfAdditionalSplits.decrementAndGet());
     try {
-      this.prefix = prfx;
-      this.boundaryKeys = boundKeys;
-      this.boundIndex = 0;
-      this.closeOnException = closeOnEx;
-      this.lock = new ReentrantLock();
-      this.maxNumberOfAdditionalSplits = new AtomicInteger(maxParallelism);
-      this.initialized = false;
+      this.rawIterator = ReferenceCountedObject.wrap(itr, () -> { },
+          (completelyReleased) -> {
+            if (completelyReleased) {
+              closeRawIteratorWithLock();
+            }
+            this.maxNumberOfAdditionalSplits.incrementAndGet();
+          });
+      this.rawIterator.retain();
     } catch (Throwable e) {
+      itr.close();
       throw e;
     }
+    initialized = true;
   }
-
-  public synchronized void initializeIterator() throws IOException {
-    if (initialized) {
-      TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> itr = getRawIterator(this.prefix, start, maxParallelism);
-      try {
-        this.rawIterator = ReferenceCountedObject.wrap(itr, () -> { },
-            (completelyReleased) -> {
-              if (completelyReleased) {
-                closeRawIteratorWithLock();
-              }
-              this.maxNumberOfAdditionalSplits.incrementAndGet();
-            });
-        this.rawIterator.retain();
-      } catch (Throwable e) {
-        itr.close();
-        throw new RuntimeException(e);
-      }
-    }
-  }
-
 
   @Override
   public boolean tryAdvance(Consumer<? super Table.KeyValue<KEY, VALUE>> action) {
