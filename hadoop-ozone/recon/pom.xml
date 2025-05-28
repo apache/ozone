@@ -236,20 +236,8 @@
       <artifactId>jersey-server</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.javassist</groupId>
-      <artifactId>javassist</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.jooq</groupId>
       <artifactId>jooq</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.jooq</groupId>
-      <artifactId>jooq-codegen</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.jooq</groupId>
-      <artifactId>jooq-meta</artifactId>
     </dependency>
     <dependency>
       <groupId>org.reflections</groupId>

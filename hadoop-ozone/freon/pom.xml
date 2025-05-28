@@ -184,11 +184,6 @@
       <artifactId>metainf-services</artifactId>
       <scope>provided</scope>
     </dependency>
-    <dependency>
-      <groupId>ch.qos.reload4j</groupId>
-      <artifactId>reload4j</artifactId>
-      <scope>runtime</scope>
-    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
