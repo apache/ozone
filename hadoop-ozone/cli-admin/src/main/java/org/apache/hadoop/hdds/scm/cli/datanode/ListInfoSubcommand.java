@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.Collections;
@@ -107,11 +109,11 @@ public class ListInfoSubcommand extends ScmSubcommand {
           .compareToIgnoreCase(hostname) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeOperationalState)) {
-      allNodes = allNodes.filter(p -> p.getOpState().toString()
+      allNodes = allNodes.filter(p -> p.getOpState()
           .compareToIgnoreCase(nodeOperationalState) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeState)) {
-      allNodes = allNodes.filter(p -> p.getHealthState().toString()
+      allNodes = allNodes.filter(p -> p.getHealthState()
           .compareToIgnoreCase(nodeState) == 0);
     }
 
@@ -171,7 +173,19 @@ public class ListInfoSubcommand extends ScmSubcommand {
     System.out.println("Related pipelines:\n" + pipelineListInfo);
   }
 
+  @JsonPropertyOrder({
+      "id",
+      "hostname",
+      "ipAddress",
+      "healthState",
+      "opState",
+      "persistedOpStateExpiryEpochSec",
+      "decommissioned",
+      "maintenance",
+      "topology"
+  })
   private static class DatanodeWithAttributes {
+    @JsonIgnore
     private DatanodeDetails datanodeDetails;
     private HddsProtos.NodeOperationalState operationalState;
     private HddsProtos.NodeState healthState;
@@ -188,12 +202,86 @@ public class ListInfoSubcommand extends ScmSubcommand {
       return datanodeDetails;
     }
 
-    public HddsProtos.NodeOperationalState getOpState() {
-      return operationalState;
+    public String getOpState() {
+      return operationalState.name();
+    }
+    
+    public String getHealthState() {
+      return healthState.name();
     }
 
-    public HddsProtos.NodeState getHealthState() {
-      return healthState;
+    public String getId() {
+      return datanodeDetails.getUuid().toString();
+    }
+
+    public String getHostname() {
+      return datanodeDetails.getHostName();
+    }
+
+    public String getIpAddress() {
+      return datanodeDetails.getIpAddress();
+    }
+
+    public long getPersistedOpStateExpiryEpochSec() {
+      try {
+        return datanodeDetails.getPersistedOpStateExpiryEpochSec();
+      } catch (Exception e) {
+        return 0L;
+      }
+    }
+
+    public boolean isDecommissioned() {
+      return datanodeDetails.isDecommissioned();
+    }
+
+    public boolean isMaintenance() {
+      return datanodeDetails.isMaintenance();
+    }
+
+    public Topology getTopology() {
+      return new Topology(datanodeDetails);
+    }
+
+    private static class Topology {
+      private final String networkLocation;
+      private final String networkName;
+      private final String networkFullPath;
+      private final int numOfLeaves;
+      private final int level;
+      private final int cost;
+
+      Topology(DatanodeDetails dn) {
+        this.networkLocation = dn.getNetworkLocation();
+        this.networkName = dn.getNetworkName();
+        this.networkFullPath = dn.getNetworkFullPath();
+        this.numOfLeaves = dn.getNumOfLeaves();
+        this.level = dn.getLevel();
+        this.cost = dn.getCost();
+      }
+      
+      public String getNetworkLocation() {
+        return networkLocation;
+      }
+      
+      public String getNetworkName() {
+        return networkName;
+      }
+      
+      public String getNetworkFullPath() {
+        return networkFullPath;
+      }
+      
+      public int getNumOfLeaves() {
+        return numOfLeaves;
+      }
+      
+      public int getLevel() {
+        return level;
+      }
+      
+      public int getCost() {
+        return cost;
+      }
     }
   }
 }
