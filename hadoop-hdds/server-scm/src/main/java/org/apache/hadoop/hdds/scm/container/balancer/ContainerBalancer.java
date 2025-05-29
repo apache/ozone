@@ -462,16 +462,17 @@ public class ContainerBalancer extends StatefulService {
           "be less than hdds.container.balancer.move.timeout.");
     }
 
-    // (move.timeout - move.replication.timeout - event.timeout.datanode.offset) should be greater than 9 minutes
+    // (move.timeout - move.replication.timeout - event.timeout.datanode.offset)
+    // should be greater than or equal to 9 minutes
     long datanodeOffset = ozoneConfiguration.getTimeDuration("hdds.scm.replication.event.timeout.datanode.offset",
         Duration.ofMinutes(6).toMillis(), TimeUnit.MILLISECONDS);
     if ((conf.getMoveTimeout().toMillis() - conf.getMoveReplicationTimeout().toMillis() - datanodeOffset)
         < Duration.ofMinutes(9).toMillis()) {
       String msg = String.format("(hdds.container.balancer.move.timeout (%sm) - " +
               "hdds.container.balancer.move.replication.timeout (%sm) - " +
-              "hdds.scm.replication.event.timeout.datanode.offset (%sm)) should be greater than 9 minutes.",
-          conf.getMoveReplicationTimeout().toMinutes(),
+              "hdds.scm.replication.event.timeout.datanode.offset (%sm)) should be greater than or equal to 9 minutes.",
           conf.getMoveTimeout().toMinutes(),
+          conf.getMoveReplicationTimeout().toMinutes(),
           Duration.ofMillis(datanodeOffset).toMinutes());
       LOG.warn(msg);
       throw new InvalidContainerBalancerConfigurationException(msg);
