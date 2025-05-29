@@ -15,16 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.hdds.utils.db.iterator;
 
 import java.io.IOException;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
-import org.apache.hadoop.hdds.utils.db.Table.BaseDBTableIterator;
+import org.apache.hadoop.hdds.utils.db.RDBTable;
+import org.apache.hadoop.hdds.utils.db.RawKeyValue;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.ratis.util.ReferenceCountedObject;
-import org.apache.ratis.util.UncheckedAutoCloseable;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,8 +34,8 @@ import org.slf4j.LoggerFactory;
  *
  * @param <RAW> the raw type.
  */
-abstract class ReferenceCountedRDBStoreAbstractIterator<RAW>
-    implements BaseDBTableIterator<RAW, ReferenceCountedRDBStoreAbstractIterator.CloseableRawKeyValue<RAW>> {
+public abstract class ReferenceCountedRDBStoreAbstractIterator<RAW>
+    implements BaseDBTableIterator<RAW, CloseableRawKeyValue<RAW>> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReferenceCountedRDBStoreAbstractIterator.class);
@@ -185,20 +186,6 @@ abstract class ReferenceCountedRDBStoreAbstractIterator<RAW>
     rocksDBIterator.close();
     closed = true;
     releaseEntry();
-  }
-
-  public static final class CloseableRawKeyValue<RAW> extends RawKeyValue<RAW> implements UncheckedAutoCloseable {
-    private final UncheckedAutoCloseableSupplier<RawKeyValue<RAW>> keyValue;
-
-    private CloseableRawKeyValue(ReferenceCountedObject<RawKeyValue<RAW>> kv) {
-      super(kv.get().getKey(), kv.get().getValue());
-      this.keyValue = kv.retainAndReleaseOnClose();
-    }
-
-    @Override
-    public void close() {
-      keyValue.close();
-    }
   }
 
   @Override

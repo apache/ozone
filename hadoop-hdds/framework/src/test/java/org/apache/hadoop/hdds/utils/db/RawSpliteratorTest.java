@@ -33,8 +33,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Spliterator;
 import java.util.function.Consumer;
-import org.apache.hadoop.hdds.utils.db.ReferenceCountedRDBStoreAbstractIterator.CloseableRawKeyValue;
-import org.apache.hadoop.hdds.utils.db.Table.BaseDBTableIterator;
+import org.apache.hadoop.hdds.utils.db.iterator.BaseDBTableIterator;
+import org.apache.hadoop.hdds.utils.db.iterator.CloseableRawKeyValue;
 import org.junit.jupiter.api.Test;
 
 /**

@@ -15,18 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.hdds.utils.db.iterator;
 
 import java.io.IOException;
 import java.util.Arrays;
+import org.apache.hadoop.hdds.utils.db.RDBTable;
+import org.apache.hadoop.hdds.utils.db.RawKeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.ratis.util.ReferenceCountedObject;
 
 /**
  * RocksDB store iterator using the byte[] API.
  */
-class ReferenceCountedRDBStoreByteArrayIterator extends ReferenceCountedRDBStoreAbstractIterator<byte[]> {
-  ReferenceCountedRDBStoreByteArrayIterator(ManagedRocksIterator iterator,
+public class ReferenceCountedRDBStoreByteArrayIterator extends ReferenceCountedRDBStoreAbstractIterator<byte[]> {
+  public ReferenceCountedRDBStoreByteArrayIterator(ManagedRocksIterator iterator,
       RDBTable table, byte[] prefix) {
     super(iterator, table,
         prefix == null ? null : Arrays.copyOf(prefix, prefix.length));

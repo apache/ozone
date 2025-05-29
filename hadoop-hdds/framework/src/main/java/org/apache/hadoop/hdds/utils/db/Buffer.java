@@ -19,24 +19,29 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.ratis.util.Preconditions;
 
-class Buffer {
+/**
+ * A utility class for managing an underlying {@link CodecBuffer} with dynamic capacity adjustment
+ * based on the requirements of a data source. This class encapsulates operations to allocate,
+ * prepare, and release the buffer, as well as retrieve data from a source.
+ */
+public class Buffer {
   private final CodecBuffer.Capacity initialCapacity;
   private final PutToByteBuffer<RuntimeException> source;
   private CodecBuffer buffer;
 
-  Buffer(CodecBuffer.Capacity initialCapacity,
+  public Buffer(CodecBuffer.Capacity initialCapacity,
       PutToByteBuffer<RuntimeException> source) {
     this.initialCapacity = initialCapacity;
     this.source = source;
   }
 
-  void release() {
+  public void release() {
     if (buffer != null) {
       buffer.release();
     }
   }
 
-  private void prepare() {
+  public void prepare() {
     if (buffer == null) {
       allocate();
     } else {
@@ -44,14 +49,14 @@ class Buffer {
     }
   }
 
-  private void allocate() {
+  public void allocate() {
     if (buffer != null) {
       buffer.release();
     }
     buffer = CodecBuffer.allocateDirect(-initialCapacity.get());
   }
 
-  CodecBuffer getFromDb() {
+  public CodecBuffer getFromDb() {
     for (prepare(); ; allocate()) {
       final Integer required = buffer.putFromSource(source);
       if (required == null) {

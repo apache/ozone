@@ -27,6 +27,9 @@ import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.iterator.BaseDBTableIterator;
+import org.apache.hadoop.hdds.utils.db.iterator.ReferenceCountedRDBStoreByteArrayIterator;
+import org.apache.hadoop.hdds.utils.db.iterator.ReferenceCountedRDBStoreCodecBufferIterator;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * metadata store content. All other user's using Table should use TypedTable.
  */
 @InterfaceAudience.Private
-class RDBTable implements Table<byte[], byte[]> {
+public class RDBTable implements Table<byte[], byte[]> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBTable.class);

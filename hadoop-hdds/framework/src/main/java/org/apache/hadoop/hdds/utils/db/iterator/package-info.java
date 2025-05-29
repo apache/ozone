@@ -15,23 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
-
-import java.nio.ByteBuffer;
-import org.apache.ratis.util.function.CheckedFunction;
-
 /**
- * A function puts data from a source to the {@link ByteBuffer}
- * specified in the parameter.
- * The source may or may not be available.
- * This function must return the required size (possibly 0)
- * if the source is available; otherwise, return null.
- * When the {@link ByteBuffer}'s capacity is smaller than the required size,
- * partial data may be put to the {@link ByteBuffer}.
- *
- * @param <E> The exception type this function may throw.
+ * Provides an interface for iterating over the contents of a DB table.
  */
-@FunctionalInterface
-public interface PutToByteBuffer<E extends Exception>
-    extends CheckedFunction<ByteBuffer, Integer, E> {
-}
+package org.apache.hadoop.hdds.utils.db.iterator;

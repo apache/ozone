@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.hdds.utils.db.iterator;
 
 import java.io.IOException;
 import java.util.Deque;
@@ -27,6 +27,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.commons.lang3.exception.UncheckedInterruptedException;
+import org.apache.hadoop.hdds.utils.db.Buffer;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.RDBTable;
+import org.apache.hadoop.hdds.utils.db.RawKeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.util.Sets;
 import org.apache.ratis.util.Preconditions;
@@ -41,13 +45,13 @@ import org.apache.ratis.util.ReferenceCountedObject;
  * processing large datasets.
  * Key features:
  **/
-class ReferenceCountedRDBStoreCodecBufferIterator extends ReferenceCountedRDBStoreAbstractIterator<CodecBuffer> {
+public class ReferenceCountedRDBStoreCodecBufferIterator extends ReferenceCountedRDBStoreAbstractIterator<CodecBuffer> {
 
   private final BlockingDeque<RawKeyValue<Buffer>> availableBufferStack;
   private final Set<RawKeyValue<Buffer>> inUseBuffers;
   private final AtomicReference<Boolean> closed = new AtomicReference<>(false);
 
-  ReferenceCountedRDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
+  public ReferenceCountedRDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
       CodecBuffer prefix, int maxNumberOfBuffersInMemory) {
     super(iterator, table, prefix);
     // We need atleast 1 buffers one for setting next value and one for sending the current value.

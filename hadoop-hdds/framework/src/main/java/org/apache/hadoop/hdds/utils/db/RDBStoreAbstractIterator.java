@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.IOException;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
-import org.apache.hadoop.hdds.utils.db.Table.BaseDBTableIterator;
+import org.apache.hadoop.hdds.utils.db.iterator.BaseDBTableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
