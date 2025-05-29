@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.protocol.VolumeInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
@@ -58,7 +57,7 @@ public class TestVolumeCommand {
   @Test
   public void testCheckVolumeFailureJsonAccuracy() throws Exception {
     ScmClient scmClient = mock(ScmClient.class);
-    when(scmClient.getVolumeInfos("all", "", "", 20, null)).
+    when(scmClient.getVolumeInfos("ALL", "", "", 20, null)).
         thenAnswer(invocation -> getUsageProto());
 
     CommandLine c = new CommandLine(cmd);
@@ -82,7 +81,7 @@ public class TestVolumeCommand {
   public void testCheckVolumeFailureTableAccuracy() throws Exception {
     ScmClient scmClient = mock(ScmClient.class);
 
-    when(scmClient.getVolumeInfos("all", "", "", 20, null)).
+    when(scmClient.getVolumeInfos("ALL", "", "", 20, null)).
         thenAnswer(invocation -> getUsageProto());
 
     CommandLine c = new CommandLine(cmd);

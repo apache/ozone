@@ -1679,8 +1679,8 @@ public class SCMClientProtocolServer implements
       volumeInfos = volumeInfos.stream().filter(filter -> filter.getFailed()).
           collect(Collectors.toList());
       break;
-    case "NORMAL":
-      // Display only normal volumes
+    case "HEALTHY":
+      // Display only health volumes
       volumeInfos = volumeInfos.stream().filter(filter -> !filter.getFailed()).
           collect(Collectors.toList());
       break;

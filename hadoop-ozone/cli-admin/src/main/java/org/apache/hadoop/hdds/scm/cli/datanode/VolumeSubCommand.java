@@ -61,7 +61,7 @@ public class VolumeSubCommand extends ScmSubcommand {
    * and 'healthy' is used to display normal disks.
    */
   @Option(names = { "--state" },
-      defaultValue = "all",
+      defaultValue = "ALL",
       description = "Filter disks by state: 'failed' shows failed disks, " +
       "'healthy' shows healthy disks, 'all' shows all disks.")
   private State state;
