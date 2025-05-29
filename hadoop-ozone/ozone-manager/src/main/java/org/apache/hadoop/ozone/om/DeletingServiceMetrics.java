@@ -65,6 +65,8 @@ public final class DeletingServiceMetrics {
    */
   @Metric("Total no. of keys purged")
   private MutableGaugeLong numKeysPurged;
+  @Metric("Total no. of rename entries purged")
+  private MutableGaugeLong numRenameEntriesPurged;
 
   private DeletingServiceMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
@@ -152,6 +154,10 @@ public final class DeletingServiceMetrics {
 
   public void incrNumKeysPurged(long keysPurged) {
     this.numKeysPurged.incr(keysPurged);
+  }
+
+  public void incrNumRenameEntriesPurged(long renameEntriesPurged) {
+    this.numRenameEntriesPurged.incr(renameEntriesPurged);
   }
 
   @VisibleForTesting

@@ -31,7 +31,6 @@ import java.io.File;
 import java.util.Objects;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ratis.util.Preconditions;
 
 /** Recon for {@link MiniOzoneCluster}. */

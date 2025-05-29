@@ -17,16 +17,22 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -49,6 +55,7 @@ public class TestListInfoSubcommand {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
+  private final ObjectMapper mapper = new ObjectMapper();
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
   @BeforeEach
@@ -99,6 +106,54 @@ public class TestListInfoSubcommand {
 
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
+
+    // ----- with JSON flag -----
+    outContent.reset();
+
+    CommandLine cmdWithJsonFlag = new CommandLine(cmd);
+    cmdWithJsonFlag.parseArgs("--json");
+    cmd.execute(scmClient);
+
+    String jsonOutput = outContent.toString(DEFAULT_ENCODING);
+    JsonNode root;
+    try {
+      root = mapper.readTree(jsonOutput);
+    } catch (IOException e) {
+      fail("Invalid JSON output:\n" + jsonOutput + "\nError: " + e.getMessage());
+      return;
+    }
+
+    assertTrue(root.isArray(), "JSON output should be an array");
+    assertEquals(4, root.size(), "Expected 4 nodes in JSON output");
+
+    List<String> healthStates = new ArrayList<>();
+    List<String> operationalStates = new ArrayList<>();
+    for (JsonNode node : root) {
+      healthStates.add(node.get("healthState").asText());
+      operationalStates.add(node.get("opState").asText());
+    }
+
+    // Check expected operational states are present
+    List<String> expectedOpStates = Arrays.asList("IN_SERVICE", "DECOMMISSIONING");
+    for (String expectedState : expectedOpStates) {
+      assertTrue(operationalStates.contains(expectedState),
+          "Expected operational state: " + expectedState + " but not found");
+    }
+
+    // Check all expected health states are present
+    for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
+      assertTrue(healthStates.contains(state.toString()),
+          "Expected health state: " + state + " but not found");
+    }
+
+    // Check order: HEALTHY -> STALE -> DEAD -> HEALTHY_READONLY
+    List<String> expectedOrder = Arrays.asList("HEALTHY", "STALE", "DEAD", "HEALTHY_READONLY");
+    int lastIndex = -1;
+    for (String state : healthStates) {
+      int index = expectedOrder.indexOf(state);
+      assertTrue(index >= lastIndex, "Health states not in expected order: " + healthStates);
+      lastIndex = index;
+    }
   }
 
   @Test
@@ -125,6 +180,34 @@ public class TestListInfoSubcommand {
         Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
+
+    outContent.reset();
+
+    // ----- with JSON flag -----
+    CommandLine cmdWithJson = new CommandLine(cmd);
+    cmdWithJson.parseArgs("--id", nodes.get(0).getNodeID().getUuid(), "--json");
+    cmd.execute(scmClient);
+    
+    String jsonOutput = outContent.toString(DEFAULT_ENCODING);
+    JsonNode root;
+    try {
+      root = mapper.readTree(jsonOutput);
+    } catch (IOException e) {
+      fail("Invalid JSON output:\n" + jsonOutput + "\nError: " + e.getMessage());
+      return;
+    }
+
+    assertTrue(root.isArray(), "JSON output should be an array");
+    assertEquals(1, root.size(), "Expected 1 node in JSON output");
+
+    JsonNode node = root.get(0);
+    assertTrue(node.has("datanodeDetails"), "Missing datanodeDetails");
+    String opState = node.get("opState").asText();
+    String uuid = node.get("datanodeDetails").get("uuid").asText();
+
+    assertEquals("IN_SERVICE", opState, "Expected opState IN_SERVICE but got: " + opState);
+    assertEquals(nodes.get(0).getNodeID().getUuid(), uuid,
+        "Expected UUID " + nodes.get(0).getNodeID().getUuid() + " but got: " + uuid);
   }
 
   private List<HddsProtos.Node> getNodeDetails() {

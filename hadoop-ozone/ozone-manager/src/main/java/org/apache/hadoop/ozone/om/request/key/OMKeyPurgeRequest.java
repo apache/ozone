@@ -91,6 +91,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     List<String> keysToBePurgedList = new ArrayList<>();
 
     int numKeysDeleted = 0;
+    List<String> renamedKeysToBePurged = new ArrayList<>(purgeKeysRequest.getRenamedKeysList());
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
       List<String> keysList = bucketWithDeleteKeys.getKeysList();
       keysToBePurgedList.addAll(keysList);
@@ -98,8 +99,9 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
     DeletingServiceMetrics deletingServiceMetrics = ozoneManager.getDeletionMetrics();
     deletingServiceMetrics.incrNumKeysPurged(numKeysDeleted);
+    deletingServiceMetrics.incrNumRenameEntriesPurged(renamedKeysToBePurged.size());
 
-    if (keysToBePurgedList.isEmpty()) {
+    if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
           new OMException("None of the keys can be purged be purged since a new snapshot was created for all the " +
               "buckets, making this request invalid", OMException.ResultCodes.KEY_DELETION_ERROR)));
@@ -118,7 +120,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
 
     return new OMKeyPurgeResponse(omResponse.build(),
-        keysToBePurgedList, fromSnapshotInfo, keysToUpdateList);
+        keysToBePurgedList, renamedKeysToBePurged, fromSnapshotInfo, keysToUpdateList);
   }
 
 }
