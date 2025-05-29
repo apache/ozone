@@ -73,6 +73,7 @@ public class RDBStore implements DBStore {
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
+  private final boolean initializeReferenceCountedIterator;
 
   @SuppressWarnings("parameternumber")
   RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
@@ -82,13 +83,14 @@ public class RDBStore implements DBStore {
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
                   ConfigurationSource configuration,
-                  boolean enableRocksDBMetrics)
+                  boolean enableRocksDBMetrics, boolean initializeReferenceCountedIterator)
 
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
     this.maxDbUpdatesSizeThreshold = maxDbUpdatesSizeThreshold;
+    this.initializeReferenceCountedIterator = initializeReferenceCountedIterator;
     dbLocation = dbFile;
     this.dbOptions = dbOptions;
     this.statistics = statistics;
@@ -292,7 +294,7 @@ public class RDBStore implements DBStore {
     if (handle == null) {
       throw new IOException("No such table in this DB. TableName : " + name);
     }
-    return new RDBTable(this.db, handle, rdbMetrics);
+    return new RDBTable(this.db, handle, rdbMetrics, initializeReferenceCountedIterator);
   }
 
   @Override
@@ -305,7 +307,7 @@ public class RDBStore implements DBStore {
   public ArrayList<Table> listTables() {
     ArrayList<Table> returnList = new ArrayList<>();
     for (ColumnFamily family : getColumnFamilies()) {
-      returnList.add(new RDBTable(db, family, rdbMetrics));
+      returnList.add(new RDBTable(db, family, rdbMetrics, initializeReferenceCountedIterator));
     }
     return returnList;
   }

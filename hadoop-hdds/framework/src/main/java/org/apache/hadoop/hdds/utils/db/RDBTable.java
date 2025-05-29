@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdds.utils.db.ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -46,6 +45,7 @@ class RDBTable implements Table<byte[], byte[]> {
   private final RocksDatabase db;
   private final ColumnFamily family;
   private final RDBMetrics rdbMetrics;
+  private final boolean initializeThreadSafeIterator;
 
   /**
    * Constructs a TableStore.
@@ -54,10 +54,11 @@ class RDBTable implements Table<byte[], byte[]> {
    * @param family - ColumnFamily Handle.
    */
   RDBTable(RocksDatabase db, ColumnFamily family,
-      RDBMetrics rdbMetrics) {
+      RDBMetrics rdbMetrics, boolean initializeThreadSafeIterator) {
     this.db = db;
     this.family = family;
     this.rdbMetrics = rdbMetrics;
+    this.initializeThreadSafeIterator = initializeThreadSafeIterator;
   }
 
   public ColumnFamily getColumnFamily() {
@@ -211,15 +212,18 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> iterator()
+  public BaseDBTableIterator<byte[], ? extends RawKeyValue<byte[]>> iterator()
       throws IOException {
     return iterator((byte[])null);
   }
 
   @Override
-  public TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> iterator(byte[] prefix)
+  public BaseDBTableIterator<byte[], ? extends RawKeyValue<byte[]>> iterator(byte[] prefix)
       throws IOException {
-    return new ReferenceCountedRDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
+    if (initializeThreadSafeIterator) {
+      return new ReferenceCountedRDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
+    }
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
   }
 
   @Override
@@ -234,15 +238,19 @@ class RDBTable implements Table<byte[], byte[]> {
     return newByteArraySpliterator(prefix, startKey, maxParallelism, closeOnException);
   }
 
-  TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
+  BaseDBTableIterator<CodecBuffer, ? extends RawKeyValue<CodecBuffer>> iterator(
       CodecBuffer prefix) throws IOException {
     return iterator(prefix, 1);
   }
 
-  TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
+  BaseDBTableIterator<CodecBuffer, ? extends RawKeyValue<CodecBuffer>> iterator(
       CodecBuffer prefix, int maxNumberOfBuffers) throws IOException {
-    return new ReferenceCountedRDBStoreCodecBufferIterator(db.newIterator(family, false),
-        this, prefix, maxNumberOfBuffers);
+    if (initializeThreadSafeIterator) {
+      return new ReferenceCountedRDBStoreCodecBufferIterator(db.newIterator(family, false),
+          this, prefix, maxNumberOfBuffers);
+    }
+    return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
+        this, prefix);
   }
 
   @Override
@@ -375,8 +383,11 @@ class RDBTable implements Table<byte[], byte[]> {
     return result;
   }
 
-  private RawSpliterator<byte[], byte[], byte[]> newByteArraySpliterator(byte[] prefix, byte[] startKey,
+  private KeyValueSpliterator<byte[], byte[]> newByteArraySpliterator(byte[] prefix, byte[] startKey,
       int maxParallelism, boolean closeOnException) throws IOException {
+    if (initializeThreadSafeIterator) {
+      return new ByteArrayRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
+    }
     return new ByteArrayRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
   }
 
@@ -395,9 +406,9 @@ class RDBTable implements Table<byte[], byte[]> {
     }
 
     @Override
-    TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> getRawIterator(
+    BaseDBTableIterator<byte[], ? extends RawKeyValue<byte[]>> getRawIterator(
         byte[] prefix, byte[] startKey, int maxParallelism) throws IOException {
-      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = iterator(prefix);
+      BaseDBTableIterator<byte[], ? extends RawKeyValue<byte[]>> itr = iterator(prefix);
       if (startKey != null) {
         itr.seek(startKey);
       }

@@ -226,7 +226,7 @@ public final class DBStoreBuilder {
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
           openReadOnly, dbJmxBeanNameName, enableCompactionDag,
           maxDbUpdatesSizeThreshold, createCheckpointDirs, configuration,
-          enableRocksDbMetrics);
+          enableRocksDbMetrics, rocksDBConfiguration.isThreadSafeIteratorEnabled());
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }

@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
-import org.apache.hadoop.hdds.utils.db.ReferenceCountedRDBStoreAbstractIterator.AutoCloseableRawKeyValue;
+import org.apache.hadoop.hdds.utils.db.Table.BaseDBTableIterator;
 import org.apache.ratis.util.ReferenceCountedObject;
 
 /**
@@ -42,21 +42,22 @@ import org.apache.ratis.util.ReferenceCountedObject;
  * @param <KEY>   The type of key in the key-value pair.
  * @param <VALUE> The type of value in the key-value pair.
  */
-abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSpliterator<KEY, VALUE> {
+abstract class RawSpliterator<RAW, KEY, VALUE>
+    implements Table.KeyValueSpliterator<KEY, VALUE> {
 
-  private ReferenceCountedObject<TableIterator<RAW, AutoCloseableRawKeyValue<RAW>>> rawIterator;
+  private ReferenceCountedObject<BaseDBTableIterator<RAW, ? extends RawKeyValue<RAW>>> rawIterator;
   private final KEY keyPrefix;
   private final KEY startKey;
   private final AtomicInteger maxNumberOfAdditionalSplits;
-  private final Lock lock;
   private final AtomicReference<IOException> closeException = new AtomicReference<>();
+  private boolean initialized;
+  private final Lock lock;
   private boolean closed;
   private final boolean closeOnException;
-  private boolean initialized;
 
   abstract Table.KeyValue<KEY, VALUE> convert(RawKeyValue<RAW> kv) throws IOException;
 
-  abstract TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> getRawIterator(
+  abstract BaseDBTableIterator<RAW, ? extends RawKeyValue<RAW>> getRawIterator(
       KEY prefix, KEY start, int maxParallelism) throws IOException;
 
   RawSpliterator(KEY keyPrefix, KEY startKey, int maxParallelism, boolean closeOnException) {
@@ -73,7 +74,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
     if (initialized) {
       return;
     }
-    TableIterator<RAW, AutoCloseableRawKeyValue<RAW>> itr = getRawIterator(keyPrefix,
+    BaseDBTableIterator<RAW, ? extends RawKeyValue<RAW>> itr = getRawIterator(keyPrefix,
         startKey, maxNumberOfAdditionalSplits.decrementAndGet());
     try {
       this.rawIterator = ReferenceCountedObject.wrap(itr, () -> { },
@@ -91,23 +92,63 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
     initialized = true;
   }
 
-  @Override
-  public boolean tryAdvance(Consumer<? super Table.KeyValue<KEY, VALUE>> action) {
-    lock.lock();
-    AutoCloseableRawKeyValue<RAW> kv;
+  private RawKeyValue<RAW> getNextKV() {
     try {
-      if (!closed && this.rawIterator.get().hasNext()) {
-        kv = rawIterator.get().next();
+      if (!closed && rawIterator.get().hasNext()) {
+        return rawIterator.get().next();
       } else {
         closeRawIterator();
-        return false;
+        return null;
       }
+    } catch (Throwable e) {
+      if (closeOnException) {
+        closeRawIterator();
+      }
+      throw new IllegalStateException("Failed next()", e);
+    }
+  }
+
+  private boolean tryAdvanceForCloseableKV(Consumer<? super Table.KeyValue<KEY, VALUE>> action) {
+    lock.lock();
+    RawKeyValue<RAW> rawKV;
+    try {
+      rawKV = getNextKV();
     } finally {
       lock.unlock();
     }
-    try (AutoCloseableRawKeyValue<RAW> keyValue = kv) {
-      if (keyValue != null) {
-        action.accept(convert(keyValue));
+    try (AutoCloseable ignored = (AutoCloseable) rawKV) {
+      if (rawKV != null) {
+        action.accept(convert(rawKV));
+        return true;
+      }
+      return false;
+    } catch (Throwable e) {
+      if (closeOnException) {
+        closeRawIteratorWithLock();
+      }
+      throw new IllegalStateException("Failed while running action(kv)", e);
+    }
+  }
+
+  private boolean tryAdvanceForKV(Consumer<? super Table.KeyValue<KEY, VALUE>> action) {
+    lock.lock();
+    Table.KeyValue<KEY, VALUE> kv = null;
+    try {
+      RawKeyValue<RAW> rawKV = getNextKV();
+      if (rawKV != null) {
+        kv = convert(rawKV);
+      }
+    } catch (Throwable e) {
+      if (closeOnException) {
+        closeRawIterator();
+      }
+      throw new IllegalStateException("Failed next()", e);
+    } finally {
+      lock.unlock();
+    }
+    try {
+      if (kv != null) {
+        action.accept(kv);
         return true;
       }
       return false;
@@ -117,6 +158,14 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
       }
       throw new IllegalStateException("Failed next()", e);
     }
+  }
+
+  @Override
+  public boolean tryAdvance(Consumer<? super Table.KeyValue<KEY, VALUE>> action) {
+    if (rawIterator.get().isKVCloseable()) {
+      return tryAdvanceForCloseableKV(action);
+    }
+    return tryAdvanceForKV(action);
   }
 
   @Override
@@ -141,7 +190,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
     return null;
   }
 
-  private void closeRawIterator() {
+  void closeRawIterator() {
     if (!closed) {
       try {
         closed = true;
@@ -152,7 +201,7 @@ abstract class RawSpliterator<RAW, KEY, VALUE> implements Table.KeyValueSplitera
     }
   }
 
-  private void closeRawIteratorWithLock() {
+  void closeRawIteratorWithLock() {
     if (!closed) {
       this.lock.lock();
       try {

@@ -464,4 +464,11 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   interface KeyValueSpliterator<KEY, VALUE> extends Spliterator<KeyValue<KEY, VALUE>>, Closeable {
   }
+
+  /**
+   * Base class for Raw DB TableIterator.
+   */
+  interface BaseDBTableIterator<RAW, V extends KeyValue<RAW, RAW>> extends TableIterator<RAW, V> {
+    boolean isKVCloseable();
+  }
 }
