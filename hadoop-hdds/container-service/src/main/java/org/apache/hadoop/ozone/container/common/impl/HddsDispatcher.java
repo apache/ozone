@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.security.token.NoopTokenVerifier;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -135,8 +136,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         : new NoopTokenVerifier();
     this.slowOpThresholdNs = getSlowOpThresholdMs(conf) * 1000000;
     fullVolumeLastHeartbeatTriggerMs = new AtomicLong(-1);
-    long heartbeatInterval =
-        config.getTimeDuration("hdds.heartbeat.interval", 30000, TimeUnit.MILLISECONDS);
+    long heartbeatInterval = HddsServerUtil.getScmHeartbeatInterval(conf);
     fullVolumeHeartbeatThrottleIntervalMs = Math.min(heartbeatInterval, 30000);
 
     protocolMetrics =
