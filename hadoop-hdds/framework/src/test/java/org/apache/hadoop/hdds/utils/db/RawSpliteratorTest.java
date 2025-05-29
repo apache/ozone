@@ -50,6 +50,7 @@ class RawSpliteratorTest {
     // Mock dependencies
     BaseDBTableIterator<String, CloseableRawKeyValue<String>> rawIteratorMock =
         mock(BaseDBTableIterator.class);
+    when(rawIteratorMock.isKVCloseable()).thenReturn(true);
     CloseableRawKeyValue<String> rawKeyValueMock =
         mock(CloseableRawKeyValue.class);
 

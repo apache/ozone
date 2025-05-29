@@ -31,7 +31,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -117,12 +116,8 @@ public class TestRDBStoreCodecBufferIterator {
     List<Table.KeyValue<byte[], byte[]>> remaining = new ArrayList<>();
     try (RDBStoreCodecBufferIterator i = newIterator()) {
       i.forEachRemaining(kv -> {
-        try {
-          remaining.add(RawKeyValue.create(
-              kv.getKey().getArray(), kv.getValue().getArray()));
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
+        remaining.add(RawKeyValue.create(
+            kv.getKey().getArray(), kv.getValue().getArray()));
       });
 
       System.out.println("remaining: " + remaining);
