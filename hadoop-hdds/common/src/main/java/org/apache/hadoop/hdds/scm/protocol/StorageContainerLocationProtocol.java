@@ -31,9 +31,9 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -492,7 +492,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
   String getMetrics(String query) throws IOException;
 
   /**
-   * Get getVolumeInfos based on query conditions.
+   * Retrieves volume information based on the specified query parameters.
    *
    * @param displayMode Represents the mode for displaying volumes.
    * Options include "all" for all volumes, "failed" for failed volumes,
@@ -505,7 +505,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    * I/O exceptions that may occur during the process of querying the volume.
    */
-  StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto getVolumeInfos(
+  GetVolumeInfosResponseProto getVolumeInfos(
       String displayMode, String uuid, String hostName, int pageSize, String startItem)
       throws IOException;
 }

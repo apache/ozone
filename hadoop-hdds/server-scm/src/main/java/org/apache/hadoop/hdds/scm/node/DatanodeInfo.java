@@ -165,7 +165,7 @@ public class DatanodeInfo extends DatanodeDetails {
 
       String storageLocation = report.getStorageLocation();
       long capacity = report.getCapacity();
-      String uuid = getUuidString();
+
       String hostName = getHostName();
 
       long failureTime = -1;
@@ -180,7 +180,7 @@ public class DatanodeInfo extends DatanodeDetails {
 
       VolumeInfoProto volumeFailure =
           VolumeInfoProto.newBuilder().
-          setUuid(uuid).
+          setDataNodeId(getID().toProto()).
           setHostName(hostName).
           setVolumeName(storageLocation).
           setCapacity(capacity).
@@ -195,7 +195,7 @@ public class DatanodeInfo extends DatanodeDetails {
       lastStatsUpdatedTime = Time.monotonicNow();
       failedVolumeCount = failedCount;
       storageReports = reports;
-      volumeInfos = volumeInfoLists;
+      volumeInfos = Collections.unmodifiableList(volumeInfoLists);
     } finally {
       lock.writeLock().unlock();
     }

@@ -15,17 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.datanode;
+package org.apache.hadoop.hdds.protocol;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
-import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 
 /**
  * This class is used to record disk failure conditions.
@@ -34,25 +31,15 @@ import org.apache.hadoop.hdds.utils.db.Proto2Codec;
  */
 public final class VolumeInfo implements Comparable<VolumeInfo> {
 
-  private String uuid;
+  private DatanodeID datanodeID;
   private String hostName;
   private String volumeName;
   private boolean failed;
   private long failureTime;
   private long capacity;
 
-  private static final Codec<VolumeInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(HddsProtos.VolumeInfoProto.getDefaultInstance()),
-      VolumeInfo::fromProtobuf,
-      VolumeInfo::getProtobuf,
-      VolumeInfo.class);
-
-  public static Codec<VolumeInfo> getCodec() {
-    return CODEC;
-  }
-
   private VolumeInfo(VolumeInfo.Builder b) {
-    this.uuid = b.uuid;
+    this.datanodeID = b.datanodeID;
     this.volumeName = b.volumeName;
     this.failureTime = b.failureTime;
     this.hostName = b.hostName;
@@ -62,7 +49,7 @@ public final class VolumeInfo implements Comparable<VolumeInfo> {
 
   public static VolumeInfo fromProtobuf(HddsProtos.VolumeInfoProto info) {
     VolumeInfo.Builder builder = new VolumeInfo.Builder();
-    builder.setUuid(info.getUuid())
+    builder.setDatanodeID(DatanodeID.fromProto(info.getDataNodeId()))
         .setHostName(info.getHostName())
         .setFailed(info.getFailed())
         .setVolumeName(info.getVolumeName())
@@ -75,7 +62,8 @@ public final class VolumeInfo implements Comparable<VolumeInfo> {
   public HddsProtos.VolumeInfoProto getProtobuf() {
     HddsProtos.VolumeInfoProto.Builder builder =
         HddsProtos.VolumeInfoProto.newBuilder();
-    builder.setUuid(getUuid())
+    final HddsProtos.DatanodeIDProto id = getDatanodeID().toProto();
+    builder.setDataNodeId(id)
         .setHostName(getHostName())
         .setFailed(isFailed())
         .setVolumeName(getVolumeName())
@@ -93,15 +81,15 @@ public final class VolumeInfo implements Comparable<VolumeInfo> {
    * </p>
    */
   public static class Builder {
-    private String uuid;
+    private DatanodeID datanodeID;
     private String hostName;
     private boolean failed;
     private String volumeName;
     private long failureTime;
     private long capacity;
 
-    public VolumeInfo.Builder setUuid(String pUuid) {
-      this.uuid = pUuid;
+    public VolumeInfo.Builder setDatanodeID(DatanodeID pDatanodeID) {
+      this.datanodeID = pDatanodeID;
       return this;
     }
 
@@ -135,8 +123,8 @@ public final class VolumeInfo implements Comparable<VolumeInfo> {
     }
   }
 
-  public String getUuid() {
-    return uuid;
+  public DatanodeID getDatanodeID() {
+    return datanodeID;
   }
 
   public String getVolumeName() {
@@ -161,9 +149,9 @@ public final class VolumeInfo implements Comparable<VolumeInfo> {
 
   @Override
   public int compareTo(VolumeInfo that) {
-    Preconditions.checkNotNull(that);
+    Objects.requireNonNull(that);
     return new CompareToBuilder()
-        .append(this.uuid, that.uuid)
+        .append(this.datanodeID, that.datanodeID)
         .append(this.hostName, that.hostName)
         .append(this.failed, that.failed)
         .append(this.volumeName, that.volumeName)
@@ -175,7 +163,7 @@ public final class VolumeInfo implements Comparable<VolumeInfo> {
   @Override
   public int hashCode() {
     return new HashCodeBuilder(61, 71)
-        .append(this.uuid)
+        .append(this.datanodeID)
         .append(this.hostName)
         .append(this.failed)
         .append(this.volumeName)
@@ -194,7 +182,7 @@ public final class VolumeInfo implements Comparable<VolumeInfo> {
     }
     final VolumeInfo that = (VolumeInfo) o;
     return new EqualsBuilder()
-        .append(this.uuid, that.uuid)
+        .append(this.datanodeID, that.datanodeID)
         .append(this.hostName, that.hostName)
         .append(this.failed, that.failed)
         .append(this.volumeName, that.volumeName)

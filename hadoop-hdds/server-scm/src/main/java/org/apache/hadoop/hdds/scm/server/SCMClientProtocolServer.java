@@ -1693,7 +1693,7 @@ public class SCMClientProtocolServer implements
     int startIndex = 0;
     if (StringUtils.isNotBlank(startItem)) {
       for (int i = 0; i < volumeInfos.size(); i++) {
-        if (volumeInfos.get(i).getUuid().equals(startItem) ||
+        if (volumeInfos.get(i).getDataNodeId().getUuid().equals(startItem) ||
             volumeInfos.get(i).getHostName().equals(startItem)) {
           startIndex = i + 1; // skip the startItem itself
           break;

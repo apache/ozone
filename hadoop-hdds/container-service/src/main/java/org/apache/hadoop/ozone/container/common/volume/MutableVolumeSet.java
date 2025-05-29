@@ -384,10 +384,11 @@ public class MutableVolumeSet implements VolumeSet {
 
         LOG.info("Removed Volume : {} from VolumeSet", volumeRoot);
       } else if (failedVolumeMap.containsKey(volumeRoot)) {
-        StorageVolume storageVolume = failedVolumeMap.get(volumeRoot);
-        storageVolume.resetFailureTime();
-        failedVolumeMap.remove(volumeRoot);
-        LOG.info("Removed Volume : {} from failed VolumeSet", volumeRoot);
+        StorageVolume storageVolume = failedVolumeMap.remove(volumeRoot);
+        if (storageVolume != null) {
+          storageVolume.resetFailureTime();
+          LOG.info("Removed Volume : {} from failed VolumeSet", volumeRoot);
+        }
       } else {
         LOG.warn("Volume : {} does not exist in VolumeSet", volumeRoot);
       }

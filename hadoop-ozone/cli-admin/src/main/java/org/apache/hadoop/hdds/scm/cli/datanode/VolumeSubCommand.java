@@ -24,11 +24,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.VolumeInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.datanode.VolumeInfo;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.shell.ListPaginationOptions;
 import org.apache.hadoop.ozone.utils.FormattingCLIUtils;
@@ -58,13 +58,13 @@ public class VolumeSubCommand extends ScmSubcommand {
    * We have designed a new option called 'show',
    * which includes two selectable configurations:
    * 'failed' is used to display failed disks,
-   * and 'normal' is used to display normal disks.
+   * and 'healthy' is used to display normal disks.
    */
-  @Option(names = { "--displayMode" },
+  @Option(names = { "--state" },
       defaultValue = "all",
-      description = "Display mode for disks: 'failed' shows failed disks, " +
-      "'normal' shows healthy disks, 'all' shows all disks.")
-  private DISPLAYMODE displayMode;
+      description = "Filter disks by state: 'failed' shows failed disks, " +
+      "'healthy' shows healthy disks, 'all' shows all disks.")
+  private State state;
 
   // The UUID identifier of the DataNode.
   @Option(names = { "--uuid" },
@@ -72,8 +72,8 @@ public class VolumeSubCommand extends ScmSubcommand {
       description = "Filter disks by the UUID of the DataNode.")
   private String uuid;
 
-  // The HostName identifier of the DataNode.
-  @Option(names = { "--hostName" },
+  // The hostname identifier of the DataNode.
+  @Option(names = { "--hostname" },
       defaultValue = "",
       description = "Filter disks by the host name of the DataNode.")
   private String hostName;
@@ -94,7 +94,7 @@ public class VolumeSubCommand extends ScmSubcommand {
   @CommandLine.Mixin
   private ListPaginationOptions listOptions;
 
-  enum DISPLAYMODE { all, normal, failed }
+  enum State { ALL, HEALTHY, FAILED }
 
   @Override
   public void execute(ScmClient client) throws IOException {
@@ -108,14 +108,14 @@ public class VolumeSubCommand extends ScmSubcommand {
       pageSize = -1;
     }
     GetVolumeInfosResponseProto response =
-        client.getVolumeInfos(displayMode.name(), uuid, hostName, pageSize, listOptions.getStartItem());
+        client.getVolumeInfos(state.name(), uuid, hostName, pageSize, listOptions.getStartItem());
 
     List<VolumeInfoProto> volumeInfosList = response.getVolumeInfosList();
     List<VolumeInfo> volumeInfos = convertToVolumeInfos(volumeInfosList);
 
     // If displayed in JSON format.
     if (json) {
-      System.out.print(JsonUtils.toJsonStringWithDefaultPrettyPrinter(volumeInfos));
+      System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(volumeInfos));
       return;
     }
 
@@ -127,7 +127,7 @@ public class VolumeSubCommand extends ScmSubcommand {
         String capacity = StringUtils.byteDesc(info.getCapacity());
         String failureTime = sdf.format(info.getFailureTime());
         String volumeStatus = getVolumeStatus(info.isFailed());
-        String[] values = new String[]{info.getUuid(), info.getHostName(), info.getVolumeName(),
+        String[] values = new String[]{info.getDatanodeID().getID(), info.getHostName(), info.getVolumeName(),
             volumeStatus, capacity, failureTime};
         formattingCLIUtils.addLine(values);
       }
@@ -145,7 +145,7 @@ public class VolumeSubCommand extends ScmSubcommand {
    * @param info volume information.
    */
   private void printInfo(VolumeInfo info) {
-    System.out.printf("%-13s: %s %n", "Uuid", info.getUuid());
+    System.out.printf("%-13s: %s %n", "Uuid", info.getDatanodeID().getID());
     System.out.printf("%-13s: %s %n", "HostName", info.getHostName());
     System.out.printf("%-13s: %s %n", "Volume Status", getVolumeStatus(info.isFailed()));
     System.out.printf("%-13s: %s %n", "Volume Name", info.getVolumeName());

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.scm;
+package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,12 +29,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.scm.cli.datanode.VolumeSubCommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.datanode.VolumeInfo;
+import org.apache.hadoop.hdds.protocol.VolumeInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -44,7 +45,7 @@ import picocli.CommandLine;
 
 /**
  * This unit test is used to verify whether the output of
- * `TestVolumeFailureSubCommand` meets the expected results.
+ * `TestVolumeCommand` meets the expected results.
  */
 public class TestVolumeCommand {
   private VolumeSubCommand cmd;
@@ -52,10 +53,6 @@ public class TestVolumeCommand {
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new VolumeSubCommand();
-  }
-
-  @AfterEach
-  public void tearDown() {
   }
 
   @Test
@@ -107,11 +104,11 @@ public class TestVolumeCommand {
       HddsProtos.DatanodeDetailsProto datanodeDetails =
           MockDatanodeDetails.randomLocalDatanodeDetails().getProtoBufMessage();
       String hostName = datanodeDetails.getHostName();
-      String uuId = datanodeDetails.getUuid();
+      HddsProtos.UUID uuid = datanodeDetails.getId().getUuid();
       VolumeInfo volumeInfo =
           new VolumeInfo.Builder().
           setHostName(hostName).
-          setUuid(uuId).
+          setDatanodeID(DatanodeID.of(uuid)).
           setFailed(true).
           setFailureTime(Time.now()).
           setVolumeName("/data" + i + "/ozonedata/hdds").

@@ -305,7 +305,7 @@ message RemoveScmResponseProto {
 }
 
 message VolumeInfoProto {
-    optional string uuid = 1;
+    optional DatanodeIDProto dataNodeId = 1;
     optional string hostName = 2;
     optional string volumeName = 3;
     optional bool failed = 4;
