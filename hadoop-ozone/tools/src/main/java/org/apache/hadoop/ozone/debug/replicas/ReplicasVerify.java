@@ -227,7 +227,8 @@ public class ReplicasVerify extends Handler {
 
     @CommandLine.Option(names = "--container-state",
         description = "Check the container and replica states. " +
-            "Replicas in [DELETED, UNHEALTHY, INVALID] states fail the check.",
+            "Containers in [DELETING, DELETED] states, or " +
+            "it's replicas in [DELETED, UNHEALTHY, INVALID] states fail the check.",
         defaultValue = "false")
     private boolean doExecuteReplicaState;
 

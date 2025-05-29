@@ -73,11 +73,11 @@ public class ContainerStateVerifier implements ReplicaVerifier {
           keyLocation, replicaIndex, containerInfoToken);
 
       ContainerDataProto.State state = containerData.getState();
-      if (state == ContainerDataProto.State.UNHEALTHY ||
-          state == ContainerDataProto.State.INVALID ||
-          state == ContainerDataProto.State.DELETED) {
-        replicaCheckMsg.append(state.name());
-      } else if (containerInfoToken.getContainerState() != HddsProtos.LifeCycleState.DELETING &&
+      replicaCheckMsg.append(state.name());
+      if (state != ContainerDataProto.State.UNHEALTHY &&
+          state != ContainerDataProto.State.INVALID &&
+          state != ContainerDataProto.State.DELETED &&
+          containerInfoToken.getContainerState() != HddsProtos.LifeCycleState.DELETING &&
           containerInfoToken.getContainerState() != HddsProtos.LifeCycleState.DELETED) {
         pass = true;
       }
@@ -89,6 +89,10 @@ public class ContainerStateVerifier implements ReplicaVerifier {
         return BlockVerificationResult.failCheck(replicaCheckMsg.toString());
       }
     } catch (IOException e) {
+      if (e.getMessage().contains("does not exist")) {
+        // if container "does not exist", mark it as failed instead of incomplete
+        return BlockVerificationResult.failCheck(e.getMessage());
+      }
       return BlockVerificationResult.failIncomplete(e.getMessage());
     }
   }
@@ -101,6 +105,7 @@ public class ContainerStateVerifier implements ReplicaVerifier {
     ReadContainerResponseProto response;
     try {
       Pipeline pipeline = Pipeline.newBuilder(keyLocation.getPipeline())
+          .setId(dn.getID())
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
           .setNodes(Collections.singletonList(dn))
           .setReplicaIndexes(Collections.singletonMap(dn, replicaIndex))
