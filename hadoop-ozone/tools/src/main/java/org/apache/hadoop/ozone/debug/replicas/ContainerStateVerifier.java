@@ -47,13 +47,14 @@ public class ContainerStateVerifier implements ReplicaVerifier {
   private final ContainerOperationClient containerOperationClient;
   private final XceiverClientManager xceiverClientManager;
   // cache for container info and encodedToken from the SCM
-  private final Cache<Long, ContainerInfoToken> encodedTokenCache = CacheBuilder.newBuilder()
-      .maximumSize(1000000)
-      .build();
+  private final Cache<Long, ContainerInfoToken> encodedTokenCache;
 
-  public ContainerStateVerifier(OzoneConfiguration conf) throws IOException {
+  public ContainerStateVerifier(OzoneConfiguration conf, long containerCacheSize) throws IOException {
     containerOperationClient = new ContainerOperationClient(conf);
     xceiverClientManager = containerOperationClient.getXceiverClientManager();
+    encodedTokenCache = CacheBuilder.newBuilder()
+        .maximumSize((containerCacheSize < 1) ? 1000000 : containerCacheSize)
+        .build();
   }
 
   @Override
@@ -89,7 +90,7 @@ public class ContainerStateVerifier implements ReplicaVerifier {
         return BlockVerificationResult.failCheck(replicaCheckMsg.toString());
       }
     } catch (IOException e) {
-      if (e.getMessage().contains("does not exist")) {
+      if (e.getMessage().contains("ContainerID") && e.getMessage().contains("does not exist")) {
         // if container "does not exist", mark it as failed instead of incomplete
         return BlockVerificationResult.failCheck(e.getMessage());
       }

@@ -67,6 +67,14 @@ public class ReplicasVerify extends Handler {
   @CommandLine.ArgGroup(exclusive = false, multiplicity = "1")
   private Verification verification;
 
+  @CommandLine.Option(names = {"--container-cache-size"},
+      description = "The cache size (in number of containers) for container state verification '--container-state'. " +
+          "Default is 1 million containers (which takes around 43MB). " +
+          "Value must be greater than zero, otherwise the default of 1 million is considered. " +
+          "Note: This option is ignored if '--container-state' option is not used.",
+      defaultValue = "1000000")
+  private long containerCacheSize;
+
   private List<ReplicaVerifier> replicaVerifiers;
 
   @Override
@@ -81,7 +89,7 @@ public class ReplicasVerify extends Handler {
       replicaVerifiers.add(new BlockExistenceVerifier(getConf()));
     }
     if (verification.doExecuteReplicaState) {
-      replicaVerifiers.add(new ContainerStateVerifier(getConf()));
+      replicaVerifiers.add(new ContainerStateVerifier(getConf(), containerCacheSize));
     }
 
     findCandidateKeys(client, address);
