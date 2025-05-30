@@ -100,6 +100,17 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public KeyValueSpliterator<KEY, VALUE> spliterator(int maxParallelism, boolean closeOnException) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public KeyValueSpliterator<KEY, VALUE> spliterator(KEY startKey, KEY prefix, int maxParallelism,
+      boolean closeOnException) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public String getName() {
     return "";
   }

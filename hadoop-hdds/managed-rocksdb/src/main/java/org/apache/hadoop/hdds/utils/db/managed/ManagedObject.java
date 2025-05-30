@@ -29,6 +29,7 @@ import org.rocksdb.RocksObject;
 class ManagedObject<T extends RocksObject> implements AutoCloseable {
   private final T original;
   private final UncheckedAutoCloseable leakTracker = track(this);
+  private volatile boolean isClosed = false;
 
   ManagedObject(T original) {
     this.original = original;
@@ -40,10 +41,17 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable {
 
   @Override
   public void close() {
-    try {
-      original.close();
-    } finally {
-      leakTracker.close();
+    if (!isClosed) {
+      try {
+        original.close();
+      } finally {
+        leakTracker.close();
+      }
+      isClosed = true;
     }
+  }
+
+  public boolean isClosed() {
+    return isClosed;
   }
 }

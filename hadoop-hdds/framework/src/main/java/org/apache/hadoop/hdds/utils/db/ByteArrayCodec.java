@@ -17,15 +17,22 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.util.Comparator;
+
 /**
  * No-op codec for byte arrays.
  */
 public final class ByteArrayCodec implements Codec<byte[]> {
 
   private static final Codec<byte[]> INSTANCE = new ByteArrayCodec();
+  private static final Comparator<byte[]> COMPARATOR = new ByteWiseComparator();
 
   public static Codec<byte[]> get() {
     return INSTANCE;
+  }
+
+  public static Comparator<byte[]> getComparator() {
+    return COMPARATOR;
   }
 
   private ByteArrayCodec() {
@@ -50,5 +57,19 @@ public final class ByteArrayCodec implements Codec<byte[]> {
   @Override
   public byte[] copyObject(byte[] bytes) {
     return bytes;
+  }
+
+  private static class ByteWiseComparator implements Comparator<byte[]> {
+    @Override
+    public int compare(byte[] o1, byte[] o2) {
+      int length = Math.min(o1.length, o2.length);
+      for (int i = 0; i < length; i++) {
+        int compareValue = Integer.compareUnsigned(Byte.toUnsignedInt(o1[i]), Byte.toUnsignedInt(o2[i]));
+        if (compareValue != 0) {
+          return compareValue;
+        }
+      }
+      return Integer.compare(o1.length, o2.length);
+    }
   }
 }
