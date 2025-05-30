@@ -22,7 +22,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -42,13 +41,14 @@ public abstract class BackgroundService {
       LoggerFactory.getLogger(BackgroundService.class);
 
   // Executor to launch child tasks
-  private final ScheduledThreadPoolExecutor exec;
-  private volatile ScheduledFuture<?> scheduledHandle;
-  private final ThreadGroup threadGroup;
+  private ScheduledThreadPoolExecutor exec;
+  private ThreadGroup threadGroup;
   private final String serviceName;
   private long interval;
   private final long serviceTimeoutInNanos;
   private TimeUnit unit;
+  private final int threadPoolSize;
+  private final String threadNamePrefix;
   private final PeriodicalTask service;
 
   public BackgroundService(String serviceName, long interval,
@@ -64,14 +64,9 @@ public abstract class BackgroundService {
     this.serviceName = serviceName;
     this.serviceTimeoutInNanos = TimeDuration.valueOf(serviceTimeout, unit)
             .toLong(TimeUnit.NANOSECONDS);
-    threadGroup = new ThreadGroup(serviceName);
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setThreadFactory(r -> new Thread(threadGroup, r))
-        .setDaemon(true)
-        .setNameFormat(threadNamePrefix + serviceName + "#%d")
-        .build();
-    exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(
-        threadPoolSize, threadFactory);
+    this.threadPoolSize = threadPoolSize;
+    this.threadNamePrefix = threadNamePrefix;
+    initExecutorAndThreadGroup();
     service = new PeriodicalTask();
   }
 
@@ -106,24 +101,15 @@ public abstract class BackgroundService {
 
   // start service
   public synchronized void start() {
-    if (scheduledHandle != null && !scheduledHandle.isCancelled()) {
-      LOG.warn("Background service {} is already running", serviceName);
-      return;
+    if (exec == null || exec.isShutdown() || exec.isTerminated()) {
+      initExecutorAndThreadGroup();
     }
-    scheduledHandle = exec.scheduleWithFixedDelay(service, 0, interval, unit);
+    exec.scheduleWithFixedDelay(service, 0, interval, unit);
   }
 
   protected synchronized void setInterval(long newInterval, TimeUnit newUnit) {
     this.interval = newInterval;
     this.unit = newUnit;
-  }
-
-  public synchronized void stop() {
-    LOG.info("Stopping {}", serviceName);
-    if (scheduledHandle != null) {
-      scheduledHandle.cancel(false); // don't interrupt running tasks
-      scheduledHandle = null;
-    }
   }
 
   public abstract BackgroundTaskQueue getTasks();
@@ -190,5 +176,15 @@ public abstract class BackgroundService {
     if (threadGroup.activeCount() == 0 && !threadGroup.isDestroyed()) {
       threadGroup.destroy();
     }
+  }
+
+  private void initExecutorAndThreadGroup() {
+    threadGroup = new ThreadGroup(serviceName);
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setThreadFactory(r -> new Thread(threadGroup, r))
+        .setDaemon(true)
+        .setNameFormat(threadNamePrefix + serviceName + "#%d")
+        .build();
+    exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(threadPoolSize, threadFactory);
   }
 }
