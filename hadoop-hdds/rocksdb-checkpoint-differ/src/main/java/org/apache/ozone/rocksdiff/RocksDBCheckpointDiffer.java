@@ -19,8 +19,6 @@ package org.apache.ozone.rocksdiff;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_BYTE_ARRAY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
@@ -167,7 +165,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private final Scheduler scheduler;
   private volatile boolean closed;
-  private final long maxAllowedTimeInDag;
   private final BootstrapStateHandler.Lock lock
       = new BootstrapStateHandler.Lock();
   private static final int SST_READ_AHEAD_SIZE = 2 * 1024 * 1024;
@@ -224,10 +221,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     this.sstBackupDir = Paths.get(metadataDirName, sstBackupDirName) + "/";
     createSstBackUpDir();
 
-    this.maxAllowedTimeInDag = configuration.getTimeDuration(
-        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
-        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
-        TimeUnit.MILLISECONDS);
     this.suspended = new AtomicBoolean(false);
 
     long pruneCompactionDagDaemonRunIntervalInMs =
@@ -252,12 +245,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
       this.scheduler = new Scheduler(DAG_PRUNING_SERVICE_NAME,
           true, 1);
-
-      this.scheduler.scheduleWithFixedDelay(
-          this::pruneOlderSnapshotsWithCompactionHistory,
-          pruneCompactionDagDaemonRunIntervalInMs,
-          pruneCompactionDagDaemonRunIntervalInMs,
-          TimeUnit.MILLISECONDS);
 
       this.scheduler.scheduleWithFixedDelay(
           this::pruneSstFiles,
@@ -1059,85 +1046,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   /**
-   * This is the task definition which is run periodically by the service
-   * executor at fixed delay.
-   * It looks for snapshots in compaction DAG which are older than the allowed
-   * time to be in compaction DAG and removes them from the DAG.
-   */
-  public void pruneOlderSnapshotsWithCompactionHistory() {
-    if (!shouldRun()) {
-      return;
-    }
-    Pair<Set<String>, List<byte[]>> fileNodeToKeyPair =
-        getOlderFileNodes();
-    Set<String> lastCompactionSstFiles = fileNodeToKeyPair.getLeft();
-    List<byte[]> keysToRemove = fileNodeToKeyPair.getRight();
-
-    Set<String> sstFileNodesRemoved =
-        pruneSstFileNodesFromDag(lastCompactionSstFiles);
-
-    if (CollectionUtils.isNotEmpty(sstFileNodesRemoved)) {
-      LOG.info("Removing SST files: {} as part of compaction DAG pruning.",
-          sstFileNodesRemoved);
-    }
-
-    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
-      removeSstFiles(sstFileNodesRemoved);
-      removeKeyFromCompactionLogTable(keysToRemove);
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  /**
-   * Returns the list of input files from the compaction entries which are
-   * older than the maximum allowed in the compaction DAG.
-   */
-  private synchronized Pair<Set<String>, List<byte[]>> getOlderFileNodes() {
-    long compactionLogPruneStartTime = System.currentTimeMillis();
-    Set<String> compactionNodes = new HashSet<>();
-    List<byte[]> keysToRemove = new ArrayList<>();
-
-    try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
-        activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
-      managedRocksIterator.get().seekToFirst();
-      while (managedRocksIterator.get().isValid()) {
-        CompactionLogEntry compactionLogEntry = CompactionLogEntry
-            .getFromProtobuf(CompactionLogEntryProto
-                .parseFrom(managedRocksIterator.get().value()));
-
-        if (compactionLogPruneStartTime -
-            compactionLogEntry.getCompactionTime() < maxAllowedTimeInDag) {
-          break;
-        }
-
-        compactionLogEntry.getInputFileInfoList()
-            .forEach(inputFileInfo ->
-                compactionNodes.add(inputFileInfo.getFileName()));
-        keysToRemove.add(managedRocksIterator.get().key());
-        managedRocksIterator.get().next();
-
-      }
-    } catch (InvalidProtocolBufferException exception) {
-      // TODO: Handle this properly before merging the PR.
-      throw new RuntimeException(exception);
-    }
-    return Pair.of(compactionNodes, keysToRemove);
-  }
-
-  private synchronized void removeKeyFromCompactionLogTable(
-      List<byte[]> keysToRemove) {
-    try {
-      for (byte[] key: keysToRemove) {
-        activeRocksDB.get().delete(compactionLogTableCFHandle, key);
-      }
-    } catch (RocksDBException exception) {
-      // TODO Handle exception properly before merging the PR.
-      throw new RuntimeException(exception);
-    }
-  }
-
-  /**
    * Deletes the SST files from the backup directory if exists.
    */
   private void removeSstFiles(Set<String> sstFileNodes) {
@@ -1149,27 +1057,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       } catch (IOException exception) {
         LOG.warn("Failed to delete SST file: " + sstFileNode, exception);
       }
-    }
-  }
-
-  /**
-   * Prunes forward and backward DAGs when oldest snapshot with compaction
-   * history gets deleted.
-   */
-  public Set<String> pruneSstFileNodesFromDag(Set<String> sstFileNodes) {
-    Set<CompactionNode> startNodes = new HashSet<>();
-    for (String sstFileNode : sstFileNodes) {
-      CompactionNode infileNode = compactionDag.getCompactionNode(sstFileNode);
-      if (infileNode == null) {
-        LOG.warn("Compaction node doesn't exist for sstFile: {}.", sstFileNode);
-        continue;
-      }
-
-      startNodes.add(infileNode);
-    }
-
-    synchronized (this) {
-      return compactionDag.pruneNodesFromDag(startNodes);
     }
   }
 
