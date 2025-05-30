@@ -504,6 +504,9 @@ public class TestMoveManager {
     containerInfo = ReplicationTestUtil.createContainer(
         HddsProtos.LifeCycleState.CLOSED, new ECReplicationConfig(3, 2));
     setupMocks();
+    long moveTimeout = 55 * 60 * 1000, replicationTimeout = 50 * 60 * 1000;
+    moveManager.setMoveTimeout(moveTimeout);
+    moveManager.setReplicationTimeout(replicationTimeout);
 
     replicas.addAll(ReplicationTestUtil
         .createReplicas(containerInfo.containerID(), 1, 2, 3, 4, 5));
@@ -516,23 +519,26 @@ public class TestMoveManager {
 
     CompletableFuture<MoveManager.MoveResult> res =
         moveManager.move(containerInfo.containerID(), src, tgt);
+    ArgumentCaptor<Long> longCaptorReplicate = ArgumentCaptor.forClass(Long.class);
+    verify(replicationManager).sendLowPriorityReplicateContainerCommand(
+        eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
+        eq(tgt), longCaptorReplicate.capture());
+
     ContainerReplicaOp op = new ContainerReplicaOp(
         ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
-
-    ArgumentCaptor<Long> longCaptor = ArgumentCaptor.forClass(Long.class);
+    ArgumentCaptor<Long> longCaptorDelete = ArgumentCaptor.forClass(Long.class);
     verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
-        eq(true), longCaptor.capture());
+        eq(true), longCaptorDelete.capture());
 
-    // 6 minutes is the datanodeTimeoutOffset set for datanodeCommands sent by replicationManager by default
-    assertTrue((Duration.ofMillis(longCaptor.getValue()).toMillis()
-        - Duration.ofMinutes(6).toMillis()) > clock.millis());
-
+    // verify that command is sent with expiration time as (moveStartTime + moveTimeout)
+    // moveStartTime can be calculated as (expirationTime set for replication - replicationTimeout)
+    assertEquals(longCaptorReplicate.getValue() - replicationTimeout + moveTimeout, longCaptorDelete.getValue());
+    assertTrue((longCaptorDelete.getValue() - Duration.ofMinutes(6).toMillis()) > clock.millis());
     op = new ContainerReplicaOp(
         DELETE, src, srcReplica.getReplicaIndex(), null, clock.millis() + 1000);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
-
     MoveManager.MoveResult finalResult = res.get();
     assertEquals(COMPLETED, finalResult);
   }
