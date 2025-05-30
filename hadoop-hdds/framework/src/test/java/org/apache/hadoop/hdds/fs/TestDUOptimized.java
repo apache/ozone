@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
  */
 class TestDUOptimized {
   private DUOptimized duOptimized;
-  DU metaPathDUMock = mock(DU.class);
+  private final DU metaPathDUMock = mock(DU.class);
 
   @BeforeEach
   void setUp() throws Exception {
