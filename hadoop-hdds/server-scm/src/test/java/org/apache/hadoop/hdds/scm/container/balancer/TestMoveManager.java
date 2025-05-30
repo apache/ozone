@@ -532,10 +532,14 @@ public class TestMoveManager {
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
         eq(true), longCaptorDelete.capture());
 
-    // verify that command is sent with expiration time as (moveStartTime + moveTimeout)
+    // verify that command is sent with deadline as (moveStartTime + moveTimeout)
     // moveStartTime can be calculated as (expirationTime set for replication - replicationTimeout)
     assertEquals(longCaptorReplicate.getValue() - replicationTimeout + moveTimeout, longCaptorDelete.getValue());
+    // replicationManager sends a datanode command with the scm deadline as
+    // (scmDeadlineEpochMs - rmConf.getDatanodeTimeoutOffset()). The offset is 6 minutes by default.
+    // For the scm deadline to not be in the past, the below condition is checked.
     assertTrue((longCaptorDelete.getValue() - Duration.ofMinutes(6).toMillis()) > clock.millis());
+
     op = new ContainerReplicaOp(
         DELETE, src, srcReplica.getReplicaIndex(), null, clock.millis() + 1000);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
