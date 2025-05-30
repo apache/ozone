@@ -438,7 +438,7 @@ public class TestHddsDispatcher {
       getNodeReport() SHOULD BE CALLED, AND LOG CAPTURE SHOULD CONTAIN THE EXCEPTION
        */
       verify(ozoneContainer, times(1)).getNodeReport();
-      assertTrue(logCapturer.getOutput().contains("Failed to handle full volume while handling request"));
+      assertTrue(logCapturer.getOutput().contains("Failed to create node report when handling full volume"));
     } finally {
       volumeSet.shutdown();
       ContainerMetrics.remove();

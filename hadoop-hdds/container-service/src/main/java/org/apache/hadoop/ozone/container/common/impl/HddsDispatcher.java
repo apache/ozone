@@ -47,8 +47,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -348,11 +348,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       boolean isFull = isVolumeFull(container);
       sendCloseContainerActionIfNeeded(container, isFull);
       if (isFull) {
-        try {
-          handleFullVolume(container.getContainerData().getVolume());
-        } catch (StorageContainerException e) {
-          LOG.warn("Failed to handle full volume while handling request: {}", msg, e);
-        }
+        handleFullVolume(container.getContainerData().getVolume(), msg);
       }
     }
     Handler handler = getHandler(containerType);
@@ -460,28 +456,31 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
    * heartbeat, and then send the heartbeat (including container close action) immediately.
    * @param volume the volume being written to
    */
-  private void handleFullVolume(HddsVolume volume) throws StorageContainerException {
+  private void handleFullVolume(HddsVolume volume, ContainerCommandRequestProto request) {
     long current = System.currentTimeMillis();
     long last = fullVolumeLastHeartbeatTriggerMs.get();
     boolean isFirstTrigger = last == -1;
     boolean allowedToTrigger = (current - fullVolumeHeartbeatThrottleIntervalMs) >= last;
     if (isFirstTrigger || allowedToTrigger) {
       if (fullVolumeLastHeartbeatTriggerMs.compareAndSet(last, current)) {
-        StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReport;
         try {
-          nodeReport = context.getParent().getContainer().getNodeReport();
-          context.refreshFullReport(nodeReport);
-          context.getParent().triggerHeartbeat();
-          LOG.info("Triggering heartbeat for full volume {}, with node report: {}.", volume, nodeReport);
+          NodeReportProto nodeReport = triggerHeartbeatWithNodeReport();
+          LOG.info("Triggered heartbeat for full volume {}, with node report: {}.", volume, nodeReport);
         } catch (IOException e) {
           String volumePath = volume.getVolumeRootDir();
           StorageLocationReport volumeReport = volume.getReport();
-          String error = String.format(
-              "Failed to create node report when handling full volume %s. Volume Report: %s", volumePath, volumeReport);
-          throw new StorageContainerException(error, e, Result.IO_EXCEPTION);
+          LOG.warn("Failed to create node report when handling full volume at path {} for request {}. Volume Report:" +
+                  " {}", volumePath, request, volumeReport, e);
         }
       }
     }
+  }
+
+  private NodeReportProto triggerHeartbeatWithNodeReport() throws IOException {
+    NodeReportProto nodeReport = context.getParent().getContainer().getNodeReport();
+    context.refreshFullReport(nodeReport);
+    context.getParent().triggerHeartbeat();
+    return nodeReport;
   }
 
   private long getSlowOpThresholdMs(ConfigurationSource config) {
