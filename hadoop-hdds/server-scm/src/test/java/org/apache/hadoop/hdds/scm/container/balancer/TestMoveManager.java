@@ -537,7 +537,7 @@ public class TestMoveManager {
     assertEquals(longCaptorReplicate.getValue() - replicationTimeout + moveTimeout, longCaptorDelete.getValue());
     // replicationManager sends a datanode command with the scm deadline as
     // (scmDeadlineEpochMs - rmConf.getDatanodeTimeoutOffset()). The offset is 6 minutes by default.
-    // For the scm deadline to not be in the past, the below condition is checked.
+    // For the datanode deadline to not be in the past, the below condition is checked.
     assertTrue((longCaptorDelete.getValue() - Duration.ofMinutes(6).toMillis()) > clock.millis());
 
     op = new ContainerReplicaOp(
