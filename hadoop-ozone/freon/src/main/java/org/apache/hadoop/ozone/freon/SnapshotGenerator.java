@@ -81,8 +81,7 @@ public class SnapshotGenerator extends BaseFreonGenerator implements Callable<Vo
       for (int snapIndex = 1; snapIndex <= numSnapshots; snapIndex++) {
         String snapshotName = String.format("snap-%d", snapIndex);
 
-        // Snapshot creation: this is a placeholder call.
-        // Replace this call with the actual snapshot creation method supported in your environment.
+        // Create snapshot.
         String snapshotResponse = store.createSnapshot(volumeName, bucketName, snapshotName);
         System.out.println("Created snapshot: " + snapshotResponse);
 
