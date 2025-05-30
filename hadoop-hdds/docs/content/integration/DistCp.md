@@ -95,10 +95,12 @@ If a DistCp command fails and the error output contains "OzoneToken", indicating
 
 Add the following property to `core-site.xml` or `ozone-site.xml` on the node where you run the DistCp command:
 
+```xml
     <property>
       <name>ozone.security.enabled</name>
       <value>true</value>
     </property>
+```
 
 This helps the client correctly engage in secure communication protocols with Ozone.
 
@@ -141,18 +143,22 @@ You can prevent the DistCp MapReduce job from attempting to renew delegation tok
 
 **Parameter:**
 
+```shell
     -Dmapreduce.job.hdfs-servers.token-renewal.exclude=<authority_of_filesystem_to_exclude>
+```
 
 For an HDFS cluster, `<authority_of_filesystem_to_exclude>` would be its NameNode address (e.g., `namenode.example.com:8020` or just `namenode.example.com` if the port is standard). For an Ozone cluster, it would be its service ID (e.g., `ozoneprod`).
 
 **Example:**
 If you are running the DistCp command on a YARN cluster associated with the *destination* Ozone cluster (`ofs://ozone1707264383/...`) and copying data *from* a source HDFS cluster (`hdfs://ccycloud-1.weichiu-src.root.comops.site:8020/...`), and the token renewal for the source HDFS cluster is failing:
 
+```shell
     hadoop distcp \
       -Dmapreduce.job.hdfs-servers.token-renewal.exclude=ccycloud-1.weichiu-src.root.comops.site \
       -Ddfs.checksum.combine.mode=COMPOSITE_CRC \
       -Dozone.client.checksum.type=CRC32C \
       hdfs://ccycloud-1.weichiu-src.root.comops.site:8020/tmp/ \
       ofs://ozone1707264383/tmp/dest
+```
 
 In this example, `ccycloud-1.weichiu-src.root.comops.site` is the authority of the source HDFS cluster, and its tokens will not be renewed by the DistCp MapReduce job. Adjust the value based on which cluster's (source or destination, HDFS or Ozone) token renewals are problematic.
