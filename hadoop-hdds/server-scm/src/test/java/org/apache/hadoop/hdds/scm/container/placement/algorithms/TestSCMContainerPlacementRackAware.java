@@ -874,4 +874,16 @@ public class TestSCMContainerPlacementRackAware {
     assertEquals(favouredNodes.get(0), datanodeDetails.get(0));
 
   }
+
+  @Test
+  public void testSourceDatanodeIsNotChosenAsTarget() {
+    setup(2);
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+    usedNodes.add(datanodes.get(0));
+    dnInfos.get(1).setNodeStatus(NodeStatus.inServiceHealthyReadOnly());
+
+    assertThrows(SCMException.class,
+            () -> policy.chooseDatanodes(usedNodes, null, null, 1, 0, 0),
+            "No target datanode, this call should fail");
+  }
 }
