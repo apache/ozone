@@ -26,7 +26,7 @@ Currently, automatic RocksDB compactions are disabled for snapshot RocksDB to pr
 
 3. ### Directory Structure Changes
 
-   Snapshots currently reside in the `db.checkpoints` directory. The proposal introduces a `db.checkpoint.compacted` directory for compacted snapshots. The directory format should be as follows:
+   Snapshots currently reside in the `db.checkpoints` directory. The proposal introduces a `db.checkpoints.compacted` directory for compacted snapshots. The directory format should be as follows:
 
 | om.db-\<snapshot\_id\>.\<compaction\_timestamp\> |
 | :---- |
@@ -44,21 +44,24 @@ To compute a snapshot diff:
 5. ### Snapshot Compaction Workflow
 
    Snapshot compaction should only occur once the snapshot has undergone SST filtering. The following steps outline the process:
-1. **Create a RocksDB checkpoint** of the path previous snapshot corresponding to the bucket in the chain (if it exists). If a compacted copy already exists, update `compactionTime` and set `needsCompaction` to `false`. This checkpoint can be created in a tmp directory.
+1. **Create a RocksDB checkpoint** of the path previous snapshot corresponding to the bucket in the chain (if it exists).
 2. **Acquire the `SNAPSHOT_GC_LOCK`** for the snapshot ID to prevent garbage collection during compaction.
-3. **Compute the diff** between tables (`keyTable`, `fileTable`, `directoryTable`) of the checkpoint and the current snapshot using snapshot diff functionality.
-4. **Flush changed objects** into separate SST files using the SST file writer, categorizing them by table type.
-5. **Ingest these SST files** into the RocksDB checkpoint using the `ingestFile` API.
-6. Truncate `deletedTable,deletedDirectoryTable,snapshotRenamedTable etc. (All tables excepting keyTable/fileTable/directoryTable)` in checkpointed rocksdb and ingest the entire table from deletedTable and deletedDirectoryTable from the current snapshot rocksdb.
-7. **Acquire the snapshot cache lock** to prevent snapshot access during directory updates.
-8. **Move the checkpoint directory** into `db.checkpoint.compacted` with the format:
+  1. If there is no path previous snapshot then
+    1.  take a checkpoint of the same rocksdb instance remove keys that don’t correspond to the bucket from tables `keyTable`, `fileTable`, `directoryTable,deletedTable,deletedDirectoryTable` by running rocksdb delete range api. We can trigger a forced manual compaction on the rocksdb instance(This can be behind a flag wherein the process can just work with the checkpoint of the rocksdb if the flag is disabled and not perform manual compaction). This should be done if the snapshot has never been compacted before i.e. if `lastCompactionTime` is zero or null. Otherwise just update the `needsCompaction` to False.
+  2. If path previous snapshot exists:
+    1. **Compute the diff** between tables (`keyTable`, `fileTable`, `directoryTable`) of the checkpoint and the current snapshot using snapshot diff functionality.
+    2. **Flush changed objects** into separate SST files using the SST file writer, categorizing them by table type.
+    3. **Ingest these SST files** into the RocksDB checkpoint using the `ingestFile` API.
+3. Truncate `deletedTable,deletedDirectoryTable,snapshotRenamedTable etc. (All tables excepting keyTable/fileTable/directoryTable)` in checkpointed rocksdb and ingest the entire table from deletedTable and deletedDirectoryTable from the current snapshot rocksdb.
+4. **Acquire the snapshot cache lock** to prevent snapshot access during directory updates.
+5. **Move the checkpoint directory** into `db.checkpoint.compacted` with the format:
 
 | om.db-\<snapshot\_id\>.\<snapshot\_compaction\_time\> |
 | :---- |
 
-9. **Update snapshot metadata**, setting `lastCompactionTime` and marking `needsCompaction = false` and set the next snapshot in the chain is marked for compaction. The `sstFiles` is set by creating Map\<String, List\<Long\>\> from the uncompacted version of the snapshot and this is only set once i.e. `lastCompactionTime` should be zero.
-10. **Delete old uncompacted/compacted snapshots**, ensuring unreferenced uncompacted/compacted snapshots are purged during OM startup(This is to handle jvm crash after viii).
-11. **Release the snapshot cache lock** on the snapshot id. Now the snapshot is ready to be used to read.
+6. **Update snapshot metadata**, setting `lastCompactionTime` and marking `needsCompaction = false` and set the next snapshot in the chain is marked for compaction. The `sstFiles` is set by creating Map\<String, List\<Long\>\> from the uncompacted version of the snapshot and this is only set once i.e. `lastCompactionTime` should be zero.
+7. **Delete old uncompacted/compacted snapshots**, ensuring unreferenced uncompacted/compacted snapshots are purged during OM startup(This is to handle jvm crash after viii).
+8. **Release the snapshot cache lock** on the snapshot id. Now the snapshot is ready to be used to read.
 
 
 
@@ -82,6 +85,3 @@ To compute a snapshot diff:
 # Conclusion
 
 This approach effectively reduces storage overhead while maintaining efficient snapshot retrieval and diff computation. The total storage would be in the order of total number of keys in the snapshots \+ AOS by reducing overall redundancy of the objects while also making the snapshot diff computation for even older snapshots more computationally efficient.
-
- 
-
