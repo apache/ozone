@@ -115,6 +115,12 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     start();
   }
 
+  @VisibleForTesting
+  public long getDirectoryDeletingServiceInterval(OzoneConfiguration conf) {
+    return conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
+        OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
+  }
+
   private boolean shouldRun() {
     if (getOzoneManager() == null) {
       // OzoneManager can be null for testing
