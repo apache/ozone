@@ -23,10 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import jakarta.annotation.Nonnull;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -37,21 +40,29 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Allocat
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests OMAllocateBlockRequest class.
  */
 public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
-  @Test
-  public void testPreExecute() throws Exception {
-
-    doPreExecute(createAllocateBlockRequest());
-
+  public static Collection<Object[]> cacheEnabledValues() {
+    return Arrays.asList(new Object[][] {
+        {true},
+        {false}
+    });
   }
 
-  @Test
-  public void testValidateAndUpdateCache() throws Exception {
+  public void testPreExecute() throws Exception {
+    doPreExecute(createAllocateBlockRequest());
+  }
+
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCache(boolean cacheEnabled) throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     // Add volume, bucket, key entries to DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
@@ -119,9 +130,10 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     return new OMAllocateBlockRequest(modifiedOmRequest, BucketLayout.DEFAULT);
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
-
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithVolumeNotFound(boolean cacheEnabled) throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     OMRequest modifiedOmRequest =
         doPreExecute(createAllocateBlockRequest());
 
@@ -137,9 +149,10 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
-
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithBucketNotFound(boolean cacheEnabled) throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     OMRequest modifiedOmRequest =
         doPreExecute(createAllocateBlockRequest());
 
@@ -159,9 +172,10 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithKeyNotFound() throws Exception {
-
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithKeyNotFound(boolean cacheEnabled) throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     OMRequest modifiedOmRequest =
         doPreExecute(createAllocateBlockRequest());
 
