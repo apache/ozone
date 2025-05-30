@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.IOException;
+import java.time.Instant;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
@@ -54,7 +55,8 @@ public class HddsVolumeFactory extends StorageVolumeFactory {
   public StorageVolume createFailedVolume(String locationString)
       throws IOException {
     HddsVolume.Builder volumeBuilder = new HddsVolume.Builder(locationString)
-        .failedVolume(true);
+        .failedVolume(true)
+        .failureTime(Instant.now());
     return volumeBuilder.build();
   }
 }
