@@ -49,7 +49,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -63,6 +62,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmUtils;
@@ -619,14 +619,11 @@ public class ReconStorageContainerManagerFacade
     try {
       final DBStore newStore = DBStoreBuilder.newBuilder(ozoneConfiguration, ReconSCMDBDefinition.get(), dbFile)
           .build();
-      Table<UUID, DatanodeDetails> nodeTable =
-          ReconSCMDBDefinition.NODES.getTable(dbStore);
-      Table<UUID, DatanodeDetails> newNodeTable =
-          ReconSCMDBDefinition.NODES.getTable(newStore);
-      try (TableIterator<UUID, ? extends KeyValue<UUID,
-          DatanodeDetails>> iterator = nodeTable.iterator()) {
+      final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(dbStore);
+      final Table<DatanodeID, DatanodeDetails> newNodeTable = ReconSCMDBDefinition.NODES.getTable(newStore);
+      try (TableIterator<DatanodeID, ? extends KeyValue<DatanodeID, DatanodeDetails>> iterator = nodeTable.iterator()) {
         while (iterator.hasNext()) {
-          KeyValue<UUID, DatanodeDetails> keyValue = iterator.next();
+          final KeyValue<DatanodeID, DatanodeDetails> keyValue = iterator.next();
           newNodeTable.put(keyValue.getKey(), keyValue.getValue());
         }
       }

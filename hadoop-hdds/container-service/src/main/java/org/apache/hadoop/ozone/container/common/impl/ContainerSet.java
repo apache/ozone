@@ -154,8 +154,6 @@ public class ContainerSet implements Iterable<Container<?>> {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }
       missingContainerSet.remove(containerId);
-      // wish we could have done this from ContainerData.setState
-      container.getContainerData().commitSpace();
       if (container.getContainerData().getState() == RECOVERING) {
         recoveringContainerMap.put(
             clock.millis() + recoveringTimeout, containerId);

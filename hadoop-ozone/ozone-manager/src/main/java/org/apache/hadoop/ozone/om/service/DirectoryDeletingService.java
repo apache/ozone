@@ -48,10 +48,10 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -319,7 +319,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                   previousSnapshotInfo)) {
         return true;
       }
-      try (ReferenceCounted<OmSnapshot> rcLatestSnapshot =
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> rcLatestSnapshot =
           omSnapshotManager.getSnapshot(
               deletedDirInfo.getVolumeName(),
               deletedDirInfo.getBucketName(),

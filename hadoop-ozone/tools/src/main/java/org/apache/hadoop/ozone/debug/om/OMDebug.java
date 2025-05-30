@@ -28,9 +28,20 @@ import picocli.CommandLine;
     name = "om",
     description = "Debug commands related to OM.",
     subcommands = {
+        CompactionLogDagPrinter.class,
         PrefixParser.class
     }
 )
 @MetaInfServices(DebugSubcommand.class)
 public class OMDebug implements DebugSubcommand {
+
+  @CommandLine.Option(names = {"--db"},
+      required = true,
+      scope = CommandLine.ScopeType.INHERIT,
+      description = "Path to OM RocksDB")
+  private String dbPath;
+
+  public String getDbPath() {
+    return dbPath;
+  }
 }

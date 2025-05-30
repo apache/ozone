@@ -52,12 +52,10 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * This class tests datanode can tolerate configured num of failed volumes.
  */
-@Timeout(300)
 public class TestDatanodeHddsVolumeFailureToleration {
 
   private MiniOzoneCluster cluster;

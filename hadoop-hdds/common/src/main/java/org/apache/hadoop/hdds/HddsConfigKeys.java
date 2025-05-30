@@ -28,15 +28,15 @@ public final class HddsConfigKeys {
   public static final String HDDS_HEARTBEAT_INTERVAL_DEFAULT =
       "30s";
   public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL =
-      "hdds.initial.heartbeat.interval";
+      "hdds.heartbeat.initial-interval";
   public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
       "2s";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL =
-      "hdds.recon.heartbeat.interval";
+      "hdds.heartbeat.recon.interval";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT =
       "60s";
   public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL =
-      "hdds.recon.initial.heartbeat.interval";
+      "hdds.heartbeat.recon.initial-interval";
   public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
       "2s";
   public static final String HDDS_NODE_REPORT_INTERVAL =
@@ -80,7 +80,7 @@ public final class HddsConfigKeys {
   public static final boolean HDDS_SCM_SAFEMODE_ENABLED_DEFAULT = true;
   public static final String HDDS_SCM_SAFEMODE_MIN_DATANODE =
       "hdds.scm.safemode.min.datanode";
-  public static final int HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT = 1;
+  public static final int HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT = 3;
 
   public static final String
       HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT =

@@ -27,10 +27,6 @@ import org.apache.ratis.util.TimeDuration;
  * Ozone Manager Constants.
  */
 public final class OMConfigKeys {
-  public static final String OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB =
-      "ozone.om.snapshot.load.native.lib";
-  public static final boolean OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT = true;
-
   public static final String OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY =
       "ozone.filesystem.snapshot.enabled";
   public static final boolean OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT = true;
@@ -282,7 +278,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";
-  public static final int OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT = 1000;
+  public static final int OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT = 10000;
 
   public static final String OZONE_OM_KERBEROS_KEYTAB_FILE_KEY = "ozone.om."
       + "kerberos.keytab.file";
@@ -403,7 +399,12 @@ public final class OMConfigKeys {
   public static final String OZONE_THREAD_NUMBER_DIR_DELETION =
       "ozone.thread.number.dir.deletion";
 
+  public static final String OZONE_THREAD_NUMBER_KEY_DELETION =
+      "ozone.thread.number.key.deletion";
+
   public static final int OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT = 10;
+
+  public static final int OZONE_THREAD_NUMBER_KEY_DELETION_DEFAULT = 10;
 
   public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.filtering.limit.per.task";

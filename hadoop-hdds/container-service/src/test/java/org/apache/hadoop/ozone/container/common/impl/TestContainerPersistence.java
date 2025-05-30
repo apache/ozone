@@ -96,7 +96,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +105,6 @@ import org.slf4j.LoggerFactory;
  * these tests are specific to {@link KeyValueContainer}. If a new {@link
  * ContainerProtos.ContainerType} is added, the tests need to be modified.
  */
-@Timeout(300)
 public class TestContainerPersistence {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String SCM_ID = UUID.randomUUID().toString();
@@ -204,10 +202,11 @@ public class TestContainerPersistence {
     data.addMetadata("VOLUME", "shire");
     data.addMetadata("owner)", "bilbo");
     KeyValueContainer container = new KeyValueContainer(data, conf);
+    commitBytesBefore = StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()).get(0).getCommittedBytes();
+
     container.create(volumeSet, volumeChoosingPolicy, SCM_ID);
-    commitBytesBefore = container.getContainerData()
-        .getVolume().getCommittedBytes();
     cSet.addContainer(container);
+
     commitBytesAfter = container.getContainerData()
         .getVolume().getCommittedBytes();
     commitIncrement = commitBytesAfter - commitBytesBefore;

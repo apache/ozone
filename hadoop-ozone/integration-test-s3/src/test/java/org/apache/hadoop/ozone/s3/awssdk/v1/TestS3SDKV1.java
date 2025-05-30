@@ -22,12 +22,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests the AWS S3 SDK basic operations with OM Ratis enabled.
  */
-@Timeout(300)
 public class TestS3SDKV1 extends AbstractS3SDKV1Tests {
 
   @BeforeAll
