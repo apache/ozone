@@ -503,6 +503,9 @@ public final class SCMContainerPlacementRackAware
       }
 
       if (usedNodes != null && usedNodes.contains(node)) {
+        if (excludedNodesForCapacity == null) {
+          excludedNodesForCapacity = new ArrayList<>();
+        }
         excludedNodesForCapacity.add(node.getNetworkFullPath());
         continue;
       }

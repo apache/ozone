@@ -882,11 +882,8 @@ public class TestSCMContainerPlacementRackAware {
     usedNodes.add(datanodes.get(0));
     dnInfos.get(1).setNodeStatus(NodeStatus.inServiceHealthyReadOnly());
 
-    Exception e =
-        assertThrows(SCMException.class,
+    assertThrows(SCMException.class,
             () -> policy.chooseDatanodes(usedNodes, null, null, 1, 0, 0),
             "No target datanode, this call should fail");
-
-    assertEquals("SCMException", e.getClass().getSimpleName());
   }
 }
