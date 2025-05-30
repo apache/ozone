@@ -48,6 +48,7 @@ import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -539,6 +540,25 @@ public class TestHddsVolume {
     result = volume.check(false);
     assertEquals(VolumeCheckResult.FAILED, result);
 
+    volume.shutdown();
+  }
+
+  @Test
+  public void testGetContainerDirsPath() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, null);
+
+    File expectedPath = new File(new File(volume.getStorageDir(), CLUSTER_ID), Storage.STORAGE_DIR_CURRENT);
+    assertEquals(expectedPath, volume.getContainerDirsPath());
+
+    volume.shutdown();
+  }
+
+  @Test
+  public void testGetContainerDirsPathWhenNotFormatted() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    assertNull(volume.getContainerDirsPath());
     volume.shutdown();
   }
 
