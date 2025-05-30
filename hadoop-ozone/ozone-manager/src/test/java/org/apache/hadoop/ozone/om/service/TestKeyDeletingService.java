@@ -31,11 +31,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -48,11 +51,14 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -60,6 +66,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -74,6 +81,7 @@ import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PendingKeysDeletion;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -581,6 +589,41 @@ class TestKeyDeletingService extends OzoneTestBase {
         assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
         checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, true);
       }
+    }
+
+    @Test
+    public void testKeyDeletingServiceWithDeepCleanedSnapshots() throws Exception {
+      OzoneManager ozoneManager = Mockito.spy(om);
+      OmMetadataManagerImpl omMetadataManager = Mockito.mock(OmMetadataManagerImpl.class);
+      SnapshotChainManager snapshotChainManager = Mockito.mock(SnapshotChainManager.class);
+      OmSnapshotManager omSnapshotManager = Mockito.mock(OmSnapshotManager.class);
+      when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+      when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
+      when(omMetadataManager.getSnapshotChainManager()).thenReturn(snapshotChainManager);
+      when(snapshotChainManager.getTableKey(any(UUID.class)))
+          .thenAnswer(i -> i.getArgument(0).toString());
+      Table snapshotInfoTable = Mockito.mock(Table.class);
+      when(omMetadataManager.getSnapshotInfoTable()).thenReturn(snapshotInfoTable);
+      when(snapshotInfoTable.get(any(String.class))).thenAnswer(i -> {
+        SnapshotInfo snapshotInfo = Mockito.mock(SnapshotInfo.class);
+        when(snapshotInfo.getSnapshotId()).thenReturn(UUID.fromString(i.getArgument(0)));
+        when(snapshotInfo.getDeepClean()).thenReturn(true);
+        return snapshotInfo;
+      });
+      List<UUID> snapshotIds = IntStream.range(0, 10).mapToObj(i -> UUID.randomUUID()).collect(Collectors.toList());
+      when(snapshotChainManager.iterator(anyBoolean())).thenAnswer(i -> snapshotIds.iterator());
+      KeyDeletingService kds = Mockito.spy(new KeyDeletingService(ozoneManager, scmBlockTestingClient, 10000,
+          100000, conf, 10, true));
+      when(kds.getTasks()).thenAnswer(i -> {
+        BackgroundTaskQueue queue = new BackgroundTaskQueue();
+        for (UUID id : snapshotIds) {
+          queue.add(kds.new KeyDeletingTask(kds, id));
+        }
+        return queue;
+      });
+      kds.runPeriodicalTaskNow();
+      clearInvocations(omSnapshotManager);
+      verify(omSnapshotManager, Mockito.never()).getActiveSnapshot(any(), any(), any());
     }
 
     @Test
