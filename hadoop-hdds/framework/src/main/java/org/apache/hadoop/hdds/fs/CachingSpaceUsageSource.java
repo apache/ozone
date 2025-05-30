@@ -78,9 +78,6 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
         "executor should be provided if and only if refresh is requested");
 
     loadInitialValue();
-    // update recent capacity and available space after loading initial value
-    // later executor service will update used space over path on start()
-    updateAvailable();
   }
 
   @Override
