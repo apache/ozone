@@ -33,23 +33,25 @@ Once the KMS is configured, users can create an encryption key and then create a
 
 1.  **Set up a Key Management Server (KMS):**
   * **Hadoop KMS:** Follow the instructions in the [Hadoop KMS documentation](https://hadoop.apache.org/docs/r3.4.1/hadoop-kms/index.html).
-  * **Ranger KMS:** Ranger KMS can also be used. For Ranger KMS, encryption keys can be managed via the Ranger KMS management console or its REST API, in addition to the `hadoop key` command line interface.
+  * **Ranger KMS:** Ranger KMS can also be used. For Ranger KMS, encryption keys can be managed via the Ranger KMS management console or its [REST API](https://ranger.apache.org/kms/apidocs/index.html), in addition to the `hadoop key` command line interface.
 
 2.  **Configure Ozone:**
     Add the following property to Ozone’s `core-site.xml`:
 
         <property>
           <name>hadoop.security.key.provider.path</name>
-          <value>kms://<kms_provider_path_for_example_http@localhost:9600/kms></value>
+          <value><kms_provider_path></value>
         </property>
 
-    Replace `<kms_provider_path_for_example_http@localhost:9600/kms>` with the actual URI of your KMS.
+    Replace `<kms_provider_path>` with the actual URI of your KMS. For example, `kms://http@kms1.example.com:9600/kms`
 
 ### Creating an Encryption Key
 
 Use the `hadoop key create` command to create an encryption key in the configured KMS:
 
-    hadoop key create <key_name> [-size <key_bit_length>] [-cipher <cipher_suite>] [-description <description>]
+```shell
+  hadoop key create <key_name> [-size <key_bit_length>] [-cipher <cipher_suite>] [-description <description>]
+```
 
 * `<key_name>`: The name of the encryption key.
 * **`-size <key_bit_length>` (Optional):** Specifies the key bit length. Ozone supports **128** (default) and **256** bits.
@@ -58,17 +60,23 @@ Use the `hadoop key create` command to create an encryption key in the configure
 
 For example:
 
-    hadoop key create enckey -size 256 -cipher AES/CTR/NoPadding -description "Encryption key for my_bucket"
+```shell
+  hadoop key create enckey -size 256 -cipher AES/CTR/NoPadding -description "Encryption key for my_bucket"
+```
 
 ### Creating an Encrypted Bucket
 
 Use the Ozone shell `ozone sh bucket create` command with the `-k` (or `--key`) option to specify the encryption key:
 
-    ozone sh bucket create --key <key_name> /<volume_name>/<bucket_name>
+```shell
+  ozone sh bucket create --key <key_name> /<volume_name>/<bucket_name>
+```
 
 For example:
 
-    ozone sh bucket create --key enckey /vol1/encrypted_bucket
+```shell
+  ozone sh bucket create --key enckey /vol1/encrypted_bucket
+```
 
 Now, all data written to `/vol1/encrypted_bucket` will be encrypted.
 
@@ -81,12 +89,16 @@ When creating an encrypted bucket that will be accessed via S3G:
 1.  **Create the bucket under the `/s3v` volume:**
     The `/s3v` volume is the default volume for S3 buckets.
 
-        ozone sh bucket create --key <key_name> /s3v/<bucket_name>
+```shell
+  ozone sh bucket create --key <key_name> /s3v/<bucket_name>
+```
 
 2.  **Alternatively, create an encrypted bucket elsewhere and link it:**
 
-        ozone sh bucket create --key <key_name> /<volume_name>/<bucket_name>
-        ozone sh bucket link /<volume_name>/<bucket_name> /s3v/<link_name>
+```shell
+  ozone sh bucket create --key <key_name> /<volume_name>/<bucket_name>
+  ozone sh bucket link /<volume_name>/<bucket_name> /s3v/<link_name>
+```
 
 Note 1: An encrypted bucket cannot be created via S3 APIs. It must be done using Ozone shell commands as shown above.
 After creating an encrypted bucket, all the keys added to this bucket using s3g will be encrypted.
@@ -147,21 +159,21 @@ s3g.kerberos.principal" is assumed to be "s3g"
 
 ### KMS Authorization
 
-When Apache Ranger is enabled for KMS authorization, permissions for key operations are managed by Ranger policies. Ensure that the appropriate users have the necessary permissions.
+Key Management Servers (KMS) may enforce key access authorization. **Hadoop KMS supports ACLs (Access Control Lists) for fine-grained permission control, while Ranger KMS supports Ranger policies for encryption keys.** Ensure that the appropriate users have the necessary permissions based on the KMS type in use.
 
-For example, to allow the user `om` (the Ozone Manager user) to access the key `enckey` and the user `hdfs` (a typical HDFS service user) to manage keys, you might have policies in Ranger KMS like:
+For example, when using Ranger KMS for authorization, to allow the user `om` (the Ozone Manager user) to access the key `enckey` and the user `hdfs` (a typical HDFS service user) to manage keys, you might have policies in Ranger KMS like:
 
 * **Policy for `om` user (or the user running the Ozone Manager):**
   * Resource: `keyname=enckey`
-  * Permissions: `DECRYPT_EEK` (Decrypt Encrypted Encryption Key), `Youtube`
+  * Permissions: `DECRYPT_EEK` (Decrypt Encrypted Encryption Key)
 * **Policy for S3 Gateway proxy user (e.g., `s3g_proxy`):**
   * Resource: `keyname=enckey` (or specific keys for S3 buckets)
-  * Permissions: `DECRYPT_EEK`, `Youtube`
+  * Permissions: `DECRYPT_EEK`
 * **Policy for administrative users (e.g., `hdfs` or a keyadmin group):**
   * Resource: `keyname=*` (or specific keys)
-  * Permissions: `CREATE_KEY`, `DELETE_KEY`, `GET_KEYS`, `Youtube`, `ROLL_NEW_VERSION`
+  * Permissions: `CREATE_KEY`, `DELETE_KEY`, `GET_KEYS`, `ROLL_NEW_VERSION`
 
-Refer to the Ranger KMS documentation or [Hadoop KMS documentation](https://hadoop.apache.org/docs/r3.4.1/hadoop-kms/index.html#ACLs_.28Access_Control_Lists.29) for detailed instructions on configuring KMS policies.
+Refer to the Ranger documentation for detailed instructions on configuring KMS policies if you are using Ranger KMS. For Hadoop KMS, consult its [Hadoop KMS documentation](https://hadoop.apache.org/docs/r3.4.1/hadoop-kms/index.html#ACLs_.28Access_Control_Lists.29) for managing ACLs.
 
 ### Additional References
 
