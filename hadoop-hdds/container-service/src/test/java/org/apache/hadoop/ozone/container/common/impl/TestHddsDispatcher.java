@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -349,6 +350,95 @@ public class TestHddsDispatcher {
                   new RoundRobinVolumeChoosingPolicy(), scmId.toString()));
       assertEquals("Container creation failed, due to disk out of space",
           scException.getMessage());
+    } finally {
+      volumeSet.shutdown();
+      ContainerMetrics.remove();
+    }
+  }
+
+  /**
+   * Tests that we log any exception properly along with volume and request details when handling a full volume.
+   */
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testExceptionHandlingWhenVolumeFull(ContainerLayoutVersion layoutVersion) throws IOException {
+    /*
+    SETTING UP FULL VOLUME SCENARIO AND MOCKS, SAME AS OTHER TESTS
+     */
+    String testDirPath = testDir.getPath();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setStorageSize(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+        100.0, StorageUnit.BYTES);
+    DatanodeDetails dd = randomDatanodeDetails();
+
+    HddsVolume.Builder volumeBuilder =
+        new HddsVolume.Builder(testDirPath).datanodeUuid(dd.getUuidString())
+            .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+    // state of cluster : available (160) > 100  ,datanode volume
+    // utilisation threshold not yet reached. container creates are successful.
+    AtomicLong usedSpace = new AtomicLong(340);
+    SpaceUsageSource spaceUsage = MockSpaceUsageSource.of(500, usedSpace);
+
+    SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
+        spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
+    volumeBuilder.usageCheckFactory(factory);
+    MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(volumeBuilder.build()));
+    try {
+      UUID scmId = UUID.randomUUID();
+      ContainerSet containerSet = newContainerSet();
+      StateContext context = ContainerTestUtils.getMockContext(dd, conf);
+
+      /*
+      MOCK TO THROW AN EXCEPTION WHEN getNodeReport() IS CALLED
+       */
+      DatanodeStateMachine stateMachine = context.getParent();
+      OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+      doReturn(ozoneContainer).when(stateMachine).getContainer();
+      doThrow(new IOException()).when(ozoneContainer).getNodeReport();
+      // create a 50 byte container
+      // available (160) > 100 (min free space) + 50 (container size)
+      KeyValueContainerData containerData = new KeyValueContainerData(1L,
+          layoutVersion,
+          50, UUID.randomUUID().toString(),
+          dd.getUuidString());
+      Container container = new KeyValueContainer(containerData, conf);
+      StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+          .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+          scmId.toString());
+      containerSet.addContainer(container);
+      ContainerMetrics metrics = ContainerMetrics.create(conf);
+      Map<ContainerType, Handler> handlers = Maps.newHashMap();
+      for (ContainerType containerType : ContainerType.values()) {
+        handlers.put(containerType,
+            Handler.getHandlerForContainerType(containerType, conf,
+                context.getParent().getDatanodeDetails().getUuidString(),
+                containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER));
+      }
+      HddsDispatcher hddsDispatcher = new HddsDispatcher(
+          conf, containerSet, volumeSet, handlers, context, metrics, null);
+      hddsDispatcher.setClusterId(scmId.toString());
+      /*
+      CAPTURE LOGS TO ASSERT THAT THE EXCEPTION WAS LOGGED PROPERLY
+       */
+      LogCapturer logCapturer = LogCapturer.captureLogs(HddsDispatcher.LOG);
+      containerData.getVolume().getVolumeUsage()
+          .ifPresent(usage -> usage.incrementUsedSpace(50));
+      usedSpace.addAndGet(50);
+      ContainerCommandResponseProto response = hddsDispatcher
+          .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
+      logCapturer.stopCapturing();
+
+      assertEquals(ContainerProtos.Result.SUCCESS,
+          response.getResult());
+      verify(context, times(1))
+          .addContainerActionIfAbsent(any(ContainerAction.class));
+      /*
+      getNodeReport() SHOULD BE CALLED, AND LOG CAPTURE SHOULD CONTAIN THE EXCEPTION
+       */
+      verify(ozoneContainer, times(1)).getNodeReport();
+      assertTrue(logCapturer.getOutput().contains("Failed to handle full volume while handling request"));
     } finally {
       volumeSet.shutdown();
       ContainerMetrics.remove();

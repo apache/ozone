@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
@@ -53,7 +55,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.security.token.NoopTokenVerifier;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -136,8 +137,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         : new NoopTokenVerifier();
     this.slowOpThresholdNs = getSlowOpThresholdMs(conf) * 1000000;
     fullVolumeLastHeartbeatTriggerMs = new AtomicLong(-1);
-    long heartbeatInterval = HddsServerUtil.getScmHeartbeatInterval(conf);
-    fullVolumeHeartbeatThrottleIntervalMs = Math.min(heartbeatInterval, 30000);
+    long nodeReportInterval = conf.getTimeDuration(HDDS_NODE_REPORT_INTERVAL, HDDS_NODE_REPORT_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    fullVolumeHeartbeatThrottleIntervalMs = Math.min(nodeReportInterval, 60000); // min of interval and 1 minute
 
     protocolMetrics =
         new ProtocolMessageMetrics<>(
@@ -349,7 +351,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         try {
           handleFullVolume(container.getContainerData().getVolume());
         } catch (StorageContainerException e) {
-          ContainerUtils.logAndReturnError(LOG, e, msg);
+          LOG.warn("Failed to handle full volume while handling request: {}", msg, e);
         }
       }
     }
