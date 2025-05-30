@@ -62,7 +62,11 @@ The Ozone shell provides convenient commands to manage snapshots. Snapshots can 
 ```shell
 ozone sh snapshot create /vol1/bucket1 finance_backup_2025
 ```
-  This captures an instantaneous image of all keys under `/vol1/bucket1`. The operation requires you to be the bucket owner or volume owner (admin privilege). If no snapshot name is provided, Ozone will auto-generate a name (often using a timestamp).
+  This captures an instantaneous image of all keys under `/vol1/bucket1`. The operation requires you to be the bucket owner or volume owner (admin privilege). If no snapshot name is provided, Ozone will auto-generate a name using using the format `s` + `yyyyMMdd-HHmmss.SSS`. For example, `s20250530-005848.163`.
+  If you supply a snapshot name, it must:
+  * confirm to a valid DNS name, similar to volume name and bucket name. For example, `finance_backup_2025` is a valid name, while `finance backup 2025` (with spaces) is not.
+  * The name must be unique within the bucket.
+
   Alternatively, you can create a snapshot using the Hadoop FS interface:
 ```shell
 ozone fs -createSnapshot ofs://om-service/vol1/bucket1 finance_backup_2025
