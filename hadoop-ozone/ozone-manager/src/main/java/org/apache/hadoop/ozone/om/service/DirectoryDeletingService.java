@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -101,6 +104,21 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.dirDeletingCorePoolSize = dirDeletingServiceCorePoolSize;
     deletedDirSupplier = new DeletedDirSupplier();
     taskCount.set(0);
+  }
+
+  public synchronized void updateAndRestart(OzoneConfiguration conf) {
+    long newInterval = conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
+        OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
+    LOG.info("Updating and restarting DirectoryDeletingService with interval: {}", newInterval);
+    shutdown();
+    setInterval(newInterval, TimeUnit.SECONDS);
+    start();
+  }
+
+  @VisibleForTesting
+  public long getDirectoryDeletingServiceInterval(OzoneConfiguration conf) {
+    return conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
+        OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
   }
 
   private boolean shouldRun() {

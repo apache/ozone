@@ -18,13 +18,16 @@
 package org.apache.hadoop.ozone.shell;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import org.apache.hadoop.conf.ReconfigurableBase;
+import org.apache.hadoop.conf.ReconfigurationException;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurableBase;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -33,6 +36,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
@@ -47,6 +51,8 @@ import org.junit.jupiter.api.TestInstance;
 public abstract class TestReconfigShell implements NonHATests.TestCase {
 
   private OzoneAdmin ozoneAdmin;
+  private OzoneConfiguration conf;
+  private DirectoryDeletingService directoryDeletingService;
   private GenericTestUtils.PrintStreamCapturer out;
   private GenericTestUtils.PrintStreamCapturer err;
 
@@ -55,6 +61,8 @@ public abstract class TestReconfigShell implements NonHATests.TestCase {
     out = GenericTestUtils.captureOut();
     err = GenericTestUtils.captureErr();
     ozoneAdmin = new OzoneAdmin();
+    conf = new OzoneConfiguration();
+    directoryDeletingService = cluster().getOzoneManager().getKeyManager().getDirDeletingService();
   }
 
   @AfterEach
@@ -75,6 +83,21 @@ public abstract class TestReconfigShell implements NonHATests.TestCase {
     OzoneManager om = cluster().getOzoneManager();
     InetSocketAddress socket = om.getOmRpcServerAddr();
     executeAndAssertProperties(om.getReconfigurationHandler(), "OM", socket);
+  }
+
+  @Test
+  void testDirectoryDeletingServiceIntervalReconfiguration() throws ReconfigurationException {
+    OzoneManager om = cluster().getOzoneManager();
+    InetSocketAddress socket = om.getOmRpcServerAddr();
+
+    cluster().getOzoneManager().getReconfigurationHandler()
+        .reconfigurePropertyImpl(OZONE_DIR_DELETING_SERVICE_INTERVAL, "1m");
+
+    executeAndAssertStart("OM", socket);
+    //If config value is set in ozone-site.xml then it is picked up during reconfiguration
+    assertThat(directoryDeletingService.getDirectoryDeletingServiceInterval(conf)).isEqualTo(120L); //2m
+    executeStatus("OM", socket);
+    assertThat(out.get()).contains("SUCCESS: Changed property ozone.directory.deleting.service.interval");
   }
 
   @Test
@@ -130,4 +153,16 @@ public abstract class TestReconfigShell implements NonHATests.TestCase {
   private String getAddress(InetSocketAddress socket) {
     return socket.getHostString() + ":" + socket.getPort();
   }
+
+  private void executeAndAssertStart(String service, InetSocketAddress socket) {
+    String address = socket.getHostString() + ":" + socket.getPort();
+    ozoneAdmin.getCmd().execute("reconfig", "--service", service, "--address", address, "start");
+    assertThat(out.get()).contains(service + ": Started reconfiguration task on node");
+  }
+
+  private void executeStatus(String service, InetSocketAddress socket) {
+    String address = socket.getHostString() + ":" + socket.getPort();
+    ozoneAdmin.getCmd().execute("reconfig", "--service", service, "--address", address, "status");
+  }
+
 }
