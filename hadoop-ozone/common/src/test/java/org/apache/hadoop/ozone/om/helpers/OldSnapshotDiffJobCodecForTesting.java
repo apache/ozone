@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.hadoop.hdds.utils.db.Codec;
 import java.io.IOException;
+import org.apache.hadoop.hdds.utils.db.Codec;
 
 /**
  * Codec to serialize / deserialize SnapshotDiffJob.
