@@ -592,6 +592,7 @@ class TestKeyDeletingService extends OzoneTestBase {
     }
 
     @Test
+    @DisplayName("KeyDeletingService should skip active snapshot retrieval for deep cleaned snapshots")
     public void testKeyDeletingServiceWithDeepCleanedSnapshots() throws Exception {
       OzoneManager ozoneManager = Mockito.spy(om);
       OmMetadataManagerImpl omMetadataManager = Mockito.mock(OmMetadataManagerImpl.class);
@@ -607,7 +608,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       when(snapshotInfoTable.get(any(String.class))).thenAnswer(i -> {
         SnapshotInfo snapshotInfo = Mockito.mock(SnapshotInfo.class);
         when(snapshotInfo.getSnapshotId()).thenReturn(UUID.fromString(i.getArgument(0)));
-        when(snapshotInfo.getDeepClean()).thenReturn(true);
+        when(snapshotInfo.isDeepCleaned()).thenReturn(true);
         return snapshotInfo;
       });
       List<UUID> snapshotIds = IntStream.range(0, 10).mapToObj(i -> UUID.randomUUID()).collect(Collectors.toList());
@@ -903,7 +904,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       while (iterator.hasNext()) {
         SnapshotInfo snapInfo = iterator.next().getValue();
         if (volumeName.equals(snapInfo.getVolumeName())) {
-          assertThat(snapInfo.getDeepClean())
+          assertThat(snapInfo.isDeepCleaned())
               .as(snapInfo.toAuditMap().toString())
               .isEqualTo(deepClean);
         }
