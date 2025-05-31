@@ -22,16 +22,11 @@ Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${user}              hadoop
+${user}              testuser/om@EXAMPLE.COM
 ${buckets}           5
 ${auditworkdir}      /tmp
 
 *** Keywords ***
-Set username
-    ${hostname} =          Execute         hostname
-    Set Suite Variable     ${user}         testuser/${hostname}@EXAMPLE.COM
-    [return]               ${user}
-
 Create data
     Freon OMBG    prefix=auditparser    n=${buckets}
     Freon OCKG    prefix=auditparser    n=100
@@ -46,7 +41,6 @@ Testing audit parser
     ${result} =        Execute              ozone debug auditparser "${auditworkdir}/audit.db" template top5cmds
                        Should Contain       ${result}  ALLOCATE_KEY
     ${result} =        Execute              ozone debug auditparser "${auditworkdir}/audit.db" template top5users
-    Run Keyword If     '${SECURITY_ENABLED}' == 'true'      Set username
                        Should Contain       ${result}  ${user}
     ${result} =        Execute              ozone debug auditparser "${auditworkdir}/audit.db" query "select count(*) from audit where op='CREATE_VOLUME' and RESULT='SUCCESS'"
     ${result} =        Convert To Number     ${result}
