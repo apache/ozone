@@ -548,10 +548,6 @@
             <groupId>org.apache.tomcat.embed</groupId>
             <artifactId>tomcat-embed-core</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>org.jetbrains.kotlin</groupId>
-            <artifactId>kotlin-stdlib</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1379,11 +1375,6 @@
       <dependency>
         <groupId>org.aspectj</groupId>
         <artifactId>aspectjrt</artifactId>
-        <version>${aspectj.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.aspectj</groupId>
-        <artifactId>aspectjweaver</artifactId>
         <version>${aspectj.version}</version>
       </dependency>
       <dependency>

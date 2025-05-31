@@ -44,10 +44,6 @@
       <artifactId>hdds-managed-rocksdb</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-io</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.rocksdb</groupId>
       <artifactId>rocksdbjni</artifactId>
       <!-- <scope>test</scope> but transitive via hdds-managed-rocksdb -->
