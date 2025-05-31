@@ -336,13 +336,17 @@ public class DeletedBlockLogImpl
         DeletedBlocksTransaction.newBuilder(tx)
             .setCount(transactionStatusManager.getRetryCount(tx.getTxID()))
             .build();
+    boolean flag = false;
     for (ContainerReplica replica : replicas) {
       final DatanodeID datanodeID = replica.getDatanodeDetails().getID();
       if (!transactionStatusManager.isDuplication(
           datanodeID, tx.getTxID(), commandStatus)) {
         transactions.addTransactionToDN(datanodeID, updatedTxn);
-        metrics.incrProcessedTransaction();
+        flag = true;
       }
+    }
+    if (flag) {
+      metrics.incrProcessedTransaction();
     }
   }
 
