@@ -160,6 +160,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
@@ -2196,101 +2197,52 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId,
       OmKeyInfo parentInfo, long remainingBufLimit) throws IOException {
-    String seekDirInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
-        parentInfo.getObjectID(), "");
-    long countEntries = 0;
-
-    Table<String, OmDirectoryInfo> dirTable = metadataManager.getDirectoryTable();
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, OmDirectoryInfo>>
-        iterator = dirTable.iterator(seekDirInDB)) {
-      return gatherSubDirsWithIterator(parentInfo, countEntries, iterator, remainingBufLimit);
-    }
-
+    return gatherSubPathsWithIterator(volumeId, bucketId, parentInfo, metadataManager.getDirectoryTable(),
+        omDirectoryInfo -> OMFileRequest.getKeyInfoWithFullPath(parentInfo, omDirectoryInfo), remainingBufLimit);
   }
 
-  private DeleteKeysResult gatherSubDirsWithIterator(OmKeyInfo parentInfo,
-      long countEntries,
-      TableIterator<String,
-          ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator, long remainingBufLimit)
-      throws IOException {
-    List<OmKeyInfo> directories = new ArrayList<>();
+  private <T extends WithParentObjectId> DeleteKeysResult gatherSubPathsWithIterator(
+      long volumeId, long bucketId, OmKeyInfo parentInfo,
+      Table<String, T> table, Function<T, OmKeyInfo> deleteKeyTransformer,
+      long remainingBufLimit) throws IOException {
+    List<OmKeyInfo> keyInfos = new ArrayList<>();
+    String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
+        parentInfo.getObjectID(), "");
     long consumedSize = 0;
-    boolean processedSubDirs = false;
-
-    while (iterator.hasNext() && remainingBufLimit > 0) {
-      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
-      OmDirectoryInfo dirInfo = entry.getValue();
-      long objectSerializedSize = entry.getRawSize();
-      if (!OMFileRequest.isImmediateChild(dirInfo.getParentObjectID(),
-          parentInfo.getObjectID())) {
-        processedSubDirs = true;
-        break;
+    boolean processedSubPaths = false;
+    try (TableIterator<String, ? extends Table.KeyValue<String, T>> iterator = table.iterator(seekFileInDB)) {
+      while (iterator.hasNext() && remainingBufLimit > 0) {
+        Table.KeyValue<String, T> entry = iterator.next();
+        T withParentObjectId = entry.getValue();
+        long objectSerializedSize = entry.getRawSize();
+        if (!OMFileRequest.isImmediateChild(withParentObjectId.getParentObjectID(),
+            parentInfo.getObjectID())) {
+          processedSubPaths = true;
+          break;
+        }
+        if (!table.isExist(entry.getKey())) {
+          continue;
+        }
+        if (remainingBufLimit - objectSerializedSize < 0) {
+          break;
+        }
+        OmKeyInfo keyInfo = deleteKeyTransformer.apply(withParentObjectId);
+        keyInfos.add(keyInfo);
+        remainingBufLimit -= objectSerializedSize;
+        consumedSize += objectSerializedSize;
       }
-      if (!metadataManager.getDirectoryTable().isExist(entry.getKey())) {
-        continue;
-      }
-      if (remainingBufLimit - objectSerializedSize < 0) {
-        break;
-      }
-      String dirName = OMFileRequest.getAbsolutePath(parentInfo.getKeyName(),
-          dirInfo.getName());
-      OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(
-          parentInfo.getVolumeName(), parentInfo.getBucketName(), dirInfo,
-          dirName);
-      directories.add(omKeyInfo);
-      countEntries++;
-      remainingBufLimit -= objectSerializedSize;
-      consumedSize += objectSerializedSize;
+      processedSubPaths = processedSubPaths || (!iterator.hasNext());
+      return new DeleteKeysResult(keyInfos, consumedSize, processedSubPaths);
     }
-
-    processedSubDirs = processedSubDirs || (!iterator.hasNext());
-
-    return new DeleteKeysResult(directories, consumedSize, processedSubDirs);
   }
 
   @Override
   public DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
       long bucketId, OmKeyInfo parentInfo, long remainingBufLimit)
           throws IOException {
-    List<OmKeyInfo> files = new ArrayList<>();
-    String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
-        parentInfo.getObjectID(), "");
-    long consumedSize = 0;
-    boolean processedSubFiles = false;
-
-    Table fileTable = metadataManager.getFileTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = fileTable.iterator(seekFileInDB)) {
-
-      while (iterator.hasNext() && remainingBufLimit > 0) {
-        Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
-        OmKeyInfo fileInfo = entry.getValue();
-        long objectSerializedSize = entry.getRawSize();
-        if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
-            parentInfo.getObjectID())) {
-          processedSubFiles = true;
-          break;
-        }
-        if (!metadataManager.getFileTable().isExist(entry.getKey())) {
-          continue;
-        }
-        if (remainingBufLimit - objectSerializedSize < 0) {
-          break;
-        }
-        fileInfo.setFileName(fileInfo.getKeyName());
-        String fullKeyPath = OMFileRequest.getAbsolutePath(
-            parentInfo.getKeyName(), fileInfo.getKeyName());
-        fileInfo.setKeyName(fullKeyPath);
-
-        files.add(fileInfo);
-        remainingBufLimit -= objectSerializedSize;
-        consumedSize += objectSerializedSize;
-      }
-      processedSubFiles = processedSubFiles || (!iterator.hasNext());
-    }
-
-    return new DeleteKeysResult(files, consumedSize, processedSubFiles);
+    return gatherSubPathsWithIterator(volumeId, bucketId, parentInfo, metadataManager.getFileTable(),
+        keyInfo -> OMFileRequest.getKeyInfoWithFullPath(parentInfo, keyInfo),
+        remainingBufLimit);
   }
 
   public boolean isBucketFSOptimized(String volName, String buckName)
