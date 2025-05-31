@@ -15,13 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.hdds.utils.db.iterator;
 
 import java.io.IOException;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
-import org.apache.hadoop.hdds.utils.db.iterator.BaseDBTableIterator;
+import org.apache.hadoop.hdds.utils.db.RDBTable;
+import org.apache.hadoop.hdds.utils.db.RawKeyValue;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.ratis.util.ReferenceCountedObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,31 +34,35 @@ import org.slf4j.LoggerFactory;
  *
  * @param <RAW> the raw type.
  */
-abstract class RDBStoreAbstractIterator<RAW>
-    implements BaseDBTableIterator<RAW, RawKeyValue<RAW>> {
+public abstract class ReferenceCountedRDBStoreAbstractIterator<RAW>
+    implements BaseDBTableIterator<RAW, CloseableRawKeyValue<RAW>> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(RDBStoreAbstractIterator.class);
+      LoggerFactory.getLogger(ReferenceCountedRDBStoreAbstractIterator.class);
 
   private final ManagedRocksIterator rocksDBIterator;
   private final RDBTable rocksDBTable;
-  private RawKeyValue<RAW> currentEntry;
+  private ReferenceCountedObject<RawKeyValue<RAW>> currentEntry;
+  private RawKeyValue<RAW> previousKeyValue;
   // This is for schemas that use a fixed-length
   // prefix for each key.
   private final RAW prefix;
+  private Boolean hasNext;
+  private boolean closed;
 
-  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table,
+  ReferenceCountedRDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table,
       RAW prefix) {
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
     this.prefix = prefix;
+    this.currentEntry = null;
+    this.hasNext = false;
+    this.closed = false;
+    this.previousKeyValue = null;
   }
 
-  /** @return the key for the current entry. */
-  abstract RAW key();
-
   /** @return the {@link Table.KeyValue} for the current entry. */
-  abstract RawKeyValue<RAW> getKeyValue();
+  abstract ReferenceCountedObject<RawKeyValue<RAW>> getKeyValue();
 
   /** Seek to the given key. */
   abstract void seek0(RAW key);
@@ -79,32 +87,52 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final void forEachRemaining(
-      Consumer<? super RawKeyValue<RAW>> action) {
+      Consumer<? super CloseableRawKeyValue<RAW>> action) {
     while (hasNext()) {
-      action.accept(next());
+      CloseableRawKeyValue<RAW> entry = next();
+      action.accept(entry);
     }
   }
 
+  private void releaseEntry() {
+    if (currentEntry != null) {
+      currentEntry.release();
+    }
+    currentEntry = null;
+    hasNext = null;
+  }
+
   private void setCurrentEntry() {
-    if (rocksDBIterator.get().isValid()) {
+    boolean isValid = !closed && rocksDBIterator.get().isValid();
+    if (isValid) {
       currentEntry = getKeyValue();
+      currentEntry.retain();
     } else {
       currentEntry = null;
     }
+    setHasNext(isValid, currentEntry);
+  }
+
+  public void setHasNext(boolean isValid, ReferenceCountedObject<RawKeyValue<RAW>> entry) {
+    this.hasNext = isValid && (prefix == null || startsWithPrefix(entry.get().getKey()));
   }
 
   @Override
   public final boolean hasNext() {
-    return rocksDBIterator.get().isValid() &&
-        (prefix == null || startsWithPrefix(key()));
+    if (hasNext == null) {
+      setCurrentEntry();
+    }
+    return hasNext;
   }
 
   @Override
-  public final RawKeyValue<RAW> next() {
-    setCurrentEntry();
-    if (currentEntry != null) {
+  public final CloseableRawKeyValue<RAW> next() {
+    if (hasNext()) {
+      CloseableRawKeyValue<RAW> entry = new CloseableRawKeyValue<>(currentEntry);
+      this.previousKeyValue = currentEntry.get();
       rocksDBIterator.get().next();
-      return currentEntry;
+      releaseEntry();
+      return entry;
     }
     throw new NoSuchElementException("RocksDB Store has no more elements");
   }
@@ -116,7 +144,7 @@ abstract class RDBStoreAbstractIterator<RAW>
     } else {
       seek0(prefix);
     }
-    setCurrentEntry();
+    releaseEntry();
   }
 
   @Override
@@ -126,14 +154,19 @@ abstract class RDBStoreAbstractIterator<RAW>
     } else {
       throw new UnsupportedOperationException("seekToLast: prefix != null");
     }
-    setCurrentEntry();
+    releaseEntry();
   }
 
   @Override
-  public final RawKeyValue<RAW> seek(RAW key) {
+  public final CloseableRawKeyValue<RAW> seek(RAW key) {
     seek0(key);
+    releaseEntry();
     setCurrentEntry();
-    return currentEntry;
+    // Current entry should be only closed when the next() and thus closing the returned entry should be a noop.
+    if (hasNext()) {
+      return new CloseableRawKeyValue<>(currentEntry);
+    }
+    return null;
   }
 
   @Override
@@ -141,8 +174,8 @@ abstract class RDBStoreAbstractIterator<RAW>
     if (rocksDBTable == null) {
       throw new UnsupportedOperationException("remove");
     }
-    if (currentEntry != null) {
-      delete(currentEntry.getKey());
+    if (previousKeyValue != null) {
+      delete(previousKeyValue.getKey());
     } else {
       LOG.info("Failed to removeFromDB: currentEntry == null");
     }
@@ -151,10 +184,12 @@ abstract class RDBStoreAbstractIterator<RAW>
   @Override
   public void close() {
     rocksDBIterator.close();
+    closed = true;
+    releaseEntry();
   }
 
   @Override
   public boolean isKVCloseable() {
-    return false;
+    return true;
   }
 }
