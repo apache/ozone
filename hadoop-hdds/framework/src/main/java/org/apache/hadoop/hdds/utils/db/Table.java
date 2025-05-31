@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Spliterator;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -169,6 +171,34 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix)
       throws IOException;
+
+  /**
+   * Creates a spliterator over the key-value pairs in the table with the specified
+   * maximum parallelism and exception handling behavior.
+   *
+   * @param maxParallelism the maximum number of threads that can be used for parallel processing.
+   * @param closeOnException if true, the spliterator will automatically close resources
+   *                         if an exception occurs during processing.
+   * @return a {@code Table.KeyValueSpliterator} instance for iterating over the key-value pairs.
+   * @throws IOException if an I/O error occurs during spliterator creation.
+   */
+  Table.KeyValueSpliterator<KEY, VALUE> spliterator(int maxParallelism, boolean closeOnException)
+      throws IOException;
+
+  /**
+   * Returns a spliterator that iterates over the key-value pairs starting from a given key
+   * and within a specified key prefix. The spliterator can be parallelized up to a given level
+   * of parallelism and may optionally close resources in case of exceptions.
+   *
+   * @param startKey the starting key from which iteration begins
+   * @param prefix the key prefix used to limit the keys being iterated
+   * @param maxParallelism the maximum level of parallelism allowed for the iteration
+   * @param closeOnException if true, closes resources when an exception occurs during iteration
+   * @return a spliterator that supports parallel iteration over the key-value pairs
+   * @throws IOException if an I/O error occurs during the creation of the spliterator
+   */
+  Table.KeyValueSpliterator<KEY, VALUE> spliterator(KEY startKey, KEY prefix, int maxParallelism,
+      boolean closeOnException) throws IOException;
 
   /**
    * Returns the Name of this Table.
@@ -418,5 +448,20 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   /** A {@link TableIterator} to iterate {@link KeyValue}s. */
   interface KeyValueIterator<KEY, VALUE>
       extends TableIterator<KEY, KeyValue<KEY, VALUE>> {
+  }
+
+  /**
+   * A generic interface extending {@link Spliterator} and {@link Closeable},
+   * designed for iterating over and splitting key-value pairs.
+   *
+   * @param <KEY>   The type of keys in the key-value pairs.
+   * @param <VALUE> The type of values in the key-value pairs.
+   *
+   * This interface facilitates traversal and splitting of key-value pairs
+   * while also providing resource management capabilities via {@link Closeable}.
+   * Implementations must handle key-value pair splitting to enable parallel processing,
+   * and ensure proper resource management when the spliterator is closed.
+   */
+  interface KeyValueSpliterator<KEY, VALUE> extends Spliterator<KeyValue<KEY, VALUE>>, Closeable {
   }
 }
