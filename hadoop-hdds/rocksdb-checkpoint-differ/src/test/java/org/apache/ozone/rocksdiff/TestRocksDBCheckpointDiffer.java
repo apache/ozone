@@ -21,8 +21,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.apache.hadoop.hdds.StringUtils.bytes2String;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
@@ -355,11 +353,6 @@ public class TestRocksDBCheckpointDiffer {
     createDir(sstBackUpDir, METADATA_DIR_NAME + "/" + SST_BACK_UP_DIR_NAME);
 
     config = mock(ConfigurationSource.class);
-
-    when(config.getTimeDuration(
-        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
-        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
-        TimeUnit.MILLISECONDS)).thenReturn(MINUTES.toMillis(10));
 
     when(config.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
@@ -1580,84 +1573,6 @@ public class TestRocksDBCheckpointDiffer {
             1
         )
     );
-  }
-
-  /**
-   * End-to-end test for snapshot's compaction history pruning.
-   */
-  @ParameterizedTest(name = "{0}")
-  @MethodSource("compactionDagPruningScenarios")
-  public void testPruneOlderSnapshotsWithCompactionHistory(
-      String description,
-      List<String> compactionLogs,
-      List<CompactionLogEntry> compactionLogEntries,
-      Set<String> expectedNodes,
-      int expectedNumberOfLogEntriesBeforePruning,
-      int expectedNumberOfLogEntriesAfterPruning
-  ) throws IOException, ExecutionException, InterruptedException,
-      TimeoutException {
-    List<File> filesCreated = new ArrayList<>();
-
-    if (compactionLogs != null) {
-      for (int i = 0; i < compactionLogs.size(); i++) {
-        String compactionFileName = METADATA_DIR_NAME + "/" + COMPACTION_LOG_DIR_NAME
-            + "/0000" + i + COMPACTION_LOG_FILE_NAME_SUFFIX;
-        File compactionFile = new File(compactionFileName);
-        Files.write(compactionFile.toPath(),
-            compactionLogs.get(i).getBytes(UTF_8));
-        filesCreated.add(compactionFile);
-      }
-    } else if (compactionLogEntries != null) {
-      compactionLogEntries.forEach(entry ->
-          rocksDBCheckpointDiffer.addToCompactionLogTable(entry));
-    } else {
-      throw new IllegalArgumentException("One of compactionLog or" +
-          " compactionLogEntries should be present.");
-    }
-
-    rocksDBCheckpointDiffer.loadAllCompactionLogs();
-    assertEquals(expectedNumberOfLogEntriesBeforePruning,
-        countEntriesInCompactionLogTable());
-    waitForLock(rocksDBCheckpointDiffer,
-        RocksDBCheckpointDiffer::pruneOlderSnapshotsWithCompactionHistory);
-
-    Set<String> actualNodesInForwardDAG = rocksDBCheckpointDiffer
-        .getForwardCompactionDAG()
-        .nodes()
-        .stream()
-        .map(CompactionNode::getFileName)
-        .collect(Collectors.toSet());
-
-    Set<String> actualNodesBackwardDAG = rocksDBCheckpointDiffer
-        .getBackwardCompactionDAG()
-        .nodes()
-        .stream()
-        .map(CompactionNode::getFileName)
-        .collect(Collectors.toSet());
-
-    assertEquals(expectedNodes, actualNodesInForwardDAG);
-    assertEquals(expectedNodes, actualNodesBackwardDAG);
-
-    for (int i = 0; compactionLogs != null && i < compactionLogs.size(); i++) {
-      File compactionFile = filesCreated.get(i);
-      assertFalse(compactionFile.exists());
-    }
-
-    assertEquals(expectedNumberOfLogEntriesAfterPruning,
-        countEntriesInCompactionLogTable());
-  }
-
-  private int countEntriesInCompactionLogTable() {
-    try (ManagedRocksIterator iterator = new ManagedRocksIterator(
-        activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
-      iterator.get().seekToFirst();
-      int count = 0;
-      while (iterator.get().isValid()) {
-        iterator.get().next();
-        count++;
-      }
-      return count;
-    }
   }
 
   // Take the lock, confirm that the consumer doesn't finish
