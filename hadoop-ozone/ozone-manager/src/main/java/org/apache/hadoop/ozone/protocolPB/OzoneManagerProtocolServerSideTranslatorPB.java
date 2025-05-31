@@ -184,6 +184,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
   private OMResponse submitReadRequestToOM(OMRequest request)
       throws ServiceException {
+    // Read from leader or followers using linearizable read
+    if (omRatisServer.isLinearizableRead()) {
+      return handler.handleReadRequest(request);
+    }
     // Check if this OM is the leader.
     RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
     if (raftServerStatus == LEADER_AND_READY ||
