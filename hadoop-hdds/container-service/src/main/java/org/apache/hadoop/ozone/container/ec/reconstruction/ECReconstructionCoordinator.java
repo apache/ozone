@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
@@ -145,6 +146,14 @@ public class ECReconstructionCoordinator implements Closeable {
       ECReplicationConfig repConfig,
       SortedMap<Integer, DatanodeDetails> sourceNodeMap,
       SortedMap<Integer, DatanodeDetails> targetNodeMap) throws IOException {
+    reconstructECContainerGroup(containerID, repConfig, sourceNodeMap, targetNodeMap, null);
+  }
+
+  public void reconstructECContainerGroup(long containerID,
+      ECReplicationConfig repConfig,
+      SortedMap<Integer, DatanodeDetails> sourceNodeMap,
+      SortedMap<Integer, DatanodeDetails> targetNodeMap,
+      AbstractReplicationTask task) throws IOException {
 
     Pipeline pipeline = rebuildInputPipeline(repConfig, sourceNodeMap);
 
@@ -177,7 +186,7 @@ public class ECReconstructionCoordinator implements Closeable {
         Long key = blockLocationInfoEntry.getKey();
         BlockLocationInfo blockLocationInfo = blockLocationInfoEntry.getValue();
         reconstructECBlockGroup(blockLocationInfo, repConfig,
-            targetNodeMap, blockDataMap.get(key));
+            targetNodeMap, blockDataMap.get(key), task);
       }
 
       // 3. Close containers
@@ -237,7 +246,8 @@ public class ECReconstructionCoordinator implements Closeable {
   @VisibleForTesting
   public void reconstructECBlockGroup(BlockLocationInfo blockLocationInfo,
       ECReplicationConfig repConfig,
-      SortedMap<Integer, DatanodeDetails> targetMap, BlockData[] blockDataGroup)
+      SortedMap<Integer, DatanodeDetails> targetMap, BlockData[] blockDataGroup,
+      AbstractReplicationTask task)
       throws IOException {
     long safeBlockGroupLength = blockLocationInfo.getLength();
     List<Integer> missingContainerIndexes = new ArrayList<>(targetMap.keySet());
@@ -297,6 +307,9 @@ public class ECReconstructionCoordinator implements Closeable {
             int readLen;
             try {
               readLen = sis.recoverChunks(bufs);
+              if (readLen > 0 && task != null) {
+                task.setTransferredBytes(readLen);
+              }
               Set<Integer> failedIndexes = sis.getFailedIndexes();
               if (!failedIndexes.isEmpty()) {
                 // There was a problem reading some of the block indexes, but we
