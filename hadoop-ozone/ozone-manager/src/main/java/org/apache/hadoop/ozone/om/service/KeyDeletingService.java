@@ -172,11 +172,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * the blocks info in its deletedBlockLog), it removes these keys from the
    * DB.
    */
-  private final class KeyDeletingTask implements BackgroundTask {
+  @VisibleForTesting
+  final class KeyDeletingTask implements BackgroundTask {
     private final KeyDeletingService deletingService;
     private final UUID snapshotId;
 
-    private KeyDeletingTask(KeyDeletingService service, UUID snapshotId) {
+    KeyDeletingTask(KeyDeletingService service, UUID snapshotId) {
       this.deletingService = service;
       this.snapshotId = snapshotId;
     }
@@ -321,12 +322,17 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           snapInfo = snapshotId == null ? null :
               SnapshotUtils.getSnapshotInfo(getOzoneManager(), snapshotChainManager, snapshotId);
           if (snapInfo != null) {
+            if (snapInfo.isDeepCleaned()) {
+              LOG.info("Snapshot {} has already been deep cleaned. Skipping the snapshot in this iteration.",
+                  snapInfo.getSnapshotId());
+              return EmptyTaskResult.newResult();
+            }
             if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo)) {
               LOG.info("Skipping snapshot processing since changes to snapshot {} have not been flushed to disk",
                   snapInfo);
               return EmptyTaskResult.newResult();
             }
-            if (!snapInfo.getDeepCleanedDeletedDir()) {
+            if (!snapInfo.isDeepCleanedDeletedDir()) {
               LOG.debug("Snapshot {} hasn't done deleted directory deep cleaning yet. Skipping the snapshot in this" +
                   " iteration.", snapInfo);
               return EmptyTaskResult.newResult();

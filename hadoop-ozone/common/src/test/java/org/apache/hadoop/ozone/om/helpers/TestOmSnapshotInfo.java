@@ -169,8 +169,8 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getSnapshotStatus());
     assertEquals(snapshotInfoExpected.getDbTxSequenceNumber(),
         snapshotInfoActual.getDbTxSequenceNumber());
-    assertEquals(snapshotInfoExpected.getDeepClean(),
-        snapshotInfoActual.getDeepClean());
+    assertEquals(snapshotInfoExpected.isDeepCleaned(),
+        snapshotInfoActual.isDeepCleaned());
     assertEquals(snapshotInfoExpected.isSstFiltered(),
         snapshotInfoActual.isSstFiltered());
     assertEquals(snapshotInfoExpected.getReferencedSize(),
@@ -181,8 +181,8 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getExclusiveSize());
     assertEquals(snapshotInfoExpected.getExclusiveReplicatedSize(),
         snapshotInfoActual.getExclusiveReplicatedSize());
-    assertEquals(snapshotInfoExpected.getDeepCleanedDeletedDir(),
-        snapshotInfoActual.getDeepCleanedDeletedDir());
+    assertEquals(snapshotInfoExpected.isDeepCleanedDeletedDir(),
+        snapshotInfoActual.isDeepCleanedDeletedDir());
     assertEquals(snapshotInfoExpected.getExclusiveSizeDeltaFromDirDeepCleaning(),
         snapshotInfoActual.getExclusiveSizeDeltaFromDirDeepCleaning());
     assertEquals(snapshotInfoExpected.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning(),
