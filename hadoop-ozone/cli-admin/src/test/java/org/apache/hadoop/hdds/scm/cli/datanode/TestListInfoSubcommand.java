@@ -217,11 +217,10 @@ public class TestListInfoSubcommand {
     List<HddsProtos.DatanodeUsageInfoProto> usageList = new ArrayList<>();
     List<HddsProtos.Node> nodeList = getNodeDetails();
 
-    // Decreasing usage: 400, 300, 200, 100
     for (int i = 0; i < 4; i++) {
       usageList.add(HddsProtos.DatanodeUsageInfoProto.newBuilder()
           .setNode(nodeList.get(i).getNodeID())
-          .setUsed(100L * (4 - i))
+          .setRemaining(1000 - (100 * i))
           .setCapacity(1000)
           .build());
 
@@ -229,6 +228,7 @@ public class TestListInfoSubcommand {
           .thenReturn(nodeList.get(i));
     }
 
+    Collections.reverse(usageList);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE)).thenReturn(usageList);
     when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
 
@@ -259,10 +259,15 @@ public class TestListInfoSubcommand {
     // Check order
     for (int i = 0; i < root.size() - 1; i++) {
       long usedCurrent = root.get(i).get("used").asLong();
+      long capacityCurrent = root.get(i).get("capacity").asLong();
       long usedNext = root.get(i + 1).get("used").asLong();
-      assertTrue(usedCurrent >= usedNext,
-          "JSON used values not in descending order at index " + i + ": " +
-              usedCurrent + " < " + usedNext);
+      long capacityNext = root.get(i+1).get("capacity").asLong();
+      double usageCurrent = (capacityCurrent == 0) ? 0.0 : (double) usedCurrent / capacityCurrent;
+      double usageNext = (capacityNext == 0) ? 0.0 : (double) usedNext / capacityNext;
+
+      assertTrue(usageCurrent >= usageNext,
+          "Not in descending order of used/capacity at index " + i + ": " +
+              usageCurrent + " > " + usageNext);
     }
 
     outContent.reset();
@@ -272,19 +277,26 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String textOutput = outContent.toString(DEFAULT_ENCODING);
-    Pattern pattern = Pattern.compile("Used: (\\d+)");
-    Matcher matcher = pattern.matcher(textOutput);
-    List<Long> usedValues = new ArrayList<>();
+    Pattern usedPattern = Pattern.compile("Used: (\\d+)");
+    Pattern capacityPattern = Pattern.compile("Capacity: (\\d+)");
+    Matcher usedMatcher = usedPattern.matcher(textOutput);
+    Matcher capacityMatcher = capacityPattern.matcher(textOutput);
 
-    while (matcher.find()) {
-      usedValues.add(Long.parseLong(matcher.group(1)));
+    List<Double> usageRatios = new ArrayList<>();
+
+    while (usedMatcher.find() && capacityMatcher.find()) {
+      long used = Long.parseLong(usedMatcher.group(1));
+      long capacity = Long.parseLong(capacityMatcher.group(1));
+      double usage = (capacity == 0) ? 0.0 : (double) used / capacity;
+      usageRatios.add(usage);
     }
 
     // Check order
-    List<Long> sorted = new ArrayList<>(usedValues);
-    sorted.sort(Collections.reverseOrder());
-    assertEquals(sorted, usedValues,
-        "values are not in descending order.");
+    for (int i = 0; i < usageRatios.size() - 1; i++) {
+      assertTrue(usageRatios.get(i) >= usageRatios.get(i + 1),
+          "Not in descending order of used/capacity at index " + i + ": " +
+              usageRatios.get(i) + " > " + usageRatios.get(i + 1));
+    }
   }
 
   @Test
@@ -293,11 +305,10 @@ public class TestListInfoSubcommand {
     List<HddsProtos.DatanodeUsageInfoProto> usageList = new ArrayList<>();
     List<HddsProtos.Node> nodeList = getNodeDetails();
 
-    // Increasing usage: 100, 200, 300, 400
     for (int i = 0; i < 4; i++) {
       usageList.add(HddsProtos.DatanodeUsageInfoProto.newBuilder()
           .setNode(nodeList.get(i).getNodeID())
-          .setUsed(100L * (i + 1))
+          .setRemaining(1000 - (100L * (i + 1)))
           .setCapacity(1000)
           .build());
 
@@ -335,10 +346,15 @@ public class TestListInfoSubcommand {
     // Check order
     for (int i = 0; i < root.size() - 1; i++) {
       long usedCurrent = root.get(i).get("used").asLong();
+      long capacityCurrent = root.get(i).get("capacity").asLong();
       long usedNext = root.get(i + 1).get("used").asLong();
-      assertTrue(usedCurrent <= usedNext,
-          "JSON used values not in ascending order at index " + i + ": " +
-              usedCurrent + " > " + usedNext);
+      long capacityNext = root.get(i+1).get("capacity").asLong();
+      double usageCurrent = (capacityCurrent == 0) ? 0.0 : (double) usedCurrent / capacityCurrent;
+      double usageNext = (capacityNext == 0) ? 0.0 : (double) usedNext / capacityNext;
+
+      assertTrue(usageCurrent <= usageNext,
+          "Not in ascending order of used/capacity at index " + i + ": " +
+              usageCurrent + " > " + usageNext);
     }
 
     outContent.reset();
@@ -348,18 +364,26 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String textOutput = outContent.toString(DEFAULT_ENCODING);
-    Pattern pattern = Pattern.compile("Used: (\\d+)");
-    Matcher matcher = pattern.matcher(textOutput);
-    List<Long> usedValues = new ArrayList<>();
+    Pattern usedPattern = Pattern.compile("Used: (\\d+)");
+    Pattern capacityPattern = Pattern.compile("Capacity: (\\d+)");
+    Matcher usedMatcher = usedPattern.matcher(textOutput);
+    Matcher capacityMatcher = capacityPattern.matcher(textOutput);
 
-    while (matcher.find()) {
-      usedValues.add(Long.parseLong(matcher.group(1)));
+    List<Double> usageRatios = new ArrayList<>();
+
+    while (usedMatcher.find() && capacityMatcher.find()) {
+      long used = Long.parseLong(usedMatcher.group(1));
+      long capacity = Long.parseLong(capacityMatcher.group(1));
+      double usage = (capacity == 0) ? 0.0 : (double) used / capacity;
+      usageRatios.add(usage);
     }
 
     // Check order
-    List<Long> sorted = new ArrayList<>(usedValues);
-    Collections.sort(sorted);
-    assertEquals(sorted, usedValues, "Values not in ascending order.");
+    for (int i = 0; i < usageRatios.size() - 1; i++) {
+      assertTrue(usageRatios.get(i) <= usageRatios.get(i + 1),
+          "Not in ascending order of used/capacity at index " + i + ": " +
+              usageRatios.get(i) + " > " + usageRatios.get(i + 1));
+    }
   }
 
   private List<HddsProtos.Node> getNodeDetails() {

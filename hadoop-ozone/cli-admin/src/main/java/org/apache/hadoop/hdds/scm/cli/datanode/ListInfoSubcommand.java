@@ -155,8 +155,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
             try {
               HddsProtos.Node node = scmClient.queryNode(parsedUuid);
-              long used = p.getUsed();
               long capacity = p.getCapacity();
+              long used = capacity - p.getRemaining();
               double percentUsed = (capacity > 0) ? (used * 100.0) / capacity : 0.0;
               return new DatanodeWithAttributes(
                   DatanodeDetails.getFromProtoBuf(node.getNodeID()),
