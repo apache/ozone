@@ -26,6 +26,9 @@ import org.slf4j.LoggerFactory;
 /**
  * A time-based sliding window implementation that tracks only failed test results within a specified time duration.
  * It determines failure based on a configured tolerance threshold.
+ *
+ * The queue saves one failure more than the configured tolerance threshold,
+ * so that the window can be considered failed.
  */
 public class SlidingWindow {
   private static final Logger LOG = LoggerFactory.getLogger(SlidingWindow.class);
@@ -44,7 +47,8 @@ public class SlidingWindow {
     this.windowDuration = windowDuration;
     this.timeUnit = timeUnit;
     this.failureTolerance = failureTolerance;
-    this.failureTimestamps = new ArrayDeque<>(Math.min(failureTolerance, 100));
+    // If the failure tolerance is high, we limit the queue size to 100 as we want to control the memory usage
+    this.failureTimestamps = new ArrayDeque<>(Math.min(failureTolerance + 1, 100));
   }
 
   public synchronized void add(boolean result) {

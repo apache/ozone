@@ -51,7 +51,7 @@ public class TestSlidingWindow {
 
   @Test
   public void testAddFailedResult() {
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
       slidingWindow.add(false);
       assertFalse(slidingWindow.isFailed());
     }
@@ -63,6 +63,7 @@ public class TestSlidingWindow {
 
   @Test
   public void testMixedResults() {
+    slidingWindow.add(false);
     slidingWindow.add(false);
     slidingWindow.add(false);
     assertFalse(slidingWindow.isFailed());
@@ -88,6 +89,7 @@ public class TestSlidingWindow {
     // Add failed results to reach failure threshold
     slidingWindow.add(false);
     slidingWindow.add(false);
+    slidingWindow.add(false);
     assertTrue(slidingWindow.isFailed());
 
     // Wait for failures to expire
@@ -104,6 +106,7 @@ public class TestSlidingWindow {
   public void testPartialExpiration() throws InterruptedException {
     slidingWindow = new SlidingWindow(3, 1, TimeUnit.SECONDS);
 
+    slidingWindow.add(false);
     slidingWindow.add(false);
     slidingWindow.add(false);
     slidingWindow.add(false);
@@ -132,7 +135,7 @@ public class TestSlidingWindow {
     SlidingWindow highToleranceWindow = new SlidingWindow(10, 5, TimeUnit.SECONDS);
 
     // Add failures less than tolerance
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < 10; i++) {
       highToleranceWindow.add(false);
       assertFalse(highToleranceWindow.isFailed());
     }
@@ -215,6 +218,8 @@ public class TestSlidingWindow {
   public void testEdgeCases() {
     // Test with minimum values
     SlidingWindow minWindow = new SlidingWindow(1, 1, TimeUnit.MILLISECONDS);
+    minWindow.add(false);
+    assertFalse(minWindow.isFailed());
     minWindow.add(false);
     assertTrue(minWindow.isFailed());
 
