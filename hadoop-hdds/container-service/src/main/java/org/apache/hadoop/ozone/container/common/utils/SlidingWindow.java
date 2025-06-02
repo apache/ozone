@@ -24,6 +24,9 @@ import java.util.concurrent.TimeUnit;
 /**
  * A time-based sliding window implementation that tracks only failed test results within a specified time duration.
  * It determines failure based on a configured tolerance threshold.
+ *
+ * The queue saves one failure more than the configured tolerance threshold,
+ * so that the window can be considered failed.
  */
 public class SlidingWindow {
   private final long windowDuration;
@@ -40,12 +43,13 @@ public class SlidingWindow {
     this.windowDuration = windowDuration;
     this.timeUnit = timeUnit;
     this.failureTolerance = failureTolerance;
-    this.failureTimestamps = new ArrayDeque<>(Math.min(failureTolerance, 100));
+    // If the failure tolerance is high, we limit the queue size to 100 as we want to control the memory usage
+    this.failureTimestamps = new ArrayDeque<>(Math.min(failureTolerance + 1, 100));
   }
 
   public synchronized void add(boolean result) {
     if (!result) {
-      if (failureTolerance > 0 && failureTimestamps.size() >= failureTolerance) {
+      if (failureTolerance > 0 && failureTimestamps.size() > failureTolerance) {
         failureTimestamps.remove();
       }
       long currentTime = System.currentTimeMillis();
@@ -57,7 +61,7 @@ public class SlidingWindow {
 
   public synchronized boolean isFailed() {
     removeExpiredFailures();
-    return failureTimestamps.size() >= failureTolerance;
+    return failureTimestamps.size() > failureTolerance;
   }
 
   private void removeExpiredFailures() {
