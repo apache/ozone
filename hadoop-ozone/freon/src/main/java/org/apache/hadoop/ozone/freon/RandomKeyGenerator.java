@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -67,6 +68,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
@@ -190,6 +192,12 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
           "volumes, buckets and keys."
   )
   private boolean cleanObjects = false;
+
+  @Option(
+      names = "--bucket-layout",
+      description = "Specifies the bucket layout (e.g., FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY)."
+  )
+  private BucketLayout bucketLayout;
 
   private ReplicationConfig replicationConfig;
 
@@ -757,7 +765,14 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
         .createActivatedSpan("createBucket")) {
 
       long start = System.nanoTime();
-      volume.createBucket(bucketName);
+      if (bucketLayout != null) {
+        BucketArgs bucketArgs = BucketArgs.newBuilder()
+            .setBucketLayout(bucketLayout)
+            .build();
+        volume.createBucket(bucketName, bucketArgs);
+      } else {
+        volume.createBucket(bucketName);
+      }
       long bucketCreationDuration = System.nanoTime() - start;
       histograms.get(FreonOps.BUCKET_CREATE.ordinal())
           .update(bucketCreationDuration);
