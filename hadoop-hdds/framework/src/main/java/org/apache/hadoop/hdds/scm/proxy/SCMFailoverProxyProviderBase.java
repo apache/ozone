@@ -117,7 +117,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     this.maxRetryCount = scmClientConfig.getRetryCount();
     this.retryInterval = scmClientConfig.getRetryInterval();
 
-    getLogger().info("Created fail-over proxy for protocol {} with {} nodes: {}", protocol.getSimpleName(),
+    getLogger().debug("Created fail-over proxy for protocol {} with {} nodes: {}", protocol.getSimpleName(),
         scmNodeIds.size(), scmProxyInfoMap.values());
   }
 
