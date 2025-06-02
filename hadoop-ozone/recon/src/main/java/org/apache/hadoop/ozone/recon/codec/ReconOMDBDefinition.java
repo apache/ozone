@@ -15,33 +15,59 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.codec;
+package org.apache.hadoop.ozone.recon.codec;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.COMPACTION_LOG_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELEGATION_TOKEN_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_ACCESS_ID_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_STATE_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TRANSACTION_INFO_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.USER_TABLE_DEF;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinitionBase;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
-import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
-import org.apache.ozone.compaction.log.CompactionLogEntry;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 
 /**
  * OM database definitions.
@@ -134,184 +160,201 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  *   2. /volumeId/bucketId/parentId/fileName
  *   3. /volumeName/bucketName/keyName
  */
-public final class OMDBDefinition extends DBDefinition.WithMap implements OMDBDefinitionBase {
-
-  //---------------------------------------------------------------------------
-  // User, Token and Secret Tables:
-  public static final String USER_TABLE = "userTable";
-  /** userTable: /user :- UserVolumeInfo. */
-  public static final DBColumnFamilyDefinition<String, PersistedUserVolumeInfo> USER_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(USER_TABLE,
-          StringCodec.get(),
-          Proto2Codec.get(PersistedUserVolumeInfo.getDefaultInstance()));
-
-  public static final String DELEGATION_TOKEN_TABLE = "dTokenTable";
-  /** dTokenTable: OzoneTokenID :- renew_time. */
-  public static final DBColumnFamilyDefinition<OzoneTokenIdentifier, Long> DELEGATION_TOKEN_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(DELEGATION_TOKEN_TABLE,
-          TokenIdentifierCodec.get(),
-          LongCodec.get());
-
-  public static final String S3_SECRET_TABLE = "s3SecretTable";
-  /** s3SecretTable: s3g_access_key_id :- s3Secret. */
-  public static final DBColumnFamilyDefinition<String, S3SecretValue> S3_SECRET_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(S3_SECRET_TABLE,
-          StringCodec.get(),
-          S3SecretValue.getCodec());
+public final class ReconOMDBDefinition extends DBDefinition.WithMap implements OMDBDefinitionBase {
 
   //---------------------------------------------------------------------------
   // Volume, Bucket, Prefix and Transaction Tables:
-  public static final String VOLUME_TABLE = "volumeTable";
   /** volumeTable: /volume :- VolumeInfo. */
   public static final DBColumnFamilyDefinition<String, OmVolumeArgs> VOLUME_TABLE_DEF
       = new DBColumnFamilyDefinition<>(VOLUME_TABLE,
           StringCodec.get(),
           OmVolumeArgs.getCodec());
 
-  public static final String BUCKET_TABLE = "bucketTable";
+  /**
+   * Parses BucketInfo protobuf and creates OmBucketInfo without deserializing ACL list.
+   * @param bucketInfo
+   * @return instance of OmBucketInfo
+   */
+  public static OmBucketInfo getOmBucketInfoFromProtobuf(OzoneManagerProtocolProtos.BucketInfo bucketInfo) {
+    OmBucketInfo.Builder obib = OmBucketInfo.newBuilder()
+        .setVolumeName(bucketInfo.getVolumeName())
+        .setBucketName(bucketInfo.getBucketName())
+        .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
+        .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
+        .setCreationTime(bucketInfo.getCreationTime())
+        .setUsedBytes(bucketInfo.getUsedBytes())
+        .setModificationTime(bucketInfo.getModificationTime())
+        .setQuotaInBytes(bucketInfo.getQuotaInBytes())
+        .setUsedNamespace(bucketInfo.getUsedNamespace())
+        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace());
+
+    obib.setBucketLayout(
+        BucketLayout.fromProto(bucketInfo.getBucketLayout()));
+    if (bucketInfo.hasDefaultReplicationConfig()) {
+      obib.setDefaultReplicationConfig(
+          DefaultReplicationConfig.fromProto(
+              bucketInfo.getDefaultReplicationConfig()));
+    }
+    if (bucketInfo.hasObjectID()) {
+      obib.setObjectID(bucketInfo.getObjectID());
+    }
+    if (bucketInfo.hasUpdateID()) {
+      obib.setUpdateID(bucketInfo.getUpdateID());
+    }
+    if (bucketInfo.hasSourceVolume()) {
+      obib.setSourceVolume(bucketInfo.getSourceVolume());
+    }
+    if (bucketInfo.hasSourceBucket()) {
+      obib.setSourceBucket(bucketInfo.getSourceBucket());
+    }
+    if (bucketInfo.hasOwner()) {
+      obib.setOwner(bucketInfo.getOwner());
+    }
+    return obib.build();
+  }
+
+  private static final Codec<OmBucketInfo> CUSTOM_CODEC_FOR_BUCKET_TABLE = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.BucketInfo.getDefaultInstance()),
+      ReconOMDBDefinition::getOmBucketInfoFromProtobuf,
+      null,
+      OmBucketInfo.class);
   /** bucketTable: /volume/bucket :- BucketInfo. */
   public static final DBColumnFamilyDefinition<String, OmBucketInfo> BUCKET_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(BUCKET_TABLE,
-          StringCodec.get(),
-          OmBucketInfo.getCodec());
-
-  public static final String PREFIX_TABLE = "prefixTable";
-  /** prefixTable: prefix :- PrefixInfo. */
-  public static final DBColumnFamilyDefinition<String, OmPrefixInfo> PREFIX_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(PREFIX_TABLE,
-          StringCodec.get(),
-          OmPrefixInfo.getCodec());
-
-  public static final String TRANSACTION_INFO_TABLE = "transactionInfoTable";
-  /** transactionInfoTable: #TRANSACTIONINFO :- OMTransactionInfo. */
-  public static final DBColumnFamilyDefinition<String, TransactionInfo> TRANSACTION_INFO_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(TRANSACTION_INFO_TABLE,
-          StringCodec.get(),
-          TransactionInfo.getCodec());
-
-  public static final String META_TABLE = "metaTable";
-  /** metaTable: metaDataKey :- metaDataValue. */
-  public static final DBColumnFamilyDefinition<String, String> META_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(META_TABLE,
-          StringCodec.get(),
-          StringCodec.get());
+      = new DBColumnFamilyDefinition<>(BUCKET_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_BUCKET_TABLE);
 
   //---------------------------------------------------------------------------
+  public static OmKeyInfo getOmKeyInfoFromProtobuf(OzoneManagerProtocolProtos.KeyInfo keyInfo) {
+    if (keyInfo == null) {
+      return null;
+    }
+
+    List<OmKeyLocationInfoGroup> omKeyLocationInfos = new ArrayList<>();
+    for (OzoneManagerProtocolProtos.KeyLocationList keyLocationList : keyInfo.getKeyLocationListList()) {
+      omKeyLocationInfos.add(
+          OmKeyLocationInfoGroup.getFromProtobuf(keyLocationList));
+    }
+
+    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
+        .setVolumeName(keyInfo.getVolumeName())
+        .setBucketName(keyInfo.getBucketName())
+        .setKeyName(keyInfo.getKeyName())
+        .setOmKeyLocationInfos(omKeyLocationInfos)
+        .setDataSize(keyInfo.getDataSize())
+        .setCreationTime(keyInfo.getCreationTime())
+        .setModificationTime(keyInfo.getModificationTime())
+        .setReplicationConfig(ReplicationConfig
+            .fromProto(keyInfo.getType(), keyInfo.getFactor(),
+                keyInfo.getEcReplicationConfig()))
+        .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()));
+    if (keyInfo.hasObjectID()) {
+      builder.setObjectID(keyInfo.getObjectID());
+    }
+    if (keyInfo.hasUpdateID()) {
+      builder.setUpdateID(keyInfo.getUpdateID());
+    }
+    if (keyInfo.hasParentID()) {
+      builder.setParentObjectID(keyInfo.getParentID());
+    }
+    if (keyInfo.hasFileChecksum()) {
+      FileChecksum fileChecksum = OMPBHelper.convert(keyInfo.getFileChecksum());
+      builder.setFileChecksum(fileChecksum);
+    }
+
+    if (keyInfo.hasIsFile()) {
+      builder.setFile(keyInfo.getIsFile());
+    }
+    if (keyInfo.hasOwnerName()) {
+      builder.setOwnerName(keyInfo.getOwnerName());
+    }
+    // not persisted to DB. FileName will be filtered out from keyName
+    builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
+    return builder.build();
+  }
+
+  private static final Codec<OmKeyInfo> CUSTOM_CODEC_FOR_KEY_TABLE = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.KeyInfo.getDefaultInstance()),
+      ReconOMDBDefinition::getOmKeyInfoFromProtobuf,
+      k -> k.getProtobuf(true, ClientVersion.CURRENT_VERSION),
+      OmKeyInfo.class);
   // Object Store (OBS) Tables:
-  public static final String KEY_TABLE = "keyTable";
   /** keyTable: /volume/bucket/key :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> KEY_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(KEY_TABLE,
-          StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+      = new DBColumnFamilyDefinition<>(KEY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
 
-  public static final String DELETED_TABLE = "deletedTable";
+  public static RepeatedOmKeyInfo getRepeatedOmKeyInfoFromProto(
+      OzoneManagerProtocolProtos.RepeatedKeyInfo repeatedKeyInfo) {
+    List<OmKeyInfo> list = new ArrayList<>();
+    for (OzoneManagerProtocolProtos.KeyInfo k : repeatedKeyInfo.getKeyInfoList()) {
+      list.add(ReconOMDBDefinition.getOmKeyInfoFromProtobuf(k));
+    }
+    return new RepeatedOmKeyInfo.Builder().setOmKeyInfos(list).build();
+  }
+
+  private static final Codec<RepeatedOmKeyInfo> CUSTOM_CODEC_FOR_DELETED_TABLE = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.RepeatedKeyInfo.getDefaultInstance()),
+      ReconOMDBDefinition::getRepeatedOmKeyInfoFromProto,
+      k -> k.getProto(true, ClientVersion.CURRENT_VERSION),
+      RepeatedOmKeyInfo.class);
+
   /** deletedTable: /volume/bucket/key :- RepeatedKeyInfo. */
   public static final DBColumnFamilyDefinition<String, RepeatedOmKeyInfo> DELETED_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(DELETED_TABLE,
-          StringCodec.get(),
-          RepeatedOmKeyInfo.getCodec(true));
+      = new DBColumnFamilyDefinition<>(DELETED_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_DELETED_TABLE);
 
-  public static final String OPEN_KEY_TABLE = "openKeyTable";
   /** openKeyTable: /volume/bucket/key/id :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_KEY_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(OPEN_KEY_TABLE,
-          StringCodec.get(),
-          OmKeyInfo.getCodec(true));
-
-  public static final String MULTIPART_INFO_TABLE = "multipartInfoTable";
-  /** multipartInfoTable: /volume/bucket/key/uploadId :- parts. */
-  public static final DBColumnFamilyDefinition<String, OmMultipartKeyInfo> MULTIPART_INFO_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(MULTIPART_INFO_TABLE,
-          StringCodec.get(),
-          OmMultipartKeyInfo.getCodec());
+      = new DBColumnFamilyDefinition<>(OPEN_KEY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
 
   //---------------------------------------------------------------------------
   // File System Optimized (FSO) Tables:
-  public static final String FILE_TABLE = "fileTable";
   /** fileTable: /volumeId/bucketId/parentId/fileName :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> FILE_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(FILE_TABLE,
-          StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+      = new DBColumnFamilyDefinition<>(FILE_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
 
-  public static final String OPEN_FILE_TABLE = "openFileTable";
   /** openFileTable: /volumeId/bucketId/parentId/fileName/id :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_FILE_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(OPEN_FILE_TABLE,
-          StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+      = new DBColumnFamilyDefinition<>(OPEN_FILE_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
 
-  public static final String DIRECTORY_TABLE = "directoryTable";
+  /**
+   * Parses DirectoryInfo protobuf and creates OmPrefixInfo.
+   * @param dirInfo
+   * @return instance of OmDirectoryInfo
+   */
+  public static OmDirectoryInfo getOmDirInfoFromProtobuf(OzoneManagerProtocolProtos.DirectoryInfo dirInfo) {
+    OmDirectoryInfo.Builder opib = OmDirectoryInfo.newBuilder()
+        .setName(dirInfo.getName())
+        .setCreationTime(dirInfo.getCreationTime())
+        .setModificationTime(dirInfo.getModificationTime());
+    if (dirInfo.getMetadataList() != null) {
+      opib.addAllMetadata(KeyValueUtil
+          .getFromProtobuf(dirInfo.getMetadataList()));
+    }
+    if (dirInfo.hasObjectID()) {
+      opib.setObjectID(dirInfo.getObjectID());
+    }
+    if (dirInfo.hasParentID()) {
+      opib.setParentObjectID(dirInfo.getParentID());
+    }
+    if (dirInfo.hasUpdateID()) {
+      opib.setUpdateID(dirInfo.getUpdateID());
+    }
+    if (dirInfo.hasOwnerName()) {
+      opib.setOwner(dirInfo.getOwnerName());
+    }
+    return opib.build();
+  }
+
+  private static final Codec<OmDirectoryInfo> CUSTOM_CODEC_FOR_DIR_TABLE = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.DirectoryInfo.getDefaultInstance()),
+      ReconOMDBDefinition::getOmDirInfoFromProtobuf,
+      null,
+      OmDirectoryInfo.class);
   /** directoryTable: /volumeId/bucketId/parentId/dirName :- DirInfo. */
   public static final DBColumnFamilyDefinition<String, OmDirectoryInfo> DIRECTORY_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(DIRECTORY_TABLE,
-          StringCodec.get(),
-          OmDirectoryInfo.getCodec());
+      = new DBColumnFamilyDefinition<>(DIRECTORY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_DIR_TABLE);
 
-  public static final String DELETED_DIR_TABLE = "deletedDirectoryTable";
   /** deletedDirectoryTable: /volumeId/bucketId/parentId/dirName/objectId :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> DELETED_DIR_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE,
-          StringCodec.get(),
-          OmKeyInfo.getCodec(true));
-
-  //---------------------------------------------------------------------------
-  // S3 Multi-Tenancy Tables
-  public static final String TENANT_STATE_TABLE = "tenantStateTable";
-  /** tenantStateTable: tenantId :- OmDBTenantState. */
-  public static final DBColumnFamilyDefinition<String, OmDBTenantState> TENANT_STATE_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(TENANT_STATE_TABLE,
-          StringCodec.get(), // tenantId (tenant name)
-          OmDBTenantState.getCodec());
-
-  public static final String TENANT_ACCESS_ID_TABLE = "tenantAccessIdTable";
-  /** tenantAccessIdTable: accessId :- OmDBAccessIdInfo. */
-  public static final DBColumnFamilyDefinition<String, OmDBAccessIdInfo> TENANT_ACCESS_ID_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(TENANT_ACCESS_ID_TABLE,
-          StringCodec.get(), // accessId
-          OmDBAccessIdInfo.getCodec()); // tenantId, secret, principal
-
-  public static final String PRINCIPAL_TO_ACCESS_IDS_TABLE = "principalToAccessIdsTable";
-  /** principalToAccessIdsTable: userPrincipal :- OmDBUserPrincipalInfo. */
-  public static final DBColumnFamilyDefinition<String, OmDBUserPrincipalInfo> PRINCIPAL_TO_ACCESS_IDS_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(PRINCIPAL_TO_ACCESS_IDS_TABLE,
-          StringCodec.get(), // User principal
-          OmDBUserPrincipalInfo.getCodec()); // List of accessIds
-
-  //---------------------------------------------------------------------------
-  // Snapshot Tables
-  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
-  /** snapshotInfoTable: /volume/bucket/snapshotName :- SnapshotInfo. */
-  public static final DBColumnFamilyDefinition<String, SnapshotInfo> SNAPSHOT_INFO_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(SNAPSHOT_INFO_TABLE,
-          StringCodec.get(), // snapshot path
-          SnapshotInfo.getCodec());
-
-  public static final String SNAPSHOT_RENAMED_TABLE = "snapshotRenamedTable";
-  /**
-   * snapshotRenamedTable: /volumeName/bucketName/objectID :- renameFrom.
-   * <p>
-   * This table complements the keyTable (or fileTable)
-   * and dirTable entries of the immediately previous snapshot in the
-   * same snapshot scope (bucket or volume).
-   * <p>
-   * Key/Dir renames between the two subsequent snapshots are captured, this
-   * information is used in {@link SnapshotDeletingService} to check if the
-   * renamedKey or renamedDir is present in the previous snapshot's keyTable
-   * (or fileTable).
-   */
-  public static final DBColumnFamilyDefinition<String, String> SNAPSHOT_RENAMED_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(SNAPSHOT_RENAMED_TABLE,
-          StringCodec.get(),
-          StringCodec.get()); // path to key in prev snapshot's key(file)/dir Table.
-
-  public static final String COMPACTION_LOG_TABLE = "compactionLogTable";
-  /** compactionLogTable: dbTrxId-compactionTime :- compactionLogEntry. */
-  public static final DBColumnFamilyDefinition<String, CompactionLogEntry> COMPACTION_LOG_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(COMPACTION_LOG_TABLE,
-          StringCodec.get(),
-          CompactionLogEntry.getCodec());
+      = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
 
   //---------------------------------------------------------------------------
   private static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
@@ -339,13 +382,13 @@ public final class OMDBDefinition extends DBDefinition.WithMap implements OMDBDe
           USER_TABLE_DEF,
           VOLUME_TABLE_DEF);
 
-  private static final OMDBDefinition INSTANCE = new OMDBDefinition();
+  private static final ReconOMDBDefinition INSTANCE = new ReconOMDBDefinition();
 
-  public static OMDBDefinition get() {
+  public static ReconOMDBDefinition get() {
     return INSTANCE;
   }
 
-  private OMDBDefinition() {
+  private ReconOMDBDefinition() {
     super(COLUMN_FAMILIES);
   }
 
@@ -357,11 +400,6 @@ public final class OMDBDefinition extends DBDefinition.WithMap implements OMDBDe
   @Override
   public String getLocationConfigKey() {
     return OMConfigKeys.OZONE_OM_DB_DIRS;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, PersistedUserVolumeInfo> getUserTableDef() {
-    return USER_TABLE_DEF;
   }
 
   @Override
@@ -382,11 +420,6 @@ public final class OMDBDefinition extends DBDefinition.WithMap implements OMDBDe
   @Override
   public DBColumnFamilyDefinition<String, OmKeyInfo> getOpenKeyTableDef() {
     return OPEN_KEY_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmMultipartKeyInfo> getMultipartInfoTableDef() {
-    return MULTIPART_INFO_TABLE_DEF;
   }
 
   @Override
@@ -414,59 +447,5 @@ public final class OMDBDefinition extends DBDefinition.WithMap implements OMDBDe
     return DELETED_DIR_TABLE_DEF;
   }
 
-  @Override
-  public DBColumnFamilyDefinition<OzoneTokenIdentifier, Long> getDelegationTokenTableDef() {
-    return DELEGATION_TOKEN_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, S3SecretValue> getS3SecretTableDef() {
-    return S3_SECRET_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmPrefixInfo> getPrefixTableDef() {
-    return PREFIX_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, TransactionInfo> getTransactionInfoTableDef() {
-    return TRANSACTION_INFO_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, String> getMetaTableDef() {
-    return META_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmDBAccessIdInfo> getTenantAccessIdTableDef() {
-    return TENANT_ACCESS_ID_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmDBUserPrincipalInfo> getPrincipalToAccessIdsTableDef() {
-    return PRINCIPAL_TO_ACCESS_IDS_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmDBTenantState> getTenantStateTableDef() {
-    return TENANT_STATE_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, SnapshotInfo> getSnapshotInfoTableDef() {
-    return SNAPSHOT_INFO_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, String> getSnapshotRenamedTableDef() {
-    return SNAPSHOT_RENAMED_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, CompactionLogEntry> getCompactionLogTableDef() {
-    return COMPACTION_LOG_TABLE_DEF;
-  }
 }
 

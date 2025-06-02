@@ -83,6 +83,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinitionBase;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -253,7 +254,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setCreateCheckpointDirs(false)
         .setEnableRocksDbMetrics(true)
         .build();
-    initializeOmTables(CacheType.PARTIAL_CACHE, false);
+    initializeOmTables(CacheType.PARTIAL_CACHE, false, OMDBDefinition.get());
     perfMetrics = null;
   }
 
@@ -295,7 +296,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           .setEnableRocksDbMetrics(enableRocksDBMetrics)
           .build();
 
-      initializeOmTables(CacheType.PARTIAL_CACHE, false);
+      initializeOmTables(CacheType.PARTIAL_CACHE, false, OMDBDefinition.get());
     } catch (IOException e) {
       stop();
       throw e;
@@ -411,7 +412,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       this.store = loadDB(configuration, metaDir, maxOpenFiles);
 
-      initializeOmTables(CacheType.FULL_CACHE, true);
+      initializeOmTables(CacheType.FULL_CACHE, true, OMDBDefinition.get());
     }
 
     snapshotChainManager = new SnapshotChainManager(this);
@@ -437,52 +438,52 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @throws IOException
    */
   protected void initializeOmTables(CacheType cacheType,
-                                    boolean addCacheMetrics)
+                                    boolean addCacheMetrics, OMDBDefinitionBase omdbDefinitionBase)
       throws IOException {
     final TableInitializer initializer = new TableInitializer(addCacheMetrics);
 
-    userTable = initializer.get(OMDBDefinition.USER_TABLE_DEF);
+    userTable = initializer.get(omdbDefinitionBase.getUserTableDef(), cacheType);
 
-    volumeTable = initializer.get(OMDBDefinition.VOLUME_TABLE_DEF, cacheType);
-    bucketTable = initializer.get(OMDBDefinition.BUCKET_TABLE_DEF, cacheType);
-    keyTable = initializer.get(OMDBDefinition.KEY_TABLE_DEF);
+    volumeTable = initializer.get(omdbDefinitionBase.getVolumeTableDef(), cacheType);
+    bucketTable = initializer.get(omdbDefinitionBase.getBucketTableDef(), cacheType);
+    keyTable = initializer.get(omdbDefinitionBase.getKeyTableDef());
 
-    openKeyTable = initializer.get(OMDBDefinition.OPEN_KEY_TABLE_DEF);
-    multipartInfoTable = initializer.get(OMDBDefinition.MULTIPART_INFO_TABLE_DEF);
-    deletedTable = initializer.get(OMDBDefinition.DELETED_TABLE_DEF);
+    openKeyTable = initializer.get(omdbDefinitionBase.getOpenKeyTableDef());
+    multipartInfoTable = initializer.get(omdbDefinitionBase.getMultipartInfoTableDef());
+    deletedTable = initializer.get(omdbDefinitionBase.getDeletedTableDef());
 
-    dirTable = initializer.get(OMDBDefinition.DIRECTORY_TABLE_DEF);
-    fileTable = initializer.get(OMDBDefinition.FILE_TABLE_DEF);
-    openFileTable = initializer.get(OMDBDefinition.OPEN_FILE_TABLE_DEF);
-    deletedDirTable = initializer.get(OMDBDefinition.DELETED_DIR_TABLE_DEF);
+    dirTable = initializer.get(omdbDefinitionBase.getDirectoryTableDef());
+    fileTable = initializer.get(omdbDefinitionBase.getFileTableDef());
+    openFileTable = initializer.get(omdbDefinitionBase.getOpenFileTableDef());
+    deletedDirTable = initializer.get(omdbDefinitionBase.getDeletedDirTableDef());
 
-    dTokenTable = initializer.get(OMDBDefinition.DELEGATION_TOKEN_TABLE_DEF);
-    s3SecretTable = initializer.get(OMDBDefinition.S3_SECRET_TABLE_DEF);
-    prefixTable = initializer.get(OMDBDefinition.PREFIX_TABLE_DEF);
+    dTokenTable = initializer.get(omdbDefinitionBase.getDelegationTokenTableDef());
+    s3SecretTable = initializer.get(omdbDefinitionBase.getS3SecretTableDef());
+    prefixTable = initializer.get(omdbDefinitionBase.getPrefixTableDef());
 
-    transactionInfoTable = initializer.get(OMDBDefinition.TRANSACTION_INFO_TABLE_DEF);
+    transactionInfoTable = initializer.get(omdbDefinitionBase.getTransactionInfoTableDef());
 
-    metaTable = initializer.get(OMDBDefinition.META_TABLE_DEF);
+    metaTable = initializer.get(omdbDefinitionBase.getMetaTableDef());
 
     // accessId -> OmDBAccessIdInfo (tenantId, secret, Kerberos principal)
-    tenantAccessIdTable = initializer.get(OMDBDefinition.TENANT_ACCESS_ID_TABLE_DEF);
+    tenantAccessIdTable = initializer.get(omdbDefinitionBase.getTenantAccessIdTableDef());
 
     // User principal -> OmDBUserPrincipalInfo (a list of accessIds)
-    principalToAccessIdsTable = initializer.get(OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE_DEF);
+    principalToAccessIdsTable = initializer.get(omdbDefinitionBase.getPrincipalToAccessIdsTableDef());
 
     // tenant name -> tenant (tenant states)
-    tenantStateTable = initializer.get(OMDBDefinition.TENANT_STATE_TABLE_DEF);
+    tenantStateTable = initializer.get(omdbDefinitionBase.getTenantStateTableDef());
 
     // TODO: [SNAPSHOT] Consider FULL_CACHE for snapshotInfoTable since
     //  exclusiveSize in SnapshotInfo can be frequently updated.
     // path -> snapshotInfo (snapshot info for snapshot)
-    snapshotInfoTable = initializer.get(OMDBDefinition.SNAPSHOT_INFO_TABLE_DEF);
+    snapshotInfoTable = initializer.get(omdbDefinitionBase.getSnapshotInfoTableDef());
 
     // volumeName/bucketName/objectID -> renamedKey or renamedDir
-    snapshotRenamedTable = initializer.get(OMDBDefinition.SNAPSHOT_RENAMED_TABLE_DEF);
+    snapshotRenamedTable = initializer.get(omdbDefinitionBase.getSnapshotRenamedTableDef());
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
-    compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
+    compactionLogTable = initializer.get(omdbDefinitionBase.getCompactionLogTableDef());
   }
 
   /**
