@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
  */
 public class ContainerStateVerifier implements ReplicaVerifier {
   private static final String CHECK_TYPE = "replicaState";
+  private static final long DEFAULT_CONTAINER_CACHE_SIZE = 1000000;
   private final ContainerOperationClient containerOperationClient;
   private final XceiverClientManager xceiverClientManager;
   // cache for container info and encodedToken from the SCM
@@ -52,9 +53,13 @@ public class ContainerStateVerifier implements ReplicaVerifier {
   public ContainerStateVerifier(OzoneConfiguration conf, long containerCacheSize) throws IOException {
     containerOperationClient = new ContainerOperationClient(conf);
     xceiverClientManager = containerOperationClient.getXceiverClientManager();
-    encodedTokenCache = CacheBuilder.newBuilder()
-        .maximumSize((containerCacheSize < 1) ? 1000000 : containerCacheSize)
-        .build();
+
+    if (containerCacheSize < 1) {
+      System.err.println("Invalid cache size provided: " + containerCacheSize +
+              ". Falling back to default: " + DEFAULT_CONTAINER_CACHE_SIZE);
+      containerCacheSize = DEFAULT_CONTAINER_CACHE_SIZE;
+    }
+    encodedTokenCache = CacheBuilder.newBuilder().maximumSize(containerCacheSize).build();
   }
 
   @Override
@@ -73,13 +78,12 @@ public class ContainerStateVerifier implements ReplicaVerifier {
       ContainerDataProto containerData = fetchContainerDataFromDatanode(datanode, keyLocation.getContainerID(),
           keyLocation, replicaIndex, containerInfoToken);
 
+      if (containerData == null) {
+        return BlockVerificationResult.failIncomplete("No container data returned from DN.");
+      }
       ContainerDataProto.State state = containerData.getState();
       replicaCheckMsg.append(state.name());
-      if (state != ContainerDataProto.State.UNHEALTHY &&
-          state != ContainerDataProto.State.INVALID &&
-          state != ContainerDataProto.State.DELETED &&
-          containerInfoToken.getContainerState() != HddsProtos.LifeCycleState.DELETING &&
-          containerInfoToken.getContainerState() != HddsProtos.LifeCycleState.DELETED) {
+      if (areContainerAndReplicasInGoodState(state, containerInfoToken.getContainerState())) {
         pass = true;
       }
       replicaCheckMsg.append(", Container state in SCM is ").append(containerInfoToken.getContainerState());
@@ -96,6 +100,15 @@ public class ContainerStateVerifier implements ReplicaVerifier {
       }
       return BlockVerificationResult.failIncomplete(e.getMessage());
     }
+  }
+
+  private boolean areContainerAndReplicasInGoodState(ContainerDataProto.State replicaState,
+      HddsProtos.LifeCycleState containerState) {
+    return (replicaState != ContainerDataProto.State.UNHEALTHY &&
+        replicaState != ContainerDataProto.State.INVALID &&
+        replicaState != ContainerDataProto.State.DELETED &&
+        containerState != HddsProtos.LifeCycleState.DELETING &&
+        containerState != HddsProtos.LifeCycleState.DELETED);
   }
 
   private ContainerDataProto fetchContainerDataFromDatanode(DatanodeDetails dn, long containerId,
