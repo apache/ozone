@@ -109,16 +109,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   public synchronized void updateAndRestart(OzoneConfiguration conf) {
     long newInterval = conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
         OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
-    LOG.info("Updating and restarting DirectoryDeletingService with interval: {}", newInterval);
+    LOG.info("Updating and restarting DirectoryDeletingService with interval: {} {}",
+        newInterval, TimeUnit.SECONDS.name().toLowerCase());
     shutdown();
     setInterval(newInterval, TimeUnit.SECONDS);
     start();
-  }
-
-  @VisibleForTesting
-  public long getDirectoryDeletingServiceInterval(OzoneConfiguration conf) {
-    return conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
-        OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
   }
 
   private boolean shouldRun() {

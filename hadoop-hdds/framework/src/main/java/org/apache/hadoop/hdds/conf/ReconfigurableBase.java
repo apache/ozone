@@ -122,7 +122,6 @@ public abstract class ReconfigurableBase extends Configured implements Reconfigu
         } else {
           this.getConf().unset(property);
         }
-
       }
     } else {
       throw new ReconfigurationException(property, newVal, this.getConf().get(property));
