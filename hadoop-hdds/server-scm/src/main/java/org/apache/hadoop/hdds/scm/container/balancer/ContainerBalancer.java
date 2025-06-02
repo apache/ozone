@@ -471,7 +471,7 @@ public class ContainerBalancer extends StatefulService {
       String msg = String.format("(hdds.container.balancer.move.timeout (%sms) - " +
               "hdds.container.balancer.move.replication.timeout (%sms) - " +
               "hdds.scm.replication.event.timeout.datanode.offset (%sms)) " +
-              "should be greater than or equal to 540000ms or 9 minutes.\n",
+              "should be greater than or equal to 540000ms or 9 minutes.",
           conf.getMoveTimeout().toMillis(),
           conf.getMoveReplicationTimeout().toMillis(),
           Duration.ofMillis(datanodeOffset).toMillis());
