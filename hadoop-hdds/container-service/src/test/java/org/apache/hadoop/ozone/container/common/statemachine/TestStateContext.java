@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.LambdaTestUtils;
@@ -750,8 +751,92 @@ public class TestStateContext {
     assertNull(subject.getNextCommand());
   }
 
+  @Test
+  public void testCommandStatusUpdateWhenQueueExceedsLimit() throws Exception {
+    // Set a small queue limit for testing
+    final int maxQueueSize = 2;
+    DatanodeConfiguration datanodeConfig = new DatanodeConfiguration();
+    datanodeConfig.setCommandQueueLimit(maxQueueSize);
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setFromObject(datanodeConfig);
+    StateContext ctx = createSubject(ozoneConfiguration);
+    
+    ctx.setTermOfLeaderSCM(1L);
+    SCMCommand<?> cmd1 = ReplicateContainerCommand.forTest(1);
+    SCMCommand<?> cmd2 = ReplicateContainerCommand.forTest(1);
+    SCMCommand<?> cmd3 = ReplicateContainerCommand.forTest(1);
+    cmd1.setTerm(1L);
+    cmd2.setTerm(1L);
+    cmd3.setTerm(1L);
+
+    // Initialize command status for all commands
+    CommandStatus status1 = getCommandStatus(cmd1,
+        StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
+    CommandStatus status2 = getCommandStatus(cmd2,
+        StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
+    CommandStatus status3 = getCommandStatus(cmd3,
+        StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
+    ctx.addCmdStatus(cmd1.getId(), status1);
+    ctx.addCmdStatus(cmd2.getId(), status2);
+    ctx.addCmdStatus(cmd3.getId(), status3);
+
+    ctx.addCommand(cmd1);
+    ctx.addCommand(cmd2);
+    ctx.addCommand(cmd3); // This should be rejected
+
+    Map<Long, CommandStatus> statusMap = ctx.getCommandStatusMap();
+    
+    // Verify first two commands are in PENDING state and third is FAILED
+    assertEquals(StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING, 
+        statusMap.get(cmd1.getId()).getStatus());
+    assertEquals(StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING, 
+        statusMap.get(cmd2.getId()).getStatus());
+    assertEquals(StorageContainerDatanodeProtocolProtos.CommandStatus.Status.FAILED, 
+        statusMap.get(cmd3.getId()).getStatus());
+  }
+
+  @Test
+  public void testCommandStatusUpdateWhenTermStale() throws Exception {
+    StateContext ctx = createSubject();
+    // Initialize with term 1
+    ctx.setTermOfLeaderSCM(1L);
+    SCMCommand<?> cmd1 = ReplicateContainerCommand.forTest(1);
+    cmd1.setTerm(1L);
+    CommandStatus status1 = getCommandStatus(cmd1,
+        StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
+    ctx.addCmdStatus(cmd1.getId(), status1);
+    ctx.addCommand(cmd1);
+    
+    // Update leader SCM term to make previous commands stale
+    ctx.setTermOfLeaderSCM(2L);
+    SCMCommand<?> cmd2 = ReplicateContainerCommand.forTest(1);
+    cmd2.setTerm(2L);
+    CommandStatus status2 = getCommandStatus(cmd2,
+        StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
+    ctx.addCmdStatus(cmd2.getId(), status2);
+    ctx.addCommand(cmd2);
+    
+    // Get command and verify its status
+    assertEquals(cmd2.getId(), ctx.getNextCommand().getId());
+    Map<Long, CommandStatus> statusMap = ctx.getCommandStatusMap();
+    assertEquals(StorageContainerDatanodeProtocolProtos.CommandStatus.Status.FAILED,
+        statusMap.get(cmd1.getId()).getStatus());
+  }
+
+  private CommandStatus getCommandStatus(SCMCommand<?> command,
+      StorageContainerDatanodeProtocolProtos.CommandStatus.Status status) {
+    return CommandStatus.CommandStatusBuilder.newBuilder()
+        .setCmdId(command.getId())
+        .setType(command.getType())
+        .setStatus(status)
+        .build();
+  }
+
   private static StateContext createSubject() throws IOException {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    return createSubject(new OzoneConfiguration());
+  }
+
+  private static StateContext createSubject(OzoneConfiguration conf) throws IOException {
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
     OzoneContainer o = mock(OzoneContainer.class);
