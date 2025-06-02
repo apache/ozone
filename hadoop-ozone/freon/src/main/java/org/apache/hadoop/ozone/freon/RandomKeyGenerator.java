@@ -662,7 +662,17 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
    */
   @VisibleForTesting
   OzoneBucket getBucketForTesting(Integer bucketNumber) {
-    return waitUntilAddedToMap(buckets, bucketNumber);
+    return getBucket(bucketNumber);
+  }
+
+  /**
+   * Returns the current size of the buckets map.
+   *
+   * @return number of buckets created and added to the map
+   */
+  @VisibleForTesting
+  int getBucketMapSizeForTesting() {
+    return buckets.size();
   }
 
   /**
