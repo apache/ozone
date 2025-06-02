@@ -32,8 +32,8 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -261,7 +261,7 @@ public class TestListInfoSubcommand {
       long usedCurrent = root.get(i).get("used").asLong();
       long capacityCurrent = root.get(i).get("capacity").asLong();
       long usedNext = root.get(i + 1).get("used").asLong();
-      long capacityNext = root.get(i+1).get("capacity").asLong();
+      long capacityNext = root.get(i + 1).get("capacity").asLong();
       double usageCurrent = (capacityCurrent == 0) ? 0.0 : (double) usedCurrent / capacityCurrent;
       double usageNext = (capacityNext == 0) ? 0.0 : (double) usedNext / capacityNext;
 
@@ -348,7 +348,7 @@ public class TestListInfoSubcommand {
       long usedCurrent = root.get(i).get("used").asLong();
       long capacityCurrent = root.get(i).get("capacity").asLong();
       long usedNext = root.get(i + 1).get("used").asLong();
-      long capacityNext = root.get(i+1).get("capacity").asLong();
+      long capacityNext = root.get(i + 1).get("capacity").asLong();
       double usageCurrent = (capacityCurrent == 0) ? 0.0 : (double) usedCurrent / capacityCurrent;
       double usageNext = (capacityNext == 0) ? 0.0 : (double) usedNext / capacityNext;
 
