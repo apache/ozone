@@ -25,165 +25,170 @@ icon: tower
   limitations under the License.
 -->
 
+Apache Ozone relies on Kerberos for robust security. Enabling Kerberos is the standard and recommended practice for all production environments.
 
-# Kerberos
+## Enabling Security
 
-Ozone depends on [Kerberos](https://web.mit.edu/kerberos/) to make the
-clusters secure. Historically, HDFS has supported running in an isolated
-secure networks where it is possible to deploy without securing the cluster.
+To activate security, set the following in `ozone-site.xml`:
 
-This release of Ozone follows that model, but soon will move to _secure by
-default._  Today to enable security in ozone cluster, we need to set the
-configuration **ozone.security.enabled** to _true_ and **hadoop.security.authentication**
-to _kerberos_.
+| Property                         | Value    | Description                                           |
+| :------------------------------- | :------- | :----------------------------------------------------- |
+| `ozone.security.enabled`         | `true`   | Enables Ozone-specific security features.              |
+| `hadoop.security.authentication` | `kerberos` | Specifies Kerberos as the authentication mechanism.    |
 
-Property|Value
-----------------------|---------
-ozone.security.enabled| _true_
-hadoop.security.authentication| _kerberos_
+Both properties must be correctly configured for a secure cluster.
 
-# Tokens #
+## Network Communication Security Overview
 
-Ozone uses a notion of tokens to avoid overburdening the Kerberos server.
-When you serve thousands of requests per second, involving Kerberos might not
-work well. Hence once an authentication is done, Ozone issues delegation
-tokens and block tokens to the clients. These tokens allow applications to do
-specified operations against the cluster, as if they have kerberos tickets
-with them. Ozone supports following kinds of tokens.
+Securing Ozone involves protecting inter-service (e.g. OM to SCM) RPC, client-to-service RPC, DataNode gRPC, and HTTP/HTTPS interfaces. Mechanisms include Kerberos, TLS/SSL, and SPNEGO. For a comprehensive list of default ports, refer to the [Network Ports documentation]({{< ref "concept/NetworkPorts.md" >}}).
 
-### Delegation Token ###
-Delegation tokens allow an application to impersonate a users kerberos
-credentials. This token is based on verification of kerberos identity and is
-issued by the Ozone Manager. Delegation tokens are enabled by default when
-security is enabled.
+---
 
-### Block Token ###
+## Authentication Mechanisms
 
-Block tokens allow a client to read or write a block. This is needed so that
-data nodes know that the user/client has permission to read or make
-modifications to the block.
+### Kerberos
 
-### S3AuthInfo ###
+With security enabled, all Ozone daemons (OM, SCM, DataNodes, S3G, Recon, HttpFS) and users require Kerberos credentials, which means  each client must always first obtain a Kerberos ticket.
 
-S3 uses a very different shared secret security scheme. Ozone supports the AWS Signature Version 4 protocol,
-and from the end users perspective Ozone's S3 feels exactly like AWS S3.
+### Tokens
 
-The S3 credential tokens are called S3 auth info in the code. These tokens are
-also enabled by default when security is enabled.
+Ozone uses security tokens (Delegation, Block, S3AuthInfo) after initial Kerberos authentication to reduce KDC load and manage permissions efficiently.
+* **Delegation Token**: Allows an application to act on behalf of an authenticated user.
+* **Block Token**: Grants specific permissions for accessing data blocks on DataNodes.
+* **S3AuthInfo**: S3-specific credentials (Access Key ID and Secret Access Key) for S3 client authentication. This is different from the Hadoop-style delegation tokens mentioned above.
 
+---
 
-Each of the service daemons that make up Ozone needs a  Kerberos service
-principal name and a corresponding [kerberos key tab](https://web.mit.edu/kerberos/krb5-latest/doc/basic/keytab_def.html) file.
+## Component-Specific Security Configurations
 
-All these settings should be made in ozone-site.xml.
+All Kerberos service principals and keytab file paths are configured in `ozone-site.xml`.
 
-<div class="card-group">
-  <div class="card">
-    <div class="card-body">
-      <h3 class="card-title">Storage Container Manager</h3>
-      <p class="card-text">
-      <br>
-        SCM requires two Kerberos principals, and the corresponding key tab files
-        for both of these principals.
-      <br>
-      <table class="table table-dark">
-        <thead>
-          <tr>
-            <th scope="col">Property</th>
-            <th scope="col">Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>hdds.scm.kerberos.principal</th>
-            <td>The SCM service principal. <br/> e.g. scm/_HOST@REALM.COM</td>
-          </tr>
-          <tr>
-            <td>hdds.scm.kerberos.keytab.file</th>
-            <td>The keytab file used by SCM daemon to login as its service principal.</td>
-          </tr>
-          <tr>
-            <td>hdds.scm.http.auth.kerberos.principal</th>
-            <td>SCM http server service principal if SPNEGO is enabled for SCM http server.</td>
-          </tr>
-          <tr>
-            <td>hdds.scm.http.auth.kerberos.keytab</th>
-            <td>The keytab file used by SCM http server to login as its service principal if SPNEGO is enabled for SCM http server</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-body">
-      <h3 class="card-title">Ozone Manager</h3>
-      <p class="card-text">
-      <br>
-        Like SCM, OM also requires two Kerberos principals, and the
-        corresponding key tab files for both of these principals.
-      <br>
-      <table class="table table-dark">
-        <thead>
-          <tr>
-            <th scope="col">Property</th>
-            <th scope="col">Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>ozone.om.kerberos.principal</th>
-            <td>The OzoneManager service principal. <br/> e.g. om/_HOST@REALM.COM</td>
-          </tr>
-          <tr>
-            <td>ozone.om.kerberos.keytab.file</th>
-            <td>The keytab file used by OM daemon to login as its service principal.</td>
-          </tr>
-          <tr>
-            <td>ozone.om.http.auth.kerberos.principal</th>
-            <td>Ozone Manager http server service principal if SPNEGO is enabled for om http server.</td>
-          </tr>
-          <tr>
-            <td>ozone.om.http.auth.kerberos.keytab</th>
-            <td>The keytab file used by OM http server to login as its service principal if SPNEGO is enabled for om http server.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-body">
-      <h3 class="card-title">S3 Gateway</h3>
-      <p class="card-text">
-      <br>
-        S3 gateway requires one service principal and here the configuration values
-        needed in the ozone-site.xml.
-      <br>
-      <table class="table table-dark">
-        <thead>
-          <tr>
-            <th scope="col">Property</th>
-            <th scope="col">Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>ozone.s3g.kerberos.principal</th>
-            <td>S3 Gateway principal. <br/> e.g. s3g/_HOST@REALM</td>
-          </tr>
-          <tr>
-            <td>ozone.s3g.kerberos.keytab.file</th>
-            <td>The keytab file used by S3 gateway. <br/> e.g. /etc/security/keytabs/s3g.keytab</td>
-          </tr>
-          <tr>
-            <td>ozone.s3g.http.auth.kerberos.principal</th>
-            <td>S3 Gateway principal if SPNEGO is enabled for S3 Gateway http server. <br/> e.g. HTTP/_HOST@EXAMPLE.COM</td>
-          </tr>
-          <tr>
-            <td>ozone.s3g.http.auth.kerberos.keytab</th>
-            <td>The keytab file used by S3 gateway if SPNEGO is enabled for S3 Gateway http server.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
+### Ozone Manager (OM)
+
+#### Kerberos Configuration
+
+| Property                                | Example Value        | Description                               |
+| :-------------------------------------- | :------------------- | :---------------------------------------- |
+| `ozone.om.kerberos.principal`           | `om/_HOST@REALM.COM` | OM service principal.                     |
+| `ozone.om.kerberos.keytab.file`         | `/path/to/om.keytab` | Keytab for OM service principal.          |
+| `ozone.om.http.auth.kerberos.principal` | `HTTP/_HOST@REALM.COM`| OM HTTP interface principal (SPNEGO).     |
+| `ozone.om.http.auth.kerberos.keytab`    | `/path/to/http.keytab`| Keytab for OM HTTP principal.             |
+
+#### Hadoop RPC Encryption
+
+OM RPC communication can be encrypted using `hadoop.rpc.protection`.
+
+| Property                | Value                                | Description                                                                                                                               |
+| :---------------------- | :----------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
+| `hadoop.rpc.protection` | `authentication`/`integrity`/`privacy` | Controls RPC Quality of Protection. `privacy` enables full encryption. |
+
+Ensure compatibility with other Hadoop services if `privacy` is enabled.
+
+#### Ratis Security for OM High Availability (HA)
+
+OM HA uses Apache Ratis for state replication via gRPC. This channel should be secured with TLS. Refer to [Apache Ratis Security documentation](https://github.com/apache/ratis/blob/master/ratis-docs/src/site/markdown/security.md) for Ratis-specific TLS configurations.
+
+### Storage Container Manager (SCM)
+
+#### Kerberos Configuration
+
+| Property                                | Example Value         | Description                               |
+| :-------------------------------------- | :-------------------- | :---------------------------------------- |
+| `hdds.scm.kerberos.principal`           | `scm/_HOST@REALM.COM` | SCM service principal.                    |
+| `hdds.scm.kerberos.keytab.file`         | `/path/to/scm.keytab` | Keytab for SCM service principal.         |
+| `hdds.scm.http.auth.kerberos.principal` | `HTTP/_HOST@REALM.COM`| SCM HTTP interface principal (SPNEGO).    |
+| `hdds.scm.http.auth.kerberos.keytab`    | `/path/to/http.keytab`| Keytab for SCM HTTP principal.            |
+
+#### Ratis Security for SCM High Availability (HA)
+
+SCM HA (`ozone.scm.ratis.enable=true`) uses Ratis for state replication via gRPC, secured by TLS. The primordial SCM acts as a root CA, issuing certificates to other SCMs, which then issue certificates to OMs and DataNodes. Consult [Apache Ratis source code and documentation](https://github.com/apache/ratis) for Ratis TLS configurations.
+
+### DataNodes
+
+DataNodes store data blocks. For comprehensive details, see [Securing Datanodes documentation]({{< ref "security/securingdatanodes.md" >}}).
+
+#### Kerberos-based Authentication
+
+Legacy Kerberos authentication is supported using the following properties:
+
+| Property                                   | Description                                           |
+| :----------------------------------------- | :---------------------------------------------------- |
+| `hdds.datanode.kerberos.principal`          | DataNode service principal.                           |
+| `hdds.datanode.kerberos.keytab.file`        | Keytab for DataNode service principal.                |
+| `hdds.datanode.http.auth.kerberos.principal` | DataNode HTTP interface principal.                    |
+| `hdds.datanode.http.auth.kerberos.keytab`  | Keytab for DataNode HTTP principal.                   |
+
+#### Certificate-based Security and gRPC TLS/mTLS Encryption
+
+Modern Ozone DataNodes use SCM-issued certificates. DataNode gRPC communication (including Ratis replication) is secured using TLS/mTLS enabled by these certificates.
+
+| Property                | Value        | Description                                                                                                |
+| :---------------------- | :----------- | :--------------------------------------------------------------------------------------------------------- |
+| `hdds.grpc.tls.enabled` | `true`/`false` | Enables TLS for DataNode gRPC channels (requires `ozone.security.enabled=true`).                             |
+
+Ratis replication between DataNodes uses gRPC TLS for data-in-transit protection, which is also controlled by `hdds.grpc.tls.enabled`. Refer to Apache Ratis documentation for specific gRPC TLS settings.
+Note: this property is also used by OM and SCM gRPC and Ratis transport.
+
+### S3 Gateway (S3G)
+
+Provides an S3-compatible REST interface.
+
+#### Kerberos Configuration
+
+| Property                                 | Example Value          | Description                               |
+| :--------------------------------------- | :--------------------- | :---------------------------------------- |
+| `ozone.s3g.http.auth.kerberos.principal` | `HTTP/_HOST@REALM.COM` | S3G HTTP server principal (SPNEGO).       |
+| `ozone.s3g.http.auth.kerberos.keytab`    | `/path/to/http.keytab` | Keytab for S3G HTTP principal.            |
+
+S3G uses Kerberos for its service identity and S3 credentials (Access Key ID/Secret Key) for client S3 operations via AWS Signature Version 4.
+
+### HttpFS Gateway
+
+Offers an HDFS-compatible REST API (webhdfs).
+
+#### Introduction to HttpFS Security
+
+HttpFS supports Hadoop pseudo authentication (simple) and Kerberos SPNEGO.
+
+#### Kerberos Configuration
+
+HttpFS requires Kerberos for client-facing authentication and for its connection to Ozone Manager.
+
+| Property                                          | Default Value                                      | Description                                                                                                |
+| :------------------------------------------------ | :------------------------------------------------- | :--------------------------------------------------------------------------------------------------------- |
+| `httpfs.authentication.type`                      | `simple`                                           | Client HTTP authentication. Set to `kerberos` for SPNEGO.                                                  |
+| `httpfs.authentication.kerberos.principal`        | `HTTP/${httpfs.hostname}@${kerberos.realm}`        | HttpFS client-facing HTTP principal.                                                                       |
+| `httpfs.authentication.kerberos.keytab`           | `${user.home}/httpfs.keytab`                       | Keytab for client-facing principal.                                                                        |
+| `httpfs.hadoop.authentication.type`               | `simple`                                           | HttpFS to Ozone Manager authentication. Set to `kerberos`.                                                 |
+| `httpfs.hadoop.authentication.kerberos.principal` | `${user.name}/${httpfs.hostname}@${kerberos.realm}` | HttpFS principal for OM connection.                                                                        |
+| `httpfs.hadoop.authentication.kerberos.keytab`    | `${user.home}/httpfs.keytab`                       | Keytab for OM connection principal.                                                                        |
+
+HttpFS acts as a secure proxy, authenticating clients and then using its own identity to connect to OM.
+
+### Recon Server
+
+Provides a web UI and REST APIs for cluster monitoring.
+
+#### Introduction to Recon Security
+
+Recon's HTTP/HTTPS endpoints can be secured using Kerberos SPNEGO.
+
+#### Kerberos Configuration for HTTP Access
+
+| Property                                   | Value                                                        | Description                                                                                                |
+| :----------------------------------------- | :----------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------- |
+| `ozone.security.http.kerberos.enabled`     | `true`                                                       | Global switch for Kerberos on Ozone HTTP endpoints.                                                        |
+| `ozone.http.filter.initializers`           | `org.apache.hadoop.security.AuthenticationFilterInitializer` | Filter initializer for SPNEGO.                                                                             |
+| `ozone.recon.http.auth.type`               | `kerberos`                                                   | Sets Recon HTTP authentication to `kerberos`.                                                              |
+| `ozone.recon.http.auth.kerberos.principal` | `HTTP/_HOST@REALM`                                           | Recon HTTP service principal.                                                                              |
+| `ozone.recon.http.auth.kerberos.keytab`    | `/path/to/HTTP.keytab`                                       | Keytab for Recon HTTP principal.                                                                           |
+| `ozone.recon.administrators`               | `comma,separated,kerberos,users,or,groups`                   | Users/groups with admin privileges in Recon.                                                               |
+
+Access to Recon's admin-only APIs is controlled by `ozone.administrators` or `ozone.recon.administrators` lists.
+
+---
+## Further Reading
+
+* [Securing Datanodes]({{< ref "security/securingdatanodes.md" >}})
+* [Network Ports]({{< ref "concept/networkports.md" >}})
+* [Apache Ratis](https://github.com/apache/ratis)
