@@ -655,6 +655,17 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   }
 
   /**
+   * Returns the bucket for the given bucket number.
+   *
+   * @param bucketNumber bucket index
+   * @return corresponding OzoneBucket instance
+   */
+  @VisibleForTesting
+  OzoneBucket getBucketForTesting(Integer bucketNumber) {
+    return waitUntilAddedToMap(buckets, bucketNumber);
+  }
+
+  /**
    * Wrapper to hold ozone keyValidate entry.
    */
   private static class KeyValidate {
