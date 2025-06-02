@@ -205,7 +205,7 @@ public abstract class TestRandomKeyGenerator implements NonHATests.TestCase {
     assertEquals(1, randomKeyGenerator.getBucketMapSizeForTesting());
 
     // Fetch the bucket and check its layout
-    OzoneBucket bucket = randomKeyGenerator.getBucketForTesting(0);
+    OzoneBucket bucket = randomKeyGenerator.getBucket(0);
     assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
   }
 }
