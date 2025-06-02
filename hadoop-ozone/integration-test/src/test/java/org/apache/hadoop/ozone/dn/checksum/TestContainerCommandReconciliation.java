@@ -368,7 +368,7 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainer(containerID);
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());
@@ -445,7 +445,7 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainer(containerID);
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterChunkCorruption =
         readChecksumFile(container.getContainerData());
@@ -515,7 +515,7 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainer(containerID);
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());
