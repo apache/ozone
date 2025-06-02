@@ -654,7 +654,6 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     return validateWrites ? writeValidationFailureCount.get() : 0;
   }
 
-
   /**
    * Returns the current size of the buckets map.
    *
@@ -907,7 +906,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   }
 
   @VisibleForTesting
-  public OzoneBucket getBucket(Integer bucketNumber) {
+  OzoneBucket getBucket(Integer bucketNumber) {
     return waitUntilAddedToMap(buckets, bucketNumber);
   }
 
