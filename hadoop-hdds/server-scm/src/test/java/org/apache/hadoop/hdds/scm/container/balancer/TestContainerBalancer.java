@@ -215,10 +215,14 @@ public class TestContainerBalancer {
 
     balancerConfiguration =
         conf.getObject(ContainerBalancerConfiguration.class);
-    assertThrowsExactly(
-        InvalidContainerBalancerConfigurationException.class,
-        () -> containerBalancer.startBalancer(balancerConfiguration),
-        "should be greater than or equal to 9 minutes.");
+    InvalidContainerBalancerConfigurationException ex =
+        assertThrowsExactly(
+            InvalidContainerBalancerConfigurationException.class,
+            () -> containerBalancer.startBalancer(balancerConfiguration),
+            "(hdds.container.balancer.move.timeout - hdds.container.balancer.move.replication.timeout " +
+                "- hdds.scm.replication.event.timeout.datanode.offset) should be greater than or equal to 9 minutes.");
+    assertTrue(ex.getMessage().contains("should be greater than or equal to 540000ms or 9 minutes"),
+        "Exception message should contain 'should be greater than or equal to 540000ms or 9 minutes'");
     assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
   }
 

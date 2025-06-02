@@ -468,12 +468,13 @@ public class ContainerBalancer extends StatefulService {
         Duration.ofMinutes(6).toMillis(), TimeUnit.MILLISECONDS);
     if ((conf.getMoveTimeout().toMillis() - conf.getMoveReplicationTimeout().toMillis() - datanodeOffset)
         < Duration.ofMinutes(9).toMillis()) {
-      String msg = String.format("(hdds.container.balancer.move.timeout (%sm) - " +
-              "hdds.container.balancer.move.replication.timeout (%sm) - " +
-              "hdds.scm.replication.event.timeout.datanode.offset (%sm)) should be greater than or equal to 9 minutes.",
-          conf.getMoveTimeout().toMinutes(),
-          conf.getMoveReplicationTimeout().toMinutes(),
-          Duration.ofMillis(datanodeOffset).toMinutes());
+      String msg = String.format("(hdds.container.balancer.move.timeout (%sms) - " +
+              "hdds.container.balancer.move.replication.timeout (%sms) - " +
+              "hdds.scm.replication.event.timeout.datanode.offset (%sms)) " +
+              "should be greater than or equal to 540000ms or 9 minutes.\n",
+          conf.getMoveTimeout().toMillis(),
+          conf.getMoveReplicationTimeout().toMillis(),
+          Duration.ofMillis(datanodeOffset).toMillis());
       LOG.warn(msg);
       throw new InvalidContainerBalancerConfigurationException(msg);
     }
