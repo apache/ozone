@@ -20,12 +20,16 @@ package org.apache.hadoop.ozone.container.common.utils;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A time-based sliding window implementation that tracks only failed test results within a specified time duration.
  * It determines failure based on a configured tolerance threshold.
  */
 public class SlidingWindow {
+  private static final Logger LOG = LoggerFactory.getLogger(SlidingWindow.class);
+
   private final long windowDuration;
   private final TimeUnit timeUnit;
   private final int failureTolerance;
@@ -44,8 +48,9 @@ public class SlidingWindow {
   }
 
   public synchronized void add(boolean result) {
+    LOG.debug("Received test result: {}", result);
     if (!result) {
-      if (failureTolerance > 0 && failureTimestamps.size() >= failureTolerance) {
+      if (failureTolerance > 0 && failureTimestamps.size() > failureTolerance) {
         failureTimestamps.remove();
       }
       long currentTime = System.currentTimeMillis();
@@ -57,7 +62,8 @@ public class SlidingWindow {
 
   public synchronized boolean isFailed() {
     removeExpiredFailures();
-    return failureTimestamps.size() >= failureTolerance;
+    LOG.debug("Is failed: {} {}", failureTimestamps.size() > failureTolerance, failureTimestamps);
+    return failureTimestamps.size() > failureTolerance;
   }
 
   private void removeExpiredFailures() {
@@ -65,7 +71,26 @@ public class SlidingWindow {
     long expirationThreshold = currentTime - timeUnit.toMillis(windowDuration);
 
     while (!failureTimestamps.isEmpty() && failureTimestamps.peek() < expirationThreshold) {
+      LOG.debug("Removing expired failure timestamp: {}", failureTimestamps.peek());
       failureTimestamps.remove();
     }
+
+    LOG.debug("Current failure count: {}", failureTimestamps.size());
+  }
+
+  public int getFailureTolerance() {
+    return failureTolerance;
+  }
+
+  public long getWindowDuration() {
+    return windowDuration;
+  }
+
+  public TimeUnit getTimeUnit() {
+    return timeUnit;
+  }
+
+  public int getFailureCount() {
+    return failureTimestamps.size();
   }
 }
