@@ -89,7 +89,7 @@ with fs.open_output_stream(path) as stream:
 </configuration>
 ```
 
-Try it yourself! Check out [PyArrow Tutorial](recipe/PyArrowTutorial.md) for a quick start using Ozone's Docker image.
+Try it yourself! Check out [PyArrow Tutorial](../recipe/PyArrowTutorial.md) for a quick start using Ozone's Docker image.
 
 ## Method 2: Access Ozone via Boto3 and S3 Gateway
 
@@ -198,7 +198,7 @@ else:
   print(resp_read.text)
 ```
 
-Try it yourself! Check out [Access Ozone using HTTPFS REST API Tutorial](recipe/PythonRequestsOzoneHttpFS.md) for a quick start using Ozone's Docker image.
+Try it yourself! Check out [Access Ozone using HTTPFS REST API Tutorial](../recipe/PythonRequestsOzoneHttpFS.md) for a quick start using Ozone's Docker image.
 
 
 ### Code Example (webhdfs)
@@ -229,7 +229,7 @@ with fs.open(file_path, mode='rb') as f:
 - **Authentication Errors**: Verify credentials and Kerberos tokens (if used).
 - **Connection Issues**: Check endpoint URLs, ports, and firewall rules.
 - **FileSystem Errors**: Ensure correct Ozone configuration and appropriate permissions.
-- **Missing Dependencies**: Install required Python packages (`pip install pyarrow boto3 requests webhdfs`).
+- **Missing Dependencies**: Install required Python packages (`pip install pyarrow boto3 requests fsspec`).
 
 ## References and Further Resources
 
