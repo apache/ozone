@@ -54,6 +54,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     });
   }
 
+  @Test
   public void testPreExecute() throws Exception {
     doPreExecute(createAllocateBlockRequest());
   }
