@@ -660,7 +660,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
    * @return number of buckets created and added to the map
    */
   @VisibleForTesting
-  int getBucketMapSizeForTesting() {
+  int getBucketMapSize() {
     return buckets.size();
   }
 
