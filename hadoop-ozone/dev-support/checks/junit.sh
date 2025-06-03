@@ -68,8 +68,13 @@ for i in $(seq 1 ${ITERATIONS}); do
     mkdir -p "${REPORT_DIR}"
   fi
 
-  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" verify \
-    | tee "${REPORT_DIR}/output.log"
+  if [[ $i -eq 1 ]]; then
+    mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" verify \
+      | tee "${REPORT_DIR}/output.log"
+  else
+    mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" clean verify \
+      | tee "${REPORT_DIR}/output.log"
+  fi
   irc=$?
 
   # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
