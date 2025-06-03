@@ -123,62 +123,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return isRunningOnAOS.get();
   }
 
-  @Override
-  public BackgroundTaskQueue getTasks() {
-    BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new KeyDeletingTask(this, null));
-    if (deepCleanSnapshots) {
-      Iterator<UUID> iterator = null;
-      try {
-        iterator = snapshotChainManager.iterator(true);
-      } catch (IOException e) {
-        LOG.error("Error while initializing snapshot chain iterator.");
-        return queue;
-      }
-      while (iterator.hasNext()) {
-        UUID snapshotId = iterator.next();
-        queue.add(new KeyDeletingTask(this, snapshotId));
-      }
-    }
-    return queue;
-  }
-
-  private boolean shouldRun() {
-    if (getOzoneManager() == null) {
-      // OzoneManager can be null for testing
-      return true;
-    }
-    return !suspended.get() && getOzoneManager().isLeaderReady();
-  }
-
-  /**
-   * Suspend the service.
-   */
-  @VisibleForTesting
-  public void suspend() {
-    suspended.set(true);
-  }
-
-  /**
-   * Resume the service if suspended.
-   */
-  @VisibleForTesting
-  public void resume() {
-    suspended.set(false);
-  }
-
-  public int getKeyLimitPerTask() {
-    return keyLimitPerTask;
-  }
-
-  public void setKeyLimitPerTask(int keyLimitPerTask) {
-    this.keyLimitPerTask = keyLimitPerTask;
-  }
-
   Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
       Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
       String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
-
     long startTime = Time.monotonicNow();
     Pair<Integer, Boolean> purgeResult = Pair.of(0, false);
     if (LOG.isDebugEnabled()) {
@@ -193,7 +140,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           keyBlocksList.size(), logSize, keyBlocksList.subList(0, logSize));
     }
     List<DeleteBlockGroupResult> blockDeletionResults =
-        getScmClient().deleteKeyBlocks(keyBlocksList);
+        scmClient.deleteKeyBlocks(keyBlocksList);
     LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
         keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
@@ -205,7 +152,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
           purgeResult, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
     }
-    getPerfMetrics().setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
+    perfMetrics.setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
     return purgeResult;
   }
 
@@ -295,7 +242,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
         .setPurgeKeysRequest(purgeKeysRequest)
-        .setClientId(getClientId().toString())
+        .setClientId(clientId.toString())
         .build();
 
     // Submit PurgeKeys request to OM. Acquire bootstrap lock when processing deletes for snapshots.
@@ -312,7 +259,57 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return Pair.of(deletedCount, purgeSuccess);
   }
 
+  @Override
+  public BackgroundTaskQueue getTasks() {
+    BackgroundTaskQueue queue = new BackgroundTaskQueue();
+    queue.add(new KeyDeletingTask(this, null));
+    if (deepCleanSnapshots) {
+      Iterator<UUID> iterator = null;
+      try {
+        iterator = snapshotChainManager.iterator(true);
+      } catch (IOException e) {
+        LOG.error("Error while initializing snapshot chain iterator.");
+        return queue;
+      }
+      while (iterator.hasNext()) {
+        UUID snapshotId = iterator.next();
+        queue.add(new KeyDeletingTask(this, snapshotId));
+      }
+    }
+    return queue;
+  }
 
+  private boolean shouldRun() {
+    if (getOzoneManager() == null) {
+      // OzoneManager can be null for testing
+      return true;
+    }
+    return !suspended.get() && getOzoneManager().isLeaderReady();
+  }
+
+  /**
+   * Suspend the service.
+   */
+  @VisibleForTesting
+  public void suspend() {
+    suspended.set(true);
+  }
+
+  /**
+   * Resume the service if suspended.
+   */
+  @VisibleForTesting
+  public void resume() {
+    suspended.set(false);
+  }
+
+  public int getKeyLimitPerTask() {
+    return keyLimitPerTask;
+  }
+
+  public void setKeyLimitPerTask(int keyLimitPerTask) {
+    this.keyLimitPerTask = keyLimitPerTask;
+  }
 
   /**
    * A key deleting task scans OM DB and looking for a certain number of
