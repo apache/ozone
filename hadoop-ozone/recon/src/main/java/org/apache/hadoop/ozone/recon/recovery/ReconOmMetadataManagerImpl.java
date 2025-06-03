@@ -37,17 +37,14 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfoProtoWrapper;
-import org.apache.hadoop.ozone.recon.codec.ReconOMDBDefinition;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,7 +64,6 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   private OzoneConfiguration ozoneConfiguration;
   private ReconUtils reconUtils;
   private boolean omTablesInitialized = false;
-  private TypedTable<String, OmDirectoryInfo> dirTable;
 
   @Inject
   public ReconOmMetadataManagerImpl(OzoneConfiguration configuration,
@@ -97,14 +93,14 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
    */
   private void initializeNewRdbStore(File dbFile) throws IOException {
     try {
-      setStore(DBStoreBuilder.newBuilder(ozoneConfiguration, ReconOMDBDefinition.get(), dbFile).build());
+      setStore(DBStoreBuilder.newBuilder(ozoneConfiguration, OMDBDefinition.get(), dbFile).build());
       LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
       LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
     }
     if (getStore() != null) {
-      initializeOmTables(TableCache.CacheType.FULL_CACHE, true, ReconOMDBDefinition.get());
+      initializeOmTables(TableCache.CacheType.FULL_CACHE, true);
       omTablesInitialized = true;
     }
   }

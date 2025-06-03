@@ -134,7 +134,7 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  *   2. /volumeId/bucketId/parentId/fileName
  *   3. /volumeName/bucketName/keyName
  */
-public final class OMDBDefinition extends DBDefinition.WithMap implements OMDBDefinitionBase {
+public final class OMDBDefinition extends DBDefinition.WithMap {
 
   //---------------------------------------------------------------------------
   // User, Token and Secret Tables:
@@ -357,116 +357,6 @@ public final class OMDBDefinition extends DBDefinition.WithMap implements OMDBDe
   @Override
   public String getLocationConfigKey() {
     return OMConfigKeys.OZONE_OM_DB_DIRS;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, PersistedUserVolumeInfo> getUserTableDef() {
-    return USER_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmVolumeArgs> getVolumeTableDef() {
-    return VOLUME_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmBucketInfo> getBucketTableDef() {
-    return BUCKET_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmKeyInfo> getKeyTableDef() {
-    return KEY_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmKeyInfo> getOpenKeyTableDef() {
-    return OPEN_KEY_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmMultipartKeyInfo> getMultipartInfoTableDef() {
-    return MULTIPART_INFO_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, RepeatedOmKeyInfo> getDeletedTableDef() {
-    return DELETED_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmDirectoryInfo> getDirectoryTableDef() {
-    return DIRECTORY_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmKeyInfo> getFileTableDef() {
-    return FILE_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmKeyInfo> getOpenFileTableDef() {
-    return OPEN_FILE_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmKeyInfo> getDeletedDirTableDef() {
-    return DELETED_DIR_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<OzoneTokenIdentifier, Long> getDelegationTokenTableDef() {
-    return DELEGATION_TOKEN_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, S3SecretValue> getS3SecretTableDef() {
-    return S3_SECRET_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmPrefixInfo> getPrefixTableDef() {
-    return PREFIX_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, TransactionInfo> getTransactionInfoTableDef() {
-    return TRANSACTION_INFO_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, String> getMetaTableDef() {
-    return META_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmDBAccessIdInfo> getTenantAccessIdTableDef() {
-    return TENANT_ACCESS_ID_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmDBUserPrincipalInfo> getPrincipalToAccessIdsTableDef() {
-    return PRINCIPAL_TO_ACCESS_IDS_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmDBTenantState> getTenantStateTableDef() {
-    return TENANT_STATE_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, SnapshotInfo> getSnapshotInfoTableDef() {
-    return SNAPSHOT_INFO_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, String> getSnapshotRenamedTableDef() {
-    return SNAPSHOT_RENAMED_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, CompactionLogEntry> getCompactionLogTableDef() {
-    return COMPACTION_LOG_TABLE_DEF;
   }
 }
 

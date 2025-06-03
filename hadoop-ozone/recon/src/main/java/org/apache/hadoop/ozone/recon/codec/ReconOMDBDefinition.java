@@ -56,7 +56,6 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.codec.OMDBDefinitionBase;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -160,7 +159,7 @@ import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
  *   2. /volumeId/bucketId/parentId/fileName
  *   3. /volumeName/bucketName/keyName
  */
-public final class ReconOMDBDefinition extends DBDefinition.WithMap implements OMDBDefinitionBase {
+public final class ReconOMDBDefinition extends DBDefinition.WithMap {
 
   //---------------------------------------------------------------------------
   // Volume, Bucket, Prefix and Transaction Tables:
@@ -179,7 +178,7 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap implements O
   public static final DBColumnFamilyDefinition<String, OmBucketInfo> BUCKET_TABLE_DEF
       = new DBColumnFamilyDefinition<>(BUCKET_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_BUCKET_TABLE);
 
-  private static final Codec<OmKeyInfo> CUSTOM_CODEC_FOR_KEY_TABLE = new DelegatedCodec<>(
+  public static final Codec<OmKeyInfo> CUSTOM_CODEC_FOR_KEY_TABLE = new DelegatedCodec<>(
       Proto2Codec.get(OzoneManagerProtocolProtos.KeyInfo.getDefaultInstance()),
       ReconOMDBDefinition::getOmKeyInfoFromProtobuf,
       k -> k.getProtobuf(true, ClientVersion.CURRENT_VERSION),
@@ -213,7 +212,7 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap implements O
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_FILE_TABLE_DEF
       = new DBColumnFamilyDefinition<>(OPEN_FILE_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
 
-  private static final Codec<OmDirectoryInfo> CUSTOM_CODEC_FOR_DIR_TABLE = new DelegatedCodec<>(
+  public static final Codec<OmDirectoryInfo> CUSTOM_CODEC_FOR_DIR_TABLE = new DelegatedCodec<>(
       Proto2Codec.get(OzoneManagerProtocolProtos.DirectoryInfo.getDefaultInstance()),
       ReconOMDBDefinition::getOmDirInfoFromProtobuf,
       null,
@@ -227,7 +226,7 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap implements O
       = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
 
   //---------------------------------------------------------------------------
-  private static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
+  public static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
       = DBColumnFamilyDefinition.newUnmodifiableMap(
       BUCKET_TABLE_DEF,
       DELETED_DIR_TABLE_DEF,
@@ -400,51 +399,6 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap implements O
   @Override
   public String getLocationConfigKey() {
     return OMConfigKeys.OZONE_OM_DB_DIRS;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmVolumeArgs> getVolumeTableDef() {
-    return VOLUME_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmBucketInfo> getBucketTableDef() {
-    return BUCKET_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmKeyInfo> getKeyTableDef() {
-    return KEY_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmKeyInfo> getOpenKeyTableDef() {
-    return OPEN_KEY_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, RepeatedOmKeyInfo> getDeletedTableDef() {
-    return DELETED_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmDirectoryInfo> getDirectoryTableDef() {
-    return DIRECTORY_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmKeyInfo> getFileTableDef() {
-    return FILE_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmKeyInfo> getOpenFileTableDef() {
-    return OPEN_FILE_TABLE_DEF;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, OmKeyInfo> getDeletedDirTableDef() {
-    return DELETED_DIR_TABLE_DEF;
   }
 
 }
