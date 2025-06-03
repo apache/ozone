@@ -170,6 +170,90 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap implements O
           StringCodec.get(),
           OmVolumeArgs.getCodec());
 
+  private static final Codec<OmBucketInfo> CUSTOM_CODEC_FOR_BUCKET_TABLE = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.BucketInfo.getDefaultInstance()),
+      ReconOMDBDefinition::getOmBucketInfoFromProtobuf,
+      null,
+      OmBucketInfo.class);
+  /** bucketTable: /volume/bucket :- BucketInfo. */
+  public static final DBColumnFamilyDefinition<String, OmBucketInfo> BUCKET_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(BUCKET_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_BUCKET_TABLE);
+
+  private static final Codec<OmKeyInfo> CUSTOM_CODEC_FOR_KEY_TABLE = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.KeyInfo.getDefaultInstance()),
+      ReconOMDBDefinition::getOmKeyInfoFromProtobuf,
+      k -> k.getProtobuf(true, ClientVersion.CURRENT_VERSION),
+      OmKeyInfo.class);
+  // Object Store (OBS) Tables:
+  /** keyTable: /volume/bucket/key :- KeyInfo. */
+  public static final DBColumnFamilyDefinition<String, OmKeyInfo> KEY_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(KEY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
+
+  private static final Codec<RepeatedOmKeyInfo> CUSTOM_CODEC_FOR_DELETED_TABLE = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.RepeatedKeyInfo.getDefaultInstance()),
+      ReconOMDBDefinition::getRepeatedOmKeyInfoFromProto,
+      k -> k.getProto(true, ClientVersion.CURRENT_VERSION),
+      RepeatedOmKeyInfo.class);
+
+  /** deletedTable: /volume/bucket/key :- RepeatedKeyInfo. */
+  public static final DBColumnFamilyDefinition<String, RepeatedOmKeyInfo> DELETED_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(DELETED_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_DELETED_TABLE);
+
+  /** openKeyTable: /volume/bucket/key/id :- KeyInfo. */
+  public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_KEY_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(OPEN_KEY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
+
+  //---------------------------------------------------------------------------
+  // File System Optimized (FSO) Tables:
+  /** fileTable: /volumeId/bucketId/parentId/fileName :- KeyInfo. */
+  public static final DBColumnFamilyDefinition<String, OmKeyInfo> FILE_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(FILE_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
+
+  /** openFileTable: /volumeId/bucketId/parentId/fileName/id :- KeyInfo. */
+  public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_FILE_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(OPEN_FILE_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
+
+  private static final Codec<OmDirectoryInfo> CUSTOM_CODEC_FOR_DIR_TABLE = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.DirectoryInfo.getDefaultInstance()),
+      ReconOMDBDefinition::getOmDirInfoFromProtobuf,
+      null,
+      OmDirectoryInfo.class);
+  /** directoryTable: /volumeId/bucketId/parentId/dirName :- DirInfo. */
+  public static final DBColumnFamilyDefinition<String, OmDirectoryInfo> DIRECTORY_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(DIRECTORY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_DIR_TABLE);
+
+  /** deletedDirectoryTable: /volumeId/bucketId/parentId/dirName/objectId :- KeyInfo. */
+  public static final DBColumnFamilyDefinition<String, OmKeyInfo> DELETED_DIR_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
+
+  //---------------------------------------------------------------------------
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
+      = DBColumnFamilyDefinition.newUnmodifiableMap(
+      BUCKET_TABLE_DEF,
+      DELETED_DIR_TABLE_DEF,
+      DELETED_TABLE_DEF,
+      DIRECTORY_TABLE_DEF,
+      DELEGATION_TOKEN_TABLE_DEF,
+      FILE_TABLE_DEF,
+      KEY_TABLE_DEF,
+      META_TABLE_DEF,
+      MULTIPART_INFO_TABLE_DEF,
+      OPEN_FILE_TABLE_DEF,
+      OPEN_KEY_TABLE_DEF,
+      PREFIX_TABLE_DEF,
+      PRINCIPAL_TO_ACCESS_IDS_TABLE_DEF,
+      S3_SECRET_TABLE_DEF,
+      SNAPSHOT_INFO_TABLE_DEF,
+      SNAPSHOT_RENAMED_TABLE_DEF,
+      COMPACTION_LOG_TABLE_DEF,
+      TENANT_ACCESS_ID_TABLE_DEF,
+      TENANT_STATE_TABLE_DEF,
+      TRANSACTION_INFO_TABLE_DEF,
+      USER_TABLE_DEF,
+      VOLUME_TABLE_DEF);
+
+  private static final ReconOMDBDefinition INSTANCE = new ReconOMDBDefinition();
+
   /**
    * Parses BucketInfo protobuf and creates OmBucketInfo without deserializing ACL list.
    * @param bucketInfo
@@ -212,15 +296,6 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap implements O
     }
     return obib.build();
   }
-
-  private static final Codec<OmBucketInfo> CUSTOM_CODEC_FOR_BUCKET_TABLE = new DelegatedCodec<>(
-      Proto2Codec.get(OzoneManagerProtocolProtos.BucketInfo.getDefaultInstance()),
-      ReconOMDBDefinition::getOmBucketInfoFromProtobuf,
-      null,
-      OmBucketInfo.class);
-  /** bucketTable: /volume/bucket :- BucketInfo. */
-  public static final DBColumnFamilyDefinition<String, OmBucketInfo> BUCKET_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(BUCKET_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_BUCKET_TABLE);
 
   //---------------------------------------------------------------------------
   public static OmKeyInfo getOmKeyInfoFromProtobuf(OzoneManagerProtocolProtos.KeyInfo keyInfo) {
@@ -271,16 +346,6 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap implements O
     return builder.build();
   }
 
-  private static final Codec<OmKeyInfo> CUSTOM_CODEC_FOR_KEY_TABLE = new DelegatedCodec<>(
-      Proto2Codec.get(OzoneManagerProtocolProtos.KeyInfo.getDefaultInstance()),
-      ReconOMDBDefinition::getOmKeyInfoFromProtobuf,
-      k -> k.getProtobuf(true, ClientVersion.CURRENT_VERSION),
-      OmKeyInfo.class);
-  // Object Store (OBS) Tables:
-  /** keyTable: /volume/bucket/key :- KeyInfo. */
-  public static final DBColumnFamilyDefinition<String, OmKeyInfo> KEY_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(KEY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
-
   public static RepeatedOmKeyInfo getRepeatedOmKeyInfoFromProto(
       OzoneManagerProtocolProtos.RepeatedKeyInfo repeatedKeyInfo) {
     List<OmKeyInfo> list = new ArrayList<>();
@@ -289,30 +354,6 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap implements O
     }
     return new RepeatedOmKeyInfo.Builder().setOmKeyInfos(list).build();
   }
-
-  private static final Codec<RepeatedOmKeyInfo> CUSTOM_CODEC_FOR_DELETED_TABLE = new DelegatedCodec<>(
-      Proto2Codec.get(OzoneManagerProtocolProtos.RepeatedKeyInfo.getDefaultInstance()),
-      ReconOMDBDefinition::getRepeatedOmKeyInfoFromProto,
-      k -> k.getProto(true, ClientVersion.CURRENT_VERSION),
-      RepeatedOmKeyInfo.class);
-
-  /** deletedTable: /volume/bucket/key :- RepeatedKeyInfo. */
-  public static final DBColumnFamilyDefinition<String, RepeatedOmKeyInfo> DELETED_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(DELETED_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_DELETED_TABLE);
-
-  /** openKeyTable: /volume/bucket/key/id :- KeyInfo. */
-  public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_KEY_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(OPEN_KEY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
-
-  //---------------------------------------------------------------------------
-  // File System Optimized (FSO) Tables:
-  /** fileTable: /volumeId/bucketId/parentId/fileName :- KeyInfo. */
-  public static final DBColumnFamilyDefinition<String, OmKeyInfo> FILE_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(FILE_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
-
-  /** openFileTable: /volumeId/bucketId/parentId/fileName/id :- KeyInfo. */
-  public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_FILE_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(OPEN_FILE_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
 
   /**
    * Parses DirectoryInfo protobuf and creates OmPrefixInfo.
@@ -342,47 +383,6 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap implements O
     }
     return opib.build();
   }
-
-  private static final Codec<OmDirectoryInfo> CUSTOM_CODEC_FOR_DIR_TABLE = new DelegatedCodec<>(
-      Proto2Codec.get(OzoneManagerProtocolProtos.DirectoryInfo.getDefaultInstance()),
-      ReconOMDBDefinition::getOmDirInfoFromProtobuf,
-      null,
-      OmDirectoryInfo.class);
-  /** directoryTable: /volumeId/bucketId/parentId/dirName :- DirInfo. */
-  public static final DBColumnFamilyDefinition<String, OmDirectoryInfo> DIRECTORY_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(DIRECTORY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_DIR_TABLE);
-
-  /** deletedDirectoryTable: /volumeId/bucketId/parentId/dirName/objectId :- KeyInfo. */
-  public static final DBColumnFamilyDefinition<String, OmKeyInfo> DELETED_DIR_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
-
-  //---------------------------------------------------------------------------
-  private static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
-      = DBColumnFamilyDefinition.newUnmodifiableMap(
-          BUCKET_TABLE_DEF,
-          DELETED_DIR_TABLE_DEF,
-          DELETED_TABLE_DEF,
-          DIRECTORY_TABLE_DEF,
-          DELEGATION_TOKEN_TABLE_DEF,
-          FILE_TABLE_DEF,
-          KEY_TABLE_DEF,
-          META_TABLE_DEF,
-          MULTIPART_INFO_TABLE_DEF,
-          OPEN_FILE_TABLE_DEF,
-          OPEN_KEY_TABLE_DEF,
-          PREFIX_TABLE_DEF,
-          PRINCIPAL_TO_ACCESS_IDS_TABLE_DEF,
-          S3_SECRET_TABLE_DEF,
-          SNAPSHOT_INFO_TABLE_DEF,
-          SNAPSHOT_RENAMED_TABLE_DEF,
-          COMPACTION_LOG_TABLE_DEF,
-          TENANT_ACCESS_ID_TABLE_DEF,
-          TENANT_STATE_TABLE_DEF,
-          TRANSACTION_INFO_TABLE_DEF,
-          USER_TABLE_DEF,
-          VOLUME_TABLE_DEF);
-
-  private static final ReconOMDBDefinition INSTANCE = new ReconOMDBDefinition();
 
   public static ReconOMDBDefinition get() {
     return INSTANCE;
