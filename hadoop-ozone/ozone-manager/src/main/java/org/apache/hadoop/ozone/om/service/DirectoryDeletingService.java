@@ -577,7 +577,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           subFileNum += purgePathRequest.getDeletedSubFilesCount();
         }
 
-        directoryDeletingService.optimizeDirDeletesAndSubmitRequest(dirNum, subDirNum,
+        optimizeDirDeletesAndSubmitRequest(dirNum, subDirNum,
             subFileNum, allSubDirList, purgePathRequestList, snapshotTableKey,
             startTime, remainingBufLimit, getOzoneManager().getKeyManager(),
             reclaimableDirFilter, reclaimableFileFilter, expectedPreviousSnapshotId,
