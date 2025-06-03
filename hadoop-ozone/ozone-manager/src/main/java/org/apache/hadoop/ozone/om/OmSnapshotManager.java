@@ -764,6 +764,11 @@ public final class OmSnapshotManager implements AutoCloseable {
         OM_DB_NAME + snapshotInfo.getCheckpointDirName();
   }
 
+  public static String getSnapshotLocalPropertyPath(OzoneConfiguration conf,
+      SnapshotInfo snapshotInfo) {
+    return getSnapshotPath(conf, snapshotInfo) + ".yaml";
+  }
+
   public static boolean isSnapshotKey(String[] keyParts) {
     return (keyParts.length > 1) &&
         (keyParts[0].compareTo(OM_SNAPSHOT_INDICATOR) == 0);
