@@ -21,9 +21,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION;
@@ -34,6 +37,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBER
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -144,6 +150,15 @@ public class TestContainerCommandReconciliation {
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 128 * 1024, StorageUnit.BYTES);
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE,  512 * 1024, StorageUnit.BYTES);
+    // Support restarting datanodes and SCM in a rolling fashion to test checksum reporting after restart.
+    // Datanodes need to heartbeat more frequently, because they will not know that SCM was restarted until they
+    // heartbeat and SCM indicates they need to re-register.
+    conf.set(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, "200ms");
+    conf.set(HDDS_HEARTBEAT_INTERVAL, "1s");
+    conf.set(OZONE_SCM_STALENODE_INTERVAL, "3s");
+    conf.set(OZONE_SCM_DEADNODE_INTERVAL, "6s");
+    conf.set(HDDS_NODE_REPORT_INTERVAL, "5s");
+    conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
 
     startMiniKdc();
     setSecureConfig();
@@ -291,7 +306,6 @@ public class TestContainerCommandReconciliation {
     Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
         .getContainerSet().getContainer(containerID);
     File treeFile = getContainerChecksumFile(container.getContainerData());
-    // TODO After HDDS-10379 the file will already exist and need to be overwritten.
     assertTrue(treeFile.exists());
     Files.write(treeFile.toPath(), new byte[]{},
         StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
