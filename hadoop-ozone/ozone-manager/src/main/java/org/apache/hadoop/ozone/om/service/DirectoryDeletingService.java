@@ -177,7 +177,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     super.shutdown();
   }
 
-  private final class DeletedDirSupplier implements Closeable {
+  private static final class DeletedDirSupplier implements Closeable {
     private TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
         deleteTableIterator;
 
@@ -192,6 +192,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       return null;
     }
 
+    @Override
     public void close() {
       IOUtils.closeQuietly(deleteTableIterator);
     }
@@ -273,7 +274,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           processedAllDeletedDirs = future.thenCombine(future, (a, b) -> a && b);
         }
         // If AOS or all directories have been processed for snapshot, update snapshot size delta and deep clean flag
-        if (currentSnapshotInfo == null || processedAllDeletedDirs.get()) {
+        // if it is a snapshot.
+        if (processedAllDeletedDirs.get()) {
           List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
           Map<UUID, Long> exclusiveReplicatedSizeMap = reclaimableFileFilter.getExclusiveReplicatedSizeMap();
           Map<UUID, Long> exclusiveSizeMap = reclaimableFileFilter.getExclusiveSizeMap();
@@ -297,6 +299,21 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       }
     }
 
+    /**
+     * Processes the directories marked as deleted and performs reclamation if applicable.
+     * This includes preparing and submitting requests to delete directories and their
+     * subdirectories/files while respecting buffer limits and snapshot constraints.
+     *
+     * @param snapshotTableKey the key of the snapshot table to which the operation applies
+     * @param dirSupplier thread safe supplier to fetch the next directory marked as deleted.
+     * @param remainingBufLimit the limit for the remaining buffer size available for processing
+     * @param reclaimableDirFilter filter to determine whether a directory is reclaimable
+     * @param reclaimableFileFilter filter to determine whether a file is reclaimable
+     * @param expectedPreviousSnapshotId UUID of the expected previous snapshot in the snapshot chain
+     * @param runCount the current run count of the deletion process
+     * @return true if no purge requests were submitted (indicating no deletions processed),
+     *         false otherwise
+     */
     private boolean processDeletedDirectories(String snapshotTableKey,
         DeletedDirSupplier dirSupplier, long remainingBufLimit, ReclaimableDirFilter reclaimableDirFilter,
         ReclaimableKeyFilter reclaimableFileFilter, UUID expectedPreviousSnapshotId, long runCount) {
