@@ -66,7 +66,7 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  * Implementations:
  * <ul>
  *   <li>{@link OMDBDefinition}</li>
- *   <li>{@link ReconOmDBDefinition}</li>
+ *   <li>{@code ReconOmDBDefinition}</li>
  * </ul>
  */
 public interface OMDBDefinitionBase {
