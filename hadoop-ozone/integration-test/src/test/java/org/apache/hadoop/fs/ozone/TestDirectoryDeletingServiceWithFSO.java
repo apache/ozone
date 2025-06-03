@@ -277,8 +277,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertEquals(18, metrics.getNumSubDirsMovedToDeletedDirTable());
     assertEquals(18, metrics.getNumSubDirsSentForPurge());
 
-
-    long elapsedRunCount = dirDeletingService.getRunCount().get() - preRunCount;
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
     // Ensure dir deleting speed, here provide a backup value for safe CI
     GenericTestUtils.waitFor(() -> dirDeletingService.getRunCount().get() - preRunCount >= 7, 1000, 100000);
