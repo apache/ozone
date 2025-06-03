@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Maps;
 import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
@@ -449,15 +450,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     }
 
     private OzoneManagerProtocolProtos.SetSnapshotPropertyRequest getSetSnapshotRequestUpdatingExclusiveSize(
-        Map<UUID, Long> exclusiveSizeMap, Map<UUID, Long> exclusiveReplicatedSizeMap, UUID snapshotID) {
+        long exclusiveSize, long exclusiveReplicatedSize, UUID snapshotID) {
       OzoneManagerProtocolProtos.SnapshotSize snapshotSize = OzoneManagerProtocolProtos.SnapshotSize.newBuilder()
-          .setExclusiveSize(
-              exclusiveSizeMap.getOrDefault(snapshotID, 0L))
-          .setExclusiveReplicatedSize(
-              exclusiveReplicatedSizeMap.getOrDefault(
-                  snapshotID, 0L))
+          .setExclusiveSize(exclusiveSize)
+          .setExclusiveReplicatedSize(exclusiveReplicatedSize)
           .build();
-
       return OzoneManagerProtocolProtos.SetSnapshotPropertyRequest.newBuilder()
           .setSnapshotKey(snapshotChainManager.getTableKey(snapshotID))
           .setSnapshotSizeDeltaFromDirDeepCleaning(snapshotSize)
@@ -471,7 +468,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
      */
     private void processDeletedDirsForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
         long remainingBufLimit, long rnCnt) throws IOException, ExecutionException, InterruptedException {
-      String volume, bucket, snapshotTableKey;
+      String volume, bucket; String snapshotTableKey;
       if (currentSnapshotInfo != null) {
         volume = currentSnapshotInfo.getVolumeName();
         bucket = currentSnapshotInfo.getBucketName();
@@ -480,47 +477,39 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         volume = null; bucket = null; snapshotTableKey = null;
       }
 
-      OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
-      IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
-
       try (DeletedDirSupplier dirSupplier = new DeletedDirSupplier(currentSnapshotInfo == null ?
-          keyManager.getDeletedDirEntries() : keyManager.getDeletedDirEntries(volume, bucket));
-           ReclaimableDirFilter reclaimableDirFilter = new ReclaimableDirFilter(getOzoneManager(),
-               omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock);
-           ReclaimableKeyFilter reclaimableFileFilter = new ReclaimableKeyFilter(getOzoneManager(),
-               omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock)) {
+          keyManager.getDeletedDirEntries() : keyManager.getDeletedDirEntries(volume, bucket))) {
         // This is to avoid race condition b/w purge request and snapshot chain update. For AOS taking the global
         // snapshotId since AOS could process multiple buckets in one iteration. While using path
         // previous snapshotId for a snapshot since it would process only one bucket.
         UUID expectedPreviousSnapshotId = currentSnapshotInfo == null ?
             snapshotChainManager.getLatestGlobalSnapshotId() :
             SnapshotUtils.getPreviousSnapshotId(currentSnapshotInfo, snapshotChainManager);
+        Map<UUID, Pair<Long, Long>> exclusiveSizeMap = Maps.newConcurrentMap();
+
         CompletableFuture<Boolean> processedAllDeletedDirs = CompletableFuture.completedFuture(true);
         for (int i = 0; i < numberOfParallelThreadsPerStore; i++) {
-          CompletableFuture<Boolean> future = new CompletableFuture<>();
-          deletionThreadPool.submit(() -> {
+          CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(() -> {
             try {
-              boolean processedAll = processDeletedDirectories(snapshotTableKey, dirSupplier, remainingBufLimit,
-                  reclaimableDirFilter, reclaimableFileFilter, expectedPreviousSnapshotId, rnCnt);
-              future.complete(processedAll);
+              return processDeletedDirectories(currentSnapshotInfo, keyManager, dirSupplier, remainingBufLimit,
+                  expectedPreviousSnapshotId, exclusiveSizeMap, rnCnt);
             } catch (Throwable e) {
-              future.complete(false);
+              return false;
             }
-          });
+          }, deletionThreadPool);
           processedAllDeletedDirs = future.thenCombine(future, (a, b) -> a && b);
         }
         // If AOS or all directories have been processed for snapshot, update snapshot size delta and deep clean flag
         // if it is a snapshot.
         if (processedAllDeletedDirs.get()) {
           List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
-          Map<UUID, Long> exclusiveReplicatedSizeMap = reclaimableFileFilter.getExclusiveReplicatedSizeMap();
-          Map<UUID, Long> exclusiveSizeMap = reclaimableFileFilter.getExclusiveSizeMap();
-          List<UUID> previousPathSnapshotsInChain =
-              Stream.of(exclusiveSizeMap.keySet(), exclusiveReplicatedSizeMap.keySet())
-                  .flatMap(Collection::stream).distinct().collect(Collectors.toList());
-          for (UUID snapshot : previousPathSnapshotsInChain) {
-            setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(exclusiveSizeMap,
-                exclusiveReplicatedSizeMap, snapshot));
+
+          for (Map.Entry<UUID, Pair<Long, Long>> entry : exclusiveSizeMap.entrySet()) {
+            UUID snapshotID = entry.getKey();
+            long exclusiveSize = entry.getValue().getLeft();
+            long exclusiveReplicatedSize = entry.getValue().getRight();
+            setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(
+                exclusiveSize, exclusiveReplicatedSize, snapshotID));
           }
 
           // Updating directory deep clean flag of snapshot.
@@ -536,24 +525,30 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     }
 
     /**
-     * Processes the directories marked as deleted and performs reclamation if applicable.
-     * This includes preparing and submitting requests to delete directories and their
-     * subdirectories/files while respecting buffer limits and snapshot constraints.
+     * Processes deleted directories for snapshot management, determining whether
+     * directories and files can be purged, and calculates exclusive size mappings
+     * for snapshots.
      *
-     * @param snapshotTableKey the key of the snapshot table to which the operation applies
-     * @param dirSupplier thread safe supplier to fetch the next directory marked as deleted.
-     * @param remainingBufLimit the limit for the remaining buffer size available for processing
-     * @param reclaimableDirFilter filter to determine whether a directory is reclaimable
-     * @param reclaimableFileFilter filter to determine whether a file is reclaimable
-     * @param expectedPreviousSnapshotId UUID of the expected previous snapshot in the snapshot chain
-     * @param runCount the current run count of the deletion process
-     * @return true if no purge requests were submitted (indicating no deletions processed),
-     *         false otherwise
+     * @param currentSnapshotInfo Information about the current snapshot whose deleted directories are being processed.
+     * @param keyManager Key manager of the underlying storage system to handle key operations.
+     * @param dirSupplier Supplier for fetching pending deleted directories to be processed.
+     * @param remainingBufLimit Remaining buffer limit for processing directories and files.
+     * @param expectedPreviousSnapshotId The UUID of the previous snapshot expected in the chain.
+     * @param totalExclusiveSizeMap A map for storing total exclusive size and exclusive replicated size
+     *                              for each snapshot.
+     * @param runCount The number of times the processing task has been executed.
+     * @return A boolean indicating whether the processed directory list is empty.
      */
-    private boolean processDeletedDirectories(String snapshotTableKey,
-        DeletedDirSupplier dirSupplier, long remainingBufLimit, ReclaimableDirFilter reclaimableDirFilter,
-        ReclaimableKeyFilter reclaimableFileFilter, UUID expectedPreviousSnapshotId, long runCount) {
-      try {
+    private boolean processDeletedDirectories(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
+        DeletedDirSupplier dirSupplier, long remainingBufLimit, UUID expectedPreviousSnapshotId,
+        Map<UUID, Pair<Long, Long>> totalExclusiveSizeMap, long runCount) {
+      OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
+      IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
+      String snapshotTableKey = currentSnapshotInfo == null ? null : currentSnapshotInfo.getTableKey();
+      try (ReclaimableDirFilter reclaimableDirFilter = new ReclaimableDirFilter(getOzoneManager(),
+          omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock);
+          ReclaimableKeyFilter reclaimableFileFilter = new ReclaimableKeyFilter(getOzoneManager(),
+              omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock)) {
         long startTime = Time.monotonicNow();
         long dirNum = 0L;
         long subDirNum = 0L;
@@ -591,6 +586,21 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             startTime, remainingBufLimit, getOzoneManager().getKeyManager(),
             reclaimableDirFilter, reclaimableFileFilter, expectedPreviousSnapshotId,
             runCount);
+        Map<UUID, Long> exclusiveReplicatedSizeMap = reclaimableFileFilter.getExclusiveReplicatedSizeMap();
+        Map<UUID, Long> exclusiveSizeMap = reclaimableFileFilter.getExclusiveSizeMap();
+        List<UUID> previousPathSnapshotsInChain =
+            Stream.of(exclusiveSizeMap.keySet(), exclusiveReplicatedSizeMap.keySet())
+                .flatMap(Collection::stream).distinct().collect(Collectors.toList());
+        for (UUID snapshot : previousPathSnapshotsInChain) {
+          totalExclusiveSizeMap.compute(snapshot, (k, v) -> {
+            long exclusiveSize = exclusiveSizeMap.getOrDefault(snapshot, 0L);
+            long exclusiveReplicatedSize = exclusiveReplicatedSizeMap.getOrDefault(snapshot, 0L);
+            if (v == null) {
+              return Pair.of(exclusiveSize, exclusiveReplicatedSize);
+            }
+            return Pair.of(v.getLeft() + exclusiveSize, v.getRight() + exclusiveReplicatedSize);
+          });
+        }
 
         return purgePathRequestList.isEmpty();
       } catch (IOException e) {

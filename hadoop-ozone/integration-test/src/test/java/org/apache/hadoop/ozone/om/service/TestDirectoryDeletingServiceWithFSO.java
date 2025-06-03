@@ -275,11 +275,9 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertEquals(18, metrics.getNumSubDirsMovedToDeletedDirTable());
     assertEquals(18, metrics.getNumSubDirsSentForPurge());
 
-
-    long elapsedRunCount = dirDeletingService.getRunCount().get() - preRunCount;
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
     // Ensure dir deleting speed, here provide a backup value for safe CI
-    assertThat(elapsedRunCount).isGreaterThanOrEqualTo(7);
+    GenericTestUtils.waitFor(() -> dirDeletingService.getRunCount().get() - preRunCount >= 7, 1000, 100000);
   }
 
   @Test
@@ -651,8 +649,8 @@ public class TestDirectoryDeletingServiceWithFSO {
         }
       }, 1000, 10000);
       return i.callRealMethod();
-    }).when(omSnapshotManager).getSnapshot(ArgumentMatchers.eq(testVolumeName), ArgumentMatchers.eq(testBucketName),
-        ArgumentMatchers.eq(snap1));
+    }).when(omSnapshotManager).getActiveSnapshot(ArgumentMatchers.eq(testVolumeName),
+        ArgumentMatchers.eq(testBucketName), ArgumentMatchers.eq(snap1));
     assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 1);
     service.runPeriodicalTaskNow();
     service.runPeriodicalTaskNow();
@@ -729,7 +727,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     DirectoryDeletingService dirDeletingService =
         (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
             .getDirDeletingService();
-
     // After delete. 5 more files left out under the root dir
     assertTableRowCount(keyTable, 5);
     assertTableRowCount(dirTable, 5);
@@ -749,14 +746,13 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
-
     // Case-2) Delete dir
     fs.delete(root, true);
 
     // After delete. 5 sub files are still in keyTable.
     // 4 dirs in dirTable.
     assertTableRowCount(keyTable, 5);
-    assertTableRowCount(dirTable, 4);
+    assertTableRowCount(dirTable, 0);
 
     // KeyDeletingService and DirectoryDeletingService will not
     // clean up because the paths are part of a snapshot.
@@ -764,7 +760,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     // remain in dirTable and keyTable respectively.
     long prevDDSRunCount = dirDeletingService.getRunCount().get();
     long prevKDSRunCount = keyDeletingService.getRunCount().get();
-    assertTableRowCount(deletedDirTable, 1);
+    assertTableRowCount(deletedDirTable, 5);
     assertTableRowCount(deletedKeyTable, 3);
     GenericTestUtils.waitFor(() -> dirDeletingService.getRunCount().get() >
         prevDDSRunCount, 100, 10000);
@@ -772,7 +768,7 @@ public class TestDirectoryDeletingServiceWithFSO {
         prevKDSRunCount, 100, 10000);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 4);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
 
     // Manual cleanup deletedDirTable for next tests
