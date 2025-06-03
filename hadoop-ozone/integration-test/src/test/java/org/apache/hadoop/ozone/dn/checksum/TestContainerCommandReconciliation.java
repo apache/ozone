@@ -420,7 +420,6 @@ public class TestContainerCommandReconciliation {
     HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanode(dataNodeDetails.get(0));
     DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
     Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
-    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
     ContainerProtos.ContainerChecksumInfo oldContainerChecksumInfo = readChecksumFile(container.getContainerData());
     KeyValueHandler kvHandler = (KeyValueHandler) datanodeStateMachine.getContainer().getDispatcher()
         .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
