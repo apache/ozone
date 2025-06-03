@@ -43,10 +43,11 @@ docker compose up -d --scale datanode=3
 ### 2️⃣ Connect to the SCM Container
 
 ```bash
-docker exec -it weichiu-scm-1 bash
+docker exec -it <your-scm-container-name-or-id> bash
 ```
+> Change the container id `<your-scm-container-name-or-id>` to your actual container id.
 
-> Change the container id `weichiu-scm-1` to your actual container id.
+The rest of the tutorial will run on this container.
 
 Create a volume and a bucket inside Ozone:
 
@@ -95,6 +96,7 @@ Add the following to `/etc/hadoop/core-site.xml`:
     </property>
 </configuration>
 ```
+> Note: the Docker container has environment variable `OZONE_CONF_DIR=/etc/hadoop/` so it knows where to locate the configuration files.
 
 ### 6️⃣ Access Ozone Using PyArrow
 
@@ -106,7 +108,7 @@ import pyarrow.fs as pafs
 
 # Connect to Ozone using HadoopFileSystem
 # "default" tells PyArrow to use the fs.defaultFS property from core-site.xml
-fs = pafs.HadoopFileSystem("default", 9864)
+fs = pafs.HadoopFileSystem("default", 9862)
 
 # Create a directory inside the bucket
 fs.create_dir("volume/bucket/aaa")

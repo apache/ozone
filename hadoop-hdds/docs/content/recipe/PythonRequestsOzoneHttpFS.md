@@ -66,9 +66,11 @@ docker compose up -d --scale datanode=3
 Connect to the SCM container:
 
 ```bash
-docker exec -it weichiu-scm-1 bash
+docker exec -it <your-scm-container-name-or-id> bash
 ```
-> Change the container id `weichiu-scm-1` to your actual container id.
+> Change the container id `<your-scm-container-name-or-id>` to your actual container id.
+
+The rest of the tutorial will run on this container.
 
 Create a volume and a bucket:
 

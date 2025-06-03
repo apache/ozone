@@ -5,7 +5,7 @@ weight: 6
 menu:
   main:
     parent: "Client Interfaces"
-summary: Access Apache Ozone from Python using PyArrow, Boto3, requests and fssec WebHDFS libraries
+summary: Access Apache Ozone from Python using PyArrow, Boto3, requests and fsspec WebHDFS libraries
 ---
 
 <!--
@@ -26,7 +26,7 @@ limitations under the License.
 -->
 
 Apache Ozone project itself does not provide Python client libraries.
-However, several thirdparty open source libraries can be used to build applications to access an Ozone cluster via
+However, several third-party open source libraries can be used to build applications to access an Ozone cluster via
 different interfaces: OFS file system, Ozone HTTPFS REST API and Ozone S3.
 
 This document outlines these approaches, providing concise setup instructions and validated code examples.
@@ -68,7 +68,7 @@ import pyarrow.fs as pafs
 
 # Connect to Ozone using HadoopFileSystem
 # "default" tells PyArrow to use the fs.defaultFS property from core-site.xml
-fs = pafs.HadoopFileSystem("default", 9864)
+fs = pafs.HadoopFileSystem("default", 9862)
 
 # Create a directory inside the bucket
 fs.create_dir("volume/bucket/aaa")
@@ -146,7 +146,7 @@ pip install requests
 import requests
 
 # Ozone HTTPFS endpoint and file path
-host = "http://httpfs:9874"
+host = "http://httpfs:14000"
 volume = "vol1"
 bucket = "bucket1"
 filename = "hello.txt"
@@ -236,5 +236,4 @@ with fs.open(file_path, mode='rb') as f:
 - [Apache Ozone Documentation](https://ozone.apache.org/docs/)
 - [PyArrow Documentation](https://arrow.apache.org/docs/python/)
 - [Boto3 Documentation](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html)
-- [WebHDFS Python Client](https://pypi.org/project/webhdfs/)
-- [Apache Spark Documentation](https://spark.apache.org/docs/latest/)
+- [fsspec WebHDFS Python API](https://filesystem-spec.readthedocs.io/en/latest/api.html#fsspec.implementations.webhdfs.WebHDFS)
