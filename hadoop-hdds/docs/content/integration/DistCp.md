@@ -91,9 +91,9 @@ For more information about using Hadoop DistCp, consult the [DistCp Guide](https
 ## Troubleshooting Common Issues
 
 ### Delegation Token Issues
-If a DistCp command fails and the error output contains "OzoneToken", indicating an issue with retrieving a delegation token from the destination (or source) Ozone cluster, ensure that Ozone's security is explicitly enabled in the client's Hadoop configuration.
+If a DistCp command fails and the error output contains "OzoneToken", indicating an issue with retrieving a delegation token from the destination (or source) Ozone cluster, ensure that Ozone's security is explicitly enabled in the client's configuration.
 
-Add the following property to `core-site.xml` or `ozone-site.xml` on the node where you run the DistCp command:
+Add the following property to `ozone-site.xml` on the node where you run the DistCp command:
 
 ```xml
     <property>
@@ -110,7 +110,7 @@ This helps the client correctly engage in secure communication protocols with Oz
 
 When issuing DistCp commands (or other HDFS-compatible commands like `hdfs dfs -ls`) against an Ozone cluster in a different Kerberos realm than the client or source/destination cluster, Ozone 1.x versions may produce an error similar to:
 
-    24/02/07 18:47:36 INFO retry.RetryInvocationHandler: com.google.protobuf.ServiceException: java.io.IOException: DestHost:destPort ccycloud-1.weichiu-dst.root.comops.site:9862, LocalHost:localPort ccycloud-1.weichiu-src.local/10.140.99.144:0. Failed on local exception: java.io.IOException: Couldn't set up IO streams: java.lang.IllegalArgumentException: Server has invalid Kerberos principal: om/ccycloud-1.weichiu-dst.local@DST.LOCAL, expecting: OM/ccycloud-1.weichiu-dst.local@REALM, while invoking $Proxy10.submitRequest over nodeId=om26,nodeAddress=ccycloud-1.weichiu-dst.local:9862 after 3 failover attempts. Trying to failover immediately.
+    24/02/07 18:47:36 INFO retry.RetryInvocationHandler: com.google.protobuf.ServiceException: java.io.IOException: DestHost:destPort host1.dst.example.com:9862, LocalHost:localPort host1.src.example.com/10.140.99.144:0. Failed on local exception: java.io.IOException: Couldn't set up IO streams: java.lang.IllegalArgumentException: Server has invalid Kerberos principal: om/host1.dst.example.com@DST.LOCAL, expecting: OM/host1.dst.example.com@REALM, while invoking $Proxy10.submitRequest over nodeId=om26,nodeAddress=host1.dst.example.com:9862 after 3 failover attempts. Trying to failover immediately.
 
 
 **Cause:**
@@ -134,7 +134,7 @@ This bug is tracked by [HDDS-10328](https://issues.apache.org/jira/browse/HDDS-1
 In environments with bidirectional cross-realm Kerberos trust, DistCp jobs (which run as MapReduce jobs) may fail during execution due to errors renewing delegation tokens. An example error is:
 
     24/02/08 00:35:00 ERROR tools.DistCp: Exception encountered
-    java.io.IOException: org.apache.hadoop.yarn.exceptions.YarnException: Failed to submit application_1707350431298_0001 to YARN: Failed to renew token: Kind: HDFS_DELEGATION_TOKEN, Service: 10.140.99.144:8020, Ident: (token for systest: HDFS_DELEGATION_TOKEN owner=systest@SRC.COMOPS.SITE, renewer=yarn, realUser=, issueDate=1707352474394, maxDate=1707957274394, sequenceNumber=44, masterKeyId=14)
+    java.io.IOException: org.apache.hadoop.yarn.exceptions.YarnException: Failed to submit application_1707350431298_0001 to YARN: Failed to renew token: Kind: HDFS_DELEGATION_TOKEN, Service: 10.140.99.144:8020, Ident: (token for systest: HDFS_DELEGATION_TOKEN owner=user1@SRC.EXAMPLE.COM, renewer=yarn, realUser=, issueDate=1707352474394, maxDate=1707957274394, sequenceNumber=44, masterKeyId=14)
 
 This can happen when the MapReduce job attempts to renew a delegation token for a remote HDFS or Ozone filesystem, and the renewal fails due to cross-realm complexities. The `Service` field in the error (e.g., `10.140.99.144:8020`) usually indicates the filesystem whose token renewal failed.
 
@@ -150,15 +150,15 @@ You can prevent the DistCp MapReduce job from attempting to renew delegation tok
 For an HDFS cluster, `<authority_of_filesystem_to_exclude>` would be its NameNode address (e.g., `namenode.example.com:8020` or just `namenode.example.com` if the port is standard). For an Ozone cluster, it would be its service ID (e.g., `ozoneprod`).
 
 **Example:**
-If you are running the DistCp command on a YARN cluster associated with the *destination* Ozone cluster (`ofs://ozone1707264383/...`) and copying data *from* a source HDFS cluster (`hdfs://ccycloud-1.weichiu-src.root.comops.site:8020/...`), and the token renewal for the source HDFS cluster is failing:
+If you are running the DistCp command on a YARN cluster associated with the *destination* Ozone cluster (`ofs://ozone1707264383/...`) and copying data *from* a source HDFS cluster (`hdfs://host1.src.example.com:8020/...`), and the token renewal for the source HDFS cluster is failing:
 
 ```shell
     hadoop distcp \
-      -Dmapreduce.job.hdfs-servers.token-renewal.exclude=ccycloud-1.weichiu-src.root.comops.site \
+      -Dmapreduce.job.hdfs-servers.token-renewal.exclude=host1.src.example.com \
       -Ddfs.checksum.combine.mode=COMPOSITE_CRC \
       -Dozone.client.checksum.type=CRC32C \
-      hdfs://ccycloud-1.weichiu-src.root.comops.site:8020/tmp/ \
+      hdfs://host1.src.example.com:8020/tmp/ \
       ofs://ozone1707264383/tmp/dest
 ```
 
-In this example, `ccycloud-1.weichiu-src.root.comops.site` is the authority of the source HDFS cluster, and its tokens will not be renewed by the DistCp MapReduce job. Adjust the value based on which cluster's (source or destination, HDFS or Ozone) token renewals are problematic.
+In this example, `host1.src.example.com` is the authority of the source HDFS cluster, and its tokens will not be renewed by the DistCp MapReduce job. Adjust the value based on which cluster's (source or destination, HDFS or Ozone) token renewals are problematic.
