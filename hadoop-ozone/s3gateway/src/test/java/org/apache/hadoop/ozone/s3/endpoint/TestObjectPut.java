@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
@@ -77,6 +78,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -97,6 +99,7 @@ class TestObjectPut {
   private static final String DEST_BUCKET_NAME = "b2";
   private static final String DEST_KEY = "key=value/2";
   private static final String NO_SUCH_BUCKET = "nonexist";
+  private static final String DEFAULT_OWNER = "defaultOwner";
 
   private OzoneClient clientStub;
   private ObjectEndpoint objectEndpoint;
@@ -144,6 +147,7 @@ class TestObjectPut {
     OzoneVolume volume = clientStub.getObjectStore().getVolume(volumeName);
     BucketArgs fsoBucketArgs = BucketArgs.newBuilder()
         .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .setOwner(DEFAULT_OWNER)
         .build();
     volume.createBucket(FSO_BUCKET_NAME, fsoBucketArgs);
     fsoBucket = volume.getBucket(FSO_BUCKET_NAME);
@@ -174,6 +178,33 @@ class TestObjectPut {
     assertNotNull(keyDetails.getMetadata());
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
     assertThat(keyDetails.getTags()).isEmpty();
+  }
+
+  @Test
+  public void testObjectPutWithPassBucketOwnerCondition() throws Exception {
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn(DEFAULT_OWNER);
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    long dataSize = CONTENT.length();
+
+    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, dataSize, 1, null, null, null, body);
+
+    assertEquals(200, response.getStatus());
+  }
+
+  @Test
+  public void testPutObjectWithFailedBucketOwnerCondition() {
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("wrongOwner");
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    long dataSize = CONTENT.length();
+
+    OS3Exception exception = assertThrows(OS3Exception.class,
+        () -> objectEndpoint.put(BUCKET_NAME, KEY_NAME, dataSize, 1, null, null, null, body));
+
+    assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
   }
 
   @Test
@@ -228,6 +259,39 @@ class TestObjectPut {
     assertEquals(2, tags.size());
     assertEquals("value1", tags.get("tag1"));
     assertEquals("value2", tags.get("tag2"));
+  }
+
+  @Test
+  public void testCopyObjectWithPassBucketOwnerCondition() throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn(DEFAULT_OWNER);
+
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+
+    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
+        1, null, null, null, body);
+
+    assertEquals(200, response.getStatus());
+  }
+
+  @Test
+  public void testCopyObjectWithFailedBucketOwnerCondition() {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("wrongOwner");
+
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+
+    OS3Exception exception =
+        assertThrows(OS3Exception.class, () -> objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
+            1, null, null, null, body));
+
+    assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
   }
 
   @Test

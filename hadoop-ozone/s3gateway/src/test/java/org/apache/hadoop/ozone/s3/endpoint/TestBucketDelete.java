@@ -17,9 +17,14 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -28,6 +33,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +47,7 @@ public class TestBucketDelete {
   private OzoneClient clientStub;
   private ObjectStore objectStoreStub;
   private BucketEndpoint bucketEndpoint;
+  private HttpHeaders httpHeaders;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -56,12 +63,12 @@ public class TestBucketDelete {
         .setClient(clientStub)
         .build();
 
-
+    httpHeaders = mock(HttpHeaders.class);
   }
 
   @Test
   public void testBucketEndpoint() throws Exception {
-    Response response = bucketEndpoint.delete(bucketName);
+    Response response = bucketEndpoint.delete(bucketName, httpHeaders);
     assertEquals(HttpStatus.SC_NO_CONTENT, response.getStatus());
 
   }
@@ -69,7 +76,7 @@ public class TestBucketDelete {
   @Test
   public void testDeleteWithNoSuchBucket() throws Exception {
     try {
-      bucketEndpoint.delete("unknownbucket");
+      bucketEndpoint.delete("unknownbucket", httpHeaders);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
@@ -84,7 +91,7 @@ public class TestBucketDelete {
     try {
       ObjectStoreStub stub = (ObjectStoreStub) objectStoreStub;
       stub.setBucketEmptyStatus(bucketName, false);
-      bucketEndpoint.delete(bucketName);
+      bucketEndpoint.delete(bucketName, httpHeaders);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.BUCKET_NOT_EMPTY.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.BUCKET_NOT_EMPTY.getErrorMessage(),
@@ -92,5 +99,24 @@ public class TestBucketDelete {
       return;
     }
     fail("testDeleteWithBucketNotEmpty failed");
+  }
+
+  @Test
+  public void testPassBucketOwnerCondition() throws Exception {
+    when(httpHeaders.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+    Response response = bucketEndpoint.delete(bucketName, httpHeaders);
+    assertEquals(HttpStatus.SC_NO_CONTENT, response.getStatus());
+  }
+
+  @Test
+  public void testFailedBucketOwnerCondition() {
+    when(httpHeaders.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("wrongOwner");
+
+    OS3Exception exception =
+        assertThrows(OS3Exception.class, () -> bucketEndpoint.delete(bucketName, httpHeaders));
+
+    assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
   }
 }

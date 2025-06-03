@@ -93,6 +93,7 @@ public class TestPermissionCheck {
     clientProtocol = mock(ClientProtocol.class);
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
+    when(bucket.getOwner()).thenReturn("ozone");
   }
 
   /**
@@ -118,7 +119,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.head("bucketName"));
+        bucketEndpoint.head("bucketName", headers));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -137,11 +138,13 @@ public class TestPermissionCheck {
   @Test
   public void testDeleteBucket() throws IOException {
     doThrow(exception).when(objectStore).deleteS3Bucket(anyString());
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(null);
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.delete("bucketName"));
+        bucketEndpoint.delete("bucketName", headers));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -153,7 +156,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.listMultipartUploads("bucketName", "prefix", "", "", 10));
+        bucketEndpoint.listMultipartUploads("bucketName", "prefix", "", "", 10, headers));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -190,7 +193,7 @@ public class TestPermissionCheck {
     request.setObjects(objectList);
 
     MultiDeleteResponse response =
-        bucketEndpoint.multiDelete("BucketName", "keyName", request);
+        bucketEndpoint.multiDelete("BucketName", "keyName", request, headers);
     assertEquals(1, response.getErrors().size());
     assertEquals("ACCESS_DENIED", response.getErrors().get(0).getCode());
   }
@@ -247,6 +250,8 @@ public class TestPermissionCheck {
   @Test
   public void testGetKey() throws IOException {
     when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(null);
     doThrow(exception).when(clientProtocol)
         .getS3KeyDetails(anyString(), anyString());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -281,6 +286,8 @@ public class TestPermissionCheck {
   @Test
   public void testDeleteKey() throws IOException {
     when(objectStore.getS3Volume()).thenReturn(volume);
+    when(volume.getBucket(anyString())).thenReturn(bucket);
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(null);
     doThrow(exception).when(clientProtocol).deleteKey(anyString(), anyString(),
         anyString(), anyBoolean());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()

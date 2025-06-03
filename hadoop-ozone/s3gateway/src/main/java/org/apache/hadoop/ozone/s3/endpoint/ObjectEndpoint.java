@@ -237,12 +237,16 @@ public class ObjectEndpoint extends EndpointBase {
 
     String copyHeader = null, storageType = null, storageConfig = null;
     DigestInputStream digestInputStream = null;
+    OzoneBucket bucket = null;
     try {
       if (aclMarker != null) {
         s3GAction = S3GAction.PUT_OBJECT_ACL;
         throw newError(NOT_IMPLEMENTED, keyPath);
       }
       OzoneVolume volume = getVolume();
+      bucket = volume.getBucket(bucketName);
+      String bucketOwner = bucket.getOwner();
+      BucketOwnerCondition.verify(headers, bucketOwner);
       if (taggingMarker != null) {
         s3GAction = S3GAction.PUT_OBJECT_TAGGING;
         return putObjectTagging(volume, bucketName, keyPath, body);
@@ -265,7 +269,6 @@ public class ObjectEndpoint extends EndpointBase {
       boolean storageTypeDefault = StringUtils.isEmpty(storageType);
 
       // Normal put object
-      OzoneBucket bucket = volume.getBucket(bucketName);
       ReplicationConfig replicationConfig =
           getReplicationConfig(bucket, storageType, storageConfig);
 
@@ -428,16 +431,18 @@ public class ObjectEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.GET_KEY;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
     try {
+      OzoneBucket bucket = getBucket(bucketName);
+      BucketOwnerCondition.verify(headers, bucket.getOwner());
       if (taggingMarker != null) {
         s3GAction = S3GAction.GET_OBJECT_TAGGING;
-        return getObjectTagging(bucketName, keyPath);
+        return getObjectTagging(bucket, keyPath);
       }
 
       if (uploadId != null) {
         // When we have uploadId, this is the request for list Parts.
         s3GAction = S3GAction.LIST_PARTS;
         int partMarker = parsePartNumberMarker(partNumberMarker);
-        Response response = listParts(bucketName, keyPath, uploadId,
+        Response response = listParts(bucket, keyPath, uploadId,
             partMarker, maxParts, perf);
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
             getAuditParameters(), perf));
@@ -619,9 +624,10 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("path") String keyPath) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_KEY;
-
     OzoneKey key;
     try {
+      OzoneBucket bucket = getBucket(bucketName);
+      BucketOwnerCondition.verify(headers, bucket.getOwner());
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
@@ -743,9 +749,11 @@ public class ObjectEndpoint extends EndpointBase {
 
     try {
       OzoneVolume volume = getVolume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      BucketOwnerCondition.verify(headers, bucket.getOwner());
       if (taggingMarker != null) {
         s3GAction = S3GAction.DELETE_OBJECT_TAGGING;
-        return deleteObjectTagging(volume, bucketName, keyPath);
+        return deleteObjectTagging(bucket, keyPath);
       }
 
       if (uploadId != null && !uploadId.equals("")) {
@@ -818,6 +826,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
+      BucketOwnerCondition.verify(headers, ozoneBucket.getOwner());
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
       String storageConfig = headers.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
 
@@ -881,7 +890,6 @@ public class ObjectEndpoint extends EndpointBase {
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.COMPLETE_MULTIPART_UPLOAD;
-    OzoneVolume volume = getVolume();
     // Using LinkedHashMap to preserve ordering of parts list.
     Map<Integer, String> partsMap = new LinkedHashMap<>();
     List<CompleteMultipartUploadRequest.Part> partList =
@@ -889,6 +897,10 @@ public class ObjectEndpoint extends EndpointBase {
 
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
+      OzoneVolume volume = getVolume();
+      OzoneBucket ozoneBucket = volume.getBucket(bucket);
+      BucketOwnerCondition.verify(headers, ozoneBucket.getOwner());
+
       for (CompleteMultipartUploadRequest.Part part : partList) {
         partsMap.put(part.getPartNumber(), part.getETag());
       }
@@ -939,6 +951,8 @@ public class ObjectEndpoint extends EndpointBase {
         throw os3Exception;
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucket, ex);
+      } else if (isAccessDenied(ex)) {
+        throw newError(S3ErrorTable.ACCESS_DENIED, bucket + "/" + key, ex);
       }
       throw ex;
     } catch (Exception ex) {
@@ -990,6 +1004,8 @@ public class ObjectEndpoint extends EndpointBase {
         Pair<String, String> result = parseSourceHeader(copyHeader);
         String sourceBucket = result.getLeft();
         String sourceKey = result.getRight();
+        String sourceBucketOwner = volume.getBucket(sourceBucket).getOwner();
+        BucketOwnerCondition.verifyCopyOperation(headers, sourceBucketOwner, ozoneBucket.getOwner());
 
         OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
             volume.getName(), sourceBucket, sourceKey);
@@ -1128,16 +1144,15 @@ public class ObjectEndpoint extends EndpointBase {
    * @throws IOException
    * @throws OS3Exception
    */
-  private Response listParts(String bucket, String key, String uploadID,
+  private Response listParts(OzoneBucket bucket, String key, String uploadID,
       int partNumberMarker, int maxParts, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     ListPartsResponse listPartsResponse = new ListPartsResponse();
     try {
-      OzoneBucket ozoneBucket = getBucket(bucket);
       OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
-          ozoneBucket.listParts(key, uploadID, partNumberMarker, maxParts);
-      listPartsResponse.setBucket(bucket);
+          bucket.listParts(key, uploadID, partNumberMarker, maxParts);
+      listPartsResponse.setBucket(bucket.getName());
       listPartsResponse.setKey(key);
       listPartsResponse.setUploadID(uploadID);
       listPartsResponse.setMaxParts(maxParts);
@@ -1236,6 +1251,10 @@ public class ObjectEndpoint extends EndpointBase {
     String sourceBucket = result.getLeft();
     String sourceKey = result.getRight();
     DigestInputStream sourceDigestInputStream = null;
+
+    String sourceBucketOwner = volume.getBucket(sourceBucket).getOwner();
+    String destBucketOwner = volume.getBucket(destBucket).getOwner();
+    BucketOwnerCondition.verifyCopyOperation(headers, sourceBucketOwner, destBucketOwner);
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);
@@ -1456,23 +1475,21 @@ public class ObjectEndpoint extends EndpointBase {
     return Response.ok().build();
   }
 
-  private Response getObjectTagging(String bucketName, String keyName) throws IOException {
+  private Response getObjectTagging(OzoneBucket bucket, String keyName) throws IOException {
     long startNanos = Time.monotonicNowNanos();
 
-    OzoneVolume volume = getVolume();
-
-    Map<String, String> tagMap = volume.getBucket(bucketName).getObjectTagging(keyName);
+    Map<String, String> tagMap = bucket.getObjectTagging(keyName);
 
     getMetrics().updateGetObjectTaggingSuccessStats(startNanos);
     return Response.ok(S3Tagging.fromMap(tagMap), MediaType.APPLICATION_XML_TYPE).build();
   }
 
-  private Response deleteObjectTagging(OzoneVolume volume, String bucketName, String keyName)
+  private Response deleteObjectTagging(OzoneBucket bucket, String keyName)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
 
     try {
-      volume.getBucket(bucketName).deleteObjectTagging(keyName);
+      bucket.deleteObjectTagging(keyName);
     } catch (OMException ex) {
       // Unlike normal key deletion that ignores the key not found exception
       // DeleteObjectTagging should throw the exception if the key does not exist
