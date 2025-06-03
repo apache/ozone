@@ -384,6 +384,7 @@ class TestSnapshotCache {
     final Semaphore compactionLock = new Semaphore(1);
     final AtomicBoolean table1Compacting = new AtomicBoolean(false);
     final AtomicBoolean table1CompactedFinish = new AtomicBoolean(false);
+    final AtomicBoolean table2CompactedFinish = new AtomicBoolean(false);
     org.apache.hadoop.hdds.utils.db.DBStore store1 = snapshot1.get().getMetadataManager().getStore();
     doAnswer(invocation -> {
       table1Compacting.set(true);
@@ -392,6 +393,10 @@ class TestSnapshotCache {
       table1CompactedFinish.set(true);
       return null;
     }).when(store1).compactTable("table1");
+    doAnswer(invocation -> {
+      table2CompactedFinish.set(true);
+      return null;
+    }).when(store1).compactTable("table2");
     compactionLock.acquire();
 
     final UUID dbKey2 = UUID.randomUUID();
@@ -411,6 +416,7 @@ class TestSnapshotCache {
     assertFalse(table1CompactedFinish.get());
     compactionLock.release();
     GenericTestUtils.waitFor(() -> table1CompactedFinish.get(), 50, 3000);
+    GenericTestUtils.waitFor(() -> table2CompactedFinish.get(), 50, 3000);
 
     verify(store1, times(1)).compactTable("table1");
     verify(store1, times(1)).compactTable("table2");
