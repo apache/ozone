@@ -161,9 +161,8 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     GenericTestUtils.waitFor(() -> {
       String dnLogs = dnStateChangeLog.getOutput();
       return
-          dnLogs.contains("Node state changed to DECOMMISSIONING. Stopping DiskBalancerService.")
-              && dnLogs.contains("Node state changed to ENTERING_MAINTENANCE." +
-          " Stopping DiskBalancerService.");
+          dnLogs.contains("Stopping DiskBalancerService as Node state changed to DECOMMISSIONING.")
+              && dnLogs.contains("Stopping DiskBalancerService as Node state changed to ENTERING_MAINTENANCE.");
     }, 100, 5000);
 
     // Recommission DN1
@@ -194,9 +193,9 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     //otherwise it will be resumed
     GenericTestUtils.waitFor(() -> {
       String dnLogs = dnStateChangeLog.getOutput();
-      return dnLogs.contains("Node state changed to IN_SERVICE. Resuming DiskBalancerService to running state.")
-          || dnLogs.contains("Node state changed to IN_SERVICE. DiskBalancerService will" +
-          " not be resumed as it was previously in stopped state");
+      return dnLogs.contains("Resuming DiskBalancerService to running state as Node state changed to IN_SERVICE.")
+          || dnLogs.contains("DiskBalancerService will not resume as it was either stopped " +
+          "manually during maintenance/decommissioning or was not running before state changed.");
     }, 100, 5000);
   }
 }

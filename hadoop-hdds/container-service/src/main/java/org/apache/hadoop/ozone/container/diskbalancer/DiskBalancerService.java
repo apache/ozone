@@ -113,6 +113,14 @@ public class DiskBalancerService extends BackgroundService {
   private DiskBalancerServiceMetrics metrics;
   private long bytesToMove;
 
+  /**
+   * Tracks whether the DiskBalancerService is paused.
+   * If true, the service is temporarily stopped but can be resumed later.
+   *
+   * In maintenance/decommissioning state of dn, if disk balancer
+   * is stopped by client, this will be set to false, although it
+   * was true stating disk balancer is stopped manually by client.
+   */
   private final AtomicBoolean paused = new AtomicBoolean(false);
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
@@ -212,6 +220,7 @@ public class DiskBalancerService extends BackgroundService {
     setParallelThread(diskBalancerInfo.getParallelThread());
     setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
+    setIsPaused(diskBalancerInfo.isPaused());
 
     // Default executorService is ScheduledThreadPoolExecutor, so we can
     // update the poll size by setting corePoolSize.
@@ -540,7 +549,7 @@ public class DiskBalancerService extends BackgroundService {
   public DiskBalancerInfo getDiskBalancerInfo() {
     return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
         parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
-        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes());
+        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), isPaused());
   }
 
   public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {
@@ -629,21 +638,27 @@ public class DiskBalancerService extends BackgroundService {
     return paused.get();
   }
 
+  public void setIsPaused(boolean pause) {
+    this.paused.set(pause);
+  }
+
   /**
    * Handle state changes for DiskBalancerService.
    */
   public void nodeStateChange(HddsProtos.NodeOperationalState state) {
-    if (state == HddsProtos.NodeOperationalState.DECOMMISSIONING ||
-        state == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE) {
-      LOG.info("Node state changed to {}. Stopping DiskBalancerService.", state);
+    if ((state == HddsProtos.NodeOperationalState.DECOMMISSIONING ||
+        state == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE) && shouldRun) {
+      LOG.info("Stopping DiskBalancerService as Node state changed to {}.", state);
       stopDiskBalancer();
     } else if (state == HddsProtos.NodeOperationalState.IN_SERVICE) {
       if (isPaused()) {
-        LOG.info("Node state changed to {}. Resuming DiskBalancerService to running state.", state);
+        LOG.info("Resuming DiskBalancerService to running state as Node state changed to {}. ", state);
         resumeDiskBalancer();
+      } else if (!isPaused() && shouldRun) {
+        LOG.info("DiskBalancerService resumes as it was started during maintenance/decommissioning state.", state);
       } else {
-        LOG.info("Node state changed to {}. DiskBalancerService will not" +
-            " be resumed as it was previously in stopped state.", state);
+        LOG.info("DiskBalancerService will not resume as it was either stopped" +
+            " manually during maintenance/decommissioning or was not running before state changed.", state);
       }
     }
   }
