@@ -18,15 +18,25 @@
 package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -37,15 +47,20 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableDirFilter;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -76,31 +91,33 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   // Using multi thread for DirDeletion. Multiple threads would read
   // from parent directory info from deleted directory table concurrently
   // and send deletion requests.
-  private final int dirDeletingCorePoolSize;
   private int ratisByteLimit;
   private final AtomicBoolean suspended;
-  private AtomicBoolean isRunningOnAOS;
-
-  private final DeletedDirSupplier deletedDirSupplier;
-
-  private AtomicInteger taskCount = new AtomicInteger(0);
+  private final AtomicBoolean isRunningOnAOS;
+  private final SnapshotChainManager snapshotChainManager;
+  private final boolean deepCleanSnapshots;
+  private final ExecutorService deletionThreadPool;
+  private final int numberOfParallelThreadsPerStore;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
-      OzoneConfiguration configuration, int dirDeletingServiceCorePoolSize) {
+      OzoneConfiguration configuration, int dirDeletingServiceCorePoolSize, boolean deepCleanSnapshots) {
     super(DirectoryDeletingService.class.getSimpleName(), interval, unit,
         dirDeletingServiceCorePoolSize, serviceTimeout, ozoneManager, null);
     int limit = (int) configuration.getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
+    this.numberOfParallelThreadsPerStore = dirDeletingServiceCorePoolSize;
+    this.deletionThreadPool = new ThreadPoolExecutor(0, numberOfParallelThreadsPerStore, interval, unit,
+        new LinkedBlockingDeque<>(Integer.MAX_VALUE));
+
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
     this.suspended = new AtomicBoolean(false);
     this.isRunningOnAOS = new AtomicBoolean(false);
-    this.dirDeletingCorePoolSize = dirDeletingServiceCorePoolSize;
-    deletedDirSupplier = new DeletedDirSupplier();
-    taskCount.set(0);
+    this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
+    this.deepCleanSnapshots = deepCleanSnapshots;
   }
 
   private boolean shouldRun() {
@@ -113,10 +130,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   public boolean isRunningOnAOS() {
     return isRunningOnAOS.get();
-  }
-
-  public AtomicInteger getTaskCount() {
-    return taskCount;
   }
 
   /**
@@ -142,20 +155,19 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    if (taskCount.get() > 0) {
-      LOG.info("{} Directory deleting task(s) already in progress.",
-          taskCount.get());
-      return queue;
-    }
-    try {
-      deletedDirSupplier.reInitItr();
-    } catch (IOException ex) {
-      LOG.error("Unable to get the iterator.", ex);
-      return queue;
-    }
-    taskCount.set(dirDeletingCorePoolSize);
-    for (int i = 0; i < dirDeletingCorePoolSize; i++) {
-      queue.add(new DirectoryDeletingService.DirDeletingTask(this));
+    queue.add(new DirDeletingTask(this, null));
+    if (deepCleanSnapshots) {
+      Iterator<UUID> iterator = null;
+      try {
+        iterator = snapshotChainManager.iterator(true);
+      } catch (IOException e) {
+        LOG.error("Error while initializing snapshot chain iterator.");
+        return queue;
+      }
+      while (iterator.hasNext()) {
+        UUID snapshotId = iterator.next();
+        queue.add(new DirDeletingTask(this, snapshotId));
+      }
     }
     return queue;
   }
@@ -163,39 +175,35 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public void shutdown() {
     super.shutdown();
-    deletedDirSupplier.closeItr();
   }
 
-  private final class DeletedDirSupplier {
+  private final class DeletedDirSupplier implements Closeable {
     private TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
         deleteTableIterator;
 
-    private synchronized Table.KeyValue<String, OmKeyInfo> get()
-        throws IOException {
+    private DeletedDirSupplier(TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> deleteTableIterator) {
+      this.deleteTableIterator = deleteTableIterator;
+    }
+
+    private synchronized Table.KeyValue<String, OmKeyInfo> get() {
       if (deleteTableIterator.hasNext()) {
         return deleteTableIterator.next();
       }
       return null;
     }
 
-    private synchronized void closeItr() {
+    public void close() {
       IOUtils.closeQuietly(deleteTableIterator);
-      deleteTableIterator = null;
-    }
-
-    private synchronized void reInitItr() throws IOException {
-      closeItr();
-      deleteTableIterator =
-          getOzoneManager().getMetadataManager().getDeletedDirTable()
-              .iterator();
     }
   }
 
   private final class DirDeletingTask implements BackgroundTask {
     private final DirectoryDeletingService directoryDeletingService;
+    private final UUID snapshotId;
 
-    private DirDeletingTask(DirectoryDeletingService service) {
+    private DirDeletingTask(DirectoryDeletingService service, UUID snapshotId) {
       this.directoryDeletingService = service;
+      this.snapshotId = snapshotId;
     }
 
     @Override
@@ -203,147 +211,192 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       return 0;
     }
 
-    @Override
-    public BackgroundTaskResult call() {
-      try {
-        if (shouldRun()) {
-          isRunningOnAOS.set(true);
-          long rnCnt = getRunCount().incrementAndGet();
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Running DirectoryDeletingService. {}", rnCnt);
-          }
-          long dirNum = 0L;
-          long subDirNum = 0L;
-          long subFileNum = 0L;
-          long remainingBufLimit = ratisByteLimit;
-          int consumedSize = 0;
-          List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
-          List<Pair<String, OmKeyInfo>> allSubDirList =
-              new ArrayList<>();
+    private OzoneManagerProtocolProtos.SetSnapshotPropertyRequest getSetSnapshotRequestUpdatingExclusiveSize(
+        Map<UUID, Long> exclusiveSizeMap, Map<UUID, Long> exclusiveReplicatedSizeMap, UUID snapshotID) {
+      OzoneManagerProtocolProtos.SnapshotSize snapshotSize = OzoneManagerProtocolProtos.SnapshotSize.newBuilder()
+          .setExclusiveSize(
+              exclusiveSizeMap.getOrDefault(snapshotID, 0L))
+          .setExclusiveReplicatedSize(
+              exclusiveReplicatedSizeMap.getOrDefault(
+                  snapshotID, 0L))
+          .build();
 
-          Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
-          // This is to avoid race condition b/w purge request and snapshot chain updation. For AOS taking the global
-          // snapshotId since AOS could process multiple buckets in one iteration.
-          try {
-            UUID expectedPreviousSnapshotId =
-                ((OmMetadataManagerImpl) getOzoneManager().getMetadataManager()).getSnapshotChainManager()
-                    .getLatestGlobalSnapshotId();
-
-            long startTime = Time.monotonicNow();
-            while (remainingBufLimit > 0) {
-              pendingDeletedDirInfo = getPendingDeletedDirInfo();
-              if (pendingDeletedDirInfo == null) {
-                break;
-              }
-              // Do not reclaim if the directory is still being referenced by
-              // the previous snapshot.
-              if (previousSnapshotHasDir(pendingDeletedDirInfo)) {
-                continue;
-              }
-
-              PurgePathRequest request = prepareDeleteDirRequest(
-                  pendingDeletedDirInfo.getValue(),
-                  pendingDeletedDirInfo.getKey(), allSubDirList,
-                  getOzoneManager().getKeyManager(), remainingBufLimit);
-
-              consumedSize += request.getSerializedSize();
-              remainingBufLimit -= consumedSize;
-              purgePathRequestList.add(request);
-              // Count up the purgeDeletedDir, subDirs and subFiles
-              if (request.getDeletedDir() != null && !request.getDeletedDir()
-                  .isEmpty()) {
-                dirNum++;
-              }
-              subDirNum += request.getMarkDeletedSubDirsCount();
-              subFileNum += request.getDeletedSubFilesCount();
-            }
-
-            optimizeDirDeletesAndSubmitRequest(dirNum, subDirNum,
-                subFileNum, allSubDirList, purgePathRequestList, null,
-                startTime, remainingBufLimit,
-                getOzoneManager().getKeyManager(), expectedPreviousSnapshotId,
-                rnCnt);
-
-          } catch (IOException e) {
-            LOG.error(
-                "Error while running delete directories and files " + "background task. Will retry at next run.",
-                e);
-          }
-          isRunningOnAOS.set(false);
-          synchronized (directoryDeletingService) {
-            this.directoryDeletingService.notify();
-          }
-        }
-      } finally {
-        taskCount.getAndDecrement();
-      }
-      // place holder by returning empty results of this call back.
-      return BackgroundTaskResult.EmptyTaskResult.newResult();
+      return OzoneManagerProtocolProtos.SetSnapshotPropertyRequest.newBuilder()
+          .setSnapshotKey(snapshotChainManager.getTableKey(snapshotID))
+          .setSnapshotSizeDeltaFromDirDeepCleaning(snapshotSize)
+          .build();
     }
 
-    private boolean previousSnapshotHasDir(
-        KeyValue<String, OmKeyInfo> pendingDeletedDirInfo) throws IOException {
-      String key = pendingDeletedDirInfo.getKey();
-      OmKeyInfo deletedDirInfo = pendingDeletedDirInfo.getValue();
-      OmSnapshotManager omSnapshotManager =
-          getOzoneManager().getOmSnapshotManager();
-      OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
-          getOzoneManager().getMetadataManager();
-      SnapshotInfo previousSnapshotInfo = SnapshotUtils.getLatestSnapshotInfo(deletedDirInfo.getVolumeName(),
-          deletedDirInfo.getBucketName(), getOzoneManager(), metadataManager.getSnapshotChainManager());
-      if (previousSnapshotInfo == null) {
+    /**
+     *
+     * @param currentSnapshotInfo if null, deleted directories in AOS should be processed.
+     * @param keyManager KeyManager of the underlying store.
+     */
+    private void processDeletedDirsForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
+        long remainingBufLimit, long rnCnt) throws IOException, ExecutionException, InterruptedException {
+      String volume, bucket, snapshotTableKey;
+      if (currentSnapshotInfo != null) {
+        volume = currentSnapshotInfo.getVolumeName();
+        bucket = currentSnapshotInfo.getBucketName();
+        snapshotTableKey = currentSnapshotInfo.getTableKey();
+      } else {
+        volume = null; bucket = null; snapshotTableKey = null;
+      }
+
+      OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
+      IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
+
+      try (DeletedDirSupplier dirSupplier = new DeletedDirSupplier(currentSnapshotInfo == null ?
+          keyManager.getDeletedDirEntries() : keyManager.getDeletedDirEntries(volume, bucket));
+           ReclaimableDirFilter reclaimableDirFilter = new ReclaimableDirFilter(getOzoneManager(),
+               omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock);
+           ReclaimableKeyFilter reclaimableFileFilter = new ReclaimableKeyFilter(getOzoneManager(),
+               omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock)) {
+        // This is to avoid race condition b/w purge request and snapshot chain update. For AOS taking the global
+        // snapshotId since AOS could process multiple buckets in one iteration. While using path
+        // previous snapshotId for a snapshot since it would process only one bucket.
+        UUID expectedPreviousSnapshotId = currentSnapshotInfo == null ?
+            snapshotChainManager.getLatestGlobalSnapshotId() :
+            SnapshotUtils.getPreviousSnapshotId(currentSnapshotInfo, snapshotChainManager);
+        CompletableFuture<Boolean> processedAllDeletedDirs = CompletableFuture.completedFuture(true);
+        for (int i = 0; i < numberOfParallelThreadsPerStore; i++) {
+          CompletableFuture<Boolean> future = new CompletableFuture<>();
+          deletionThreadPool.submit(() -> {
+            try {
+              boolean processedAll = processDeletedDirectories(snapshotTableKey, dirSupplier, remainingBufLimit,
+                  reclaimableDirFilter, reclaimableFileFilter, expectedPreviousSnapshotId, rnCnt);
+              future.complete(processedAll);
+            } catch (Throwable e) {
+              future.complete(false);
+            }
+          });
+          processedAllDeletedDirs = future.thenCombine(future, (a, b) -> a && b);
+        }
+        // If AOS or all directories have been processed for snapshot, update snapshot size delta and deep clean flag
+        if (currentSnapshotInfo == null || processedAllDeletedDirs.get()) {
+          List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
+          Map<UUID, Long> exclusiveReplicatedSizeMap = reclaimableFileFilter.getExclusiveReplicatedSizeMap();
+          Map<UUID, Long> exclusiveSizeMap = reclaimableFileFilter.getExclusiveSizeMap();
+          List<UUID> previousPathSnapshotsInChain =
+              Stream.of(exclusiveSizeMap.keySet(), exclusiveReplicatedSizeMap.keySet())
+                  .flatMap(Collection::stream).distinct().collect(Collectors.toList());
+          for (UUID snapshot : previousPathSnapshotsInChain) {
+            setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(exclusiveSizeMap,
+                exclusiveReplicatedSizeMap, snapshot));
+          }
+
+          // Updating directory deep clean flag of snapshot.
+          if (currentSnapshotInfo != null) {
+            setSnapshotPropertyRequests.add(OzoneManagerProtocolProtos.SetSnapshotPropertyRequest.newBuilder()
+                .setSnapshotKey(snapshotTableKey)
+                .setDeepCleanedDeletedDir(true)
+                .build());
+          }
+          submitSetSnapshotRequests(setSnapshotPropertyRequests);
+        }
+      }
+    }
+
+    private boolean processDeletedDirectories(String snapshotTableKey,
+        DeletedDirSupplier dirSupplier, long remainingBufLimit, ReclaimableDirFilter reclaimableDirFilter,
+        ReclaimableKeyFilter reclaimableFileFilter, UUID expectedPreviousSnapshotId, long runCount) {
+      try {
+        long startTime = Time.monotonicNow();
+        long dirNum = 0L;
+        long subDirNum = 0L;
+        long subFileNum = 0L;
+        int consumedSize = 0;
+        List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
+        List<Pair<String, OmKeyInfo>> allSubDirList = new ArrayList<>();
+        while (remainingBufLimit > 0) {
+          KeyValue<String, OmKeyInfo> pendingDeletedDirInfo = dirSupplier.get();
+          if (pendingDeletedDirInfo == null) {
+            break;
+          }
+          boolean isDirReclaimable = reclaimableDirFilter.apply(pendingDeletedDirInfo);
+          Optional<PurgePathRequest> request = prepareDeleteDirRequest(
+              pendingDeletedDirInfo.getValue(),
+              pendingDeletedDirInfo.getKey(), isDirReclaimable, allSubDirList,
+              getOzoneManager().getKeyManager(), reclaimableFileFilter, remainingBufLimit);
+          if (!request.isPresent()) {
+            continue;
+          }
+          PurgePathRequest purgePathRequest = request.get();
+          consumedSize += purgePathRequest.getSerializedSize();
+          remainingBufLimit -= consumedSize;
+          purgePathRequestList.add(purgePathRequest);
+          // Count up the purgeDeletedDir, subDirs and subFiles
+          if (purgePathRequest.hasDeletedDir() && !StringUtils.isBlank(purgePathRequest.getDeletedDir())) {
+            dirNum++;
+          }
+          subDirNum += purgePathRequest.getMarkDeletedSubDirsCount();
+          subFileNum += purgePathRequest.getDeletedSubFilesCount();
+        }
+
+        optimizeDirDeletesAndSubmitRequest(dirNum, subDirNum,
+            subFileNum, allSubDirList, purgePathRequestList, snapshotTableKey,
+            startTime, remainingBufLimit, getOzoneManager().getKeyManager(),
+            reclaimableDirFilter, reclaimableFileFilter, expectedPreviousSnapshotId,
+            runCount);
+
+        return purgePathRequestList.isEmpty();
+      } catch (IOException e) {
+        LOG.error("Error while running delete directories for store : {} and files background task. " +
+                "Will retry at next run. ", snapshotTableKey, e);
         return false;
       }
-      // previous snapshot is not active or it has not been flushed to disk then don't process the key in this
-      // iteration.
-      if (previousSnapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE ||
-              !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(),
-                  previousSnapshotInfo)) {
-        return true;
-      }
-      try (UncheckedAutoCloseableSupplier<OmSnapshot> rcLatestSnapshot =
-          omSnapshotManager.getSnapshot(
-              deletedDirInfo.getVolumeName(),
-              deletedDirInfo.getBucketName(),
-              previousSnapshotInfo.getName())) {
+    }
 
-        if (rcLatestSnapshot != null) {
-          String dbRenameKey = metadataManager
-              .getRenameKey(deletedDirInfo.getVolumeName(),
-                  deletedDirInfo.getBucketName(), deletedDirInfo.getObjectID());
-          Table<String, OmDirectoryInfo> prevDirTable =
-              rcLatestSnapshot.get().getMetadataManager().getDirectoryTable();
-          Table<String, OmKeyInfo> prevDeletedDirTable =
-              rcLatestSnapshot.get().getMetadataManager().getDeletedDirTable();
-          OmKeyInfo prevDeletedDirInfo = prevDeletedDirTable.get(key);
-          if (prevDeletedDirInfo != null) {
-            return true;
+    @Override
+    public BackgroundTaskResult call() {
+      // Check if this is the Leader OM. If not leader, no need to execute this
+      // task.
+      if (shouldRun()) {
+        final long run = getRunCount().incrementAndGet();
+        if (snapshotId == null) {
+          LOG.debug("Running DirectoryDeletingService for active object store, {}", run);
+          isRunningOnAOS.set(true);
+        } else {
+          LOG.debug("Running DirectoryDeletingService for snapshot : {}, {}", snapshotId, run);
+        }
+        OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
+        SnapshotInfo snapInfo = null;
+        try {
+          snapInfo = snapshotId == null ? null :
+              SnapshotUtils.getSnapshotInfo(getOzoneManager(), snapshotChainManager, snapshotId);
+          if (snapInfo != null) {
+            if (snapInfo.isDeepCleanedDeletedDir()) {
+              LOG.info("Snapshot {} has already been deep cleaned directory. Skipping the snapshot in this iteration.",
+                  snapInfo.getSnapshotId());
+              return BackgroundTaskResult.EmptyTaskResult.newResult();
+            }
+            if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo)) {
+              LOG.info("Skipping snapshot processing since changes to snapshot {} have not been flushed to disk",
+                  snapInfo);
+              return BackgroundTaskResult.EmptyTaskResult.newResult();
+            }
           }
-          String prevDirTableDBKey = metadataManager.getSnapshotRenamedTable()
-              .get(dbRenameKey);
-          // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
-          // OzoneDeletePathKey. Changing it back to check the previous DirTable
-          String prevDbKey = prevDirTableDBKey == null ?
-              metadataManager.getOzoneDeletePathDirKey(key) : prevDirTableDBKey;
-          OmDirectoryInfo prevDirInfo = prevDirTable.get(prevDbKey);
-          //Checking if the previous snapshot in the chain hasn't changed while checking if the deleted directory is
-          // present in the previous snapshot. If the chain has changed, the deleted directory could have been moved
-          // to the newly created snapshot.
-          SnapshotInfo newPreviousSnapshotInfo = SnapshotUtils.getLatestSnapshotInfo(deletedDirInfo.getVolumeName(),
-              deletedDirInfo.getBucketName(), getOzoneManager(), metadataManager.getSnapshotChainManager());
-          return (!Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),
-              Optional.ofNullable(previousSnapshotInfo).map(SnapshotInfo::getSnapshotId))) || (prevDirInfo != null &&
-              prevDirInfo.getObjectID() == deletedDirInfo.getObjectID());
+          try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = snapInfo == null ? null :
+              omSnapshotManager.getActiveSnapshot(snapInfo.getVolumeName(), snapInfo.getBucketName(),
+                  snapInfo.getName())) {
+            KeyManager keyManager = snapInfo == null ? getOzoneManager().getKeyManager()
+                : omSnapshot.get().getKeyManager();
+            processDeletedDirsForStore(snapInfo, keyManager, ratisByteLimit, run);
+          }
+        } catch (IOException | ExecutionException | InterruptedException e) {
+          LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
+              snapInfo, e);
+        } finally {
+          if (snapshotId == null) {
+            isRunningOnAOS.set(false);
+            synchronized (directoryDeletingService) {
+              this.directoryDeletingService.notify();
+            }
+          }
         }
       }
-
-      return false;
+      // By design, no one cares about the results of this call back.
+      return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
   }
-
-  public KeyValue<String, OmKeyInfo> getPendingDeletedDirInfo()
-      throws IOException {
-    return deletedDirSupplier.get();
-  }
-
 }

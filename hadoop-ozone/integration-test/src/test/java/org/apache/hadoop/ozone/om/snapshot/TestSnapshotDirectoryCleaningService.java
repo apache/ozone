@@ -49,7 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
@@ -76,7 +76,7 @@ public class TestSnapshotDirectoryCleaningService {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL, 2500);
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 2500);
     conf.setBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED, true);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 2500,
         TimeUnit.MILLISECONDS);
@@ -140,8 +140,8 @@ public class TestSnapshotDirectoryCleaningService {
         cluster.getOzoneManager().getMetadataManager().getDeletedTable();
     Table<String, SnapshotInfo> snapshotInfoTable =
         cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable();
-    SnapshotDirectoryCleaningService snapshotDirectoryCleaningService =
-        cluster.getOzoneManager().getKeyManager().getSnapshotDirectoryService();
+    DirectoryDeletingService snapshotDirectoryCleaningService =
+        cluster.getOzoneManager().getKeyManager().getDirDeletingService();
 
     /*    DirTable
     /v/b/snapDir

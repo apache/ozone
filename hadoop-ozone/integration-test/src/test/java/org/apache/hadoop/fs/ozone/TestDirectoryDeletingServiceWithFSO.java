@@ -79,6 +79,8 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableDirFilter;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -592,8 +594,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     OmSnapshotManager omSnapshotManager = Mockito.spy(ozoneManager.getOmSnapshotManager());
     when(ozoneManager.getOmSnapshotManager()).thenAnswer(i -> omSnapshotManager);
     DirectoryDeletingService service = Mockito.spy(new DirectoryDeletingService(1000, TimeUnit.MILLISECONDS, 1000,
-        ozoneManager,
-        cluster.getConf(), 1));
+        ozoneManager, cluster.getConf(), 1, false));
     service.shutdown();
     final int initialSnapshotCount =
         (int) cluster.getOzoneManager().getMetadataManager().countRowsInTable(snapshotInfoTable);
@@ -627,7 +628,8 @@ public class TestDirectoryDeletingServiceWithFSO {
       }
       return null;
     }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(),
-        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyLong(), Mockito.any(), any(),
+        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyLong(), any(),
+        any(ReclaimableDirFilter.class), any(ReclaimableKeyFilter.class), any(),
         anyLong());
 
     Mockito.doAnswer(i -> {
