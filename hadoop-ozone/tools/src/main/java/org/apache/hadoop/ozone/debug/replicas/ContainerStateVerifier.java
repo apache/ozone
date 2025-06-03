@@ -43,7 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
  * [DELETED, UNHEALTHY, INVALID] are considered bad states.
  */
 public class ContainerStateVerifier implements ReplicaVerifier {
-  private static final String CHECK_TYPE = "replicaState";
+  private static final String CHECK_TYPE = "containerState";
   private static final long DEFAULT_CONTAINER_CACHE_SIZE = 1000000;
   private final ContainerOperationClient containerOperationClient;
   private final XceiverClientManager xceiverClientManager;

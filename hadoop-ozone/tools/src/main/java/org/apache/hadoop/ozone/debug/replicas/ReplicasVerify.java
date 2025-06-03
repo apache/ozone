@@ -68,8 +68,8 @@ public class ReplicasVerify extends Handler {
   private Verification verification;
 
   @CommandLine.Option(names = {"--container-cache-size"},
-      description = "The cache size (in number of containers) for container state verification '--container-state'. " +
-          "Default is 1 million containers (which takes around 43MB). " +
+      description = "Size (in number of containers) of the in-memory cache for container state verification " +
+          "'--container-state'. Default is 1 million containers (which takes around 43MB). " +
           "Value must be greater than zero, otherwise the default of 1 million is considered. " +
           "Note: This option is ignored if '--container-state' option is not used.",
       defaultValue = "1000000")
