@@ -105,13 +105,17 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
+import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -131,6 +135,7 @@ public class TestContainerCommandReconciliation {
   private static OzoneConfiguration conf;
   private static DNContainerOperationClient dnClient;
   private static final String KEY_NAME = "testkey";
+  private static final Logger LOG = LoggerFactory.getLogger(TestContainerCommandReconciliation.class);
 
   @TempDir
   private static File testDir;
@@ -426,37 +431,10 @@ public class TestContainerCommandReconciliation {
     List<BlockData> blockDatas = blockManager.listBlock(container, -1, 100);
     long oldDataChecksum = oldContainerChecksumInfo.getContainerMerkleTree().getDataChecksum();
 
-    // 2. Corrupt first chunk for all the blocks
-    try (DBHandle db = BlockUtils.getDB(containerData, conf);
-         BatchOperation op = db.getStore().getBatchHandler().initBatchOperation()) {
-      for (BlockData blockData : blockDatas) {
-        // Modify the block metadata to simulate chunk corruption.
-        ContainerProtos.BlockData.Builder blockDataBuilder = blockData.getProtoBufMessage().toBuilder();
-        blockDataBuilder.clearChunks();
-
-        ContainerProtos.ChunkInfo chunkInfo = blockData.getChunks().get(0);
-        ContainerProtos.ChecksumData.Builder checksumDataBuilder = ContainerProtos.ChecksumData.newBuilder()
-            .setBytesPerChecksum(chunkInfo.getChecksumData().getBytesPerChecksum())
-            .setType(chunkInfo.getChecksumData().getType());
-
-        for (ByteString checksum : chunkInfo.getChecksumData().getChecksumsList()) {
-          byte[] checksumBytes = checksum.toByteArray();
-          // Modify the checksum bytes to simulate corruption.
-          checksumBytes[0] = (byte) (checksumBytes[0] - 1);
-          checksumDataBuilder.addChecksums(ByteString.copyFrom(checksumBytes)).build();
-        }
-        chunkInfo = chunkInfo.toBuilder().setChecksumData(checksumDataBuilder.build()).build();
-        blockDataBuilder.addChunks(chunkInfo);
-        for (int i = 1; i < blockData.getChunks().size(); i++) {
-          blockDataBuilder.addChunks(blockData.getChunks().get(i));
-        }
-
-        // Modify the block metadata from the container db to simulate chunk corruption.
-        db.getStore().getBlockDataTable().putWithBatch(op, containerData.getBlockKey(blockData.getLocalID()),
-            BlockData.getFromProtoBuf(blockDataBuilder.build()));
-      }
-      db.getStore().getBatchHandler().commitBatchOperation(op);
-      db.getStore().flushDB();
+    // 2. Corrupt every block in one replica.
+    for (BlockData blockData : blockDatas) {
+      long blockID = blockData.getLocalID();
+      TestContainerCorruptions.CORRUPT_BLOCK.applyTo(container, blockID);
     }
 
     datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
@@ -569,11 +547,13 @@ public class TestContainerCommandReconciliation {
                 ClientVersion.CURRENT_VERSION).stream()
             .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
             .collect(Collectors.toSet());
+        LOG.info("Waiting for {} total unique checksums from container {} to be reported to SCM. Currently {} unique" +
+            "checksums are reported.", expectedSize, containerID, dataChecksums.size());
         return dataChecksums.size() == expectedSize;
       } catch (Exception ex) {
         return false;
       }
-    }, 500, 20000);
+    }, 1000, 20000);
   }
 
   private Pair<Long, byte[]> getDataAndContainer(boolean close, int dataLen, String volumeName, String bucketName)
