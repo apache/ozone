@@ -101,7 +101,7 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
     List<SnapshotInfo> snapshotInfos = getLastSnapshotInfos(volume, bucket, 2, index);
     SnapshotInfo previousToPreviousSapshotInfo = snapshotInfos.get(0);
     SnapshotInfo prevSnapshotInfo = snapshotInfos.get(1);
-    OmBucketInfo bucketInfo = getOzoneManager().getBucketInfo(volume, bucket);
+    OmBucketInfo bucketInfo = getOzoneManager().getBucketManager().getBucketInfo(volume, bucket);
     long volumeId = getOzoneManager().getMetadataManager().getVolumeId(volume);
 
     UncheckedAutoCloseableSupplier<OmSnapshot> prevSnap = Optional.ofNullable(prevSnapshotInfo)
