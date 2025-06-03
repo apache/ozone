@@ -22,7 +22,6 @@ import com.google.protobuf.ServiceException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
@@ -42,10 +41,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     implements BootstrapStateHandler {
 
   private final OzoneManager ozoneManager;
-  final DeletingServiceMetrics metrics;
-  final OMPerformanceMetrics perfMetrics;
-  final ScmBlockLocationProtocol scmClient;
-  final ClientId clientId = ClientId.randomId();
+  private final DeletingServiceMetrics metrics;
+  private final OMPerformanceMetrics perfMetrics;
+  private final ClientId clientId = ClientId.randomId();
   private final AtomicLong runCount;
   private final AtomicLong callId;
   private final BootstrapStateHandler.Lock lock =
@@ -53,11 +51,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   public AbstractKeyDeletingService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout,
-      OzoneManager ozoneManager, ScmBlockLocationProtocol scmClient) {
+      OzoneManager ozoneManager) {
     super(serviceName, interval, unit, threadPoolSize, serviceTimeout,
         ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
-    this.scmClient = scmClient;
     this.runCount = new AtomicLong(0);
     this.metrics = ozoneManager.getDeletionMetrics();
     this.perfMetrics = ozoneManager.getPerfMetrics();
@@ -77,8 +74,16 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return ozoneManager;
   }
 
-  public ScmBlockLocationProtocol getScmClient() {
-    return scmClient;
+  ClientId getClientId() {
+    return clientId;
+  }
+
+  DeletingServiceMetrics getMetrics() {
+    return metrics;
+  }
+
+  OMPerformanceMetrics getPerfMetrics() {
+    return perfMetrics;
   }
 
   /**

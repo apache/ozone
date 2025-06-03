@@ -95,7 +95,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       throws IOException {
     super(SnapshotDeletingService.class.getSimpleName(), interval,
         TimeUnit.MILLISECONDS, SNAPSHOT_DELETING_CORE_POOL_SIZE,
-        serviceTimeout, ozoneManager, null);
+        serviceTimeout, ozoneManager);
     this.ozoneManager = ozoneManager;
     this.omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)

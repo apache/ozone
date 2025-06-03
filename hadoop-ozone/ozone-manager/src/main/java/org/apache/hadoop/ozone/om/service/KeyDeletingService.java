@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
-import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -66,6 +65,8 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableRenameEntryFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NullableUUID;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -81,6 +82,7 @@ import org.slf4j.LoggerFactory;
 public class KeyDeletingService extends AbstractKeyDeletingService {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDeletingService.class);
+  private final ScmBlockLocationProtocol scmClient;
 
   private int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
@@ -88,7 +90,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final AtomicBoolean isRunningOnAOS;
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
-  private DeletingServiceMetrics metrics;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient, long serviceInterval,
@@ -96,7 +97,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       boolean deepCleanSnapshots) {
     super(KeyDeletingService.class.getSimpleName(), serviceInterval,
         TimeUnit.MILLISECONDS, keyDeletionCorePoolSize,
-        serviceTimeout, ozoneManager, scmClient);
+        serviceTimeout, ozoneManager);
     this.keyLimitPerTask = conf.getInt(OZONE_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
     Preconditions.checkArgument(keyLimitPerTask >= 0,
@@ -106,7 +107,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.isRunningOnAOS = new AtomicBoolean(false);
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
-    this.metrics = ozoneManager.getDeletionMetrics();
+    this.scmClient = scmClient;
   }
 
   /**
@@ -152,7 +153,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
           purgeResult, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
     }
-    perfMetrics.setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
+    getPerfMetrics().setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
     return purgeResult;
   }
 
@@ -196,12 +197,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       }
     }
 
-    OzoneManagerProtocolProtos.PurgeKeysRequest.Builder purgeKeysRequest = OzoneManagerProtocolProtos.PurgeKeysRequest.newBuilder();
+    PurgeKeysRequest.Builder purgeKeysRequest = PurgeKeysRequest.newBuilder();
     if (snapTableKey != null) {
       purgeKeysRequest.setSnapshotTableKey(snapTableKey);
     }
-    OzoneManagerProtocolProtos.NullableUUID.Builder expectedPreviousSnapshotNullableUUID =
-        OzoneManagerProtocolProtos.NullableUUID.newBuilder();
+    NullableUUID.Builder expectedPreviousSnapshotNullableUUID = NullableUUID.newBuilder();
     if (expectedPreviousSnapshotId != null) {
       expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
     }
@@ -242,7 +242,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
         .setPurgeKeysRequest(purgeKeysRequest)
-        .setClientId(clientId.toString())
+        .setClientId(getClientId().toString())
         .build();
 
     // Submit PurgeKeys request to OM. Acquire bootstrap lock when processing deletes for snapshots.
@@ -407,8 +407,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 renamedTableEntries, snapshotTableKey, expectedPreviousSnapshotId);
             remainNum -= purgeResult.getKey();
             successStatus = purgeResult.getValue();
-            metrics.incrNumKeysProcessed(keyBlocksList.size());
-            metrics.incrNumKeysSentForPurge(purgeResult.getKey());
+            getMetrics().incrNumKeysProcessed(keyBlocksList.size());
+            getMetrics().incrNumKeysSentForPurge(purgeResult.getKey());
             if (successStatus) {
               deletedKeyCount.addAndGet(purgeResult.getKey());
             }

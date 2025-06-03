@@ -117,7 +117,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       long serviceTimeout, OzoneManager ozoneManager,
       OzoneConfiguration configuration, int dirDeletingServiceCorePoolSize, boolean deepCleanSnapshots) {
     super(DirectoryDeletingService.class.getSimpleName(), interval, unit,
-        dirDeletingServiceCorePoolSize, serviceTimeout, ozoneManager, null);
+        dirDeletingServiceCorePoolSize, serviceTimeout, ozoneManager);
     int limit = (int) configuration.getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
@@ -254,8 +254,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               " totalRunCount: {}",
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
           timeTakenInIteration, rnCnt);
-      metrics.incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
-      perfMetrics.setDirectoryDeletingServiceLatencyMs(timeTakenInIteration);
+      getMetrics().incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
+      getPerfMetrics().setDirectoryDeletingServiceLatencyMs(timeTakenInIteration);
     }
   }
 
@@ -419,7 +419,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
             .setPurgeDirectoriesRequest(purgeDirRequest)
-            .setClientId(clientId.toString())
+            .setClientId(getClientId().toString())
             .build();
 
     // Submit Purge paths request to OM. Acquire bootstrap lock when processing deletes for snapshots.
@@ -430,8 +430,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     }
     return null;
   }
-
-
 
   private final class DirDeletingTask implements BackgroundTask {
     private final DirectoryDeletingService directoryDeletingService;
