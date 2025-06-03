@@ -79,6 +79,7 @@ public class DiskBalancerCommandHandler implements CommandHandler {
         break;
       case STOP:
         diskBalancerInfo.setShouldRun(false);
+        diskBalancerInfo.setPaused(false);
         break;
       case UPDATE:
         diskBalancerInfo.updateFromConf(diskBalancerConf);
