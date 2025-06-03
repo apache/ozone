@@ -196,7 +196,7 @@ public class ChunkKeyHandler extends KeyHandler {
               // e.g. for RS-3-2 we will have data indexes 1,2,3 and parity indexes 4,5
               ChunkType chunkType = (replicaIndex > dataCount) ? ChunkType.PARITY : ChunkType.DATA;
               jsonObj.put("chunkType", chunkType.name());
-              jsonObj.put("ecIndex", replicaIndex);
+              jsonObj.put("replicaIndex", replicaIndex);
             }
           }
         } catch (InterruptedException e) {
