@@ -384,6 +384,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     int consumedSize = 0;
     while (subDirRecursiveCnt < allSubDirList.size() && remainingBufLimit > 0) {
       try {
+        LOG.info("Subdir deleting request: {}", subDirRecursiveCnt);
         Pair<String, OmKeyInfo> stringOmKeyInfoPair = allSubDirList.get(subDirRecursiveCnt++);
         Boolean subDirectoryReclaimable = reclaimableDirChecker.apply(Table.newKeyValue(stringOmKeyInfoPair.getKey(),
             stringOmKeyInfoPair.getValue()));
