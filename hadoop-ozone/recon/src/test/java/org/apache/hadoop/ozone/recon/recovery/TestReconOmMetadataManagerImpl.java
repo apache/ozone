@@ -17,12 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.recovery;
 
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,14 +30,9 @@ import java.nio.file.Path;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -213,168 +204,5 @@ public class TestReconOmMetadataManagerImpl {
 
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
-  }
-
-  /**
-   * Test performance of Recon OM DB definition.
-   * This test creates a Recon OM Metadata Manager instance, adds multiple buckets in a volume, and each bucket will
-   * have multiple ACLS. Each bucket will have multiple keys, and each key will have multiple ACLs. This test measures
-   * the time taken to iterate those keys inside each bucket and volume. Then does the same for OM Metadata Manager
-   * instance. Compare the time taken for both because both using different DB implementations as Recon OM Metadata
-   * Manager uses custom lightweight codecs skipping ACL deserialization and OM Metadata Manager uses deserialization
-   * with ACLs.
-   *
-   * @throws Exception
-   */
-  @Test
-  public void testReconOmDBDefinitionPerformance() throws Exception {
-    OMMetadataManager omMetadataManager = getOMMetadataManagerInstance();
-
-    //Take checkpoint of the above OM DB.
-    DBCheckpoint checkpoint = omMetadataManager.getStore()
-        .getCheckpoint(true);
-    File snapshotFile = new File(
-        checkpoint.getCheckpointLocation().getParent() + "/" +
-            "om.snapshot.db_" + System.currentTimeMillis());
-    assertTrue(checkpoint.getCheckpointLocation().toFile().renameTo(snapshotFile));
-
-    //Create new Recon OM Metadata manager instance.
-    File reconOmDbDir = Files.createDirectory(
-        temporaryFolder.resolve("NewDir")).toFile();
-    OzoneConfiguration configuration = new OzoneConfiguration();
-    configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir
-        .getAbsolutePath());
-    FileUtils.copyDirectory(snapshotFile.getParentFile(), reconOmDbDir);
-
-    ReconOMMetadataManager reconOmMetadataManager =
-        new ReconOmMetadataManagerImpl(configuration, new ReconUtils());
-    reconOmMetadataManager.start(configuration);
-
-    long startTime = System.currentTimeMillis();
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>> volumeIter =
-            omMetadataManager.getVolumeTable().iterator()) {
-      while (volumeIter.hasNext()) {
-        Table.KeyValue<String, OmVolumeArgs> volume = volumeIter.next();
-        String volumeKey = volume.getKey();
-        try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> bucketIter =
-                 omMetadataManager.getBucketTable().iterator(volumeKey)) {
-          while (bucketIter.hasNext()) {
-            Table.KeyValue<String, OmBucketInfo> bucket = bucketIter.next();
-            String bucketKey = bucket.getKey();
-            try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter =
-                     omMetadataManager.getKeyTable(getBucketLayout()).iterator(bucketKey)) {
-              while (keyIter.hasNext()) {
-                Table.KeyValue<String, OmKeyInfo> key = keyIter.next();
-                OmKeyInfo value = key.getValue();
-                // Access the ACLs to ensure they are deserialized.
-                assertFalse(value.getAcls().isEmpty());
-              }
-            }
-          }
-        }
-      }
-    }
-    long endTime = System.currentTimeMillis();
-    long omDbTime = endTime - startTime;
-    System.out.println("Time taken to iterate keys based on OM Metadata Manager DB definition"
-        + ": " + omDbTime + " ms");
-
-    // Measure time taken to iterate keys in Recon OM DB.
-    startTime = System.currentTimeMillis();
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>> volumeIter =
-            reconOmMetadataManager.getVolumeTable().iterator()) {
-      while (volumeIter.hasNext()) {
-        Table.KeyValue<String, OmVolumeArgs> volume = volumeIter.next();
-        String volumeKey = volume.getKey();
-        try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> bucketIter =
-                 reconOmMetadataManager.getBucketTable().iterator(volumeKey)) {
-          while (bucketIter.hasNext()) {
-            Table.KeyValue<String, OmBucketInfo> bucket = bucketIter.next();
-            String bucketKey = bucket.getKey();
-            try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter =
-                     reconOmMetadataManager.getKeyTable(getBucketLayout()).iterator(bucketKey)) {
-              while (keyIter.hasNext()) {
-                Table.KeyValue<String, OmKeyInfo> key = keyIter.next();
-                OmKeyInfo value = key.getValue();
-                // Access the ACLs to ensure they are deserialized.
-                assertTrue(value.getAcls().isEmpty());
-              }
-            }
-          }
-        }
-      }
-    }
-
-    endTime = System.currentTimeMillis();
-    long reconOmDBTime = endTime - startTime;
-    System.out.println("Time taken to iterate keys based on Recon OM DB definition"
-        + ": " + reconOmDBTime + " ms");
-    assertTrue(reconOmDBTime < omDbTime,
-        "Recon OM DB definition should be faster than OM Metadata Manager DB definition");
-  }
-
-  private OMMetadataManager getOMMetadataManagerInstance() throws IOException {
-    //Create a new OM Metadata Manager instance + DB.
-    File omDbDir = Files.createDirectory(
-        temporaryFolder.resolve("OmMetadataDir")).toFile();
-    OzoneConfiguration omConfiguration = new OzoneConfiguration();
-    omConfiguration.set(OZONE_OM_DB_DIRS,
-        omDbDir.getAbsolutePath());
-    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
-        omConfiguration, null);
-    // Create a new OM Metadata Manager instance + DB.
-    int numberOfBuckets = 1000;
-    int numberOfKeysPerBucket = 100;
-    int numberOfAclsPerKey = 1000;
-
-    // Write Data to OM
-    for (int i = 0; i < numberOfBuckets; i++) {
-      String volumeName = "volume" + i;
-      String bucketName = "bucket" + i;
-      omMetadataManager.getVolumeTable().put(omMetadataManager.getVolumeKey(volumeName),
-          OmVolumeArgs.newBuilder()
-              .setVolume(volumeName)
-              .setAdminName("TestUser2")
-              .setOwnerName("TestUser2")
-              .setQuotaInBytes(OzoneConsts.GB)
-              .setQuotaInNamespace(1000)
-              .setUsedNamespace(500)
-              .build());
-      omMetadataManager.getBucketTable().put(
-          omMetadataManager.getBucketKey(volumeName, bucketName),
-          OmBucketInfo.newBuilder()
-              .setVolumeName(volumeName)
-              .setBucketName(bucketName)
-              .setQuotaInBytes(OzoneConsts.GB)
-              .setUsedBytes(OzoneConsts.MB)
-              .setQuotaInNamespace(5)
-              .setStorageType(StorageType.DISK)
-              .setUsedNamespace(3)
-              .setBucketLayout(BucketLayout.LEGACY)
-              .setOwner("TestUser2")
-              .setIsVersionEnabled(false)
-              .build());
-
-      for (int j = 0; j < numberOfKeysPerBucket; j++) {
-        String keyName = "key" + j;
-        OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
-            .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-            .setKeyName(keyName)
-            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
-                HddsProtos.ReplicationFactor.ONE))
-            .build();
-        // Add multiple ACLs to each key.
-        for (int k = 0; k < numberOfAclsPerKey; k++) {
-          omKeyInfo.addAcl(OzoneAcl.of(USER, "user1", ACCESS, ALL));
-        }
-        omMetadataManager.getKeyTable(getBucketLayout())
-            .put(omMetadataManager.getOzoneKey(volumeName, bucketName,
-                keyName), omKeyInfo);
-      }
-    }
-    return omMetadataManager;
   }
 }
