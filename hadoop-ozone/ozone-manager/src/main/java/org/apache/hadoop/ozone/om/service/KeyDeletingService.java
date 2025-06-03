@@ -22,13 +22,16 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_P
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -36,21 +39,27 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PendingKeysDeletion;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
@@ -58,6 +67,7 @@ import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableRenameEntryFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -164,6 +174,145 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   public void setKeyLimitPerTask(int keyLimitPerTask) {
     this.keyLimitPerTask = keyLimitPerTask;
   }
+
+  Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
+      Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
+
+    long startTime = Time.monotonicNow();
+    Pair<Integer, Boolean> purgeResult = Pair.of(0, false);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Send {} key(s) to SCM: {}",
+          keyBlocksList.size(), keyBlocksList);
+    } else if (LOG.isInfoEnabled()) {
+      int logSize = 10;
+      if (keyBlocksList.size() < logSize) {
+        logSize = keyBlocksList.size();
+      }
+      LOG.info("Send {} key(s) to SCM, first {} keys: {}",
+          keyBlocksList.size(), logSize, keyBlocksList.subList(0, logSize));
+    }
+    List<DeleteBlockGroupResult> blockDeletionResults =
+        getScmClient().deleteKeyBlocks(keyBlocksList);
+    LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
+        keyBlocksList.size(), Time.monotonicNow() - startTime);
+    if (blockDeletionResults != null) {
+      long purgeStartTime = Time.monotonicNow();
+      purgeResult = submitPurgeKeysRequest(blockDeletionResults,
+          keysToModify, renameEntries, snapTableKey, expectedPreviousSnapshotId);
+      int limit = getOzoneManager().getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
+          OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
+      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
+          purgeResult, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
+    }
+    getPerfMetrics().setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
+    return purgeResult;
+  }
+
+  /**
+   * Submits PurgeKeys request for the keys whose blocks have been deleted
+   * by SCM.
+   * @param results DeleteBlockGroups returned by SCM.
+   * @param keysToModify Updated list of RepeatedOmKeyInfo
+   */
+  private Pair<Integer, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
+      Map<String, RepeatedOmKeyInfo> keysToModify,  List<String> renameEntriesToBeDeleted,
+      String snapTableKey, UUID expectedPreviousSnapshotId) {
+    List<String> purgeKeys = new ArrayList<>();
+
+    // Put all keys to be purged in a list
+    int deletedCount = 0;
+    Set<String> failedDeletedKeys = new HashSet<>();
+    boolean purgeSuccess = true;
+    for (DeleteBlockGroupResult result : results) {
+      String deletedKey = result.getObjectKey();
+      if (result.isSuccess()) {
+        // Add key to PurgeKeys list.
+        if (keysToModify != null && !keysToModify.containsKey(deletedKey)) {
+          // Parse Volume and BucketName
+          purgeKeys.add(deletedKey);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Key {} set to be updated in OM DB, Other versions " +
+                "of the key that are reclaimable are reclaimed.", deletedKey);
+          }
+        } else if (keysToModify == null) {
+          purgeKeys.add(deletedKey);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Key {} set to be purged from OM DB", deletedKey);
+          }
+        }
+        deletedCount++;
+      } else {
+        // If the block deletion failed, then the deleted keys should also not be modified.
+        failedDeletedKeys.add(deletedKey);
+        purgeSuccess = false;
+      }
+    }
+
+    OzoneManagerProtocolProtos.PurgeKeysRequest.Builder purgeKeysRequest = OzoneManagerProtocolProtos.PurgeKeysRequest.newBuilder();
+    if (snapTableKey != null) {
+      purgeKeysRequest.setSnapshotTableKey(snapTableKey);
+    }
+    OzoneManagerProtocolProtos.NullableUUID.Builder expectedPreviousSnapshotNullableUUID =
+        OzoneManagerProtocolProtos.NullableUUID.newBuilder();
+    if (expectedPreviousSnapshotId != null) {
+      expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
+    }
+    purgeKeysRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
+    OzoneManagerProtocolProtos.DeletedKeys deletedKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
+        .setVolumeName("")
+        .setBucketName("")
+        .addAllKeys(purgeKeys)
+        .build();
+    purgeKeysRequest.addDeletedKeys(deletedKeys);
+    // Adding rename entries to be purged.
+    if (renameEntriesToBeDeleted != null) {
+      purgeKeysRequest.addAllRenamedKeys(renameEntriesToBeDeleted);
+    }
+    List<OzoneManagerProtocolProtos.SnapshotMoveKeyInfos> keysToUpdateList = new ArrayList<>();
+    if (keysToModify != null) {
+      for (Map.Entry<String, RepeatedOmKeyInfo> keyToModify :
+          keysToModify.entrySet()) {
+        if (failedDeletedKeys.contains(keyToModify.getKey())) {
+          continue;
+        }
+        OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.Builder keyToUpdate =
+            OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.newBuilder();
+        keyToUpdate.setKey(keyToModify.getKey());
+        List<OzoneManagerProtocolProtos.KeyInfo> keyInfos =
+            keyToModify.getValue().getOmKeyInfoList().stream()
+                .map(k -> k.getProtobuf(ClientVersion.CURRENT_VERSION))
+                .collect(Collectors.toList());
+        keyToUpdate.addAllKeyInfos(keyInfos);
+        keysToUpdateList.add(keyToUpdate.build());
+      }
+
+      if (!keysToUpdateList.isEmpty()) {
+        purgeKeysRequest.addAllKeysToUpdate(keysToUpdateList);
+      }
+    }
+
+    OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
+        .setPurgeKeysRequest(purgeKeysRequest)
+        .setClientId(getClientId().toString())
+        .build();
+
+    // Submit PurgeKeys request to OM. Acquire bootstrap lock when processing deletes for snapshots.
+    try (BootstrapStateHandler.Lock lock = snapTableKey != null ? getBootstrapStateLock().lock() : null) {
+      OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
+      if (omResponse != null) {
+        purgeSuccess = purgeSuccess && omResponse.getSuccess();
+      }
+    } catch (ServiceException | InterruptedException e) {
+      LOG.error("PurgeKey request failed. Will retry at next run.", e);
+      return Pair.of(0, false);
+    }
+
+    return Pair.of(deletedCount, purgeSuccess);
+  }
+
+
 
   /**
    * A key deleting task scans OM DB and looking for a certain number of
