@@ -24,6 +24,7 @@ cd "$DIR/../../.." || exit 1
 : ${ITERATIONS:="1"}
 : ${OZONE_WITH_COVERAGE:="false"}
 : ${OZONE_REPO_CACHED:="false"}
+: ${TARGET_DIR:="target"}
 
 declare -i ITERATIONS
 if [[ ${ITERATIONS} -le 0 ]]; then
@@ -56,7 +57,7 @@ if [[ ${ITERATIONS} -gt 1 ]] && [[ ${OZONE_REPO_CACHED} == "false" ]]; then
   mvn ${MAVEN_OPTIONS} -DskipTests install
 fi
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
+REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../${TARGET_DIR}/${CHECK}"}
 REPORT_FILE="${REPORT_DIR}/summary.txt"
 mkdir -p "$REPORT_DIR"
 
@@ -68,13 +69,8 @@ for i in $(seq 1 ${ITERATIONS}); do
     mkdir -p "${REPORT_DIR}"
   fi
 
-  if [[ $i -eq 1 ]]; then
-    mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" verify \
+  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" clean verify \
       | tee "${REPORT_DIR}/output.log"
-  else
-    mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" clean verify \
-      | tee "${REPORT_DIR}/output.log"
-  fi
   irc=$?
 
   # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
