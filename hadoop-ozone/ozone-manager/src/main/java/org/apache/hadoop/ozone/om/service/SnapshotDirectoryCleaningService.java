@@ -148,7 +148,7 @@ public class SnapshotDirectoryCleaningService
           // Expand deleted dirs only on active snapshot. Deleted Snapshots
           // will be cleaned up by SnapshotDeletingService.
           if (currSnapInfo == null || currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
-              currSnapInfo.getDeepCleanedDeletedDir()) {
+              currSnapInfo.isDeepCleanedDeletedDir()) {
             continue;
           }
 

@@ -479,8 +479,8 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
     }
     for (SnapshotInfo snapshotInfo : snapshotInfoList) {
       assertEquals(snapshotInfo.getLastTransactionInfo(), expectedTransactionInfos.get(snapshotInfo.getSnapshotId()));
-      assertEquals(snapshotInfo.getDeepClean(), expectedDeepCleanFlags.get(snapshotInfo.getSnapshotId()));
-      assertEquals(snapshotInfo.getDeepCleanedDeletedDir(), expectedDeepCleanFlags.get(snapshotInfo.getSnapshotId()));
+      assertEquals(snapshotInfo.isDeepCleaned(), expectedDeepCleanFlags.get(snapshotInfo.getSnapshotId()));
+      assertEquals(snapshotInfo.isDeepCleanedDeletedDir(), expectedDeepCleanFlags.get(snapshotInfo.getSnapshotId()));
     }
     OmMetadataManagerImpl metadataManager =
         (OmMetadataManagerImpl) getOmMetadataManager();
