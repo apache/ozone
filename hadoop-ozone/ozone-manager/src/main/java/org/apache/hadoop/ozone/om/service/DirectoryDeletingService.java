@@ -104,7 +104,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   // and send deletion requests.
   private int ratisByteLimit;
   private final AtomicBoolean suspended;
-  private final AtomicBoolean isRunningOnAOS;
   private final SnapshotChainManager snapshotChainManager;
   private final boolean deepCleanSnapshots;
   private final ExecutorService deletionThreadPool;
@@ -129,7 +128,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
     this.suspended = new AtomicBoolean(false);
-    this.isRunningOnAOS = new AtomicBoolean(false);
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.deletedDirsCount = new AtomicLong(0);
@@ -143,10 +141,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       return true;
     }
     return getOzoneManager().isLeaderReady() && !suspended.get();
-  }
-
-  public boolean isRunningOnAOS() {
-    return isRunningOnAOS.get();
   }
 
   /**
@@ -172,7 +166,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new DirDeletingTask(this, null));
+    queue.add(new DirDeletingTask(null));
     if (deepCleanSnapshots) {
       Iterator<UUID> iterator = null;
       try {
@@ -183,7 +177,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       }
       while (iterator.hasNext()) {
         UUID snapshotId = iterator.next();
-        queue.add(new DirDeletingTask(this, snapshotId));
+        queue.add(new DirDeletingTask(snapshotId));
       }
     }
     return queue;
@@ -432,11 +426,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   private final class DirDeletingTask implements BackgroundTask {
-    private final DirectoryDeletingService directoryDeletingService;
     private final UUID snapshotId;
 
-    private DirDeletingTask(DirectoryDeletingService service, UUID snapshotId) {
-      this.directoryDeletingService = service;
+    private DirDeletingTask(UUID snapshotId) {
       this.snapshotId = snapshotId;
     }
 
@@ -614,7 +606,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         final long run = getRunCount().incrementAndGet();
         if (snapshotId == null) {
           LOG.debug("Running DirectoryDeletingService for active object store, {}", run);
-          isRunningOnAOS.set(true);
         } else {
           LOG.debug("Running DirectoryDeletingService for snapshot : {}, {}", snapshotId, run);
         }
@@ -645,13 +636,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         } catch (IOException | ExecutionException | InterruptedException e) {
           LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
               snapInfo, e);
-        } finally {
-          if (snapshotId == null) {
-            isRunningOnAOS.set(false);
-            synchronized (directoryDeletingService) {
-              this.directoryDeletingService.notify();
-            }
-          }
         }
       }
       // By design, no one cares about the results of this call back.

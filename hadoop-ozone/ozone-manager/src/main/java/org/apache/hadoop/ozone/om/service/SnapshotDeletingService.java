@@ -22,14 +22,17 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETIN
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_GC_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -53,6 +56,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
@@ -88,7 +93,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   private final int keyLimitPerTask;
   private final int snapshotDeletionPerTask;
   private final int ratisByteLimit;
-  private final long serviceTimeout;
+  private MultiSnapshotLocks snapshotIdLocks;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
                                  OzoneManager ozoneManager)
@@ -115,32 +120,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     this.keyLimitPerTask = conf.getInt(
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
-    this.serviceTimeout = serviceTimeout;
-  }
-
-  // Wait for a notification from KeyDeletingService if the key deletion is running. This is to ensure, merging of
-  // entries do not start while the AOS is still processing the deleted keys.
-  @VisibleForTesting
-  public void waitForKeyDeletingService() throws InterruptedException {
-    KeyDeletingService keyDeletingService = getOzoneManager().getKeyManager().getDeletingService();
-    synchronized (keyDeletingService) {
-      while (keyDeletingService.isRunningOnAOS()) {
-        keyDeletingService.wait(serviceTimeout);
-      }
-    }
-  }
-
-  // Wait for a notification from DirectoryDeletingService if the directory deletion is running. This is to ensure,
-  // merging of entries do not start while the AOS is still processing the deleted keys.
-  @VisibleForTesting
-  public void waitForDirDeletingService() throws InterruptedException {
-    DirectoryDeletingService directoryDeletingService = getOzoneManager().getKeyManager()
-        .getDirDeletingService();
-    synchronized (directoryDeletingService) {
-      while (directoryDeletingService.isRunningOnAOS()) {
-        directoryDeletingService.wait(serviceTimeout);
-      }
-    }
+    IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
+    this.snapshotIdLocks = new MultiSnapshotLocks(lock, SNAPSHOT_GC_LOCK, true);
   }
 
   private class SnapshotDeletingTask implements BackgroundTask {
@@ -177,11 +158,16 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             continue;
           }
 
+          // Acquire write lock on current snapshot and next snapshot in chain.
+          if (!snapshotIdLocks.acquireLock(Arrays.asList(snapInfo.getSnapshotId(),
+                  Optional.ofNullable(nextSnapshot).map(SnapshotInfo::getSnapshotId).orElse(null)))
+              .isLockAcquired()) {
+            continue;
+          }
+
           // nextSnapshot = null means entries would be moved to AOS.
           if (nextSnapshot == null) {
             LOG.info("Snapshot: {} entries will be moved to AOS.", snapInfo.getTableKey());
-            waitForKeyDeletingService();
-            waitForDirDeletingService();
           } else {
             LOG.info("Snapshot: {} entries will be moved to next active snapshot: {}",
                 snapInfo.getTableKey(), nextSnapshot.getTableKey());
@@ -232,6 +218,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             } else {
               snapshotsToBePurged.add(snapInfo.getTableKey());
             }
+          } finally {
+            snapshotIdLocks.releaseLock();
           }
           successRunCount.incrementAndGet();
           snapshotLimit--;

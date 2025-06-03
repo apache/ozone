@@ -169,6 +169,7 @@ class TestKeyDeletingService extends OzoneTestBase {
   private void createSubject() throws Exception {
     OmTestManagers omTestManagers = new OmTestManagers(conf, scmBlockTestingClient, null);
     keyManager = omTestManagers.getKeyManager();
+
     keyDeletingService = keyManager.getDeletingService();
     directoryDeletingService = keyManager.getDirDeletingService();
     writeClient = omTestManagers.getWriteClient();
@@ -345,7 +346,8 @@ class TestKeyDeletingService extends OzoneTestBase {
       keyDeletingService.suspend();
       SnapshotDeletingService snapshotDeletingService = om.getKeyManager().getSnapshotDeletingService();
       snapshotDeletingService.suspend();
-      GenericTestUtils.waitFor(() -> !keyDeletingService.isRunningOnAOS(), 1000, 10000);
+      Thread.sleep(1000);
+
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       OzoneManager ozoneManager = Mockito.spy(om);
@@ -620,7 +622,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       when(kds.getTasks()).thenAnswer(i -> {
         BackgroundTaskQueue queue = new BackgroundTaskQueue();
         for (UUID id : snapshotIds) {
-          queue.add(kds.new KeyDeletingTask(kds, id));
+          queue.add(kds.new KeyDeletingTask(id));
         }
         return queue;
       });

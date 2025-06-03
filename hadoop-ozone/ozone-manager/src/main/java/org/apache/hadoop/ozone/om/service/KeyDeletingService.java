@@ -87,7 +87,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
   private final AtomicBoolean suspended;
-  private final AtomicBoolean isRunningOnAOS;
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
 
@@ -104,7 +103,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
     this.deletedKeyCount = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
-    this.isRunningOnAOS = new AtomicBoolean(false);
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
     this.scmClient = scmClient;
@@ -118,10 +116,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   @VisibleForTesting
   public AtomicLong getDeletedKeyCount() {
     return deletedKeyCount;
-  }
-
-  public boolean isRunningOnAOS() {
-    return isRunningOnAOS.get();
   }
 
   Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
@@ -262,7 +256,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new KeyDeletingTask(this, null));
+    queue.add(new KeyDeletingTask(null));
     if (deepCleanSnapshots) {
       Iterator<UUID> iterator = null;
       try {
@@ -273,7 +267,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       }
       while (iterator.hasNext()) {
         UUID snapshotId = iterator.next();
-        queue.add(new KeyDeletingTask(this, snapshotId));
+        queue.add(new KeyDeletingTask(snapshotId));
       }
     }
     return queue;
@@ -320,11 +314,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    */
   @VisibleForTesting
   final class KeyDeletingTask implements BackgroundTask {
-    private final KeyDeletingService deletingService;
     private final UUID snapshotId;
 
-    KeyDeletingTask(KeyDeletingService service, UUID snapshotId) {
-      this.deletingService = service;
+    KeyDeletingTask(UUID snapshotId) {
       this.snapshotId = snapshotId;
     }
 
@@ -457,7 +449,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         final long run = getRunCount().incrementAndGet();
         if (snapshotId == null) {
           LOG.debug("Running KeyDeletingService for active object store, {}", run);
-          isRunningOnAOS.set(true);
         } else {
           LOG.debug("Running KeyDeletingService for snapshot : {}, {}", snapshotId, run);
         }
@@ -494,13 +485,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         } catch (IOException e) {
           LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
               snapInfo, e);
-        } finally {
-          if (snapshotId == null) {
-            isRunningOnAOS.set(false);
-            synchronized (deletingService) {
-              this.deletingService.notify();
-            }
-          }
         }
       }
       // By design, no one cares about the results of this call back.
