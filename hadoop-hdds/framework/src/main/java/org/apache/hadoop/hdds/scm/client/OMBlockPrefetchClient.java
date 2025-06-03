@@ -169,7 +169,7 @@ public class OMBlockPrefetchClient {
     if (prefetchExecutor != null) {
       prefetchExecutor.shutdown();
       try {
-        if (prefetchExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+        if (!prefetchExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
           prefetchExecutor.shutdownNow();
         }
       } catch (InterruptedException e) {
