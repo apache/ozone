@@ -23,11 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -52,6 +48,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
@@ -59,11 +56,13 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * Test for {@link ContainerImporter}.
@@ -185,6 +184,36 @@ class TestContainerImporter {
                 tarFile.toPath(), null, NO_COMPRESSION));
     Assertions.assertTrue(scException.getMessage().
         contains("Container checksum error"));
+  }
+
+  @Test
+  public void testImportContainerScansContainer() throws Exception {
+    long containerId = 1;
+    try (MockedStatic<OnDemandContainerDataScanner> mockedStatic = mockStatic(OnDemandContainerDataScanner.class)) {
+      // create container
+      KeyValueContainerData containerData = new KeyValueContainerData(containerId,
+          ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
+      KeyValueContainer container = new KeyValueContainer(containerData, conf);
+      ContainerController controllerMock = mock(ContainerController.class);
+      when(controllerMock.importContainer(any(), any(), any())).thenReturn(container);
+
+      // create containerImporter object
+      ContainerSet containerSet = newContainerSet(0);
+      MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
+          StorageVolume.VolumeType.DATA_VOLUME, null);
+      HddsVolume targetVolume = mock(HddsVolume.class);
+      doNothing().when(targetVolume).incrementUsedSpace(anyLong());
+      ContainerImporter containerImporter = new ContainerImporter(conf,
+          containerSet, controllerMock, volumeSet, volumeChoosingPolicy);
+
+      // import the container
+      File tarFile = containerTarFile(containerId, containerData);
+      containerImporter.importContainer(containerId, tarFile.toPath(),
+          targetVolume, NO_COMPRESSION);
+
+      // verify static method was called
+      mockedStatic.verify(() -> OnDemandContainerDataScanner.scanContainer(container), times(1));
+    }
   }
 
   private File containerTarFile(
