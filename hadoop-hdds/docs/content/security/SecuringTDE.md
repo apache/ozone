@@ -139,24 +139,21 @@ The below three configurations must be added to the kms-site.xml to allow the S3
   <name>hadoop.kms.proxyuser.s3g.users</name>
   <value>user1,user2,user3</value>
   <description>
-        Here the value can be all the S3G accesskey ids accessing Ozone S3
-        or set to '*' to allow all the accesskey ids.
+    Specifies the list of users that the S3 Gateway (`s3g`) is allowed to impersonate when interacting with the KMS. Use `*` to allow all users.
   </description>
 </property>
 <property>
   <name>hadoop.kms.proxyuser.s3g.groups</name>
   <value>group1,group2,group3</value>
   <description>
-        Here the value can be all the S3G accesskey groups accessing Ozone S3
-        or set to '*' to allow all the accesskey ids.
+    Specifies the list of groups whose members `s3g` is allowed to impersonate when making requests to the KMS. Use `*` to allow all groups.
   </description>
 </property>
 <property>
   <name>hadoop.kms.proxyuser.s3g.hosts</name>
   <value>s3g-host1.com</value>
   <description>
-         This is the host where the S3Gateway is running. Set this to '*' to allow
-         requests from any hosts to be proxied.
+    Specifies the hostnames or IPs from which `s3g` is permitted to send proxy requests to the KMS. Use `*` to allow all hosts.
   </description>
 </property>
 ```
