@@ -411,12 +411,21 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     try {
       switch (request.getCmdType()) {
       case AllocateContainer:
-        return ScmContainerLocationResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setContainerResponse(allocateContainer(
-                request.getContainerRequest(), request.getVersion()))
-            .build();
+        ScmContainerLocationResponse.Builder responseBuilder =
+            ScmContainerLocationResponse.newBuilder()
+                .setCmdType(request.getCmdType())
+                .setStatus(Status.OK);
+
+        if (request.hasContainerRequest()) {
+          responseBuilder.setContainerResponse(
+              allocateContainer(request.getContainerRequest(), request.getVersion()));
+        } else if (request.hasEcContainerRequest()) {
+          responseBuilder.setEcContainerResponse(
+              allocateEcContainer(request.getEcContainerRequest(), request.getVersion()));
+        } else {
+          throw new IOException("Invalid request");
+        }
+        return responseBuilder.build();
       case GetContainer:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -761,6 +770,17 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .setErrorCode(ContainerResponseProto.Error.success)
         .build();
 
+  }
+
+  public StorageContainerLocationProtocolProtos.ECContainerResponseProto allocateEcContainer(
+      StorageContainerLocationProtocolProtos.ECContainerRequestProto request,
+      int clientVersion) throws IOException {
+    ContainerWithPipeline cp = impl
+        .allocateContainer(new ECReplicationConfig(request.getEcReplicationConfig()), request.getOwner());
+    return StorageContainerLocationProtocolProtos.ECContainerResponseProto.newBuilder()
+        .setContainerWithPipeline(cp.getProtobuf(clientVersion))
+        .setErrorCode(StorageContainerLocationProtocolProtos.ECContainerResponseProto.Error.success)
+        .build();
   }
 
   public GetContainerResponseProto getContainer(

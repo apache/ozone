@@ -85,6 +85,12 @@ message ScmContainerLocationRequest {
   optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
   optional GetMetricsRequestProto getMetricsRequest = 47;
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
+  optional ECContainerRequestProto ecContainerRequest = 49; 
+  optional GetEcContainerRequestProto getEcContainerRequest = 50;
+  optional GetEcContainerWithPipelineRequestProto getEcContainerWithPipelineRequest = 51;
+  optional GetEcContainerReplicasRequestProto getEcContainerReplicasRequest = 52;
+  optional GetEcContainerWithPipelineBatchRequestProto getEcContainerWithPipelineBatchRequest = 53;
+  optional GetExistEcContainerWithPipelinesInBatchRequestProto getExistEcContainerWithPipelinesInBatchRequest = 54;
 }
 
 message ScmContainerLocationResponse {
@@ -141,6 +147,12 @@ message ScmContainerLocationResponse {
   optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
   optional GetMetricsResponseProto getMetricsResponse = 47;
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
+  optional ECContainerResponseProto ecContainerResponse = 49; 
+  optional GetEcContainerResponseProto getEcContainerResponse = 50;
+  optional GetEcContainerWithPipelineResponseProto getEcContainerWithPipelineResponse = 51;
+  optional GetEcContainerReplicasResponseProto getEcContainerReplicasResponse = 52;
+  optional GetExistEcContainerWithPipelinesInBatchResponseProto getExistEcContainerWithPipelinesInBatchResponse = 53;
+  optional GetEcContainerWithPipelineBatchResponseProto getEcContainerWithPipelineBatchResponse = 54;
 
   enum Status {
     OK = 1;
@@ -207,6 +219,72 @@ message ContainerRequestProto {
   required ReplicationType  replicationType = 3;
   required string owner = 4;
   optional string traceID = 5;
+}
+
+message ECContainerRequestProto {
+  required ECReplicationConfig ecReplicationConfig = 1;
+  required string owner = 2;
+  optional string traceID = 3;
+}
+
+message ECContainerResponseProto {
+  enum Error {
+    success = 1;
+    errorContainerAlreadyExists = 2;
+    errorContainerMissing = 3;
+    scmNotLeader = 4;
+  }
+  required Error errorCode = 1;
+  required ContainerWithPipeline containerWithPipeline = 2;
+  optional string errorMessage = 3;
+}
+
+message GetEcContainerRequestProto {
+  required int64 containerID = 1;
+  optional string traceID = 2;
+
+}
+
+message GetEcContainerResponseProto {
+  required ContainerInfoProto containerInfo = 1;
+}
+
+message GetEcContainerWithPipelineRequestProto {
+  required int64 containerID = 1;
+  optional string traceID = 2;
+
+}
+
+message GetEcContainerWithPipelineResponseProto {
+  required ContainerWithPipeline containerWithPipeline = 1;
+}
+
+message GetEcContainerReplicasRequestProto {
+  required int64 containerID = 1;
+  optional string traceID = 2;
+}
+
+message GetEcContainerReplicasResponseProto {
+  repeated SCMContainerReplicaProto containerReplica = 1;
+}
+
+message GetEcContainerWithPipelineBatchRequestProto {
+  repeated int64 containerIDs = 1;
+  optional string traceID = 2;
+}
+
+message GetExistEcContainerWithPipelinesInBatchResponseProto {
+  repeated int64 containerIDs = 1;
+  optional string traceID = 2;
+}
+
+message GetExistEcContainerWithPipelinesInBatchRequestProto {
+  repeated int64 containerIDs = 1;
+  optional string traceID = 2;
+}
+
+message GetEcContainerWithPipelineBatchResponseProto {
+  repeated ContainerWithPipeline containerWithPipelines = 1;
 }
 
 /**

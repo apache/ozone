@@ -222,6 +222,33 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public ContainerWithPipeline createContainer(ReplicationConfig replicationConfig,
+                                                String owner) throws IOException {
+    XceiverClientSpi client = null;
+    XceiverClientManager clientManager = getXceiverClientManager();
+    try {
+      if (replicationConfig == null) {
+        replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(replicationType, replicationFactor);
+      }
+      // allocate container on SCM.
+      ContainerWithPipeline containerWithPipeline =
+          storageContainerLocationClient.allocateContainer(replicationConfig,
+              owner);
+      Pipeline pipeline = containerWithPipeline.getPipeline();
+      // connect to pipeline leader and allocate container on leader datanode.
+      client = clientManager.acquireClient(pipeline);
+      createContainer(client,
+          containerWithPipeline.getContainerInfo().getContainerID());
+      return containerWithPipeline;
+    } finally {
+      if (client != null) {
+        clientManager.releaseClient(client, false);
+      }
+    }
+
+  }
+
+  @Override
   public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
     return storageContainerLocationClient.getContainersOnDecomNode(dn);
   }
