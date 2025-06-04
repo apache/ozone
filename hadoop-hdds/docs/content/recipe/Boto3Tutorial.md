@@ -49,7 +49,7 @@ docker exec -it <your-scm-container-name-or-id> bash
 
 The rest of the tutorial will run on this container.
 
-Create a a **bucket** inside the volume **s3v**:
+Create a **bucket** inside the volume **s3v**:
 
 ```bash
 ozone sh bucket create s3v/bucket
@@ -105,14 +105,14 @@ python ozone_boto3_example.py
 ## Notes
 
 - The S3 Gateway listens on port `9878` by default.
-- The bucket name used in Boto3 should match the one created inside your `s3v` volume.
+- The `Bucket` parameter in Boto3 calls (e.g., `'bucket'` in the script) should be the name of the Ozone bucket created under the `s3v` volume (i.e., the `bucket` part of `s3v/bucket`). The `s3v` volume itself is implicitly handled by the S3 Gateway.
 - Make sure the S3 Gateway container (`s3g`) is up and running. You can check using `docker ps`.
 
 ## Troubleshooting Tips
 
 - **Access Denied or Bucket Not Found**: Ensure that the bucket name exists and matches exactly (Ozone S3 Gateway uses flat bucket names).
 - **Connection Refused**: Check that the S3 Gateway container is running and accessible at the specified endpoint.
-- **Timeout or DNS Issues**: Try replacing `weichiu-s3g-1` with `localhost` or the actual IP address depending on how your Docker network is set up.
+- **Timeout or DNS Issues**: Try replacing `s3g` with `localhost` or the actual IP address depending on how your Docker network is set up.
 
 ## References
 

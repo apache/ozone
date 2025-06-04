@@ -68,7 +68,7 @@ import pyarrow.fs as pafs
 
 # Connect to Ozone using HadoopFileSystem
 # "default" tells PyArrow to use the fs.defaultFS property from core-site.xml
-fs = pafs.HadoopFileSystem("default", 9862)
+fs = pafs.HadoopFileSystem("default")
 
 # Create a directory inside the bucket
 fs.create_dir("volume/bucket/aaa")
