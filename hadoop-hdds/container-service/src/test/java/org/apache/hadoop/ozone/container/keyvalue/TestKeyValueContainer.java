@@ -215,7 +215,7 @@ public class TestKeyValueContainer {
 
     // When the container is loaded, the missing chunks directory should
     // be created.
-    KeyValueContainerUtil.parseKVContainerData(data, CONF);
+    KeyValueContainerUtil.parseKVContainerData(data, CONF, false);
     assertTrue(chunksDir.exists());
   }
 

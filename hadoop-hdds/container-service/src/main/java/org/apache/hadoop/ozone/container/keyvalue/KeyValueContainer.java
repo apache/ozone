@@ -649,14 +649,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   public void importContainerData(KeyValueContainerData originalContainerData)
       throws IOException {
-    //Set all metadata and state BEFORE parsing and verifying checksum
-    containerData.setState(originalContainerData.getState());
     containerData
         .setContainerDBType(originalContainerData.getContainerDBType());
     containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
-
-    // rewriting the yaml file with new checksum calculation
-    update(originalContainerData.getMetadata(), true);
 
     if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // load metadata from received dump files before we try to parse kv
@@ -664,8 +659,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     }
 
     //fill in memory stat counter (keycount, byte usage)
-    //This step performs checksum verification; all metadata must be set beforehand
-    KeyValueContainerUtil.parseKVContainerData(containerData, config);
+    KeyValueContainerUtil.parseKVContainerData(containerData, config, true);
+
+    // rewriting the yaml file with new checksum calculation
+    // restore imported container's state to the original state and flush the yaml file
+    containerData.setState(originalContainerData.getState());
+    update(originalContainerData.getMetadata(), true);
   }
 
   @Override

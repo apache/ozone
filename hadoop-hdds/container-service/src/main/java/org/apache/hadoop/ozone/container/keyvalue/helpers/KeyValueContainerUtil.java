@@ -198,15 +198,19 @@ public final class KeyValueContainerUtil {
    * pending delete block count and delete transaction id.
    * @param kvContainerData
    * @param config
+   * @param skipVerifyChecksum
    * @throws IOException
    */
   public static void parseKVContainerData(KeyValueContainerData kvContainerData,
-      ConfigurationSource config) throws IOException {
+      ConfigurationSource config, boolean skipVerifyChecksum) throws IOException {
 
     long containerID = kvContainerData.getContainerID();
 
     // Verify Checksum
-    ContainerUtils.verifyChecksum(kvContainerData, config);
+    // skip verify checksum if the state has changed to RECOVERING
+    if (!skipVerifyChecksum) {
+      ContainerUtils.verifyChecksum(kvContainerData, config);
+    }
 
     if (kvContainerData.getSchemaVersion() == null) {
       // If this container has not specified a schema version, it is in the old
