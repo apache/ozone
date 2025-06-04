@@ -39,6 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -425,6 +426,20 @@ public final class Pipeline {
 
   public Pipeline copyWithNodesInOrder(List<? extends DatanodeDetails> nodes) {
     return toBuilder().setNodesInOrder(nodes).build();
+  }
+
+  public Pipeline copyForRead() {
+    if (replicationConfig.getReplicationType() == ReplicationType.STAND_ALONE) {
+      return this;
+    }
+
+    HddsProtos.ReplicationFactor factor = replicationConfig instanceof ReplicatedReplicationConfig
+        ? ((ReplicatedReplicationConfig) replicationConfig).getReplicationFactor()
+        : HddsProtos.ReplicationFactor.ONE;
+
+    return toBuilder()
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(factor))
+        .build();
   }
 
   public Pipeline copyForReadFromNode(DatanodeDetails node) {
