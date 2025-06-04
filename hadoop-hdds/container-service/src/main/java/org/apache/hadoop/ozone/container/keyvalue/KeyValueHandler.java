@@ -1391,7 +1391,7 @@ public class KeyValueHandler extends Handler {
    * @param container The container which will have a tree generated.
    */
   private void updateContainerChecksumFromMetadataIfNeeded(Container container) {
-    if (ContainerChecksumTreeManager.checksumFileExist(container)) {
+    if (ContainerChecksumTreeManager.checksumFileExists(container.getContainerData())) {
       return;
     }
 
@@ -1447,7 +1447,7 @@ public class KeyValueHandler extends Handler {
       if (sendICR) {
         sendICR(container);
       }
-      if (ContainerChecksumTreeManager.hasContainerChecksumFile(containerData)) {
+      if (ContainerChecksumTreeManager.checksumFileExists(containerData)) {
         LOG.warn(message);
         ContainerLogger.logChecksumUpdated(containerData, originalDataChecksum);
       } else {

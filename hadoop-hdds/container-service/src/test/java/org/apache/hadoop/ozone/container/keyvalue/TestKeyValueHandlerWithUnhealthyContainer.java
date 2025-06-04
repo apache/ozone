@@ -238,14 +238,14 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     // be ignored.
     hddsVolume.setState(StorageVolume.VolumeState.FAILED);
     handler.markContainerUnhealthy(container, ContainerTestUtils.getUnhealthyDataScanResult());
-    assertFalse(ContainerChecksumTreeManager.checksumFileExist(container));
+    assertFalse(ContainerChecksumTreeManager.checksumFileExists(kvData));
     verify(mockIcrSender, never()).send(any());
 
     // When volume is healthy, ICR should be sent when container is marked
     // unhealthy.
     hddsVolume.setState(StorageVolume.VolumeState.NORMAL);
     handler.markContainerUnhealthy(container, ContainerTestUtils.getUnhealthyDataScanResult());
-    assertTrue(ContainerChecksumTreeManager.checksumFileExist(container));
+    assertTrue(ContainerChecksumTreeManager.checksumFileExists(kvData));
     verify(mockIcrSender, atMostOnce()).send(any());
   }
 

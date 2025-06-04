@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -305,13 +304,6 @@ public class ContainerChecksumTreeManager {
   }
 
   /**
-   * Returns whether the container checksum tree file for the specified container exists without deserializing it.
-   */
-  public static boolean hasContainerChecksumFile(ContainerData data) {
-    return getContainerChecksumFile(data).exists();
-  }
-
-  /**
    * Returns the container checksum tree file for the specified container without deserializing it.
    */
   @VisibleForTesting
@@ -418,9 +410,11 @@ public class ContainerChecksumTreeManager {
     return this.metrics;
   }
 
-  public static boolean checksumFileExist(Container<?> container) {
-    File checksumFile = getContainerChecksumFile(container.getContainerData());
-    return checksumFile.exists();
+  /**
+   * Returns whether the container checksum tree file for the specified container exists without deserializing it.
+   */
+  public static boolean checksumFileExists(ContainerData data) {
+    return getContainerChecksumFile(data).exists();
   }
 
 }

@@ -383,7 +383,7 @@ public class TestKeyValueHandler {
     // Closing invalid container should return error response.
     ContainerProtos.ContainerCommandResponseProto response =
         keyValueHandler.handleCloseContainer(closeContainerRequest, container);
-    assertTrue(ContainerChecksumTreeManager.checksumFileExist(container));
+    assertTrue(ContainerChecksumTreeManager.checksumFileExists(kvData));
 
     assertEquals(ContainerProtos.Result.INVALID_CONTAINER_STATE,
         response.getResult(),
