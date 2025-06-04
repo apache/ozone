@@ -40,6 +40,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -425,6 +427,16 @@ public final class Pipeline {
     return toBuilder().setNodesInOrder(nodes).build();
   }
 
+  public Pipeline copyForReadFromNode(DatanodeDetails node) {
+    Preconditions.assertTrue(nodeStatus.containsKey(node), () -> node + " is not part of the pipeline " + id.getId());
+
+    return toBuilder()
+        .setNodes(Collections.singletonList(node))
+        .setReplicaIndexes(Collections.singletonMap(node, getReplicaIndex(node)))
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .build();
+  }
+
   public Builder toBuilder() {
     return newBuilder(this);
   }
@@ -552,7 +564,7 @@ public final class Pipeline {
 
     public Builder() { }
 
-    public Builder(Pipeline pipeline) {
+    private Builder(Pipeline pipeline) {
       this.id = pipeline.id;
       this.replicationConfig = pipeline.replicationConfig;
       this.state = pipeline.state;

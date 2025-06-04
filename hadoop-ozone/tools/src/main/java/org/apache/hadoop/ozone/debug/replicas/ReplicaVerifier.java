@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
  * Functional interface for implementing a block verifier.
  */
 public interface ReplicaVerifier {
-  BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation, int replicaIndex);
+  BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation);
 
   String getType();
 }
