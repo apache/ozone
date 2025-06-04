@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_DB_LOCK;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
@@ -307,8 +307,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
    * If cache size exceeds soft limit, attempt to clean up and close the
      instances that has zero reference count.
    */
-  @VisibleForTesting
-  synchronized void cleanup(boolean force) {
+  private synchronized void cleanup(boolean force) {
     if (force || dbMap.size() > cacheSizeLimit) {
       for (UUID evictionKey : pendingEvictionQueue) {
         ReferenceCounted<OmSnapshot> snapshot = dbMap.get(evictionKey);
