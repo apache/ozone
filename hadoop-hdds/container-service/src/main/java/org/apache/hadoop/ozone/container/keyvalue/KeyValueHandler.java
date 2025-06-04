@@ -81,7 +81,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.locks.Lock;
@@ -1383,7 +1382,7 @@ public class KeyValueHandler extends Handler {
    * Write the merkle tree for this container using the existing checksum metadata only. The data is not read or
    * validated by this method, so it is expected to run quickly.
    * <p>
-   * If a checksum file already exists on the disk, this method will do nothing. The existing file would have either
+   * If a data checksum for the container already exists, this method does nothing. The existing value would have either
    * been made from the metadata or data itself so there is no need to recreate it from the metadata. This method
    * does not send an ICR with the updated checksum info.
    * <p>
@@ -1391,7 +1390,7 @@ public class KeyValueHandler extends Handler {
    * @param container The container which will have a tree generated.
    */
   private void updateContainerChecksumFromMetadataIfNeeded(Container container) {
-    if (ContainerChecksumTreeManager.checksumFileExist(container)) {
+    if (!container.getContainerData().needsDataChecksum()) {
       return;
     }
 
@@ -1435,24 +1434,24 @@ public class KeyValueHandler extends Handler {
     // checksum to prevent divergence from what SCM sees in the ICR vs what datanode peers will see when pulling the
     // merkle tree.
     long originalDataChecksum = containerData.getDataChecksum();
+    boolean hadDataChecksum = containerData.needsDataChecksum();
     ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.writeContainerDataTree(containerData,
         treeWriter);
     long updatedDataChecksum = updateChecksumInfo.getContainerMerkleTree().getDataChecksum();
 
     if (updatedDataChecksum != originalDataChecksum) {
       containerData.setDataChecksum(updatedDataChecksum);
-      String message =
-          "Container data checksum updated from " + checksumToString(originalDataChecksum) + " to " +
-              checksumToString(updatedDataChecksum);
       if (sendICR) {
         sendICR(container);
       }
-      if (ContainerChecksumTreeManager.hasContainerChecksumFile(containerData)) {
+
+      String message = "Container data checksum updated from " + checksumToString(originalDataChecksum) + " to " +
+              checksumToString(updatedDataChecksum);
+      if (hadDataChecksum) {
         LOG.warn(message);
         ContainerLogger.logChecksumUpdated(containerData, originalDataChecksum);
       } else {
-        // If this is the first time the scanner has run with the feature to generate a checksum file, don't
-        // log a warning for the checksum update.
+        // If this is the first time the checksum is being generated, don't log a warning about updating the checksum.
         LOG.debug(message);
       }
     }
@@ -1572,12 +1571,9 @@ public class KeyValueHandler extends Handler {
     long containerID = containerData.getContainerID();
 
     // Obtain the original checksum info before reconciling with any peers.
-    Optional<ContainerProtos.ContainerChecksumInfo> optionalChecksumInfo = checksumManager.read(containerData);
-    ContainerProtos.ContainerChecksumInfo originalChecksumInfo;
-    if (optionalChecksumInfo.isPresent()) {
-      originalChecksumInfo = optionalChecksumInfo.get();
-    } else {
-      // Try creating the checksum info from RocksDB metadata if it is not present.
+    ContainerProtos.ContainerChecksumInfo originalChecksumInfo = checksumManager.read(containerData);
+    if (!originalChecksumInfo.hasContainerMerkleTree()) {
+      // Try creating the merkle tree from RocksDB metadata if it is not present.
       originalChecksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
     }
     // This holds our current most up-to-date checksum info that we are using for the container.
