@@ -112,7 +112,7 @@ python ozone_boto3_example.py
 
 - **Access Denied or Bucket Not Found**: Ensure that the bucket name exists and matches exactly (Ozone S3 Gateway uses flat bucket names).
 - **Connection Refused**: Check that the S3 Gateway container is running and accessible at the specified endpoint.
-- **Timeout or DNS Issues**: Try replacing `s3g` with `localhost` or the actual IP address depending on how your Docker network is set up.
+- **Timeout or DNS Issues**: If you adapt this script to run from your host machine (outside Docker), you might need to replace s3g:9878 with localhost:9878 (assuming default port mapping).
 
 ## References
 

@@ -212,7 +212,7 @@ pip install fsspec
 ```python
 from fsspec.implementations.webhdfs import WebHDFS
 
-fs = WebHDFS(host='httpfs', port=14000, user='hdfs')
+fs = WebHDFS(host='httpfs', port=14000, user='ozone')
 
 # Read a file from /vol1/bucket1/hello.txt
 file_path = "/vol1/bucket1/hello.txt"
