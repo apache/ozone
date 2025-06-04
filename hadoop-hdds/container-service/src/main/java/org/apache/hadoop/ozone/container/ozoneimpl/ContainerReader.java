@@ -270,13 +270,11 @@ public class ContainerReader implements Runnable {
    */
   private boolean resolveDuplicate(KeyValueContainer existing,
       KeyValueContainer toAdd) throws IOException {
-    if (existing.getContainerData().getReplicaIndex() != 0 ||
-        toAdd.getContainerData().getReplicaIndex() != 0) {
-      // This is an EC container. As EC Containers don't have a BSCID, we can't
-      // know which one has the most recent data. Additionally, it is possible
-      // for both copies to have a different replica index for the same
-      // container. Therefore we just let whatever one is loaded first win AND
-      // leave the other one on disk.
+    if (existing.getContainerData().getReplicaIndex() != 0 &&
+        existing.getContainerData().getReplicaIndex() != toAdd.getContainerData().getReplicaIndex()) {
+      // This is an EC container. BCSID for both replica will be 0. If replica index of both replica is different,
+      // then knowing which EC container to keep is not possible, so we leave both on disk.
+      // Delete one of the replica only if replica index is same.
       LOG.warn("Container {} is present at {} and at {}. Both are EC " +
               "containers. Leaving both containers on disk.",
           existing.getContainerData().getContainerID(),

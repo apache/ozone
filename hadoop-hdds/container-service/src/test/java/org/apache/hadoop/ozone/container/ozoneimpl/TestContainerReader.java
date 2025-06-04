@@ -609,6 +609,75 @@ public class TestContainerReader {
     }
   }
 
+  @ContainerTestVersionInfo.ContainerTest
+  public void testEcContainerDuplicateWithSameIndex(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
+
+    long ecContainerId = 202;
+    int replicaIndex = 2;
+
+    // Create first EC container
+    KeyValueContainerData ecContainerData1 = new KeyValueContainerData(
+        ecContainerId, layout, (long) StorageUnit.GB.toBytes(5),
+        UUID.randomUUID().toString(), datanodeId.toString());
+    ecContainerData1.setReplicaIndex(replicaIndex);
+    KeyValueContainer ecContainer1 = new KeyValueContainer(ecContainerData1, conf);
+    ecContainer1.create(volumeSet, volumeChoosingPolicy, clusterId);
+
+    // Create a second volume directory
+    File volumeDir2 = Files.createDirectory(tempDir.resolve("volumeDir2")).toFile();
+    HddsVolume hddsVolume2 = new HddsVolume.Builder(volumeDir2.getAbsolutePath())
+        .conf(conf).datanodeUuid(datanodeId.toString()).clusterID(clusterId).build();
+    StorageVolumeUtil.checkVolume(hddsVolume2, clusterId, clusterId, conf, null, null);
+
+    // Mock the volume set to include both volumes
+    List<StorageVolume> volumes = new ArrayList<>();
+    volumes.add(hddsVolume);
+    volumes.add(hddsVolume2);
+    when(volumeSet.getVolumesList()).thenReturn(volumes);
+
+    // Update the volume choosing policy to return the second volume for ecContainer2
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+        .thenReturn(hddsVolume2);
+
+    // Create ecContainer2 on the second volume
+    // Create duplicate EC container with same ID and replica index
+    KeyValueContainerData ecContainerData2 = new KeyValueContainerData(
+        ecContainerId, layout, (long) StorageUnit.GB.toBytes(5),
+        UUID.randomUUID().toString(), datanodeId.toString());
+    ecContainerData2.setReplicaIndex(replicaIndex);
+    KeyValueContainer ecContainer2 = new KeyValueContainer(ecContainerData2, conf);
+    ecContainer2.create(volumeSet, volumeChoosingPolicy, clusterId);
+
+    // Run ContainerReader to resolve duplicates
+    ContainerReader containerReader = new ContainerReader(volumeSet,
+        hddsVolume, containerSet, conf, true);
+    containerReader.run();
+    ContainerReader containerReader2 = new ContainerReader(volumeSet,
+        hddsVolume2, containerSet, conf, true);
+    containerReader2.run();
+
+    // Both EC containers with same replica index: one should be deleted
+    int count = 0;
+    if (containerSet.getContainer(ecContainerId) != null) {
+      count = 1;
+    }
+    assertEquals(1, count);
+
+    // Only one container directory should exist on disk
+    File containerDir1 = new File(ecContainerData1.getContainerPath());
+    File containerDir2 = new File(ecContainerData2.getContainerPath());
+    int dirExists = 0;
+    if (containerDir1.exists()) {
+      dirExists++;
+    }
+    if (containerDir2.exists()) {
+      dirExists++;
+    }
+    assertEquals(1, dirExists);
+  }
+
   private long addDbEntry(KeyValueContainerData containerData)
       throws Exception {
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
