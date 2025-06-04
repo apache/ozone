@@ -24,7 +24,6 @@ cd "$DIR/../../.." || exit 1
 : ${ITERATIONS:="1"}
 : ${OZONE_WITH_COVERAGE:="false"}
 : ${OZONE_REPO_CACHED:="false"}
-: ${TARGET_DIR:="target"}
 
 declare -i ITERATIONS
 if [[ ${ITERATIONS} -le 0 ]]; then
@@ -57,7 +56,7 @@ if [[ ${ITERATIONS} -gt 1 ]] && [[ ${OZONE_REPO_CACHED} == "false" ]]; then
   mvn ${MAVEN_OPTIONS} -DskipTests install
 fi
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../${TARGET_DIR}/${CHECK}"}
+REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
 REPORT_FILE="${REPORT_DIR}/summary.txt"
 mkdir -p "$REPORT_DIR"
 
