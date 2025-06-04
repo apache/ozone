@@ -492,7 +492,8 @@ public final class Pipeline {
     final ReplicationConfig config = ReplicationConfig
         .fromProto(pipeline.getType(), pipeline.getFactor(),
             pipeline.getEcReplicationConfig());
-    return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
+    return newBuilder()
+        .setId(PipelineID.getFromProtobuf(pipeline.getId()))
         .setReplicationConfig(config)
         .setState(PipelineState.fromProtobuf(pipeline.getState()))
         .setNodes(new ArrayList<>(nodes.keySet()))
@@ -561,7 +562,7 @@ public final class Pipeline {
   /**
    * Builder class for Pipeline.
    */
-  public static class Builder {
+  public static final class Builder {
     private PipelineID id = null;
     private ReplicationConfig replicationConfig = null;
     private PipelineState state = null;
@@ -573,7 +574,7 @@ public final class Pipeline {
     private DatanodeID suggestedLeaderId = null;
     private Map<DatanodeDetails, Integer> replicaIndexes = ImmutableMap.of();
 
-    public Builder() { }
+    private Builder() { }
 
     private Builder(Pipeline pipeline) {
       this.id = pipeline.id;
