@@ -599,8 +599,20 @@ public final class Pipeline {
     }
 
     public Builder setNodes(List<DatanodeDetails> nodes) {
-      this.nodeStatus = new LinkedHashMap<>();
-      nodes.forEach(node -> nodeStatus.put(node, -1L));
+      Map<DatanodeDetails, Long> newNodeStatus = new LinkedHashMap<>();
+      nodes.forEach(node -> newNodeStatus.put(node, -1L));
+
+      // replace pipeline ID if nodes are not the same
+      if (nodeStatus != null && !nodeStatus.keySet().equals(newNodeStatus.keySet())) {
+        if (nodes.size() == 1) {
+          setId(nodes.iterator().next().getID());
+        } else {
+          setId(PipelineID.randomId());
+        }
+      }
+
+      nodeStatus = newNodeStatus;
+
       if (nodesInOrder != null) {
         // nodesInOrder may belong to another pipeline, avoid overwriting it
         nodesInOrder = new LinkedList<>(nodesInOrder);

@@ -23,10 +23,13 @@ import static org.apache.hadoop.hdds.protocol.TestDatanodeDetails.assertPorts;
 import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.Arrays;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.jupiter.api.Test;
 
@@ -96,9 +99,6 @@ public class TestPipeline {
     assertEquals(original.getReplicationConfig(),
         copied.getReplicationConfig());
     assertEquals(original.getPipelineState(), copied.getPipelineState());
-    assertEquals(original.getId(), copied.getId());
-    assertEquals(original.getId(), copied.getId());
-    assertEquals(original.getId(), copied.getId());
     assertEquals(original.getNodeSet(), copied.getNodeSet());
     assertEquals(original.getNodesInOrder(), copied.getNodesInOrder());
     assertEquals(original.getLeaderId(), copied.getLeaderId());
@@ -110,5 +110,21 @@ public class TestPipeline {
       assertEquals(original.getReplicaIndex(dn),
           copied.getReplicaIndex(dn));
     }
+  }
+
+  @Test
+  void idChangedIfNodesReplaced() {
+    Pipeline original = MockPipeline.createRatisPipeline();
+
+    Pipeline withDifferentNodes = Pipeline.newBuilder(original)
+        .setNodes(Arrays.asList(
+            MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails()))
+        .build();
+
+    assertNotEquals(original.getId(), withDifferentNodes.getId());
+    withDifferentNodes.getNodes()
+        .forEach(node -> assertNotEquals(node.getID().toPipelineID(), withDifferentNodes.getId()));
   }
 }
