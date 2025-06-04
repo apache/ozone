@@ -55,7 +55,7 @@ Use the `hadoop key create` command to create an encryption key in the configure
 
 * `<key_name>`: The name of the encryption key.
 * **`-size <key_bit_length>` (Optional):** Specifies the key bit length. The default is 128 bits (defined by `hadoop.security.key.default.bitlength`).
-RangerKMS supports both 128 and 256 bits. HadoopKMS does not specify what else is supported, although valid AES key lengths are 128, 192, and 256 bits.
+RangerKMS supports both 128 and 256 bits. HadoopKMS is also commonly used with 128 and 256 bit keys; for specific version capabilities, consult the Hadoop KMS documentation. Valid AES key lengths are 128, 192, and 256 bits.
 * **`-cipher <cipher_suite>` (Optional):** Specifies the cipher suite. Currently, only **`AES/CTR/NoPadding`** (the default) is supported.
 * `-description <description>` (Optional): A description for the key.
 
