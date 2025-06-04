@@ -62,7 +62,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
@@ -1969,7 +1968,7 @@ public class TestRootedOzoneFileSystem {
 
     assertTrue(trash.getConf().getClass(
         "fs.trash.classname", TrashPolicy.class).
-        isAssignableFrom(TrashPolicyOzone.class));
+        isAssignableFrom(OzoneTrashPolicy.class));
 
     long prevNumTrashDeletes = getOMMetrics().getNumTrashDeletes();
     long prevNumTrashFileDeletes = getOMMetrics().getNumTrashFilesDeletes();

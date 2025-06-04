@@ -36,6 +36,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.ozone.OzoneTrashPolicy;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -62,7 +63,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.fs.TrashPolicy;
-import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 
 import com.google.common.base.Strings;
 import com.google.gson.Gson;
@@ -576,17 +576,17 @@ public class TestOzoneShellHA {
 
   /**
    * Helper function to retrieve Ozone client configuration for ozone
-   * trash testing with TrashPolicyOzone.
+   * trash testing with OzoneTrashPolicy.
    * @param hostPrefix Scheme + Authority. e.g. ofs://om-service-test1
    * @param configuration Server config to generate client config from.
    * @return Config ofs configuration added with fs.trash.classname
-   * = TrashPolicyOzone.
+   * = OzoneTrashPolicy.
    */
   private OzoneConfiguration getClientConfForOzoneTrashPolicy(
           String hostPrefix, OzoneConfiguration configuration) {
     OzoneConfiguration clientConf =
             getClientConfForOFS(hostPrefix, configuration);
-    clientConf.setClass("fs.trash.classname", TrashPolicyOzone.class,
+    clientConf.setClass("fs.trash.classname", OzoneTrashPolicy.class,
             TrashPolicy.class);
     return clientConf;
   }
@@ -774,7 +774,7 @@ public class TestOzoneShellHA {
 
     // Test delete from Trash directory removes item from filesystem
 
-    // setup configuration to use TrashPolicyOzone
+    // setup configuration to use OzoneTrashPolicy
     // (default is TrashPolicyDefault)
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf =
