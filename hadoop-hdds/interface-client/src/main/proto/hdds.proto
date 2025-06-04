@@ -316,7 +316,6 @@ enum ReplicationFactor {
     ONE = 1;
     THREE = 3;
     ZERO = 0; // Invalid Factor
-    PLACEHOLDER_EC = 100;
 }
 
 message ECReplicationConfig {
