@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import com.google.common.base.Strings;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -89,8 +90,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
           node.getNodeStates(0));
       
       if (json) {
-        DatanodeInfoJson dto = new DatanodeInfoJson(dwa);
-        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(dto));
+        List<DatanodeInfoJson> dtoList = Collections.singletonList(new DatanodeInfoJson(dwa));
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(dtoList));
       } else {
         printDatanodeInfo(dwa);
       }
@@ -118,7 +119,6 @@ public class ListInfoSubcommand extends ScmSubcommand {
       List<DatanodeInfoJson> datanodeList = allNodes
           .map(DatanodeInfoJson::new)
           .collect(Collectors.toList());
-
       System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
     } else {
       allNodes.forEach(this::printDatanodeInfo);
