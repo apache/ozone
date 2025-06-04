@@ -90,13 +90,13 @@ When creating an encrypted bucket that will be accessed via S3G:
     The `/s3v` volume is the default volume for S3 buckets.
 
 ```shell
-  ozone sh bucket create --key <key_name> /s3v/<bucket_name>
+  ozone sh bucket create --key <key_name> /s3v/<bucket_name> --layout=OBJECT_STORE
 ```
 
 2.  **Alternatively, create an encrypted bucket elsewhere and link it:**
 
 ```shell
-  ozone sh bucket create --key <key_name> /<volume_name>/<bucket_name>
+  ozone sh bucket create --key <key_name> /<volume_name>/<bucket_name> --layout=OBJECT_STORE
   ozone sh bucket link /<volume_name>/<bucket_name> /s3v/<link_name>
 ```
 
@@ -130,13 +130,8 @@ See [Prefix based File System Optimization]({{< relref "../feature/PrefixFSO.md"
 
 When accessing an S3G-enabled encrypted bucket:
 
-* **Secure Mode (Kerberos enabled):**
-  The S3 Gateway proxy user (configured by `ozone.s3g.proxy.user`) must have permissions to decrypt the encryption key. This user also needs proxy user privileges for the end-user (e.g., be configured as a proxy user in `core-site.xml` for Hadoop’s proxy user mechanism).
-* **Non-Secure Mode:**
-  The user running the S3 Gateway (typically the user who started the S3G daemon) must have permissions to decrypt the encryption key.
-
-The below two configurations must be added to the kms-site.xml to allow the S3Gateway principal to act as a proxy for other users. In this example, "ozone.
-s3g.kerberos.principal" is assumed to be "s3g"
+The below three configurations must be added to the kms-site.xml to allow the S3Gateway principal to act as a proxy for other users. In this example,
+`ozone.s3g.kerberos.principal` is assumed to be `s3g`
 
 ```xml
 <property>
@@ -144,6 +139,14 @@ s3g.kerberos.principal" is assumed to be "s3g"
   <value>user1,user2,user3</value>
   <description>
         Here the value can be all the S3G accesskey ids accessing Ozone S3
+        or set to '*' to allow all the accesskey ids.
+  </description>
+</property>
+<property>
+  <name>hadoop.kms.proxyuser.s3g.groups</name>
+  <value>group1,group2,group3</value>
+  <description>
+        Here the value can be all the S3G accesskey groups accessing Ozone S3
         or set to '*' to allow all the accesskey ids.
   </description>
 </property>
@@ -166,7 +169,7 @@ For example, when using Ranger KMS for authorization, to allow the user `om` (th
 * **Policy for `om` user (or the user running the Ozone Manager):**
   * Resource: `keyname=enckey`
   * Permissions: `DECRYPT_EEK` (Decrypt Encrypted Encryption Key)
-* **Policy for S3 Gateway proxy user (e.g., `s3g_proxy`):**
+* **Policy for S3 Gateway proxy user (e.g., the user specified in `ozone.s3g.kerberos.principal`, typically `s3g`):**
   * Resource: `keyname=enckey` (or specific keys for S3 buckets)
   * Permissions: `DECRYPT_EEK`
 * **Policy for administrative users (e.g., `hdfs` or a keyadmin group):**
