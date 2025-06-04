@@ -453,7 +453,7 @@ public final class Pipeline {
   }
 
   public Builder toBuilder() {
-    return newBuilder(this);
+    return new Builder(this);
   }
 
   public static Builder toBuilder(HddsProtos.Pipeline pipeline) {
@@ -556,10 +556,6 @@ public final class Pipeline {
 
   public static Builder newBuilder() {
     return new Builder();
-  }
-
-  public static Builder newBuilder(Pipeline pipeline) {
-    return new Builder(pipeline);
   }
 
   /**

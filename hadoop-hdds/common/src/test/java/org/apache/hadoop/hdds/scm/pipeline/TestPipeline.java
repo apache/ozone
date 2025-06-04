@@ -98,7 +98,7 @@ public class TestPipeline {
   @Test
   public void testBuilderCopiesAllFieldsFromOtherPipeline() {
     Pipeline original = MockPipeline.createEcPipeline();
-    Pipeline copied = Pipeline.newBuilder(original).build();
+    Pipeline copied = original.toBuilder().build();
     assertEquals(original.getId(), copied.getId());
     assertEquals(original.getReplicationConfig(),
         copied.getReplicationConfig());
@@ -120,7 +120,7 @@ public class TestPipeline {
   void idChangedIfNodesReplaced() {
     Pipeline original = MockPipeline.createRatisPipeline();
 
-    Pipeline withDifferentNodes = Pipeline.newBuilder(original)
+    Pipeline withDifferentNodes = original.toBuilder()
         .setNodes(Arrays.asList(randomDatanodeDetails(), randomDatanodeDetails(), randomDatanodeDetails()))
         .build();
 
