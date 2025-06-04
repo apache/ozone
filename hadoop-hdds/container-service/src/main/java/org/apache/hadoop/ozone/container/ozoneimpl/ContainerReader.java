@@ -275,11 +275,10 @@ public class ContainerReader implements Runnable {
       // This is an EC container. BCSID for both replica will be 0. If replica index of both replica is different,
       // then knowing which EC container to keep is not possible, so we leave both on disk.
       // Delete one of the replica only if replica index is same.
-      LOG.warn("Container {} is present at {} and at {}. Both are EC " +
-              "containers. Leaving both containers on disk.",
-          existing.getContainerData().getContainerID(),
-          existing.getContainerData().getContainerPath(),
-          toAdd.getContainerData().getContainerPath());
+      LOG.warn("EC Container {} is present at {} with index {} and at {} with index {}. " +
+              "Leaving both containers on disk.", existing.getContainerData().getContainerID(),
+          existing.getContainerData().getContainerPath(), toAdd.getContainerData().getContainerPath(),
+          existing.getContainerData().getReplicaIndex(), toAdd.getContainerData().getReplicaIndex());
       return false;
     }
 

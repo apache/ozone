@@ -453,7 +453,7 @@ public class TestContainerReader {
         conflict22.close();
       } else if (i == 3) {
         ec1 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
-        ec2 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
+        ec2 = createContainerWithId(i, volumeSets, policy, baseBCSID, 2);
       } else {
         createContainerWithId(i, volumeSets, policy, baseBCSID, 0);
       }
@@ -516,7 +516,7 @@ public class TestContainerReader {
     assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
         containerSet.getContainer(2).getContainerData().getState());
 
-    // For the EC conflict, both containers should be left on disk
+    // For the EC conflict and index is different, then both containers should be left on disk
     assertTrue(Files.exists(Paths.get(ec1.getContainerData().getContainerPath())));
     assertTrue(Files.exists(Paths.get(ec2.getContainerData().getContainerPath())));
     assertNotNull(containerSet.getContainer(3));
