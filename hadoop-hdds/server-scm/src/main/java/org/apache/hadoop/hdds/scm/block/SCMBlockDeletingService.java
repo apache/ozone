@@ -313,7 +313,7 @@ public class SCMBlockDeletingService extends BackgroundService
     final Set<DatanodeDetails> included = new HashSet<>();
     for (DatanodeDetails dn : datanodes) {
       if (nodeManager.getTotalDatanodeCommandCount(dn, Type.deleteBlocksCommand) < deleteBlocksPendingCommandLimit
-          && nodeManager.getCommandQueueCount(dn.getUuid(), Type.deleteBlocksCommand) < 2) {
+          && nodeManager.getCommandQueueCount(dn.getID(), Type.deleteBlocksCommand) < 2) {
         included.add(dn);
       }
     }
