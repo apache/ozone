@@ -1391,7 +1391,7 @@ public class KeyValueHandler extends Handler {
    * @param container The container which will have a tree generated.
    */
   private void updateContainerChecksumFromMetadataIfNeeded(Container container) {
-    if (container.getContainerData().getDataChecksum() != 0) {
+    if (!container.getContainerData().needsDataChecksum()) {
       return;
     }
 
@@ -1435,6 +1435,7 @@ public class KeyValueHandler extends Handler {
     // checksum to prevent divergence from what SCM sees in the ICR vs what datanode peers will see when pulling the
     // merkle tree.
     long originalDataChecksum = containerData.getDataChecksum();
+    boolean hadDataChecksum = containerData.needsDataChecksum();
     ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.writeContainerDataTree(containerData,
         treeWriter);
     long updatedDataChecksum = updateChecksumInfo.getContainerMerkleTree().getDataChecksum();
@@ -1447,7 +1448,7 @@ public class KeyValueHandler extends Handler {
 
       String message = "Container data checksum updated from " + checksumToString(originalDataChecksum) + " to " +
               checksumToString(updatedDataChecksum);
-      if (containerData.getDataChecksum() != 0) {
+      if (hadDataChecksum) {
         LOG.warn(message);
         ContainerLogger.logChecksumUpdated(containerData, originalDataChecksum);
       } else {
