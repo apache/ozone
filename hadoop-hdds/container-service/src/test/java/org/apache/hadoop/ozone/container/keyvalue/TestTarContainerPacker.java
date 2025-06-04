@@ -72,7 +72,7 @@ public class TestTarContainerPacker {
   private static final String TEST_CHUNK_FILE_CONTENT = "This is a chunk";
 
   private static final String TEST_DESCRIPTOR_FILE_CONTENT = "!<KeyValueContainerData>\n" +
-      "checksum: 2215d39f2ae1de89fec837d18dc6387d8cba22fb5943cf4616f80c4b34e2edfe\n" +
+      "checksum: 5e4bea7286f96d88a5b3a745011ff9e4281a5221bfe564413215cd85871dcfd8\n" +
       "chunksPath: target/test-dir/MiniOzoneClusterImpl-23c1bb30-d86a-4f79-88dc-574d8259a5b3/ozone-meta/datanode-4" +
         "/data-0/hdds/23c1bb30-d86a-4f79-88dc-574d8259a5b3/current/containerDir0/1/chunks\n" +
       "containerDBType: RocksDB\n" +
