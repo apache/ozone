@@ -21,9 +21,11 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -43,11 +45,16 @@ public class CreateSubcommand extends ScmSubcommand {
   private String owner;
 
   @CommandLine.Mixin
-  private ContainerReplicationOptions containerReplicationOptions;
+  private ShellReplicationOptions containerReplicationOptions;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     ReplicationConfig replicationConfig = containerReplicationOptions.fromParamsOrConfig(new OzoneConfiguration());
+    if (replicationConfig == null) {
+      // if replication options not provided via command then by default STAND_ALONE container will be created.
+      replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.STAND_ALONE, 
+          HddsProtos.ReplicationFactor.ONE);
+    }
     ContainerWithPipeline container = scmClient.createContainer(replicationConfig, owner);
     System.out.printf("Container %s is created.%n",
         container.getContainerInfo().getContainerID());

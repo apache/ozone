@@ -411,21 +411,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     try {
       switch (request.getCmdType()) {
       case AllocateContainer:
-        ScmContainerLocationResponse.Builder responseBuilder =
-            ScmContainerLocationResponse.newBuilder()
-                .setCmdType(request.getCmdType())
-                .setStatus(Status.OK);
-
-        if (request.hasContainerRequest()) {
-          responseBuilder.setContainerResponse(
-              allocateContainer(request.getContainerRequest(), request.getVersion()));
-        } else if (request.hasEcContainerRequest()) {
-          responseBuilder.setEcContainerResponse(
-              allocateEcContainer(request.getEcContainerRequest(), request.getVersion()));
-        } else {
-          throw new IOException("Invalid request");
-        }
-        return responseBuilder.build();
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setContainerResponse(allocateContainer(
+                request.getContainerRequest(), request.getVersion()))
+            .build();
       case GetContainer:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -762,25 +753,20 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public ContainerResponseProto allocateContainer(ContainerRequestProto request,
       int clientVersion) throws IOException {
-    ContainerWithPipeline cp = impl
-        .allocateContainer(request.getReplicationType(),
-            request.getReplicationFactor(), request.getOwner());
+    ContainerWithPipeline cp;
+    if (request.getReplicationType() == HddsProtos.ReplicationType.EC) {
+      cp = impl
+          .allocateContainer(new ECReplicationConfig(request.getEcReplicationConfig()), request.getOwner());
+    } else {
+      cp = impl
+          .allocateContainer(request.getReplicationType(), 
+              request.getReplicationFactor(), request.getOwner());
+    }
     return ContainerResponseProto.newBuilder()
         .setContainerWithPipeline(cp.getProtobuf(clientVersion))
         .setErrorCode(ContainerResponseProto.Error.success)
         .build();
 
-  }
-
-  public StorageContainerLocationProtocolProtos.ECContainerResponseProto allocateEcContainer(
-      StorageContainerLocationProtocolProtos.ECContainerRequestProto request,
-      int clientVersion) throws IOException {
-    ContainerWithPipeline cp = impl
-        .allocateContainer(new ECReplicationConfig(request.getEcReplicationConfig()), request.getOwner());
-    return StorageContainerLocationProtocolProtos.ECContainerResponseProto.newBuilder()
-        .setContainerWithPipeline(cp.getProtobuf(clientVersion))
-        .setErrorCode(StorageContainerLocationProtocolProtos.ECContainerResponseProto.Error.success)
-        .build();
   }
 
   public GetContainerResponseProto getContainer(

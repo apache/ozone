@@ -184,8 +184,7 @@ public interface ScmClient extends Closeable {
       HddsProtos.ReplicationFactor replicationFactor,
       String owner) throws IOException;
 
-  ContainerWithPipeline createContainer(ReplicationConfig replicationConfig,
-                                        String owner) throws IOException;
+  ContainerWithPipeline createContainer(ReplicationConfig replicationConfig, String owner) throws IOException;
 
   /**
    * Gets the list of underReplicated and unClosed containers on a decommissioning node.

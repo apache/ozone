@@ -18,8 +18,6 @@
 package org.apache.hadoop.hdds.scm.protocolPB;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSING;
 
@@ -225,13 +223,33 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public ContainerWithPipeline allocateContainer(
       HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
       String owner) throws IOException {
+    ReplicationConfig replicationConfig =
+        ReplicationConfig.fromProtoTypeAndFactor(type, factor);
+    return allocateContainer(replicationConfig, owner);
+  }
 
-    ContainerRequestProto request = ContainerRequestProto.newBuilder()
-        .setTraceID(TracingUtil.exportCurrentSpan())
-        .setReplicationFactor(factor)
-        .setReplicationType(type)
-        .setOwner(owner)
-        .build();
+  @Override
+  public ContainerWithPipeline allocateContainer(
+      ReplicationConfig replicationConfig, String owner) throws IOException {
+
+    ContainerRequestProto request;
+    if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.EC) {
+      HddsProtos.ECReplicationConfig ecProto = ((ECReplicationConfig) replicationConfig).toProto();
+      request = ContainerRequestProto.newBuilder()
+          .setTraceID(TracingUtil.exportCurrentSpan())
+          .setEcReplicationConfig(ecProto)
+          .setReplicationFactor(ReplicationFactor.PLACEHOLDER_EC)// Set for backward compatibility, ignored for EC.
+          .setReplicationType(replicationConfig.getReplicationType())
+          .setOwner(owner)
+          .build();
+    } else {
+      request = ContainerRequestProto.newBuilder()
+          .setTraceID(TracingUtil.exportCurrentSpan())
+          .setReplicationFactor(ReplicationFactor.valueOf(replicationConfig.getReplication()))
+          .setReplicationType(replicationConfig.getReplicationType())
+          .setOwner(owner)
+          .build();
+    }
 
     ContainerResponseProto response =
         submitRequest(Type.AllocateContainer,
@@ -242,53 +260,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       throw new IOException(response.hasErrorMessage() ?
           response.getErrorMessage() : "Allocate container failed.");
     }
-    return ContainerWithPipeline.fromProtobuf(
-        response.getContainerWithPipeline());
-  }
-
-  @Override
-  public ContainerWithPipeline allocateContainer(
-      ReplicationConfig replicationConfig, String owner) throws IOException {
-
-    if (replicationConfig.getReplicationType() == RATIS || replicationConfig.getReplicationType() == STAND_ALONE) {
-      ContainerRequestProto request = ContainerRequestProto.newBuilder()
-          .setTraceID(TracingUtil.exportCurrentSpan())
-          .setReplicationFactor(ReplicationFactor.valueOf(replicationConfig.getReplication()))
-          .setReplicationType(replicationConfig.getReplicationType())
-          .setOwner(owner)
-          .build();
-
-      ContainerResponseProto response =
-          submitRequest(Type.AllocateContainer,
-              builder -> builder.setContainerRequest(request))
-              .getContainerResponse();
-      //TODO should be migrated to use the top level status structure.
-      if (response.getErrorCode() != ContainerResponseProto.Error.success) {
-        throw new IOException(response.hasErrorMessage() ?
-            response.getErrorMessage() : "Allocate container failed.");
-      }
-      return ContainerWithPipeline.fromProtobuf(
-          response.getContainerWithPipeline());
-    } else {
-      StorageContainerLocationProtocolProtos.ECContainerRequestProto.Builder requestBuilder =
-          StorageContainerLocationProtocolProtos.ECContainerRequestProto.newBuilder()
-              .setTraceID(TracingUtil.exportCurrentSpan())
-              .setOwner(owner);
-      
-      ECReplicationConfig ecConfig = (ECReplicationConfig) replicationConfig;
-      requestBuilder.setEcReplicationConfig(ecConfig.toProto());
-
-      StorageContainerLocationProtocolProtos.ECContainerResponseProto response = submitRequest(
-          Type.AllocateContainer,
-          builder -> builder.setEcContainerRequest(requestBuilder.build()))
-          .getEcContainerResponse();
-
-      if (response.getErrorCode() != StorageContainerLocationProtocolProtos.ECContainerResponseProto.Error.success) {
-        throw new IOException(response.hasErrorMessage() ?
-            response.getErrorMessage() : "Allocate container failed.");
-      }
-      return ContainerWithPipeline.fromProtobuf(response.getContainerWithPipeline());
-    }
+    return ContainerWithPipeline.fromProtobuf(response.getContainerWithPipeline());
   }
 
   @Override

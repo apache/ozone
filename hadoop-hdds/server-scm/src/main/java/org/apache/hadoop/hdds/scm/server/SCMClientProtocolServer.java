@@ -230,45 +230,16 @@ public class SCMClientProtocolServer implements
   public ContainerWithPipeline allocateContainer(HddsProtos.ReplicationType
       replicationType, HddsProtos.ReplicationFactor factor,
       String owner) throws IOException {
-
-    Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("replicationType", String.valueOf(replicationType));
-    auditMap.put("factor", String.valueOf(factor));
-    auditMap.put("owner", String.valueOf(owner));
-
-    try {
-      if (scm.getScmContext().isInSafeMode()) {
-        throw new SCMException("SafeModePrecheck failed for allocateContainer",
-            ResultCodes.SAFE_MODE_EXCEPTION);
-      }
-      getScm().checkAdminAccess(getRemoteUser(), false);
-      final ContainerInfo container = scm.getContainerManager()
-          .allocateContainer(
-              ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor),
-              owner);
-      final Pipeline pipeline = scm.getPipelineManager()
-          .getPipeline(container.getPipelineID());
-      ContainerWithPipeline cp = new ContainerWithPipeline(container, pipeline);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.ALLOCATE_CONTAINER, auditMap)
-      );
-      return cp;
-    } catch (Exception ex) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.ALLOCATE_CONTAINER, auditMap, ex)
-      );
-      throw ex;
-    }
+    ReplicationConfig replicationConfig =
+        ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor);
+    return allocateContainer(replicationConfig, owner);
   }
 
   @Override
   public ContainerWithPipeline allocateContainer(ReplicationConfig replicationConfig, String owner) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("replicationType", String.valueOf(replicationConfig.getReplicationType()));
-    if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.RATIS ||
-        replicationConfig.getReplicationType() == HddsProtos.ReplicationType.STAND_ALONE) {
-      auditMap.put("factor", String.valueOf(replicationConfig.getReplication()));
-    }
+    auditMap.put("replication", String.valueOf(replicationConfig.getReplication()));
     auditMap.put("owner", String.valueOf(owner));
 
     try {
