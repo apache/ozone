@@ -40,10 +40,10 @@ Once the KMS is configured, users can create an encryption key and then create a
 
         <property>
           <name>hadoop.security.key.provider.path</name>
-          <value><kms_provider_path></value>
+          <value>kms://http@kms-host:9600/kms</value>
         </property>
 
-    Replace `<kms_provider_path>` with the actual URI of your KMS. For example, `kms://http@kms1.example.com:9600/kms`
+    Replace `kms://http@kms-host:9600/kms` with the actual URI of your KMS. For example, `kms://http@kms1.example.com:9600/kms`
 
 ### Creating an Encryption Key
 
@@ -54,7 +54,8 @@ Use the `hadoop key create` command to create an encryption key in the configure
 ```
 
 * `<key_name>`: The name of the encryption key.
-* **`-size <key_bit_length>` (Optional):** Specifies the key bit length. Ozone supports **128** (default) and **256** bits.
+* **`-size <key_bit_length>` (Optional):** Specifies the key bit length. The default is 128 bits (defined by `hadoop.security.key.default.bitlength`).
+RangerKMS supports both 128 and 256 bits. HadoopKMS does not specify what else is supported, although valid AES key lengths are 128, 192, and 256 bits.
 * **`-cipher <cipher_suite>` (Optional):** Specifies the cipher suite. Currently, only **`AES/CTR/NoPadding`** (the default) is supported.
 * `-description <description>` (Optional): A description for the key.
 
@@ -78,7 +79,7 @@ For example:
   ozone sh bucket create --key enckey /vol1/encrypted_bucket
 ```
 
-Now, all data written to `/vol1/encrypted_bucket` will be encrypted.
+Now, all data written to `/vol1/encrypted_bucket` will be encrypted at rest. As long as the client is configured correctly to use the key, such encryption is completely transparent to the end users.
 
 ### Using Transparent Data Encryption from S3G
 
