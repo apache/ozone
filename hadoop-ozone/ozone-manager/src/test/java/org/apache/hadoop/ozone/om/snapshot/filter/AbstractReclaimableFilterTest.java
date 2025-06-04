@@ -174,10 +174,10 @@ public abstract class AbstractReclaimableFilterTest {
       String volume = i.getArgument(0, String.class);
       String bucket = i.getArgument(1, String.class);
       if (!volumes.contains(volume)) {
-        throw new OMException("Volume " + volume + " already exists", OMException.ResultCodes.VOLUME_NOT_FOUND);
+        throw new OMException("Volume " + volume + " doesn't exist", OMException.ResultCodes.VOLUME_NOT_FOUND);
       }
       if (!buckets.contains(bucket)) {
-        throw new OMException("Bucket " + bucket + " already exists", OMException.ResultCodes.BUCKET_NOT_FOUND);
+        throw new OMException("Bucket " + bucket + " doesn't exist", OMException.ResultCodes.BUCKET_NOT_FOUND);
       }
       return OmBucketInfo.newBuilder().setVolumeName(volume).setBucketName(bucket)
           .setObjectID((long) volumes.indexOf(volume) * buckets.size() + buckets.indexOf(bucket))
