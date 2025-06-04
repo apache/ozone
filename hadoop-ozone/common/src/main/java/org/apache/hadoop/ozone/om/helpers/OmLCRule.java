@@ -125,6 +125,7 @@ public final class OmLCRule {
    * - ID length should not exceed the allowed limit
    * - At least one action must be specified
    * - Filter and Prefix cannot be used together
+   * - Filter and prefix cannot both be null
    * - Prefix can be "", in which case the rule applies to all objects in the bucket.
    * - Actions must be valid
    * - Filter must be valid
@@ -158,6 +159,11 @@ public final class OmLCRule {
 
     if (prefix != null && filter != null) {
       throw new OMException("Filter and Prefix cannot be used together.",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    if (prefix == null && filter == null) {
+      throw new OMException("Filter and Prefix cannot both be null.",
           OMException.ResultCodes.INVALID_REQUEST);
     }
 

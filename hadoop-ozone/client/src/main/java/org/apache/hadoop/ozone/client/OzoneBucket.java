@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -1089,6 +1090,36 @@ public class OzoneBucket extends WithMetadata {
    */
   public void deleteObjectTagging(String keyName) throws IOException {
     proxy.deleteObjectTagging(volumeName, name, keyName);
+  }
+
+  /**
+   * Gets the lifecycle configuration information.
+   * @return OmLifecycleConfiguration or exception is thrown.
+   * @throws IOException
+   */
+  @JsonIgnore
+  public OzoneLifecycleConfiguration getLifecycleConfiguration()
+      throws IOException {
+    return proxy.getLifecycleConfiguration(volumeName, name);
+  }
+
+  /**
+   * Creates a new lifecycle configuration.
+   * @param lifecycleConfiguration - lifecycle configuration info.
+   * @throws IOException
+   */
+  public void createLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration)
+      throws IOException {
+    proxy.createLifecycleConfiguration(lifecycleConfiguration);
+  }
+
+  /**
+   * Deletes existing lifecycle configuration.
+   * @throws IOException
+   */
+  public void deleteLifecycleConfiguration()
+      throws IOException {
+    proxy.deleteLifecycleConfiguration(volumeName, name);
   }
 
   public void setSourcePathExist(boolean b) {
