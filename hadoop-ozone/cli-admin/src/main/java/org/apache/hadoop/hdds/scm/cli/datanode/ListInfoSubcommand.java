@@ -17,11 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.google.common.base.Strings;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -92,8 +89,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
           node.getNodeStates(0));
       
       if (json) {
-        List<DatanodeWithAttributes> singleList = Collections.singletonList(dwa);
-        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(singleList));
+        DatanodeInfoJson dto = new DatanodeInfoJson(dwa);
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(dto));
       } else {
         printDatanodeInfo(dwa);
       }
@@ -109,19 +106,20 @@ public class ListInfoSubcommand extends ScmSubcommand {
           .compareToIgnoreCase(hostname) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeOperationalState)) {
-      allNodes = allNodes.filter(p -> p.getOpState()
+      allNodes = allNodes.filter(p -> p.getOpState().toString()
           .compareToIgnoreCase(nodeOperationalState) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeState)) {
-      allNodes = allNodes.filter(p -> p.getHealthState()
+      allNodes = allNodes.filter(p -> p.getHealthState().toString()
           .compareToIgnoreCase(nodeState) == 0);
     }
 
     if (json) {
-      List<DatanodeWithAttributes> datanodeList = allNodes.collect(
-              Collectors.toList());
-      System.out.println(
-              JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
+      List<DatanodeInfoJson> datanodeList = allNodes
+          .map(DatanodeInfoJson::new)
+          .collect(Collectors.toList());
+
+      System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
     } else {
       allNodes.forEach(this::printDatanodeInfo);
     }
@@ -173,19 +171,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
     System.out.println("Related pipelines:\n" + pipelineListInfo);
   }
 
-  @JsonPropertyOrder({
-      "id",
-      "hostname",
-      "ipAddress",
-      "healthState",
-      "opState",
-      "persistedOpStateExpiryEpochSec",
-      "decommissioned",
-      "maintenance",
-      "topology"
-  })
-  private static class DatanodeWithAttributes {
-    @JsonIgnore
+  static class DatanodeWithAttributes {
     private DatanodeDetails datanodeDetails;
     private HddsProtos.NodeOperationalState operationalState;
     private HddsProtos.NodeState healthState;
@@ -202,86 +188,12 @@ public class ListInfoSubcommand extends ScmSubcommand {
       return datanodeDetails;
     }
 
-    public String getOpState() {
-      return operationalState.name();
-    }
-    
-    public String getHealthState() {
-      return healthState.name();
+    public HddsProtos.NodeOperationalState getOpState() {
+      return operationalState;
     }
 
-    public String getId() {
-      return datanodeDetails.getUuid().toString();
-    }
-
-    public String getHostname() {
-      return datanodeDetails.getHostName();
-    }
-
-    public String getIpAddress() {
-      return datanodeDetails.getIpAddress();
-    }
-
-    public long getPersistedOpStateExpiryEpochSec() {
-      try {
-        return datanodeDetails.getPersistedOpStateExpiryEpochSec();
-      } catch (Exception e) {
-        return 0L;
-      }
-    }
-
-    public boolean isDecommissioned() {
-      return datanodeDetails.isDecommissioned();
-    }
-
-    public boolean isMaintenance() {
-      return datanodeDetails.isMaintenance();
-    }
-
-    public Topology getTopology() {
-      return new Topology(datanodeDetails);
-    }
-
-    private static class Topology {
-      private final String networkLocation;
-      private final String networkName;
-      private final String networkFullPath;
-      private final int numOfLeaves;
-      private final int level;
-      private final int cost;
-
-      Topology(DatanodeDetails dn) {
-        this.networkLocation = dn.getNetworkLocation();
-        this.networkName = dn.getNetworkName();
-        this.networkFullPath = dn.getNetworkFullPath();
-        this.numOfLeaves = dn.getNumOfLeaves();
-        this.level = dn.getLevel();
-        this.cost = dn.getCost();
-      }
-      
-      public String getNetworkLocation() {
-        return networkLocation;
-      }
-      
-      public String getNetworkName() {
-        return networkName;
-      }
-      
-      public String getNetworkFullPath() {
-        return networkFullPath;
-      }
-      
-      public int getNumOfLeaves() {
-        return numOfLeaves;
-      }
-      
-      public int getLevel() {
-        return level;
-      }
-      
-      public int getCost() {
-        return cost;
-      }
+    public HddsProtos.NodeState getHealthState() {
+      return healthState;
     }
   }
 }
