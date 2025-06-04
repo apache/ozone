@@ -1383,7 +1383,7 @@ public class KeyValueHandler extends Handler {
    * Write the merkle tree for this container using the existing checksum metadata only. The data is not read or
    * validated by this method, so it is expected to run quickly.
    * <p>
-   * If a checksum file already exists on the disk, this method will do nothing. The existing file would have either
+   * If a data checksum for the container already exists, this method does nothing. The existing value would have either
    * been made from the metadata or data itself so there is no need to recreate it from the metadata. This method
    * does not send an ICR with the updated checksum info.
    * <p>
@@ -1391,7 +1391,7 @@ public class KeyValueHandler extends Handler {
    * @param container The container which will have a tree generated.
    */
   private void updateContainerChecksumFromMetadataIfNeeded(Container container) {
-    if (ContainerChecksumTreeManager.checksumFileExists(container.getContainerData())) {
+    if (container.getContainerData().getDataChecksum() != 0) {
       return;
     }
 
@@ -1441,18 +1441,17 @@ public class KeyValueHandler extends Handler {
 
     if (updatedDataChecksum != originalDataChecksum) {
       containerData.setDataChecksum(updatedDataChecksum);
-      String message =
-          "Container data checksum updated from " + checksumToString(originalDataChecksum) + " to " +
-              checksumToString(updatedDataChecksum);
       if (sendICR) {
         sendICR(container);
       }
-      if (ContainerChecksumTreeManager.checksumFileExists(containerData)) {
+
+      String message = "Container data checksum updated from " + checksumToString(originalDataChecksum) + " to " +
+              checksumToString(updatedDataChecksum);
+      if (containerData.getDataChecksum() != 0) {
         LOG.warn(message);
         ContainerLogger.logChecksumUpdated(containerData, originalDataChecksum);
       } else {
-        // If this is the first time the scanner has run with the feature to generate a checksum file, don't
-        // log a warning for the checksum update.
+        // If this is the first time the checksum is being generated, don't log a warning about updating the checksum.
         LOG.debug(message);
       }
     }
@@ -1572,12 +1571,9 @@ public class KeyValueHandler extends Handler {
     long containerID = containerData.getContainerID();
 
     // Obtain the original checksum info before reconciling with any peers.
-    Optional<ContainerProtos.ContainerChecksumInfo> optionalChecksumInfo = checksumManager.read(containerData);
-    ContainerProtos.ContainerChecksumInfo originalChecksumInfo;
-    if (optionalChecksumInfo.isPresent()) {
-      originalChecksumInfo = optionalChecksumInfo.get();
-    } else {
-      // Try creating the checksum info from RocksDB metadata if it is not present.
+    ContainerProtos.ContainerChecksumInfo originalChecksumInfo = checksumManager.read(containerData);
+    if (!originalChecksumInfo.hasContainerMerkleTree()) {
+      // Try creating the merkle tree from RocksDB metadata if it is not present.
       originalChecksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
     }
     // This holds our current most up-to-date checksum info that we are using for the container.

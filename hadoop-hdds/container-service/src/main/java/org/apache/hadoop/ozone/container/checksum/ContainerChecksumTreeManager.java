@@ -90,15 +90,8 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getLock(containerID);
     writeLock.lock();
     try {
-      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
-      try {
-        // If the file is not present, we will create the data for the first time. This happens under a write lock.
-        checksumInfoBuilder = readBuilder(data).orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
-      } catch (IOException ex) {
-        LOG.error("Failed to read container checksum tree file for container {}. Creating a new instance.",
-            containerID, ex);
-        checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
-      }
+      // If the file is not present, we will create the data for the first time. This happens under a write lock.
+      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = readOrCreate(data).toBuilder();
 
       ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
           tree::toProto);
@@ -125,16 +118,8 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getLock(containerID);
     writeLock.lock();
     try {
-      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
-      try {
-        // If the file is not present, we will create the data for the first time. This happens under a write lock.
-        checksumInfoBuilder = readBuilder(data)
-            .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
-      } catch (IOException ex) {
-        LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
-            data.getContainerID(), ex);
-        checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
-      }
+      // If the file is not present, we will create the data for the first time. This happens under a write lock.
+      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = readOrCreate(data).toBuilder();
 
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
@@ -321,21 +306,34 @@ public class ContainerChecksumTreeManager {
   }
 
   /**
+   * Reads the checksum info of the specified container. If the tree file with the information does not exist, an empty
+   * instance is returned.
    * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
    * swapped into place.
    */
-  public Optional<ContainerProtos.ContainerChecksumInfo> read(ContainerData data) throws IOException {
+  public ContainerProtos.ContainerChecksumInfo read(ContainerData data) throws IOException {
     try {
-      return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(), () -> readChecksumInfo(data));
+      return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(), () ->
+          readChecksumInfo(data).orElse(ContainerProtos.ContainerChecksumInfo.newBuilder().build()));
     } catch (IOException ex) {
       metrics.incrementMerkleTreeReadFailures();
-      throw new IOException(ex);
+      throw ex;
     }
   }
 
-  private Optional<ContainerProtos.ContainerChecksumInfo.Builder> readBuilder(ContainerData data) throws IOException {
-    Optional<ContainerProtos.ContainerChecksumInfo> checksumInfo = read(data);
-    return checksumInfo.map(ContainerProtos.ContainerChecksumInfo::toBuilder);
+  /**
+   * Reads the checksum info of the specified container. If the tree file with the information does not exist, or there
+   * is an exception trying to read the file, an empty instance is returned.
+   */
+  private ContainerProtos.ContainerChecksumInfo readOrCreate(ContainerData data) {
+    try {
+      // If the file is not present, we will create the data for the first time. This happens under a write lock.
+      return read(data);
+    } catch (IOException ex) {
+      LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
+          data.getContainerID(), ex);
+      return ContainerProtos.ContainerChecksumInfo.newBuilder().build();
+    }
   }
 
   /**
@@ -387,6 +385,7 @@ public class ContainerChecksumTreeManager {
    * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
    * swapped into place.
    */
+  // TODO HDDS-12824 Once data checksum is stored in RocksDB this method can be removed.
   public static Optional<ContainerProtos.ContainerChecksumInfo> readChecksumInfo(ContainerData data)
       throws IOException {
     long containerID = data.getContainerID();
@@ -409,12 +408,4 @@ public class ContainerChecksumTreeManager {
   public ContainerMerkleTreeMetrics getMetrics() {
     return this.metrics;
   }
-
-  /**
-   * Returns whether the container checksum tree file for the specified container exists without deserializing it.
-   */
-  public static boolean checksumFileExists(ContainerData data) {
-    return getContainerChecksumFile(data).exists();
-  }
-
 }

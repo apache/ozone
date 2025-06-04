@@ -335,7 +335,7 @@ public final class ContainerMerkleTreeTestUtils {
   public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode, long containerID) {
     OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
     Container<?> container = ozoneContainer.getController().getContainer(containerID);
-    return ContainerChecksumTreeManager.checksumFileExists(container.getContainerData());
+    return getContainerChecksumFile(container.getContainerData()).exists();
   }
 
   public static void writeContainerDataTreeProto(ContainerData data, ContainerProtos.ContainerMerkleTree tree)
