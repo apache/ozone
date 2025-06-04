@@ -132,8 +132,8 @@ jobs:
       - name: Find modules
         id: modules
         run: |
-          grep -e 'surefire:${{ env.SUREFIRE_VERSION }}:test' -e 'Running org.apache' ${{ env.OUTPUT_DIR }}/unit/output.log | grep -B1 'Running org.apache'
-          modules=$(grep -e 'surefire:${{ env.SUREFIRE_VERSION }}:test' -e 'Running org.apache' ${{ env.OUTPUT_DIR }}/unit/output.log | grep -B1 'Running org.apache' \
+          grep -e 'surefire:${{ env.SUREFIRE_VERSION }}:test' -e 'Running org.apache' ${{ env.OUTPUT_DIR }}/output.log | grep -B1 'Running org.apache'
+          modules=$(grep -e 'surefire:${{ env.SUREFIRE_VERSION }}:test' -e 'Running org.apache' ${{ env.OUTPUT_DIR }}/output.log | grep -B1 'Running org.apache' \
               | grep surefire | cut -f2 -d'@' | awk '{ print $1 }' | sed 's/^/:/' | xargs | sed -e 's/ /,/g')
           echo "modules=$modules" >> $GITHUB_OUTPUT
         if: ${{ !cancelled() }}
@@ -276,14 +276,14 @@ jobs:
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh ${{ env.OUTPUT_DIR }}/unit/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh ${{ env.OUTPUT_DIR }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: ${{ failure() }}
         with:
           name: result-${{ github.run_number }}-${{ github.run_id }}-split-${{ matrix.split }}
-          path: ${{ env.OUTPUT_DIR }}/unit
+          path: ${{ env.OUTPUT_DIR }}
   count-failures:
     if: ${{ failure() }}
     needs: run-test
