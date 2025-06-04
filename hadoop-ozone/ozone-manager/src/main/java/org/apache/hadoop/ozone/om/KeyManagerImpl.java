@@ -116,6 +116,7 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersi
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -139,7 +140,7 @@ import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -744,7 +745,7 @@ public class KeyManagerImpl implements KeyManager {
       String volume, String bucket, String startKey,
       CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
       int count) throws IOException {
-    List<BlockGroup> keyBlocksList = Lists.newArrayList();
+    List<DeletedBlockGroup> keyBlocksList = Lists.newArrayList();
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
@@ -762,18 +763,19 @@ public class KeyManagerImpl implements KeyManager {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
         if (kv != null) {
-          List<BlockGroup> blockGroupList = Lists.newArrayList();
+          List<DeletedBlockGroup> blockGroupList = Lists.newArrayList();
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
           for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
-              List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
+              List<DeletedBlock> blocks = info.getKeyLocationVersions().stream()
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                      .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
-              BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
-                  .addAllBlockIDs(blockIDS).build();
+                      .map(b -> new DeletedBlock(new BlockID(b.getContainerID(), b.getLocalID()), b.getLength())))
+                      .collect(Collectors.toList());
+              DeletedBlockGroup keyBlocks = DeletedBlockGroup.newBuilder().setKeyName(kv.getKey())
+                  .addAllBlocks(blocks).build();
               blockGroupList.add(keyBlocks);
               currentCount++;
             } else {

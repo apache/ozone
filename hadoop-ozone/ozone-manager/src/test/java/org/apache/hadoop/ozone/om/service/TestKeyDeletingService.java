@@ -55,6 +55,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -63,7 +64,7 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -395,7 +396,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 1, metadataManager);
       doAnswer(i -> {
         PendingKeysDeletion pendingKeysDeletion = (PendingKeysDeletion) i.callRealMethod();
-        for (BlockGroup group : pendingKeysDeletion.getKeyBlocksList()) {
+        for (DeletedBlockGroup group : pendingKeysDeletion.getKeyBlocksList()) {
           Assertions.assertNotEquals(deletePathKey[0], group.getGroupID());
         }
         return pendingKeysDeletion;
@@ -746,8 +747,10 @@ class TestKeyDeletingService extends OzoneTestBase {
               return OzoneManagerProtocolProtos.OMResponse.newBuilder().setCmdType(purgeRequest.get().getCmdType())
                   .setStatus(OzoneManagerProtocolProtos.Status.TIMEOUT).build();
             });
-        List<BlockGroup> blockGroups = Collections.singletonList(BlockGroup.newBuilder().setKeyName("key1")
-            .addAllBlockIDs(Collections.singletonList(new BlockID(1, 1))).build());
+        List<DeletedBlockGroup> blockGroups = Collections.singletonList(DeletedBlockGroup
+            .newBuilder().setKeyName("key1")
+            .addAllBlocks(Collections.singletonList(new DeletedBlock(new BlockID(1, 1), 1)))
+            .build());
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
         OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
             .setBucketName("buck")
@@ -1021,7 +1024,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
           .getKeyBlocksList()
           .stream()
-          .map(BlockGroup::getBlockIDList)
+          .map(DeletedBlockGroup::getAllBlocks)
           .mapToLong(Collection::size)
           .sum();
     } catch (IOException e) {

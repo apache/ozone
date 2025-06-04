@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -41,7 +42,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -373,7 +374,7 @@ public class SnapshotDirectoryCleaningService
     String seekFileInDB = metadataManager.getOzonePathKey(volumeId,
         bucketInfo.getObjectID(),
         parentInfo.getObjectID(), "");
-    List<BlockGroup> blocksForKeyDelete = new ArrayList<>();
+    List<DeletedBlockGroup> blocksForKeyDelete = new ArrayList<>();
 
     Table<String, OmKeyInfo> fileTable = metadataManager.getFileTable();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
@@ -393,12 +394,12 @@ public class SnapshotDirectoryCleaningService
             fileInfo, bucketInfo, volumeId, null)) {
           for (OmKeyLocationInfoGroup keyLocations :
               fileInfo.getKeyLocationVersions()) {
-            List<BlockID> item = keyLocations.getLocationList().stream()
-                .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
+            List<DeletedBlock> item = keyLocations.getLocationList().stream()
+                .map(b -> new DeletedBlock(new BlockID(b.getContainerID(), b.getLocalID()), b.getLength()))
                 .collect(Collectors.toList());
-            BlockGroup keyBlocks = BlockGroup.newBuilder()
+            DeletedBlockGroup keyBlocks = DeletedBlockGroup.newBuilder()
                 .setKeyName(ozoneDeletePathKey)
-                .addAllBlockIDs(item)
+                .addAllBlocks(item)
                 .build();
             blocksForKeyDelete.add(keyBlocks);
           }

@@ -45,7 +45,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -78,8 +78,8 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -265,7 +265,7 @@ public class SCMBlockProtocolServer implements
    */
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
-      List<BlockGroup> keyBlocksInfoList) throws IOException {
+      List<DeletedBlockGroup> keyBlocksInfoList) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("SCM is informed by OM to delete {} blocks",
           keyBlocksInfoList.size());
@@ -302,10 +302,10 @@ public class SCMBlockProtocolServer implements
                 unknownFailure;
       }
     }
-    for (BlockGroup bg : keyBlocksInfoList) {
+    for (DeletedBlockGroup bg : keyBlocksInfoList) {
       List<DeleteBlockResult> blockResult = new ArrayList<>();
-      for (BlockID b : bg.getBlockIDList()) {
-        blockResult.add(new DeleteBlockResult(b, resultCode));
+      for (DeletedBlock b : bg.getAllBlocks()) {
+        blockResult.add(new DeleteBlockResult(b.getBlockID(), resultCode));
       }
       results.add(new DeleteBlockGroupResult(bg.getGroupID(), blockResult));
     }
