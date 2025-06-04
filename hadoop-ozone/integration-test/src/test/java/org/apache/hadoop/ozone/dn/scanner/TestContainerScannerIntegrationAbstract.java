@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -112,13 +113,10 @@ public abstract class TestContainerScannerIntegrationAbstract {
     }
   }
 
-  protected void waitForScmToSeeUnhealthyReplica(long containerID)
+  protected void waitForScmToSeeReplicaState(long containerID, State state)
       throws Exception {
-    ContainerManager scmContainerManager = cluster.getStorageContainerManager()
-        .getContainerManager();
     LambdaTestUtils.await(5000, 500,
-        () -> getContainerReplica(scmContainerManager, containerID)
-            .getState() == State.UNHEALTHY);
+        () -> getContainerReplica(containerID).getState() == state);
   }
 
   protected void waitForScmToCloseContainer(long containerID) throws Exception {
@@ -137,6 +135,12 @@ public abstract class TestContainerScannerIntegrationAbstract {
 
   protected Container<?> getDnContainer(long containerID) {
     return getOzoneContainer().getContainerSet().getContainer(containerID);
+  }
+
+  protected boolean containerChecksumFileExists(long containerID) {
+    assertEquals(1, cluster.getHddsDatanodes().size());
+    HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
+    return ContainerMerkleTreeTestUtils.containerChecksumFileExists(dn, containerID);
   }
 
   protected long writeDataThenCloseContainer() throws Exception {
@@ -181,11 +185,9 @@ public abstract class TestContainerScannerIntegrationAbstract {
         .getBytes(UTF_8);
   }
 
-  protected ContainerReplica getContainerReplica(
-      ContainerManager cm, long containerId) throws ContainerNotFoundException {
-    Set<ContainerReplica> containerReplicas = cm.getContainerReplicas(
-        ContainerID.valueOf(
-            containerId));
+  protected ContainerReplica getContainerReplica(long containerId) throws ContainerNotFoundException {
+    ContainerManager cm = cluster.getStorageContainerManager().getContainerManager();
+    Set<ContainerReplica> containerReplicas = cm.getContainerReplicas(ContainerID.valueOf(containerId));
     // Only using a single datanode cluster.
     assertEquals(1, containerReplicas.size());
     return containerReplicas.iterator().next();

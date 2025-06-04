@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -152,6 +153,18 @@ public abstract class Handler {
    * @throws IOException in case of exception
    */
   public abstract void markContainerForClose(Container container)
+      throws IOException;
+
+  /**
+   * Updates the container checksum information on disk and in memory and sends an ICR if the container checksum was
+   * changed from its previous value.
+   *
+   * @param container The container to update
+   * @param treeWriter The container merkle tree with the updated information about the container
+   * @throws IOException For errors sending an ICR or updating the container checksum on disk. If the disk update
+   * fails, the checksum in memory will not be updated and an ICR will not be sent.
+   */
+  public abstract void updateContainerChecksum(Container container, ContainerMerkleTreeWriter treeWriter)
       throws IOException;
 
   /**

@@ -301,8 +301,7 @@ public class KeyValueHandler extends Handler {
 
   @VisibleForTesting
   static ContainerCommandResponseProto dispatchRequest(KeyValueHandler handler,
-      ContainerCommandRequestProto request, KeyValueContainer kvContainer,
-      DispatcherContext dispatcherContext) {
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer, DispatcherContext dispatcherContext) {
     Type cmdType = request.getCmdType();
     // Validate the request has been made to the correct datanode with the node id matching.
     if (kvContainer != null) {
@@ -619,31 +618,6 @@ public class KeyValueHandler extends Handler {
     }
 
     return getSuccessResponse(request);
-  }
-
-  /**
-   * Write the merkle tree for this container using the existing checksum metadata only. The data is not read or
-   * validated by this method, so it is expected to run quickly.
-   *
-   * If a checksum file already exists on the disk, this method will do nothing. The existing file would have either
-   * been made from the metadata or data itself so there is no need to recreate it from the metadata.
-   *
-   * TODO: This method should be changed to private after HDDS-10374 is merged.
-   *
-   * @param container The container which will have a tree generated.
-   */
-  public void createContainerMerkleTreeFromMetadata(Container container) {
-    if (ContainerChecksumTreeManager.checksumFileExist(container)) {
-      return;
-    }
-
-    try {
-      KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
-      updateAndGetContainerChecksum(containerData);
-    } catch (IOException ex) {
-      LOG.error("Cannot create container checksum for container {} , Exception: ",
-          container.getContainerData().getContainerID(), ex);
-    }
   }
 
   /**
@@ -1097,7 +1071,6 @@ public class KeyValueHandler extends Handler {
 
   /**
    * Handle Write Chunk operation for closed container. Calls ChunkManager to process the request.
-   *
    */
   public void writeChunkForClosedContainer(ChunkInfo chunkInfo, BlockID blockID,
                                            ChunkBuffer data, KeyValueContainer kvContainer)
@@ -1132,7 +1105,7 @@ public class KeyValueHandler extends Handler {
    */
   public void putBlockForClosedContainer(KeyValueContainer kvContainer, BlockData blockData,
                                          long blockCommitSequenceId, boolean overwriteBscId)
-          throws IOException {
+      throws IOException {
     Preconditions.checkNotNull(kvContainer);
     Preconditions.checkNotNull(blockData);
     long startTime = Time.monotonicNowNanos();
@@ -1346,7 +1319,8 @@ public class KeyValueHandler extends Handler {
   @Override
   public Container importContainer(ContainerData originalContainerData,
       final InputStream rawContainerStream,
-      final TarContainerPacker packer) throws IOException {
+      final TarContainerPacker packer)
+      throws IOException {
     Preconditions.checkState(originalContainerData instanceof
         KeyValueContainerData, "Should be KeyValueContainerData instance");
 
@@ -1367,8 +1341,8 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void exportContainer(final Container container,
-      final OutputStream outputStream,
-      final TarContainerPacker packer)
+                              final OutputStream outputStream,
+                              final TarContainerPacker packer)
       throws IOException {
     final KeyValueContainer kvc = (KeyValueContainer) container;
     kvc.exportContainerData(outputStream, packer);
@@ -1394,9 +1368,95 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTreeFromMetadata(container);
+    updateContainerChecksumFromMetadataIfNeeded(container);
     ContainerLogger.logClosing(container.getContainerData());
     sendICR(container);
+  }
+
+  @Override
+  public void updateContainerChecksum(Container container, ContainerMerkleTreeWriter treeWriter)
+      throws IOException {
+    updateAndGetContainerChecksum(container, treeWriter, true);
+  }
+
+  /**
+   * Write the merkle tree for this container using the existing checksum metadata only. The data is not read or
+   * validated by this method, so it is expected to run quickly.
+   * <p>
+   * If a checksum file already exists on the disk, this method will do nothing. The existing file would have either
+   * been made from the metadata or data itself so there is no need to recreate it from the metadata. This method
+   * does not send an ICR with the updated checksum info.
+   * <p>
+   *
+   * @param container The container which will have a tree generated.
+   */
+  private void updateContainerChecksumFromMetadataIfNeeded(Container container) {
+    if (ContainerChecksumTreeManager.checksumFileExist(container)) {
+      return;
+    }
+
+    try {
+      KeyValueContainer keyValueContainer = (KeyValueContainer) container;
+      updateAndGetContainerChecksumFromMetadata(keyValueContainer);
+    } catch (IOException ex) {
+      LOG.error("Cannot create container checksum for container {} , Exception: ",
+          container.getContainerData().getContainerID(), ex);
+    }
+  }
+
+  /**
+   * Updates the container merkle tree based on the RocksDb's block metadata and returns the updated checksum info.
+   * This method does not send an ICR with the updated checksum info.
+   * @param container - Container for which the container merkle tree needs to be updated.
+   */
+  private ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksumFromMetadata(
+      KeyValueContainer container) throws IOException {
+    ContainerMerkleTreeWriter merkleTree = new ContainerMerkleTreeWriter();
+    try (DBHandle dbHandle = BlockUtils.getDB(container.getContainerData(), conf);
+         BlockIterator<BlockData> blockIterator = dbHandle.getStore().
+             getBlockIterator(container.getContainerData().getContainerID())) {
+      while (blockIterator.hasNext()) {
+        BlockData blockData = blockIterator.nextBlock();
+        merkleTree.addBlock(blockData.getLocalID());
+        // Assume all chunks are healthy when building the tree from metadata. Scanner will identify corruption when
+        // it runs after.
+        List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
+        merkleTree.addChunks(blockData.getLocalID(), true, chunkInfos);
+      }
+    }
+    return updateAndGetContainerChecksum(container, merkleTree, false);
+  }
+
+  private ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksum(Container container,
+      ContainerMerkleTreeWriter treeWriter, boolean sendICR) throws IOException {
+    ContainerData containerData = container.getContainerData();
+
+    // Attempt to write the new data checksum to disk. If persisting this fails, keep using the original data
+    // checksum to prevent divergence from what SCM sees in the ICR vs what datanode peers will see when pulling the
+    // merkle tree.
+    long originalDataChecksum = containerData.getDataChecksum();
+    ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.writeContainerDataTree(containerData,
+        treeWriter);
+    long updatedDataChecksum = updateChecksumInfo.getContainerMerkleTree().getDataChecksum();
+
+    if (updatedDataChecksum != originalDataChecksum) {
+      containerData.setDataChecksum(updatedDataChecksum);
+      String message =
+          "Container data checksum updated from " + checksumToString(originalDataChecksum) + " to " +
+              checksumToString(updatedDataChecksum);
+      if (sendICR) {
+        sendICR(container);
+      }
+      if (ContainerChecksumTreeManager.hasContainerChecksumFile(containerData)) {
+        LOG.warn(message);
+        ContainerLogger.logChecksumUpdated(containerData, originalDataChecksum);
+      } else {
+        // If this is the first time the scanner has run with the feature to generate a checksum file, don't
+        // log a warning for the checksum update.
+        LOG.debug(message);
+      }
+    }
+    return updateChecksumInfo;
   }
 
   @Override
@@ -1427,7 +1487,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTreeFromMetadata(container);
+    updateContainerChecksumFromMetadataIfNeeded(container);
     // Even if the container file is corrupted/missing and the unhealthy
     // update fails, the unhealthy state is kept in memory and sent to
     // SCM. Write a corresponding entry to the container log as well.
@@ -1458,7 +1518,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTreeFromMetadata(container);
+    updateContainerChecksumFromMetadataIfNeeded(container);
     ContainerLogger.logQuasiClosed(container.getContainerData(), reason);
     sendICR(container);
   }
@@ -1492,7 +1552,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTreeFromMetadata(container);
+    updateContainerChecksumFromMetadataIfNeeded(container);
     ContainerLogger.logClosed(container.getContainerData());
     sendICR(container);
   }
@@ -1518,7 +1578,7 @@ public class KeyValueHandler extends Handler {
       originalChecksumInfo = optionalChecksumInfo.get();
     } else {
       // Try creating the checksum info from RocksDB metadata if it is not present.
-      originalChecksumInfo = updateAndGetContainerChecksum(containerData);
+      originalChecksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
     }
     // This holds our current most up-to-date checksum info that we are using for the container.
     ContainerProtos.ContainerChecksumInfo latestChecksumInfo = originalChecksumInfo;
@@ -1608,7 +1668,7 @@ public class KeyValueHandler extends Handler {
       // Based on repaired done with this peer, write the updated merkle tree to the container.
       // This updated tree will be used when we reconcile with the next peer.
       ContainerProtos.ContainerChecksumInfo previousChecksumInfo = latestChecksumInfo;
-      latestChecksumInfo = checksumManager.writeContainerDataTree(containerData, updatedTreeWriter);
+      latestChecksumInfo = updateAndGetContainerChecksum(container, updatedTreeWriter, false);
 
       // Log the results of reconciliation with this peer.
       long duration = Instant.now().toEpochMilli() - start;
@@ -1655,30 +1715,8 @@ public class KeyValueHandler extends Handler {
     }
 
     // Trigger on demand scanner, which will build the merkle tree based on the newly ingested data.
-    containerSet.scanContainer(containerID);
+    containerSet.scanContainerWithoutGap(containerID);
     sendICR(container);
-  }
-
-  /**
-   * Updates the container merkle tree based on the RocksDb's block metadata and returns the updated checksum info.
-   * @param containerData - Container data for which the container merkle tree needs to be updated.
-   */
-  private ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksum(KeyValueContainerData containerData)
-      throws IOException {
-    ContainerMerkleTreeWriter merkleTree = new ContainerMerkleTreeWriter();
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
-         BlockIterator<BlockData> blockIterator = dbHandle.getStore().
-             getBlockIterator(containerData.getContainerID())) {
-      while (blockIterator.hasNext()) {
-        BlockData blockData = blockIterator.nextBlock();
-        List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
-        // TODO: Add empty blocks to the merkle tree. Done in HDDS-10374, needs to be backported.
-        // Assume all chunks are healthy when building the tree from metadata. Scanner will identify corruption when
-        // it runs after.
-        merkleTree.addChunks(blockData.getLocalID(), true, chunkInfos);
-      }
-    }
-    return checksumManager.writeContainerDataTree(containerData, merkleTree);
   }
 
   /**
