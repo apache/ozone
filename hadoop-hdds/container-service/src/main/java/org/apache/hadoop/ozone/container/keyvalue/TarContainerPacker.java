@@ -101,10 +101,12 @@ public class TarContainerPacker
     if (FileUtils.isEmptyDirectory(destContainerDir.toFile())) {
 
       //before state change to RECOVERING, we need to verify the checksum for untarContainerData.
-      KeyValueContainerData untarContainerData =
-          (KeyValueContainerData) ContainerDataYaml
-              .readContainer(descriptorFileContent);
-      ContainerUtils.verifyChecksum(untarContainerData, conf);
+      if (descriptorFileContent != null) {
+        KeyValueContainerData untarContainerData =
+            (KeyValueContainerData) ContainerDataYaml
+                .readContainer(descriptorFileContent);
+        ContainerUtils.verifyChecksum(untarContainerData, conf);
+      }
 
       // Before the atomic move, the destination dir is empty and doesn't have a metadata directory.
       // Writing the .container file will fail as the metadata dir doesn't exist.
