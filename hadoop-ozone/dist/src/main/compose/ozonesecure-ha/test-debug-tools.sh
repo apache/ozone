@@ -15,45 +15,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:unsecure
+#suite:HA-secure
 
 set -u -o pipefail
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-export SECURITY_ENABLED=false
-export OZONE_REPLICATION_FACTOR=3
+export SECURITY_ENABLED=true
+export OM_SERVICE_ID=omservice
+export SCM=scm1.org
+export OM=om1
+export COMPOSE_FILE=docker-compose.yaml:debug-tools.yaml
+export OZONE_DIR=/opt/hadoop
+
+: "${OZONE_VOLUME_OWNER:=}"
+: "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
+
+export OZONE_VOLUME
+
+# Clean up saved internal state from each container's volume for the next run.
+rm -rf "${OZONE_VOLUME}"
+mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,dn4,dn5,om1,om2,om3,scm1,scm2,scm3,recon,s3g,kms}
+
+if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
+  current_user=$(whoami)
+  if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
+    chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
+      || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
+  fi
+fi
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-execute_robot_test scm lib
-execute_robot_test scm ozone-lib
+execute_robot_test ${OM} kinit.robot
 
-execute_robot_test scm basic
+execute_robot_test ${OM} debug/auditparser.robot
 
-execute_robot_test scm gdpr
+execute_robot_test ${SCM} kinit.robot
 
-execute_robot_test scm security/ozone-secure-token.robot
-
-execute_robot_test scm recon
-
-execute_robot_test scm om-ratis
-
-execute_robot_test scm freon
-
-execute_robot_test scm cli
-execute_robot_test scm admincli
-
-execute_robot_test scm -v USERNAME:httpfs httpfs
 source "$COMPOSE_DIR/../common/replicas-test.sh"
-
-execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-bucket ozonefs/ozonefs.robot
-execute_robot_test scm -v SCHEME:ofs -N ozonefs-obs ozonefs/ozonefs-obs.robot
-
-execute_robot_test s3g grpc/grpc-om-s3-metrics.robot
-
-execute_robot_test scm --exclude pre-finalized-snapshot-tests snapshot

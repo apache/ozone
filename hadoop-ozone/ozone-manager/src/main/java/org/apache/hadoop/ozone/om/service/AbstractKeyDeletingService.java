@@ -101,12 +101,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.callId = new AtomicLong(0);
   }
 
-  protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
-      Map<String, RepeatedOmKeyInfo> keysToModify,
-      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
+  protected Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
+      Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException, InterruptedException {
 
     long startTime = Time.monotonicNow();
-    int delCount = 0;
+    Pair<Integer, Boolean> purgeResult = Pair.of(0, false);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send {} key(s) to SCM: {}",
           keyBlocksList.size(), keyBlocksList);
@@ -124,15 +124,15 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
       long purgeStartTime = Time.monotonicNow();
-      delCount = submitPurgeKeysRequest(blockDeletionResults,
-          keysToModify, snapTableKey, expectedPreviousSnapshotId);
+      purgeResult = submitPurgeKeysRequest(blockDeletionResults,
+          keysToModify, renameEntries, snapTableKey, expectedPreviousSnapshotId);
       int limit = ozoneManager.getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
-          delCount, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
+          purgeResult, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
     }
     perfMetrics.setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
-    return delCount;
+    return purgeResult;
   }
 
   /**
@@ -141,13 +141,15 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * @param results DeleteBlockGroups returned by SCM.
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
-  private int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-      Map<String, RepeatedOmKeyInfo> keysToModify, String snapTableKey, UUID expectedPreviousSnapshotId) {
+  private Pair<Integer, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
+      Map<String, RepeatedOmKeyInfo> keysToModify,  List<String> renameEntriesToBeDeleted,
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws InterruptedException {
     List<String> purgeKeys = new ArrayList<>();
 
     // Put all keys to be purged in a list
     int deletedCount = 0;
     Set<String> failedDeletedKeys = new HashSet<>();
+    boolean purgeSuccess = true;
     for (DeleteBlockGroupResult result : results) {
       String deletedKey = result.getObjectKey();
       if (result.isSuccess()) {
@@ -169,6 +171,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       } else {
         // If the block deletion failed, then the deleted keys should also not be modified.
         failedDeletedKeys.add(deletedKey);
+        purgeSuccess = false;
       }
     }
 
@@ -188,7 +191,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         .addAllKeys(purgeKeys)
         .build();
     purgeKeysRequest.addDeletedKeys(deletedKeys);
-
+    // Adding rename entries to be purged.
+    if (renameEntriesToBeDeleted != null) {
+      purgeKeysRequest.addAllRenamedKeys(renameEntriesToBeDeleted);
+    }
     List<SnapshotMoveKeyInfos> keysToUpdateList = new ArrayList<>();
     if (keysToModify != null) {
       for (Map.Entry<String, RepeatedOmKeyInfo> keyToModify :
@@ -219,14 +225,17 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         .build();
 
     // Submit PurgeKeys request to OM
-    try {
-      submitRequest(omRequest);
+    try (BootstrapStateHandler.Lock lock = snapTableKey != null ? getBootstrapStateLock().lock() : null) {
+      OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
+      if (omResponse != null) {
+        purgeSuccess = purgeSuccess && omResponse.getSuccess();
+      }
     } catch (ServiceException e) {
       LOG.error("PurgeKey request failed. Will retry at next run.", e);
-      return 0;
+      return Pair.of(0, false);
     }
 
-    return deletedCount;
+    return Pair.of(deletedCount, purgeSuccess);
   }
 
   protected OzoneManagerProtocolProtos.OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
@@ -636,5 +645,26 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
+  }
+
+  /**
+   * Submits SetSnapsnapshotPropertyRequest to OM.
+   * @param setSnapshotPropertyRequests request to be sent to OM
+   */
+  protected void submitSetSnapshotRequests(
+      List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests) {
+    if (setSnapshotPropertyRequests.isEmpty()) {
+      return;
+    }
+    OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetSnapshotProperty)
+        .addAllSetSnapshotPropertyRequests(setSnapshotPropertyRequests)
+        .setClientId(clientId.toString())
+        .build();
+    try {
+      submitRequest(omRequest);
+    } catch (ServiceException e) {
+      LOG.error("Failed to submit set snapshot property request", e);
+    }
   }
 }

@@ -23,7 +23,11 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * TODO: javadoc.
+ * Represents an owner of S3 resources in the Ozone S3 compatibility layer.
+ *
+ * This class models the Owner XML element in S3 responses, containing both a unique ID
+ * and a display name for the owner of buckets and objects.
+ *
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "Owner")
