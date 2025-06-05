@@ -27,7 +27,6 @@ ${VOLUME}           cli-debug-volume${PREFIX}
 ${BUCKET}           cli-debug-bucket
 ${DEBUGKEY}         debugKey
 ${TESTFILE}         testfile
-${OM_SERVICE_ID}    %{OM_SERVICE_ID}
 
 *** Keywords ***
 Write keys
@@ -38,7 +37,7 @@ Write keys
 
 *** Test Cases ***
 Test ozone debug replicas verify checksums
-    ${output} =    Execute   ozone debug replicas verify --checksums o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} --output-dir ${TEMP_DIR}
+    ${output} =    Execute   ozone debug replicas verify --checksums --block-existence --container-state o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} --output-dir ${TEMP_DIR}
     ${json} =      Evaluate  json.loads('''${output}''')      json
 
     # 'keys' array should be empty if all keys and their replicas passed checksum verification
