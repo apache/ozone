@@ -41,12 +41,13 @@ public class TestDiskBalancerYaml {
     int parallelThread = 5;
     boolean stopAfterDiskEven = true;
     DiskBalancerVersion version = DiskBalancerVersion.DEFAULT_VERSION;
+    boolean paused = false;
 
     File file = new File(tmpDir.toString(),
         OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
 
     DiskBalancerInfo info = new DiskBalancerInfo(shouldRun, threshold,
-        bandwidthInMB, parallelThread, stopAfterDiskEven, version);
+        bandwidthInMB, parallelThread, stopAfterDiskEven, version, paused);
 
     DiskBalancerYaml.createDiskBalancerInfoFile(info, file);
 

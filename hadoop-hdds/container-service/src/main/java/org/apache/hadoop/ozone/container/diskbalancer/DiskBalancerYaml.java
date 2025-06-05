@@ -81,7 +81,8 @@ public final class DiskBalancerYaml {
           diskBalancerInfoYaml.getParallelThread(),
           diskBalancerInfoYaml.isStopAfterDiskEven(),
           DiskBalancerVersion.getDiskBalancerVersion(
-              diskBalancerInfoYaml.version));
+              diskBalancerInfoYaml.version),
+          diskBalancerInfoYaml.isPaused());
     }
 
     return diskBalancerInfo;
@@ -92,6 +93,7 @@ public final class DiskBalancerYaml {
    */
   public static class DiskBalancerInfoYaml {
     private boolean shouldRun;
+    private boolean paused;
     private double threshold;
     private long bandwidthInMB;
     private int parallelThread;
@@ -103,9 +105,10 @@ public final class DiskBalancerYaml {
       // Needed for snake-yaml introspection.
     }
 
-    private DiskBalancerInfoYaml(boolean shouldRun, double threshold,
+    private DiskBalancerInfoYaml(boolean shouldRun, boolean paused, double threshold,
         long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, int version) {
       this.shouldRun = shouldRun;
+      this.paused = paused;
       this.threshold = threshold;
       this.bandwidthInMB = bandwidthInMB;
       this.parallelThread = parallelThread;
@@ -119,6 +122,14 @@ public final class DiskBalancerYaml {
 
     public void setShouldRun(boolean shouldRun) {
       this.shouldRun = shouldRun;
+    }
+
+    public boolean isPaused() {
+      return paused;
+    }
+
+    public void setPaused(boolean paused) {
+      this.paused = paused;
     }
 
     public void setThreshold(double threshold) {
@@ -167,6 +178,7 @@ public final class DiskBalancerYaml {
 
     return new DiskBalancerInfoYaml(
         diskBalancerInfo.isShouldRun(),
+        diskBalancerInfo.isPaused(),
         diskBalancerInfo.getThreshold(),
         diskBalancerInfo.getBandwidthInMB(),
         diskBalancerInfo.getParallelThread(),
