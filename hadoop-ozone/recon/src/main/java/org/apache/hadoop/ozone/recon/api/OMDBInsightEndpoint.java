@@ -58,6 +58,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -646,9 +647,9 @@ public class OMDBInsightEndpoint {
         keyEntityInfo.setKey(omKeyInfo.getFileName());
         keyEntityInfo.setPath(createPath(omKeyInfo));
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        keyEntityInfo.setSize(
-            fetchSizeForDeletedDirectory(omKeyInfo.getObjectID()));
-        keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
+        Pair<Long, Long> sizeInfo = fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
+        keyEntityInfo.setSize(sizeInfo.getLeft());
+        keyEntityInfo.setReplicatedSize(sizeInfo.getRight());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
         pendingForDeletionKeyInfo.setUnreplicatedDataSize(
             pendingForDeletionKeyInfo.getUnreplicatedDataSize() +
@@ -681,17 +682,21 @@ public class OMDBInsightEndpoint {
    * @return total used data size in bytes
    * @throws IOException ioEx
    */
-  protected long fetchSizeForDeletedDirectory(long objectId)
+  protected Pair<Long, Long> fetchSizeForDeletedDirectory(long objectId)
       throws IOException {
     NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
     if (nsSummary == null) {
-      return 0L;
+      return Pair.of(0L, 0L);
     }
     long totalSize = nsSummary.getSizeOfFiles();
+    long totalReplicatedSize = nsSummary.getReplicatedSizeOfFiles();
+
     for (long childId : nsSummary.getChildDir()) {
-      totalSize += fetchSizeForDeletedDirectory(childId);
+      Pair<Long, Long> childSize = fetchSizeForDeletedDirectory(childId);
+      totalSize += childSize.getLeft();
+      totalReplicatedSize += childSize.getRight();
     }
-    return totalSize;
+    return Pair.of(totalSize, totalReplicatedSize);
   }
 
   /** This method retrieves set of directories pending for deletion.

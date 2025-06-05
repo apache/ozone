@@ -91,6 +91,7 @@ public class NSSummaryTaskDbEventHandler {
     int[] fileBucket = nsSummary.getFileSizeBucket();
     nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
     nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
+    nsSummary.setReplicatedSizeOfFiles(nsSummary.getReplicatedSizeOfFiles() + keyInfo.getReplicatedSize());
     int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
 
     ++fileBucket[binIndex];
@@ -162,6 +163,7 @@ public class NSSummaryTaskDbEventHandler {
     // we still need children dir IDs info
     nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() - 1);
     nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() - keyInfo.getDataSize());
+    nsSummary.setReplicatedSizeOfFiles(nsSummary.getReplicatedSizeOfFiles() - keyInfo.getReplicatedSize());
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
