@@ -92,7 +92,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   private Path folder;
   private HttpServletRequest requestMock = null;
   private HttpServletResponse responseMock = null;
-  private OMDBCheckPointServletInodeBasedXfer omDbCheckpointServletMock = null;
+  private OMDBCheckpointServletInodeBasedXfer omDbCheckpointServletMock = null;
   private ServletOutputStream servletOutputStream;
   private File tempFile;
   private static final AtomicInteger COUNTER = new AtomicInteger();
@@ -143,7 +143,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     };
 
     omDbCheckpointServletMock =
-        mock(OMDBCheckPointServletInodeBasedXfer.class);
+        mock(OMDBCheckpointServletInodeBasedXfer.class);
 
     BootstrapStateHandler.Lock lock =
         new OMDBCheckpointServlet.Lock(om);
@@ -181,8 +181,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDir();
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any(), anyBoolean());
-    doCallRealMethod().when(omDbCheckpointServletMock).getFilesForArchive(any(), any(), any(), any(),
-        anyLong());
   }
 
   @Test
