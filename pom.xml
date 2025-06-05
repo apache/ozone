@@ -2179,14 +2179,14 @@
               If a new module is introduced with generated config:
               - override ban-annotations execution of maven-enforcer-plugin
               - configure maven-compiler-plugin with the ConfigFileGenerator annotationProcessor
-              - bind one or both of these rename executions
+              - bind one or both of these copy executions
               - add the module's name in OzoneConfiguration#activate
               See hadoop-hdds/common/pom.xml for example.
             -->
             <execution>
-              <id>rename-generated-config</id>
+              <id>copy-generated-config</id>
               <goals>
-                <goal>rename</goal>
+                <goal>copy</goal>
               </goals>
               <!-- bind to process-classes in modules where needed -->
               <phase>none</phase>
@@ -2200,9 +2200,9 @@
               </configuration>
             </execution>
             <execution>
-              <id>rename-generated-test-config</id>
+              <id>copy-generated-test-config</id>
               <goals>
-                <goal>rename</goal>
+                <goal>copy</goal>
               </goals>
               <!-- bind to process-test-classes in modules where needed -->
               <phase>none</phase>
