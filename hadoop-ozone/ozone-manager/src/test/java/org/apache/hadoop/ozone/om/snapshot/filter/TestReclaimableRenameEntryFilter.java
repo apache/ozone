@@ -80,7 +80,7 @@ public class TestReclaimableRenameEntryFilter extends AbstractReclaimableFilterT
       throws IOException {
     List<SnapshotInfo> snapshotInfos = getLastSnapshotInfos(volume, bucket, 1, index);
     SnapshotInfo prevSnapshotInfo = snapshotInfos.get(0);
-    OmBucketInfo bucketInfo = getOzoneManager().getBucketInfo(volume, bucket);
+    OmBucketInfo bucketInfo = getOzoneManager().getBucketManager().getBucketInfo(volume, bucket);
     if (prevSnapshotInfo != null) {
       UncheckedAutoCloseableSupplier<OmSnapshot> prevSnap = Optional.ofNullable(prevSnapshotInfo)
           .map(info -> {
