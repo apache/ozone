@@ -101,7 +101,7 @@ public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase
 
     // create a volume and a bucket to be used by OzoneFileSystem
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
-        BucketLayout.OBJECT_STORE);
+        BucketLayout.OBJECT_STORE, null);
     volume = client.getObjectStore().getVolume(volumeName);
   }
 

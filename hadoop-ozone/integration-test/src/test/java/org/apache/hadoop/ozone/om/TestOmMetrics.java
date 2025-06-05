@@ -357,7 +357,7 @@ public class TestOmMetrics {
     long initialNumDeleteObjectTaggingFails = getLongCounter("NumDeleteObjectTaggingFails", omMetrics);
 
     // see HDDS-10078 for making this work with FILE_SYSTEM_OPTIMIZED layout
-    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
+    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY, null);
     OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     doKeyOps(keyArgs); // This will perform 7 different operations on the key
@@ -487,7 +487,7 @@ public class TestOmMetrics {
     String bucketName = UUID.randomUUID().toString();
 
     // create bucket with different layout in each ParameterizedTest
-    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, bucketLayout);
+    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, bucketLayout, null);
 
     // Create bucket with 2 nested directories.
     String rootPath = String.format("%s://%s/",
