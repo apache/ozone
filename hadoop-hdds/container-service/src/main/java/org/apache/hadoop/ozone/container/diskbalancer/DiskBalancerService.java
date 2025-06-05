@@ -164,7 +164,7 @@ public class DiskBalancerService extends BackgroundService {
    * @param diskBalancerInfo
    * @throws IOException
    */
-  public void refresh(DiskBalancerInfo diskBalancerInfo) throws IOException {
+  public synchronized void refresh(DiskBalancerInfo diskBalancerInfo) throws IOException {
     applyDiskBalancerInfo(diskBalancerInfo);
   }
 
@@ -645,21 +645,14 @@ public class DiskBalancerService extends BackgroundService {
   /**
    * Handle state changes for DiskBalancerService.
    */
-  public void nodeStateChange(HddsProtos.NodeOperationalState state) {
+  public synchronized void nodeStateChange(HddsProtos.NodeOperationalState state) {
     if ((state == HddsProtos.NodeOperationalState.DECOMMISSIONING ||
         state == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE) && shouldRun) {
       LOG.info("Stopping DiskBalancerService as Node state changed to {}.", state);
       stopDiskBalancer();
-    } else if (state == HddsProtos.NodeOperationalState.IN_SERVICE) {
-      if (isPaused()) {
-        LOG.info("Resuming DiskBalancerService to running state as Node state changed to {}. ", state);
-        resumeDiskBalancer();
-      } else if (!isPaused() && shouldRun) {
-        LOG.info("DiskBalancerService resumes as it was started during maintenance/decommissioning state.", state);
-      } else {
-        LOG.info("DiskBalancerService will not resume as it was either stopped" +
-            " manually during maintenance/decommissioning or was not running before state changed.", state);
-      }
+    } else if (state == HddsProtos.NodeOperationalState.IN_SERVICE && isPaused()) {
+      LOG.info("Resuming DiskBalancerService to running state as Node state changed to {}. ", state);
+      resumeDiskBalancer();
     }
   }
 

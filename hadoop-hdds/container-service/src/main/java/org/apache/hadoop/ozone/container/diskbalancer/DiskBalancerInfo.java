@@ -40,19 +40,20 @@ public class DiskBalancerInfo {
   private boolean paused;
 
   public DiskBalancerInfo(boolean shouldRun, double threshold,
-      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven) {
+      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, boolean paused) {
     this(shouldRun, threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
-        DiskBalancerVersion.DEFAULT_VERSION);
+        DiskBalancerVersion.DEFAULT_VERSION, paused);
   }
 
   public DiskBalancerInfo(boolean shouldRun, double threshold,
-      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version) {
+      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version, boolean paused) {
     this.shouldRun = shouldRun;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
     this.parallelThread = parallelThread;
     this.stopAfterDiskEven = stopAfterDiskEven;
     this.version = version;
+    this.paused = paused;
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
