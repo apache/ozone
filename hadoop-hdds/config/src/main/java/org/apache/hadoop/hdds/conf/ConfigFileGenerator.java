@@ -79,7 +79,7 @@ public class ConfigFileGenerator extends AbstractProcessor {
         outputFileName = OUTPUT_FILE_NAME; // 設定預設檔名
       } else {
         outputFileName = currentArtifactId + OUTPUT_FILE_NAME.substring(5);
-      };
+      }
       try (InputStream input = filer
           .getResource(StandardLocation.CLASS_OUTPUT, "",
               outputFileName).openInputStream()) {
