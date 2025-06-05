@@ -22,7 +22,7 @@ import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 /**
- * BlockID of Ozone (containerID + localID + blockCommitSequenceId + replicaIndex).
+ * DeletedBlock of Ozone (BlockID + usedBytes).
  */
 public class DeletedBlock {
 
@@ -50,8 +50,8 @@ public class DeletedBlock {
   }
 
   public void appendTo(StringBuilder sb) {
-    sb.append(" blockIS: ").append(blockID.getContainerBlockID().getLocalID());
-    sb.append(" usedSpace: ").append(usedBytes);
+    sb.append(" blockID: ").append(blockID.getContainerBlockID().getLocalID());
+    sb.append(" usedBytes: ").append(usedBytes);
   }
 
   @JsonIgnore
