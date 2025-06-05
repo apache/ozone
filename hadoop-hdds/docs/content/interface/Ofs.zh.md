@@ -220,7 +220,7 @@ $ ozone fs -put ./NOTICE.txt ofs://om/tmp/key1
 </property>
 <property>
   <name>fs.trash.classname</name>
-  <value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
+  <value>org.apache.hadoop.fs.ozone.OzoneTrashPolicy</value>
 </property>
 {{< /highlight >}}
 

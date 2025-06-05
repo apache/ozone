@@ -82,7 +82,7 @@ public class TestContainerBalancerOperations {
     Optional<Long> maxSizeLeavingSourceInGB = Optional.of(6L);
     Optional<Integer> balancingInterval = Optional.of(70);
     Optional<Integer> moveTimeout = Optional.of(65);
-    Optional<Integer> moveReplicationTimeout = Optional.of(55);
+    Optional<Integer> moveReplicationTimeout = Optional.of(50);
     Optional<Boolean> networkTopologyEnable = Optional.of(false);
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
@@ -147,7 +147,7 @@ public class TestContainerBalancerOperations {
     Optional<Long> maxSizeEnteringTargetInGB = Optional.of(6L);
     Optional<Long> maxSizeLeavingSourceInGB = Optional.of(6L);
     Optional<Integer> moveTimeout = Optional.of(65);
-    Optional<Integer> moveReplicationTimeout = Optional.of(55);
+    Optional<Integer> moveReplicationTimeout = Optional.of(50);
     Optional<Boolean> networkTopologyEnable = Optional.of(true);
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
