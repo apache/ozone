@@ -188,7 +188,7 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
           ReplicationFactor.THREE);
     }
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
-        layout);
+        layout, null);
     TestDataUtil.createKey(
         client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
         keyName, repConfig, "test".getBytes(StandardCharsets.UTF_8));

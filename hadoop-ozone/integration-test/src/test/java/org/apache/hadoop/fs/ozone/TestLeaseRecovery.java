@@ -265,7 +265,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
   @Test
   public void testOBSRecoveryShouldFail() throws Exception {
     OzoneBucket obsBucket = TestDataUtil.createVolumeAndBucket(client,
-        "vol2", "obs", BucketLayout.OBJECT_STORE);
+        "vol2", "obs", BucketLayout.OBJECT_STORE, null);
     String obsDir = OZONE_ROOT + obsBucket.getVolumeName() + OZONE_URI_DELIMITER + obsBucket.getName();
     Path obsFile = new Path(obsDir, "file" + getTestName() + FILE_COUNTER.incrementAndGet());
 
