@@ -140,7 +140,7 @@ public class TestSnapshotDirectoryCleaningService {
         cluster.getOzoneManager().getMetadataManager().getDeletedTable();
     Table<String, SnapshotInfo> snapshotInfoTable =
         cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable();
-    DirectoryDeletingService snapshotDirectoryCleaningService =
+    DirectoryDeletingService directoryDeletingService =
         cluster.getOzoneManager().getKeyManager().getDirDeletingService();
 
     /*    DirTable
@@ -220,8 +220,8 @@ public class TestSnapshotDirectoryCleaningService {
     fs.delete(root, true);
     assertTableRowCount(deletedKeyTable, 10);
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snap3");
-    long prevRunCount = snapshotDirectoryCleaningService.getRunCount().get();
-    GenericTestUtils.waitFor(() -> snapshotDirectoryCleaningService.getRunCount().get()
+    long prevRunCount = directoryDeletingService.getRunCount().get();
+    GenericTestUtils.waitFor(() -> directoryDeletingService.getRunCount().get()
         > prevRunCount + 1, 100, 10000);
 
     Thread.sleep(2000);
