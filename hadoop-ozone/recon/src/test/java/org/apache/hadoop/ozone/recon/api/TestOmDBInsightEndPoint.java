@@ -119,33 +119,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
   private Set<Long> generatedIds = new HashSet<>();
-
-  public static Collection<Object[]> replicationConfigValues() {
-    return Arrays.asList(new Object[][]{
-        {ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE)},
-        {ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE)},
-        {ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
-            toProto(3, 2, ECReplicationConfig.EcCodec.RS, 1024))},
-        {ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
-            toProto(6, 3, ECReplicationConfig.EcCodec.RS, 1024))},
-        {ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
-            toProto(10, 4, ECReplicationConfig.EcCodec.XOR, 4096))}
-    });
-  }
-
-  public static HddsProtos.ECReplicationConfig toProto(int data, int parity, ECReplicationConfig.EcCodec codec,
-                                                       int ecChunkSize) {
-    return HddsProtos.ECReplicationConfig.newBuilder()
-        .setData(data)
-        .setParity(parity)
-        .setCodec(codec.toString())
-        .setEcChunkSize(ecChunkSize)
-        .build();
-  }
-
   private static final String VOLUME_ONE = "volume1";
-
   private static final String OBS_BUCKET = "obs-bucket";
   private static final String FSO_BUCKET = "fso-bucket";
   private static final String EMPTY_OBS_BUCKET = "empty-obs-bucket";
@@ -285,6 +259,30 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   public TestOmDBInsightEndPoint() {
     super();
+  }
+
+  public static Collection<Object[]> replicationConfigValues() {
+    return Arrays.asList(new Object[][]{
+        {ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE)},
+        {ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE)},
+        {ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
+            toProto(3, 2, ECReplicationConfig.EcCodec.RS, 1024))},
+        {ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
+            toProto(6, 3, ECReplicationConfig.EcCodec.RS, 1024))},
+        {ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
+            toProto(10, 4, ECReplicationConfig.EcCodec.XOR, 4096))}
+    });
+  }
+
+  public static HddsProtos.ECReplicationConfig toProto(int data, int parity, ECReplicationConfig.EcCodec codec,
+                                                       int ecChunkSize) {
+    return HddsProtos.ECReplicationConfig.newBuilder()
+        .setData(data)
+        .setParity(parity)
+        .setCodec(codec.toString())
+        .setEcChunkSize(ecChunkSize)
+        .build();
   }
 
   private long generateUniqueRandomLong() {
