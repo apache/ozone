@@ -50,6 +50,7 @@ import javax.tools.StandardLocation;
 public class ConfigFileGenerator extends AbstractProcessor {
 
   private static final String OUTPUT_FILE_NAME = "ozone-default-generated.xml";
+  private static final String OUTPUT_FILE_POSTFIX = "-default.xml";
 
   private static final SimpleTypeVisitor8<Element, Void> GET_PARENT_ELEMENT =
       new SimpleTypeVisitor8<Element, Void>() {
@@ -78,7 +79,7 @@ public class ConfigFileGenerator extends AbstractProcessor {
       if (currentArtifactId == null || currentArtifactId.isEmpty()) {
         outputFileName = OUTPUT_FILE_NAME; // 設定預設檔名
       } else {
-        outputFileName = currentArtifactId + OUTPUT_FILE_NAME.substring(5);
+        outputFileName = currentArtifactId + OUTPUT_FILE_POSTFIX;
       }
       try (InputStream input = filer
           .getResource(StandardLocation.CLASS_OUTPUT, "",
