@@ -51,12 +51,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.HATests;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for SCM HA.
  */
-@Timeout(300)
 public abstract class TestStorageContainerManagerHAWithAllRunning implements HATests.TestCase {
 
   private static final int OM_COUNT = 3;

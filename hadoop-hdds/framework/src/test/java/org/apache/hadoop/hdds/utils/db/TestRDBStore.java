@@ -88,7 +88,7 @@ public class TestRDBStore {
       long maxDbUpdatesSizeThreshold)
       throws IOException {
     return new RDBStore(dbFile, options, null, new ManagedWriteOptions(), families,
-        CodecRegistry.newBuilder().build(), false, null, false,
+        false, null, false,
         maxDbUpdatesSizeThreshold, true, null, true);
   }
 
@@ -149,6 +149,23 @@ public class TestRDBStore {
     assertThat(metaSizeAfterCompact).isLessThan(metaSizeBeforeCompact);
     assertEquals(metaSizeAfterCompact, 2);
 
+  }
+
+  @Test
+  public void compactTable() throws Exception {
+    assertNotNull(rdbStore, "DBStore cannot be null");
+
+    for (int j = 0; j <= 20; j++) {
+      insertRandomData(rdbStore, 0);
+      rdbStore.flushDB();
+    }
+
+    int metaSizeBeforeCompact = rdbStore.getDb().getLiveFilesMetaDataSize();
+    rdbStore.compactTable(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY));
+    int metaSizeAfterCompact = rdbStore.getDb().getLiveFilesMetaDataSize();
+
+    assertThat(metaSizeAfterCompact).isLessThan(metaSizeBeforeCompact);
+    assertThat(metaSizeAfterCompact).isEqualTo(1);
   }
 
   @Test

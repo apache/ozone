@@ -58,7 +58,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -67,7 +66,6 @@ import org.junit.jupiter.params.provider.CsvSource;
  * Test Multipart Upload Cleanup Service.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 class TestMultipartUploadCleanupService {
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;

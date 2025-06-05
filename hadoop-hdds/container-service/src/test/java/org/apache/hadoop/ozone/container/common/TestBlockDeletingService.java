@@ -106,7 +106,6 @@ import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,7 +113,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Tests to test block deleting service.
  */
-@Timeout(30)
 public class TestBlockDeletingService {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestBlockDeletingService.class);

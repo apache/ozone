@@ -57,12 +57,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests the containerStateMachine failure handling by set flush delay.
  */
-@Timeout(300)
 public class TestContainerStateMachineFlushDelay {
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();

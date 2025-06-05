@@ -50,7 +50,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -58,7 +57,6 @@ import org.slf4j.event.Level;
 /**
  * Tests for {@link ContainerBalancer}.
  */
-@Timeout(60)
 public class TestContainerBalancer {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestContainerBalancer.class);
@@ -207,6 +205,25 @@ public class TestContainerBalancer {
         () -> containerBalancer.startBalancer(balancerConfiguration),
         "hdds.container.balancer.move.replication.timeout should " +
             "be less than hdds.container.balancer.move.timeout.");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    conf.setTimeDuration("hdds.container.balancer.move.timeout", 60,
+        TimeUnit.MINUTES);
+    conf.setTimeDuration(
+        "hdds.container.balancer.move.replication.timeout", 50,
+        TimeUnit.MINUTES);
+
+    balancerConfiguration =
+        conf.getObject(ContainerBalancerConfiguration.class);
+    InvalidContainerBalancerConfigurationException ex =
+        assertThrowsExactly(
+            InvalidContainerBalancerConfigurationException.class,
+            () -> containerBalancer.startBalancer(balancerConfiguration),
+            "(hdds.container.balancer.move.timeout - hdds.container.balancer.move.replication.timeout " +
+                "- hdds.scm.replication.event.timeout.datanode.offset) should be greater than or equal to 9 minutes.");
+    assertTrue(ex.getMessage().contains("should be greater than or equal to 540000ms or 9 minutes"),
+        "Exception message should contain 'should be greater than or equal to 540000ms or 9 minutes'");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
   }
 
   /**

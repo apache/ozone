@@ -22,17 +22,11 @@ import static org.mockito.Mockito.mock;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests for GrpcOzoneManagerServer.
  */
-@Timeout(30)
 public class TestGrpcOzoneManagerServer {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestGrpcOzoneManagerServer.class);
   private OzoneManager ozoneManager;
   private OzoneManagerProtocolServerSideTranslatorPB omServerProtocol;
   private GrpcOzoneManagerServer server;

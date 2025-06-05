@@ -79,17 +79,16 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests snapshot background services.
  */
-@Timeout(5000)
 public class TestSnapshotBackgroundServices {
   private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;
@@ -262,7 +261,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot c
     OmSnapshot snapC;
-    try (ReferenceCounted<OmSnapshot> rcC = newLeaderOM
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcC = newLeaderOM
         .getOmSnapshotManager()
         .getSnapshot(volumeName, bucketName, snapshotInfoC.getName())) {
       assertNotNull(rcC);
@@ -286,7 +285,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot d
     OmSnapshot snapD;
-    try (ReferenceCounted<OmSnapshot> rcD = newLeaderOM
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcD = newLeaderOM
         .getOmSnapshotManager()
         .getSnapshot(volumeName, bucketName, snapshotInfoD.getName())) {
       assertNotNull(rcD);

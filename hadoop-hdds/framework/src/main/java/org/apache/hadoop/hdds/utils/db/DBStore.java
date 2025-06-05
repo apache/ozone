@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 /**
@@ -45,33 +47,11 @@ public interface DBStore extends Closeable, BatchOperationHandler {
    */
   Table<byte[], byte[]> getTable(String name) throws IOException;
 
-
-  /**
-   * Gets an existing TableStore with implicit key/value conversion and
-   * with default cache type for cache. Default cache type is partial cache.
-   *
-   * @param name - Name of the TableStore to get
-   * @param keyType
-   * @param valueType
-   * @return - TableStore.
-   * @throws IOException on Failure
-   */
-  <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
-      Class<KEY> keyType, Class<VALUE> valueType) throws IOException;
-
-  /**
-   * Gets an existing TableStore with implicit key/value conversion and
-   * with specified cache type.
-   * @param name - Name of the TableStore to get
-   * @param keyType
-   * @param valueType
-   * @param cacheType
-   * @return - TableStore.
-   * @throws IOException
-   */
-  <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
-      Class<KEY> keyType, Class<VALUE> valueType,
-      TableCache.CacheType cacheType) throws IOException;
+  /** The same as getTable(name, keyCodec, valueCodec, CacheType.PARTIAL_CACHE). */
+  default <KEY, VALUE> TypedTable<KEY, VALUE> getTable(String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec)
+      throws IOException {
+    return getTable(name, keyCodec, valueCodec, CacheType.PARTIAL_CACHE);
+  }
 
   /**
    * Gets table store with implict key/value conversion.
@@ -118,6 +98,23 @@ public interface DBStore extends Closeable, BatchOperationHandler {
    * @throws IOException on Failure
    */
   void compactDB() throws IOException;
+
+  /**
+   * Compact the specific table.
+   *
+   * @param tableName - Name of the table to compact.
+   * @throws IOException on Failure
+   */
+  void compactTable(String tableName) throws IOException;
+
+  /**
+   * Compact the specific table.
+   *
+   * @param tableName - Name of the table to compact.
+   * @param options - Options for the compact operation.
+   * @throws IOException on Failure
+   */
+  void compactTable(String tableName, ManagedCompactRangeOptions options) throws IOException;
 
   /**
    * Moves a key from the Source Table to the destination Table.

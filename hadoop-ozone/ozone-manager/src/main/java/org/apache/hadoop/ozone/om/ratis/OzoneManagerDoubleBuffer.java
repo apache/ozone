@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -473,7 +472,7 @@ public final class OzoneManagerDoubleBuffer {
       Collections.sort(epochs);
       omMetadataManager.getTable(tableName).cleanupCache(epochs);
       // Check if the table is S3SecretTable, if yes, then clear the cache.
-      if (tableName.equals(S3_SECRET_TABLE.getName())) {
+      if (tableName.equals(OMDBDefinition.S3_SECRET_TABLE_DEF.getName())) {
         s3SecretManager.clearS3Cache(epochs);
       }
     });

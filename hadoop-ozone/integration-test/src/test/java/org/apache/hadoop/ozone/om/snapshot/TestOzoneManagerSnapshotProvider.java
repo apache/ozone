@@ -38,12 +38,10 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test OM's snapshot provider service.
  */
-@Timeout(300)
 public class TestOzoneManagerSnapshotProvider {
 
   private MiniOzoneHAClusterImpl cluster = null;

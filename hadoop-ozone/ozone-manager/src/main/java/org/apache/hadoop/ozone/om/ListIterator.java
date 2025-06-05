@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.Closeable;
 import java.io.IOException;

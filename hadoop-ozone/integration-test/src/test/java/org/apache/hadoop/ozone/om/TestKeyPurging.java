@@ -43,12 +43,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test OM's {@link KeyDeletingService}.
  */
-@Timeout(300)
 public class TestKeyPurging {
 
   private MiniOzoneCluster cluster;
@@ -128,7 +126,7 @@ public class TestKeyPurging {
     GenericTestUtils.waitFor(
         () -> {
           try {
-            return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
+            return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
                 .getKeyBlocksList().isEmpty();
           } catch (IOException e) {
             return false;

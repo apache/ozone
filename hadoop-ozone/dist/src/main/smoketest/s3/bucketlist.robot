@@ -25,12 +25,19 @@ Suite Setup         Setup s3 tests
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
+${DEFAULT_OWNER_ID}   bb2bd7ca4a327f84e6cd3979f8fa3828a50a08893c1b68f9d6715352c8d07b93
 
 *** Test Cases ***
 
 List buckets
-    ${result} =         Execute AWSS3APICli     list-buckets | jq -r '.Buckets[].Name'
-                        Should contain          ${result}    ${BUCKET}
+    ${result} =             Execute AWSS3APICli   list-buckets
+    ${bucket_names} =       Execute               echo '''${result}''' | jq -r '.Buckets[].Name'
+    Should contain          ${bucket_names}       ${BUCKET}
+    ${ownerId} =            Execute               echo '''${result}''' | jq -r '.Owner.ID'
+    Should Be Equal         ${ownerId}            ${DEFAULT_OWNER_ID}
+    ${ownerDisplayName} =   Execute               echo '''${result}''' | jq -r '.Owner.DisplayName'
+    Should Not Be Equal     ${ownerDisplayName}   null
+
 
 Get bucket info with Ozone Shell to check the owner field
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled

@@ -117,13 +117,11 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class used for testing the OM DB Checkpoint provider servlet.
  */
-@Timeout(240)
 public class TestOMDbCheckpointServlet {
   public static final String JAVA_IO_TMPDIR = "java.io.tmpdir";
   private OzoneConfiguration conf;

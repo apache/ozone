@@ -82,6 +82,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private long referencedReplicatedSize;
   private long exclusiveSize;
   private long exclusiveReplicatedSize;
+  private long exclusiveSizeDeltaFromDirDeepCleaning;
+  private long exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
   private boolean deepCleanedDeletedDir;
   private ByteString lastTransactionInfo;
 
@@ -104,6 +106,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.referencedReplicatedSize = b.referencedReplicatedSize;
     this.exclusiveSize = b.exclusiveSize;
     this.exclusiveReplicatedSize = b.exclusiveReplicatedSize;
+    this.exclusiveSizeDeltaFromDirDeepCleaning = b.exclusiveSizeDeltaFromDirDeepCleaning;
+    this.exclusiveReplicatedSizeDeltaFromDirDeepCleaning = b.exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
     this.deepCleanedDeletedDir = b.deepCleanedDeletedDir;
     this.lastTransactionInfo = b.lastTransactionInfo;
   }
@@ -148,7 +152,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.checkpointDir = checkpointDir;
   }
 
-  public boolean getDeepClean() {
+  public boolean isDeepCleaned() {
     return deepClean;
   }
 
@@ -233,6 +237,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setReferencedReplicatedSize(referencedReplicatedSize)
         .setExclusiveSize(exclusiveSize)
         .setExclusiveReplicatedSize(exclusiveReplicatedSize)
+        .setExclusiveSizeDeltaFromDirDeepCleaning(exclusiveSizeDeltaFromDirDeepCleaning)
+        .setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(exclusiveReplicatedSizeDeltaFromDirDeepCleaning)
         .setDeepCleanedDeletedDir(deepCleanedDeletedDir)
         .setLastTransactionInfo(lastTransactionInfo);
   }
@@ -259,6 +265,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     private long referencedReplicatedSize;
     private long exclusiveSize;
     private long exclusiveReplicatedSize;
+    private long exclusiveSizeDeltaFromDirDeepCleaning;
+    private long exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
     private boolean deepCleanedDeletedDir;
     private ByteString lastTransactionInfo;
 
@@ -374,6 +382,19 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       return this;
     }
 
+    /** @param exclusiveSizeDeltaFromDirDeepCleaning - Snapshot exclusive size. */
+    public Builder setExclusiveSizeDeltaFromDirDeepCleaning(long exclusiveSizeDeltaFromDirDeepCleaning) {
+      this.exclusiveSizeDeltaFromDirDeepCleaning = exclusiveSizeDeltaFromDirDeepCleaning;
+      return this;
+    }
+
+    /** @param exclusiveReplicatedSizeDeltaFromDirDeepCleaning - Snapshot exclusive size w/ replication. */
+    public Builder setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(
+        long exclusiveReplicatedSizeDeltaFromDirDeepCleaning) {
+      this.exclusiveReplicatedSizeDeltaFromDirDeepCleaning = exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
+      return this;
+    }
+
     public Builder setDeepCleanedDeletedDir(boolean deepCleanedDeletedDir) {
       this.deepCleanedDeletedDir = deepCleanedDeletedDir;
       return this;
@@ -408,6 +429,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
             .setReferencedReplicatedSize(referencedReplicatedSize)
             .setExclusiveSize(exclusiveSize)
             .setExclusiveReplicatedSize(exclusiveReplicatedSize)
+            .setExclusiveSizeDeltaFromDirDeepCleaning(exclusiveSizeDeltaFromDirDeepCleaning)
+            .setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(exclusiveReplicatedSizeDeltaFromDirDeepCleaning)
             .setDeepCleanedDeletedDir(deepCleanedDeletedDir);
 
     if (pathPreviousSnapshotId != null) {
@@ -483,6 +506,15 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     if (snapshotInfoProto.hasExclusiveReplicatedSize()) {
       osib.setExclusiveReplicatedSize(
           snapshotInfoProto.getExclusiveReplicatedSize());
+    }
+
+    if (snapshotInfoProto.hasExclusiveSizeDeltaFromDirDeepCleaning()) {
+      osib.setExclusiveSizeDeltaFromDirDeepCleaning(snapshotInfoProto.getExclusiveSizeDeltaFromDirDeepCleaning());
+    }
+
+    if (snapshotInfoProto.hasExclusiveReplicatedSizeDeltaFromDirDeepCleaning()) {
+      osib.setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(
+          snapshotInfoProto.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning());
     }
 
     if (snapshotInfoProto.hasDeepCleanedDeletedDir()) {
@@ -571,15 +603,31 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     return exclusiveSize;
   }
 
+  public void setExclusiveSizeDeltaFromDirDeepCleaning(long exclusiveSizeDeltaFromDirDeepCleaning) {
+    this.exclusiveSizeDeltaFromDirDeepCleaning = exclusiveSizeDeltaFromDirDeepCleaning;
+  }
+
+  public long getExclusiveSizeDeltaFromDirDeepCleaning() {
+    return exclusiveSizeDeltaFromDirDeepCleaning;
+  }
+
   public void setExclusiveReplicatedSize(long exclusiveReplicatedSize) {
     this.exclusiveReplicatedSize = exclusiveReplicatedSize;
+  }
+
+  public void setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(long exclusiveReplicatedSizeDeltaFromDirDeepCleaning) {
+    this.exclusiveReplicatedSizeDeltaFromDirDeepCleaning = exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
+  }
+
+  public long getExclusiveReplicatedSizeDeltaFromDirDeepCleaning() {
+    return exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
   }
 
   public long getExclusiveReplicatedSize() {
     return exclusiveReplicatedSize;
   }
 
-  public boolean getDeepCleanedDeletedDir() {
+  public boolean isDeepCleanedDeletedDir() {
     return deepCleanedDeletedDir;
   }
 
@@ -707,7 +755,9 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         ", referencedReplicatedSize: '" + referencedReplicatedSize + '\'' +
         ", exclusiveSize: '" + exclusiveSize + '\'' +
         ", exclusiveReplicatedSize: '" + exclusiveReplicatedSize + '\'' +
-        ", deepCleanedDeletedDir: '" + deepCleanedDeletedDir + '\'' +
+        ", exclusiveSizeDeltaFromDirDeepCleaning: '" + exclusiveSizeDeltaFromDirDeepCleaning + '\'' +
+        ", exclusiveReplicatedSizeDeltaFromDirDeepCleaning: '" + exclusiveReplicatedSizeDeltaFromDirDeepCleaning +
+        "', deepCleanedDeletedDir: '" + deepCleanedDeletedDir + '\'' +
         ", lastTransactionInfo: '" + lastTransactionInfo + '\'' +
         '}';
   }

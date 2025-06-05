@@ -33,15 +33,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -88,9 +89,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       LoggerFactory.getLogger(XceiverClientGrpc.class);
   private final Pipeline pipeline;
   private final ConfigurationSource config;
-  private final Map<UUID, XceiverClientProtocolServiceStub> asyncStubs;
+  private final Map<DatanodeID, XceiverClientProtocolServiceStub> asyncStubs;
   private final XceiverClientMetrics metrics;
-  private final Map<UUID, ManagedChannel> channels;
+  private final Map<DatanodeID, ManagedChannel> channels;
   private final Semaphore semaphore;
   private long timeout;
   private final SecurityConfig secConfig;
@@ -178,14 +179,19 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     ManagedChannel channel = createChannel(dn, port).build();
     XceiverClientProtocolServiceStub asyncStub =
         XceiverClientProtocolServiceGrpc.newStub(channel);
-    asyncStubs.put(dn.getUuid(), asyncStub);
-    channels.put(dn.getUuid(), channel);
+    asyncStubs.put(dn.getID(), asyncStub);
+    channels.put(dn.getID(), channel);
   }
 
   protected NettyChannelBuilder createChannel(DatanodeDetails dn, int port)
       throws IOException {
-    NettyChannelBuilder channelBuilder =
-        NettyChannelBuilder.forAddress(dn.getIpAddress(), port).usePlaintext()
+    String dnHost;
+    if (datanodeUseHostName()) {
+      dnHost = dn.getHostName();
+    } else {
+      dnHost = dn.getIpAddress();
+    }
+    NettyChannelBuilder channelBuilder = NettyChannelBuilder.forAddress(dnHost, port)
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
             .proxyDetector(uri -> null)
             .intercept(new GrpcClientInterceptor());
@@ -205,6 +211,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return channelBuilder;
   }
 
+  private boolean datanodeUseHostName() {
+    return config.getBoolean(
+            HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+            HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+  }
+
   /**
    * Checks if the client has a live connection channel to the specified
    * Datanode.
@@ -213,7 +225,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    */
   @VisibleForTesting
   public boolean isConnected(DatanodeDetails details) {
-    return isConnected(channels.get(details.getUuid()));
+    return isConnected(channels.get(details.getID()));
   }
 
   private boolean isConnected(ManagedChannel channel) {
@@ -567,10 +579,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       ContainerCommandRequestProto request, DatanodeDetails dn)
       throws IOException, InterruptedException {
     checkOpen(dn);
-    UUID dnId = dn.getUuid();
+    DatanodeID dnId = dn.getID();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
-          request.getCmdType(), dn.getIpAddress());
+          request.getCmdType(), dn);
     }
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
@@ -625,7 +637,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throw new IOException("This channel is not connected.");
     }
 
-    ManagedChannel channel = channels.get(dn.getUuid());
+    ManagedChannel channel = channels.get(dn.getID());
     // If the channel doesn't exist for this specific datanode or the channel
     // is closed, just reconnect
     if (!isConnected(channel)) {
@@ -639,7 +651,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     ManagedChannel channel;
     try {
       connectToDatanode(dn);
-      channel = channels.get(dn.getUuid());
+      channel = channels.get(dn.getID());
     } catch (Exception e) {
       throw new IOException("Error while connecting", e);
     }

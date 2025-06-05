@@ -90,8 +90,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.getRaftGroupIdFromOmServiceId;
 import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_SECRET_STORAGE_TYPE;
@@ -102,7 +102,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.Time.monotonicNow;
-import static org.apache.ozone.graph.PrintableGraph.GraphType.FILE_NAME;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -284,7 +283,6 @@ import org.apache.hadoop.ozone.om.service.CompactDBService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
@@ -330,7 +328,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.KMSUtil;
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.graph.PrintableGraph;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -341,6 +338,7 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.LifeCycle;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -492,9 +490,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private IAccessAuthorizer accessAuthorizer;
   // This metadata reader points to the active filesystem
   private OmMetadataReader omMetadataReader;
-  // Wrap active DB metadata reader in ReferenceCounted once to avoid
+  // Wrap active DB metadata reader in UncheckedAutoCloseableSupplier once to avoid
   // instance creation every single time.
-  private ReferenceCounted<IOmMetadataReader> rcOmMetadataReader;
+  private UncheckedAutoCloseableSupplier<IOmMetadataReader> rcOmMetadataReader;
   private OmSnapshotManager omSnapshotManager;
 
   @SuppressWarnings("methodlength")
@@ -965,7 +963,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         this, LOG, AUDIT, metrics, accessAuthorizer);
     // Active DB's OmMetadataReader instance does not need to be reference
     // counted, but it still needs to be wrapped to be consistent.
-    rcOmMetadataReader = new ReferenceCounted<>(omMetadataReader, true, null);
+    rcOmMetadataReader = new UncheckedAutoCloseableSupplier<IOmMetadataReader>() {
+      @Override
+      public IOmMetadataReader get() {
+        return omMetadataReader;
+      }
+
+      @Override
+      public void close() {
+
+      }
+    };
 
     // Reload snapshot feature config flag
     fsSnapshotEnabled = configuration.getBoolean(
@@ -983,10 +991,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         LOG.info("New OM snapshot received with higher layout version {}. " +
             "Attempting to finalize current OM to that version.",
             layoutVersionInDB);
-        OmUpgradeConfig uConf = configuration.getObject(OmUpgradeConfig.class);
         upgradeFinalizer.finalizeAndWaitForCompletion(
             "om-ratis-snapshot", this,
-            uConf.getRatisBasedFinalizationTimeout());
+            config.getRatisBasedFinalizationTimeout());
         if (versionManager.getMetadataLayoutVersion() < layoutVersionInDB) {
           throw new IOException("Unable to finalize OM to the desired layout " +
               "version " + layoutVersionInDB + " present in the snapshot DB.");
@@ -2717,7 +2724,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return allowListAllVolumes;
   }
 
-  public ReferenceCounted<IOmMetadataReader> getOmMetadataReader() {
+  public UncheckedAutoCloseableSupplier<IOmMetadataReader> getOmMetadataReader() {
     return rcOmMetadataReader;
   }
 
@@ -2987,7 +2994,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
-    try (ReferenceCounted<IOmMetadataReader> rcReader = getReader(args)) {
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader = getReader(args)) {
       return rcReader.get().lookupKey(args);
     }
   }
@@ -2999,7 +3006,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public KeyInfoWithVolumeContext getKeyInfo(final OmKeyArgs args,
                                              boolean assumeS3Context)
       throws IOException {
-    try (ReferenceCounted<IOmMetadataReader> rcReader = getReader(args)) {
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader = getReader(args)) {
       return rcReader.get().getKeyInfo(args, assumeS3Context);
     }
   }
@@ -3011,7 +3018,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public ListKeysResult listKeys(String volumeName, String bucketName,
                                  String startKey, String keyPrefix, int maxKeys)
       throws IOException {
-    try (ReferenceCounted<IOmMetadataReader> rcReader =
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader =
              getReader(volumeName, bucketName, keyPrefix)) {
       return rcReader.get().listKeys(
           volumeName, bucketName, startKey, keyPrefix, maxKeys);
@@ -3045,6 +3052,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName));
       auditMap = buildAuditMap(resolvedBucket.realVolume());
       auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+      }
       SnapshotInfo snapshotInfo =
           metadataManager.getSnapshotInfo(resolvedBucket.realVolume(), resolvedBucket.realBucket(), snapshotName);
 
@@ -3840,7 +3851,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
-    try (ReferenceCounted<IOmMetadataReader> rcReader =
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader =
         getReader(args)) {
       return rcReader.get().getFileStatus(args);
     }
@@ -3851,7 +3862,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmKeyInfo lookupFile(OmKeyArgs args) throws IOException {
-    try (ReferenceCounted<IOmMetadataReader> rcReader =
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader =
         getReader(args)) {
       return rcReader.get().lookupFile(args);
     }
@@ -3871,7 +3882,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
-    try (ReferenceCounted<IOmMetadataReader> rcReader =
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader =
         getReader(args)) {
       return rcReader.get().listStatus(
           args, recursive, startKey, numEntries, allowPartialPrefixes);
@@ -3895,7 +3906,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
-    try (ReferenceCounted<IOmMetadataReader> rcReader =
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader =
         getReader(obj)) {
       return rcReader.get().getAcl(obj);
     }
@@ -4859,7 +4870,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public Map<String, String> getObjectTagging(final OmKeyArgs args)
       throws IOException {
-    try (ReferenceCounted<IOmMetadataReader> rcReader = getReader(args)) {
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader = getReader(args)) {
       return rcReader.get().getObjectTagging(args);
     }
   }
@@ -4946,9 +4957,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Caller is responsible of closing the return value.
    * Using try-with-resources is recommended.
    * @param keyArgs OmKeyArgs
-   * @return ReferenceCounted<IOmMetadataReader, SnapshotCache>
+   * @return UncheckedAutoCloseableSupplier<IOmMetadataReader, SnapshotCache>
    */
-  private ReferenceCounted<IOmMetadataReader> getReader(OmKeyArgs keyArgs)
+  private UncheckedAutoCloseableSupplier<IOmMetadataReader> getReader(OmKeyArgs keyArgs)
       throws IOException {
     return omSnapshotManager.getActiveFsMetadataOrSnapshot(
         keyArgs.getVolumeName(), keyArgs.getBucketName(), keyArgs.getKeyName());
@@ -4961,9 +4972,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param volumeName volume name
    * @param bucketName bucket name
    * @param key key path
-   * @return ReferenceCounted<IOmMetadataReader, SnapshotCache>
+   * @return UncheckedAutoCloseableSupplier<IOmMetadataReader, SnapshotCache>
    */
-  private ReferenceCounted<IOmMetadataReader> getReader(
+  private UncheckedAutoCloseableSupplier<IOmMetadataReader> getReader(
           String volumeName, String bucketName, String key) throws IOException {
     return omSnapshotManager.getActiveFsMetadataOrSnapshot(
         volumeName, bucketName, key);
@@ -4974,9 +4985,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Caller is responsible of closing the return value.
    * Using try-with-resources is recommended.
    * @param ozoneObj OzoneObj
-   * @return ReferenceCounted<IOmMetadataReader, SnapshotCache>
+   * @return UncheckedAutoCloseableSupplier<IOmMetadataReader, SnapshotCache>
    */
-  private ReferenceCounted<IOmMetadataReader> getReader(OzoneObj ozoneObj)
+  private UncheckedAutoCloseableSupplier<IOmMetadataReader> getReader(OzoneObj ozoneObj)
       throws IOException {
     return omSnapshotManager.getActiveFsMetadataOrSnapshot(
         ozoneObj.getVolumeName(),
@@ -4995,11 +5006,40 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            boolean forceFullDiff,
                                            boolean disableNativeDiff)
       throws IOException {
-    // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
-    // permission check, since linked bucket permissions and source bucket permissions could be different.
-    ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
-    return omSnapshotManager.getSnapshotDiffReport(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
-        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff, disableNativeDiff);
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.VOLUME, volume);
+    auditMap.put(OzoneConsts.BUCKET, bucket);
+    auditMap.put(OzoneConsts.FROM_SNAPSHOT, fromSnapshot);
+    auditMap.put(OzoneConsts.TO_SNAPSHOT, toSnapshot);
+    auditMap.put(OzoneConsts.TOKEN, token);
+    auditMap.put(OzoneConsts.PAGE_SIZE, String.valueOf(pageSize));
+    auditMap.put(OzoneConsts.FORCE_FULL_DIFF, String.valueOf(forceFullDiff));
+    auditMap.put(OzoneConsts.DISABLE_NATIVE_DIFF, String.valueOf(disableNativeDiff));
+
+    try {
+      // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+      // permission check, since linked bucket permissions and source bucket permissions could be different.
+      ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+      }
+      // do not increment snapshot diff job metrics here, since it is not
+      // a job, but a request.
+      return omSnapshotManager.getSnapshotDiffReport(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
+          fromSnapshot, toSnapshot, token, pageSize, forceFullDiff, disableNativeDiff);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.GET_SNAPSHOT_DIFF_REPORT,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.GET_SNAPSHOT_DIFF_REPORT,
+            auditMap));
+      }
+    }
   }
 
   @Override
@@ -5008,9 +5048,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                                        String fromSnapshot,
                                                        String toSnapshot)
       throws IOException {
-    ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
-    return omSnapshotManager.cancelSnapshotDiff(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
-        fromSnapshot, toSnapshot);
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.VOLUME, volume);
+    auditMap.put(OzoneConsts.BUCKET, bucket);
+    auditMap.put(OzoneConsts.FROM_SNAPSHOT, fromSnapshot);
+    auditMap.put(OzoneConsts.TO_SNAPSHOT, toSnapshot);
+
+    try {
+      ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+      }
+      return omSnapshotManager.cancelSnapshotDiff(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
+          fromSnapshot, toSnapshot);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.CANCEL_SNAPSHOT_DIFF_JOBS,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.CANCEL_SNAPSHOT_DIFF_JOBS,
+            auditMap));
+      }
+    }
   }
 
   @Override
@@ -5021,43 +5084,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       boolean listAllStatus,
       String prevSnapshotDiffJob,
       int maxListResult) throws IOException {
-    ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
-    if (isAclEnabled) {
-      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, volume, bucket, null);
-    }
-
-    return omSnapshotManager.getSnapshotDiffList(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
-        jobStatus, listAllStatus, prevSnapshotDiffJob, maxListResult);
-  }
-
-  @Override
-  public String printCompactionLogDag(String fileNamePrefix,
-                                      String graphType)
-      throws IOException {
-    checkAdminUserPrivilege("print compaction DAG.");
-
-    if (StringUtils.isBlank(fileNamePrefix)) {
-      fileNamePrefix = "dag-";
-    } else {
-      fileNamePrefix = fileNamePrefix + "-";
-    }
-    File tempFile = File.createTempFile(fileNamePrefix, ".png");
-
-    PrintableGraph.GraphType type;
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.VOLUME, volume);
+    auditMap.put(OzoneConsts.BUCKET, bucket);
+    auditMap.put(OzoneConsts.JOB_STATUS, jobStatus);
 
     try {
-      type = PrintableGraph.GraphType.valueOf(graphType);
-    } catch (IllegalArgumentException e) {
-      type = FILE_NAME;
+      ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, volume, bucket, null);
+      }
+
+      return omSnapshotManager.getSnapshotDiffList(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
+          jobStatus, listAllStatus, prevSnapshotDiffJob, maxListResult);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_SNAPSHOT_DIFF_JOBS,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_SNAPSHOT_DIFF_JOBS,
+            auditMap));
+      }
     }
-
-    getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer()
-        .pngPrintMutableGraph(tempFile.getAbsolutePath(), type);
-
-    return String.format("Graph was generated at '\\tmp\\%s' on OM " +
-        "node '%s'.", tempFile.getName(), getOMNodeId());
   }
 
   private String reconfOzoneAdmins(String newVal) {
