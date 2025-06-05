@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
  * A buffer used by {@link Codec}
  * for supporting RocksDB direct {@link ByteBuffer} APIs.
  */
-public class CodecBuffer implements UncheckedAutoCloseable {
+public class CodecBuffer implements UncheckedAutoCloseable, Comparable<byte[]> {
   private static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
 
   private static final ByteBufAllocator POOL = PooledByteBufAllocator.DEFAULT;
@@ -374,6 +374,19 @@ public class CodecBuffer implements UncheckedAutoCloseable {
       return false;
     }
     return buf.slice(buf.readerIndex(), length).equals(prefix.buf);
+  }
+
+  public int compareTo(byte[] other) {
+    Objects.requireNonNull(other, "other == null");
+    final int size = Math.min(readableBytes(), other.length);
+    for (int i = 0; i < size; i++) {
+      final int b1 = buf.getByte(buf.readerIndex() + i) & 0xff;
+      final int b2 = other[i] & 0xff;
+      if (b1 != b2) {
+        return b1 - b2;
+      }
+    }
+    return readableBytes() - other.length;
   }
 
   /** @return an {@link InputStream} reading from this buffer. */

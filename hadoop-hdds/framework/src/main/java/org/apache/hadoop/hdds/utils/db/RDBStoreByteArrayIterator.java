@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.IOException;
 import java.util.Arrays;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.ratis.util.ReferenceCountedObject;
 
 /**
  * RocksDB store iterator using the byte[] API.
@@ -33,14 +34,10 @@ class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
   }
 
   @Override
-  byte[] key() {
-    return getRocksDBIterator().get().key();
-  }
-
-  @Override
-  Table.KeyValue<byte[], byte[]> getKeyValue() {
+  ReferenceCountedObject<RawKeyValue<byte[]>> getKeyValue() {
     final ManagedRocksIterator i = getRocksDBIterator();
-    return RawKeyValue.create(i.get().key(), i.get().value());
+    RawKeyValue<byte[]> rawKV = RawKeyValue.create(i.get().key(), i.get().value());
+    return ReferenceCountedObject.wrap(rawKV);
   }
 
   @Override
