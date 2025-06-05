@@ -81,13 +81,13 @@ public class TestReconInsightsForDeletedDirectories {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestReconInsightsForDeletedDirectories.class);
 
-  private static MiniOzoneCluster cluster;
-  private static FileSystem fs;
-  private static String volumeName;
-  private static String bucketName;
-  private static ReplicationConfig replicationConfig;
-  private static OzoneClient client;
-  private static ReconService recon;
+  protected static MiniOzoneCluster cluster;
+  protected static FileSystem fs;
+  protected static String volumeName;
+  protected static String bucketName;
+  protected static ReplicationConfig replicationConfig;
+  protected static OzoneClient client;
+  protected static ReconService recon;
 
   @BeforeAll
   public static void init() throws Exception {
