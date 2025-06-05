@@ -167,7 +167,13 @@ message AllocateScmBlockRequestProto {
  * multiple number of keys (and their blocks).
  */
 message DeleteScmKeyBlocksRequestProto {
-  repeated DeletedKeyBlocks keyBlocks = 1;
+
+  // Field kept for rolling upgrades.  It contains KeyBlocks without
+  // per-block size information.
+  repeated KeyBlocks keyBlocks = 1 [deprecated = true];
+
+  // New field that carries DeletedBlocks, each of which includes `usedBytes`.
+  repeated DeletedKeyBlocks deletedKeyBlocks = 2;
 }
 
 /**
