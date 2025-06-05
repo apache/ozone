@@ -37,27 +37,29 @@ public class DiskBalancerInfo {
   private long failureCount;
   private long bytesToMove;
   private long balancedBytes;
+  private boolean paused;
 
   public DiskBalancerInfo(boolean shouldRun, double threshold,
-      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven) {
+      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, boolean paused) {
     this(shouldRun, threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
-        DiskBalancerVersion.DEFAULT_VERSION);
+        DiskBalancerVersion.DEFAULT_VERSION, paused);
   }
 
   public DiskBalancerInfo(boolean shouldRun, double threshold,
-      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version) {
+      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version, boolean paused) {
     this.shouldRun = shouldRun;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
     this.parallelThread = parallelThread;
     this.stopAfterDiskEven = stopAfterDiskEven;
     this.version = version;
+    this.paused = paused;
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public DiskBalancerInfo(boolean shouldRun, double threshold,
       long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version,
-      long successCount, long failureCount, long bytesToMove, long balancedBytes) {
+      long successCount, long failureCount, long bytesToMove, long balancedBytes, boolean paused) {
     this.shouldRun = shouldRun;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
@@ -68,6 +70,7 @@ public class DiskBalancerInfo {
     this.failureCount = failureCount;
     this.bytesToMove = bytesToMove;
     this.balancedBytes = balancedBytes;
+    this.paused = paused;
   }
 
   public DiskBalancerInfo(boolean shouldRun,
@@ -149,6 +152,14 @@ public class DiskBalancerInfo {
 
   public void setStopAfterDiskEven(boolean stopAfterDiskEven) {
     this.stopAfterDiskEven = stopAfterDiskEven;
+  }
+
+  public boolean isPaused() {
+    return paused;
+  }
+
+  public void setPaused(boolean paused) {
+    this.paused = paused;
   }
 
   public DiskBalancerVersion getVersion() {
