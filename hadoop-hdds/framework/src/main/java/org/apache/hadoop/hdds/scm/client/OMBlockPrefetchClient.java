@@ -68,15 +68,6 @@ import org.slf4j.LoggerFactory;
  */
 public class OMBlockPrefetchClient {
   private static final Logger LOG = LoggerFactory.getLogger(OMBlockPrefetchClient.class);
-  private final ScmBlockLocationProtocol scmBlockLocationProtocol;
-  private int maxBlocks;
-  private int minBlocks;
-  private boolean useHostname;
-  private DNSToSwitchMapping dnsToSwitchMapping;
-  private final Map<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>> blockQueueMap =
-      new ConcurrentHashMap<>();
-  private long expiryDuration;
-  private OMBlockPrefetchMetrics metrics;
   private static final ReplicationConfig RATIS_THREE =
       ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE);
@@ -92,6 +83,15 @@ public class OMBlockPrefetchClient {
   private static final ReplicationConfig XOR_10_4_4096 =
       ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
           toProto(10, 4, ECReplicationConfig.EcCodec.XOR, 4096));
+  private final ScmBlockLocationProtocol scmBlockLocationProtocol;
+  private int maxBlocks;
+  private int minBlocks;
+  private boolean useHostname;
+  private DNSToSwitchMapping dnsToSwitchMapping;
+  private final Map<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>> blockQueueMap =
+      new ConcurrentHashMap<>();
+  private long expiryDuration;
+  private OMBlockPrefetchMetrics metrics;
   private ExecutorService prefetchExecutor;
   private final AtomicBoolean isPrefetching = new AtomicBoolean(false);
 
@@ -261,7 +261,7 @@ public class OMBlockPrefetchClient {
     prefetchExecutor.submit(() -> {
       try {
         List<AllocatedBlock> prefetchedBlocks = scmBlockLocationProtocol.allocateBlock(blockSize, blocksToPrefetch,
-            repConfig, serviceID, new ExcludeList(), null);
+            repConfig, serviceID, (ExcludeList) Collections.emptyList(), null);
         if (prefetchedBlocks != null && !prefetchedBlocks.isEmpty()) {
           ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(repConfig);
           if (queue != null) {
