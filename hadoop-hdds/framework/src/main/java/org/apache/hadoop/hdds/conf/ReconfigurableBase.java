@@ -189,8 +189,6 @@ public abstract class ReconfigurableBase extends Configured implements Reconfigu
         this.parent.status = Collections.unmodifiableMap(results);
         this.parent.reconfigThread = null;
 
-        LOG.info("Reconfiguration completed. {} properties were updated.", results.size());
-
         for (Consumer<ReconfigurationTaskStatus> callback : parent.reconfigurationCompleteCallbacks) {
           try {
             callback.accept(parent.getReconfigurationTaskStatus());

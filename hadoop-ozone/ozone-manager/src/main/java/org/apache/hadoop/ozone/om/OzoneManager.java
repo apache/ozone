@@ -525,19 +525,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 this::reconfOzoneKeyDeletingLimitPerTask)
             .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval);
 
-    reconfigurationHandler.setReconfigurationCompleteCallback((status, newConf) -> {
-      if (status.getStatus() != null && !status.getStatus().isEmpty()) {
-        LOG.info("Reconfiguration completed with {} updated properties.", status.getStatus().size());
-      } else {
-        LOG.info("Reconfiguration complete. No properties were changed.");
-      }
-    });
-
-    reconfigurationHandler.registerCompleteCallback((changedKeys, newConf) -> {
-      if (changedKeys.containsKey(OZONE_DIR_DELETING_SERVICE_INTERVAL)) {
-        getKeyManager().getDirDeletingService().updateAndRestart(getConfiguration());
-      }
-    });
+    reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);

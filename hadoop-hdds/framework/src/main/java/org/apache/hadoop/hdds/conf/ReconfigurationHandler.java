@@ -36,6 +36,8 @@ import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.ReconfigurationUtil;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.ratis.util.function.CheckedConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Keeps track of reconfigurable properties and the corresponding functions
@@ -44,6 +46,7 @@ import org.apache.ratis.util.function.CheckedConsumer;
 public class ReconfigurationHandler extends ReconfigurableBase
     implements ReconfigureProtocol {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ReconfigurationHandler.class);
   private final String name;
   private final CheckedConsumer<String, IOException> requireAdminPrivilege;
   private final Map<String, UnaryOperator<String>> properties =
@@ -59,6 +62,17 @@ public class ReconfigurationHandler extends ReconfigurableBase
   public void setReconfigurationCompleteCallback(BiConsumer<ReconfigurationTaskStatus, Configuration>
       statusListener) {
     this.reconfigurationStatusListener = statusListener;
+  }
+
+  public BiConsumer<ReconfigurationTaskStatus, Configuration> defaultLoggingCallback() {
+    return (status, conf) -> {
+      if (status.getStatus() != null && !status.getStatus().isEmpty()) {
+        LOG.info("Reconfiguration completed with {} updated properties.",
+            status.getStatus().size());
+      } else {
+        LOG.info("Reconfiguration complete. No properties were changed.");
+      }
+    };
   }
 
   private void triggerCompleteCallbacks(ReconfigurationTaskStatus status, Configuration newConf) {

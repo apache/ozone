@@ -104,6 +104,8 @@ public abstract class BackgroundService {
     if (exec == null || exec.isShutdown() || exec.isTerminated()) {
       initExecutorAndThreadGroup();
     }
+    LOG.info("Starting service {} with interval {} {}", serviceName,
+        interval, unit.name().toLowerCase());
     exec.scheduleWithFixedDelay(service, 0, interval, unit);
   }
 
