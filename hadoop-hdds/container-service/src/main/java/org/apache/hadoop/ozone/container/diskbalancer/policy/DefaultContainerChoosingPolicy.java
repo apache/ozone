@@ -17,8 +17,13 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
+import static java.util.concurrent.TimeUnit.HOURS;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -33,17 +38,32 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   public static final Logger LOG = LoggerFactory.getLogger(
       DefaultContainerChoosingPolicy.class);
 
+  private final ThreadLocal<Cache<HddsVolume, Iterator<Container<?>>>> containerIteratorCache =
+      ThreadLocal.withInitial(
+          () -> CacheBuilder.newBuilder().recordStats().expireAfterAccess(1, HOURS).build());
+
   @Override
   public ContainerData chooseContainer(OzoneContainer ozoneContainer,
       HddsVolume hddsVolume, Set<Long> inProgressContainerIDs) {
-    Iterator<Container<?>> itr = ozoneContainer.getController()
-        .getContainers(hddsVolume);
+    Iterator<Container<?>> itr;
+    try {
+      itr = containerIteratorCache.get().get(hddsVolume,
+          () -> ozoneContainer.getController().getContainers(hddsVolume));
+    } catch (ExecutionException e) {
+      LOG.warn("Failed to get container iterator for volume {}", hddsVolume, e);
+      return null;
+    }
+
     while (itr.hasNext()) {
       ContainerData containerData = itr.next().getContainerData();
       if (!inProgressContainerIDs.contains(
           containerData.getContainerID()) && containerData.isClosed()) {
         return containerData;
       }
+    }
+
+    if (!itr.hasNext()) {
+      containerIteratorCache.get().invalidate(hddsVolume);
     }
     return null;
   }
