@@ -4201,7 +4201,7 @@
   </property>
 
   <property>
-    <name>ozone.om.allocate.block.cache_enabled</name>
+    <name>ozone.om.allocate.block.cache.enabled</name>
     <value>false</value>
     <tag>OZONE, OM, SCM</tag>
     <description>

@@ -433,7 +433,7 @@ public final class OMConfigKeys {
       true;
 
   public static final String OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED =
-      "ozone.om.allocate.block.cache_enabled";
+      "ozone.om.allocate.block.cache.enabled";
   public static final boolean OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED_DEFAULT =
       false;
 
