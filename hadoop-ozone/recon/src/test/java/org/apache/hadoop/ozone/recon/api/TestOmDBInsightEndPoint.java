@@ -1442,20 +1442,17 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
                                  String keyName, boolean isFile) {
-    return new OmKeyInfo.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setFile(isFile)
-        .setObjectID(generateUniqueRandomLong())
-        .setReplicationConfig(StandaloneReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.ONE))
-        .setDataSize(random.nextLong())
-        .build();
+    return buildOmKeyInfo(volumeName, bucketName, keyName, isFile,
+        StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
   }
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
                                  String keyName, boolean isFile, ReplicationConfig replicationConfig) {
+    return buildOmKeyInfo(volumeName, bucketName, keyName, isFile, replicationConfig);
+  }
+
+  private OmKeyInfo buildOmKeyInfo(String volumeName, String bucketName,
+                                   String keyName, boolean isFile, ReplicationConfig replicationConfig) {
     return new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
