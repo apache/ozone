@@ -240,7 +240,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         maxTotalSstSize.set(Long.MAX_VALUE);
         Path checkpointDir = checkpoint.getCheckpointLocation();
         writeDBToArchive(copyFiles, sstFilesToExclude, checkpointDir,
-            maxTotalSstSize, archiveOutputStream, false, tmpdir);
+            maxTotalSstSize, archiveOutputStream, tmpdir);
         allPathsToVisit.add(checkpointDir);
         generateAndWriteHardlinkFile(checkpointDir, allPathsToVisit, archiveOutputStream);
       }
