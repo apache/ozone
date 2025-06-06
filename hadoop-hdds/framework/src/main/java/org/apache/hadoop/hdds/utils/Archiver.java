@@ -123,7 +123,7 @@ public final class Archiver {
       ArchiveOutputStream<TarArchiveEntry> archiveOutput, Path tmpDir) throws IOException {
     File link = null;
     try {
-      Files.createLink(tmpDir.resolve(file.getName()), file.toPath());
+      Files.createLink(tmpDir.resolve(entryName), file.toPath());
       link = tmpDir.resolve(file.getName()).toFile();
       TarArchiveEntry entry = archiveOutput.createArchiveEntry(link, entryName);
       archiveOutput.putArchiveEntry(entry);

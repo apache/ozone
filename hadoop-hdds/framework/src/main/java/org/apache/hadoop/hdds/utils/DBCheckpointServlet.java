@@ -122,6 +122,10 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
+  public File getBootstrapTempData() {
+    return bootstrapTempData;
+  }
+
   private boolean hasPermission(UserGroupInformation user) {
     // Check ACL for dbCheckpoint only when global Ozone ACL and SPNEGO is
     // enabled
@@ -132,7 +136,7 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
-  private static void logSstFileList(Collection<String> sstList, String msg, int sampleSize) {
+  protected static void logSstFileList(Collection<String> sstList, String msg, int sampleSize) {
     int count = sstList.size();
     if (LOG.isDebugEnabled()) {
       LOG.debug(msg, count, "", sstList);
@@ -198,20 +202,16 @@ public class DBCheckpointServlet extends HttpServlet
       flush = Boolean.parseBoolean(flushParam);
     }
 
-    Set<String> receivedSstFiles = new HashSet<>();
+    processMetadataSnapshotRequest(request, response, isFormData, checkpoint, flush);
+  }
+
+  protected void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response, boolean isFormData,
+      DBCheckpoint checkpoint, boolean flush) {
     List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?
         parseFormDataParameters(request) : request.getParameterValues(
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
-    if (sstParam != null) {
-      receivedSstFiles.addAll(
-          Arrays.stream(sstParam)
-              .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
-              .distinct()
-              .collect(Collectors.toList()));
-      logSstFileList(receivedSstFiles,
-          "Received list of {} SST files to be excluded{}: {}", 5);
-    }
+    Set<String> receivedSstFiles = fetchSstFilesReceived(sstParam);
 
     Path tmpdir = null;
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
@@ -238,7 +238,7 @@ public class DBCheckpointServlet extends HttpServlet
 
       Instant start = Instant.now();
       writeDbDataToStream(checkpoint, request, response.getOutputStream(),
-          receivedSstFiles,  tmpdir);
+          receivedSstFiles, tmpdir);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
@@ -278,6 +278,16 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
+  protected static Set<String> fetchSstFilesReceived(String[] sstParam) {
+    Set<String> receivedSstFiles = new HashSet<>();
+    if (sstParam != null) {
+      receivedSstFiles.addAll(
+          Arrays.stream(sstParam).filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX)).distinct().collect(Collectors.toList()));
+      logSstFileList(receivedSstFiles, "Received list of {} SST files to be excluded{}: {}", 5);
+    }
+    return receivedSstFiles;
+  }
+
   public DBCheckpoint getCheckpoint(Path ignoredTmpdir, boolean flush)
       throws IOException {
     return dbStore.getCheckpoint(flush);
@@ -288,7 +298,7 @@ public class DBCheckpointServlet extends HttpServlet
    * @param request the HTTP servlet request
    * @return array of parsed sst form data parameters for exclusion
    */
-  private static String[] parseFormDataParameters(HttpServletRequest request) {
+  protected static String[] parseFormDataParameters(HttpServletRequest request) {
     ServletFileUpload upload = new ServletFileUpload();
     List<String> sstParam = new ArrayList<>();
 

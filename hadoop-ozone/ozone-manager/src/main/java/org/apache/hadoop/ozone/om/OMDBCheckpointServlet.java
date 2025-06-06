@@ -96,7 +96,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
-  protected static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
   private transient BootstrapStateHandler.Lock lock;
@@ -334,7 +334,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         compactionLogDir.getOriginalDir().toPath());
   }
 
-  protected void logEstimatedTarballSize(
+  private void logEstimatedTarballSize(
       DBCheckpoint checkpoint, boolean includeSnapshotData) {
     try {
       Counters.PathCounters counters = Counters.longPathCounters();
@@ -365,7 +365,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
    * @param waitForDir Wait for dir to exist on fs.
    * @return Set of expected snapshot dirs.
    */
-  protected Set<Path> getSnapshotDirs(DBCheckpoint checkpoint, boolean waitForDir)
+  private Set<Path> getSnapshotDirs(DBCheckpoint checkpoint, boolean waitForDir)
       throws IOException {
 
     OzoneConfiguration conf = getConf();
@@ -569,7 +569,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   // Returns value of http request parameter.
-  protected static boolean includeSnapshotData(HttpServletRequest request) {
+  private static boolean includeSnapshotData(HttpServletRequest request) {
     String includeParam =
         request.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA);
     return Boolean.parseBoolean(includeParam);
@@ -654,7 +654,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   @Nonnull
-  protected static Path getMetaDirPath(Path checkpointLocation) {
+  private static Path getMetaDirPath(Path checkpointLocation) {
     // This check is done to take care of findbugs else below getParent()
     // should not be null.
     Path locationParent = checkpointLocation.getParent();
@@ -676,7 +676,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         .getConfiguration();
   }
 
-  protected Path getSnapshotDir() {
+  private Path getSnapshotDir() {
     OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
     RDBStore store = (RDBStore) om.getMetadataManager().getStore();
     // store.getSnapshotsParentDir() returns path to checkpointState (e.g. <om-data-dir>/db.snapshots/checkpointState)
