@@ -243,7 +243,7 @@ public class VolumeUsage {
     SpaceUsageSource spaceUsageSource = realUsage();
     long reservedUsed = getOtherUsed(spaceUsageSource);
     if (reservedInBytes > 0 && reservedUsed > reservedInBytes) {
-      LOG.warn("Reserved usages {} is higher than actual allocated reserved space {}.", reservedInBytes, reservedUsed);
+      LOG.warn("Reserved usages {} is higher than actual allocated reserved space {}.", reservedUsed, reservedInBytes);
       return false;
     }
     return true;

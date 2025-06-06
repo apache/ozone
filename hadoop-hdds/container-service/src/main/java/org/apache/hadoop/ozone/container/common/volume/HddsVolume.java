@@ -361,7 +361,7 @@ public class HddsVolume extends StorageVolume {
     } else if (committedBytes.get() > 0 && currentUsage.getAvailable() < committedBytes.get() + getFreeSpaceToSpare) {
       LOG.warn("Volume {} has insufficient space for on-going container write operation. " +
               "Committed: {}, Available: {}, Free space to spare: {}",
-          getStorageDir(), committedBytes, currentUsage.getAvailable(), getFreeSpaceToSpare);
+          getStorageDir(), committedBytes.get(), currentUsage.getAvailable(), getFreeSpaceToSpare);
       isEnoughSpaceAvailable = false;
     }
 
