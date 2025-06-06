@@ -35,7 +35,7 @@ public final class ReconConstants {
   // By default, limit the number of results returned
 
   /**
-   * The maximum number of top disk usage records to return in a /du response.
+   * The maximum number of top disk usage records to return in a /namespace/usage response.
    */
   public static final int DISK_USAGE_TOP_RECORDS_LIMIT = 30;
   public static final String DEFAULT_OPEN_KEY_INCLUDE_NON_FSO = "false";
