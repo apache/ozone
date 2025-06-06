@@ -574,6 +574,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     DirectoryDeletingService dirDeletingService = cluster.getOzoneManager().getKeyManager().getDirDeletingService();
     // Suspend KeyDeletingService
     dirDeletingService.suspend();
+    GenericTestUtils.waitFor(() -> !dirDeletingService.isRunningOnAOS(), 1000, 10000);
     Random random = new Random();
     final String testVolumeName = "volume" + random.nextInt();
     final String testBucketName = "bucket" + random.nextInt();

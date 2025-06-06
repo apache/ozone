@@ -25,17 +25,31 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -47,27 +61,34 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -494,6 +515,233 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     snap1 = null;
     rcSnap1.close();
+  }
+
+  private DirectoryDeletingService getMockedDirectoryDeletingService(AtomicBoolean dirDeletionWaitStarted,
+                                                                     AtomicBoolean dirDeletionStarted)
+      throws InterruptedException, TimeoutException, IOException {
+    OzoneManager ozoneManager = Mockito.spy(om);
+    om.getKeyManager().getDirDeletingService().shutdown();
+    KeyManager keyManager = Mockito.spy(om.getKeyManager());
+    when(ozoneManager.getKeyManager()).thenReturn(keyManager);
+    GenericTestUtils.waitFor(() -> om.getKeyManager().getDirDeletingService().getThreadCount() == 0, 1000,
+        100000);
+    DirectoryDeletingService directoryDeletingService = Mockito.spy(new DirectoryDeletingService(10000,
+        TimeUnit.MILLISECONDS, 100000, ozoneManager, cluster.getConf(), 1, false));
+    directoryDeletingService.shutdown();
+    GenericTestUtils.waitFor(() -> directoryDeletingService.getThreadCount() == 0, 1000,
+        100000);
+    doAnswer(i -> {
+      // Wait for SDS to reach DDS wait block before processing any deleted directories.
+      GenericTestUtils.waitFor(dirDeletionWaitStarted::get, 1000, 100000);
+      dirDeletionStarted.set(true);
+      return i.callRealMethod();
+    }).when(keyManager).getDeletedDirEntries();
+    return directoryDeletingService;
+  }
+
+  private KeyDeletingService getMockedKeyDeletingService(AtomicBoolean keyDeletionWaitStarted,
+                                                         AtomicBoolean keyDeletionStarted)
+      throws InterruptedException, TimeoutException, IOException {
+    OzoneManager ozoneManager = Mockito.spy(om);
+    om.getKeyManager().getDeletingService().shutdown();
+    GenericTestUtils.waitFor(() -> om.getKeyManager().getDeletingService().getThreadCount() == 0, 1000,
+        100000);
+    KeyManager keyManager = Mockito.spy(om.getKeyManager());
+    when(ozoneManager.getKeyManager()).thenReturn(keyManager);
+    KeyDeletingService keyDeletingService = Mockito.spy(new KeyDeletingService(ozoneManager,
+        ozoneManager.getScmClient().getBlockClient(), 10000,
+        100000, cluster.getConf(), 10, false));
+    keyDeletingService.shutdown();
+    GenericTestUtils.waitFor(() -> keyDeletingService.getThreadCount() == 0, 1000,
+        100000);
+    when(keyManager.getPendingDeletionKeys(any(), anyInt())).thenAnswer(i -> {
+      // wait for SDS to reach the KDS wait block before processing any key.
+      GenericTestUtils.waitFor(keyDeletionWaitStarted::get, 1000, 100000);
+      keyDeletionStarted.set(true);
+      return i.callRealMethod();
+    });
+    return keyDeletingService;
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  private SnapshotDeletingService getMockedSnapshotDeletingService(KeyDeletingService keyDeletingService,
+                                                                   DirectoryDeletingService directoryDeletingService,
+                                                                   AtomicBoolean snapshotDeletionStarted,
+                                                                   AtomicBoolean keyDeletionWaitStarted,
+                                                                   AtomicBoolean dirDeletionWaitStarted,
+                                                                   AtomicBoolean keyDeletionStarted,
+                                                                   AtomicBoolean dirDeletionStarted,
+                                                                   OzoneBucket testBucket)
+      throws InterruptedException, TimeoutException, IOException {
+    OzoneManager ozoneManager = Mockito.spy(om);
+    om.getKeyManager().getSnapshotDeletingService().shutdown();
+    GenericTestUtils.waitFor(() -> om.getKeyManager().getSnapshotDeletingService().getThreadCount() == 0, 1000,
+        100000);
+    KeyManager keyManager = Mockito.spy(om.getKeyManager());
+    OmMetadataManagerImpl omMetadataManager = Mockito.spy((OmMetadataManagerImpl)om.getMetadataManager());
+    SnapshotChainManager unMockedSnapshotChainManager =
+        ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager();
+    SnapshotChainManager snapshotChainManager = Mockito.spy(unMockedSnapshotChainManager);
+    OmSnapshotManager omSnapshotManager = Mockito.spy(om.getOmSnapshotManager());
+    when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
+    when(ozoneManager.getKeyManager()).thenReturn(keyManager);
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    when(omMetadataManager.getSnapshotChainManager()).thenReturn(snapshotChainManager);
+    when(keyManager.getDeletingService()).thenReturn(keyDeletingService);
+    when(keyManager.getDirDeletingService()).thenReturn(directoryDeletingService);
+    SnapshotDeletingService snapshotDeletingService = Mockito.spy(new SnapshotDeletingService(10000,
+        100000, ozoneManager));
+    snapshotDeletingService.shutdown();
+    GenericTestUtils.waitFor(() -> snapshotDeletingService.getThreadCount() == 0, 1000,
+        100000);
+    when(snapshotChainManager.iterator(anyBoolean())).thenAnswer(i -> {
+      Iterator<UUID> itr = (Iterator<UUID>) i.callRealMethod();
+      return Lists.newArrayList(itr).stream().filter(uuid -> {
+        try {
+          SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(om, snapshotChainManager, uuid);
+          return snapshotInfo.getBucketName().equals(testBucket.getName()) &&
+              snapshotInfo.getVolumeName().equals(testBucket.getVolumeName());
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }).iterator();
+    });
+    when(snapshotChainManager.getLatestGlobalSnapshotId())
+        .thenAnswer(i -> unMockedSnapshotChainManager.getLatestGlobalSnapshotId());
+    when(snapshotChainManager.getOldestGlobalSnapshotId())
+        .thenAnswer(i -> unMockedSnapshotChainManager.getOldestGlobalSnapshotId());
+    doAnswer(i -> {
+      // KDS wait block reached in SDS.
+      GenericTestUtils.waitFor(() -> {
+        return keyDeletingService.isRunningOnAOS();
+      }, 1000, 100000);
+      keyDeletionWaitStarted.set(true);
+      return i.callRealMethod();
+    }).when(snapshotDeletingService).waitForKeyDeletingService();
+    doAnswer(i -> {
+      // DDS wait block reached in SDS.
+      GenericTestUtils.waitFor(directoryDeletingService::isRunningOnAOS, 1000, 100000);
+      dirDeletionWaitStarted.set(true);
+      return i.callRealMethod();
+    }).when(snapshotDeletingService).waitForDirDeletingService();
+    doAnswer(i -> {
+      // Assert KDS & DDS is not running when SDS starts moving entries & assert all wait block, KDS processing
+      // AOS block & DDS AOS block have been executed.
+      Assertions.assertTrue(keyDeletionWaitStarted.get());
+      Assertions.assertTrue(dirDeletionWaitStarted.get());
+      Assertions.assertTrue(keyDeletionStarted.get());
+      Assertions.assertTrue(dirDeletionStarted.get());
+      Assertions.assertFalse(keyDeletingService.isRunningOnAOS());
+      Assertions.assertFalse(directoryDeletingService.isRunningOnAOS());
+      snapshotDeletionStarted.set(true);
+      return i.callRealMethod();
+    }).when(omSnapshotManager).getSnapshot(anyString(), anyString(), anyString());
+    return snapshotDeletingService;
+  }
+
+  @Test
+  @Order(4)
+  @Flaky("HDDS-11847")
+  public void testParallelExcecutionOfKeyDeletionAndSnapshotDeletion() throws Exception {
+    AtomicBoolean keyDeletionWaitStarted = new AtomicBoolean(false);
+    AtomicBoolean dirDeletionWaitStarted = new AtomicBoolean(false);
+    AtomicBoolean keyDeletionStarted = new AtomicBoolean(false);
+    AtomicBoolean dirDeletionStarted = new AtomicBoolean(false);
+    AtomicBoolean snapshotDeletionStarted = new AtomicBoolean(false);
+    Random random = new Random();
+    String bucketName = "bucket" + random.nextInt();
+    BucketArgs bucketArgs = new BucketArgs.Builder()
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .build();
+    OzoneBucket testBucket = TestDataUtil.createBucket(
+        client, VOLUME_NAME, bucketArgs, bucketName);
+    // mock keyDeletingService
+    KeyDeletingService keyDeletingService = getMockedKeyDeletingService(keyDeletionWaitStarted, keyDeletionStarted);
+
+    // mock dirDeletingService
+    DirectoryDeletingService directoryDeletingService = getMockedDirectoryDeletingService(dirDeletionWaitStarted,
+        dirDeletionStarted);
+
+    // mock snapshotDeletingService.
+    SnapshotDeletingService snapshotDeletingService = getMockedSnapshotDeletingService(keyDeletingService,
+        directoryDeletingService, snapshotDeletionStarted, keyDeletionWaitStarted, dirDeletionWaitStarted,
+        keyDeletionStarted, dirDeletionStarted, testBucket);
+    createSnapshotFSODataForBucket(testBucket);
+    List<Table.KeyValue<String, String>> renamesKeyEntries;
+    List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries;
+    List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries;
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
+             om.getOmSnapshotManager().getSnapshot(testBucket.getVolumeName(), testBucket.getName(),
+                 testBucket.getName() + "snap2")) {
+      renamesKeyEntries = snapshot.get().getKeyManager().getRenamesKeyEntries(testBucket.getVolumeName(),
+          testBucket.getName(), "", (kv) -> true, 1000);
+      deletedKeyEntries = snapshot.get().getKeyManager().getDeletedKeyEntries(testBucket.getVolumeName(),
+          testBucket.getName(), "", (kv) -> true, 1000);
+      deletedDirEntries = snapshot.get().getKeyManager().getDeletedDirEntries(testBucket.getVolumeName(),
+          testBucket.getName(), 1000);
+    }
+    Thread keyDeletingThread = new Thread(() -> {
+      try {
+        keyDeletingService.runPeriodicalTaskNow();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    });
+    Thread directoryDeletingThread = new Thread(() -> {
+      try {
+        directoryDeletingService.runPeriodicalTaskNow();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    });
+    ExecutorService snapshotDeletingThread = Executors.newFixedThreadPool(1);
+    Runnable snapshotDeletionRunnable = () -> {
+      try {
+        snapshotDeletingService.runPeriodicalTaskNow();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    };
+    keyDeletingThread.start();
+    directoryDeletingThread.start();
+    Future<?> future = snapshotDeletingThread.submit(snapshotDeletionRunnable);
+    GenericTestUtils.waitFor(snapshotDeletionStarted::get, 1000, 30000);
+    future.get();
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
+             om.getOmSnapshotManager().getSnapshot(testBucket.getVolumeName(), testBucket.getName(),
+                 testBucket.getName() + "snap2")) {
+      Assertions.assertEquals(Collections.emptyList(),
+          snapshot.get().getKeyManager().getRenamesKeyEntries(testBucket.getVolumeName(),
+          testBucket.getName(), "", (kv) -> true, 1000));
+      Assertions.assertEquals(Collections.emptyList(),
+          snapshot.get().getKeyManager().getDeletedKeyEntries(testBucket.getVolumeName(),
+          testBucket.getName(), "", (kv) -> true, 1000));
+      Assertions.assertEquals(Collections.emptyList(),
+          snapshot.get().getKeyManager().getDeletedDirEntries(testBucket.getVolumeName(),
+          testBucket.getName(), 1000));
+    }
+    List<Table.KeyValue<String, String>> aosRenamesKeyEntries =
+        om.getKeyManager().getRenamesKeyEntries(testBucket.getVolumeName(),
+            testBucket.getName(), "", (kv) -> true, 1000);
+    List<Table.KeyValue<String, List<OmKeyInfo>>> aosDeletedKeyEntries =
+        om.getKeyManager().getDeletedKeyEntries(testBucket.getVolumeName(),
+            testBucket.getName(), "", (kv) -> true, 1000);
+    List<Table.KeyValue<String, OmKeyInfo>> aosDeletedDirEntries =
+        om.getKeyManager().getDeletedDirEntries(testBucket.getVolumeName(),
+            testBucket.getName(), 1000);
+    renamesKeyEntries.forEach(entry -> Assertions.assertTrue(aosRenamesKeyEntries.contains(entry)));
+    deletedKeyEntries.forEach(entry -> Assertions.assertTrue(aosDeletedKeyEntries.contains(entry)));
+    deletedDirEntries.forEach(entry -> Assertions.assertTrue(aosDeletedDirEntries.contains(entry)));
+    Mockito.reset(snapshotDeletingService);
+    SnapshotInfo snap2 = SnapshotUtils.getSnapshotInfo(om, testBucket.getVolumeName(),
+        testBucket.getName(), testBucket.getName() + "snap2");
+    Assertions.assertEquals(snap2.getSnapshotStatus(), SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
+    future = snapshotDeletingThread.submit(snapshotDeletionRunnable);
+    future.get();
+    Assertions.assertThrows(IOException.class, () -> SnapshotUtils.getSnapshotInfo(om, testBucket.getVolumeName(),
+        testBucket.getName(), testBucket.getName() + "snap2"));
+    cluster.restartOzoneManager();
   }
 
   /*
