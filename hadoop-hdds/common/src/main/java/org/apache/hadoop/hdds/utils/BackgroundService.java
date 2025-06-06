@@ -86,10 +86,9 @@ public abstract class BackgroundService {
     exec.setCorePoolSize(size);
   }
 
-  public void setServiceTimeoutInNanos(long newTimeout) {
-    LOG.info("{} timeout in nanos {}", serviceName, newTimeout);
-    this.serviceTimeoutInNanos = TimeDuration.valueOf(newTimeout, unit)
-        .toLong(TimeUnit.NANOSECONDS);
+  public synchronized void setServiceTimeoutInNanos(long newTimeout) {
+    LOG.info("{} timeout is {} {}", serviceName, newTimeout, TimeUnit.NANOSECONDS.name().toLowerCase());
+    this.serviceTimeoutInNanos = newTimeout;
   }
 
   @VisibleForTesting

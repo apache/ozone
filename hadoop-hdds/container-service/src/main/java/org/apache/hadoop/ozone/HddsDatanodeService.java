@@ -688,7 +688,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     getConf().set(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT, value);
 
     long timeout = conf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
-        OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT, TimeUnit.SECONDS);
+        OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT, TimeUnit.NANOSECONDS);
     getDatanodeStateMachine().getContainer().getBlockDeletingService()
         .setServiceTimeoutInNanos(timeout);
     return value;
