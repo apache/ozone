@@ -36,6 +36,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -192,6 +193,12 @@ public class HddsVolume extends StorageVolume {
 
   public VolumeInfoMetrics getVolumeInfoStats() {
     return volumeInfoMetrics;
+  }
+
+  public boolean isVolumeFull() {
+    SpaceUsageSource currentUsage = getCurrentUsage();
+    // if the volume is failed, this method will implicitly return true because available space will be 0
+    return currentUsage.getAvailable() - getFreeSpaceToSpare(currentUsage.getCapacity()) <= 0;
   }
 
   @Override
