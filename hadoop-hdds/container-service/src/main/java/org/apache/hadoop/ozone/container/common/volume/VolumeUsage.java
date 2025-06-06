@@ -106,7 +106,6 @@ public class VolumeUsage {
     source = new CachingSpaceUsageSource(checkParams);
     reservedInBytes = getReserved(conf, checkParams.getPath(), source.getCapacity());
     Preconditions.assertTrue(reservedInBytes >= 0, reservedInBytes + " < 0");
-    start(); // TODO should start only on demand
   }
 
   @VisibleForTesting
