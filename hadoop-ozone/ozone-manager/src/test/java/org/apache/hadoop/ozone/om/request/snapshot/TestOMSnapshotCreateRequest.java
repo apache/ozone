@@ -318,6 +318,7 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     assertEquals(OMException.ResultCodes.TOO_MANY_SNAPSHOTS, omException.getResult());
   }
 
+  @DisplayName("Snapshot limit is enforced even after failed creation attempts")
   @Test
   public void testSnapshotLimitWithFailures() throws Exception {
     when(getOzoneManager().isAdmin(any())).thenReturn(true);
