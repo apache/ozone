@@ -612,7 +612,7 @@ Example: /api/v1/namespace/summary?path=/volume1/bucket1/dir/nestedDir
 
 If any `num` field is `-1`, the path request is not applicable to such an entity type.
 
-### GET /api/v1/namespace/du
+### GET /api/v1/namespace/usage
 
 **Parameters**
 
@@ -622,17 +622,17 @@ If any `num` field is `-1`, the path request is not applicable to such an entity
 
 * files (optional)
 
-  A boolean with a default value of `false`. If set to `true`, computes disk usage for keys 
+  A boolean with a default value of `false`. If set to `true`, computes namespace usage for keys 
   under the path.
 
 * replica (optional)
 
-  A boolean with a default value of `false`. If set to `true`, computes disk usage with replicated
+  A boolean with a default value of `false`. If set to `true`, computes namespace usage with replicated
 size of keys.
 
 **Returns**
 
-Returns disk usage of all sub-paths under the path. Normalizes `path` fields, returns
+Returns the namespace usage of all sub-paths under the path. Normalizes `path` fields, returns
 total size of keys directly under the path as `sizeDirectKey`, and returns 
 `size`/`sizeWithReplica` in number of bytes. 
 
