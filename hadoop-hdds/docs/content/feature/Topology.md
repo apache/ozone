@@ -38,7 +38,7 @@ Ozone's topology-aware placement strategies vary by container replication type a
 
 ## Configuring Topology Hierarchy
 
-Ozone determines DataNode network locations (e.g., racks) using Hadoop's rack awareness, configured via `net.topology.node.switch.mapping.impl` in `core-site.xml`. This key specifies a `org.apache.hadoop.net.CachedDNSToSwitchMapping` implementation. \[1]
+Ozone determines DataNode network locations (e.g., racks) using Hadoop's rack awareness, configured via `net.topology.node.switch.mapping.impl` in `ozone-site.xml`. This key specifies a `org.apache.hadoop.net.CachedDNSToSwitchMapping` implementation. \[1]
 
 Two primary methods exist:
 
@@ -128,7 +128,7 @@ SCM uses a pluggable policy for placing additional replicas of *closed* RATIS-re
 
 * **Function:** Randomly selects healthy, available DataNodes meeting basic criteria (space, no existing replica), ignoring rack topology. \[1, 4]
 * **Use Cases:** Small/dev/test clusters, or if rack fault tolerance for closed replicas isn't critical.
-* **Configuration:** (Default)
+* **Configuration:**
     ```xml
     <property>
       <name>ozone.scm.container.placement.impl</name>
@@ -149,7 +149,7 @@ SCM uses a pluggable policy for placing additional replicas of *closed* RATIS-re
     </property>
     ```
 * **Best Practices:** Prevents uneven node filling.
-* **Interaction:** Typically respects topology constraints first (like `SCMContainerPlacementRackAware` in simple topologies), then chooses by capacity among valid nodes. Verify this interaction for specific needs.
+* **Interaction:** This container placement policy selects datanodes by randomly picking two nodes from a pool of healthy, available nodes and then choosing the one with lower utilization (more free space). This approach aims to distribute containers more evenly across the cluster over time, favoring less utilized nodes without overwhelming newly added nodes.
 
 ## Topology Awareness and Placement for Erasure Coded (EC) Containers
 
@@ -207,6 +207,5 @@ This directs clients (replicated data) and the system (EC reconstruction) to rea
 3.  Ozone Source Code: `org.apache.hadoop.hdds.scm.container.placement.algorithms` package. (For implementations of pluggable placement policies).
 4.  Ozone Source Code: `SCMContainerPlacementRandom.java`.
 5.  Ozone Source Code: `SCMContainerPlacementCapacity.java`.
-6.  Relevant JIRAs or design discussions for `SCMContainerPlacementCapacity` if more specific details on its behavior are needed.
-7.  Apache Ozone JIRA: [HDDS-3816](https://issues.apache.org/jira/browse/HDDS-3816) - Erasure Coding in Ozone.
-8.  Erasure Coding in Apache Hadoop Ozone (PDF linked from HDDS-3816 or Ozone documentation site).
+6.  Apache Ozone JIRA: [HDDS-3816](https://issues.apache.org/jira/browse/HDDS-3816) - Erasure Coding in Ozone.
+7.  Erasure Coding in Apache Hadoop Ozone (PDF linked from HDDS-3816 or Ozone documentation site).
