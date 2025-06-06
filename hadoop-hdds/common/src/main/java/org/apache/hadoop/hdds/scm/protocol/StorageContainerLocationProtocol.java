@@ -81,6 +81,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
       HddsProtos.ReplicationFactor factor, String owner)
       throws IOException;
 
+  ContainerWithPipeline allocateContainer(ReplicationConfig replicationConfig, String owner) throws IOException;
+
   /**
    * Ask SCM the location of the container. SCM responds with a group of
    * nodes where this container and its replicas are located.
