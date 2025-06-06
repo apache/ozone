@@ -135,20 +135,29 @@ Provides an S3-compatible REST interface.
 
 #### Kerberos Configuration
 
-| Property                                 | Example Value          | Description                               |
-| :--------------------------------------- | :--------------------- | :---------------------------------------- |
-| `ozone.s3g.http.auth.kerberos.principal` | `HTTP/_HOST@REALM.COM` | S3G HTTP server principal (SPNEGO).       |
-| `ozone.s3g.http.auth.kerberos.keytab`    | `/path/to/http.keytab` | Keytab for S3G HTTP principal.            |
+**Service Identity**
+
+| Property                         | Example Value           | Description                              |
+| :------------------------------ | :---------------------- | :--------------------------------------- |
+| `ozone.s3g.kerberos.principal`   | `s3g/_HOST@REALM.COM`   | S3G service principal for Kerberos auth. |
+| `ozone.s3g.kerberos.keytab.file` | `/path/to/s3g.keytab`   | Keytab for S3G service principal.        |
+
+**HTTP SPNEGO Authentication**
+
+| Property                                 | Example Value            | Description                               |
+| :--------------------------------------- | :----------------------- | :---------------------------------------- |
+| `ozone.s3g.http.auth.kerberos.principal` | `HTTP/_HOST@REALM.COM`   | S3G HTTP server principal (SPNEGO).       |
+| `ozone.s3g.http.auth.kerberos.keytab`    | `/path/to/http.keytab`   | Keytab for S3G HTTP principal.            |
 
 S3G uses Kerberos for its service identity and S3 credentials (Access Key ID/Secret Key) for client S3 operations via AWS Signature Version 4.
 
 ### HttpFS Gateway
 
-Offers an HDFS-compatible REST API (webhdfs).
+Offers an HDFS-compatible REST API (`webhdfs`).
 
 #### Introduction to HttpFS Security
 
-HttpFS supports Hadoop pseudo authentication (simple) and Kerberos SPNEGO.
+HttpFS supports Hadoop pseudo authentication (`simple`) and Kerberos SPNEGO.
 
 #### Kerberos Configuration
 
