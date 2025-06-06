@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.reconfig;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
@@ -49,6 +51,8 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
     Set<String> expected = ImmutableSet.<String>builder()
         .add(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX)
         .add(OZONE_BLOCK_DELETING_SERVICE_WORKERS)
+        .add(OZONE_BLOCK_DELETING_SERVICE_INTERVAL)
+        .add(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT)
         .add(REPLICATION_STREAMS_LIMIT_KEY)
         .addAll(new DatanodeConfiguration().reconfigurableProperties())
         .build();

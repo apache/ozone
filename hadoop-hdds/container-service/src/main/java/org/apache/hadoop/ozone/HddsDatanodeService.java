@@ -22,6 +22,9 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
@@ -40,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.ObjectName;
 import org.apache.hadoop.conf.Configurable;
@@ -284,6 +288,10 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
                   this::reconfigDeletingServiceWorkers)
+              .register(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
+                  this::reconfigBlockDeletingServiceInterval)
+              .register(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+                  this::reconfigBlockDeletingServiceTimeout)
               .register(REPLICATION_STREAMS_LIMIT_KEY,
                   this::reconfigReplicationStreamsLimit);
 
@@ -668,6 +676,21 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
     getDatanodeStateMachine().getContainer().getReplicationServer()
         .setPoolSize(Integer.parseInt(value));
+    return value;
+  }
+
+  private String reconfigBlockDeletingServiceInterval(String value) {
+    getConf().set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, value);
+    return value;
+  }
+
+  private String reconfigBlockDeletingServiceTimeout(String value) {
+    getConf().set(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT, value);
+
+    long timeout = conf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+        OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT, TimeUnit.NANOSECONDS);
+    getDatanodeStateMachine().getContainer().getBlockDeletingService()
+        .setServiceTimeoutInNanos(timeout);
     return value;
   }
 

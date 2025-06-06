@@ -23,10 +23,12 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Set;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -53,6 +55,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
         .add(OZONE_OM_VOLUME_LISTALL_ALLOWED)
         .add(OZONE_READONLY_ADMINISTRATORS)
         .add(OZONE_DIR_DELETING_SERVICE_INTERVAL)
+        .add(OZONE_THREAD_NUMBER_DIR_DELETION)
         .addAll(new OmConfig().reconfigurableProperties())
         .build();
 
@@ -121,6 +124,18 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     getSubject().reconfigurePropertyImpl(OZONE_OM_VOLUME_LISTALL_ALLOWED, newValue);
 
     assertEquals(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT, cluster().getOzoneManager().getAllowListAllVolumes());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = { -1, +1 })
+  void threadNumberDirDeletion(int delta) throws ReconfigurationException {
+    ScheduledThreadPoolExecutor executor = (ScheduledThreadPoolExecutor)
+        cluster().getOzoneManager().getKeyManager().getDirDeletingService().getExecutorService();
+    int newValue = executor.getCorePoolSize() + delta;
+
+    cluster().getOzoneManager().getReconfigurationHandler().reconfigurePropertyImpl(
+        OZONE_THREAD_NUMBER_DIR_DELETION, String.valueOf(newValue));
+    assertEquals(newValue, executor.getCorePoolSize());
   }
 
 }
