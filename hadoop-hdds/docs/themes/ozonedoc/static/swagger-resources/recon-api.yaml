@@ -573,7 +573,7 @@ paths:
           description: |
             Successful operation<br>
             #### **Note**:
-            #### The below example response is for the sample endpoint: **namespace/du?path=/vol1/bucket1&files=true&replica=true**
+            #### The below example response is for the sample endpoint: **namespace/usage?path=/vol1/bucket1&files=true&replica=true**
             #### status can be either **OK** if path exists else **PATH_NOT_FOUND**
             #### If files is set to **false**, sub-path **/vol1/bucket1/key1-1 is omitted**.
             #### If replica is set to **false**, **sizeWithReplica returns -1**.

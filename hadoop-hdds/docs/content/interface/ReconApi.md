@@ -638,7 +638,7 @@ total size of keys directly under the path as `sizeDirectKey`, and returns
 
 `status` is `OK` if path exists, `PATH_NOT_FOUND` otherwise.
 
-Example: /api/v1/namespace/du?path=/vol1/bucket1&files=true&replica=true
+Example: /api/v1/namespace/usage?path=/vol1/bucket1&files=true&replica=true
 ```json
     {
       "status": OK,
