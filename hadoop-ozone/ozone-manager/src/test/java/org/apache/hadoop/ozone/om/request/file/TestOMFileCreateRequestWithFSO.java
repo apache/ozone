@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -39,6 +40,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests OMFileCreateRequest - prefix layout.
@@ -46,8 +49,10 @@ import org.junit.jupiter.api.Test;
 public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
 
   @Override
-  @Test
-  public void testValidateAndUpdateCacheWithNonRecursive() throws Exception {
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithNonRecursive(boolean cacheEnabled) throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     testNonRecursivePath(UUID.randomUUID().toString(), false, false, false);
     testNonRecursivePath("a/b", false, false, true);
     assertEquals(0, omMetrics.getNumKeys(), "Invalid metrics value");
@@ -78,9 +83,11 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   }
 
   @Override
-  @Test
-  public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded()
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded(boolean cacheEnabled)
       throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     OMRequest omRequest = createFileRequest(volumeName, bucketName,
         "/test/a1/a2", ONE,
         HddsProtos.ReplicationType.RATIS, false, true);
@@ -103,9 +110,11 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   }
 
   @Override
-  @Test
-  public void testValidateAndUpdateCacheWithRecursiveAndOverWrite()
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithRecursiveAndOverWrite(boolean cacheEnabled)
           throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     String key = "c/d/e/f";
     // Should be able to create file even if parent directories does not exist
     testNonRecursivePath(key, false, true, false);
@@ -133,9 +142,11 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   }
 
   @Override
-  @Test
-  public void testValidateAndUpdateCacheWithNonRecursiveAndOverWrite()
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithNonRecursiveAndOverWrite(boolean cacheEnabled)
           throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     String parentDir = "c/d/e";
     String fileName = "f";
     String key = parentDir + "/" + fileName;
@@ -170,9 +181,11 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     super.testCreateFileInheritParentDefaultAcls();
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithSnapshotReservedWord()
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithSnapshotReservedWord(boolean cacheEnabled)
       throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     String[] validPaths = {
         "a/b/" + OM_SNAPSHOT_INDICATOR + "c/d",
         "a/b/c/" + OM_SNAPSHOT_INDICATOR + "/d"

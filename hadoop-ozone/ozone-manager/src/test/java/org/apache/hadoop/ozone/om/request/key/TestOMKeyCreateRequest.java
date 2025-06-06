@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
@@ -86,11 +87,16 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   public static Collection<Object[]> data() {
-    return Arrays.asList(
-        new Object[]{true, true},
-        new Object[]{true, false},
-        new Object[]{false, true},
-        new Object[]{false, false});
+    return Arrays.asList(new Object[][]{
+        {true, true, true},
+        {true, true, false},
+        {true, false, true},
+        {true, false, false},
+        {false, true, true},
+        {false, true, false},
+        {false, false, true},
+        {false, false, false}
+    });
   }
 
   @Test
@@ -136,9 +142,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCache(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean  cacheEnabled) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
 
     Map<String, String> tags = new HashMap<>();
     tags.put("tag-key1", "tag-value1");
@@ -235,9 +242,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded(
-      boolean setKeyPathLock, boolean setFileSystemPaths)throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean cacheEnabled) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(false, 0, "test/" + keyName));
 
@@ -307,9 +315,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithNoSuchMultipartUploadError(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean cacheEnabled) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     int partNumber = 1;
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(true, partNumber));
@@ -350,9 +359,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithVolumeNotFound(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean cacheEnabled) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(false, 0));
 
@@ -390,9 +400,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithBucketNotFound(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean cacheEnabled) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(
             false, 0));
@@ -432,12 +443,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithInvalidPath(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean cacheEnabled) throws Exception {
     PrefixManager prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(
             false, 0, String.valueOf('\u0000')));
@@ -479,10 +491,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("data")
   public void testOverwritingExistingMetadata(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean cacheEnabled) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
-
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
         getBucketLayout());
 
@@ -521,9 +533,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("data")
   public void testCreationWithoutMetadataFollowedByOverwriteWithMetadata(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean cacheEnabled) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
         getBucketLayout());
 
@@ -907,10 +920,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("data")
   public void testKeyCreateInheritParentDefaultAcls(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean cacheEnabled) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
-
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
     acls.add(OzoneAcl.parseAcl("user:noInherit:rw"));
@@ -954,10 +967,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("data")
   public void testAtomicRewrite(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean cacheEnabled) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
-
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
             .setBucketName(bucketName)
