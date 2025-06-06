@@ -25,19 +25,6 @@ import org.apache.hadoop.security.token.Token;
  * Generates container tokens.
  */
 public interface ContainerTokenGenerator {
-
-  /**
-   * Shortcut for generating encoded token for current user.
-   * @throws UncheckedIOException if user lookup or URL-encoding fails
-   */
-  String generateEncodedToken(ContainerID containerID);
-
-  /**
-   * Generate token for the container.
-   */
-  Token<ContainerTokenIdentifier> generateToken(String user,
-      ContainerID containerID);
-
   /**
    * No-op implementation for when container tokens are disabled.
    */
@@ -48,10 +35,19 @@ public interface ContainerTokenGenerator {
     }
 
     @Override
-    public Token<ContainerTokenIdentifier> generateToken(String user,
-        ContainerID containerID) {
+    public Token<ContainerTokenIdentifier> generateToken(String user, ContainerID containerID) {
       return new Token<>();
     }
   };
 
+  /**
+   * Shortcut for generating encoded token for current user.
+   * @throws UncheckedIOException if user lookup or URL-encoding fails
+   */
+  String generateEncodedToken(ContainerID containerID);
+
+  /**
+   * Generate token for the container.
+   */
+  Token<ContainerTokenIdentifier> generateToken(String user, ContainerID containerID);
 }

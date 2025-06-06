@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
 import com.google.common.base.Preconditions;
@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
  *   - Update tenantAccessIdTable
  */
 public class OMTenantAssignAdminRequest extends OMClientRequest {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMTenantAssignAdminRequest.class);
 
   public OMTenantAssignAdminRequest(OMRequest omRequest) {

@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.abort;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
@@ -147,12 +148,17 @@ public abstract class AbstractTestChunkManager {
         }
         LOG.debug("File is in use: {}", filePath);
         return false;
+      } catch (IOException e) {
+        LOG.warn("Failed to check if file is in use: {}", filePath, e);
+        return false;  // On failure, assume the file is in use
       } finally {
         process.destroy();
       }
     } catch (IOException e) {
+      // if process cannot be started, skip the test
       LOG.warn("Failed to check if file is in use: {}", filePath, e);
-      return false;  // On failure, assume the file is in use
+      abort(e.getMessage());
+      return false; // unreachable, abort() throws exception
     }
   }
 

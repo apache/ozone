@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -55,7 +55,6 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -70,6 +69,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -230,7 +230,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               .setOmKeyLocationInfos(Collections.singletonList(
                   new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
               .setAcls(getAclsForKey(keyArgs, omBucketInfo, pathInfoFSO,
-                  ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
+                  ozoneManager.getPrefixManager(), ozoneManager.getConfig()))
               .setObjectID(pathInfoFSO.getLeafNodeObjectId())
               .setUpdateID(trxnLogIndex)
               .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
@@ -629,13 +629,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             OMException.ResultCodes.INVALID_PART);
       }
 
-      OmKeyInfo currentPartKeyInfo = null;
-      try {
-        currentPartKeyInfo =
-            OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-      } catch (IOException ioe) {
-        throw new OMException(ioe, OMException.ResultCodes.INTERNAL_ERROR);
-      }
+      final OmKeyInfo currentPartKeyInfo = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
 
       // Except for last part all parts should have minimum size.
       if (currentPartCount != partsListSize) {

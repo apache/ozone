@@ -18,10 +18,9 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.USER_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -157,7 +156,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
         // Add default ACL for volume
         List<OzoneAcl> listOfAcls = getDefaultAclList(UserGroupInformation.createRemoteUser(owner),
-            ozoneManager.getConfiguration());
+            ozoneManager.getConfig());
         // ACLs from VolumeArgs
         if (omVolumeArgs.getAcls() != null) {
           listOfAcls.addAll(omVolumeArgs.getAcls());
@@ -209,11 +208,6 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       omMetrics.incNumVolumeCreateFails();
     }
     return omClientResponse;
-  }
-
-  @VisibleForTesting
-  public static Logger getLogger() {
-    return LOG;
   }
 }
 

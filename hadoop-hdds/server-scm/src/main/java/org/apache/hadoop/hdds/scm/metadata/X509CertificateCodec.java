@@ -22,11 +22,13 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.io.LengthOutputStream;
 import org.apache.ratis.util.function.CheckedFunction;
 
@@ -57,40 +59,55 @@ public final class X509CertificateCodec implements Codec<X509Certificate> {
     return true;
   }
 
-  CheckedFunction<OutputStream, Integer, IOException> writeTo(
-      X509Certificate object) {
-    return out -> CertificateCodec.writePEMEncoded(object,
-        new LengthOutputStream(out)).getLength();
+  private CheckedFunction<OutputStream, Integer, IOException> writeTo(X509Certificate object) {
+    return new CheckedFunction<OutputStream, Integer, IOException>() {
+      @Override
+      public Integer apply(OutputStream out) throws IOException {
+        return CertificateCodec.writePEMEncoded(object, new LengthOutputStream(out)).getLength();
+      }
+
+      @Override
+      public String toString() {
+        return "cert: " + object;
+      }
+    };
   }
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull X509Certificate object,
-      CodecBuffer.Allocator allocator) throws IOException {
+      CodecBuffer.Allocator allocator) throws CodecException {
     return allocator.apply(-INITIAL_CAPACITY).put(writeTo(object));
   }
 
   @Override
-  public X509Certificate fromCodecBuffer(@Nonnull CodecBuffer buffer)
-      throws IOException {
-    try (InputStream in = buffer.getInputStream()) {
+  public X509Certificate fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
+    final InputStream in = buffer.getInputStream();
+    try {
       return CertificateCodec.readX509Certificate(in);
+    } catch (CertificateException e) {
+      throw new CodecException("Failed to readX509Certificate from " + buffer, e);
+    } finally {
+      IOUtils.closeQuietly(in);
     }
   }
 
   @Override
-  public byte[] toPersistedFormat(X509Certificate object) throws IOException {
+  public byte[] toPersistedFormat(X509Certificate object) throws CodecException {
     try (CodecBuffer buffer = toHeapCodecBuffer(object)) {
       return buffer.getArray();
-    } catch (SCMSecurityException exp) {
-      throw new IOException(exp);
     }
   }
 
   @Override
   public X509Certificate fromPersistedFormat(byte[] rawData)
-      throws IOException {
-    return CertificateCodec.readX509Certificate(
-        new ByteArrayInputStream(rawData));
+      throws CodecException {
+    // ByteArrayInputStream.close(), which is a noop, can be safely ignored.
+    final ByteArrayInputStream in = new ByteArrayInputStream(rawData);
+    try {
+      return CertificateCodec.readX509Certificate(in);
+    } catch (CertificateException e) {
+      throw new CodecException("Failed to readX509Certificate from rawData, length=" + rawData.length, e);
+    }
   }
 
   @Override

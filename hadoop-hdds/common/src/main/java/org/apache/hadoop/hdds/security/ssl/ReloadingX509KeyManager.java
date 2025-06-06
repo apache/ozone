@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Evolving
 public class ReloadingX509KeyManager extends X509ExtendedKeyManager implements CertificateNotification {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ReloadingX509KeyManager.class);
 
   private final String type;

@@ -16,11 +16,12 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>hdds</artifactId>
-    <version>2.0.0-SNAPSHOT</version>
+    <artifactId>hdds-hadoop-dependency-client</artifactId>
+    <version>2.1.0-SNAPSHOT</version>
+    <relativePath>../hadoop-dependency-client</relativePath>
   </parent>
   <artifactId>hdds-common</artifactId>
-  <version>2.0.0-SNAPSHOT</version>
+  <version>2.1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone HDDS Common</name>
   <description>Apache Ozone Distributed Data Store Common</description>
@@ -80,20 +81,6 @@
       <artifactId>metrics-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-api</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.code.findbugs</groupId>
-          <artifactId>jsr305</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>io.jaegertracing</groupId>
-      <artifactId>jaeger-client</artifactId>
-    </dependency>
-    <dependency>
       <groupId>io.jaegertracing</groupId>
       <artifactId>jaeger-core</artifactId>
     </dependency>
@@ -110,6 +97,7 @@
       <artifactId>jakarta.annotation-api</artifactId>
     </dependency>
     <dependency>
+      <!-- for the annotations in OzoneConfiguration -->
       <groupId>jakarta.xml.bind</groupId>
       <artifactId>jakarta.xml.bind-api</artifactId>
     </dependency>
@@ -122,16 +110,16 @@
       <artifactId>commons-lang3</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-annotation-processing</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-config</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -152,16 +140,6 @@
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-grpc</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ratis</groupId>
-      <artifactId>ratis-metrics-dropwizard3</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>io.dropwizard.metrics</groupId>
-          <artifactId>metrics-core</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
@@ -188,10 +166,6 @@
       <artifactId>bcprov-jdk18on</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcutil-jdk18on</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.jetbrains.kotlin</groupId>
       <artifactId>kotlin-stdlib</artifactId>
     </dependency>
@@ -207,11 +181,21 @@
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>
     </dependency>
-    <!-- for the annotations in OzoneConfiguration -->
     <dependency>
-      <groupId>org.glassfish.jaxb</groupId>
-      <artifactId>jaxb-runtime</artifactId>
-      <scope>provided</scope>
+      <groupId>io.jaegertracing</groupId>
+      <artifactId>jaeger-client</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-metrics-dropwizard3</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <!-- required for commons-configuration2 via hadoop-common -->
+      <groupId>org.slf4j</groupId>
+      <artifactId>jcl-over-slf4j</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -221,14 +205,14 @@
 
     <!-- Test dependencies -->
     <dependency>
-      <!-- Needed for mocking RaftServerImpl -->
-      <groupId>com.codahale.metrics</groupId>
-      <artifactId>metrics-core</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-test-utils</artifactId>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-test-utils</artifactId>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcutil-jdk18on</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -275,6 +259,20 @@
                 </includes>
               </source>
             </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.coderplus.maven.plugins</groupId>
+        <artifactId>copy-rename-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>rename-generated-config</id>
+            <phase>process-classes</phase>
+          </execution>
+          <execution>
+            <id>rename-generated-test-config</id>
+            <phase>process-test-classes</phase>
           </execution>
         </executions>
       </plugin>

@@ -36,7 +36,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -165,10 +164,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
   }
 
-  public static Logger getLogger() {
-    return LOG;
-  }
-
   @Override
   public Void call() throws Exception {
     OzoneConfiguration configuration = getOzoneConf();
@@ -227,23 +222,21 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
     try {
       String hostname = HddsUtils.getHostName(conf);
-      String ip = InetAddress.getByName(hostname).getHostAddress();
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
       serviceRuntimeInfo.setHostName(hostname);
-      datanodeDetails.setIpAddress(ip);
+      datanodeDetails.validateDatanodeIpAddress();
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
       datanodeDetails.setSetupTime(Time.now());
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       TracingUtil.initTracing(
-          "HddsDatanodeService." + datanodeDetails.getUuidString()
-              .substring(0, 8), conf);
-      LOG.info("HddsDatanodeService host:{} ip:{}", hostname, ip);
+          "HddsDatanodeService." + datanodeDetails.getID(), conf);
+      LOG.info("HddsDatanodeService {}", datanodeDetails);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        component = "dn-" + datanodeDetails.getUuidString();
+        component = "dn-" + datanodeDetails.getID();
         secConf = new SecurityConfig(conf);
 
         if (SecurityUtil.getAuthenticationMethod(conf).equals(
@@ -299,6 +292,8 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
                   this::reconfigBlockDeletingServiceTimeout)
               .register(REPLICATION_STREAMS_LIMIT_KEY,
                   this::reconfigReplicationStreamsLimit);
+
+      reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
 
       datanodeStateMachine = new DatanodeStateMachine(this, datanodeDetails, conf,
           dnCertClient, secretKeyClient, this::terminateDatanode,

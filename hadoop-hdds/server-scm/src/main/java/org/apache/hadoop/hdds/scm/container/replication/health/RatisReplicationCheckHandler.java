@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
  * </ul>
  */
 public class RatisReplicationCheckHandler extends AbstractCheck {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(RatisReplicationCheckHandler.class);
 
   /**
@@ -77,6 +77,10 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
   public boolean handle(ContainerCheckRequest request) {
     if (request.getContainerInfo().getReplicationType() != RATIS) {
       // This handler is only for Ratis containers.
+      return false;
+    }
+    if (QuasiClosedStuckReplicationCheck
+        .shouldHandleAsQuasiClosedStuck(request.getContainerInfo(), request.getContainerReplicas())) {
       return false;
     }
     ReplicationManagerReport report = request.getReport();

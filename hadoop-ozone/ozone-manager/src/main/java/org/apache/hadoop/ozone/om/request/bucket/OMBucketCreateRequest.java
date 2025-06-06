@@ -21,8 +21,8 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -67,6 +66,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateB
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
@@ -83,6 +83,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   public OMBucketCreateRequest(OMRequest omRequest) {
     super(omRequest);
   }
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
@@ -311,7 +312,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
         .getDefaultReplicationConfig().hasEcReplicationConfig();
   }
 
-
   /**
    * Add default acls for bucket. These acls are inherited from volume
    * default acl list.
@@ -323,7 +323,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       OmVolumeArgs omVolumeArgs, OzoneManager ozoneManager) throws OMException {
     List<OzoneAcl> acls = new ArrayList<>();
     // Add default acls
-    acls.addAll(getDefaultAclList(createUGIForApi(), ozoneManager.getConfiguration()));
+    acls.addAll(getDefaultAclList(createUGIForApi(), ozoneManager.getConfig()));
     if (omBucketInfo.getAcls() != null) {
       // Add acls for bucket creator.
       acls.addAll(omBucketInfo.getAcls());

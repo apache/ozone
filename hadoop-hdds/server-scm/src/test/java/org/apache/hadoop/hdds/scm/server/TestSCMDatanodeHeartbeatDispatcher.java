@@ -30,9 +30,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -50,7 +50,6 @@ import org.junit.jupiter.api.Test;
  * This class tests the behavior of SCMDatanodeHeartbeatDispatcher.
  */
 public class TestSCMDatanodeHeartbeatDispatcher {
-
 
   @Test
   public void testNodeReportDispatcher() throws IOException {
@@ -164,6 +163,6 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     // If SCM receives heartbeat from a node after it restarts and the node
     // is not registered, it should send a Re-Register command back to the node.
     verify(mockNodeManager, times(1)).addDatanodeCommand(
-        any(UUID.class), any(ReregisterCommand.class));
+        any(DatanodeID.class), any(ReregisterCommand.class));
   }
 }

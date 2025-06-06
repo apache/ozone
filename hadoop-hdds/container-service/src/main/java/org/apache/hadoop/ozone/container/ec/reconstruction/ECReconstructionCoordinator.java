@@ -373,7 +373,7 @@ public class ECReconstructionCoordinator implements Closeable {
       int cnt = 0;
       for (ContainerProtos.ChunkInfo chunkInfo : data.getChunks()) {
         if (cnt > 0) {
-          sb.append("\n");
+          sb.append('\n');
         }
         sb.append("  chunkNum: ")
             .append(++cnt)
@@ -464,6 +464,7 @@ public class ECReconstructionCoordinator implements Closeable {
     if (ecReconstructWriteExecutor.isInitialized()) {
       ecReconstructWriteExecutor.get().shutdownNow();
     }
+    ecReconstructReadExecutor.shutdownNow();
   }
 
   private Pipeline rebuildInputPipeline(ECReplicationConfig repConfig,
@@ -493,7 +494,7 @@ public class ECReconstructionCoordinator implements Closeable {
 
     SortedMap<Long, BlockData[]> resultMap = new TreeMap<>();
     Token<ContainerTokenIdentifier> containerToken =
-        tokenHelper.getContainerToken(new ContainerID(containerID));
+        tokenHelper.getContainerToken(ContainerID.valueOf(containerID));
 
     Iterator<Map.Entry<Integer, DatanodeDetails>> iterator =
         sourceNodeMap.entrySet().iterator();
