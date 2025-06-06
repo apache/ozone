@@ -252,7 +252,10 @@ public class RDBStore implements DBStore {
     if (statistics != null) {
       IOUtils.close(LOG, statistics);
     }
-    IOUtils.close(LOG, db);
+    if (rangeCompactionOptions != null) {
+      IOUtils.close(LOG, rangeCompactionOptions);
+    }
+    IOUtils.close(LOG, db, dbOptions);
   }
 
   @Override
