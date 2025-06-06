@@ -67,11 +67,12 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
         + (numOfChildDirs + 1) * Long.BYTES // 1 long field for parentId + list size
         + Short.BYTES // 2 dummy shorts to track length
         + dirName.length // directory name length
-        + Long.BYTES; // Added space for parentId serialization
+        + 2 * Long.BYTES; // Added space for parentId serialization and replicated size of files
 
     ByteArrayOutputStream out = new ByteArrayOutputStream(resSize);
     out.write(integerCodec.toPersistedFormat(object.getNumOfFiles()));
     out.write(longCodec.toPersistedFormat(object.getSizeOfFiles()));
+    out.write(longCodec.toPersistedFormat(object.getReplicatedSizeOfFiles()));
     out.write(shortCodec.toPersistedFormat(
         (short) ReconConstants.NUM_OF_FILE_SIZE_BINS));
     int[] fileSizeBucket = object.getFileSizeBucket();
@@ -95,6 +96,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     NSSummary res = new NSSummary();
     res.setNumOfFiles(in.readInt());
     res.setSizeOfFiles(in.readLong());
+    res.setReplicatedSizeOfFiles(in.readLong());
     short len = in.readShort();
     assert (len == (short) ReconConstants.NUM_OF_FILE_SIZE_BINS);
     int[] fileSizeBucket = new int[len];
@@ -136,6 +138,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     NSSummary copy = new NSSummary();
     copy.setNumOfFiles(object.getNumOfFiles());
     copy.setSizeOfFiles(object.getSizeOfFiles());
+    copy.setReplicatedSizeOfFiles(object.getReplicatedSizeOfFiles());
     copy.setFileSizeBucket(object.getFileSizeBucket());
     copy.setChildDir(object.getChildDir());
     copy.setDirName(object.getDirName());
