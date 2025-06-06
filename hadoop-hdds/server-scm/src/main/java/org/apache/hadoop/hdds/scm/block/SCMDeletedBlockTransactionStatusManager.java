@@ -455,11 +455,11 @@ public class SCMDeletedBlockTransactionStatusManager {
     for (DeleteBlockTransactionResult transactionResult :
         transactionResults) {
       if (isTransactionFailed(transactionResult)) {
-        metrics.incrBlockDeletionTransactionFailure();
+        metrics.incrBlockDeletionTransactionFailureOnDatanodes();
         continue;
       }
       try {
-        metrics.incrBlockDeletionTransactionSuccess();
+        metrics.incrBlockDeletionTransactionSuccessOnDatanodes();
         long txID = transactionResult.getTxID();
         // set of dns which have successfully committed transaction txId.
         final Set<DatanodeID> dnsWithCommittedTxn = transactionToDNsCommitMap.get(txID);

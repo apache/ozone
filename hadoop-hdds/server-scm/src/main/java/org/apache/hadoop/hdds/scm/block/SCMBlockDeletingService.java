@@ -199,7 +199,7 @@ public class SCMBlockDeletingService extends BackgroundService
               eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
                   new CommandForDatanode<>(dnId, command));
               metrics.incrBlockDeletionCommandSent();
-              metrics.incrBlockDeletionTransactionSent(dnTXs.size());
+              metrics.incrBlockDeletionTransactionsOnDatanodes(dnTXs.size());
               metrics.incrDNCommandsSent(dnId, 1);
               if (LOG.isDebugEnabled()) {
                 LOG.debug(
