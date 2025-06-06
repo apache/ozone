@@ -376,7 +376,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
-      }, 2000, 100000000);
+      }, 2000, 100000);
     }
     om.getKeyManager().getDirDeletingService().suspend();
     om.getKeyManager().getDeletingService().suspend();
