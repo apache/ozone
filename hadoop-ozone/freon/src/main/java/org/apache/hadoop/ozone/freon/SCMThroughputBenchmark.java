@@ -33,7 +33,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,6 +48,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
@@ -796,7 +796,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcom
     public void register() throws IOException {
       SCMRegisteredResponseProto response = datanodeScmClient.register(
           datanodeDetails.getExtendedProtoBufMessage(),
-          createNodeReport(datanodeDetails.getUuid()),
+          createNodeReport(datanodeDetails.getID()),
           createContainerReport(),
           createPipelineReport(),
           UpgradeUtils.defaultLayoutVersionProto());
@@ -852,7 +852,6 @@ public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcom
   }
 
   private static DatanodeDetails createRandomDatanodeDetails() {
-    UUID uuid = UUID.randomUUID();
     String ipAddress =
         RANDOM.nextInt(256) + "." + RANDOM.nextInt(256) + "." + RANDOM
             .nextInt(256) + "." + RANDOM.nextInt(256);
@@ -861,7 +860,8 @@ public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcom
     DatanodeDetails.Port ratisPort = DatanodeDetails.newRatisPort(0);
     DatanodeDetails.Port restPort = DatanodeDetails.newRestPort(0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(uuid).setHostName("localhost")
+    builder.setID(DatanodeID.randomID())
+        .setHostName("localhost")
         .setIpAddress(ipAddress)
         .addPort(containerPort)
         .addPort(ratisPort)
@@ -869,7 +869,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcom
     return builder.build();
   }
 
-  private static NodeReportProto createNodeReport(UUID nodeId) {
+  private static NodeReportProto createNodeReport(DatanodeID nodeId) {
     List<StorageReportProto> storageReports = new ArrayList<>();
     List<MetadataStorageReportProto> metadataStorageReports =
         new ArrayList<>();
@@ -881,7 +881,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcom
     return nb.build();
   }
 
-  private static StorageReportProto createStorageReport(UUID nodeId) {
+  private static StorageReportProto createStorageReport(DatanodeID nodeId) {
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();
     srb.setStorageUuid(nodeId.toString())
         .setStorageLocation("/data")

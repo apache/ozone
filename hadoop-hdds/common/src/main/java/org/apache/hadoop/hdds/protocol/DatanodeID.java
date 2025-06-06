@@ -121,11 +121,4 @@ public final class DatanodeID implements Comparable<DatanodeID> {
         .setLeastSigBits(id.getLeastSignificantBits())
         .build();
   }
-
-  // TODO: Remove this in follow-up Jira. (HDDS-12015)
-  //   Exposing this temporarily to help with refactoring.
-  @Deprecated
-  public UUID getUuid() {
-    return uuid;
-  }
 }

@@ -42,11 +42,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -159,7 +159,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     Set<ContainerReplica> misReplicas = getMockReplicas(5L,
         State.CLOSED, State.CLOSED, State.CLOSED);
     placementMock.setMisRepWhenDnPresent(
-        misReplicas.iterator().next().getDatanodeDetails().getUuid());
+        misReplicas.iterator().next().getDatanodeDetails().getID());
     when(containerManagerMock.getContainerReplicas(containerInfo5.containerID()))
         .thenReturn(misReplicas);
 
@@ -717,9 +717,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
   private static class MockPlacementPolicy implements
           PlacementPolicy {
 
-    private UUID misRepWhenDnPresent = null;
+    private DatanodeID misRepWhenDnPresent = null;
 
-    public void setMisRepWhenDnPresent(UUID dn) {
+    public void setMisRepWhenDnPresent(DatanodeID dn) {
       misRepWhenDnPresent = dn;
     }
 
@@ -757,7 +757,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     private boolean isDnPresent(List<DatanodeDetails> dns) {
       for (DatanodeDetails dn : dns) {
         if (misRepWhenDnPresent != null
-            && dn.getUuid().equals(misRepWhenDnPresent)) {
+            && dn.getID().equals(misRepWhenDnPresent)) {
           return true;
         }
       }

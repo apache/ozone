@@ -129,7 +129,7 @@ public class TestContainerServer {
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
     conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
         dn.getRatisPort().getValue());
-    final String dir = testDir.resolve(dn.getUuid().toString()).toString();
+    final String dir = testDir.resolve(dn.getID().toString()).toString();
     conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
 
     final ContainerDispatcher dispatcher = new TestContainerDispatcher();
@@ -207,7 +207,7 @@ public class TestContainerServer {
         ContainerProtos.ContainerType.values()) {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(containerType, conf,
-              dd.getUuid().toString(),
+              dd.getID().toString(),
               containerSet, volumeSet, volumeChoosingPolicy, metrics,
               c -> {
               }));

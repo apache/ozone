@@ -27,13 +27,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -59,7 +59,7 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
   private final ContainerManager containerManager;
   private final double safeModeCutoff;
   private final Set<Long> ecContainers;
-  private final Map<Long, Set<UUID>> ecContainerDNsMap;
+  private final Map<Long, Set<DatanodeID>> ecContainerDNsMap;
   private final AtomicLong ecContainerWithMinReplicas;
   private double ecMaxContainer;
 
@@ -149,12 +149,10 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
   @Override
   protected void process(NodeRegistrationContainerReport report) {
     DatanodeDetails datanodeDetails = report.getDatanodeDetails();
-    UUID datanodeUUID = datanodeDetails.getUuid();
-
     report.getReport().getReportsList().forEach(c -> {
       long containerID = c.getContainerID();
       if (ecContainers.contains(containerID)) {
-        putInContainerDNsMap(containerID, ecContainerDNsMap, datanodeUUID);
+        putInContainerDNsMap(containerID, datanodeDetails.getID());
         recordReportedContainer(containerID);
       }
     });
@@ -166,10 +164,8 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
     }
   }
 
-  private void putInContainerDNsMap(long containerID,
-      Map<Long, Set<UUID>> containerDNsMap,
-      UUID datanodeUUID) {
-    containerDNsMap.computeIfAbsent(containerID, key -> Sets.newHashSet()).add(datanodeUUID);
+  private void putInContainerDNsMap(long containerID, DatanodeID datanodeID) {
+    ecContainerDNsMap.computeIfAbsent(containerID, key -> Sets.newHashSet()).add(datanodeID);
   }
 
   /**
@@ -222,7 +218,7 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
     Set<Long> sampleEcContainers = ecContainerDNsMap.entrySet().stream().filter(entry -> {
       Long containerId = entry.getKey();
       int minReplica = getMinReplica(containerId);
-      Set<UUID> allReplicas = entry.getValue();
+      Set<DatanodeID> allReplicas = entry.getValue();
       return allReplicas.size() < minReplica;
     }).map(Map.Entry::getKey).limit(SAMPLE_CONTAINER_DISPLAY_LIMIT).collect(Collectors.toSet());
 

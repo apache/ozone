@@ -196,7 +196,7 @@ public abstract class Failures {
         try {
           cluster.restartHddsDatanode(dn, failureMode);
         } catch (Throwable t) {
-          LOG.error("Failed to restartNodes Datanode {}", dn.getUuid(), t);
+          LOG.error("Failed to restartNodes Datanode {}", dn.getID(), t);
         }
       });
     }
@@ -218,7 +218,7 @@ public abstract class Failures {
             cluster.restartHddsDatanode(dn, true);
           }
         } catch (Throwable t) {
-          LOG.error("Failed to shutdown Datanode {}", dn.getUuid(), t);
+          LOG.error("Failed to shutdown Datanode {}", dn.getID(), t);
         }
       });
     }
