@@ -146,7 +146,7 @@ These policies are applied when SCM needs to re-replicate containers, such as du
 
 ### 2. `SCMContainerPlacementRandom`
 
-* **Function:** Randomly selects healthy, available DataNodes meeting basic criteria (space, no existing replica), ignoring rack topology. \[1, 4]
+* **Function:** Randomly selects healthy, available DataNodes meeting basic criteria (space, no existing replica), ignoring rack topology. \[1, 4\]
 * **Use Cases:** Small/dev/test clusters, or if rack fault tolerance for closed replicas isn't critical.
 * **Configuration:**
     ```xml
@@ -159,7 +159,7 @@ These policies are applied when SCM needs to re-replicate containers, such as du
 
 ### 3. `SCMContainerPlacementCapacity`
 
-* **Function:** Selects DataNodes by available capacity (favors lower disk utilization) to balance disk usage. \[5, 6]
+* **Function:** Selects DataNodes by available capacity (favors lower disk utilization) to balance disk usage. \[5, 6\]
 * **Use Cases:** Heterogeneous storage clusters or where even disk utilization is key.
 * **Configuration:**
     ```xml
@@ -182,8 +182,6 @@ Erasure Coding (EC) offers storage efficiency with fault tolerance, featuring di
 * **Node Selection:** For EC writes, OM and SCM's `ECPipelineProvider` allocate `$d+p$` distinct DataNodes, enforcing topology for rack diversity. \[2]
 
 ### EC Container Placement Logic (Intrinsic)
-
-EC placement is an **intrinsic behavior** driven by the bucket's EC schema (e.g., `rs-6-3-1024k`), not a swappable policy like for replicated containers (see JIRA HDDS-3816). \[2, 7, 8]
 
 * **Rack Diversity:** `ECPipelineProvider` logic places each of the `$d+p$` chunks on unique racks if possible. Otherwise, it distributes chunks evenly, ensuring no rack holds more chunks from a stripe than parity (`$p$`) can recover.
 * **Node Selection Priorities:** Maximize rack/node diversity, respect rack density limits, select healthy/capacious DataNodes, and exclude unsuitable nodes.
@@ -210,7 +208,7 @@ Enable by setting `ozone.network.topology.aware.read` to `true` in `ozone-site.x
   <value>true</value>
 </property>
 ```
-This directs clients (replicated data) and the system (EC reconstruction) to read from topologically closest DataNodes, reducing latency and cross-rack traffic. Recommended with accurate topology.
+This directs clients (replicated data) to read from topologically closest DataNodes, reducing latency and cross-rack traffic. Recommended with accurate topology.
 
 ## Summary of Best Practices
 
@@ -222,10 +220,10 @@ This directs clients (replicated data) and the system (EC reconstruction) to rea
 
 ## References
 
-1.  Hadoop Documentation: Rack Awareness. (Covers `net.topology.node.switch.mapping.impl`, `SCMContainerPlacementRandom`, `SCMContainerPlacementRackAware`, `ozone.network.topology.aware.read`) - Refer to the official Apache Hadoop documentation on Rack Awareness.
-2.  Ozone Erasure Coding Design Documentation (JIRA HDDS-3816). Refer to the Apache Ozone JIRA issue HDDS-3816 and its associated design documents for authoritative details on EC implementation and placement.
-3.  Ozone Source Code: `org.apache.hadoop.hdds.scm.container.placement.algorithms` package. (For implementations of pluggable placement policies).
-4.  Ozone Source Code: `SCMContainerPlacementRandom.java`.
-5.  Ozone Source Code: `SCMContainerPlacementCapacity.java`.
+1.  [Hadoop Documentation: Rack Awareness](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/RackAwareness.html).
+2.  [Ozone Erasure Coding Design Documentation (JIRA HDDS-3816)](https://issues.apache.org/jira/browse/HDDS-3816). Refer to the Apache Ozone JIRA issue HDDS-3816 and its associated design documents for authoritative details on EC implementation and placement.
+3.  [Ozone Source Code: container placement policies](https://github.com/apache/ozone/tree/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms). (For implementations of pluggable placement policies).
+4.  [Ozone Source Code: SCMContainerPlacementRandom.java](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms/SCMContainerPlacementRandom.java).
+5.  [Ozone Source Code: SCMContainerPlacementCapacity.java](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms/SCMContainerPlacementCapacity.java).
 6.  Apache Ozone JIRA: [HDDS-3816](https://issues.apache.org/jira/browse/HDDS-3816) - Erasure Coding in Ozone.
-7.  Erasure Coding in Apache Hadoop Ozone (PDF linked from HDDS-3816 or Ozone documentation site).
+7.  [Erasure Coding in Apache Hadoop Ozone (Design Doc)](https://ozone.apache.org/docs/edge/design/ec.html)
