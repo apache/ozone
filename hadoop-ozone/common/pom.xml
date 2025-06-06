@@ -66,6 +66,10 @@
       <artifactId>netty-common</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-handler</artifactId>
+    </dependency>
+    <dependency>
       <groupId>jakarta.annotation</groupId>
       <artifactId>jakarta.annotation-api</artifactId>
     </dependency>
@@ -129,12 +133,6 @@
       <!-- required by OzoneManagerServiceBlockingStub in GrpcOmTransport -->
       <groupId>io.grpc</groupId>
       <artifactId>grpc-stub</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <!-- required by io.netty.handler.ssl.SslContextBuilder in GrpcOmTransport -->
-      <groupId>io.netty</groupId>
-      <artifactId>netty-handler</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
