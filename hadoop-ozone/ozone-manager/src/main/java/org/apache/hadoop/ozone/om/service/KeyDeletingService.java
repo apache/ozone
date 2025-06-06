@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -86,7 +85,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
   private int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
-  private final AtomicBoolean suspended;
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
 
@@ -102,7 +100,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     Preconditions.checkArgument(keyLimitPerTask >= 0,
         OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
     this.deletedKeyCount = new AtomicLong(0);
-    this.suspended = new AtomicBoolean(false);
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
     this.scmClient = scmClient;
@@ -271,30 +268,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       }
     }
     return queue;
-  }
-
-  private boolean shouldRun() {
-    if (getOzoneManager() == null) {
-      // OzoneManager can be null for testing
-      return true;
-    }
-    return !suspended.get() && getOzoneManager().isLeaderReady();
-  }
-
-  /**
-   * Suspend the service.
-   */
-  @VisibleForTesting
-  public void suspend() {
-    suspended.set(true);
-  }
-
-  /**
-   * Resume the service if suspended.
-   */
-  @VisibleForTesting
-  public void resume() {
-    suspended.set(false);
   }
 
   public int getKeyLimitPerTask() {

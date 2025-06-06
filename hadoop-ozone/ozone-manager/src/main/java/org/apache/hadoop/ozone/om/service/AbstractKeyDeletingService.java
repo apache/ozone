@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.om.service;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
@@ -46,6 +48,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong runCount;
   private final AtomicLong callId;
+  private final AtomicBoolean suspended;
   private final BootstrapStateHandler.Lock lock =
       new BootstrapStateHandler.Lock();
 
@@ -59,10 +62,36 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.metrics = ozoneManager.getDeletionMetrics();
     this.perfMetrics = ozoneManager.getPerfMetrics();
     this.callId = new AtomicLong(0);
+    this.suspended = new AtomicBoolean(false);
   }
 
   protected OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
     return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callId.incrementAndGet());
+  }
+
+  final boolean shouldRun() {
+    if (getOzoneManager() == null) {
+      // OzoneManager can be null for testing
+      return true;
+    }
+    return !suspended.get() && getOzoneManager().isLeaderReady();
+  }
+
+  /**
+   * Suspend the service.
+   */
+  @VisibleForTesting
+  public void suspend() throws ExecutionException, InterruptedException {
+    suspended.set(true);
+    getFuture().get();
+  }
+
+  /**
+   * Resume the service if suspended.
+   */
+  @VisibleForTesting
+  public void resume() {
+    suspended.set(false);
   }
 
   protected boolean isBufferLimitCrossed(

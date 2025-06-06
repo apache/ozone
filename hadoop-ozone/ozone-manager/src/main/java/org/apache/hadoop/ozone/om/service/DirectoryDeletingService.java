@@ -37,7 +37,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -103,7 +102,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   // from parent directory info from deleted directory table concurrently
   // and send deletion requests.
   private int ratisByteLimit;
-  private final AtomicBoolean suspended;
   private final SnapshotChainManager snapshotChainManager;
   private final boolean deepCleanSnapshots;
   private final ExecutorService deletionThreadPool;
@@ -127,36 +125,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
-    this.suspended = new AtomicBoolean(false);
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.deletedDirsCount = new AtomicLong(0);
     this.movedDirsCount = new AtomicLong(0);
     this.movedFilesCount = new AtomicLong(0);
-  }
-
-  private boolean shouldRun() {
-    if (getOzoneManager() == null) {
-      // OzoneManager can be null for testing
-      return true;
-    }
-    return getOzoneManager().isLeaderReady() && !suspended.get();
-  }
-
-  /**
-   * Suspend the service.
-   */
-  @VisibleForTesting
-  public void suspend() {
-    suspended.set(true);
-  }
-
-  /**
-   * Resume the service if suspended.
-   */
-  @VisibleForTesting
-  public void resume() {
-    suspended.set(false);
   }
 
   public void setRatisByteLimit(int ratisByteLimit) {
@@ -425,10 +398,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     return null;
   }
 
-  private final class DirDeletingTask implements BackgroundTask {
+  @VisibleForTesting
+  final class DirDeletingTask implements BackgroundTask {
     private final UUID snapshotId;
 
-    private DirDeletingTask(UUID snapshotId) {
+    DirDeletingTask(UUID snapshotId) {
       this.snapshotId = snapshotId;
     }
 
