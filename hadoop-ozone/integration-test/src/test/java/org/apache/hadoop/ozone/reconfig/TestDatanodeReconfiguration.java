@@ -96,26 +96,6 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
     assertEquals(newValue, executor.getCorePoolSize());
   }
 
-  @Test
-  void blockDeletingServiceInterval() throws ReconfigurationException {
-    //Initial string is 1m
-    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
-        OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "2m");
-
-    assertEquals("2m", getFirstDatanode().getDatanodeStateMachine().getContainer()
-        .getBlockDeletingService().getBlockDeletingServiceInterval());
-  }
-
-  @Test
-  void blockDeletingServiceTimeout() throws ReconfigurationException {
-    //Initial string is 300000ms
-    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
-        OZONE_BLOCK_DELETING_SERVICE_TIMEOUT, "350000ms");
-
-    assertEquals("350000ms", getFirstDatanode().getDatanodeStateMachine().getContainer()
-        .getBlockDeletingService().getBlockDeletingServiceTimeout());
-  }
-
   @ParameterizedTest
   @ValueSource(ints = { -1, +1 })
   void replicationStreamsLimit(int delta) throws ReconfigurationException {

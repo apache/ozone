@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Set;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -123,6 +124,18 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     getSubject().reconfigurePropertyImpl(OZONE_OM_VOLUME_LISTALL_ALLOWED, newValue);
 
     assertEquals(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT, cluster().getOzoneManager().getAllowListAllVolumes());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = { -1, +1 })
+  void threadNumberDirDeletion(int delta) throws ReconfigurationException {
+    ScheduledThreadPoolExecutor executor = (ScheduledThreadPoolExecutor)
+        cluster().getOzoneManager().getKeyManager().getDirDeletingService().getExecutorService();
+    int newValue = executor.getCorePoolSize() + delta;
+
+    cluster().getOzoneManager().getReconfigurationHandler().reconfigurePropertyImpl(
+        OZONE_THREAD_NUMBER_DIR_DELETION, String.valueOf(newValue));
+    assertEquals(newValue, executor.getCorePoolSize());
   }
 
 }
