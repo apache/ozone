@@ -25,6 +25,7 @@ export COMPOSE_DIR
 export SECURITY_ENABLED=true
 export OM_SERVICE_ID=omservice
 export SCM=scm1.org
+export OM=om1
 export COMPOSE_FILE=docker-compose.yaml:debug-tools.yaml
 export OZONE_DIR=/opt/hadoop
 
@@ -49,6 +50,10 @@ fi
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
+
+execute_robot_test ${OM} kinit.robot
+
+execute_robot_test ${OM} debug/auditparser.robot
 
 execute_robot_test ${SCM} kinit.robot
 

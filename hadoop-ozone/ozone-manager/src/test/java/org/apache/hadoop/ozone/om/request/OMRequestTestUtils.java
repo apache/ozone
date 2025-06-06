@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request;
 
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getOmKeyInfo;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.when;
@@ -503,13 +504,8 @@ public final class OMRequestTestUtils {
    *
    * @throws Exception
    */
-  public static void addDirKeyToDirTable(boolean addToCache,
-                                         OmDirectoryInfo omDirInfo,
-                                         String volume,
-                                         String bucket,
-                                         long trxnLogIndex,
-                                         OMMetadataManager omMetadataManager)
-          throws Exception {
+  public static String addDirKeyToDirTable(boolean addToCache, OmDirectoryInfo omDirInfo, String volume, String bucket,
+      long trxnLogIndex, OMMetadataManager omMetadataManager) throws Exception {
     final long volumeId = omMetadataManager.getVolumeId(volume);
     final long bucketId = omMetadataManager.getBucketId(volume, bucket);
     final String ozoneKey = omMetadataManager.getOzonePathKey(volumeId,
@@ -520,6 +516,7 @@ public final class OMRequestTestUtils {
               CacheValue.get(trxnLogIndex, omDirInfo));
     }
     omMetadataManager.getDirectoryTable().put(ozoneKey, omDirInfo);
+    return ozoneKey;
   }
 
   /**
@@ -1000,6 +997,22 @@ public final class OMRequestTestUtils {
 
     omMetadataManager.getDeletedTable().put(ozoneKey, repeatedOmKeyInfo);
 
+    return ozoneKey;
+  }
+
+  /**
+   * Deletes directory from directory table and adds it to DeletedDirectory table.
+   * @return the deletedDirectoryTable key.
+   */
+  public static String deleteDir(String ozoneKey, String volume, String bucket,
+      OMMetadataManager omMetadataManager)
+      throws IOException {
+    // Retrieve the keyInfo
+    OmDirectoryInfo omDirectoryInfo = omMetadataManager.getDirectoryTable().get(ozoneKey);
+    OmKeyInfo omKeyInfo = getOmKeyInfo(volume, bucket, omDirectoryInfo,
+        omDirectoryInfo.getName());
+    omMetadataManager.getDeletedDirTable().put(ozoneKey, omKeyInfo);
+    omMetadataManager.getDirectoryTable().delete(ozoneKey);
     return ozoneKey;
   }
 
