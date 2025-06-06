@@ -100,6 +100,8 @@ Uses an external script to resolve rack locations for IPs.
     ```
   Ensure the script is executable (`chmod +x /etc/ozone/determine_rack.sh`).
 
+  **Note:** For production environments, implement robust error handling and validation in your script. This should include handling network timeouts, invalid inputs, CMDB query failures, and logging errors appropriately. The example above is simplified for illustration purposes only.
+
 **Topology Mapping Best Practices:**
 
 * **Accuracy:** Mappings must be accurate and current.
@@ -108,7 +110,9 @@ Uses an external script to resolve rack locations for IPs.
 
 ## Container Placement Policies for Replicated (RATIS) Containers
 
-SCM uses a pluggable policy for placing additional replicas of *closed* RATIS-replicated containers, configured by `ozone.scm.container.placement.impl` in `ozone-site.xml`. Policies are in `org.apache.hadoop.hdds.scm.container.placement.algorithms`. \[1, 3]
+SCM uses a pluggable policy to place additional replicas of *closed* RATIS-replicated containers. This is configured using the `ozone.scm.container.placement.impl` property in `ozone-site.xml`. Available policies are found in the `org.apache.hadoop.hdds.scm.container.placement.algorithms` package \[1, 3\].
+
+These policies are applied when SCM needs to re-replicate containers, such as during container balancing.
 
 ### 1. `SCMContainerPlacementRackAware` (Default)
 
