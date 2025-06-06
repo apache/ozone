@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
@@ -119,7 +119,7 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * @throws IOException if there is any failure.
    */
   List<DeleteBlockGroupResult>
-      deleteKeyBlocks(List<BlockGroup> keyBlocksInfoList) throws IOException;
+      deleteKeyBlocks(List<DeletedBlockGroup> keyBlocksInfoList) throws IOException;
 
   /**
    * Gets the Clusterid and SCM Id from SCM.

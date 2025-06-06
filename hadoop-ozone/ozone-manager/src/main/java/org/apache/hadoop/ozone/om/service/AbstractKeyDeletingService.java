@@ -40,8 +40,8 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.DeleteKeysResult;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
@@ -101,7 +101,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.callId = new AtomicLong(0);
   }
 
-  protected Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
+  protected Pair<Integer, Boolean> processKeyDeletes(List<DeletedBlockGroup> keyBlocksList,
       Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
       String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException, InterruptedException {
 

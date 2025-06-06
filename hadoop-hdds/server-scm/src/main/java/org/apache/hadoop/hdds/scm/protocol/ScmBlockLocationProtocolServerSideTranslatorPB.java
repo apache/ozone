@@ -54,8 +54,8 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -229,8 +229,19 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     DeleteScmKeyBlocksResponseProto.Builder resp =
         DeleteScmKeyBlocksResponseProto.newBuilder();
 
-    List<BlockGroup> infoList = req.getKeyBlocksList().stream()
-        .map(BlockGroup::getFromProto).collect(Collectors.toList());
+    List<DeletedBlockGroup> infoList;
+
+    if (req.getDeletedKeyBlocksCount() > 0) {
+      // New callers: use the size-aware list.
+      infoList = req.getDeletedKeyBlocksList().stream()
+          .map(DeletedBlockGroup::getFromProto)
+          .collect(Collectors.toList());
+    } else {
+      infoList = req.getKeyBlocksList().stream()
+          .map(DeletedBlockGroup::fromLegacy)
+          .collect(Collectors.toList());
+    }
+
     final List<DeleteBlockGroupResult> results =
         impl.deleteKeyBlocks(infoList);
     for (DeleteBlockGroupResult result : results) {

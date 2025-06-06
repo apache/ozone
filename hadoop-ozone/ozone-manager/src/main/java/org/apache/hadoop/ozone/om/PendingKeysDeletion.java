@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 /**
@@ -36,9 +37,9 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 public class PendingKeysDeletion {
 
   private Map<String, RepeatedOmKeyInfo> keysToModify;
-  private List<BlockGroup> keyBlocksList;
+  private List<DeletedBlockGroup> keyBlocksList;
 
-  public PendingKeysDeletion(List<BlockGroup> keyBlocksList,
+  public PendingKeysDeletion(List<DeletedBlockGroup> keyBlocksList,
        Map<String, RepeatedOmKeyInfo> keysToModify) {
     this.keysToModify = keysToModify;
     this.keyBlocksList = keyBlocksList;
@@ -48,7 +49,7 @@ public class PendingKeysDeletion {
     return keysToModify;
   }
 
-  public List<BlockGroup> getKeyBlocksList() {
+  public List<DeletedBlockGroup> getKeyBlocksList() {
     return keyBlocksList;
   }
 }
