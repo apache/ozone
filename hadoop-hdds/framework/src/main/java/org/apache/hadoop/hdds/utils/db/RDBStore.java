@@ -73,10 +73,12 @@ public class RDBStore implements DBStore {
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
+  private final ManagedCompactRangeOptions rangeCompactionOptions;
 
   @SuppressWarnings("parameternumber")
   RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
+                  ManagedCompactRangeOptions rangeCompactionOptions,
                   boolean readOnly,
                   String dbJmxBeanName, boolean enableCompactionDag,
                   long maxDbUpdatesSizeThreshold,
@@ -92,6 +94,7 @@ public class RDBStore implements DBStore {
     dbLocation = dbFile;
     this.dbOptions = dbOptions;
     this.statistics = statistics;
+    this.rangeCompactionOptions = rangeCompactionOptions;
 
     Exception exception = null;
     try {
@@ -216,17 +219,12 @@ public class RDBStore implements DBStore {
 
   @Override
   public void compactDB() throws IOException {
-    try (ManagedCompactRangeOptions options =
-             new ManagedCompactRangeOptions()) {
-      db.compactDB(options);
-    }
+    db.compactDB(rangeCompactionOptions);
   }
 
   @Override
   public void compactTable(String tableName) throws IOException {
-    try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
-      compactTable(tableName, options);
-    }
+    compactTable(tableName, rangeCompactionOptions);
   }
 
   @Override

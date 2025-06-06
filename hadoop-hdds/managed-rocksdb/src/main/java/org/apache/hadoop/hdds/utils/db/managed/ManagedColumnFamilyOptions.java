@@ -98,4 +98,11 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
     }
     options.close();
   }
+
+  public ManagedColumnFamilyOptions setMaxCompactionBytes(long maxCompactionBytes) {
+    if (maxCompactionBytes > 0) {
+      super.setMaxCompactionBytes(maxCompactionBytes);
+    }
+    return this;
+  }
 }
