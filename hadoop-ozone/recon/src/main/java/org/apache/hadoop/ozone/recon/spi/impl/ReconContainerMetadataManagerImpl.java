@@ -34,10 +34,10 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -229,9 +229,9 @@ public class ReconContainerMetadataManagerImpl
    */
   @Override
   public void storeContainerReplicaHistory(Long containerID,
-      Map<UUID, ContainerReplicaHistory> tsMap) throws IOException {
+      Map<DatanodeID, ContainerReplicaHistory> tsMap) throws IOException {
     List<ContainerReplicaHistory> tsList = new ArrayList<>();
-    for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
+    for (Map.Entry<DatanodeID, ContainerReplicaHistory> e : tsMap.entrySet()) {
       tsList.add(e.getValue());
     }
 
@@ -247,17 +247,17 @@ public class ReconContainerMetadataManagerImpl
    */
   @Override
   public void batchStoreContainerReplicaHistory(
-      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap)
+      Map<Long, Map<DatanodeID, ContainerReplicaHistory>> replicaHistoryMap)
       throws IOException {
     try (BatchOperation batchOperation =
              containerDbStore.initBatchOperation()) {
-      for (Map.Entry<Long, Map<UUID, ContainerReplicaHistory>> entry :
+      for (Map.Entry<Long, Map<DatanodeID, ContainerReplicaHistory>> entry :
           replicaHistoryMap.entrySet()) {
         final long containerId = entry.getKey();
-        final Map<UUID, ContainerReplicaHistory> tsMap = entry.getValue();
+        final Map<DatanodeID, ContainerReplicaHistory> tsMap = entry.getValue();
 
         List<ContainerReplicaHistory> tsList = new ArrayList<>();
-        for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
+        for (Map.Entry<DatanodeID, ContainerReplicaHistory> e : tsMap.entrySet()) {
           tsList.add(e.getValue());
         }
 
@@ -290,7 +290,7 @@ public class ReconContainerMetadataManagerImpl
    * @throws IOException
    */
   @Override
-  public Map<UUID, ContainerReplicaHistory> getContainerReplicaHistory(
+  public Map<DatanodeID, ContainerReplicaHistory> getContainerReplicaHistory(
       Long containerID) throws IOException {
 
     final ContainerReplicaHistoryList tsList =
@@ -300,12 +300,12 @@ public class ReconContainerMetadataManagerImpl
       return new HashMap<>();
     }
 
-    Map<UUID, ContainerReplicaHistory> res = new HashMap<>();
+    Map<DatanodeID, ContainerReplicaHistory> res = new HashMap<>();
     // Populate result map with entries from the DB.
     // The list should be fairly short (< 10 entries).
     for (ContainerReplicaHistory ts : tsList.getList()) {
-      final UUID uuid = ts.getUuid();
-      res.put(uuid, ts);
+      final DatanodeID id = ts.getId();
+      res.put(id, ts);
     }
     return res;
   }

@@ -54,6 +54,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -341,8 +342,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       initializeInjector();
       isSetupDone = true;
     }
-    String datanodeId = datanodeDetails.getUuid().toString();
-    String datanodeId2 = datanodeDetails2.getUuid().toString();
+    String datanodeId = datanodeDetails.getID().toString();
+    String datanodeId2 = datanodeDetails2.getID().toString();
     containerReportsProto =
         ContainerReportsProto.newBuilder()
             .addReports(
@@ -432,7 +433,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     DatanodeDetailsProto datanodeDetailsProto3 =
         DatanodeDetailsProto.newBuilder()
             .setHostName(HOST3)
-            .setUuid(datanodeDetails3.getUuid().toString())
+            .setId(datanodeDetails3.getID().toProto())
             .setIpAddress(IP3)
             .build();
     extendedDatanodeDetailsProto3 =
@@ -1295,7 +1296,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     nodeManager.setNodeOperationalState(dnDetailsInternal,
         NodeOperationalState.DECOMMISSIONED, 666L);
 
-    Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(datanodeDetails3.getUuid().toString()));
+    Response removedDNResponse = nodeEndpoint.removeDatanodes(
+        Collections.singletonList(datanodeDetails3.getID().toString()));
 
     RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper =
         (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
@@ -1311,7 +1313,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @Test
   public void testExplicitRemovalOfInvalidStateNode() {
-    String dnUUID = datanodeDetails2.getUuid().toString();
+    String dnUUID = datanodeDetails2.getID().toString();
     Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(dnUUID));
     RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper =
         (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
@@ -1328,7 +1330,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @Test
   public void testExplicitRemovalOfNonExistingNode() {
-    String dnUUID = datanodeDetails4.getUuid().toString();
+    String dnUUID = datanodeDetails4.getID().toString();
     Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(dnUUID));
     RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper =
         (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
