@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -314,7 +315,8 @@ public class TestOzoneManagerHASnapshot {
    * and purgeSnapshot in same batch.
    */
   @Test
-  public void testKeyAndSnapshotDeletionService() throws IOException, InterruptedException, TimeoutException {
+  public void testKeyAndSnapshotDeletionService()
+      throws IOException, InterruptedException, TimeoutException, ExecutionException {
     OzoneManager omLeader = cluster.getOMLeader();
     OzoneManager omFollower;
 
