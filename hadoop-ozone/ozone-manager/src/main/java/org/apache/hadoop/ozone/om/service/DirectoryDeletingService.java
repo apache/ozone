@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.io.Closeable;
@@ -40,6 +43,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -117,8 +121,27 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.ratisByteLimit = (int) (limit * 0.9);
     this.suspended = new AtomicBoolean(false);
     this.isRunningOnAOS = new AtomicBoolean(false);
+    registerReconfigCallbacks(ozoneManager.getReconfigurationHandler(), configuration);
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
     this.deepCleanSnapshots = deepCleanSnapshots;
+  }
+
+  public void registerReconfigCallbacks(ReconfigurationHandler handler, OzoneConfiguration conf) {
+    handler.registerCompleteCallback((changedKeys, newConf) -> {
+      if (changedKeys.containsKey(OZONE_DIR_DELETING_SERVICE_INTERVAL)) {
+        updateAndRestart(conf);
+      }
+    });
+  }
+
+  private synchronized void updateAndRestart(OzoneConfiguration conf) {
+    long newInterval = conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
+        OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
+    LOG.info("Updating and restarting DirectoryDeletingService with interval: {} {}",
+        newInterval, TimeUnit.SECONDS.name().toLowerCase());
+    shutdown();
+    setInterval(newInterval, TimeUnit.SECONDS);
+    start();
   }
 
   private boolean shouldRun() {
