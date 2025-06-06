@@ -108,6 +108,22 @@ Uses an external script to resolve rack locations for IPs.
 * **Static Mapping:** Simpler for small, stable clusters; requires manual updates.
 * **Dynamic Mapping:** Flexible for large/dynamic clusters. Script performance, correctness, and reliability are vital; ensure it's idempotent and handles batch lookups efficiently.
 
+## Pipeline Choosing Policies
+
+Ozone supports several policies for selecting a pipeline when placing containers. The policy for Ratis containers is configured by the property `hdds.scm.pipeline.choose.policy.impl` for SCM. The policy for EC (Erasure Coded) containers is configured by the property `hdds.scm.ec.pipeline.choose.policy.impl`. For both, the default value is `org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy`.
+
+These policies help optimize for different goals such as load balancing, health, or simplicity:
+
+- **RandomPipelineChoosePolicy** (Default): Selects a pipeline at random from the available list, without considering utilization or health. This policy is simple and does not optimize for any particular metric.
+
+- **CapacityPipelineChoosePolicy**: Picks two random pipelines and selects the one with lower utilization, favoring pipelines with more available capacity and helping to balance the load across the cluster.
+
+- **RoundRobinPipelineChoosePolicy**: Selects pipelines in a round-robin order. This policy is mainly used for debugging and testing, ensuring even distribution but not considering health or capacity.
+
+- **HealthyPipelineChoosePolicy**: Randomly selects pipelines but only returns a healthy one. If no healthy pipeline is found, it returns the last tried pipeline as a fallback.
+
+These policies can be configured to suit different deployment needs and workloads.
+
 ## Container Placement Policies for Replicated (RATIS) Containers
 
 SCM uses a pluggable policy to place additional replicas of *closed* RATIS-replicated containers. This is configured using the `ozone.scm.container.placement.impl` property in `ozone-site.xml`. Available policies are found in the `org.apache.hadoop.hdds.scm.container.placement.algorithms` package \[1, 3\].
