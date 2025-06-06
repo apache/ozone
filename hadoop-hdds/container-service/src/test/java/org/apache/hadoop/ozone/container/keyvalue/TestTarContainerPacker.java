@@ -167,7 +167,7 @@ public class TestTarContainerPacker {
 
     KeyValueContainerData containerData = new KeyValueContainerData(
         id, layout,
-        -1, UUID.randomUUID().toString(), UUID.randomUUID().toString());
+        1, UUID.randomUUID().toString(), UUID.randomUUID().toString());
     containerData.setSchemaVersion(schemaVersion);
     containerData.setChunksPath(dataDir.toString());
     containerData.setMetadataPath(metaDir.toString());
