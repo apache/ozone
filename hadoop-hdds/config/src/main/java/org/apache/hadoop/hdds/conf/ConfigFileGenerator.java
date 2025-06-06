@@ -77,7 +77,7 @@ public class ConfigFileGenerator extends AbstractProcessor {
       String currentArtifactId = processingEnv.getOptions().get("artifactId");
       String outputFileName;
       if (currentArtifactId == null || currentArtifactId.isEmpty()) {
-        outputFileName = OUTPUT_FILE_NAME; // 設定預設檔名
+        outputFileName = OUTPUT_FILE_NAME;
       } else {
         outputFileName = currentArtifactId + OUTPUT_FILE_POSTFIX;
       }
