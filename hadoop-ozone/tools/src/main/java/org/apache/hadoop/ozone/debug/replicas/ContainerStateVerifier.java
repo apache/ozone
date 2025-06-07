@@ -17,14 +17,10 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Objects;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
@@ -68,15 +64,14 @@ public class ContainerStateVerifier implements ReplicaVerifier {
   }
 
   @Override
-  public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation,
-                                             int replicaIndex) {
+  public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation) {
     try {
       StringBuilder replicaCheckMsg = new StringBuilder().append("Replica state is ");
       boolean pass = false;
 
       ContainerInfoToken containerInfoToken = getContainerInfoToken(keyLocation.getContainerID());
       ContainerDataProto containerData = fetchContainerDataFromDatanode(datanode, keyLocation.getContainerID(),
-          keyLocation, replicaIndex, containerInfoToken);
+          keyLocation, containerInfoToken);
 
       if (containerData == null) {
         return BlockVerificationResult.failIncomplete("No container data returned from DN.");
@@ -112,18 +107,13 @@ public class ContainerStateVerifier implements ReplicaVerifier {
   }
 
   private ContainerDataProto fetchContainerDataFromDatanode(DatanodeDetails dn, long containerId,
-                                                            OmKeyLocationInfo keyLocation, int replicaIndex,
+                                                            OmKeyLocationInfo keyLocation,
                                                             ContainerInfoToken containerInfoToken)
       throws IOException {
     XceiverClientSpi client = null;
     ReadContainerResponseProto response;
     try {
-      Pipeline pipeline = Pipeline.newBuilder(keyLocation.getPipeline())
-          .setId(dn.getID())
-          .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
-          .setNodes(Collections.singletonList(dn))
-          .setReplicaIndexes(Collections.singletonMap(dn, replicaIndex))
-          .build();
+      Pipeline pipeline = keyLocation.getPipeline().copyForReadFromNode(dn);
       String encodedToken = containerInfoToken.getEncodedToken();
 
       client = xceiverClientManager.acquireClientForReadData(pipeline);
