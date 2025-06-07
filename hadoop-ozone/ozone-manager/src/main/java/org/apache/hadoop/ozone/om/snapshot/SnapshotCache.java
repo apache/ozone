@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_DB_LOCK;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -28,12 +29,15 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +62,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   private final int cacheSizeLimit;
   private final Set<UUID> pendingEvictionQueue;
   private final Scheduler scheduler;
+  private final IOzoneManagerLock lock;
   private static final String SNAPSHOT_CACHE_CLEANUP_SERVICE =
       "SnapshotCacheCleanupService";
   private final boolean compactNonSnapshotDiffTables;
@@ -86,7 +91,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
         try {
           metadataManager.getStore().compactTable(table.getName());
         } catch (IOException e) {
-          LOG.warn("Failed to compact table {} in snapshot {}: {}", 
+          LOG.warn("Failed to compact table {} in snapshot {}: {}",
               table.getName(), snapshot.getSnapshotID(), e.getMessage());
         }
       }
@@ -94,17 +99,18 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   }
 
   public SnapshotCache(CacheLoader<UUID, OmSnapshot> cacheLoader, int cacheSizeLimit, OMMetrics omMetrics,
-                       long cleanupInterval, boolean compactNonSnapshotDiffTables) {
+                       long cleanupInterval, boolean compactNonSnapshotDiffTables, IOzoneManagerLock lock) {
     this.dbMap = new ConcurrentHashMap<>();
     this.cacheLoader = cacheLoader;
     this.cacheSizeLimit = cacheSizeLimit;
     this.omMetrics = omMetrics;
+    this.lock = lock;
     this.pendingEvictionQueue = ConcurrentHashMap.newKeySet();
     this.compactNonSnapshotDiffTables = compactNonSnapshotDiffTables;
     if (cleanupInterval > 0) {
       this.scheduler = new Scheduler(SNAPSHOT_CACHE_CLEANUP_SERVICE,
           true, 1);
-      this.scheduler.scheduleWithFixedDelay(this::cleanup, cleanupInterval,
+      this.scheduler.scheduleWithFixedDelay(() -> this.cleanup(false), cleanupInterval,
           cleanupInterval, TimeUnit.MILLISECONDS);
     } else {
       this.scheduler = null;
@@ -172,7 +178,8 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   }
 
   /**
-   * Get or load OmSnapshot. Shall be close()d after use.
+   * Get or load OmSnapshot. Shall be close()d after use. This would acquire a read lock on the Snapshot Database
+   * during the entire lifecycle of the returned OmSnapshot instance.
    * TODO: [SNAPSHOT] Can add reason enum to param list later.
    * @param key SnapshotId
    * @return an OmSnapshot instance, or null on error
@@ -182,6 +189,11 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     if (size() > cacheSizeLimit) {
       LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).",
           size(), cacheSizeLimit);
+    }
+    OMLockDetails lockDetails = lock.acquireReadLock(SNAPSHOT_DB_LOCK, key.toString());
+    if (!lockDetails.isLockAcquired()) {
+      throw new OMException("Unable to acquire readlock on snapshot db with key " + key,
+          OMException.ResultCodes.INTERNAL_ERROR);
     }
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist, and increment the reference count on the instance.
@@ -214,11 +226,12 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     if (rcOmSnapshot == null) {
       // The only exception that would fall through the loader logic above
       // is OMException with FILE_NOT_FOUND.
+      lock.releaseReadLock(SNAPSHOT_DB_LOCK, key.toString());
       throw new OMException("SnapshotId: '" + key + "' not found, or the snapshot is no longer active.",
           OMException.ResultCodes.FILE_NOT_FOUND);
     }
     return new UncheckedAutoCloseableSupplier<OmSnapshot>() {
-      private AtomicReference<Boolean> closed = new AtomicReference<>(false);
+      private final AtomicReference<Boolean> closed = new AtomicReference<>(false);
       @Override
       public OmSnapshot get() {
         return rcOmSnapshot.get();
@@ -229,6 +242,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
         closed.updateAndGet(alreadyClosed -> {
           if (!alreadyClosed) {
             rcOmSnapshot.decrementRefCount();
+            lock.releaseReadLock(SNAPSHOT_DB_LOCK, key.toString());
           }
           return true;
         });
@@ -249,21 +263,59 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     val.decrementRefCount();
   }
 
+  /**
+   * Acquires a write lock on the snapshot database and returns an auto-closeable supplier
+   * for lock details. The lock ensures that the operations accessing the snapshot database
+   * are performed in a thread-safe manner. The returned supplier automatically releases the
+   * lock when closed, preventing potential resource contention or deadlocks.
+   */
+  public UncheckedAutoCloseableSupplier<OMLockDetails> lock() {
+    return lock(() -> lock.acquireResourceWriteLock(SNAPSHOT_DB_LOCK),
+        () -> lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK));
+  }
+
+  private UncheckedAutoCloseableSupplier<OMLockDetails> lock(
+      Supplier<OMLockDetails> lockFunction, Supplier<OMLockDetails> unlockFunction) {
+    AtomicReference<OMLockDetails> lockDetails = new AtomicReference<>(lockFunction.get());
+    if (lockDetails.get().isLockAcquired()) {
+      cleanup(true);
+      if (!dbMap.isEmpty()) {
+        lockDetails.set(unlockFunction.get());
+      }
+    }
+
+    return new UncheckedAutoCloseableSupplier<OMLockDetails>() {
+
+      @Override
+      public void close() {
+        lockDetails.updateAndGet((prevLock) -> {
+          if (prevLock != null && prevLock.isLockAcquired()) {
+            return unlockFunction.get();
+          }
+          return prevLock;
+        });
+      }
+
+      @Override
+      public OMLockDetails get() {
+        return lockDetails.get();
+      }
+    };
+  }
 
   /**
    * If cache size exceeds soft limit, attempt to clean up and close the
      instances that has zero reference count.
    */
-  @VisibleForTesting
-  void cleanup() {
-    if (dbMap.size() > cacheSizeLimit) {
+  private synchronized void cleanup(boolean force) {
+    if (force || dbMap.size() > cacheSizeLimit) {
       for (UUID evictionKey : pendingEvictionQueue) {
         ReferenceCounted<OmSnapshot> snapshot = dbMap.get(evictionKey);
         if (snapshot != null && snapshot.getTotalRefCount() == 0) {
           try {
             compactSnapshotDB(snapshot.get());
           } catch (IOException e) {
-            LOG.warn("Failed to compact snapshot DB for snapshotId {}: {}", 
+            LOG.warn("Failed to compact snapshot DB for snapshotId {}: {}",
                 evictionKey, e.getMessage());
           }
         }
