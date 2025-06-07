@@ -54,8 +54,7 @@
   "panels": [
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "-- Grafana --"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -133,8 +132,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "-- Grafana --"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "exemplar": false,
