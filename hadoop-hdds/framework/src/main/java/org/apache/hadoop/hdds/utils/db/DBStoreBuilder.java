@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLogger;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -223,7 +224,10 @@ public final class DBStoreBuilder {
         throw new IOException("The DB destination directory should exist.");
       }
 
-      return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
+      ManagedCompactRangeOptions rangeCompactionOptions = new ManagedCompactRangeOptions();
+      rangeCompactionOptions.setMaxSubcompactions(rocksDBConfiguration.getMaxSubCompactions());
+
+      return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs, rangeCompactionOptions,
           openReadOnly, dbJmxBeanNameName, enableCompactionDag,
           maxDbUpdatesSizeThreshold, createCheckpointDirs, configuration,
           enableRocksDbMetrics);
@@ -324,11 +328,11 @@ public final class DBStoreBuilder {
 
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
-        tableConfigs.add(new TableConfig(name,
-                getCfOptions(rocksDbCfWriteBufferSize)));
-      } else {
-        tableConfigs.add(new TableConfig(name, options));
+        options = getCfOptions(rocksDbCfWriteBufferSize);
       }
+      long maxCompactionBytes = rocksDBConfiguration.getMaxCompactionBytes();
+      options.setMaxCompactionBytes(maxCompactionBytes);
+      tableConfigs.add(new TableConfig(name, options));
     }
 
     return tableConfigs;
