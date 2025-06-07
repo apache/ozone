@@ -37,9 +37,13 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Create and extract archives. */
 public final class Archiver {
+
+  private static final Logger LOG = LoggerFactory.getLogger(Archiver.class);
 
   private Archiver() {
     // no instances (for now)
@@ -114,6 +118,29 @@ public final class Archiver {
     archiveOutput.closeArchiveEntry();
     return bytes;
   }
+
+  public static void linkAndIncludeFile(File file, String entryName,
+      ArchiveOutputStream<TarArchiveEntry> archiveOutput, Path tmpDir) throws IOException {
+    File link = null;
+    try {
+      Files.createLink(tmpDir.resolve(entryName), file.toPath());
+      link = tmpDir.resolve(file.getName()).toFile();
+      TarArchiveEntry entry = archiveOutput.createArchiveEntry(link, entryName);
+      archiveOutput.putArchiveEntry(entry);
+      try (InputStream input = Files.newInputStream(link.toPath())) {
+        IOUtils.copyLarge(input, archiveOutput);
+      }
+      archiveOutput.closeArchiveEntry();
+    } catch (IOException ioe) {
+      LOG.error("Couldn't create hardlink for file {} while including it in tarball.",
+          file.getAbsolutePath(), ioe);
+    } finally {
+      if (link != null) {
+        Files.deleteIfExists(link.toPath());
+      }
+    }
+  }
+
 
   public static void extractEntry(ArchiveEntry entry, InputStream input, long size,
       Path ancestor, Path path) throws IOException {
