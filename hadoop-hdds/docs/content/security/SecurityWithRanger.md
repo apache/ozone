@@ -27,8 +27,7 @@ icon: user
 
 
 Apache Ranger™ is a framework to enable, monitor and manage comprehensive data
-security across the Hadoop platform and beyond. Apache Ranger has supported authorization for Ozone 
-since version 2.0. However, it is recommended to use the latest Ranger [2.6.0](https://dist.apache.org/repos/dist/release/ranger/2.6.0/) release.
+security across the Hadoop platform and beyond. Apache Ranger has supported authorization for Ozone since version 2.0. However, due to improvements and bug fixes, it is recommended to use the latest release, [Ranger 2.6.0](https://dist.apache.org/repos/dist/release/ranger/2.6.0/).
 
 
 To use Apache Ranger, you must have Apache Ranger installed in your Hadoop
