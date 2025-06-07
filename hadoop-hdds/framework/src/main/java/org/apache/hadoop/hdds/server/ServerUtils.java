@@ -307,4 +307,6 @@ public final class ServerUtils {
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
     return (new File(metaDirPath, "ratis")).getPath();
   }
+
+  // TODO: Move helpers here instead
 }
