@@ -88,7 +88,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -142,7 +142,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -165,7 +165,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -219,7 +219,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -238,7 +238,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -292,7 +292,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -311,7 +311,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -365,7 +365,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -384,7 +384,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -438,7 +438,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -457,7 +457,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -511,7 +511,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -530,7 +530,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -584,7 +584,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -616,7 +616,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -670,7 +670,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -689,7 +689,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -743,7 +743,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -775,7 +775,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -829,7 +829,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -861,7 +861,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "gridPos": {
         "h": 3,
@@ -899,7 +899,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -979,7 +979,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -998,7 +998,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -1077,7 +1077,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1096,7 +1096,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -1175,7 +1175,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1194,7 +1194,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -1273,7 +1273,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1292,7 +1292,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -1372,7 +1372,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1391,7 +1391,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -1471,7 +1471,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1490,7 +1490,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -1569,7 +1569,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1601,7 +1601,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -1681,7 +1681,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1700,7 +1700,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -1780,7 +1780,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1799,7 +1799,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -1879,7 +1879,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1898,7 +1898,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -1978,7 +1978,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -1997,7 +1997,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -2077,7 +2077,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2096,7 +2096,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -2176,7 +2176,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2208,7 +2208,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "description": "",
       "fieldConfig": {
@@ -2289,7 +2289,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2308,7 +2308,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -2388,7 +2388,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2407,7 +2407,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "description": "",
       "fieldConfig": {
@@ -2488,7 +2488,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2507,7 +2507,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -2587,7 +2587,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2619,7 +2619,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -2699,7 +2699,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2718,7 +2718,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -2798,7 +2798,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2817,7 +2817,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -2897,7 +2897,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2916,7 +2916,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "-- Grafana --"
       },
       "fieldConfig": {
         "defaults": {
@@ -2996,7 +2996,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "-- Grafana --"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
