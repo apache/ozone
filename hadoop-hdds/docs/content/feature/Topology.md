@@ -33,7 +33,7 @@ Apache Ozone uses topology information (e.g., rack placement) to optimize data a
 
 Ozone's topology-aware placement strategies vary by container replication type and state:
 
-* **RATIS Replicated Containers:** Ozone uses RAFT replication for Open containers (write), and an async replication for closed, immutable containers (cold data). As RAFT requires low-latency network, topology awareness placement is available only for closed containers. See the [page about Containers](concept/Containers.md) about more information related to Open vs Closed containers.
+* **RATIS Replicated Containers:** Ozone uses RAFT replication for Open containers (write), and an async replication for closed, immutable containers (cold data). Topology awareness placement is implemented for both open and closed RATIS containers, ensuring rack diversity and fault tolerance during both write and re-replication operations. See the [page about Containers](concept/Containers.md) for more information related to Open vs Closed containers.
 * **Erasure Coded (EC) Containers:** EC demands topology awareness from the initial write. For an EC key, OM allocates a block group of `$d+p$` distinct DataNodes selected by SCM's `ECPipelineProvider` to ensure rack diversity and fault tolerance. This topology-aware selection is integral to the EC write path for new blocks. \[2]
 
 ## Configuring Topology Hierarchy
