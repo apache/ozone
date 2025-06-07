@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
@@ -46,6 +47,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -273,5 +275,25 @@ public class TestObjectGet {
     // THEN
     assertEquals(NO_SUCH_KEY.getCode(), ex.getCode());
     bucket.deleteKey(keyPath);
+  }
+
+  @Test
+  public void testPassBucketOwnerCondition() throws Exception {
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+    rest.setHeaders(headers);
+    Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    assertEquals(200, response.getStatus());
+  }
+
+  @Test
+  public void testFailedBucketOwnerCondition() {
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("wrongOwner");
+    rest.setHeaders(headers);
+    OS3Exception exception =
+        assertThrows(OS3Exception.class, () -> rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null));
+
+    assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
   }
 }

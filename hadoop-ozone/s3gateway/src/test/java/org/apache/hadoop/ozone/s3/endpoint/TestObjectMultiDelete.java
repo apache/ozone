@@ -18,13 +18,19 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.util.Collections.singleton;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.ws.rs.core.HttpHeaders;
 import javax.xml.bind.JAXBException;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -32,6 +38,8 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,23 +47,35 @@ import org.junit.jupiter.api.Test;
  */
 public class TestObjectMultiDelete {
 
+  public static final String BUCKET_NAME = "b1";
+  private static OzoneBucket bucket;
+  private static BucketEndpoint rest;
+
+  @BeforeAll
+  public static void setUp() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket(BUCKET_NAME);
+
+    bucket = client.getObjectStore().getS3Bucket(BUCKET_NAME);
+    bucket.createKey("key1", 0).close();
+    bucket.createKey("key2", 0).close();
+    bucket.createKey("key3", 0).close();
+
+    rest = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+  }
+
   @Test
   public void delete() throws IOException, OS3Exception, JAXBException {
     //GIVEN
-    OzoneClient client = new OzoneClientStub();
-    OzoneBucket bucket = initTestData(client);
-
-    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
-        .setClient(client)
-        .build();
-
     MultiDeleteRequest mdr = new MultiDeleteRequest();
     mdr.getObjects().add(new DeleteObject("key1"));
     mdr.getObjects().add(new DeleteObject("key2"));
     mdr.getObjects().add(new DeleteObject("key4"));
 
     //WHEN
-    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
+    MultiDeleteResponse response = rest.multiDelete(BUCKET_NAME, "", mdr, null);
 
     //THEN
     Set<String> keysAtTheEnd = Sets.newHashSet(bucket.listKeys("")).stream()
@@ -74,13 +94,6 @@ public class TestObjectMultiDelete {
   @Test
   public void deleteQuiet() throws IOException, OS3Exception, JAXBException {
     //GIVEN
-    OzoneClient client = new OzoneClientStub();
-    OzoneBucket bucket = initTestData(client);
-
-    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
-        .setClient(client)
-        .build();
-
     MultiDeleteRequest mdr = new MultiDeleteRequest();
     mdr.setQuiet(true);
     mdr.getObjects().add(new DeleteObject("key1"));
@@ -88,7 +101,7 @@ public class TestObjectMultiDelete {
     mdr.getObjects().add(new DeleteObject("key4"));
 
     //WHEN
-    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
+    MultiDeleteResponse response = rest.multiDelete(BUCKET_NAME, "", mdr, null);
 
     //THEN
     Set<String> keysAtTheEnd = Sets.newHashSet(bucket.listKeys("")).stream()
@@ -101,15 +114,34 @@ public class TestObjectMultiDelete {
     assertEquals(0, response.getErrors().size());
   }
 
-  private OzoneBucket initTestData(OzoneClient client) throws IOException {
-    client.getObjectStore().createS3Bucket("b1");
+  @Test
+  public void testPassBucketOwnerCondition() throws Exception {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
 
-    OzoneBucket bucket =
-        client.getObjectStore().getS3Bucket("b1");
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(new DeleteObject("key1"));
+    mdr.getObjects().add(new DeleteObject("key2"));
+    mdr.getObjects().add(new DeleteObject("key4"));
 
-    bucket.createKey("key1", 0).close();
-    bucket.createKey("key2", 0).close();
-    bucket.createKey("key3", 0).close();
-    return bucket;
+    assertDoesNotThrow(() -> rest.multiDelete(BUCKET_NAME, "", mdr, headers));
+  }
+
+  @Test
+  public void testFailedBucketOwnerCondition() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("wrongOwner");
+
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(new DeleteObject("key1"));
+    mdr.getObjects().add(new DeleteObject("key2"));
+    mdr.getObjects().add(new DeleteObject("key4"));
+
+    OS3Exception exception =
+        assertThrows(OS3Exception.class, () -> rest.multiDelete(BUCKET_NAME, "", mdr, headers));
+
+    assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
   }
 }

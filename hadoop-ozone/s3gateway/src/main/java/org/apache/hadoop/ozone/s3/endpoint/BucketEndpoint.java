@@ -134,7 +134,7 @@ public class BucketEndpoint extends EndpointBase {
     try {
       if (aclMarker != null) {
         s3GAction = S3GAction.GET_ACL;
-        S3BucketAcl result = getAcl(bucketName);
+        S3BucketAcl result = getAcl(hh, bucketName);
         getMetrics().updateGetAclSuccessStats(startNanos);
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
@@ -143,7 +143,7 @@ public class BucketEndpoint extends EndpointBase {
 
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
-        return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
+        return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads, hh);
       }
 
       maxKeys = validateMaxKeys(maxKeys);
@@ -168,8 +168,9 @@ public class BucketEndpoint extends EndpointBase {
           && OZONE_URI_DELIMITER.equals(delimiter);
 
       bucket = getBucket(bucketName);
-      ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
+      BucketOwnerCondition.verify(hh, bucket.getOwner());
 
+      ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
     } catch (OMException ex) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
@@ -347,7 +348,8 @@ public class BucketEndpoint extends EndpointBase {
       String prefix,
       String keyMarker,
       String uploadIdMarker,
-      int maxUploads)
+      int maxUploads,
+      HttpHeaders httpHeaders)
       throws OS3Exception, IOException {
 
     if (maxUploads < 1 || maxUploads > 1000) {
@@ -355,10 +357,12 @@ public class BucketEndpoint extends EndpointBase {
           new Exception("max-uploads must be between 1 and 1000"));
     }
 
+
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
 
     OzoneBucket bucket = getBucket(bucketName);
+    BucketOwnerCondition.verify(httpHeaders, bucket.getOwner());
 
     try {
       OzoneMultipartUploadList ozoneMultipartUploadList =
@@ -408,16 +412,25 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @HEAD
-  public Response head(@PathParam("bucket") String bucketName)
+  public Response head(@PathParam("bucket") String bucketName, @Context HttpHeaders httpHeaders)
       throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_BUCKET;
     try {
-      getBucket(bucketName);
+      OzoneBucket bucket = getBucket(bucketName);
+      BucketOwnerCondition.verify(httpHeaders, bucket.getOwner());
       AUDIT.logReadSuccess(
           buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       getMetrics().updateHeadBucketSuccessStats(startNanos);
       return Response.ok().build();
+    } catch (OMException ex) {
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      if (isAccessDenied(ex)) {
+        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+      } else {
+        throw ex;
+      }
     } catch (Exception e) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), e));
@@ -432,13 +445,13 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @DELETE
-  public Response delete(@PathParam("bucket") String bucketName)
+  public Response delete(@PathParam("bucket") String bucketName, @Context HttpHeaders httpHeaders)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.DELETE_BUCKET;
 
     try {
-      deleteS3Bucket(bucketName);
+      deleteS3Bucket(bucketName, httpHeaders);
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
@@ -477,7 +490,8 @@ public class BucketEndpoint extends EndpointBase {
   @Produces(MediaType.APPLICATION_XML)
   public MultiDeleteResponse multiDelete(@PathParam("bucket") String bucketName,
                                          @QueryParam("delete") String delete,
-                                         MultiDeleteRequest request)
+                                         MultiDeleteRequest request,
+                                         @Context HttpHeaders httpHeaders)
       throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.MULTI_DELETE;
 
@@ -492,6 +506,7 @@ public class BucketEndpoint extends EndpointBase {
       }
       long startNanos = Time.monotonicNowNanos();
       try {
+        BucketOwnerCondition.verify(httpHeaders, bucket.getOwner());
         undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
         for (DeleteObject d : request.getObjects()) {
           ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
@@ -508,6 +523,14 @@ public class BucketEndpoint extends EndpointBase {
           }
         }
         getMetrics().updateDeleteKeySuccessStats(startNanos);
+      } catch (OMException ex) {
+        AUDIT.logReadFailure(
+            buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+        if (isAccessDenied(ex)) {
+          throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+        } else {
+          throw ex;
+        }
       } catch (IOException ex) {
         LOG.error("Delete key failed: {}", ex.getMessage());
         getMetrics().updateDeleteKeyFailureStats(startNanos);
@@ -534,16 +557,14 @@ public class BucketEndpoint extends EndpointBase {
    * <p>
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html
    */
-  public S3BucketAcl getAcl(String bucketName)
+  public S3BucketAcl getAcl(HttpHeaders headers, String bucketName)
       throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3BucketAcl result = new S3BucketAcl();
     try {
       OzoneBucket bucket = getBucket(bucketName);
-      OzoneVolume volume = getVolume();
-      // TODO: use bucket owner instead of volume owner here once bucket owner
-      // TODO: is supported.
-      S3Owner owner = S3Owner.of(volume.getOwner());
+      BucketOwnerCondition.verify(headers, bucket.getOwner());
+      S3Owner owner = S3Owner.of(bucket.getOwner());
       result.setOwner(owner);
 
       // TODO: remove this duplication avoid logic when ACCESS and DEFAULT scope
@@ -592,6 +613,7 @@ public class BucketEndpoint extends EndpointBase {
 
     try {
       OzoneBucket bucket = getBucket(bucketName);
+      BucketOwnerCondition.verify(httpHeaders, bucket.getOwner());
       OzoneVolume volume = getVolume();
 
       List<OzoneAcl> ozoneAclListOnBucket = new ArrayList<>();

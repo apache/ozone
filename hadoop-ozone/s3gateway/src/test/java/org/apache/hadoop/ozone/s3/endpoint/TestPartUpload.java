@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -50,9 +51,11 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 /**
  * This class tests Upload part request.
@@ -253,6 +256,58 @@ public class TestPartUpload {
         verify(messageDigest, times(1)).reset();
       }
     }
+  }
+
+  @Test
+  public void testPassBucketOwnerCondition() throws Exception {
+    Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+        OzoneConsts.KEY);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+
+    String content = "Multipart Upload";
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
+
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
+        "STANDARD");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+    rest.setHeaders(headers);
+
+    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        content.length(), 1, uploadID, null, null, body);
+
+    assertEquals(200, response.getStatus());
+  }
+
+  @Test
+  public void testFailedBucketOwnerCondition() throws Exception {
+    Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+        OzoneConsts.KEY);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+
+    String content = "Multipart Upload";
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
+
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("wrongOwner");
+    rest.setHeaders(headers);
+    OS3Exception exception =
+        assertThrows(OS3Exception.class, () -> rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+            content.length(), 1, uploadID, null, null, body));
+
+    assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
   }
 
   private void assertContentLength(String uploadID, String key,

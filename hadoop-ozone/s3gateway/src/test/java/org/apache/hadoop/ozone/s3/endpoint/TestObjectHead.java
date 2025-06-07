@@ -20,12 +20,17 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -37,6 +42,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -184,5 +190,43 @@ public class TestObjectHead {
     // THEN
     assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus());
     bucket.deleteKey(keyPath);
+  }
+
+  @Test
+  public void testPassBucketOwnerCondition() throws Exception {
+    String value = RandomStringUtils.secure().nextAlphanumeric(32);
+    OzoneOutputStream out = bucket.createKey("key1",
+        value.getBytes(UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+            ReplicationFactor.ONE), new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+    keyEndpoint.setHeaders(headers);
+    Response response = keyEndpoint.head(bucketName, "key1");
+    assertEquals(200, response.getStatus());
+  }
+
+  @Test
+  public void testFailedBucketOwnerCondition() throws Exception {
+    String value = RandomStringUtils.secure().nextAlphanumeric(32);
+    OzoneOutputStream out = bucket.createKey("key1",
+        value.getBytes(UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+            ReplicationFactor.ONE), new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("wrongOwner");
+    keyEndpoint.setHeaders(headers);
+    OS3Exception exception =
+        assertThrows(OS3Exception.class, () -> keyEndpoint.head(bucketName, "key1"));
+
+    assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
   }
 }

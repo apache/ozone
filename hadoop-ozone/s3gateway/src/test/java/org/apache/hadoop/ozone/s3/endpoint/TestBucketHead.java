@@ -18,14 +18,19 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -37,11 +42,13 @@ public class TestBucketHead {
   private String bucketName = OzoneConsts.BUCKET;
   private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
+  private HttpHeaders httpHeaders;
 
   @BeforeEach
   public void setup() throws Exception {
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
+    httpHeaders = mock(HttpHeaders.class);
 
     // Create HeadBucket and setClient to OzoneClientStub
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
@@ -52,7 +59,7 @@ public class TestBucketHead {
   @Test
   public void testHeadBucket() throws Exception {
 
-    Response response = bucketEndpoint.head(bucketName);
+    Response response = bucketEndpoint.head(bucketName, httpHeaders);
     assertEquals(200, response.getStatus());
 
   }
@@ -60,8 +67,27 @@ public class TestBucketHead {
   @Test
   public void testHeadFail() throws Exception {
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.head("unknownbucket"));
+        bucketEndpoint.head("unknownbucket", httpHeaders));
     assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
     assertEquals("NoSuchBucket", e.getCode());
+  }
+
+  @Test
+  public void testPassBucketOwnerCondition() throws Exception {
+    when(httpHeaders.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+    Response response = bucketEndpoint.head(bucketName, httpHeaders);
+    assertEquals(200, response.getStatus());
+  }
+
+  @Test
+  public void testFailedBucketOwnerCondition() {
+    when(httpHeaders.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("wrongOwner");
+
+    OS3Exception exception =
+        assertThrows(OS3Exception.class, () -> bucketEndpoint.head(bucketName, httpHeaders));
+
+    assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
   }
 }
