@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -191,6 +192,40 @@ public class TestOneReplicaPipelineSafeModeRule {
             pipelineCountThree));
 
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
+  }
+
+  @Test
+  public void testOneReplicaPipelineRuleWithReportProcessingFalse() throws Exception {
+    // As with 30 nodes, We can create 7 pipelines with replication factor 3.
+    // (This is because in node manager for every 10 nodes, 7 nodes are
+    // healthy, 2 are stale one is dead.)
+    int totalNodes = 30;
+    int ratisPipelineCount = 7;
+    int standalonePipelineCount = 0;
+
+    setup(totalNodes, ratisPipelineCount, standalonePipelineCount);
+
+    // Disable validation based on report processing.
+    rule.setValidateBasedOnReportProcessing(false);
+
+    List<Pipeline> pipelines = pipelineManager.getPipelines();
+    assertFalse(pipelines.isEmpty());
+
+    // Pick the first pipeline and remove one node to make nodeSet.size() != 3
+    Pipeline targetPipeline = pipelines.get(0);
+    DatanodeDetails removedNode = targetPipeline.removeFirstFromNodeStatus();
+
+    // Validation should now fail because not all pipelines must meet the 3-node condition
+    assertFalse(rule.validate());
+
+    // Re-add the node back so pipeline meets 3-node condition
+    targetPipeline.setInNodeStatus(removedNode);
+
+    // Now the rule should validate successfully
+    assertTrue(rule.validate());
+
+    // Assert that the pipeline got added back to the reported set
+    assertTrue(rule.getReportedPipelineIDSet().contains(targetPipeline.getId()));
   }
 
   private void createPipelines(int count,
