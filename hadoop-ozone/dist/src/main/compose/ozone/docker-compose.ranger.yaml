@@ -14,23 +14,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+x-om-ranger-config:
+  &om-ranger-config
+  environment:
+    OZONE_MANAGER_CLASSPATH: "/opt/ranger/ozone-plugin/lib/libext/*:/opt/ozone/conf"
+    OZONE-SITE.XML_ozone.acl.enabled: "true"
+    OZONE-SITE.XML_ozone.acl.authorizer.class: "org.apache.ranger.authorization.ozone.authorizer.RangerOzoneAuthorizer"
+    OZONE-SITE.XML_ozone.om.ranger.https-address: "http://ranger:6080"
+    OZONE-SITE.XML_ozone.om.ranger.https.admin.api.user: "admin"
+    OZONE-SITE.XML_ozone.om.ranger.https.admin.api.passwd: "rangerR0cks!"
+    OZONE-SITE.XML_ozone.om.ranger.service: "dev_ozone"
+    OZONE-SITE.XML_ozone.om.tenant.dev.skip.ranger: "false"
+  volumes:
+    - ../..:/opt/hadoop
+    - ${RANGER_OZONE_PLUGIN_DIR}:/opt/ranger/ozone-plugin
+  tmpfs:
+    - /opt/ozone/conf
+  command: bash -c "sudo --preserve-env /opt/ranger/ozone-plugin/enable-ozone-plugin.sh && /opt/hadoop/bin/ozone om"
+
 services:
   om:
-    volumes:
-      - ../..:/opt/hadoop
-      - ./../../share/ranger-${RANGER_VERSION}-ozone-plugin:/opt/hadoop/ranger-ozone-plugin
-    env_file:
-      - docker-config
-      - ranger-plugin/ranger-config
-    environment:
-      - ENSURE_OM_INITIALIZED=/data/metadata/om/current/VERSION
-      - OZONE-SITE.XML_ozone.server.default.replication=${OZONE_REPLICATION_FACTOR:-1}
-      - OZONE_MANAGER_CLASSPATH=/opt/hadoop/ranger-ozone-plugin/lib/libext/*:/opt/hadoop/ranger-ozone-plugin/conf
-    command: bash -c "/opt/hadoop/ranger-ozone-plugin/ranger-plugin-install.sh && /opt/hadoop/bin/ozone om"
+    <<: *om-ranger-config
+
   ranger:
     image: apache/ranger:${RANGER_VERSION}
     container_name: ranger
-    hostname: ranger.example.com
+    hostname: ranger
     stdin_open: true
     tty: true
     ports:
@@ -52,14 +61,14 @@ services:
   ranger-zk:
     image: apache/ranger-zk:${RANGER_VERSION}
     container_name: ranger-zk
-    hostname: ranger-zk.example.com
+    hostname: ranger-zk
     ports:
       - "2181:2181"
 
   ranger-solr:
     image: apache/ranger-solr:${RANGER_VERSION}
     container_name: ranger-solr
-    hostname: ranger-solr.example.com
+    hostname: ranger-solr
     ports:
       - "8983:8983"
     command:
@@ -70,7 +79,7 @@ services:
   ranger-db:
     image: apache/ranger-db:${RANGER_VERSION}
     container_name: ranger-postgres
-    hostname: ranger-db.example.com
+    hostname: ranger-db
     healthcheck:
       test: 'su -c "pg_isready -q" postgres'
       interval: 10s
