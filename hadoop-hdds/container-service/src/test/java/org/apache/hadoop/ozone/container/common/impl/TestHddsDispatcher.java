@@ -28,8 +28,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -63,6 +65,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
@@ -79,6 +82,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.Op;
@@ -93,6 +97,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -176,6 +181,9 @@ public class TestHddsDispatcher {
           responseTwo.getResult());
       verify(context, times(1))
           .addContainerActionIfAbsent(any(ContainerAction.class));
+
+      // since the volume is not full, context.refreshFullReport(NodeReportProto) should not be called
+      verify(context, times(0)).refreshFullReport(any());
 
     } finally {
       volumeSet.shutdown();
@@ -276,6 +284,16 @@ public class TestHddsDispatcher {
       UUID scmId = UUID.randomUUID();
       ContainerSet containerSet = newContainerSet();
       StateContext context = ContainerTestUtils.getMockContext(dd, conf);
+
+      // empty report object for testing that an immediate heartbeat is triggered
+      StorageContainerDatanodeProtocolProtos.NodeReportProto.Builder nrb
+          = StorageContainerDatanodeProtocolProtos.
+          NodeReportProto.newBuilder();
+      StorageContainerDatanodeProtocolProtos.NodeReportProto reportProto = nrb.build();
+      DatanodeStateMachine stateMachine = context.getParent();
+      OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+      doReturn(ozoneContainer).when(stateMachine).getContainer();
+      doReturn(reportProto).when(ozoneContainer).getNodeReport();
       // create a 50 byte container
       // available (160) > 100 (min free space) + 50 (container size)
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
@@ -308,6 +326,15 @@ public class TestHddsDispatcher {
           response.getResult());
       verify(context, times(1))
           .addContainerActionIfAbsent(any(ContainerAction.class));
+      // verify that node report is refreshed and heartbeat is triggered
+      verify(context, times(1)).refreshFullReport(eq(reportProto));
+      verify(stateMachine, times(1)).triggerHeartbeat();
+
+      // the volume is past the min free space boundary but this time the heartbeat should not be triggered because
+      // of throttling
+      hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L), null);
+      verify(context, times(1)).refreshFullReport(eq(reportProto)); // was called once before
+      verify(stateMachine, times(1)).triggerHeartbeat(); // was called once before
 
       // try creating another container now as the volume used has crossed
       // threshold
@@ -323,6 +350,95 @@ public class TestHddsDispatcher {
                   new RoundRobinVolumeChoosingPolicy(), scmId.toString()));
       assertEquals("Container creation failed, due to disk out of space",
           scException.getMessage());
+    } finally {
+      volumeSet.shutdown();
+      ContainerMetrics.remove();
+    }
+  }
+
+  /**
+   * Tests that we log any exception properly along with volume and request details when handling a full volume.
+   */
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testExceptionHandlingWhenVolumeFull(ContainerLayoutVersion layoutVersion) throws IOException {
+    /*
+    SETTING UP FULL VOLUME SCENARIO AND MOCKS, SAME AS OTHER TESTS
+     */
+    String testDirPath = testDir.getPath();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setStorageSize(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+        100.0, StorageUnit.BYTES);
+    DatanodeDetails dd = randomDatanodeDetails();
+
+    HddsVolume.Builder volumeBuilder =
+        new HddsVolume.Builder(testDirPath).datanodeUuid(dd.getUuidString())
+            .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+    // state of cluster : available (160) > 100  ,datanode volume
+    // utilisation threshold not yet reached. container creates are successful.
+    AtomicLong usedSpace = new AtomicLong(340);
+    SpaceUsageSource spaceUsage = MockSpaceUsageSource.of(500, usedSpace);
+
+    SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
+        spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
+    volumeBuilder.usageCheckFactory(factory);
+    MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(volumeBuilder.build()));
+    try {
+      UUID scmId = UUID.randomUUID();
+      ContainerSet containerSet = newContainerSet();
+      StateContext context = ContainerTestUtils.getMockContext(dd, conf);
+
+      /*
+      MOCK TO THROW AN EXCEPTION WHEN getNodeReport() IS CALLED
+       */
+      DatanodeStateMachine stateMachine = context.getParent();
+      OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+      doReturn(ozoneContainer).when(stateMachine).getContainer();
+      doThrow(new IOException()).when(ozoneContainer).getNodeReport();
+      // create a 50 byte container
+      // available (160) > 100 (min free space) + 50 (container size)
+      KeyValueContainerData containerData = new KeyValueContainerData(1L,
+          layoutVersion,
+          50, UUID.randomUUID().toString(),
+          dd.getUuidString());
+      Container container = new KeyValueContainer(containerData, conf);
+      StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+          .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+          scmId.toString());
+      containerSet.addContainer(container);
+      ContainerMetrics metrics = ContainerMetrics.create(conf);
+      Map<ContainerType, Handler> handlers = Maps.newHashMap();
+      for (ContainerType containerType : ContainerType.values()) {
+        handlers.put(containerType,
+            Handler.getHandlerForContainerType(containerType, conf,
+                context.getParent().getDatanodeDetails().getUuidString(),
+                containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER));
+      }
+      HddsDispatcher hddsDispatcher = new HddsDispatcher(
+          conf, containerSet, volumeSet, handlers, context, metrics, null);
+      hddsDispatcher.setClusterId(scmId.toString());
+      /*
+      CAPTURE LOGS TO ASSERT THAT THE EXCEPTION WAS LOGGED PROPERLY
+       */
+      LogCapturer logCapturer = LogCapturer.captureLogs(HddsDispatcher.LOG);
+      containerData.getVolume().getVolumeUsage()
+          .ifPresent(usage -> usage.incrementUsedSpace(50));
+      usedSpace.addAndGet(50);
+      ContainerCommandResponseProto response = hddsDispatcher
+          .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
+      logCapturer.stopCapturing();
+
+      assertEquals(ContainerProtos.Result.SUCCESS,
+          response.getResult());
+      verify(context, times(1))
+          .addContainerActionIfAbsent(any(ContainerAction.class));
+      /*
+      getNodeReport() SHOULD BE CALLED, AND LOG CAPTURE SHOULD CONTAIN THE EXCEPTION
+       */
+      verify(ozoneContainer, times(1)).getNodeReport();
+      assertTrue(logCapturer.getOutput().contains("Failed to create node report when handling full volume"));
     } finally {
       volumeSet.shutdown();
       ContainerMetrics.remove();
