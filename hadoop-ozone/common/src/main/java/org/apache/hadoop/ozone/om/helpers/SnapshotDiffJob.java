@@ -316,12 +316,17 @@ public class SnapshotDiffJob {
 
     @Override
     public byte[] toPersistedFormatImpl(SnapshotDiffJob object) throws IOException {
-      return MAPPER.writeValueAsBytes(object);
+      return object.toProtoBuf().toByteArray();
     }
 
     @Override
     public SnapshotDiffJob fromPersistedFormatImpl(byte[] rawData) throws IOException {
-      return MAPPER.readValue(rawData, SnapshotDiffJob.class);
+      try {
+        SnapshotDiffJobProto proto = SnapshotDiffJobProto.parseFrom(rawData);
+        return SnapshotDiffJob.getFromProtoBuf(proto);
+      } catch (IOException e) {
+        return MAPPER.readValue(rawData, SnapshotDiffJob.class);
+      }
     }
 
     @Override
