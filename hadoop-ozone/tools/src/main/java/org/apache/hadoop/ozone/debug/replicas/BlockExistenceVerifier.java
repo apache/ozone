@@ -56,6 +56,7 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
     XceiverClientSpi client = null;
     try {
       Pipeline pipeline = Pipeline.newBuilder(keyLocation.getPipeline())
+          .setId(datanode.getID())
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
           .setNodes(Collections.singletonList(datanode))
           .setReplicaIndexes(Collections.singletonMap(datanode, replicaIndex))

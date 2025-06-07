@@ -82,7 +82,7 @@ public final class SafeModeRuleFactory {
 
     if (pipelineManager != null) {
       safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue, pipelineManager,
-          safeModeManager, config, scmContext));
+          safeModeManager, config, scmContext, nodeManager));
       safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
           safeModeManager, config));
     }

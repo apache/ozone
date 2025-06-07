@@ -421,7 +421,7 @@ public final class Pipeline {
         .build();
   }
 
-  public Pipeline copyWithNodesInOrder(List<DatanodeDetails> nodes) {
+  public Pipeline copyWithNodesInOrder(List<? extends DatanodeDetails> nodes) {
     return toBuilder().setNodesInOrder(nodes).build();
   }
 
@@ -573,6 +573,11 @@ public final class Pipeline {
       }
     }
 
+    public Builder setId(DatanodeID datanodeID) {
+      this.id = datanodeID.toPipelineID();
+      return this;
+    }
+
     public Builder setId(PipelineID id1) {
       this.id = id1;
       return this;
@@ -611,7 +616,7 @@ public final class Pipeline {
       return this;
     }
 
-    public Builder setNodesInOrder(List<DatanodeDetails> nodes) {
+    public Builder setNodesInOrder(List<? extends DatanodeDetails> nodes) {
       this.nodesInOrder = new LinkedList<>(nodes);
       return this;
     }

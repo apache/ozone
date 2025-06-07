@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
@@ -183,8 +182,8 @@ abstract class StringCodecBase implements Codec<String> {
   }
 
   @Override
-  public byte[] toPersistedFormat(String object) throws IOException {
-    return string2Bytes(object, IOException::new);
+  public byte[] toPersistedFormat(String object) throws CodecException {
+    return string2Bytes(object, CodecException::new);
   }
 
   @Override

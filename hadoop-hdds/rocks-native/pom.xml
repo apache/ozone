@@ -28,6 +28,10 @@
       <artifactId>guava</artifactId>
     </dependency>
     <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
     </dependency>
@@ -40,12 +44,9 @@
       <artifactId>hdds-managed-rocksdb</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-io</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.rocksdb</groupId>
       <artifactId>rocksdbjni</artifactId>
+      <!-- <scope>test</scope> but transitive via hdds-managed-rocksdb -->
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>

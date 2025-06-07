@@ -544,6 +544,10 @@ public class NodeStateManager implements Runnable, Closeable {
     return nodeStateMap.getAllDatanodeInfos();
   }
 
+  int getAllNodeCount() {
+    return nodeStateMap.getNodeCount();
+  }
+
   /**
    * Sets the operational state of the given node. Intended to be called when
    * a node is being decommissioned etc.

@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
-import java.io.IOException;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.function.CheckedFunction;
 
@@ -85,12 +84,12 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
   }
 
   @Override
-  public final byte[] toPersistedFormat(T message) throws IOException {
+  public final byte[] toPersistedFormat(T message) throws CodecException {
     return delegate.toPersistedFormat(backward.apply(message));
   }
 
   @Override
-  public final T fromPersistedFormat(byte[] bytes) throws IOException {
+  public final T fromPersistedFormat(byte[] bytes) throws CodecException {
     return forward.apply(delegate.fromPersistedFormat(bytes));
   }
 

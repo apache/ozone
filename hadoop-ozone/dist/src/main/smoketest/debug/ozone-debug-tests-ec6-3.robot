@@ -28,13 +28,14 @@ ${BUCKET}           cli-debug-bucket
 ${TESTFILE}         testfile
 ${EC_DATA}          6
 ${EC_PARITY}        3
+${OM_SERVICE_ID}    %{OM_SERVICE_ID}
 
 *** Keywords ***
 Create EC key
     [arguments]       ${bs}    ${count}
 
     Execute           dd if=/dev/urandom of=${TEMP_DIR}/testfile bs=${bs} count=${count}
-    Execute           ozone sh key put o3://om/${VOLUME}/${BUCKET}/testfile ${TEMP_DIR}/testfile -r rs-${EC_DATA}-${EC_PARITY}-1024k -t EC
+    Execute           ozone sh key put o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/testfile ${TEMP_DIR}/testfile -r rs-${EC_DATA}-${EC_PARITY}-1024k -t EC
 
 *** Test Cases ***
 0 data block
@@ -92,3 +93,8 @@ Create EC key
     ${count_files} =                    Count Files In Directory    ${directory}
     ${sum_size_last_stripe} =           Evaluate     1048576 * 4 + ((1000000 * 8) % 1048576)
     Should Be Equal As Integers         ${count_files}     1
+
+Test ozone debug replicas chunk-info
+    Create EC key     1048576    6
+    ${count} =        Execute           ozone debug replicas chunk-info o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/testfile | jq '[.keyLocations[0][] | select(.file | test("\\\\.block$")) | .file] | length'
+    Should Be Equal As Integers         ${count}           9

@@ -17,9 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.metadata;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.UUID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -34,7 +32,7 @@ public class OldPipelineIDCodecForTesting implements Codec<PipelineID> {
   }
 
   @Override
-  public byte[] toPersistedFormat(PipelineID object) throws IOException {
+  public byte[] toPersistedFormat(PipelineID object) {
     byte[] bytes = new byte[16];
     System.arraycopy(
         asByteArray(object.getId().getMostSignificantBits()), 0, bytes, 0, 8);
@@ -50,7 +48,7 @@ public class OldPipelineIDCodecForTesting implements Codec<PipelineID> {
   }
 
   @Override
-  public PipelineID fromPersistedFormat(byte[] rawData) throws IOException {
+  public PipelineID fromPersistedFormatImpl(byte[] rawData) {
     long mostSiginificantBits = toLong(rawData, 0);
     long leastSignificantBits = toLong(rawData, 8);
 
@@ -58,15 +56,10 @@ public class OldPipelineIDCodecForTesting implements Codec<PipelineID> {
     return PipelineID.valueOf(id);
   }
 
-  private long toLong(byte[] arr, int startIdx) throws IOException {
+  private long toLong(byte[] arr, int startIdx) {
     if (arr.length < startIdx + 8) {
-      throw new IOException("Key conversion error.",
-          new ArrayIndexOutOfBoundsException(
-              "Key does not have the least expected amount of bytes,"
-                  + "and does not contain a UUID. Key: "
-                  + Arrays.toString(arr)
-          )
-      );
+      throw new ArrayIndexOutOfBoundsException(
+          "Not enough bytes: length (=" + arr.length + ") - startIdx (=" + startIdx + ") < 8");
     }
     ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
     buffer.put(arr, startIdx, 8);

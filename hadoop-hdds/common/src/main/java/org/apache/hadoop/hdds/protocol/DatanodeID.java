@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeIDProto;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.util.StringWithByteString;
 
 /**
@@ -76,6 +77,10 @@ public final class DatanodeID implements Comparable<DatanodeID> {
   @Deprecated
   public ByteString getByteString() {
     return uuidByteString.getBytes();
+  }
+
+  public PipelineID toPipelineID() {
+    return PipelineID.valueOf(uuid);
   }
 
   public DatanodeIDProto toProto() {

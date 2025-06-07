@@ -25,10 +25,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconSafeModeManager;
@@ -48,7 +48,7 @@ public class ReconSafeModeMgrTask {
   private ContainerManager containerManager;
   private ReconNodeManager nodeManager;
   private ReconSafeModeManager safeModeManager;
-  private List<DatanodeDetails> allNodes;
+  private List<DatanodeInfo> allNodes;
   private List<ContainerInfo> containers;
   private final long interval;
   private final long dnHBInterval;
@@ -92,8 +92,7 @@ public class ReconSafeModeMgrTask {
     }
   }
 
-  private void tryReconExitSafeMode()
-      throws InterruptedException {
+  private void tryReconExitSafeMode() {
       // Recon starting first time
     if (null == allNodes || allNodes.isEmpty()) {
       return;
@@ -108,7 +107,7 @@ public class ReconSafeModeMgrTask {
         currentContainersInAllDatanodes.addAll(
             nodeManager.getContainers(node));
       } catch (NodeNotFoundException e) {
-        LOG.error("{} node not found.", node.getUuid());
+        LOG.error("Node not found: {}", node);
       }
     });
     if (containers.size() == currentContainersInAllDatanodes.size()) {

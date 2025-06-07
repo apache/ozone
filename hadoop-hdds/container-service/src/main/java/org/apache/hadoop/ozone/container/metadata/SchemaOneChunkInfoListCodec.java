@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.container.metadata;
 
-import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
@@ -67,12 +67,12 @@ public final class SchemaOneChunkInfoListCodec implements Codec<ChunkInfoList> {
   }
 
   @Override
-  public ChunkInfoList fromPersistedFormat(byte[] rawData) throws IOException {
+  public ChunkInfoList fromPersistedFormat(byte[] rawData) throws CodecException {
     try {
       return ChunkInfoList.getFromProtoBuf(
               ContainerProtos.ChunkInfoList.parseFrom(rawData));
     } catch (InvalidProtocolBufferException ex) {
-      throw new IOException("Invalid chunk information. " +
+      throw new CodecException("Invalid chunk information. " +
               "This data may have been written using datanode " +
               "schema version one, which did not save chunk information.", ex);
     }

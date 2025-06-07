@@ -255,7 +255,7 @@ public class TestDeadNodeHandler {
     // Now set the node to anything other than IN_MAINTENANCE and the relevant
     // replicas should be removed
     DeleteBlocksCommand cmd = new DeleteBlocksCommand(Collections.emptyList());
-    nodeManager.addDatanodeCommand(datanode1.getUuid(), cmd);
+    nodeManager.addDatanodeCommand(datanode1.getID(), cmd);
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_SERVICE);
     deadNodeHandler.onMessage(datanode1, publisher);
@@ -263,7 +263,7 @@ public class TestDeadNodeHandler {
     //deadNodeHandler.onMessage call will not change this
     assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
-    assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
+    assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getID(), cmd.getType()));
 
     verify(publisher).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
     verify(deletedBlockLog).onDatanodeDead(datanode1.getID());

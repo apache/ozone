@@ -103,7 +103,8 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     String[] args = new String[] {
         getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
         getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY),
-        "replicas", "verify", "--checksums", "--block-existence", fullKeyPath, "--output-dir", "/"//, "--all-results"
+        "replicas", "verify", "--checksums", "--block-existence", "--container-state", fullKeyPath,
+        "--output-dir", "/"//, "--all-results"
     };
 
     int exitCode = ozoneDebugShell.execute(args);
@@ -216,10 +217,10 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
       ObjectMapper objectMapper = new ObjectMapper();
       // Parse the JSON array string into a JsonNode
       JsonNode jsonNode = objectMapper.readTree(output);
-      JsonNode keyLocations = jsonNode.get("KeyLocations").get(0);
+      JsonNode keyLocations = jsonNode.get("keyLocations").get(0);
       for (JsonNode element : keyLocations) {
         String fileName =
-            element.get("Locations").get("files").get(0).toString();
+            element.get("file").toString();
         blockFilePaths.add(fileName);
       }
       // DN storage directories are set differently for each DN

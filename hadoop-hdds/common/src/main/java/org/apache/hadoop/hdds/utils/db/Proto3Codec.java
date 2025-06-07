@@ -95,7 +95,7 @@ public final class Proto3Codec<M extends MessageLite> implements Codec<M> {
   }
 
   @Override
-  public M fromPersistedFormat(byte[] bytes)
+  public M fromPersistedFormatImpl(byte[] bytes)
       throws InvalidProtocolBufferException {
     return parser.parseFrom(bytes);
   }

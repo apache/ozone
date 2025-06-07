@@ -205,6 +205,25 @@ public class TestContainerBalancer {
         () -> containerBalancer.startBalancer(balancerConfiguration),
         "hdds.container.balancer.move.replication.timeout should " +
             "be less than hdds.container.balancer.move.timeout.");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    conf.setTimeDuration("hdds.container.balancer.move.timeout", 60,
+        TimeUnit.MINUTES);
+    conf.setTimeDuration(
+        "hdds.container.balancer.move.replication.timeout", 50,
+        TimeUnit.MINUTES);
+
+    balancerConfiguration =
+        conf.getObject(ContainerBalancerConfiguration.class);
+    InvalidContainerBalancerConfigurationException ex =
+        assertThrowsExactly(
+            InvalidContainerBalancerConfigurationException.class,
+            () -> containerBalancer.startBalancer(balancerConfiguration),
+            "(hdds.container.balancer.move.timeout - hdds.container.balancer.move.replication.timeout " +
+                "- hdds.scm.replication.event.timeout.datanode.offset) should be greater than or equal to 9 minutes.");
+    assertTrue(ex.getMessage().contains("should be greater than or equal to 540000ms or 9 minutes"),
+        "Exception message should contain 'should be greater than or equal to 540000ms or 9 minutes'");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
   }
 
   /**

@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 public class DUFactory implements SpaceUsageCheckFactory {
 
   private static final String DU_CACHE_FILE = "scmUsed";
-  private static final String EXCLUDE_PATTERN = "*.tmp.*";
 
   private Conf conf;
 
@@ -46,7 +45,7 @@ public class DUFactory implements SpaceUsageCheckFactory {
   public SpaceUsageCheckParams paramsFor(File dir) {
     Duration refreshPeriod = conf.getRefreshPeriod();
 
-    SpaceUsageSource source = new DU(dir, EXCLUDE_PATTERN);
+    SpaceUsageSource source = new DU(dir, null);
 
     SpaceUsagePersistence persistence = new SaveSpaceUsageToFile(
         new File(dir, DU_CACHE_FILE), refreshPeriod);

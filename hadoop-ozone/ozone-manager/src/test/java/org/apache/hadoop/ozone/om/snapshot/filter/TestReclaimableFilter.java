@@ -42,8 +42,8 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -108,7 +108,7 @@ public class TestReclaimableFilter extends AbstractReclaimableFilterTest {
     Assertions.assertEquals(infos.size(), getReclaimableFilter().getPreviousOmSnapshots().size());
     Assertions.assertEquals(infos.stream().map(si -> si == null ? null : si.getSnapshotId())
         .collect(Collectors.toList()), getReclaimableFilter().getPreviousOmSnapshots().stream()
-        .map(i -> i == null ? null : ((ReferenceCounted<OmSnapshot>) i).get().getSnapshotID())
+        .map(i -> i == null ? null : ((UncheckedAutoCloseableSupplier<OmSnapshot>) i).get().getSnapshotID())
         .collect(Collectors.toList()));
     infos.add(currentSnapshotInfo);
     Assertions.assertEquals(infos.stream().filter(Objects::nonNull).map(SnapshotInfo::getSnapshotId).collect(
@@ -128,6 +128,36 @@ public class TestReclaimableFilter extends AbstractReclaimableFilterTest {
         true);
     testSnapshotInitAndLocking(volume, bucket, numberOfPreviousSnapshotsFromChain, index, currentSnapshotInfo, false,
         false);
+  }
+
+  @ParameterizedTest
+  @MethodSource("testReclaimableFilterArguments")
+  public void testReclaimableFilterSnapshotChainInitializationWithInvalidVolume(
+      int numberOfPreviousSnapshotsFromChain, int actualNumberOfSnapshots)
+      throws IOException, RocksDBException {
+    SnapshotInfo currentSnapshotInfo =
+        setup(numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots, actualNumberOfSnapshots + 1, 4, 2);
+    String volume = "volume" + 6;
+    String bucket = getBuckets().get(1);
+    testSnapshotInitAndLocking(volume, bucket, numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots + 1,
+        currentSnapshotInfo, true, true);
+    testSnapshotInitAndLocking(volume, bucket, numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots + 1,
+        currentSnapshotInfo, false, true);
+  }
+
+  @ParameterizedTest
+  @MethodSource("testReclaimableFilterArguments")
+  public void testReclaimableFilterSnapshotChainInitializationWithInvalidBucket(
+      int numberOfPreviousSnapshotsFromChain, int actualNumberOfSnapshots)
+      throws IOException, RocksDBException {
+    SnapshotInfo currentSnapshotInfo =
+        setup(numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots, actualNumberOfSnapshots + 1, 4, 2);
+    String volume = getVolumes().get(3);
+    String bucket = "bucket" + 6;
+    testSnapshotInitAndLocking(volume, bucket, numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots + 1,
+        currentSnapshotInfo, true, true);
+    testSnapshotInitAndLocking(volume, bucket, numberOfPreviousSnapshotsFromChain, actualNumberOfSnapshots + 1,
+        currentSnapshotInfo, false, true);
   }
 
   @ParameterizedTest

@@ -42,8 +42,6 @@ public class S3GatewayService implements MiniOzoneCluster.Service {
   public void stop() throws Exception {
     Preconditions.assertNotNull(s3g, "S3 Gateway not running");
     s3g.stop();
-    // TODO (HDDS-11539): Remove this workaround once the @PreDestroy issue is fixed
-    OzoneClientCache.closeClient();
   }
 
   @Override

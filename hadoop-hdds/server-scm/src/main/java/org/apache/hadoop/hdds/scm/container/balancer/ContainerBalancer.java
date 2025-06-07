@@ -19,7 +19,9 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -458,6 +460,23 @@ public class ContainerBalancer extends StatefulService {
       throw new InvalidContainerBalancerConfigurationException(
           "hdds.container.balancer.move.replication.timeout should " +
           "be less than hdds.container.balancer.move.timeout.");
+    }
+
+    // (move.timeout - move.replication.timeout - event.timeout.datanode.offset)
+    // should be greater than or equal to 9 minutes
+    long datanodeOffset = ozoneConfiguration.getTimeDuration("hdds.scm.replication.event.timeout.datanode.offset",
+        Duration.ofMinutes(6).toMillis(), TimeUnit.MILLISECONDS);
+    if ((conf.getMoveTimeout().toMillis() - conf.getMoveReplicationTimeout().toMillis() - datanodeOffset)
+        < Duration.ofMinutes(9).toMillis()) {
+      String msg = String.format("(hdds.container.balancer.move.timeout (%sms) - " +
+              "hdds.container.balancer.move.replication.timeout (%sms) - " +
+              "hdds.scm.replication.event.timeout.datanode.offset (%sms)) " +
+              "should be greater than or equal to 540000ms or 9 minutes.",
+          conf.getMoveTimeout().toMillis(),
+          conf.getMoveReplicationTimeout().toMillis(),
+          Duration.ofMillis(datanodeOffset).toMillis());
+      LOG.warn(msg);
+      throw new InvalidContainerBalancerConfigurationException(msg);
     }
   }
 

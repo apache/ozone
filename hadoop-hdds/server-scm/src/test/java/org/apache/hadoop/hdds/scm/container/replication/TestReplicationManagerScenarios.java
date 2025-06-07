@@ -43,7 +43,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -101,7 +100,7 @@ public class TestReplicationManagerScenarios {
   private Map<ContainerID, Set<ContainerReplica>> containerReplicaMap;
   private Set<ContainerInfo> containerInfoSet;
   private ContainerReplicaPendingOps containerReplicaPendingOps;
-  private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
+  private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
 
   private OzoneConfiguration configuration;
   private ReplicationManager replicationManager;
@@ -332,11 +331,11 @@ public class TestReplicationManagerScenarios {
     // datanodes.
     for (ExpectedCommands expectedCommand : expectedCommands) {
       boolean found = false;
-      for (Pair<UUID, SCMCommand<?>> command : commandsSent) {
+      for (Pair<DatanodeID, SCMCommand<?>> command : commandsSent) {
         if (command.getRight().getType() == expectedCommand.getType()) {
           if (expectedCommand.hasExpectedDatanode()) {
             // We need to assert against the command the datanode is sent to
-            DatanodeDetails commandDatanode = findDatanodeFromUUID(command.getKey());
+            DatanodeDetails commandDatanode = findDatanode(command.getKey());
             if (commandDatanode != null && expectedCommand.isTargetExpected(commandDatanode)) {
               found = true;
               commandsSent.remove(command);
@@ -354,9 +353,9 @@ public class TestReplicationManagerScenarios {
     }
   }
 
-  private DatanodeDetails findDatanodeFromUUID(UUID uuid) {
+  private DatanodeDetails findDatanode(DatanodeID uuid) {
     for (DatanodeDetails dn : DATANODE_ALIASES.values()) {
-      if (dn.getUuid().equals(uuid)) {
+      if (dn.getID().equals(uuid)) {
         return dn;
       }
     }

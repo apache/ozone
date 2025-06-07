@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;

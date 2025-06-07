@@ -154,7 +154,7 @@ public class TestCloseContainerByPipeline {
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(), command);
+        .addDatanodeCommand(datanodeDetails.getID(), command);
     GenericTestUtils
         .waitFor(() -> isContainerClosed(cluster, containerID, datanodeDetails),
             500, 5 * 1000);
@@ -202,7 +202,7 @@ public class TestCloseContainerByPipeline {
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(), command);
+        .addDatanodeCommand(datanodeDetails.getID(), command);
 
     //double check if it's really closed (waitFor also throws an exception)
     // TODO: change the below line after implementing QUASI_CLOSED to CLOSED
@@ -257,7 +257,7 @@ public class TestCloseContainerByPipeline {
       command.setTerm(cluster.getStorageContainerManager()
           .getScmContext().getTermOfLeader());
       cluster.getStorageContainerManager().getScmNodeManager()
-          .addDatanodeCommand(details.getUuid(), command);
+          .addDatanodeCommand(details.getID(), command);
       int index = cluster.getHddsDatanodeIndex(details);
       Container dnContainer = cluster.getHddsDatanodes().get(index)
           .getDatanodeStateMachine().getContainer().getContainerSet()
@@ -334,7 +334,7 @@ public class TestCloseContainerByPipeline {
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(), command);
+        .addDatanodeCommand(datanodeDetails.getID(), command);
     GenericTestUtils
         .waitFor(() -> isContainerClosed(
             cluster, containerID, datanodeDetails), 500, 5 * 1000);

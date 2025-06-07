@@ -23,7 +23,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
@@ -56,9 +55,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
       if (ret != 0) {
         return ret;
       }
-      UUID uuidA = a.getDatanodeDetails().getUuid();
-      UUID uuidB = b.getDatanodeDetails().getUuid();
-      return uuidA.compareTo(uuidB);
+      return a.getDatanodeID().compareTo(b.getDatanodeID());
     });
     this.nodeManager = nodeManager;
   }
@@ -110,8 +107,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
       addBackSourceDataNode(dui);
       return;
     }
-    LOG.warn("Cannot find datanode {} in candidate source datanodes",
-        dui.getUuid());
+    LOG.warn("Cannot find datanode {} in candidate source datanodes", dui);
   }
 
   /**

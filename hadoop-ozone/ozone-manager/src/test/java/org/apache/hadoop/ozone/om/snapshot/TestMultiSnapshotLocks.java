@@ -54,7 +54,7 @@ public class TestMultiSnapshotLocks {
   private IOzoneManagerLock mockLock;
 
   @Mock
-  private OzoneManagerLock.Resource mockResource;
+  private OzoneManagerLock.LeveledResource mockResource;
 
   private MultiSnapshotLocks multiSnapshotLocks;
   private UUID obj1 = UUID.randomUUID();

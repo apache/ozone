@@ -162,6 +162,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -187,7 +188,6 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -4108,13 +4108,11 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-    ACLType[] userRights = aclConfig.getUserDefaultRights();
-    ACLType[] groupRights = aclConfig.getGroupDefaultRights();
+    OmConfig omConfig = conf.getObject(OmConfig.class);
 
-    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, userRights));
+    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, omConfig.getUserDefaultRights()));
     //Group ACL of the User
-    listOfAcls.add(OzoneAcl.of(GROUP, ugi.getPrimaryGroupName(), ACCESS, groupRights));
+    listOfAcls.add(OzoneAcl.of(GROUP, ugi.getPrimaryGroupName(), ACCESS, omConfig.getGroupDefaultRights()));
     return listOfAcls;
   }
 

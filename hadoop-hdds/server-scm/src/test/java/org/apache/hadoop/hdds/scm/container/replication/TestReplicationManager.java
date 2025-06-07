@@ -60,7 +60,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -132,7 +131,7 @@ public class TestReplicationManager {
   private ReplicationConfig repConfig;
   private ReplicationManagerReport repReport;
   private ReplicationQueue repQueue;
-  private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
+  private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
 
   @BeforeEach
   public void setup() throws IOException {
@@ -396,7 +395,7 @@ public class TestReplicationManager {
     handler.processAndSendCommands(replicas, Collections.emptyList(),
             repQueue.dequeueOverReplicatedContainer(), 2);
     assertTrue(commandsSent.iterator().hasNext());
-    assertEquals(unhealthy.getDatanodeDetails().getUuid(),
+    assertEquals(unhealthy.getDatanodeDetails().getID(),
         commandsSent.iterator().next().getKey());
     assertEquals(SCMCommandProto.Type.deleteContainerCommand,
         commandsSent.iterator().next().getValue().getType());
@@ -874,12 +873,12 @@ public class TestReplicationManager {
     // a delete command should also have been sent for UNHEALTHY replica of
     // index 1
     assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
+    Pair<DatanodeID, SCMCommand<?>> command = commandsSent.iterator().next();
     assertEquals(SCMCommandProto.Type.deleteContainerCommand,
         command.getValue().getType());
     DeleteContainerCommand deleteCommand =
         (DeleteContainerCommand) command.getValue();
-    assertEquals(unhealthyReplica1.getDatanodeDetails().getUuid(),
+    assertEquals(unhealthyReplica1.getDatanodeDetails().getID(),
         command.getKey());
     assertEquals(container.containerID(),
         ContainerID.valueOf(deleteCommand.getContainerID()));
@@ -1318,15 +1317,14 @@ public class TestReplicationManager {
 
     ArgumentCaptor<SCMCommand<?>> command =
         ArgumentCaptor.forClass(SCMCommand.class);
-    ArgumentCaptor<UUID> targetUUID =
-        ArgumentCaptor.forClass(UUID.class);
+    ArgumentCaptor<DatanodeID> targetUUID = ArgumentCaptor.forClass(DatanodeID.class);
     verify(nodeManager).addDatanodeCommand(targetUUID.capture(), command.capture());
 
     ReplicateContainerCommand sentCommand =
         (ReplicateContainerCommand)command.getValue();
     assertEquals(datanodeDeadline, sentCommand.getDeadline());
     assertEquals(LOW, sentCommand.getPriority());
-    assertEquals(src.getUuid(), targetUUID.getValue());
+    assertEquals(src.getID(), targetUUID.getValue());
     assertEquals(target, sentCommand.getTargetDatanode());
   }
 
@@ -1381,8 +1379,8 @@ public class TestReplicationManager {
         container, new ArrayList<>(sourceNodes), destination, replicaIndex);
 
     assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> cmdWithTarget = commandsSent.iterator().next();
-    assertEquals(expectedTarget.getUuid(), cmdWithTarget.getLeft());
+    Pair<DatanodeID, SCMCommand<?>> cmdWithTarget = commandsSent.iterator().next();
+    assertEquals(expectedTarget.getID(), cmdWithTarget.getLeft());
     assertEquals(ReplicateContainerCommand.class,
         cmdWithTarget.getRight().getClass());
     ReplicateContainerCommand cmd =
@@ -1443,8 +1441,8 @@ public class TestReplicationManager {
     replicationManager.sendThrottledReconstructionCommand(container, command);
 
     assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> cmd = commandsSent.iterator().next();
-    assertEquals(cmdTarget.getUuid(), cmd.getLeft());
+    Pair<DatanodeID, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    assertEquals(cmdTarget.getID(), cmd.getLeft());
     assertEquals(0, replicationManager.getMetrics()
         .getEcReconstructionCmdsDeferredTotal());
   }
@@ -1647,9 +1645,9 @@ public class TestReplicationManager {
 
     replicationManager.opCompleted(delOp, ContainerID.valueOf(1L), true);
     assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> sentCommand = commandsSent.iterator().next();
+    Pair<DatanodeID, SCMCommand<?>> sentCommand = commandsSent.iterator().next();
     // The target should be DN2 and the deadline should have been updated from the value set in commandDeadline above
-    assertEquals(dn2.getUuid(), sentCommand.getLeft());
+    assertEquals(dn2.getID(), sentCommand.getLeft());
     assertNotEquals(commandDeadline, sentCommand.getRight().getDeadline());
   }
 

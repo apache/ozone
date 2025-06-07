@@ -63,17 +63,17 @@ public class ContainerLogController extends AbstractSubcommand {
       if (Files.exists(resolvedPath) && Files.isRegularFile(resolvedPath)) {
         out().println("Using default database file found in current directory: " + resolvedPath);
       } else {
-        err().println("No database path provided and default file '" + SQLDBConstants.DEFAULT_DB_FILENAME + "' not " +
+        throw new IllegalArgumentException("No database path provided and default file '" + 
+            SQLDBConstants.DEFAULT_DB_FILENAME + "' not " +
             "found in current directory. Please provide a valid database path");
-        return null;
       }
     } else {
       resolvedPath = Paths.get(dbPath);
       Path parentDir = resolvedPath.getParent();
 
       if (parentDir != null && !Files.exists(parentDir)) {
-        err().println("The parent directory of the provided database path does not exist: " + parentDir);
-        return null;
+        throw new IllegalArgumentException("The parent directory of the provided database " +
+            "path does not exist: " + parentDir);
       }
     }
 

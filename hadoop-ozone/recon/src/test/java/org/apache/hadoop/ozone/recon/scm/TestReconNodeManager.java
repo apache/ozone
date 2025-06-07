@@ -150,12 +150,12 @@ public class TestReconNodeManager {
     // interface, then they should be filtered out and not returned to the DN
     // when it heartbeats.
     // This command should never be returned by Recon
-    reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
+    reconNodeManager.addDatanodeCommand(datanodeDetails.getID(),
         new SetNodeOperationalStateCommand(1234,
         DECOMMISSIONING, 0));
 
     // This one should be returned
-    reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
+    reconNodeManager.addDatanodeCommand(datanodeDetails.getID(),
         new ReregisterCommand());
 
     // OperationalState sanity check

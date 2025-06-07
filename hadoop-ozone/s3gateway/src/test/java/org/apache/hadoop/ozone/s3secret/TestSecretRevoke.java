@@ -37,6 +37,7 @@ import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStoreStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -70,13 +71,14 @@ public class TestSecretRevoke {
 
   @BeforeEach
   void setUp() {
+    OzoneConfiguration conf = new OzoneConfiguration();
     OzoneClient client = new OzoneClientStub(objectStore);
 
     when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
     when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
     when(context.getUriInfo()).thenReturn(uriInfo);
 
-    endpoint = new S3SecretManagementEndpoint();
+    endpoint = new S3SecretManagementEndpoint(conf);
     endpoint.setClient(client);
     endpoint.setContext(context);
   }

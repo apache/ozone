@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.audit.AuditLogTestUtils.verifyAuditLog;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -30,9 +31,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
@@ -44,6 +47,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -202,6 +206,58 @@ public class TestOmAcls {
     assertThat(logCapturer.getOutput())
         .contains("doesn't have WRITE_ACL permission to access bucket");
     verifyAuditLog(OMAction.SET_ACL, AuditEventStatus.FAILURE);
+  }
+
+  @Test
+  public void testKeyACLOpsPermissionDenied() throws Exception {
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+    String keyName = "testKey";
+    TestDataUtil.createKey(bucket, keyName, "testcontent".getBytes(StandardCharsets.UTF_8));
+
+    authorizer.keyAclAllow = false;
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneObj key = new OzoneObjInfo.Builder()
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName())
+        .setKeyName(keyName)
+        .setResType(OzoneObj.ResourceType.KEY)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .build();
+
+    OMException exception = assertThrows(OMException.class,
+        () -> objectStore.getAcl(key));
+
+    assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
+    assertThat(logCapturer.getOutput()).contains("doesn't have READ_ACL " +
+        "permission to access key");
+    verifyAuditLog(OMAction.GET_ACL, AuditEventStatus.FAILURE);
+
+    OzoneAcl acl = OzoneAcl.of(USER, "testuser1",
+        OzoneAcl.AclScope.DEFAULT, IAccessAuthorizer.ACLType.ALL);
+
+    exception = assertThrows(OMException.class,
+        () -> objectStore.setAcl(key, Collections.singletonList(acl)));
+
+    assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
+    assertThat(logCapturer.getOutput()).contains("doesn't have WRITE_ACL " +
+        "permission to access key");
+    verifyAuditLog(OMAction.SET_ACL, AuditEventStatus.FAILURE);
+
+    exception = assertThrows(OMException.class,
+        () -> objectStore.addAcl(key, acl));
+
+    assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
+    assertThat(logCapturer.getOutput()).contains("doesn't have WRITE_ACL " +
+        "permission to access key");
+    verifyAuditLog(OMAction.ADD_ACL, AuditEventStatus.FAILURE);
+
+    exception = assertThrows(OMException.class,
+        () -> objectStore.removeAcl(key, acl));
+
+    assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
+    assertThat(logCapturer.getOutput()).contains("doesn't have WRITE_ACL " +
+        "permission to access key");
+    verifyAuditLog(OMAction.REMOVE_ACL, AuditEventStatus.FAILURE);
   }
 
   /**
