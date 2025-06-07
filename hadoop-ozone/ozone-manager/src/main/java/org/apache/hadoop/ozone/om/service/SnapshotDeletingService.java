@@ -28,11 +28,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -91,7 +89,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   private final int keyLimitPerTask;
   private final int snapshotDeletionPerTask;
   private final int ratisByteLimit;
-  private MultiSnapshotLocks snapshotIdLocks;
+  private final MultiSnapshotLocks snapshotIdLocks;
+  private final List<UUID> lockIds;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
                                  OzoneManager ozoneManager)
@@ -119,6 +118,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
     IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
     this.snapshotIdLocks = new MultiSnapshotLocks(lock, SNAPSHOT_GC_LOCK, true);
+    this.lockIds = new ArrayList<>(2);
   }
 
   private class SnapshotDeletingTask implements BackgroundTask {
@@ -154,11 +154,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                 snapInfo.getTableKey());
             continue;
           }
-
+          lockIds.clear();
+          lockIds.add(snapInfo.getSnapshotId());
+          if (nextSnapshot != null) {
+            lockIds.add(nextSnapshot.getSnapshotId());
+          }
           // Acquire write lock on current snapshot and next snapshot in chain.
-          if (!snapshotIdLocks.acquireLock(Arrays.asList(snapInfo.getSnapshotId(),
-                  Optional.ofNullable(nextSnapshot).map(SnapshotInfo::getSnapshotId).orElse(null)))
-              .isLockAcquired()) {
+          if (!snapshotIdLocks.acquireLock(lockIds).isLockAcquired()) {
             continue;
           }
 
