@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.scanner.ScannerException;
 
 /**
  * Implementation of {@link OmSnapshotLocalProperty} that uses a YAML file
@@ -153,7 +154,7 @@ public class OmSnapshotLocalPropertyYamlImpl implements OmSnapshotLocalProperty,
     try (InputStream inputStream = Files.newInputStream(yamlFile.toPath())) {
       Map<String, String> loadedProperties = YamlUtils.loadAs(inputStream, Map.class);
       properties = loadedProperties != null ? new HashMap<>(loadedProperties) : new HashMap<>();
-    } catch (IOException e) {
+    } catch (IOException | ScannerException e) {
       LOG.error("Unable to parse YAML file: {}", yamlFile, e);
       throw new IOException("Unable to parse snapshot properties YAML file", e);
     }
@@ -167,7 +168,7 @@ public class OmSnapshotLocalPropertyYamlImpl implements OmSnapshotLocalProperty,
   private void savePropertiesToFile() throws IOException {
     DumperOptions options = new DumperOptions();
     options.setPrettyFlow(true);
-    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+    options.setDefaultFlowStyle(DumperOptions.FlowStyle.FLOW);
     Yaml yaml = new Yaml(options);
 
     YamlUtils.dump(yaml, properties, yamlFile, LOG);
