@@ -102,11 +102,11 @@ When a DataNode needs to select a volume to store new data, it uses a volume cho
 
 ### Volume-Related Configuration Properties
 
-| Property Name                                 | Default Value                        | Description                                                                                  |
-|-----------------------------------------------|--------------------------------------|----------------------------------------------------------------------------------------------|
-| hdds.datanode.volume.choosing.policy          | CapacityVolumeChoosingPolicy          | The policy used to select a volume for new containers.                                       |
-| hdds.datanode.volume.min.free.space           | 10GB                                 | Minimum free space required on a volume to be eligible for new containers.                   |
-| hdds.datanode.volume.min.free.space.percent   | 15                                   | Minimum free space percentage required on a volume to be eligible for new containers.        |
+| Property Name                                 | Default Value                | Description                                                                                  |
+|-----------------------------------------------|------------------------------|----------------------------------------------------------------------------------------------|
+| hdds.datanode.volume.choosing.policy          | CapacityVolumeChoosingPolicy | The policy used to select a volume for new containers.                                       |
+| hdds.datanode.volume.min.free.space           | 20GB                         | Minimum free space required on a volume to be eligible for new containers.                   |
+| hdds.datanode.volume.min.free.space.percent   | 0.0001f                      | Minimum free space percentage required on a volume to be eligible for new containers.        |
 
 ### Disk Balancer
 
