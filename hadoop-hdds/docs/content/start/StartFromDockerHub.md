@@ -134,8 +134,9 @@ bucket using the standard aws s3 command line interface.
 aws s3 --endpoint http://localhost:9878 cp --storage-class REDUCED_REDUNDANCY  /tmp/testfile  s3://bucket1/testfile
 ```
 <div class="alert alert-info" role="alert">
-Note: REDUCED_REDUNDANCY is required for the single container ozone, since it
-has a single datanode. </div>
+Note: Add --storage-class REDUCED_REDUNDANCY if only one DataNode is started.
+Since this example starts three DataNodes, this parameter is optional.
+</div>
 We can now verify that file got uploaded by running the list command against
 our bucket.
 
