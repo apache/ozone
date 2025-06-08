@@ -79,7 +79,7 @@ connecting to the SCM's UI at [http://localhost:9876](http://localhost:9876).
 
 Navigate to the Recon server home page. the Ozone Recon server at [http://localhost:9888](http://localhost:9888), which provides monitoring and management capabilities.
 
-![Recon UI Screenshot](ozone-reconn.png)
+![Recon UI Screenshot](ozone-recon.png)
 
 ## Configuration
 You can customize your Ozone deployment by modifying the configuration parameters in the `docker-compose.yaml` file:
