@@ -69,6 +69,7 @@ docker-scm-1        apache/ozone:2.0.0   "/usr/local/bin/dumb…"   scm        1
 
 ```bash
 docker compose exec om bash
+# Now, inside the container's shell, run:
 ozone version
 ```
 
@@ -77,7 +78,7 @@ connecting to the SCM's UI at [http://localhost:9876](http://localhost:9876).
 
 ![SCM UI Screenshot](ozone-scm.png)
 
-Navigate to the Recon server home page. the Ozone Recon server at [http://localhost:9888](http://localhost:9888), which provides monitoring and management capabilities.
+Navigate to the Recon server home page. The Ozone Recon server is at [http://localhost:9888](http://localhost:9888/#), which provides monitoring and management capabilities.
 
 ![Recon UI Screenshot](ozone-recon.png)
 
@@ -95,6 +96,16 @@ x-common-config:
   OZONE-SITE.XML_ozone.recon.http-address: 0.0.0.0:9090
 ```
 
+**Note:** If you change the port Recon listens on (e.g., 9090), you must also update the ports mapping in the recon service definition within the docker-compose.yaml file. For example, change:
+```yaml
+ports:
+  - "9888:9888"
+```
+to:
+```yaml
+ports:
+  - "9090:9090"
+```
 # Running S3 Clients
 
 The S3 gateway endpoint will be exposed at port 9878. You can use Ozone's S3
@@ -131,5 +142,3 @@ our bucket.
 ```bash
 aws s3 --endpoint http://localhost:9878 ls s3://bucket1/testfile
 ```
-````
-
