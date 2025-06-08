@@ -17,24 +17,23 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.commons.io.filefilter.TrueFileFilter.TRUE;
 import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
 import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.om.codec.OMDBCheckpointUtils.getMetaDirPath;
+import static org.apache.hadoop.ozone.om.codec.OMDBCheckpointUtils.includeSnapshotData;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.createHardLinkList;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -59,8 +58,6 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOCase;
-import org.apache.commons.io.file.Counters;
-import org.apache.commons.io.file.CountingPathVisitor;
 import org.apache.commons.io.file.PathFilter;
 import org.apache.commons.io.filefilter.SuffixFileFilter;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -73,6 +70,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.codec.OMDBCheckpointUtils;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -334,28 +332,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         compactionLogDir.getOriginalDir().toPath());
   }
 
-  private void logEstimatedTarballSize(
-      DBCheckpoint checkpoint, boolean includeSnapshotData) {
-    try {
-      Counters.PathCounters counters = Counters.longPathCounters();
-      CountingPathVisitor visitor = new CountingPathVisitor(
-          counters, SST_FILE_FILTER, TRUE);
-      Files.walkFileTree(checkpoint.getCheckpointLocation(), visitor);
-      int totalSnapshots = 0;
-      if (includeSnapshotData) {
-        Set<Path> snapshotPaths = getSnapshotDirs(checkpoint, false);
-        totalSnapshots = snapshotPaths.size();
-        for (Path snapshotDir: snapshotPaths) {
-          Files.walkFileTree(snapshotDir, visitor);
-        }
-      }
-      LOG.info("Estimates for Checkpoint Tarball Stream - Data size: {} KB, " + "SST files: {}{}",
-          counters.getByteCounter().get() / (1024),
-          counters.getFileCounter().get(),
-          (includeSnapshotData ? ", snapshots: " + totalSnapshots : ""));
-    } catch (Exception e) {
-      LOG.error("Could not estimate size of transfer to Checkpoint Tarball Stream.", e);
+  private void logEstimatedTarballSize(DBCheckpoint checkpoint, boolean includeSnapshotData)
+      throws IOException {
+    Set<Path> snapshotPaths = new HashSet<>();
+    if (includeSnapshotData) {
+      snapshotPaths = getSnapshotDirs(checkpoint, true);
     }
+    OMDBCheckpointUtils.logEstimatedTarballSize(checkpoint.getCheckpointLocation(), snapshotPaths);
   }
 
   /**
@@ -568,13 +551,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return null;
   }
 
-  // Returns value of http request parameter.
-  private boolean includeSnapshotData(HttpServletRequest request) {
-    String includeParam =
-        request.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA);
-    return Boolean.parseBoolean(includeParam);
-  }
-
   private void writeFilesToArchive(
       Map<Path, Path> copyFiles,
       Map<Path, Path> hardLinkFiles,
@@ -651,23 +627,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             "to checkpoint tarball stream.{}",
         bytesWritten / (1024), filesWritten, (completed) ?
             " Checkpoint tarball is complete." : "");
-  }
-
-  @Nonnull
-  private static Path getMetaDirPath(Path checkpointLocation) {
-    // This check is done to take care of findbugs else below getParent()
-    // should not be null.
-    Path locationParent = checkpointLocation.getParent();
-    if (null == locationParent) {
-      throw new RuntimeException(
-          "checkpoint location's immediate parent is null.");
-    }
-    Path parent = locationParent.getParent();
-    if (null == parent) {
-      throw new RuntimeException(
-          "checkpoint location's path is invalid and could not be verified.");
-    }
-    return parent;
   }
 
   private OzoneConfiguration getConf() {

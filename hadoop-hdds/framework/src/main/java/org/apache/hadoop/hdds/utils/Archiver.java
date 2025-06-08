@@ -141,7 +141,6 @@ public final class Archiver {
     }
   }
 
-
   public static void extractEntry(ArchiveEntry entry, InputStream input, long size,
       Path ancestor, Path path) throws IOException {
     HddsUtils.validatePath(path, ancestor);

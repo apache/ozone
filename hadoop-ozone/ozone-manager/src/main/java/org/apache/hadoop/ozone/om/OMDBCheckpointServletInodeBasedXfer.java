@@ -17,11 +17,15 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.commons.io.filefilter.TrueFileFilter.TRUE;
-import static org.apache.hadoop.hdds.utils.Archiver.*;
-import static org.apache.hadoop.ozone.OzoneConsts.*;
+import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
+import static org.apache.hadoop.hdds.utils.Archiver.linkAndIncludeFile;
+import static org.apache.hadoop.hdds.utils.Archiver.tar;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+import static org.apache.hadoop.ozone.om.codec.OMDBCheckpointUtils.getMetaDirPath;
+import static org.apache.hadoop.ozone.om.codec.OMDBCheckpointUtils.includeSnapshotData;
+import static org.apache.hadoop.ozone.om.codec.OMDBCheckpointUtils.logEstimatedTarballSize;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_PREFIX;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_SUFFIX;
 
@@ -52,11 +56,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOCase;
-import org.apache.commons.io.file.Counters;
-import org.apache.commons.io.file.CountingPathVisitor;
-import org.apache.commons.io.file.PathFilter;
-import org.apache.commons.io.filefilter.SuffixFileFilter;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
@@ -89,8 +88,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   protected static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServletInodeBasedXfer.class);
   private static final long serialVersionUID = 1L;
-  private static final PathFilter SST_FILE_FILTER =
-      new SuffixFileFilter(ROCKSDB_SST_SUFFIX, IOCase.INSENSITIVE);
 
   @Override
   public void init() throws ServletException {
@@ -123,52 +120,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         om.isSpnegoEnabled());
   }
 
-
-  protected static Path getMetaDirPath(Path checkpointLocation) {
-    // This check is done to take care of findbugs else below getParent()
-    // should not be null.
-    Path locationParent = checkpointLocation.getParent();
-    if (null == locationParent) {
-      throw new RuntimeException(
-          "checkpoint location's immediate parent is null.");
-    }
-    Path parent = locationParent.getParent();
-    if (null == parent) {
-      throw new RuntimeException(
-          "checkpoint location's path is invalid and could not be verified.");
-    }
-    return parent;
-  }
-
-  // Returns value of http request parameter.
-  protected static boolean includeSnapshotData(HttpServletRequest request) {
-    String includeParam =
-        request.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA);
-    return Boolean.parseBoolean(includeParam);
-  }
-
-  private void logEstimatedTarballSize(Path dbLocation, Set<Path> snapshotPaths) {
-    try {
-      Counters.PathCounters counters = Counters.longPathCounters();
-      CountingPathVisitor visitor = new CountingPathVisitor(
-          counters, SST_FILE_FILTER, TRUE);
-      Files.walkFileTree(dbLocation, visitor);
-      boolean includeSnapshotData = !snapshotPaths.isEmpty();
-      long totalSnapshots = snapshotPaths.size();
-      if (includeSnapshotData) {
-        for (Path snapshotDir: snapshotPaths) {
-          Files.walkFileTree(snapshotDir, visitor);
-        }
-      }
-      LOG.info("Estimates for Checkpoint Tarball Stream - Data size: {} KB, " + "SST files: {}{}",
-          counters.getByteCounter().get() / (1024),
-          counters.getFileCounter().get(),
-          (includeSnapshotData ? ", snapshots: " + totalSnapshots : ""));
-    } catch (Exception e) {
-      LOG.error("Could not estimate size of transfer to Checkpoint Tarball Stream.", e);
-    }
-  }
-
   @Override
   protected void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, DBCheckpoint checkpoint, boolean flush) {
@@ -192,7 +143,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           "stream: {} milliseconds", duration);
       logSstFileList(excludedSstList,
           "Excluded {} SST files from the latest checkpoint{}: {}", 5);
-    } catch (Exception e){
+    } catch (Exception e) {
       LOG.error(
           "Unable to process metadata snapshot request. ", e);
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -218,7 +169,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     return new File(differ.getCompactionLogDir()).toPath();
   }
 
-
   public void writeDbDataToStream(HttpServletRequest request, OutputStream destination,
       Set<String> sstFilesToExclude, Path tmpdir) throws IOException {
     DBCheckpoint checkpoint = null;
@@ -233,7 +183,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     if (!includeSnapshotData) {
       maxTotalSstSize.set(Long.MAX_VALUE);
     } else {
-      snapshotPaths = collectSnapshotPaths(omMetadataManager);
+      snapshotPaths = getSnapshotDirs(omMetadataManager);
     }
 
     if (sstFilesToExclude.isEmpty()) {
@@ -269,7 +219,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       if (shouldContinue) {
         // we finished transferring files from snapshot DB's by now and
         // this is the last step where we transfer the active om.db contents
-        checkpoint = getCheckpoint(tmpdir,true);
+        checkpoint = getCheckpoint(tmpdir, true);
         // unlimited files as we want the Active DB contents to be transferred in a single batch
         maxTotalSstSize.set(Long.MAX_VALUE);
         Path checkpointDir = checkpoint.getCheckpointLocation();
@@ -296,7 +246,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       AtomicLong maxTotalSstSize, ArchiveOutputStream<TarArchiveEntry> archiveOutputStream,
       Path tmpdir, Map<String, String> hardLinkFileMap) throws IOException {
     return writeDBToArchive(sstFilesToExclude, dir, maxTotalSstSize,
-        archiveOutputStream, tmpdir, hardLinkFileMap, null );
+        archiveOutputStream, tmpdir, hardLinkFileMap, null);
   }
 
   private static void cleanupCheckpoint(DBCheckpoint checkpoint) {
@@ -309,8 +259,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       }
     }
   }
-
-
 
   /**
    * Writes a hardlink mapping file to the archive, which maps file IDs to their
@@ -359,16 +307,16 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @return Set of paths to snapshot databases
    * @throws IOException if an I/O error occurs
    */
-  Set<Path> collectSnapshotPaths(OMMetadataManager omMetadataManager) throws IOException {
-    Set<Path> snapshotDbPaths = new HashSet<>();
+  Set<Path> getSnapshotDirs(OMMetadataManager omMetadataManager) throws IOException {
+    Set<Path> snapshotPaths = new HashSet<>();
     SnapshotChainManager snapshotChainManager = new SnapshotChainManager(omMetadataManager);
     for (SnapshotChainInfo snapInfo : snapshotChainManager.getGlobalSnapshotChain().values()) {
       String snapshotDir =
           OmSnapshotManager.getSnapshotPath(getConf(), SnapshotInfo.getCheckpointDirName(snapInfo.getSnapshotId()));
       Path path = Paths.get(snapshotDir);
-      snapshotDbPaths.add(path);
+      snapshotPaths.add(path);
     }
-    return snapshotDbPaths;
+    return snapshotPaths;
   }
 
   /**
@@ -384,7 +332,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    */
   boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dbDir, AtomicLong maxTotalSstSize,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, Path tmpDir,
-      Map<String, String> hardLinkFileMap , Path destDir) throws IOException {
+      Map<String, String> hardLinkFileMap, Path destDir) throws IOException {
     try (Stream<Path> files = Files.list(dbDir)) {
       Iterable<Path> iterable = files::iterator;
       for (Path dbFile : iterable) {

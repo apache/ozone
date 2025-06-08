@@ -205,8 +205,8 @@ public class DBCheckpointServlet extends HttpServlet
     processMetadataSnapshotRequest(request, response, isFormData, checkpoint, flush);
   }
 
-  protected void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response, boolean isFormData,
-      DBCheckpoint checkpoint, boolean flush) {
+  protected void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+      boolean isFormData, DBCheckpoint checkpoint, boolean flush) {
     List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?
         parseFormDataParameters(request) : request.getParameterValues(

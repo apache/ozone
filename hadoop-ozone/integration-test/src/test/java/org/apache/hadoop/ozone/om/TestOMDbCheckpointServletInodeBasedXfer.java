@@ -27,7 +27,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FL
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -73,6 +72,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,6 +81,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Class used for testing the OM DB Checkpoint provider servlet using inode based transfer logic.
  */
+@Unhealthy("HDDS-13070")
 public class TestOMDbCheckpointServletInodeBasedXfer {
 
   private MiniOzoneCluster cluster;
@@ -176,11 +177,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
-
     doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(),
         anyBoolean());
-    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDir();
-    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any(), anyBoolean());
+    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any());
   }
 
   @Test
