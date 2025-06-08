@@ -110,7 +110,7 @@ When a DataNode needs to select a volume to store new data, it uses a volume cho
 
 ### Disk Balancer
 
-Over time, operations like adding or replacing disks can cause uneven disk usage. The Ozone community is developing a Disk Balancer (see HDDS-5713) to automatically balance disk usage across DataNode volumes. This feature is under active development.
+Over time, operations like adding or replacing disks can cause uneven disk usage. The Ozone community is developing a Disk Balancer (see [HDDS-5713](https://issues.apache.org/jira/browse/HDDS-5713)) to automatically balance disk usage across DataNode volumes. This feature is under active development.
 
 ## Notable configurations
 
