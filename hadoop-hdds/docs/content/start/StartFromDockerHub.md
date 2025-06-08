@@ -110,6 +110,14 @@ The S3 gateway endpoint will be exposed at port 9878. You can use Ozone's S3
 support as if you are working against the real S3.  S3 buckets are stored under
 the `/s3v` volume.
 
+First, let's configure AWS access key and secret key. Because the cluster is not secured,
+you can use any arbitrary access key and secret key. For example:
+
+```bash
+export AWS_ACCESS_KEY_ID=testuser/scm@EXAMPLE.COM
+export AWS_SECRET_ACCESS_KEY=c261b6ecabf7d37d5f9ded654b1c724adac9bd9f13e247a235e567e8296d2999
+```
+
 Here is how you create buckets from command line:
 
 ```bash
