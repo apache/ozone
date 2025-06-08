@@ -125,7 +125,31 @@ ozone om [global options (optional)] --bootstrap --force
 
 Note that using the _force_ option during bootstrap could crash the OM process if it does not have updated configurations.
 
+## Automatic Snapshot Installation for Stale Ozone Managers
+
+In an Ozone Manager (OM) High Availability (HA) cluster, all OM nodes maintain a consistent metadata state using the Ratis consensus protocol. Sometimes, an OM follower node may be offline or fall so far behind the leader OM’s log that it cannot catch up by replaying individual log entries.
+
+The OM HA implementation includes an **automatic snapshot installation and recovery process** for such cases:
+
+- **Snapshot Installation Trigger:**  
+  When a follower OM falls significantly behind and is unable to catch up with the leader OM through standard log replication, the leader OM will notify the follower to install a snapshot. This is handled internally by the OM state machine.
+
+- **How it works:**
+  - The follower OM receives a snapshot installation notification from the leader via the consensus protocol.
+  - The follower OM then downloads and installs the latest consistent checkpoint (snapshot) from the leader OM.
+  - After installing the snapshot, the follower OM resumes normal operation and log replication from the new state.
+
+- **Relevant Implementation:**  
+  This logic is implemented in the `OzoneManagerStateMachine.notifyInstallSnapshotFromLeader()` method. The install is triggered automatically by the consensus layer (Ratis) when it detects that a follower cannot catch up by log replay alone.
+
+- **What this means for administrators:**
+  - In most scenarios, stale OMs will recover automatically after coming back online, even if they have missed a large number of operations.
+  - Manual intervention (such as running `ozone om --bootstrap`) is only required when adding a new OM node to the cluster or when explicitly requested by support instructions.
+
+
 ## References
 
  * Check [this page]({{< ref "design/omha.md" >}}) for the links to the original design docs
  * Ozone distribution contains an example OM HA configuration, under the `compose/ozone-om-ha` directory which can be tested with the help of [docker-compose]({{< ref "start/RunningViaDocker.md" >}}).
+ * [OzoneManagerStateMachine.notifyInstallSnapshotFromLeader source code](https://github.com/apache/ozone/blob/master/hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/ratis/OzoneManagerStateMachine.java)
+* [Apache Ratis State Machine API documentation](https://github.com/apache/ratis/blob/master/ratis-server-api/src/main/java/org/apache/ratis/statemachine/StateMachine.java)
