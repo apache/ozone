@@ -252,7 +252,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   /**
-   * Acquires a write lock on the entire Stripe for a specified resource.
+   * Acquires all write locks for a specified resource.
    *
    * @param resource The resource for which the write lock is to be acquired.
    */
