@@ -153,7 +153,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
               openKeyInfoMap.put(dbOpenKey, openKeyInfo);
             }
           }
-
           omMetrics.decNumKeys();
           numSubFilesMoved++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
@@ -172,17 +171,26 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
         }
         if (path.hasDeletedDir()) {
+          // Using deletedDirInfo since there is no reverse mapping for volumeId and bucketId.
+          OmKeyInfo deletedDirInfo = omMetadataManager.getDeletedDirTable().get(path.getDeletedDir());
+          if (deletedDirInfo != null) {
+            OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+                deletedDirInfo.getVolumeName(), deletedDirInfo.getBucketName());
+            omBucketInfo.purgePendingDeleteSnapshotNamespace(1);
+          }
           numDirsDeleted++;
         }
       }
       deletingServiceMetrics.incrNumSubDirectoriesMoved(numSubDirMoved);
       deletingServiceMetrics.incrNumSubFilesMoved(numSubFilesMoved);
       deletingServiceMetrics.incrNumDirPurged(numDirsDeleted);
-
+      TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
       if (fromSnapshotInfo != null) {
-        fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
+        fromSnapshotInfo.setLastTransactionInfo(transactionInfo.toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
             CacheValue.get(context.getIndex(), fromSnapshotInfo));
+      } else {
+        deletingServiceMetrics.setLastAOSTransactionId(transactionInfo);
       }
     } catch (IOException ex) {
       // Case of IOException for fromProtobuf will not happen

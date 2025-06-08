@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -597,6 +598,16 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo)) {
               LOG.info("Skipping snapshot processing since changes to snapshot {} have not been flushed to disk",
                   snapInfo);
+              return BackgroundTaskResult.EmptyTaskResult.newResult();
+            }
+          } else {
+            TransactionInfo lastAOSTransactionId = getMetrics().getLastAOSTransactionId();
+            TransactionInfo flushedTransactionId = TransactionInfo.readTransactionInfo(
+                getOzoneManager().getMetadataManager());
+            if (lastAOSTransactionId.compareTo(flushedTransactionId) > 0) {
+              LOG.info("Skipping AOS processing since changes to deleted space of AOS have not been flushed to disk " +
+                      "last Purge Transaction: {}, Flushed Disk Transaction: {}", lastAOSTransactionId,
+                  flushedTransactionId);
               return BackgroundTaskResult.EmptyTaskResult.newResult();
             }
           }

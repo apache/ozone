@@ -2968,6 +2968,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setQuotaInBytes(realBucket.getQuotaInBytes())
             .setQuotaInNamespace(realBucket.getQuotaInNamespace())
             .setUsedBytes(realBucket.getUsedBytes())
+            .setPendingSnapshotDeleteBytes(realBucket.getPendingSnapshotDeleteBytes())
+            .setPendingSnapshotDeleteNamespace(realBucket.getPendingSnapshotDeleteNamespace())
             .setUsedNamespace(realBucket.getUsedNamespace())
             .addAllMetadata(realBucket.getMetadata())
             .setBucketLayout(realBucket.getBucketLayout())

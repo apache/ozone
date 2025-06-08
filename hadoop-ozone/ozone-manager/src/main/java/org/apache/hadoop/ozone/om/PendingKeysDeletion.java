@@ -35,20 +35,57 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
  */
 public class PendingKeysDeletion {
 
-  private Map<String, RepeatedOmKeyInfo> keysToModify;
-  private List<BlockGroup> keyBlocksList;
+  private final Map<String, RepeatedOmKeyInfo> keysToModify;
+  private final List<PurgedKey> purgedKeys;
 
-  public PendingKeysDeletion(List<BlockGroup> keyBlocksList,
+  public PendingKeysDeletion(List<PurgedKey> purgedKeys,
        Map<String, RepeatedOmKeyInfo> keysToModify) {
     this.keysToModify = keysToModify;
-    this.keyBlocksList = keyBlocksList;
+    this.purgedKeys = purgedKeys;
   }
 
   public Map<String, RepeatedOmKeyInfo> getKeysToModify() {
     return keysToModify;
   }
 
-  public List<BlockGroup> getKeyBlocksList() {
-    return keyBlocksList;
+  public List<PurgedKey> getPurgedKeys() {
+    return purgedKeys;
+  }
+
+  /**
+   * Represents metadata for a key that has been purged.
+   *
+   * This class holds information about a specific purged key,
+   * including its volume, bucket, associated block group,
+   * and the amount of data purged in bytes.
+   */
+  public static class PurgedKey {
+    private final String volume;
+    private final String bucket;
+    private final BlockGroup blockGroup;
+    private long purgedBytes;
+
+    public PurgedKey(String volume, String bucket, BlockGroup group, long purgedBytes) {
+      this.volume = volume;
+      this.bucket = bucket;
+      this.blockGroup = group;
+      this.purgedBytes = purgedBytes;
+    }
+
+    public BlockGroup getBlockGroup() {
+      return blockGroup;
+    }
+
+    public long getPurgedBytes() {
+      return purgedBytes;
+    }
+
+    public String getVolume() {
+      return volume;
+    }
+
+    public String getBucket() {
+      return bucket;
+    }
   }
 }

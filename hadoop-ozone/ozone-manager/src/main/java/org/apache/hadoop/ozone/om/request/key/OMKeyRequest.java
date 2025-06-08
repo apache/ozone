@@ -912,9 +912,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OMMetadataManager metadataManager, OmBucketInfo omBucketInfo,
       long allocateSize) throws IOException {
     if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
-      long usedBytes = omBucketInfo.getUsedBytes();
+      long usedBytes = omBucketInfo.getTotalBucketSpace();
       long quotaInBytes = omBucketInfo.getQuotaInBytes();
-      if (quotaInBytes - usedBytes < allocateSize) {
+      if (quotaInBytes - usedBytes  < allocateSize) {
         throw new OMException("The DiskSpace quota of bucket:"
             + omBucketInfo.getBucketName() + " exceeded quotaInBytes: "
             + quotaInBytes + " Bytes but diskspace consumed: " + (usedBytes
@@ -930,7 +930,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected void checkBucketQuotaInNamespace(OmBucketInfo omBucketInfo,
       long allocatedNamespace) throws IOException {
     if (omBucketInfo.getQuotaInNamespace() > OzoneConsts.QUOTA_RESET) {
-      long usedNamespace = omBucketInfo.getUsedNamespace();
+      long usedNamespace = omBucketInfo.getTotalBucketNamespace();
       long quotaInNamespace = omBucketInfo.getQuotaInNamespace();
       long toUseNamespaceInTotal = usedNamespace + allocatedNamespace;
       if (quotaInNamespace < toUseNamespaceInTotal) {
@@ -965,7 +965,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /**
    * @return the number of bytes used by blocks pointed to by {@code omKeyInfo}.
    */
-  protected static long sumBlockLengths(OmKeyInfo omKeyInfo) {
+  public static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
     for (OmKeyLocationInfoGroup group: omKeyInfo.getKeyLocationVersions()) {
       for (OmKeyLocationInfo locationInfo : group.getLocationList()) {

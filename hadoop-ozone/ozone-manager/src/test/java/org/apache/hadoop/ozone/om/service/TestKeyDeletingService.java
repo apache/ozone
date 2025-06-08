@@ -81,6 +81,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PendingKeysDeletion;
+import org.apache.hadoop.ozone.om.PendingKeysDeletion.PurgedKey;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -227,7 +228,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertThat(getRunCount()).isGreaterThan(initialRunCount);
       assertThat(keyManager.getPendingDeletionKeys(new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
               ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
-              keyManager, om.getMetadataManager().getLock()), Integer.MAX_VALUE).getKeyBlocksList())
+              keyManager, om.getMetadataManager().getLock()), Integer.MAX_VALUE).getPurgedKeys())
           .isEmpty();
     }
 
@@ -256,7 +257,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           1000, 10000);
       assertThat(getRunCount())
           .isGreaterThan(initialRunCount);
-      assertThat(keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE).getKeyBlocksList())
+      assertThat(keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE).getPurgedKeys())
           .isEmpty();
 
       // The 1st version of the key has 1 block and the 2nd version has 2
@@ -301,7 +302,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertThat(keyManager.getPendingDeletionKeys(new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
               ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
               keyManager, om.getMetadataManager().getLock()),
-          Integer.MAX_VALUE).getKeyBlocksList())
+          Integer.MAX_VALUE).getPurgedKeys())
           .isEmpty();
 
       // deletedTable should have deleted key of the snapshot bucket
@@ -405,8 +406,8 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 1, metadataManager);
       doAnswer(i -> {
         PendingKeysDeletion pendingKeysDeletion = (PendingKeysDeletion) i.callRealMethod();
-        for (BlockGroup group : pendingKeysDeletion.getKeyBlocksList()) {
-          Assertions.assertNotEquals(deletePathKey[0], group.getGroupID());
+        for (PurgedKey purgedKey : pendingKeysDeletion.getPurgedKeys()) {
+          Assertions.assertNotEquals(deletePathKey[0], purgedKey.getBlockGroup().getGroupID());
         }
         return pendingKeysDeletion;
       }).when(km).getPendingDeletionKeys(any(), anyInt());
@@ -796,8 +797,9 @@ class TestKeyDeletingService extends OzoneTestBase {
               return OzoneManagerProtocolProtos.OMResponse.newBuilder().setCmdType(purgeRequest.get().getCmdType())
                   .setStatus(OzoneManagerProtocolProtos.Status.TIMEOUT).build();
             });
-        List<BlockGroup> blockGroups = Collections.singletonList(BlockGroup.newBuilder().setKeyName("key1")
-            .addAllBlockIDs(Collections.singletonList(new BlockID(1, 1))).build());
+        BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1")
+            .addAllBlockIDs(Collections.singletonList(new BlockID(1, 1))).build();
+        List<PurgedKey> blockGroups = Collections.singletonList(new PurgedKey("vol", "buck", blockGroup, 30));
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
         OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
             .setBucketName("buck")
@@ -1058,7 +1060,7 @@ class TestKeyDeletingService extends OzoneTestBase {
   private int countKeysPendingDeletion() {
     try {
       final int count = keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
-          .getKeyBlocksList().size();
+          .getPurgedKeys().size();
       LOG.debug("KeyManager keys pending deletion: {}", count);
       return count;
     } catch (IOException e) {
@@ -1069,8 +1071,9 @@ class TestKeyDeletingService extends OzoneTestBase {
   private long countBlocksPendingDeletion() {
     try {
       return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
-          .getKeyBlocksList()
+          .getPurgedKeys()
           .stream()
+          .map(PurgedKey::getBlockGroup)
           .map(BlockGroup::getBlockIDList)
           .mapToLong(Collection::size)
           .sum();

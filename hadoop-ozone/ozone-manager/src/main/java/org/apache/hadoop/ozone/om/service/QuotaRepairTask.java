@@ -255,8 +255,8 @@ public class QuotaRepairTask {
     String bucketNameKey = buildNamePath(bucketInfo.getVolumeName(),
         bucketInfo.getBucketName());
     oriBucketInfoMap.put(bucketNameKey, bucketInfo.copyObject());
-    bucketInfo.incrUsedNamespace(-bucketInfo.getUsedNamespace());
-    bucketInfo.incrUsedBytes(-bucketInfo.getUsedBytes());
+    bucketInfo.incrUsedNamespace(-bucketInfo.getUsedNamespace(), false);
+    bucketInfo.incrUsedBytes(-bucketInfo.getUsedBytes(), false);
     nameBucketInfoMap.put(bucketNameKey, bucketInfo);
     idBucketInfoMap.put(buildIdPath(metadataManager.getVolumeId(bucketInfo.getVolumeName()),
             bucketInfo.getObjectID()), bucketInfo);
@@ -425,8 +425,8 @@ public class QuotaRepairTask {
       // update bucket info if available
       OmBucketInfo omBucketInfo = bucketInfoMap.get(entry.getKey());
       if (omBucketInfo != null) {
-        omBucketInfo.incrUsedBytes(entry.getValue().getSpace());
-        omBucketInfo.incrUsedNamespace(entry.getValue().getNamespace());
+        omBucketInfo.incrUsedBytes(entry.getValue().getSpace(), false);
+        omBucketInfo.incrUsedNamespace(entry.getValue().getNamespace(), false);
       }
     }
   }
