@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.Map;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
  * Interface to manage Ozone snapshot DB local checkpoint metadata properties.
@@ -33,7 +32,6 @@ public interface OmSnapshotLocalProperty extends AutoCloseable {
    * @param key          Property key
    * @param value        Property value
    * @throws IOException if an I/O error occurs
-   * @throws OMException if snapshot doesn't exist or operation fails
    */
   void setProperty(String key, String value) throws IOException;
 
@@ -43,7 +41,6 @@ public interface OmSnapshotLocalProperty extends AutoCloseable {
    * @param key          Property key
    * @return Property value or null if not found
    * @throws IOException if an I/O error occurs
-   * @throws OMException if snapshot doesn't exist or operation fails
    */
   String getProperty(String key) throws IOException;
 
@@ -52,7 +49,6 @@ public interface OmSnapshotLocalProperty extends AutoCloseable {
    *
    * @return Map of property key-value pairs
    * @throws IOException if an I/O error occurs
-   * @throws OMException if snapshot doesn't exist or operation fails
    */
   Map<String, String> getProperties() throws IOException;
 
@@ -62,7 +58,6 @@ public interface OmSnapshotLocalProperty extends AutoCloseable {
    * @param key          Property key
    * @return true if the property exists, false otherwise
    * @throws IOException if an I/O error occurs
-   * @throws OMException if snapshot doesn't exist or operation fails
    */
   boolean hasProperty(String key) throws IOException;
 
@@ -71,7 +66,6 @@ public interface OmSnapshotLocalProperty extends AutoCloseable {
    *
    * @param key          Property key
    * @throws IOException if an I/O error occurs
-   * @throws OMException if snapshot doesn't exist or operation fails
    */
   void removeProperty(String key) throws IOException;
 }
