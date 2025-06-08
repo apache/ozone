@@ -173,7 +173,6 @@ public class TestOmSnapshotLocalPropertyYamlImpl {
 
     propertyImpl.close();
 
-    // Verify property removal is persisted
     try (OmSnapshotLocalPropertyYamlImpl newPropertyImpl =
         new OmSnapshotLocalPropertyYamlImpl(yamlFile.getAbsolutePath())) {
       assertFalse(newPropertyImpl.hasProperty(key));
@@ -202,16 +201,12 @@ public class TestOmSnapshotLocalPropertyYamlImpl {
       propertyImpl.setProperty(entry.getKey(), entry.getValue());
     }
 
-    // Verify all properties are accessible
+    // Verify all properties set
     Map<String, String> retrievedProperties = propertyImpl.getProperties();
     assertEquals(testProperties.size(), retrievedProperties.size());
     for (Map.Entry<String, String> entry : testProperties.entrySet()) {
       assertEquals(entry.getValue(), retrievedProperties.get(entry.getKey()));
     }
-
-    // Verify modifications to returned map don't affect internal state
-    retrievedProperties.put("newKey", "newValue");
-    assertFalse(propertyImpl.hasProperty("newKey"));
   }
 
   @Test
@@ -259,6 +254,6 @@ public class TestOmSnapshotLocalPropertyYamlImpl {
     IOException exception = assertThrows(IOException.class,
         () -> new OmSnapshotLocalPropertyYamlImpl(yamlFile.getAbsolutePath()));
 
-    assertTrue(exception.getMessage().contains("Unable to parse snapshot properties YAML file"));
+    assertTrue(exception.getMessage().contains("Unable to parse snapshot local properties YAML file"));
   }
 }

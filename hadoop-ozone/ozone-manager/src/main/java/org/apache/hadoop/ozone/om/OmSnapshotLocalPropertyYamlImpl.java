@@ -156,8 +156,8 @@ public class OmSnapshotLocalPropertyYamlImpl implements OmSnapshotLocalProperty,
       Map<String, String> loadedProperties = YamlUtils.loadAs(inputStream, Map.class);
       properties = loadedProperties != null ? new HashMap<>(loadedProperties) : new HashMap<>();
     } catch (IOException | ScannerException e) {
-      LOG.error("Unable to parse YAML file: {}", yamlFile, e);
-      throw new IOException("Unable to parse snapshot properties YAML file", e);
+      LOG.error("Unable to parse snapshot local properties YAML file: {}", yamlFile, e);
+      throw new IOException("Unable to parse snapshot local properties YAML file", e);
     }
   }
 
