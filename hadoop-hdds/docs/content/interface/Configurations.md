@@ -26,6 +26,10 @@ summary: Configuration properties for Ozone Client.
 
 The following table lists configuration properties available for the Ozone client. These properties can be set in ozone-site.xml to control client behavior.
 
+## Ozone Client Configuration Properties
+
+The configuration properties are generated from the Configuration class `OzoneClientConfig`.
+
 | Property Name | Default Value | Description |
 |--------------|--------------|-------------|
 | ozone.client.stream.buffer.flush.size | 16MB | Size which determines at what buffer position a partial flush will be initiated during write. It should be a multiple of ozone.client.stream.buffer.size |
@@ -56,3 +60,45 @@ The following table lists configuration properties available for the Ozone clien
 | ozone.client.stream.putblock.piggybacking | false | Allow PutBlock to be piggybacked in WriteChunk requests if the chunk is small. Can be enabled only when ozone.client.hbase.enhancements.allowed = true |
 | ozone.client.key.write.concurrency | 1 | Maximum concurrent writes allowed on each key. Defaults to 1 which matches the behavior before HDDS-9844. For unlimited write concurrency, set this to -1 or any negative integer value. Any value other than 1 is effective only when ozone.client.hbase.enhancements.allowed = true |
 
+## Ozone OM Client Configuration Properties
+
+The following table lists configuration properties available for the Ozone OM client. These properties are generated from the Configuration class `OMClientConfig`.
+
+| Property Name | Default Value | Description |
+|--------------|--------------|-------------|
+| ozone.om.client.rpc.timeout | 15m | RpcClient timeout on waiting for the response from OzoneManager. The default value is set to 15 minutes. If ipc.client.ping is set to true and this rpc-timeout is greater than the value of ipc.ping.interval, the effective value of the rpc-timeout is rounded up to multiple of ipc.ping.interval. |
+| ozone.om.client.trash.core.pool.size | 5 | Total number of threads in pool for the Trash Emptier |
+
+## Ozone SCM Client Configuration Properties
+
+The following table lists configuration properties available for the Ozone SCM client. These properties are generated from the ScmClientConfig class (defined in XceiverClientManager.java).
+
+| Property Name | Default Value | Description |
+|--------------|--------------|-------------|
+| ozone.scm.client.max.size | 256 | Controls the maximum number of connections that are cached via client connection pooling. If the number of connections exceed this count, then the oldest idle connection is evicted. |
+| ozone.scm.client.idle.threshold | 10s | In the standalone pipelines, the SCM clients use netty to communicate with the container. It also uses connection pooling to reduce client side overheads. This allows a connection to stay idle for a while before the connection is closed. |
+
+## Ozone Ratis Client Configuration Properties
+
+The following table lists configuration properties available for the Ozone Ratis client. These properties are generated from the RatisClientConfig and RaftConfig classes.
+
+| Property Name | Default Value | Description |
+|--------------|--------------|-------------|
+| hdds.ratis.client.request.watch.type | ALL_COMMITTED | Desired replication level when Ozone client's Raft client calls watch(), ALL_COMMITTED or MAJORITY_COMMITTED. MAJORITY_COMMITTED increases write performance by reducing watch() latency when an Ozone datanode is slow in a pipeline, at the cost of potential read latency increasing due to read retries to different datanodes. |
+| hdds.ratis.client.request.write.timeout | 5m | Timeout for ratis client write request. |
+| hdds.ratis.client.request.watch.timeout | 3m | Timeout for ratis client watch request. |
+| hdds.ratis.client.multilinear.random.retry.policy | 5s, 5, 10s, 5, 15s, 5, 20s, 5, 25s, 5, 60s, 10 | Specifies multilinear random retry policy to be used by ratis client. |
+| hdds.ratis.client.exponential.backoff.base.sleep | 4s | Specifies base sleep for exponential backoff retry policy. With the default base sleep of 4s, the sleep duration for ith retry is min(4 * pow(2, i), max_sleep) * r, where r is random number in the range [0.5, 1.5). |
+| hdds.ratis.client.exponential.backoff.max.sleep | 40s | The sleep duration obtained from exponential backoff policy is limited by the configured max sleep. |
+| hdds.ratis.client.exponential.backoff.max.retries | 2147483647 | Client's max retry value for the exponential backoff policy. |
+| hdds.ratis.client.retrylimited.retry.interval | 1s | Interval between successive retries for a ratis client request. |
+| hdds.ratis.client.retrylimited.max.retries | 180 | Number of retries for ratis client request. |
+| hdds.ratis.client.retry.policy | org.apache.hadoop.hdds.ratis.retrypolicy.RequestTypeDependentRetryPolicyCreator | The class name of the policy for retry. |
+
+### Raft Client Properties
+
+| Property Name | Default Value | Description |
+|--------------|--------------|-------------|
+| hdds.ratis.client.raft.client.async.outstanding-requests.max | 32 | Controls the maximum number of outstanding async requests that can be handled by the Standalone as well as Ratis client. |
+| hdds.ratis.client.raft.client.rpc.request.timeout | 60s | The timeout duration for ratis client request (except for watch request). It should be set greater than leader election timeout in Ratis. |
+| hdds.ratis.client.raft.client.rpc.watch.request.timeout | 180s | The timeout duration for ratis client watch request. Timeout for the watch API in Ratis client to acknowledge a particular request getting replayed to all servers. It is highly recommended for the timeout duration to be strictly longer than Ratis server watch timeout (hdds.ratis.raft.server.watch.timeout) |
