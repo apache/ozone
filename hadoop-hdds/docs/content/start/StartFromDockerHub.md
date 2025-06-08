@@ -76,7 +76,7 @@ connecting to the SCM's UI at [http://localhost:9876](http://localhost:9876).
 
 ![SCM UI Screenshot](ozone-scm.png)
 
-Navigate to the Recon server home page. The Ozone Recon server is at [http://localhost:9888](http://localhost:9888/#), which provides monitoring and management capabilities.
+Navigate to the Recon server home page. The Ozone Recon server is at [http://localhost:9888](http://localhost:9888), which provides monitoring and management capabilities.
 
 ![Recon UI Screenshot](ozone-recon.png)
 
