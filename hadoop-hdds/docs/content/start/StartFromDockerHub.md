@@ -68,9 +68,7 @@ docker-scm-1        apache/ozone:2.0.0   "/usr/local/bin/dumb…"   scm        1
 ## Check the Ozone version
 
 ```bash
-docker compose exec om bash
-# Now, inside the container's shell, run:
-ozone version
+docker compose exec om ozone version
 ```
 
 Once the cluster is booted up and ready, you can verify its status by
