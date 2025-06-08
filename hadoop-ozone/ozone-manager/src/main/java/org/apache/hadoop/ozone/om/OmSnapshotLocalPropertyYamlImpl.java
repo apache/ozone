@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -110,7 +111,7 @@ public class OmSnapshotLocalPropertyYamlImpl implements OmSnapshotLocalProperty,
   @Override
   public Map<String, String> getProperties() throws IOException {
     checkIfClosed();
-    return new HashMap<>(properties);
+    return Collections.unmodifiableMap(properties);
   }
 
   /**
