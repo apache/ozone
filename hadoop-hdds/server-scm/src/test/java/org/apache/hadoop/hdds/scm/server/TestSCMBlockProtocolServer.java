@@ -64,7 +64,7 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTra
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -126,7 +126,7 @@ public class TestSCMBlockProtocolServer {
     }
 
     @Override
-    public void deleteBlocks(List<BlockGroup> blockIDs) throws IOException {
+    public void deleteBlocks(List<DeletedBlockGroup> blockIDs) throws IOException {
 
     }
 

@@ -27,8 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.management.ObjectName;
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -213,7 +213,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * @throws IOException if exception happens, non of the blocks is deleted.
    */
   @Override
-  public void deleteBlocks(List<BlockGroup> keyBlocksInfoList)
+  public void deleteBlocks(List<DeletedBlockGroup> keyBlocksInfoList)
       throws IOException {
     if (scm.getScmContext().isInSafeMode()) {
       throw new SCMException("SafeModePrecheck failed for deleteBlocks",
@@ -222,18 +222,18 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     Map<Long, List<Long>> containerBlocks = new HashMap<>();
     // TODO: track the block size info so that we can reclaim the container
     // TODO: used space when the block is deleted.
-    for (BlockGroup bg : keyBlocksInfoList) {
+    for (DeletedBlockGroup bg : keyBlocksInfoList) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Deleting blocks {}",
-            StringUtils.join(",", bg.getBlockIDList()));
+            StringUtils.join(",", bg.getAllBlocks()));
       }
-      for (BlockID block : bg.getBlockIDList()) {
-        long containerID = block.getContainerID();
+      for (DeletedBlock block : bg.getAllBlocks()) {
+        long containerID = block.getBlockID().getContainerID();
         if (containerBlocks.containsKey(containerID)) {
-          containerBlocks.get(containerID).add(block.getLocalID());
+          containerBlocks.get(containerID).add(block.getBlockID().getLocalID());
         } else {
           List<Long> item = new ArrayList<>();
-          item.add(block.getLocalID());
+          item.add(block.getBlockID().getLocalID());
           containerBlocks.put(containerID, item);
         }
       }

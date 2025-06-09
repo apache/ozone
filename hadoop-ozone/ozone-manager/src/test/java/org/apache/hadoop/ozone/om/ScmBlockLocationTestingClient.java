@@ -28,8 +28,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -45,8 +45,8 @@ import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,12 +146,12 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
 
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
-      List<BlockGroup> keyBlocksInfoList) throws IOException {
+      List<DeletedBlockGroup> keyBlocksInfoList) throws IOException {
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     List<DeleteBlockResult> blockResultList = new ArrayList<>();
     Result result;
-    for (BlockGroup keyBlocks : keyBlocksInfoList) {
-      for (BlockID blockKey : keyBlocks.getBlockIDList()) {
+    for (DeletedBlockGroup keyBlocks : keyBlocksInfoList) {
+      for (DeletedBlock blockKey : keyBlocks.getAllBlocks()) {
         currentCall++;
         switch (this.failCallsFrequency) {
         case 0:
@@ -169,7 +169,7 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
             numBlocksDeleted++;
           }
         }
-        blockResultList.add(new DeleteBlockResult(blockKey, result));
+        blockResultList.add(new DeleteBlockResult(blockKey.getBlockID(), result));
       }
       results.add(new DeleteBlockGroupResult(keyBlocks.getGroupID(),
           blockResultList));
