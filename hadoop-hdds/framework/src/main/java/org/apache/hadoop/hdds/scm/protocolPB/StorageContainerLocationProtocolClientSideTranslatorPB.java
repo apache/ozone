@@ -238,7 +238,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       request = ContainerRequestProto.newBuilder()
           .setTraceID(TracingUtil.exportCurrentSpan())
           .setEcReplicationConfig(ecProto)
-          .setReplicationFactor(ReplicationFactor.valueOf(1))// Set for backward compatibility, ignored for EC.
+          .setReplicationFactor(ReplicationFactor.ONE)// Set for backward compatibility, ignored for EC.
           .setReplicationType(replicationConfig.getReplicationType())
           .setOwner(owner)
           .build();

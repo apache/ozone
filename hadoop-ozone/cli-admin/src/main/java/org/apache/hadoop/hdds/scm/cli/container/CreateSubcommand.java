@@ -35,7 +35,8 @@ import picocli.CommandLine.Option;
  */
 @Command(
     name = "create",
-    description = "Create container",
+    description = "Create container. If no replication config provided, " +
+        "defaults to STAND_ALONE with replication factor ONE.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class CreateSubcommand extends ScmSubcommand {
@@ -56,7 +57,7 @@ public class CreateSubcommand extends ScmSubcommand {
           HddsProtos.ReplicationFactor.ONE);
     }
     ContainerWithPipeline container = scmClient.createContainer(replicationConfig, owner);
-    System.out.printf("Container %s is created.%n",
-        container.getContainerInfo().getContainerID());
+    System.out.printf("Container %s is created with replication config %s.%n",
+        container.getContainerInfo().getContainerID(), replicationConfig);
   }
 }
