@@ -38,7 +38,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   public static final Logger LOG = LoggerFactory.getLogger(
       DefaultContainerChoosingPolicy.class);
 
-  static private final ThreadLocal<Cache<HddsVolume, Iterator<Container<?>>>> containerIteratorCache =
+  private static final ThreadLocal<Cache<HddsVolume, Iterator<Container<?>>>> CACHE =
       ThreadLocal.withInitial(
           () -> CacheBuilder.newBuilder().recordStats().expireAfterAccess(1, HOURS).build());
 
@@ -47,7 +47,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
       HddsVolume hddsVolume, Set<Long> inProgressContainerIDs) {
     Iterator<Container<?>> itr;
     try {
-      itr = containerIteratorCache.get().get(hddsVolume,
+      itr = CACHE.get().get(hddsVolume,
           () -> ozoneContainer.getController().getContainers(hddsVolume));
     } catch (ExecutionException e) {
       LOG.warn("Failed to get container iterator for volume {}", hddsVolume, e);
@@ -63,7 +63,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
     }
 
     if (!itr.hasNext()) {
-      containerIteratorCache.get().invalidate(hddsVolume);
+      CACHE.get().invalidate(hddsVolume);
     }
     return null;
   }
