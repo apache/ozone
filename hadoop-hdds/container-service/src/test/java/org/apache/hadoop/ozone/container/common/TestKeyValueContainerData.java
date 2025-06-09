@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.container.common;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import java.util.UUID;
@@ -124,4 +126,35 @@ public class TestKeyValueContainerData {
     assertEquals(kvData.getSchemaVersion(), newKvData.getSchemaVersion());
   }
 
+  @ContainerTestVersionInfo.ContainerTest
+  public void testNeedsDataChecksum(ContainerTestVersionInfo versionInfo) {
+    initVersionInfo(versionInfo);
+
+    // A non-empty container needs a data checksum if the value is 0, indicating it was never generated.
+    KeyValueContainerData containerData = new KeyValueContainerData(1, layout, MAXSIZE, UUID.randomUUID().toString(),
+        UUID.randomUUID().toString());
+
+    assertFalse(containerData.isEmpty());
+    assertTrue(containerData.needsDataChecksum());
+    assertEquals(0, containerData.getDataChecksum());
+
+    containerData.setDataChecksum(123L);
+    assertFalse(containerData.isEmpty());
+    assertFalse(containerData.needsDataChecksum());
+    assertEquals(123L, containerData.getDataChecksum());
+
+    // An empty container does not need a data checksum generated, even if the value is 0.
+    // 0 is a valid checksum if the container has no data.
+    KeyValueContainerData emptyContainerData = new KeyValueContainerData(1, layout, MAXSIZE,
+        UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    emptyContainerData.markAsEmpty();
+
+    assertTrue(emptyContainerData.isEmpty());
+    assertFalse(emptyContainerData.needsDataChecksum());
+    assertEquals(0, emptyContainerData.getDataChecksum());
+
+    emptyContainerData.setDataChecksum(123L);
+    assertFalse(emptyContainerData.needsDataChecksum());
+    assertEquals(123L, emptyContainerData.getDataChecksum());
+  }
 }

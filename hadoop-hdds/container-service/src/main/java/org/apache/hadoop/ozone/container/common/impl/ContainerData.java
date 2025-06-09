@@ -657,6 +657,10 @@ public abstract class ContainerData {
     return dataChecksum;
   }
 
+  public boolean needsDataChecksum() {
+    return !isEmpty && dataChecksum == 0;
+  }
+
   /**
    * Returns a ProtoBuf Message from ContainerData.
    *
