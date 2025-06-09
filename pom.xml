@@ -36,10 +36,10 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.3</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.31.40</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.31.59</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
-    <bouncycastle.version>1.80</bouncycastle.version>
-    <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
+    <bouncycastle.version>1.81</bouncycastle.version>
+    <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
     <cdi-api.version>2.0</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
@@ -90,7 +90,7 @@
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
     <excluded-test-groups>unhealthy</excluded-test-groups>
-    <exec-maven-plugin.version>3.5.0</exec-maven-plugin.version>
+    <exec-maven-plugin.version>3.5.1</exec-maven-plugin.version>
     <failIfNoTests>false</failIfNoTests>
     <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
     <grpc.protobuf-compile.version>3.19.6</grpc.protobuf-compile.version>
@@ -123,11 +123,11 @@
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
     <jcip-annotations.version>1.0-1</jcip-annotations.version>
     <jersey.version>1.19.4</jersey.version>
-    <jersey2.version>2.46</jersey2.version>
+    <jersey2.version>2.47</jersey2.version>
     <jetty.version>9.4.57.v20241219</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.0</jline.version>
+    <jline.version>3.30.4</jline.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
@@ -136,7 +136,7 @@
     <json-simple.version>1.1.1</json-simple.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
-    <junit5.version>5.12.2</junit5.version>
+    <junit5.version>5.13.0</junit5.version>
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
     <license-maven-plugin.version>2.5.0</license-maven-plugin.version>
@@ -547,10 +547,6 @@
           <exclusion>
             <groupId>org.apache.tomcat.embed</groupId>
             <artifactId>tomcat-embed-core</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.jetbrains.kotlin</groupId>
-            <artifactId>kotlin-stdlib</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1382,11 +1378,6 @@
         <version>${aspectj.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.aspectj</groupId>
-        <artifactId>aspectjweaver</artifactId>
-        <version>${aspectj.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.assertj</groupId>
         <artifactId>assertj-core</artifactId>
         <version>${assertj.version}</version>
@@ -1804,6 +1795,9 @@
           <version>${maven-compiler-plugin.version}</version>
           <configuration>
             <useIncrementalCompilation>false</useIncrementalCompilation>
+            <compilerArgs>
+              <arg>-AartifactId=${project.artifactId}</arg>
+            </compilerArgs>
           </configuration>
         </plugin>
         <plugin>
@@ -2170,11 +2164,6 @@
             <includeTests>true</includeTests>
           </configuration>
         </plugin>
-        <plugin>
-          <groupId>com.coderplus.maven.plugins</groupId>
-          <artifactId>copy-rename-maven-plugin</artifactId>
-          <version>${copy-rename-maven-plugin.version}</version>
-        </plugin>
       </plugins>
     </pluginManagement>
 
@@ -2194,6 +2183,21 @@
                 <!-- disabled test -->
                 <excludedClass>org.apache.hadoop.ozone.om.service.TestRangerBGSyncService</excludedClass>
               </excludedClasses>
+              <ignoredNonTestScopedDependencies>
+                <!--
+                  Ignore false positive "Non-test scoped test only dependencies": these are test-only in some module, compile scope transitively.
+                  See:
+                  - https://issues.apache.org/jira/browse/MDEP-791
+                  - https://issues.apache.org/jira/browse/MNG-6058
+                -->
+                <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-databind:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.commons:commons-compress:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.ozone:hdds-client:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.ozone:ozone-interface-client:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.glassfish.jersey.core:jersey-common:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.rocksdb:rocksdbjni:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.springframework:spring-core:jar</ignoredNonTestScopedDependency>
+              </ignoredNonTestScopedDependencies>
             </configuration>
           </execution>
           <execution>

@@ -55,12 +55,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Snapshot BG Service for deleted directory deep clean and exclusive size
@@ -148,12 +148,12 @@ public class SnapshotDirectoryCleaningService
           // Expand deleted dirs only on active snapshot. Deleted Snapshots
           // will be cleaned up by SnapshotDeletingService.
           if (currSnapInfo == null || currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
-              currSnapInfo.getDeepCleanedDeletedDir()) {
+              currSnapInfo.isDeepCleanedDeletedDir()) {
             continue;
           }
 
-          ReferenceCounted<OmSnapshot> rcPrevOmSnapshot = null;
-          ReferenceCounted<OmSnapshot> rcPrevToPrevOmSnapshot = null;
+          UncheckedAutoCloseableSupplier<OmSnapshot> rcPrevOmSnapshot = null;
+          UncheckedAutoCloseableSupplier<OmSnapshot> rcPrevToPrevOmSnapshot = null;
           try {
             long volumeId = metadataManager
                 .getVolumeId(currSnapInfo.getVolumeName());
@@ -208,7 +208,7 @@ public class SnapshotDirectoryCleaningService
 
             String dbBucketKeyForDir = metadataManager.getBucketKeyPrefixFSO(
                 currSnapInfo.getVolumeName(), currSnapInfo.getBucketName());
-            try (ReferenceCounted<OmSnapshot>
+            try (UncheckedAutoCloseableSupplier<OmSnapshot>
                      rcCurrOmSnapshot = omSnapshotManager.getActiveSnapshot(
                 currSnapInfo.getVolumeName(),
                 currSnapInfo.getBucketName(),

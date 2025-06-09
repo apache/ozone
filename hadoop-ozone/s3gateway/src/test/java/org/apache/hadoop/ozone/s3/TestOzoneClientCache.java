@@ -27,35 +27,28 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.Test;
 
 /**
- * Test class for @{@link OzoneClientProducer}.
+ * Test class for @{@link OzoneClientCache}.
  */
-public class TestOzoneClientProducer {
-
-  private OzoneClientProducer producer;
-
-  public TestOzoneClientProducer()
-      throws Exception {
-    producer = new OzoneClientProducer();
-    OzoneConfiguration config = new OzoneConfiguration();
-    config.setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
-    config.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "");
-    producer.setOzoneConfiguration(config);
-  }
+public class TestOzoneClientCache {
 
   @Test
   public void testGetClientFailure() {
-    assertThrows(IOException.class, () -> producer.createClient(),
-        "testGetClientFailure");
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
+    config.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "");
+    OzoneClientCache subject = new OzoneClientCache(config);
+
+    assertThrows(IOException.class, subject::initialize);
   }
 
   @Test
   public void testGetClientFailureWithMultipleServiceIds() {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "ozone1,ozone2");
-    producer.setOzoneConfiguration(configuration);
-    IOException testGetClientFailure = assertThrows(IOException.class, () ->
-        producer.createClient(), "testGetClientFailureWithMultipleServiceIds");
-    assertThat(testGetClientFailure.getMessage())
+    OzoneClientCache subject = new OzoneClientCache(configuration);
+
+    IOException e = assertThrows(IOException.class, subject::initialize);
+    assertThat(e.getMessage())
         .contains("More than 1 OzoneManager ServiceID");
   }
 
@@ -64,13 +57,12 @@ public class TestOzoneClientProducer {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID, "ozone1");
     configuration.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "ozone1,ozone2");
-    producer.setOzoneConfiguration(configuration);
+    OzoneClientCache subject = new OzoneClientCache(configuration);
+
     // Still test will fail, as config is not complete. But it should pass
     // the service id check.
-    IOException testGetClientFailure = assertThrows(IOException.class, () ->
-        producer.createClient(),
-        "testGetClientFailureWithMultipleServiceIdsAndInternalServiceId");
-    assertThat(testGetClientFailure.getMessage())
+    IOException e = assertThrows(IOException.class, subject::initialize);
+    assertThat(e.getMessage())
         .doesNotContain("More than 1 OzoneManager ServiceID");
   }
 

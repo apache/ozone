@@ -152,6 +152,23 @@ public class TestRDBStore {
   }
 
   @Test
+  public void compactTable() throws Exception {
+    assertNotNull(rdbStore, "DBStore cannot be null");
+
+    for (int j = 0; j <= 20; j++) {
+      insertRandomData(rdbStore, 0);
+      rdbStore.flushDB();
+    }
+
+    int metaSizeBeforeCompact = rdbStore.getDb().getLiveFilesMetaDataSize();
+    rdbStore.compactTable(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY));
+    int metaSizeAfterCompact = rdbStore.getDb().getLiveFilesMetaDataSize();
+
+    assertThat(metaSizeAfterCompact).isLessThan(metaSizeBeforeCompact);
+    assertThat(metaSizeAfterCompact).isEqualTo(1);
+  }
+
+  @Test
   public void close() throws Exception {
     assertNotNull(rdbStore, "DBStore cannot be null");
     // This test does not assert anything if there is any error this test
