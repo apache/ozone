@@ -38,7 +38,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -86,7 +86,6 @@ public class OMBlockPrefetchClient {
   private final ScmBlockLocationProtocol scmBlockLocationProtocol;
   private int maxBlocks;
   private int minBlocks;
-  private boolean useHostname;
   private final boolean isAllocateBlockCacheEnabled;
   private DNSToSwitchMapping dnsToSwitchMapping;
   private final Map<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>> blockQueueMap =
@@ -147,8 +146,6 @@ public class OMBlockPrefetchClient {
     expiryDuration = conf.getTimeDuration(OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL,
         OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
 
-    useHostname = conf.getBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
-        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
         conf.getClass(ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
             TableMapping.class, DNSToSwitchMapping.class);
@@ -303,9 +300,12 @@ public class OMBlockPrefetchClient {
   }
 
   private Node getClientNode(String clientMachine, List<DatanodeDetails> nodes, NetworkTopology clusterMap) {
+    if (StringUtils.isEmpty(clientMachine)) {
+      return null;
+    }
     List<DatanodeDetails> matchingNodes = new ArrayList<>();
     for (DatanodeDetails node : nodes) {
-      if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(clientMachine)) {
+      if (node.getIpAddress().equals(clientMachine)) {
         matchingNodes.add(node);
       }
     }
