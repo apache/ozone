@@ -655,7 +655,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Create snap1
     client.getObjectStore().createSnapshot(volume, bucket, "snap1");
-    OzoneSnapshot snap1 = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap1");
+    client.getObjectStore().getSnapshotInfo(volume, bucket, "snap1");
     // Create snap2
     TestDataUtil.createKey(ozoneBucket, "key", CONTENT.array());
     client.getObjectStore().createSnapshot(volume, bucket, "snap2");
@@ -704,7 +704,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       kds.shutdown();
       KeyDeletingService.KeyDeletingTask task = kds.new KeyDeletingTask(snap3Id);
       SnapshotInfo snapInfo = kdsRunningOnAOS ? null : SnapshotUtils.getSnapshotInfo(om, volume, bucket, "snap3");
-      CompletableFuture<BackgroundTaskResult> future = CompletableFuture.supplyAsync(() -> {
+      CompletableFuture.supplyAsync(() -> {
         try (MockedConstruction<ReclaimableKeyFilter> mockedReclaimableFilter = getMockedReclaimableKeyFilter(
             volume, bucket, snapInfo, kdsWaitStarted, sdsLockWaitStarted, kdsFinished)) {
           return task.call();
@@ -725,76 +725,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     om.getKeyManager().getDirDeletingService().resume();
     om.getKeyManager().getDeletingService().resume();
     om.getKeyManager().getSnapshotDeletingService().resume();
-  }
-
-  /*
-      Flow
-      ----
-      create dir0/key0
-      create dir1/key1
-      overwrite dir0/key0
-      create dir2/key2
-      create snap1
-      rename dir1/key1 -> dir1/key10
-      delete dir1/key10
-      delete dir2
-      create snap2
-      delete snap2
-   */
-  private synchronized void createSnapshotFSODataForBucket(OzoneBucket bucket) throws Exception {
-    Table<String, SnapshotInfo> snapshotInfoTable =
-        om.getMetadataManager().getSnapshotInfoTable();
-    Table<String, RepeatedOmKeyInfo> deletedTable =
-        om.getMetadataManager().getDeletedTable();
-    Table<String, OmKeyInfo> deletedDirTable =
-        om.getMetadataManager().getDeletedDirTable();
-    Table<String, OmKeyInfo> keyTable =
-        om.getMetadataManager().getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    Table<String, OmDirectoryInfo> dirTable =
-        om.getMetadataManager().getDirectoryTable();
-    Table<String, String> renameTable = om.getMetadataManager().getSnapshotRenamedTable();
-    OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
-        om.getMetadataManager();
-    Map<String, Integer> countMap =
-        metadataManager.listTables().entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, e -> {
-              try {
-                return (int)metadataManager.countRowsInTable(e.getValue());
-              } catch (IOException ex) {
-                throw new RuntimeException(ex);
-              }
-            }));
-    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", CONTENT.array());
-    TestDataUtil.createKey(bucket, "dir1/" + bucket.getName() + "key1", CONTENT.array());
-    assertTableRowCount(keyTable, countMap.get(keyTable.getName()) + 2);
-    assertTableRowCount(dirTable, countMap.get(dirTable.getName()) + 2);
-
-    // Overwrite bucket1key0, This is a newer version of the key which should
-    // reclaimed as this is a different version of the key.
-    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", CONTENT.array());
-    TestDataUtil.createKey(bucket, "dir2/" + bucket.getName() + "key2", CONTENT.array());
-    assertTableRowCount(keyTable, countMap.get(keyTable.getName()) + 3);
-    assertTableRowCount(dirTable, countMap.get(dirTable.getName()) + 3);
-    assertTableRowCount(deletedTable, countMap.get(deletedTable.getName()) + 1);
-    // create snap1
-    client.getProxy().createSnapshot(bucket.getVolumeName(), bucket.getName(),
-        bucket.getName() + "snap1");
-    bucket.renameKey("dir1/" + bucket.getName() + "key1", "dir1/" + bucket.getName() + "key10");
-    bucket.renameKey("dir1/", "dir10/");
-    assertTableRowCount(renameTable, countMap.get(renameTable.getName()) + 2);
-    client.getProxy().deleteKey(bucket.getVolumeName(), bucket.getName(),
-        "dir10/" + bucket.getName() + "key10", false);
-    assertTableRowCount(deletedTable, countMap.get(deletedTable.getName()) + 1);
-    // Key 2 is deleted here, which will be reclaimed here as
-    // it is not being referenced by previous snapshot.
-    client.getProxy().deleteKey(bucket.getVolumeName(), bucket.getName(), "dir2", true);
-    assertTableRowCount(deletedDirTable, countMap.get(deletedDirTable.getName()) + 1);
-    client.getProxy().createSnapshot(bucket.getVolumeName(), bucket.getName(),
-        bucket.getName() + "snap2");
-    // Delete Snapshot 2.
-    client.getProxy().deleteSnapshot(bucket.getVolumeName(), bucket.getName(),
-        bucket.getName() + "snap2");
-    assertTableRowCount(snapshotInfoTable, countMap.get(snapshotInfoTable.getName()) +  2);
   }
 
   private void verifySnapshotChain(SnapshotInfo deletedSnapshot,
