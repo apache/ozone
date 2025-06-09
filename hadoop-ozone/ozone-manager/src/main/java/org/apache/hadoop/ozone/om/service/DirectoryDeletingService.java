@@ -200,10 +200,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     start();
   }
 
-  public void setRatisByteLimit(int ratisByteLimit) {
-    this.ratisByteLimit = ratisByteLimit;
-  }
-
   public boolean isRunningOnAOS() {
     return isRunningOnAOS.get();
   }
