@@ -119,6 +119,11 @@ public final class Archiver {
     return bytes;
   }
 
+  /**
+   * Creates a hardlink for the given file in a temporary directory, adds it
+   * as an entry in the archive, and includes its contents in the archive output.
+   * The temporary hardlink is deleted after processing.
+   */
   public static void linkAndIncludeFile(File file, String entryName,
       ArchiveOutputStream<TarArchiveEntry> archiveOutput, Path tmpDir) throws IOException {
     File link = null;

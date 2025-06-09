@@ -49,21 +49,6 @@ public final class OMDBCheckpointUtils {
   private OMDBCheckpointUtils() {
   }
 
-  public static Path getMetaDirPath(Path checkpointLocation) {
-    // This check is done to take care of findbugs else below getParent()
-    // should not be null.
-    Path locationParent = checkpointLocation.getParent();
-    if (null == locationParent) {
-      throw new RuntimeException(
-          "checkpoint location's immediate parent is null.");
-    }
-    Path parent = locationParent.getParent();
-    if (null == parent) {
-      throw new RuntimeException(
-          "checkpoint location's path is invalid and could not be verified.");
-    }
-    return parent;
-  }
 
   public static boolean includeSnapshotData(HttpServletRequest request) {
     String includeParam =

@@ -27,7 +27,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
-import static org.apache.hadoop.ozone.om.codec.OMDBCheckpointUtils.getMetaDirPath;
 import static org.apache.hadoop.ozone.om.codec.OMDBCheckpointUtils.includeSnapshotData;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.createHardLinkList;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
@@ -54,6 +53,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import jakarta.annotation.Nonnull;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
@@ -627,6 +627,23 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             "to checkpoint tarball stream.{}",
         bytesWritten / (1024), filesWritten, (completed) ?
             " Checkpoint tarball is complete." : "");
+  }
+
+  @Nonnull
+  private static Path getMetaDirPath(Path checkpointLocation) {
+    // This check is done to take care of findbugs else below getParent()
+    // should not be null.
+    Path locationParent = checkpointLocation.getParent();
+    if (null == locationParent) {
+      throw new RuntimeException(
+          "checkpoint location's immediate parent is null.");
+    }
+    Path parent = locationParent.getParent();
+    if (null == parent) {
+      throw new RuntimeException(
+          "checkpoint location's path is invalid and could not be verified.");
+    }
+    return parent;
   }
 
   private OzoneConfiguration getConf() {

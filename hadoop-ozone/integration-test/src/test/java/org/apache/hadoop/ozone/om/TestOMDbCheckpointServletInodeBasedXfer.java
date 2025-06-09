@@ -88,7 +88,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   private OzoneClient client;
   private OzoneManager om;
   private OzoneConfiguration conf;
-  private DBCheckpoint dbCheckpoint;
   @TempDir
   private Path folder;
   private HttpServletRequest requestMock = null;
@@ -213,7 +212,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Get the tarball.
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
-    dbCheckpoint = realCheckpoint.get();
+    DBCheckpoint dbCheckpoint = realCheckpoint.get();
     String testDirName = folder.resolve("testDir").toString();
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
     File newDbDir = new File(newDbDirName);

@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
-import static org.apache.hadoop.ozone.om.codec.OMDBCheckpointUtils.getMetaDirPath;
 import static org.apache.hadoop.ozone.om.codec.OMDBCheckpointUtils.includeSnapshotData;
 import static org.apache.hadoop.ozone.om.codec.OMDBCheckpointUtils.logEstimatedTarballSize;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_PREFIX;
@@ -231,7 +230,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             hardLinkFileMap, getCompactionLogDir());
         writeDBToArchive(sstFilesToExclude, tmpSstBackupDir, maxTotalSstSize, archiveOutputStream, tmpdir,
             hardLinkFileMap, getSstBackupDir());
-        writeHardlinkFile(checkpointDir, hardLinkFileMap, archiveOutputStream);
+        writeHardlinkFile(getConf(), hardLinkFileMap, archiveOutputStream);
       }
 
     } catch (Exception e) {
@@ -265,7 +264,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * relative paths. This method generates the mapping file based on the provided
    * hardlink metadata and adds it to the archive output stream.
    *
-   * @param checkpointDir       The base directory of the checkpoint metadata.
+   * @param conf                Ozone configuration for the OM instance.
    * @param hardlinkFileMap     A map where the key is the absolute file path
    *                            and the value is its corresponding file ID.
    * @param archiveOutputStream The archive output stream to which the hardlink
@@ -273,10 +272,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @throws IOException If an I/O error occurs while creating or writing the
    *                     hardlink file.
    */
-  private static void writeHardlinkFile(Path checkpointDir, Map<String, String> hardlinkFileMap,
+  private static void writeHardlinkFile(OzoneConfiguration conf, Map<String, String> hardlinkFileMap,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream) throws IOException {
     Path data = Files.createTempFile(DATA_PREFIX, DATA_SUFFIX);
-    Path metaDirPath = getMetaDirPath(checkpointDir);
+    Path metaDirPath = OMStorage.getOmDbDir(conf).toPath();
     StringBuilder sb = new StringBuilder();
 
     for (Map.Entry<String, String> entry : hardlinkFileMap.entrySet()) {
