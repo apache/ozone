@@ -79,13 +79,13 @@ public class ContainerSet implements Iterable<Container<?>> {
     return new ContainerSet(containerIdsTable, recoveringTimeout);
   }
 
-  private ContainerSet(Table<ContainerID, ContainerCreateInfo> continerIdsTable, long recoveringTimeout) {
-    this(continerIdsTable, recoveringTimeout, null);
+  private ContainerSet(Table<ContainerID, ContainerCreateInfo> containerIdsTable, long recoveringTimeout) {
+    this(containerIdsTable, recoveringTimeout, null);
   }
 
-  ContainerSet(Table<ContainerID, ContainerCreateInfo> continerIdsTable, long recoveringTimeout, Clock clock) {
+  ContainerSet(Table<ContainerID, ContainerCreateInfo> containerIdsTable, long recoveringTimeout, Clock clock) {
     this.clock = clock != null ? clock : Clock.systemUTC();
-    this.containerIdsTable = continerIdsTable;
+    this.containerIdsTable = containerIdsTable;
     this.recoveringTimeout = recoveringTimeout;
   }
 
