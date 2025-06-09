@@ -371,6 +371,8 @@ public class HddsVolume extends StorageVolume {
       LOG.warn("Volume {} reserved usages is higher than actual allocated reserved space.",
           getStorageDir());
       volumeInfoMetrics.setReservedCrossesLimit(true);
+    } else {
+      volumeInfoMetrics.setReservedCrossesLimit(false);
     }
   }
 
