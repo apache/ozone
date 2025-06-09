@@ -266,27 +266,28 @@ public class SCMBlockProtocolServer implements
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("SCM is informed by OM to delete {} keys.",
-          keyBlocksInfoList.size());
+    long totalBlocks = 0;
+    for (BlockGroup bg : keyBlocksInfoList) {
+      totalBlocks += bg.getBlockIDList().size();
     }
-
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("SCM is informed by OM to delete {} keys. Total blocks to deleted {}.",
+          keyBlocksInfoList.size(), totalBlocks);
+    }
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
     Exception e = null;
     long startNanos = Time.monotonicNowNanos();
-    long totalBlocks = 0;
-    for (BlockGroup bg : keyBlocksInfoList) {
-      totalBlocks += bg.getBlockIDList().size();
-    }
     try {
       scm.getScmBlockManager().deleteBlocks(keyBlocksInfoList);
-      perfMetrics.updateDeleteKeyBlocksInKeyDeleteCycle(totalBlocks);
+      perfMetrics.updateDeleteKeySuccessBlocksInKeyDeleteCycle(totalBlocks);
       perfMetrics.updateDeleteKeySuccessStats(keyBlocksInfoList.size(), startNanos);
       resultCode = ScmBlockLocationProtocolProtos.
           DeleteScmBlockResult.Result.success;
-      LOG.info("Total number of blocks ACK by SCM in this cycle: " + totalBlocks);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Total number of blocks ACK by SCM in this cycle: " + totalBlocks);
+      }
     } catch (IOException ioe) {
       e = ioe;
       perfMetrics.updateDeleteKeyFailedBlocksInKeyDeleteCycle(totalBlocks);

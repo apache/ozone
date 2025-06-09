@@ -110,7 +110,7 @@ public final class SCMPerformanceMetrics implements MetricsSource {
     deleteKeyFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateDeleteKeyBlocksInKeyDeleteCycle(long keys) {
+  public void updateDeleteKeySuccessBlocksInKeyDeleteCycle(long keys) {
     deleteKeyBlocksInKeyDeleteCycle.incr(keys);
   }
 
