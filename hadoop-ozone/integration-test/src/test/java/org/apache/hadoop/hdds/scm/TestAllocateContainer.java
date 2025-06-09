@@ -20,7 +20,9 @@ package org.apache.hadoop.hdds.scm;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -72,5 +74,26 @@ public abstract class TestAllocateContainer implements NonHATests.TestCase {
         storageContainerLocationClient.allocateContainer(
             SCMTestUtils.getReplicationType(conf),
             SCMTestUtils.getReplicationFactor(conf), null));
+  }
+
+  @Test
+  public void testAllocateRatis() throws Exception {
+    ContainerWithPipeline container =
+        storageContainerLocationClient.allocateContainer(HddsProtos.ReplicationType.RATIS, 
+            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+
+    assertNotNull(container);
+    assertNotNull(container.getPipeline().getFirstNode());
+  }
+  
+  @Test
+  public void testAllocateEC() throws Exception {
+    ECReplicationConfig ecReplicationConfig = new ECReplicationConfig("RS-3-2-1024k");
+
+    ContainerWithPipeline container =
+        storageContainerLocationClient.allocateContainer(ecReplicationConfig, OzoneConsts.OZONE);
+
+    assertNotNull(container);
+    assertNotNull(container.getPipeline().getFirstNode());
   }
 }
