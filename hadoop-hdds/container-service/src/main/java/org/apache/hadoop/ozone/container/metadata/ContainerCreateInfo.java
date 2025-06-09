@@ -22,6 +22,7 @@ import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto3Codec;
@@ -105,6 +106,27 @@ public final class ContainerCreateInfo {
     @Override
     public byte[] toPersistedFormat(ContainerCreateInfo object) throws CodecException {
       return CODEC.toPersistedFormat(object);
+    }
+
+    @Override
+    public CodecBuffer toCodecBuffer(ContainerCreateInfo object, CodecBuffer.Allocator allocator)
+            throws CodecException {
+      return CODEC.toCodecBuffer(object, allocator);
+    }
+
+    @Override
+    public CodecBuffer toDirectCodecBuffer(ContainerCreateInfo object) throws CodecException {
+      return CODEC.toDirectCodecBuffer(object);
+    }
+
+    @Override
+    public CodecBuffer toHeapCodecBuffer(ContainerCreateInfo object) throws CodecException {
+      return CODEC.toHeapCodecBuffer(object);
+    }
+
+    @Override
+    public ContainerCreateInfo fromCodecBuffer(CodecBuffer buffer) throws CodecException {
+      return CODEC.fromCodecBuffer(buffer);
     }
 
     @Override
