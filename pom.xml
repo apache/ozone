@@ -548,10 +548,6 @@
             <groupId>org.apache.tomcat.embed</groupId>
             <artifactId>tomcat-embed-core</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>org.jetbrains.kotlin</groupId>
-            <artifactId>kotlin-stdlib</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1382,11 +1378,6 @@
         <version>${aspectj.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.aspectj</groupId>
-        <artifactId>aspectjweaver</artifactId>
-        <version>${aspectj.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.assertj</groupId>
         <artifactId>assertj-core</artifactId>
         <version>${assertj.version}</version>
@@ -1804,6 +1795,9 @@
           <version>${maven-compiler-plugin.version}</version>
           <configuration>
             <useIncrementalCompilation>false</useIncrementalCompilation>
+            <compilerArgs>
+              <arg>-AartifactId=${project.artifactId}</arg>
+            </compilerArgs>
           </configuration>
         </plugin>
         <plugin>
@@ -2169,53 +2163,6 @@
             <printFailingErrors>true</printFailingErrors>
             <includeTests>true</includeTests>
           </configuration>
-        </plugin>
-        <plugin>
-          <groupId>com.coderplus.maven.plugins</groupId>
-          <artifactId>copy-rename-maven-plugin</artifactId>
-          <version>${copy-rename-maven-plugin.version}</version>
-          <executions>
-            <!--
-              If a new module is introduced with generated config:
-              - override ban-annotations execution of maven-enforcer-plugin
-              - configure maven-compiler-plugin with the ConfigFileGenerator annotationProcessor
-              - bind one or both of these rename executions
-              - add the module's name in OzoneConfiguration#activate
-              See hadoop-hdds/common/pom.xml for example.
-            -->
-            <execution>
-              <id>rename-generated-config</id>
-              <goals>
-                <goal>rename</goal>
-              </goals>
-              <!-- bind to process-classes in modules where needed -->
-              <phase>none</phase>
-              <configuration>
-                <fileSets>
-                  <fileSet>
-                    <sourceFile>${project.build.outputDirectory}/ozone-default-generated.xml</sourceFile>
-                    <destinationFile>${project.build.outputDirectory}/${project.artifactId}-default.xml</destinationFile>
-                  </fileSet>
-                </fileSets>
-              </configuration>
-            </execution>
-            <execution>
-              <id>rename-generated-test-config</id>
-              <goals>
-                <goal>rename</goal>
-              </goals>
-              <!-- bind to process-test-classes in modules where needed -->
-              <phase>none</phase>
-              <configuration>
-                <fileSets>
-                  <fileSet>
-                    <sourceFile>${project.build.testOutputDirectory}/ozone-default-generated.xml</sourceFile>
-                    <destinationFile>${project.build.testOutputDirectory}/${project.artifactId}-default.xml</destinationFile>
-                  </fileSet>
-                </fileSets>
-              </configuration>
-            </execution>
-          </executions>
         </plugin>
       </plugins>
     </pluginManagement>

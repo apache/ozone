@@ -750,13 +750,13 @@ public class TestDirectoryDeletingServiceWithFSO {
     fs.delete(root, true);
 
     // After delete. 5 sub files are still in keyTable.
-    // 4 dirs in dirTable.
+    // 0 dirs in dirTable.
     assertTableRowCount(keyTable, 5);
     assertTableRowCount(dirTable, 0);
 
     // KeyDeletingService and DirectoryDeletingService will not
     // clean up because the paths are part of a snapshot.
-    // As a result on 1 deleted dir and 3 deleted files will
+    // As a result on 5 deleted dir and 3 deleted files will
     // remain in dirTable and keyTable respectively.
     long prevDDSRunCount = dirDeletingService.getRunCount().get();
     long prevKDSRunCount = keyDeletingService.getRunCount().get();

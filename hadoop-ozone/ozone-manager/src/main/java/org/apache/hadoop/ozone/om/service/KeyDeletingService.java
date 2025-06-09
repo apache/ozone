@@ -266,7 +266,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       try {
         iterator = snapshotChainManager.iterator(true);
       } catch (IOException e) {
-        LOG.error("Error while initializing snapshot chain iterator.");
+        LOG.error("Error while initializing snapshot chain iterator. DirDeletingTask will only process AOS this run.");
         return queue;
       }
       while (iterator.hasNext()) {
@@ -443,8 +443,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               SnapshotUtils.getSnapshotInfo(getOzoneManager(), snapshotChainManager, snapshotId);
           if (snapInfo != null) {
             if (snapInfo.isDeepCleaned()) {
-              LOG.info("Snapshot {} has already been deep cleaned. Skipping the snapshot in this iteration. " +
-                      "Snapshot name : {}", snapInfo.getSnapshotId(), snapInfo.getName());
+              LOG.info("Snapshot '{}' ({}) has already been deep cleaned. Skipping the snapshot in this iteration.",
+                  snapInfo.getTableKey(), snapInfo.getSnapshotId());
               return EmptyTaskResult.newResult();
             }
             if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo)) {
