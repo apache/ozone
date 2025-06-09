@@ -55,6 +55,10 @@ public final class SCMPerformanceMetrics implements MetricsSource {
   private MutableRate allocateBlockSuccessLatencyNs;
   @Metric(about = "Latency for a failed allocateBlock call in nanoseconds")
   private MutableRate allocateBlockFailureLatencyNs;
+  @Metric(about = "Total blocks taken in each key delete cycle.")
+  private MutableCounterLong deleteKeyBlocksInKeyDeleteCycle;
+  @Metric(about = "Total blocks taken in each key delete cycle failure.")
+  private MutableCounterLong deleteKeyBlocksInKeyDeleteCycleFailure;
 
   public SCMPerformanceMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
@@ -84,6 +88,8 @@ public final class SCMPerformanceMetrics implements MetricsSource {
     deleteKeyFailureLatencyNs.snapshot(recordBuilder, true);
     allocateBlockSuccessLatencyNs.snapshot(recordBuilder, true);
     allocateBlockFailureLatencyNs.snapshot(recordBuilder, true);
+    deleteKeyBlocksInKeyDeleteCycle.snapshot(recordBuilder, true);
+    deleteKeyBlocksInKeyDeleteCycleFailure.snapshot(recordBuilder, true);
   }
 
   public void updateAllocateBlockSuccessLatencyNs(long startNanos) {
@@ -94,14 +100,22 @@ public final class SCMPerformanceMetrics implements MetricsSource {
     allocateBlockFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateDeleteKeySuccessStats(long startNanos) {
-    deleteKeySuccess.incr();
+  public void updateDeleteKeySuccessStats(long keys, long startNanos) {
+    deleteKeySuccess.incr(keys);
     deleteKeySuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateDeleteKeyFailureStats(long startNanos) {
-    deleteKeyFailure.incr();
+  public void updateDeleteKeyFailureStats(long keys, long startNanos) {
+    deleteKeyFailure.incr(keys);
     deleteKeyFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updateDeleteKeyBlocksInKeyDeleteCycle(long keys) {
+    deleteKeyBlocksInKeyDeleteCycle.incr(keys);
+  }
+
+  public void updateDeleteKeyFailedBlocksInKeyDeleteCycle(long keys) {
+    deleteKeyBlocksInKeyDeleteCycleFailure.incr(keys);
   }
 }
 

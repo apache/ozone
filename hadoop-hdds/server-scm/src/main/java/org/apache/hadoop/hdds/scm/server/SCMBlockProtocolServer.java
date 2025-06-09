@@ -267,7 +267,7 @@ public class SCMBlockProtocolServer implements
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("SCM is informed by OM to delete {} blocks",
+      LOG.debug("SCM is informed by OM to delete {} keys.",
           keyBlocksInfoList.size());
     }
 
@@ -276,14 +276,21 @@ public class SCMBlockProtocolServer implements
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
     Exception e = null;
     long startNanos = Time.monotonicNowNanos();
+    long totalBlocks = 0;
+    for (BlockGroup bg : keyBlocksInfoList) {
+      totalBlocks += bg.getBlockIDList().size();
+    }
     try {
       scm.getScmBlockManager().deleteBlocks(keyBlocksInfoList);
-      perfMetrics.updateDeleteKeySuccessStats(startNanos);
+      perfMetrics.updateDeleteKeyBlocksInKeyDeleteCycle(totalBlocks);
+      perfMetrics.updateDeleteKeySuccessStats(keyBlocksInfoList.size(), startNanos);
       resultCode = ScmBlockLocationProtocolProtos.
           DeleteScmBlockResult.Result.success;
+      LOG.info("Total number of blocks ACK by SCM in this cycle: " + totalBlocks);
     } catch (IOException ioe) {
       e = ioe;
-      perfMetrics.updateDeleteKeyFailureStats(startNanos);
+      perfMetrics.updateDeleteKeyFailedBlocksInKeyDeleteCycle(totalBlocks);
+      perfMetrics.updateDeleteKeyFailureStats(keyBlocksInfoList.size(), startNanos);
       LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ioe);
       switch (ioe instanceof SCMException ? ((SCMException) ioe).getResult() :
           IO_EXCEPTION) {
