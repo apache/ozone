@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
@@ -44,6 +46,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -78,21 +81,64 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This is a background service to delete orphan directories and its
- * sub paths(sub-dirs and sub-files).
+ Background service responsible for purging deleted directories and files
+ * in the Ozone Manager (OM) and associated snapshots.
  *
  * <p>
- * This will scan the metadata of om periodically to get the orphan dirs from
- * DeletedDirectoryTable and find its sub paths. It will fetch all sub-files
- * from FileTable and move those to DeletedTable so that OM's
- * KeyDeletingService will cleanup those files later. It will fetch all
- * sub-directories from the DirectoryTable and move those to
- * DeletedDirectoryTable so that these will be visited in next iterations.
+ * This service periodically scans the deleted directory table and submits
+ * purge requests for directories and their sub-entries (subdirectories and files).
+ * It operates in both the active object store (AOS) and across all deep-clean enabled
+ * snapshots. The service supports parallel processing using a thread pool and
+ * coordinates exclusive size calculations and cleanup status updates for
+ * snapshots.
+ * </p>
  *
- * <p>
- * After moving all sub-files and sub-dirs the parent orphan directory will be
- * deleted by this service. It will continue traversing until all the leaf path
- * components of an orphan directory is visited.
+ * <h2>Key Features</h2>
+ * <ul>
+ *   <li>Processes deleted directories in both the active OM and all snapshots
+ *       with deep cleaning enabled.</li>
+ *   <li>Uses a thread pool to parallelize deletion tasks within each store or snapshot.</li>
+ *   <li>Employs filters to determine reclaimability of directories and files,
+ *       ensuring safety with respect to snapshot chains.</li>
+ *   <li>Tracks and updates exclusive size and replicated exclusive size for each
+ *       snapshot as directories and files are reclaimed.</li>
+ *   <li>Updates the "deep cleaned" flag for snapshots after a successful run.</li>
+ *   <li>Handles error and race conditions gracefully, deferring work if necessary.</li>
+ * </ul>
+ *
+ * <h2>Constructor Parameters</h2>
+ * <ul>
+ *   <li><b>interval</b> - How often the service runs.</li>
+ *   <li><b>unit</b> - Time unit for the interval.</li>
+ *   <li><b>serviceTimeout</b> - Service timeout in the given time unit.</li>
+ *   <li><b>ozoneManager</b> - The OzoneManager instance.</li>
+ *   <li><b>configuration</b> - Ozone configuration object.</li>
+ *   <li><b>dirDeletingServiceCorePoolSize</b> - Number of parallel threads for deletion per store or snapshot.</li>
+ *   <li><b>deepCleanSnapshots</b> - Whether to enable deep cleaning for snapshots.</li>
+ * </ul>
+ *
+ * <h2>Threading and Parallelism</h2>
+ * <ul>
+ *   <li>Uses a configurable thread pool for parallel deletion tasks within each store/snapshot.</li>
+ *   <li>Each snapshot and AOS get a separate background task for deletion.</li>
+ * </ul>
+ *
+ * <h2>Snapshot Integration</h2>
+ * <ul>
+ *   <li>Iterates all snapshots in the chain if deep cleaning is enabled.</li>
+ *   <li>Skips snapshots that are already deep-cleaned or not yet flushed to disk.</li>
+ *   <li>Updates snapshot metadata to reflect size changes and cleaning status.</li>
+ * </ul>
+ *
+ * <h2>Usage</h2>
+ * <ul>
+ *   <li>Should be scheduled as a background service in OM.</li>
+ *   <li>Intended to be run only on the OM leader node.</li>
+ * </ul>
+ *
+ * @see org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableDirFilter
+ * @see org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter
+ * @see org.apache.hadoop.ozone.om.SnapshotChainManager
  */
 public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private static final Logger LOG =
@@ -125,6 +171,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
+    registerReconfigCallbacks(ozoneManager.getReconfigurationHandler(), configuration);
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.deletedDirsCount = new AtomicLong(0);
@@ -132,8 +179,22 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.movedFilesCount = new AtomicLong(0);
   }
 
-  public void setRatisByteLimit(int ratisByteLimit) {
-    this.ratisByteLimit = ratisByteLimit;
+  public void registerReconfigCallbacks(ReconfigurationHandler handler, OzoneConfiguration conf) {
+    handler.registerCompleteCallback((changedKeys, newConf) -> {
+      if (changedKeys.containsKey(OZONE_DIR_DELETING_SERVICE_INTERVAL)) {
+        updateAndRestart(conf);
+      }
+    });
+  }
+
+  private synchronized void updateAndRestart(OzoneConfiguration conf) {
+    long newInterval = conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
+        OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
+    LOG.info("Updating and restarting DirectoryDeletingService with interval: {} {}",
+        newInterval, TimeUnit.SECONDS.name().toLowerCase());
+    shutdown();
+    setInterval(newInterval, TimeUnit.SECONDS);
+    start();
   }
 
   @Override
