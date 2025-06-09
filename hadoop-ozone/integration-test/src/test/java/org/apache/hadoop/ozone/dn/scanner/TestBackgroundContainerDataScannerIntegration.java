@@ -83,9 +83,12 @@ class TestBackgroundContainerDataScannerIntegration
     Container<?> container = getDnContainer(containerID);
     assertEquals(State.CLOSED, container.getContainerState());
     assertTrue(containerChecksumFileExists(containerID));
+    assertFalse(container.getContainerData().needsDataChecksum());
+    assertNotEquals(0, container.getContainerData().getDataChecksum());
 
     waitForScmToSeeReplicaState(containerID, CLOSED);
     long initialReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
+    assertNotEquals(0, initialReportedDataChecksum);
 
     corruption.applyTo(container);
 
@@ -100,15 +103,18 @@ class TestBackgroundContainerDataScannerIntegration
     waitForScmToSeeReplicaState(containerID, UNHEALTHY);
     long newReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
     if (corruption == TestContainerCorruptions.MISSING_METADATA_DIR ||
-        corruption == TestContainerCorruptions.MISSING_CONTAINER_DIR) {
+        corruption == TestContainerCorruptions.MISSING_CONTAINER_DIR ||
+        corruption == TestContainerCorruptions.MISSING_CONTAINER_FILE ||
+        corruption == TestContainerCorruptions.CORRUPT_CONTAINER_FILE ||
+        corruption == TestContainerCorruptions.TRUNCATED_CONTAINER_FILE) {
       // In these cases, the new tree will not be able to be written since it exists in the metadata directory.
       // When the tree write fails, the in-memory checksum should remain at its original value.
       assertEquals(initialReportedDataChecksum, newReportedDataChecksum);
-      assertFalse(containerChecksumFileExists(containerID));
     } else {
       assertNotEquals(initialReportedDataChecksum, newReportedDataChecksum);
       // Test that the scanner wrote updated checksum info to the disk.
       assertTrue(containerChecksumFileExists(containerID));
+      assertFalse(container.getContainerData().needsDataChecksum());
       ContainerProtos.ContainerChecksumInfo updatedChecksumInfo = readChecksumFile(container.getContainerData());
       assertEquals(newReportedDataChecksum, updatedChecksumInfo.getContainerMerkleTree().getDataChecksum());
     }
