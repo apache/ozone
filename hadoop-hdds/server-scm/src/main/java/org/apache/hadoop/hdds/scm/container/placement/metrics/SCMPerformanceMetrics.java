@@ -45,7 +45,7 @@ public final class SCMPerformanceMetrics implements MetricsSource {
 
   @Metric(about = "Number of failed deleteKeys")
   private MutableCounterLong deleteKeyFailure;
-  @Metric(about = "Number of successful deleteKey operations")
+  @Metric(about = "Number of success deleteKeys")
   private MutableCounterLong deleteKeySuccess;
   @Metric(about = "Latency for deleteKey failure in nanoseconds")
   private MutableRate deleteKeyFailureLatencyNs;
