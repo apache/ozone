@@ -223,6 +223,22 @@ public class RDBStore implements DBStore {
   }
 
   @Override
+  public void compactTable(String tableName) throws IOException {
+    try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
+      compactTable(tableName, options);
+    }
+  }
+
+  @Override
+  public void compactTable(String tableName, ManagedCompactRangeOptions options) throws IOException {
+    RocksDatabase.ColumnFamily columnFamily = db.getColumnFamily(tableName);
+    if (columnFamily == null) {
+      throw new IOException("Table not found: " + tableName);
+    }
+    db.compactRange(columnFamily, null, null, options);
+  }
+
+  @Override
   public void close() throws IOException {
     if (metrics != null) {
       metrics.unregister();

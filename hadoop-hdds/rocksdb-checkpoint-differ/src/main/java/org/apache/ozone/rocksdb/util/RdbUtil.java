@@ -19,8 +19,15 @@ package org.apache.ozone.rocksdb.util;
 
 import com.google.common.collect.Sets;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.StringUtils;
@@ -48,5 +55,17 @@ public final class RdbUtil {
     return getLiveSSTFilesForCFs(rocksDB, cfs).stream()
         .map(lfm -> new File(lfm.path(), lfm.fileName()).getPath())
         .collect(Collectors.toCollection(HashSet::new));
+  }
+
+  public static Map<Object, String> getSSTFilesWithInodesForComparison(final ManagedRocksDB rocksDB, List<String> cfs)
+      throws IOException {
+    List<LiveFileMetaData> liveSSTFilesForCFs = getLiveSSTFilesForCFs(rocksDB, cfs);
+    Map<Object, String> inodeToSstMap = new HashMap<>();
+    for (LiveFileMetaData lfm : liveSSTFilesForCFs) {
+      Path sstFilePath = Paths.get(lfm.path(), lfm.fileName());
+      Object inode = Files.readAttributes(sstFilePath, BasicFileAttributes.class).fileKey();
+      inodeToSstMap.put(inode, sstFilePath.toString());
+    }
+    return inodeToSstMap;
   }
 }

@@ -53,7 +53,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
@@ -62,6 +61,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -186,14 +186,14 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             LOG.info("Snapshot: {} entries will be moved to next active snapshot: {}",
                 snapInfo.getTableKey(), nextSnapshot.getTableKey());
           }
-          try (ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(
+          try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(
               snapInfo.getVolumeName(), snapInfo.getBucketName(), snapInfo.getName())) {
             KeyManager snapshotKeyManager = snapshot.get().getKeyManager();
             int moveCount = 0;
             // Get all entries from deletedKeyTable.
             List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries =
                 snapshotKeyManager.getDeletedKeyEntries(snapInfo.getVolumeName(), snapInfo.getBucketName(),
-                    null, remaining);
+                    null, (kv) -> true, remaining);
             moveCount += deletedKeyEntries.size();
             // Get all entries from deletedDirTable.
             List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = snapshotKeyManager.getDeletedDirEntries(
@@ -201,7 +201,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             moveCount += deletedDirEntries.size();
             // Get all entries from snapshotRenamedTable.
             List<Table.KeyValue<String, String>> renameEntries = snapshotKeyManager.getRenamesKeyEntries(
-                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, remaining - moveCount);
+                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, (kv) -> true, remaining - moveCount);
             moveCount += renameEntries.size();
             if (moveCount > 0) {
               List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(deletedKeyEntries.size());

@@ -55,7 +55,7 @@ public class RootEndpoint extends EndpointBase {
       Iterator<? extends OzoneBucket> bucketIterator;
       try {
         bucketIterator =
-            listS3Buckets(null, volume -> response.setOwner(new S3Owner(volume.getOwner(), volume.getOwner())));
+            listS3Buckets(null, volume -> response.setOwner(S3Owner.of(volume.getOwner())));
       } catch (Exception e) {
         getMetrics().updateListS3BucketsFailureStats(startNanos);
         throw e;

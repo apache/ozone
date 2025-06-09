@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_DB_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,8 +135,7 @@ public class SstFilteringService extends BackgroundService
       // in OmSnapshotPurgeResponse. Any operation apart from delete can run in parallel along with this operation.
       //TODO. Revisit other SNAPSHOT_LOCK and see if we can change write locks to read locks to further optimize it.
       OMLockDetails omLockDetails = ozoneManager.getMetadataManager().getLock()
-          .acquireReadLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
-              snapshotInfo.getName());
+          .acquireReadLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
       boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
       if (acquiredSnapshotLock) {
         String snapshotDir = OmSnapshotManager.getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo);
@@ -147,8 +146,7 @@ public class SstFilteringService extends BackgroundService
           }
         } finally {
           ozoneManager.getMetadataManager().getLock()
-              .releaseReadLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(),
-                  snapshotInfo.getBucketName(), snapshotInfo.getName());
+              .releaseReadLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
         }
       }
     }
@@ -190,7 +188,7 @@ public class SstFilteringService extends BackgroundService
                     snapshotInfo.getBucketName());
 
             try (
-                ReferenceCounted<OmSnapshot> snapshotMetadataReader =
+                UncheckedAutoCloseableSupplier<OmSnapshot> snapshotMetadataReader =
                     snapshotManager.get().getActiveSnapshot(
                         snapshotInfo.getVolumeName(),
                         snapshotInfo.getBucketName(),

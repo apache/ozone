@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANI
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -44,12 +45,14 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
@@ -76,7 +79,7 @@ public class TestSnapshotDirectoryCleaningService {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL, 2500);
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 2500);
     conf.setBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED, true);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 2500,
         TimeUnit.MILLISECONDS);
@@ -140,8 +143,10 @@ public class TestSnapshotDirectoryCleaningService {
         cluster.getOzoneManager().getMetadataManager().getDeletedTable();
     Table<String, SnapshotInfo> snapshotInfoTable =
         cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable();
-    SnapshotDirectoryCleaningService snapshotDirectoryCleaningService =
-        cluster.getOzoneManager().getKeyManager().getSnapshotDirectoryService();
+    DirectoryDeletingService directoryDeletingService =
+        cluster.getOzoneManager().getKeyManager().getDirDeletingService();
+    SnapshotChainManager snapshotChainManager = ((OmMetadataManagerImpl)cluster.getOzoneManager().getMetadataManager())
+        .getSnapshotChainManager();
 
     /*    DirTable
     /v/b/snapDir
@@ -220,11 +225,9 @@ public class TestSnapshotDirectoryCleaningService {
     fs.delete(root, true);
     assertTableRowCount(deletedKeyTable, 10);
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snap3");
-    long prevRunCount = snapshotDirectoryCleaningService.getRunCount().get();
-    GenericTestUtils.waitFor(() -> snapshotDirectoryCleaningService.getRunCount().get()
+    long prevRunCount = directoryDeletingService.getRunCount().get();
+    GenericTestUtils.waitFor(() -> directoryDeletingService.getRunCount().get()
         > prevRunCount + 1, 100, 10000);
-
-    Thread.sleep(2000);
     Map<String, Long> expectedSize = new HashMap<String, Long>() {{
       // /v/b/snapDir/appRoot0/parentDir0-2/childFile contribute
       // exclusive size, /v/b/snapDir/appRoot0/parentDir0-2/childFile0-4
@@ -234,13 +237,23 @@ public class TestSnapshotDirectoryCleaningService {
         put("snap2", 5L);
         put("snap3", 0L);
       }};
+
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
         iterator = snapshotInfoTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
         String snapshotName = snapshotEntry.getValue().getName();
+
+        GenericTestUtils.waitFor(() -> {
+          try {
+            SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(cluster.getOzoneManager(), snapshotChainManager,
+                snapshotEntry.getValue());
+            return nextSnapshot == null || (nextSnapshot.isDeepCleanedDeletedDir() && nextSnapshot.isDeepCleaned());
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }, 1000, 10000);
         SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotEntry.getKey());
-        System.out.println(snapshotInfo.getName() + " " + snapshotInfo.getDeepCleanedDeletedDir());
         assertEquals(expectedSize.get(snapshotName),
             snapshotInfo.getExclusiveSize() + snapshotInfo.getExclusiveSizeDeltaFromDirDeepCleaning());
         // Since for the test we are using RATIS/THREE

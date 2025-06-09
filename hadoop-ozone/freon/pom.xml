@@ -175,17 +175,14 @@
       <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.kohsuke.metainf-services</groupId>
-      <artifactId>metainf-services</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>ch.qos.reload4j</groupId>
-      <artifactId>reload4j</artifactId>
-      <scope>runtime</scope>
+      <!-- required for @MetaInfServices at compile-time, but not at runtime -->
+      <groupId>org.kohsuke.metainf-services</groupId>
+      <artifactId>metainf-services</artifactId>
+      <scope>provided</scope>
     </dependency>
 
     <!-- Test dependencies -->

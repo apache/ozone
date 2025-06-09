@@ -387,19 +387,32 @@ public final class OMConfigKeys {
    */
   public static final String OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED = "ozone.snapshot.deep.cleaning.enabled";
   public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = false;
+  /**
+   * DirectoryDeepCleaning snapshots have been moved from SnapshotDirectoryCleaningService to DirectoryDeletingService.
+   * Configs related to SnapshotDirectoryCleaningService are deprecated as this won't be used anywhere.
+   */
+  @Deprecated
   public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL =
       "ozone.snapshot.directory.service.interval";
+  @Deprecated
   public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT
       = "24h";
+  @Deprecated
   public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT =
       "ozone.snapshot.directory.service.timeout";
+  @Deprecated
   public static final String
       OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT = "300s";
 
   public static final String OZONE_THREAD_NUMBER_DIR_DELETION =
       "ozone.thread.number.dir.deletion";
 
+  public static final String OZONE_THREAD_NUMBER_KEY_DELETION =
+      "ozone.thread.number.key.deletion";
+
   public static final int OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT = 10;
+
+  public static final int OZONE_THREAD_NUMBER_KEY_DELETION_DEFAULT = 10;
 
   public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.filtering.limit.per.task";
@@ -636,6 +649,13 @@ public final class OMConfigKeys {
       = "ozone.om.compaction.service.columnfamilies";
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
       "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable";
+
+  /**
+   * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.
+   */
+  public static final String OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES = 
+      "ozone.om.snapshot.compact.non.snapshot.diff.tables";
+  public static final boolean OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES_DEFAULT = false;
 
   /**
    * Never constructed.

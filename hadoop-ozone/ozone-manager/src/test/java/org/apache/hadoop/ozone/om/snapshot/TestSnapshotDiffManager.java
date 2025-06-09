@@ -135,6 +135,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
+import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotTestUtils.StubbedPersistentMap;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage;
@@ -153,6 +154,7 @@ import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -369,7 +371,8 @@ public class TestSnapshotDiffManager {
 
     omSnapshotManager = mock(OmSnapshotManager.class);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
-    SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10, omMetrics, 0);
+    SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10, omMetrics, 0, true,
+        new OmReadOnlyLock());
 
     when(omSnapshotManager.getActiveSnapshot(anyString(), anyString(), anyString()))
         .thenAnswer(invocationOnMock -> {
@@ -437,9 +440,9 @@ public class TestSnapshotDiffManager {
         eq(diffDir))
     ).thenReturn(Optional.of(Lists.newArrayList(randomStrings)));
 
-    ReferenceCounted<OmSnapshot> rcFromSnapshot =
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcFromSnapshot =
         omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
-    ReferenceCounted<OmSnapshot> rcToSnapshot =
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcToSnapshot =
         omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap2.toString());
     OmSnapshot fromSnapshot = rcFromSnapshot.get();
     OmSnapshot toSnapshot = rcToSnapshot.get();
@@ -517,9 +520,9 @@ public class TestSnapshotDiffManager {
             .thenReturn(Optional.ofNullable(Collections.emptyList()));
       }
 
-      ReferenceCounted<OmSnapshot> rcFromSnapshot =
+      UncheckedAutoCloseableSupplier<OmSnapshot> rcFromSnapshot =
           omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
-      ReferenceCounted<OmSnapshot> rcToSnapshot =
+      UncheckedAutoCloseableSupplier<OmSnapshot> rcToSnapshot =
           omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap2.toString());
       OmSnapshot fromSnapshot = rcFromSnapshot.get();
       OmSnapshot toSnapshot = rcToSnapshot.get();
@@ -588,9 +591,9 @@ public class TestSnapshotDiffManager {
               any(DifferSnapshotInfo.class),
               anyString());
 
-      ReferenceCounted<OmSnapshot> rcFromSnapshot =
+      UncheckedAutoCloseableSupplier<OmSnapshot> rcFromSnapshot =
           omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
-      ReferenceCounted<OmSnapshot> rcToSnapshot =
+      UncheckedAutoCloseableSupplier<OmSnapshot> rcToSnapshot =
           omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap2.toString());
       OmSnapshot fromSnapshot = rcFromSnapshot.get();
       OmSnapshot toSnapshot = rcToSnapshot.get();
@@ -1536,7 +1539,7 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testGetDeltaFilesWithFullDiff() throws IOException {
+  public void testGetDeltaFilesWithFullDiff() throws  IOException {
     SnapshotDiffManager spy = spy(snapshotDiffManager);
     UUID snap1 = UUID.randomUUID();
     OmSnapshot fromSnapshot = getMockedOmSnapshot(snap1);
@@ -1545,20 +1548,28 @@ public class TestSnapshotDiffManager {
     Mockito.doAnswer(invocation -> {
       OmSnapshot snapshot = invocation.getArgument(0);
       if (snapshot == fromSnapshot) {
-        return Sets.newHashSet("1", "2", "3");
+        Map<Integer, String> inodeToFileMap = new HashMap<>();
+        inodeToFileMap.put(1, "1.sst");
+        inodeToFileMap.put(2, "2.sst");
+        inodeToFileMap.put(3, "3.sst");
+        return inodeToFileMap;
       }
       if (snapshot == toSnapshot) {
-        return Sets.newHashSet("3", "4", "5");
+        Map<Integer, String> inodeToFileMap = new HashMap<>();
+        inodeToFileMap.put(1, "10.sst");
+        inodeToFileMap.put(2, "20.sst");
+        inodeToFileMap.put(4, "4.sst");
+        return inodeToFileMap;
       }
-      return Sets.newHashSet("6", "7", "8");
-    }).when(spy).getSSTFileListForSnapshot(Mockito.any(OmSnapshot.class),
+      return null;
+    }).when(spy).getSSTFileMapForSnapshot(Mockito.any(OmSnapshot.class),
         Mockito.anyList());
     doNothing().when(spy).recordActivity(any(), any());
     doNothing().when(spy).updateProgress(anyString(), anyDouble());
     String diffJobKey = snap1 + DELIMITER + snap2;
     Set<String> deltaFiles = spy.getDeltaFiles(fromSnapshot, toSnapshot, Collections.emptyList(), snapshotInfo,
         snapshotInfo, true, Collections.emptyMap(), null, diffJobKey);
-    Assertions.assertEquals(Sets.newHashSet("1", "2", "3", "4", "5"), deltaFiles);
+    Assertions.assertEquals(Sets.newHashSet("3.sst", "4.sst"), deltaFiles);
   }
 
   @Test

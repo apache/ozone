@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -83,6 +84,7 @@ public class TestObjectGet {
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
     headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
 
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)

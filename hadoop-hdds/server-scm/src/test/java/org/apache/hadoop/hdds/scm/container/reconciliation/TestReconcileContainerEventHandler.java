@@ -35,12 +35,12 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconcileContainerCommandProto;
@@ -206,8 +206,8 @@ public class TestReconcileContainerEventHandler {
   public void testReconcileSentToAllPeers() throws Exception {
     addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
     Set<ContainerReplica> replicas = addReplicasToContainer(3);
-    Set<UUID> allNodeIDs = replicas.stream()
-        .map(r -> r.getDatanodeDetails().getUuid())
+    Set<DatanodeID> allNodeIDs = replicas.stream()
+        .map(r -> r.getDatanodeDetails().getID())
         .collect(Collectors.toSet());
 
     EligibilityResult result =
@@ -221,7 +221,7 @@ public class TestReconcileContainerEventHandler {
     verify(eventPublisher, times(replicas.size())).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
 
     // Check each reconcile command sent for correctness.
-    Set<UUID> nodesReceivingCommands = new HashSet<>();
+    Set<DatanodeID> nodesReceivingCommands = new HashSet<>();
     for (CommandForDatanode<ReconcileContainerCommandProto> dnCommand: commandCaptor.getAllValues()) {
       SCMCommand<ReconcileContainerCommandProto> reconcileCommand = dnCommand.getCommand();
       ReconcileContainerCommandProto reconcileProto = reconcileCommand.getProto();
@@ -233,14 +233,14 @@ public class TestReconcileContainerEventHandler {
       assertEquals(CONTAINER_ID, ContainerID.valueOf(reconcileCommand.getId()));
 
       // Every node should receive exactly one reconcile command.
-      UUID targetNodeID = dnCommand.getDatanodeId();
+      DatanodeID targetNodeID = dnCommand.getDatanodeId();
       assertTrue(nodesReceivingCommands.add(targetNodeID), "Duplicate reconcile command sent to datanode.");
       // All commands should have correctly constructed peer lists that exclude the node receiving the command.
-      Set<UUID> expectedPeerIDs = allNodeIDs.stream()
-          .filter(id -> id != targetNodeID)
+      Set<DatanodeID> expectedPeerIDs = allNodeIDs.stream()
+          .filter(id -> !id.equals(targetNodeID))
           .collect(Collectors.toSet());
-      Set<UUID> actualPeerIDs = reconcileProto.getPeersList().stream()
-              .map(dn -> UUID.fromString(dn.getUuid()))
+      Set<DatanodeID> actualPeerIDs = reconcileProto.getPeersList().stream()
+              .map(dn -> DatanodeID.fromProto(dn.getId()))
               .collect(Collectors.toSet());
       assertEquals(replicas.size() - 1, actualPeerIDs.size());
       assertEquals(expectedPeerIDs, actualPeerIDs);

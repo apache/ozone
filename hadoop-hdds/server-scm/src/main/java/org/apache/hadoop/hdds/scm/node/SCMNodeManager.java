@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -546,9 +545,9 @@ public class SCMNodeManager implements NodeManager {
     writeLock().lock();
     try {
       Map<SCMCommandProto.Type, Integer> summary =
-          commandQueue.getDatanodeCommandSummary(datanodeDetails.getUuid());
+          commandQueue.getDatanodeCommandSummary(datanodeDetails.getID());
       List<SCMCommand<?>> commands =
-          commandQueue.getCommand(datanodeDetails.getUuid());
+          commandQueue.getCommand(datanodeDetails.getID());
 
       // Update the SCMCommand of deleteBlocksCommand Status
       for (SCMCommand<?> command : commands) {
@@ -610,7 +609,7 @@ public class SCMNodeManager implements NodeManager {
               scmStatus.getOperationalState(),
               scmStatus.getOpStateExpiryEpochSeconds());
           command.setTerm(scmContext.getTermOfLeader());
-          addDatanodeCommand(reportedDn.getUuid(), command);
+          addDatanodeCommand(reportedDn.getID(), command);
         } catch (NotLeaderException nle) {
           LOG.warn("Skip sending SetNodeOperationalStateCommand,"
               + " since current SCM is not leader.", nle);
@@ -852,7 +851,7 @@ public class SCMNodeManager implements NodeManager {
    * @return The count of commands queued, or zero if none.
    */
   @Override
-  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+  public int getCommandQueueCount(DatanodeID dnID, SCMCommandProto.Type cmdType) {
     readLock().lock();
     try {
       return commandQueue.getDatanodeCommandCount(dnID, cmdType);
@@ -884,7 +883,7 @@ public class SCMNodeManager implements NodeManager {
             ". Assuming zero", datanodeDetails, cmdType);
         dnCount = 0;
       }
-      return getCommandQueueCount(datanodeDetails.getUuid(), cmdType) + dnCount;
+      return getCommandQueueCount(datanodeDetails.getID(), cmdType) + dnCount;
     } finally {
       readLock().unlock();
     }
@@ -1489,7 +1488,7 @@ public class SCMNodeManager implements NodeManager {
                 getHealthyVolumeCount());
       } catch (NodeNotFoundException e) {
         LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-                dn.getUuid());
+                dn.getID());
       }
     }
     Preconditions.checkArgument(!volumeCountList.isEmpty());
@@ -1524,7 +1523,7 @@ public class SCMNodeManager implements NodeManager {
       }
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-          dn.getUuid());
+          dn.getID());
     }
     return 0;
   }
@@ -1645,10 +1644,10 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand<?> command) {
+  public void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command) {
     writeLock().lock();
     try {
-      this.commandQueue.addCommand(dnId, command);
+      this.commandQueue.addCommand(datanodeID, command);
     } finally {
       writeLock().unlock();
     }
@@ -1670,7 +1669,7 @@ public class SCMNodeManager implements NodeManager {
       return;
     }
     getNodes(IN_SERVICE, HEALTHY).forEach(datanode ->
-        addDatanodeCommand(datanode.getUuid(), refreshVolumeUsageCommand));
+        addDatanodeCommand(datanode.getID(), refreshVolumeUsageCommand));
   }
 
   /**
@@ -1688,7 +1687,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand<?>> getCommandQueue(UUID dnID) {
+  public List<SCMCommand<?>> getCommandQueue(DatanodeID dnID) {
     // Getting the queue actually clears it and returns the commands, so this
     // is a write operation and not a read as the method name suggests.
     writeLock().lock();
@@ -1834,7 +1833,7 @@ public class SCMNodeManager implements NodeManager {
         }
         nodeStateManager.removeNode(datanodeDetails.getID());
         removeFromDnsToDnIdMap(datanodeDetails.getID(), datanodeDetails.getIpAddress());
-        final List<SCMCommand<?>> cmdList = getCommandQueue(datanodeDetails.getUuid());
+        final List<SCMCommand<?>> cmdList = getCommandQueue(datanodeDetails.getID());
         LOG.info("Clearing command queue of size {} for DN {}", cmdList.size(), datanodeDetails);
       } else {
         LOG.warn("Node not decommissioned or dead, cannot remove: {}", datanodeDetails);
