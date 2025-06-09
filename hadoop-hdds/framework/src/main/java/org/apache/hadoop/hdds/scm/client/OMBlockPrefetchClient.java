@@ -228,7 +228,7 @@ public class OMBlockPrefetchClient {
 
         int queueSize = queue.size();
         if (queueSize < minBlocks) {
-          int blocksToPrefetch = minBlocks - queueSize;
+          int blocksToPrefetch = maxBlocks - queueSize;
           LOG.debug(
               "Cache for {} is below threshold (size: {}, min: {}). Submitting async prefetch task for {} blocks.",
               replicationConfig, queueSize, minBlocks, blocksToPrefetch);
