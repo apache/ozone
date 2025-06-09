@@ -148,7 +148,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               ozoneManager.getMetrics(),
               keyArgs.getSortDatanodes(),
               userInfo,
-              ozoneManager.getIsAllocateBlockCacheEnabled(),
               ozoneManager.getClusterMap(),
               ozoneManager.getOmBlockPrefetchClient(),
               ozoneManager.getPerfMetrics());

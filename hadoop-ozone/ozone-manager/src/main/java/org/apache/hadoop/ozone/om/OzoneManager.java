@@ -611,7 +611,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     scmTopologyClient = new ScmTopologyClient(scmBlockClient);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
         configuration);
-    this.omBlockPrefetchClient = new OMBlockPrefetchClient(scmBlockClient);
+    this.omBlockPrefetchClient = new OMBlockPrefetchClient(scmBlockClient, isAllocateBlockCacheEnabled);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
 
@@ -2622,10 +2622,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Should not trigger exception here at all
       return false;
     }
-  }
-
-  public boolean getIsAllocateBlockCacheEnabled() {
-    return isAllocateBlockCacheEnabled;
   }
 
   public String getVolumeOwner(String vol, ACLType type, ResourceType resType)

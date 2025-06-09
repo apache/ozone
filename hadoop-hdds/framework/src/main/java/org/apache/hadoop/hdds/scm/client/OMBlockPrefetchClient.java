@@ -87,6 +87,7 @@ public class OMBlockPrefetchClient {
   private int maxBlocks;
   private int minBlocks;
   private boolean useHostname;
+  private final boolean isAllocateBlockCacheEnabled;
   private DNSToSwitchMapping dnsToSwitchMapping;
   private final Map<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>> blockQueueMap =
       new ConcurrentHashMap<>();
@@ -105,8 +106,9 @@ public class OMBlockPrefetchClient {
         .build();
   }
 
-  public OMBlockPrefetchClient(ScmBlockLocationProtocol scmBlockClient) {
+  public OMBlockPrefetchClient(ScmBlockLocationProtocol scmBlockClient, boolean isAllocateBlockCacheEnabled) {
     this.scmBlockLocationProtocol = scmBlockClient;
+    this.isAllocateBlockCacheEnabled = isAllocateBlockCacheEnabled;
     initializeBlockQueueMap();
   }
 
@@ -184,63 +186,70 @@ public class OMBlockPrefetchClient {
   public List<AllocatedBlock> getBlocks(long scmBlockSize, int numBlocks, ReplicationConfig replicationConfig,
                                         String serviceID, ExcludeList excludeList, String clientMachine,
                                         NetworkTopology clusterMap) throws IOException {
-    long readStartTime = Time.monotonicNowNanos();
-    List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
-    int retrievedBlocksCount = 0;
-    ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
+    if (isAllocateBlockCacheEnabled) {
+      long readStartTime = Time.monotonicNowNanos();
+      List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
+      int retrievedBlocksCount = 0;
+      ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
 
-    // We redirect to the allocateBlock RPC call to SCM when we encounter an untested ReplicationConfig or a populated
-    // ExcludeList, otherwise we return blocks from cache.
-    if (queue != null && excludeList.isEmpty()) {
-      while (retrievedBlocksCount < numBlocks) {
-        ExpiringAllocatedBlock expiringBlock = queue.poll();
-        if (expiringBlock == null) {
-          break;
+      // We redirect to the allocateBlock RPC call to SCM when we encounter an untested ReplicationConfig or a populated
+      // ExcludeList, otherwise we return blocks from cache.
+      if (queue != null && excludeList.isEmpty()) {
+        while (retrievedBlocksCount < numBlocks) {
+          ExpiringAllocatedBlock expiringBlock = queue.poll();
+          if (expiringBlock == null) {
+            break;
+          }
+
+          if (System.currentTimeMillis() > expiringBlock.getExpiryTime()) {
+            continue;
+          }
+
+          AllocatedBlock block = expiringBlock.getBlock();
+          List<DatanodeDetails> sortedNodes = sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
+          if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
+            block = block.toBuilder()
+                .setPipeline(block.getPipeline().copyWithNodesInOrder(sortedNodes))
+                .build();
+          }
+          allocatedBlocks.add(block);
+          retrievedBlocksCount++;
         }
 
-        if (System.currentTimeMillis() > expiringBlock.getExpiryTime()) {
-          continue;
+        int remainingBlocks = numBlocks - retrievedBlocksCount;
+
+        // If there aren't enough blocks in cache, we make a synchronous RPC call to SCM for fetching the remaining
+        // blocks.
+        if (remainingBlocks > 0) {
+          List<AllocatedBlock> newBlocks = scmBlockLocationProtocol.allocateBlock(scmBlockSize, remainingBlocks,
+              replicationConfig, serviceID, excludeList, clientMachine);
+          allocatedBlocks.addAll(newBlocks);
+          metrics.incrementCacheMisses();
+        } else {
+          metrics.incrementCacheHits();
         }
 
-        AllocatedBlock block = expiringBlock.getBlock();
-        List<DatanodeDetails> sortedNodes = sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
-        if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
-          block = block.toBuilder()
-              .setPipeline(block.getPipeline().copyWithNodesInOrder(sortedNodes))
-              .build();
+        int queueSize = queue.size();
+        if (queueSize < minBlocks) {
+          int blocksToPrefetch = minBlocks - queueSize;
+          LOG.debug(
+              "Cache for {} is below threshold (size: {}, min: {}). Submitting async prefetch task for {} blocks.",
+              replicationConfig, queueSize, minBlocks, blocksToPrefetch);
+          submitPrefetchTask(scmBlockSize, blocksToPrefetch, replicationConfig, serviceID);
         }
-        allocatedBlocks.add(block);
-        retrievedBlocksCount++;
-      }
 
-      int remainingBlocks = numBlocks - retrievedBlocksCount;
+        metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
+        return allocatedBlocks;
 
-      // If there aren't enough blocks in cache, we make a synchronous RPC call to SCM for fetching the remaining blocks
-      if (remainingBlocks > 0) {
-        List<AllocatedBlock> newBlocks = scmBlockLocationProtocol.allocateBlock(scmBlockSize, remainingBlocks,
-            replicationConfig, serviceID, excludeList, clientMachine);
-        allocatedBlocks.addAll(newBlocks);
-        metrics.incrementCacheMisses();
       } else {
-        metrics.incrementCacheHits();
+        LOG.debug("Bypassing cache for {}. Reason: {}", replicationConfig, queue == null ?
+            "Unsupported replication config for caching." : "ExcludeList provided.");
+        metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
+        metrics.incrementCacheMisses();
+        return scmBlockLocationProtocol.allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
+            excludeList, clientMachine);
       }
-
-      int queueSize = queue.size();
-      if (queueSize < minBlocks) {
-        int blocksToPrefetch = minBlocks - queueSize;
-        LOG.debug("Cache for {} is below threshold (size: {}, min: {}). Submitting async prefetch task for {} blocks.",
-            replicationConfig, queueSize, minBlocks, blocksToPrefetch);
-        submitPrefetchTask(scmBlockSize, blocksToPrefetch, replicationConfig, serviceID);
-      }
-
-      metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
-      return allocatedBlocks;
-
     } else {
-      LOG.debug("Bypassing cache for {}. Reason: {}", replicationConfig, queue == null ?
-          "Unsupported replication config for caching." : "ExcludeList provided.");
-      metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
-      metrics.incrementCacheMisses();
       return scmBlockLocationProtocol.allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList,
           clientMachine);
     }

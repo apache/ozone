@@ -268,9 +268,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
       boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
-      boolean shouldSortDatanodes, UserInfo userInfo, boolean isAllocateBlockCacheEnabled,
-      NetworkTopology clusterMap, OMBlockPrefetchClient prefetchClient,
-      OMPerformanceMetrics perfMetrics) throws IOException {
+      boolean shouldSortDatanodes, UserInfo userInfo, NetworkTopology clusterMap,
+      OMBlockPrefetchClient prefetchClient, OMPerformanceMetrics perfMetrics) throws IOException {
     long allocateBlockStartTime = Time.monotonicNowNanos();
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
@@ -283,15 +282,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      if (isAllocateBlockCacheEnabled) {
-        allocatedBlocks = captureLatencyNs(perfMetrics.getGetBlocksFromPrefetchQueueLatencyNs(),
-            () -> prefetchClient.getBlocks(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList,
-                clientMachine, clusterMap));
-      } else {
-        allocatedBlocks = scmClient.getBlockClient()
-            .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-                excludeList, clientMachine);
-      }
+      allocatedBlocks = captureLatencyNs(perfMetrics.getGetBlocksFromPrefetchQueueLatencyNs(),
+          () -> prefetchClient.getBlocks(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList,
+              clientMachine, clusterMap));
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()
