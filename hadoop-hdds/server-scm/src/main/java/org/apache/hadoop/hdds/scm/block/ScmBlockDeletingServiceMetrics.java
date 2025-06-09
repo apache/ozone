@@ -95,6 +95,9 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   @Metric(about = "The number of dataNodes of delete transactions.")
   private MutableGaugeLong numBlockDeletionTransactionDataNodes;
 
+  @Metric(about = "Total blocks sent to DN for deletion.")
+  private MutableGaugeLong numBlockAddedForDeletionToDN;
+
   private final Map<DatanodeID, DatanodeCommandDetails> numCommandsDatanode = new ConcurrentHashMap<>();
 
   private ScmBlockDeletingServiceMetrics() {
@@ -189,6 +192,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
         .incrBlocksSent(delta);
   }
 
+  public void incrTotalBlockSentToDNForDeletion(long count) {
+    this.numBlockAddedForDeletionToDN.incr(count);
+  }
+
   public long getNumBlockDeletionCommandSent() {
     return numBlockDeletionCommandSent.value();
   }
@@ -247,6 +254,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     numSkippedTransactions.snapshot(builder, all);
     numProcessedTransactions.snapshot(builder, all);
     numBlockDeletionTransactionDataNodes.snapshot(builder, all);
+    numBlockAddedForDeletionToDN.snapshot(builder, all);
 
     MetricsRecordBuilder recordBuilder = builder;
     for (Map.Entry<DatanodeID, DatanodeCommandDetails> e : numCommandsDatanode.entrySet()) {
@@ -385,6 +393,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
         .append(numBlockDeletionTransactionSuccessOnDatanodes.value()).append('\t')
         .append("numBlockDeletionTransactionFailureOnDatanodes = ")
         .append(numBlockDeletionTransactionFailureOnDatanodes.value()).append('\t')
+        .append("numBlockAddedForDeletionToDN = " + numBlockAddedForDeletionToDN.value()).append("\t")
         .append("numDeletionCommandsPerDatanode = ").append(numCommandsDatanode);
     return buffer.toString();
   }

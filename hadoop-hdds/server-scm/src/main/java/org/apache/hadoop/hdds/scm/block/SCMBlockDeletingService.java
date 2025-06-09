@@ -217,6 +217,7 @@ public class SCMBlockDeletingService extends BackgroundService
               }
             }
           }
+          metrics.incrTotalBlockSentToDNForDeletion(transactions.getBlocksDeleted());
           LOG.info("Totally added {} blocks to be deleted for"
               + " {} datanodes / {} totalnodes, limit per iteration : {}blocks, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),
