@@ -281,7 +281,7 @@ public class SCMBlockProtocolServer implements
     long startNanos = Time.monotonicNowNanos();
     try {
       scm.getScmBlockManager().deleteBlocks(keyBlocksInfoList);
-      perfMetrics.updateDeleteKeySuccessBlocksInKeyDeleteCycle(totalBlocks);
+      perfMetrics.updateDeleteKeySuccessBlocks(totalBlocks);
       perfMetrics.updateDeleteKeySuccessStats(keyBlocksInfoList.size(), startNanos);
       resultCode = ScmBlockLocationProtocolProtos.
           DeleteScmBlockResult.Result.success;
@@ -290,7 +290,7 @@ public class SCMBlockProtocolServer implements
       }
     } catch (IOException ioe) {
       e = ioe;
-      perfMetrics.updateDeleteKeyFailedBlocksInKeyDeleteCycle(totalBlocks);
+      perfMetrics.updateDeleteKeyFailedBlocks(totalBlocks);
       perfMetrics.updateDeleteKeyFailureStats(keyBlocksInfoList.size(), startNanos);
       LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ioe);
       switch (ioe instanceof SCMException ? ((SCMException) ioe).getResult() :

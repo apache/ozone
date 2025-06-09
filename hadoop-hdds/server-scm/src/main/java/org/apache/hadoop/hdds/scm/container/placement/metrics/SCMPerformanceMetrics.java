@@ -43,7 +43,7 @@ public final class SCMPerformanceMetrics implements MetricsSource {
   private MetricsRegistry registry;
   private static SCMPerformanceMetrics instance;
 
-  @Metric(about = "Number of failed deleteKey operations")
+  @Metric(about = "Number of failed deleteKeys")
   private MutableCounterLong deleteKeyFailure;
   @Metric(about = "Number of successful deleteKey operations")
   private MutableCounterLong deleteKeySuccess;
@@ -56,9 +56,9 @@ public final class SCMPerformanceMetrics implements MetricsSource {
   @Metric(about = "Latency for a failed allocateBlock call in nanoseconds")
   private MutableRate allocateBlockFailureLatencyNs;
   @Metric(about = "Total blocks taken in each key delete cycle.")
-  private MutableCounterLong deleteKeyBlocksInKeyDeleteCycle;
+  private MutableCounterLong deleteKeyBlocksSuccess;
   @Metric(about = "Total blocks taken in each key delete cycle failure.")
-  private MutableCounterLong deleteKeyBlocksInKeyDeleteCycleFailure;
+  private MutableCounterLong deleteKeyBlocksFailure;
 
   public SCMPerformanceMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
@@ -88,8 +88,8 @@ public final class SCMPerformanceMetrics implements MetricsSource {
     deleteKeyFailureLatencyNs.snapshot(recordBuilder, true);
     allocateBlockSuccessLatencyNs.snapshot(recordBuilder, true);
     allocateBlockFailureLatencyNs.snapshot(recordBuilder, true);
-    deleteKeyBlocksInKeyDeleteCycle.snapshot(recordBuilder, true);
-    deleteKeyBlocksInKeyDeleteCycleFailure.snapshot(recordBuilder, true);
+    deleteKeyBlocksSuccess.snapshot(recordBuilder, true);
+    deleteKeyBlocksFailure.snapshot(recordBuilder, true);
   }
 
   public void updateAllocateBlockSuccessLatencyNs(long startNanos) {
@@ -110,12 +110,12 @@ public final class SCMPerformanceMetrics implements MetricsSource {
     deleteKeyFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateDeleteKeySuccessBlocksInKeyDeleteCycle(long keys) {
-    deleteKeyBlocksInKeyDeleteCycle.incr(keys);
+  public void updateDeleteKeySuccessBlocks(long keys) {
+    deleteKeyBlocksSuccess.incr(keys);
   }
 
-  public void updateDeleteKeyFailedBlocksInKeyDeleteCycle(long keys) {
-    deleteKeyBlocksInKeyDeleteCycleFailure.incr(keys);
+  public void updateDeleteKeyFailedBlocks(long keys) {
+    deleteKeyBlocksFailure.incr(keys);
   }
 }
 
