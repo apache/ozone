@@ -122,7 +122,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       try {
         iterator = snapshotChainManager.iterator(true);
       } catch (IOException e) {
-        LOG.error("Error while initializing snapshot chain iterator.");
+        LOG.error("Error while initializing snapshot chain iterator. DirDeletingTask will only process AOS this run.");
         return queue;
       }
       while (iterator.hasNext()) {
@@ -204,7 +204,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
      * @param keyManager KeyManager of the underlying store.
      */
     private void processDeletedKeysForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
-        int remainNum) throws IOException, InterruptedException {
+        int remainNum) throws IOException {
       String volume = null, bucket = null, snapshotTableKey = null;
       if (currentSnapshotInfo != null) {
         volume = currentSnapshotInfo.getVolumeName();
@@ -323,8 +323,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               SnapshotUtils.getSnapshotInfo(getOzoneManager(), snapshotChainManager, snapshotId);
           if (snapInfo != null) {
             if (snapInfo.isDeepCleaned()) {
-              LOG.info("Snapshot {} has already been deep cleaned. Skipping the snapshot in this iteration.",
-                  snapInfo.getSnapshotId());
+              LOG.info("Snapshot '{}' ({}) has already been deep cleaned. Skipping the snapshot in this iteration.",
+                  snapInfo.getTableKey(), snapInfo.getSnapshotId());
               return EmptyTaskResult.newResult();
             }
             if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo)) {
@@ -345,7 +345,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 : omSnapshot.get().getKeyManager();
             processDeletedKeysForStore(snapInfo, keyManager, remainNum);
           }
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
           LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
               snapInfo, e);
         } finally {
