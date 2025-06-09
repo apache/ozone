@@ -41,6 +41,7 @@ import java.util.function.ToLongFunction;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -66,22 +67,23 @@ public class ContainerSet implements Iterable<Container<?>> {
       new ConcurrentSkipListMap<>();
   private final Clock clock;
   private long recoveringTimeout;
-  private final Table<ContainerID, String> containerIdsTable;
+  private final Table<ContainerID, ContainerCreateInfo> containerIdsTable;
 
   public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
     return new ContainerSet(null, recoveringTimeout);
   }
 
-  public static ContainerSet newRwContainerSet(Table<ContainerID, String> containerIdsTable, long recoveringTimeout) {
+  public static ContainerSet newRwContainerSet(
+      Table<ContainerID, ContainerCreateInfo> containerIdsTable, long recoveringTimeout) {
     Objects.requireNonNull(containerIdsTable, "containerIdsTable == null");
     return new ContainerSet(containerIdsTable, recoveringTimeout);
   }
 
-  private ContainerSet(Table<ContainerID, String> continerIdsTable, long recoveringTimeout) {
+  private ContainerSet(Table<ContainerID, ContainerCreateInfo> continerIdsTable, long recoveringTimeout) {
     this(continerIdsTable, recoveringTimeout, null);
   }
 
-  ContainerSet(Table<ContainerID, String> continerIdsTable, long recoveringTimeout, Clock clock) {
+  ContainerSet(Table<ContainerID, ContainerCreateInfo> continerIdsTable, long recoveringTimeout, Clock clock) {
     this.clock = clock != null ? clock : Clock.systemUTC();
     this.containerIdsTable = continerIdsTable;
     this.recoveringTimeout = recoveringTimeout;
@@ -148,7 +150,7 @@ public class ContainerSet implements Iterable<Container<?>> {
       }
       try {
         if (containerIdsTable != null) {
-          containerIdsTable.put(ContainerID.valueOf(containerId), containerState.toString());
+          containerIdsTable.put(ContainerID.valueOf(containerId), ContainerCreateInfo.valueOf(containerState));
         }
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
@@ -461,7 +463,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     return missingContainerSet;
   }
 
-  public Table<ContainerID, String> getContainerIdsTable() {
+  public Table<ContainerID, ContainerCreateInfo> getContainerIdsTable() {
     return containerIdsTable;
   }
 

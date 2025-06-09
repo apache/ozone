@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<WitnessedContainerDBDefinition>
     implements WitnessedContainerMetadataStore {
 
-  private Table<ContainerID, String> containerIdsTable;
+  private Table<ContainerID, ContainerCreateInfo> containerIdsTable;
   private static final ConcurrentMap<String, WitnessedContainerMetadataStore> INSTANCES =
       new ConcurrentHashMap<>();
 
@@ -70,7 +70,7 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
   }
 
   @Override
-  public Table<ContainerID, String> getContainerIdsTable() {
+  public Table<ContainerID, ContainerCreateInfo> getContainerIdsTable() {
     return containerIdsTable;
   }
 }

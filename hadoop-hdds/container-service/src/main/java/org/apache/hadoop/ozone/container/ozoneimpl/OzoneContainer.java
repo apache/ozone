@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -344,7 +345,7 @@ public class OzoneContainer {
       for (Thread volumeThread : volumeThreads) {
         volumeThread.join();
       }
-      try (TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, String>> itr =
+      try (TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, ContainerCreateInfo>> itr =
                containerSet.getContainerIdsTable().iterator()) {
         final Map<ContainerID, Long> containerIds = new HashMap<>();
         while (itr.hasNext()) {
@@ -668,4 +669,7 @@ public class OzoneContainer {
     }
   }
 
+  public WitnessedContainerMetadataStore getWitnessedContainerMetadataStore() {
+    return witnessedContainerMetadataStore;
+  }
 }
