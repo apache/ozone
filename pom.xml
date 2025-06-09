@@ -2681,6 +2681,7 @@
       <properties>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <maven.shade.skip>true</maven.shade.skip>
+        <mdep.analyze.skip>true</mdep.analyze.skip>
         <skip.installnodenpm>true</skip.installnodenpm>
         <skip.npx>true</skip.npx>
         <skipDocs>true</skipDocs>
