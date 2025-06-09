@@ -31,15 +31,8 @@ This component is responsible for processing log files, extracting relevant log 
 
 `ozone debug log container --db=<path to db> parse --path=<path to logs folder> --thread-count=<n>`
 
-
-#### Concurrent Log File Processing
-- **Directory Traversal**: It recursively scans a specified directory for container log files using `Files.walk()`.
-- **File Filtering**: Only files with names matching the pattern `dn-container-<roll>.log.<datanodeId>` are considered. Files that do not satisfy this pattern are skipped.
-- **Thread Pool Execution**: A fixed-size thread pool is created using `ExecutorService`, where each thread is responsible for processing a single log file independently. This ensures no file-level concurrency issues.
-- **Synchronization with `CountDownLatch`**: A `CountDownLatch` is used to block the main thread until all worker threads have finished processing their respective files.
-- **Error Detection**: An `AtomicBoolean` is used to record if any thread encounters a `SQLException`. If set, the entire operation is considered failed.
-
 #### Log File Parsing and Validation
+- **Directory Traversal**: It recursively scans a specified directory for container log files,only files with names matching the pattern `dn-container-<roll>.log.<datanodeId>` are considered.Log files are parsed concurrently using multiple threads for efficient processing.
 - **Line-by-Line Processing**: Each log line is split using a pipe delimiter and parsed into key-value components.
 - **Field Extraction**: Key fields include:
   - **Timestamp**
@@ -47,17 +40,6 @@ This component is responsible for processing log files, extracting relevant log 
   - **ID, BCSID, State, and Index**: Extracted from key-value pairs.
 - **Error Message Capture**: Any remaining unstructured part of the log line is stored as `errorMessage`, especially relevant for WARN or ERROR level logs.
 - **Replication Index Filtering**: Only log entries with Index = 0 are processed. This limits current processing to Ratis-replicated containers. Future improvements may support EC replication.
-
-#### Log Entry Object Construction
-A builder pattern is used to create objects from parsed data. These objects represent a single log entry with structured fields.
-
-#### Batching and Database Insertion
-- Parsed entries are accumulated in a local batch list of size `MAX_OBJ_IN_LIST` (default: 5000).
-- When the list reaches the threshold, it is flushed to the database.
-- At the end of file processing, any remaining entries in the batch are also written to the database.
-
-#### Thread Safety and Simplification
-Each thread maintains its own batch list. There are no shared data structures between threads. The simplified concurrency model improves code maintainability and reduces potential for deadlocks or race conditions.
 
 ### Component 2: Database
 The tool uses a temporary SQLite database to store and manage information extracted from container logs. This helps organize the data so that both the complete history and the latest status of each container replica on a datanode can be analyzed easily.
@@ -184,6 +166,9 @@ This command displays the **Container ID** along with the count of replicas in t
 `ozone debug log container --db=<path to db> list --health=<type>  --all`
 
 **Sample output:**
+
+`ozone debug log container --db=path/to/db list --health=UNHEALTHY --all`
+
 ```
 Container ID = 6002 - Count = 1
 Container ID = 6201 - Count = 1
@@ -228,6 +213,9 @@ The command provides key details such as:
 `ozone debug log container --db=<path to db> list --lifecycle=<state> --all`
 
 **Sample output:**
+
+`ozone debug log container --db=path/to/db list --lifecycle=CLOSED --all`
+
 ```
 Timestamp                 | Datanode ID | Container ID | BCSID  | Message        | Index Value
 ---------------------------------------------------------------------------------------------------
