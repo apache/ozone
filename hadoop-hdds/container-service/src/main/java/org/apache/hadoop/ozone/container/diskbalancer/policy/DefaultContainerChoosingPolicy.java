@@ -38,7 +38,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   public static final Logger LOG = LoggerFactory.getLogger(
       DefaultContainerChoosingPolicy.class);
 
-  private final ThreadLocal<Cache<HddsVolume, Iterator<Container<?>>>> containerIteratorCache =
+  static private final ThreadLocal<Cache<HddsVolume, Iterator<Container<?>>>> containerIteratorCache =
       ThreadLocal.withInitial(
           () -> CacheBuilder.newBuilder().recordStats().expireAfterAccess(1, HOURS).build());
 
