@@ -393,7 +393,8 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
         .append(numBlockDeletionTransactionSuccessOnDatanodes.value()).append('\t')
         .append("numBlockDeletionTransactionFailureOnDatanodes = ")
         .append(numBlockDeletionTransactionFailureOnDatanodes.value()).append('\t')
-        .append("numBlockAddedForDeletionToDN = " + numBlockAddedForDeletionToDN.value()).append('\t')
+        .append("numBlockAddedForDeletionToDN = ")
+        .append(numBlockAddedForDeletionToDN.value()).append('\t')
         .append("numDeletionCommandsPerDatanode = ").append(numCommandsDatanode);
     return buffer.toString();
   }
