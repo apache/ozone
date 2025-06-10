@@ -49,7 +49,6 @@ public final class OMDBCheckpointUtils {
   private OMDBCheckpointUtils() {
   }
 
-
   public static boolean includeSnapshotData(HttpServletRequest request) {
     String includeParam =
         request.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA);

@@ -233,9 +233,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         writeHardlinkFile(getConf(), hardLinkFileMap, archiveOutputStream);
       }
 
-    } catch (Exception e) {
-      LOG.error("got exception writing to archive " + e);
-      throw e;
+    } catch (IOException ioe) {
+      LOG.error("got exception writing to archive " + ioe);
+      throw ioe;
     } finally {
       cleanupCheckpoint(checkpoint);
     }
@@ -282,7 +282,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       Path p = Paths.get(entry.getKey());
       String fileId = entry.getValue();
       Path relativePath = metaDirPath.relativize(p);
-      sb.append(fileId).append("\t").append(relativePath).append("\n");
+      sb.append(fileId).append('\t').append(relativePath).append('\n');
     }
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
     includeFile(data.toFile(), OmSnapshotManager.OM_HARDLINK_FILE, archiveOutputStream);

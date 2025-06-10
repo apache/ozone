@@ -81,7 +81,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Class used for testing the OM DB Checkpoint provider servlet using inode based transfer logic.
  */
-@Unhealthy("HDDS-13070")
+@Unhealthy("HDDS-13227")
 public class TestOMDbCheckpointServletInodeBasedXfer {
 
   private MiniOzoneCluster cluster;
@@ -212,7 +212,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Get the tarball.
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
-    DBCheckpoint dbCheckpoint = realCheckpoint.get();
     String testDirName = folder.resolve("testDir").toString();
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
     File newDbDir = new File(newDbDirName);
