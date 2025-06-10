@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Set;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -80,19 +79,6 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
     getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
         HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX, String.valueOf(newValue));
     assertEquals(newValue, executor.getMaximumPoolSize());
-    assertEquals(newValue, executor.getCorePoolSize());
-  }
-
-  @ParameterizedTest
-  @ValueSource(ints = { -1, +1 })
-  void blockDeletingServiceWorkers(int delta) throws ReconfigurationException {
-    ScheduledThreadPoolExecutor executor = (ScheduledThreadPoolExecutor)
-        getFirstDatanode().getDatanodeStateMachine().getContainer()
-            .getBlockDeletingService().getExecutorService();
-    int newValue = executor.getCorePoolSize() + delta;
-
-    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
-        OZONE_BLOCK_DELETING_SERVICE_WORKERS, String.valueOf(newValue));
     assertEquals(newValue, executor.getCorePoolSize());
   }
 

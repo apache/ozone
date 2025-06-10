@@ -5165,7 +5165,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
         OZONE_THREAD_NUMBER_DIR_DELETION + " cannot be negative.");
     getConfiguration().set(OZONE_THREAD_NUMBER_DIR_DELETION, newVal);
-    getKeyManager().getDirDeletingService().setPoolSize(Integer.parseInt(newVal));
     return newVal;
   }
 

@@ -24,7 +24,6 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWi
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
@@ -43,7 +42,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.ObjectName;
 import org.apache.hadoop.conf.Configurable;
@@ -664,10 +662,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   }
 
   private String reconfigDeletingServiceWorkers(String value) {
+    Preconditions.checkArgument(Integer.parseInt(value) >= 0,
+        OZONE_BLOCK_DELETING_SERVICE_WORKERS + " cannot be negative.");
     getConf().set(OZONE_BLOCK_DELETING_SERVICE_WORKERS, value);
-
-    getDatanodeStateMachine().getContainer().getBlockDeletingService()
-        .setPoolSize(Integer.parseInt(value));
     return value;
   }
 
@@ -686,11 +683,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
   private String reconfigBlockDeletingServiceTimeout(String value) {
     getConf().set(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT, value);
-
-    long timeout = conf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
-        OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT, TimeUnit.NANOSECONDS);
-    getDatanodeStateMachine().getContainer().getBlockDeletingService()
-        .setServiceTimeoutInNanos(timeout);
     return value;
   }
 
