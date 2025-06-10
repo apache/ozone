@@ -17,10 +17,14 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import javax.ws.rs.core.HttpHeaders;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
  * Represents an owner of S3 resources in the Ozone S3 compatibility layer.
@@ -37,6 +41,7 @@ public class S3Owner {
   public static final String DEFAULT_S3OWNER_ID = "bb2bd7ca4a327f84e6cd3979f8fa3828a50a08893c1b68f9d6715352c8d07b93";
   public static final S3Owner
       DEFAULT_S3_OWNER = new S3Owner(DEFAULT_S3OWNER_ID, "ozone");
+  public static final String ERROR_MESSAGE = "Expected bucket owner does not match";
 
   @XmlElement(name = "DisplayName")
   private String displayName;
@@ -79,5 +84,57 @@ public class S3Owner {
         "displayName='" + displayName + '\'' +
         ", id='" + id + '\'' +
         '}';
+  }
+
+  /**
+   * Verify the bucket owner condition.
+   *
+   * @param headers       HTTP headers
+   * @param bucketOwner   bucket owner
+   * @throws OMException if the expected bucket owner does not match the actual
+   *                     bucket owner
+   */
+  public static void verify(HttpHeaders headers, String bucketOwner) throws OMException {
+    if (headers == null || bucketOwner == null) {
+      return;
+    }
+
+    final String expectedBucketOwner = headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER);
+    // client does not use this feature
+    if (StringUtils.isEmpty(expectedBucketOwner)) {
+      return;
+    }
+    if (expectedBucketOwner.equals(bucketOwner)) {
+      return;
+    }
+    throw new OMException(ERROR_MESSAGE, OMException.ResultCodes.PERMISSION_DENIED);
+  }
+
+  /**
+   * Verify the copy operation's source and destination bucket owners.
+   *
+   * @param headers       HTTP headers
+   * @param sourceOwner   source bucket owner
+   * @param destOwner     destination bucket owner
+   * @throws OMException if the expected source or destination bucket owner does
+   *                     not match the actual owners
+   */
+  public static void verifyCopyOperation(HttpHeaders headers, String sourceOwner, String destOwner) throws OMException {
+    if (headers == null) {
+      return;
+    }
+
+    final String expectedSourceOwner = headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER);
+    final String expectedDestOwner = headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER);
+
+    // expectedSourceOwner is null, means the client does not want to check source owner
+    if (expectedSourceOwner != null && sourceOwner!= null && !sourceOwner.equals(expectedSourceOwner)) {
+      throw new OMException(ERROR_MESSAGE, OMException.ResultCodes.PERMISSION_DENIED);
+    }
+
+    // expectedDestOwner is null, means the client does not want to check destination owner
+    if (expectedDestOwner != null && destOwner!= null && !destOwner.equals(expectedDestOwner)) {
+      throw new OMException(ERROR_MESSAGE, OMException.ResultCodes.PERMISSION_DENIED);
+    }
   }
 }
