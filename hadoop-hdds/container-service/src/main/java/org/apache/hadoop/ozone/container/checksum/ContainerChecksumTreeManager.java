@@ -39,6 +39,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -147,7 +148,7 @@ public class ContainerChecksumTreeManager {
                                   ContainerProtos.ContainerChecksumInfo peerChecksumInfo) throws
       StorageContainerException {
 
-    ContainerDiffReport report = new ContainerDiffReport();
+    ContainerDiffReport report = new ContainerDiffReport(thisChecksumInfo.getContainerID());
     try {
       captureLatencyNs(metrics.getMerkleTreeDiffLatencyNS(), () -> {
         Preconditions.assertNotNull(thisChecksumInfo, "Datanode's checksum info is null.");
@@ -245,6 +246,8 @@ public class ContainerChecksumTreeManager {
     List<ContainerProtos.ChunkMerkleTree> thisChunkMerkleTreeList = thisBlockMerkleTree.getChunkMerkleTreeList();
     List<ContainerProtos.ChunkMerkleTree> peerChunkMerkleTreeList = peerBlockMerkleTree.getChunkMerkleTreeList();
     int thisIdx = 0, peerIdx = 0;
+    long containerID = report.getContainerID();
+    long blockID = thisBlockMerkleTree.getBlockID();
 
     // Step 1: Process both lists while elements are present in both
     while (thisIdx < thisChunkMerkleTreeList.size() && peerIdx < peerChunkMerkleTreeList.size()) {
@@ -258,8 +261,8 @@ public class ContainerChecksumTreeManager {
         // thisTree = Healthy, peerTree = unhealthy -> Do nothing as thisTree is healthy.
         // thisTree = Unhealthy, peerTree = Unhealthy -> Do Nothing as both are corrupt.
         if (thisChunkMerkleTree.getDataChecksum() != peerChunkMerkleTree.getDataChecksum() &&
-            !thisChunkMerkleTree.getIsHealthy() && peerChunkMerkleTree.getIsHealthy()) {
-          report.addCorruptChunk(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTree);
+            !thisChunkMerkleTree.getIsHealthy()) {
+          reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTreeList.get(peerIdx), report::addCorruptChunk);
         }
         thisIdx++;
         peerIdx++;
@@ -269,19 +272,29 @@ public class ContainerChecksumTreeManager {
         thisIdx++;
       } else {
         // Peer chunk's offset is smaller; record missing chunk and advance peerIdx
-        report.addMissingChunk(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTree);
+        reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTreeList.get(peerIdx), report::addMissingChunk);
         peerIdx++;
       }
     }
 
     // Step 2: Process remaining chunks in the peer list
     while (peerIdx < peerChunkMerkleTreeList.size()) {
-      report.addMissingChunk(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTreeList.get(peerIdx));
+      reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTreeList.get(peerIdx), report::addMissingChunk);
       peerIdx++;
     }
 
     // If we have remaining chunks in thisBlockMerkleTree, we can skip these chunks. The peers will pick these
     // chunks from us when they reconcile.
+  }
+
+  private void reportChunkIfHealthy(long containerID, long blockID, ContainerProtos.ChunkMerkleTree peerTree,
+      BiConsumer<Long, ContainerProtos.ChunkMerkleTree> addToReport) {
+    if (peerTree.getIsHealthy()) {
+      addToReport.accept(blockID, peerTree);
+    } else {
+      LOG.warn("Skipping chunk at offset {} in block {} of container {} since peer reported it as " +
+          "unhealthy.", peerTree.getOffset(), blockID, containerID);
+    }
   }
 
   public static long getDataChecksum(ContainerProtos.ContainerChecksumInfo checksumInfo) {

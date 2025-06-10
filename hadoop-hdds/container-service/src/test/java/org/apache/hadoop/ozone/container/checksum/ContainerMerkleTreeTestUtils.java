@@ -164,7 +164,7 @@ public final class ContainerMerkleTreeTestUtils {
                                   int numCorruptChunks) {
 
     ContainerProtos.ContainerMerkleTree.Builder treeBuilder = originalTree.toProto().toBuilder();
-    ContainerDiffReport diff = new ContainerDiffReport();
+    ContainerDiffReport diff = new ContainerDiffReport(1);
 
     introduceMissingBlocks(treeBuilder, numMissingBlocks, diff);
     introduceMissingChunks(treeBuilder, numMissingChunks, diff);
