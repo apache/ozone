@@ -89,7 +89,7 @@ To prepare an OM quorum, run
 
 To cancel preparation of an OM quorum, run
 
-    ozone admin om cancelprepare -id=<om-sevice-id>
+    ozone admin om cancelprepare -id=<om-service-id>
 
 
 ## When do you bring in a change as a Layout feature?
