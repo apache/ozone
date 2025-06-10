@@ -132,7 +132,7 @@ In an Ozone Manager (OM) High Availability (HA) cluster, all OM nodes maintain a
 The OM HA implementation includes an **automatic snapshot installation and recovery process** for such cases:
 
 - **Snapshot Installation Trigger:**  
-  When a follower OM falls significantly behind and is unable to catch up with the leader OM through standard log replication, the leader OM will notify the follower to install a snapshot. This is handled internally by the OM state machine.
+When a follower OM falls significantly behind and is unable to catch up with the leader OM through standard log replication, the Ratis consensus layer on the leader OM may determine that a snapshot installation is necessary. The leader then notifies the follower, and the snapshot installation on the follower is handled by its `OzoneManagerStateMachine`.
 
 - **How it works:**
   - The follower OM receives a snapshot installation notification from the leader via the consensus protocol.
