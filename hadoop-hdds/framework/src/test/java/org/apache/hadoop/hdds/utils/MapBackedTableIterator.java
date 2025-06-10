@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -51,7 +50,7 @@ public class MapBackedTableIterator<V> implements Table.KeyValueIterator<String,
   }
 
   @Override
-  public Table.KeyValue<String, V> seek(String s) throws IOException {
+  public Table.KeyValue<String, V> seek(String s) {
     this.itr = this.values.entrySet().stream()
         .filter(e -> prefix == null || e.getKey().startsWith(prefix))
         .filter(e -> e.getKey().compareTo(s) >= 0)
@@ -61,12 +60,12 @@ public class MapBackedTableIterator<V> implements Table.KeyValueIterator<String,
   }
 
   @Override
-  public void removeFromDB() throws IOException {
+  public void removeFromDB() {
 
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
 
   }
 

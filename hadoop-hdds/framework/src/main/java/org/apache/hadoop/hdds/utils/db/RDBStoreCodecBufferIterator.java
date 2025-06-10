@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -69,7 +68,7 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   }
 
   @Override
-  void delete(CodecBuffer key) throws IOException {
+  void delete(CodecBuffer key) throws RocksDatabaseException {
     assertOpen();
     getRocksDBTable().delete(key.asReadOnlyByteBuffer());
   }
