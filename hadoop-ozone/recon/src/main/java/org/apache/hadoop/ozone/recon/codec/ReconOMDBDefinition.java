@@ -59,95 +59,49 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
- * OM database definitions.
+ * Recon-specific OM RocksDB schema definition.
+ *
+ * <p>
+ * This is a specialized version of {@link org.apache.hadoop.ozone.om.codec.OMDBDefinition},
+ * used by the Recon service (the Ozone analytics layer). It uses lightweight,
+ * “partial” Protobuf codecs for faster deserialization and to skip loading
+ * ACL or permission details unnecessary for analytic workloads.
+ * </p>
+ *
+ * <p><b>Included Column Families:</b></p>
+ * <ul>
+ *   <li>BUCKET_TABLE_DEF: maps volume/bucket → {@link OmBucketInfo}</li>
+ *   <li>KEY_TABLE_DEF, OPEN_KEY_TABLE_DEF: map volume/bucket/key* → {@link OmKeyInfo}</li>
+ *   <li>DELETED_TABLE_DEF: maps deleted keys → {@link RepeatedOmKeyInfo}</li>
+ *   <li>FILE_TABLE_DEF, OPEN_FILE_TABLE_DEF, DIRECTORY_TABLE_DEF, DELETED_DIR_TABLE_DEF:
+ *       FSO layout support → {@link OmDirectoryInfo}, {@link OmKeyInfo}</li>
+ *   <li>… and all other column families imported from the canonical OM definition, such as:
+ *       DELEGATION_TOKEN_TABLE_DEF, META_TABLE_DEF, S3/tenant/snapshot tables, etc.</li>
+ * </ul>
+ *
+ * <p>
+ * The column families are initialized via {@link DBColumnFamilyDefinition} and passed
+ * into the parent {@link DBDefinition.WithMap} to initialize Recon's RocksDB instance.
+ * </p>
+ *
+ * <p><b>Codecs:</b></p>
+ * <ul>
+ *   <li>Custom {@link DelegatedCodec} are used to transform partial protobuf messages into OM helper objects.</li>
+ *   <li>Examples include {@link OmBucketInfo#getCodec}-based code reuse for Om-only read path.</li>
+ * </ul>
+ *
+ * <p><b>Singleton Access:</b></p>
+ * This class implements the singleton pattern:
  * <pre>
- * {@code
- * User, Token and Secret Tables:
- * |------------------------------------------------------------------------|
- * |        Column Family |                 Mapping                         |
- * |------------------------------------------------------------------------|
- * |            userTable |             /user :- UserVolumeInfo             |
- * |          dTokenTable |      OzoneTokenID :- renew_time                 |
- * |        s3SecretTable | s3g_access_key_id :- s3Secret                   |
- * |------------------------------------------------------------------------|
- * }
+ *   ReconOMDBDefinition def = ReconOMDBDefinition.get();
  * </pre>
  *
- * <pre>
- * {@code
- * Volume, Bucket, Prefix and Transaction Tables:
- * |------------------------------------------------------------------------|
- * |        Column Family |                 Mapping                         |
- * |------------------------------------------------------------------------|
- * |          volumeTable |           /volume :- VolumeInfo                 |
- * |          bucketTable |    /volume/bucket :- BucketInfo                 |
- * |------------------------------------------------------------------------|
- * |          prefixTable |            prefix :- PrefixInfo                 |
- * |------------------------------------------------------------------------|
- * | transactionInfoTable |  #TRANSACTIONINFO :- OMTransactionInfo          |
- * |            metaTable |       metaDataKey :- metaDataValue              |
- * |------------------------------------------------------------------------|
- * }
- * </pre>
+ * <p>{@inheritDoc}</p>
+ * Child methods:
  *
- * <pre>
- * {@code
- * Object Store (OBS) Tables:
- * |-----------------------------------------------------------------------|
- * |        Column Family |                           Mapping              |
- * |-----------------------------------------------------------------------|
- * |             keyTable | /volume/bucket/key          :- KeyInfo         |
- * |         deletedTable | /volume/bucket/key          :- RepeatedKeyInfo |
- * |         openKeyTable | /volume/bucket/key/id       :- KeyInfo         |
- * |   multipartInfoTable | /volume/bucket/key/uploadId :- parts           |
- * |-----------------------------------------------------------------------|
- * }
- * </pre>
- * Note that "volume", "bucket" and "key" in OBS tables are names.
- *
- * <pre>
- * {@code
- * File System Optimized (FSO) Tables:
- * |-----------------------------------------------------------------------------------|
- * |          Column Family |                                            Mapping       |
- * |-----------------------------------------------------------------------------------|
- * |              fileTable | /volumeId/bucketId/parentId/fileName         :- KeyInfo  |
- * |          openFileTable | /volumeId/bucketId/parentId/fileName/id      :- KeyInfo  |
- * |         directoryTable | /volumeId/bucketId/parentId/dirName          :- DirInfo  |
- * |  deletedDirectoryTable | /volumeId/bucketId/parentId/dirName/objectId :- KeyInfo  |
- * |-----------------------------------------------------------------------------------|
- * }
- * </pre>
- *
- * <pre>
- * {@code
- * S3 Multi-Tenant Tables:
- * |----------------------------------------------------------------------|
- * |             Column Family |             Mapping                      |
- * |----------------------------------------------------------------------|
- * |          tenantStateTable |      tenantId :- OmDBTenantState         |
- * |       tenantAccessIdTable |      accessId :- OmDBAccessIdInfo        |
- * | principalToAccessIdsTable | userPrincipal :- OmDBUserPrincipalInfo   |
- * |----------------------------------------------------------------------|
- * }
- * </pre>
- *
- * <pre>
- * {@code
- * Snapshot Tables:
- * |----------------------------------------------------------------------------------|
- * |        Column Family |                                   Mapping                 |
- * |----------------------------------------------------------------------------------|
- * |    snapshotInfoTable | /volumeName/bucketName/snapshotName :- SnapshotInfo       |
- * | snapshotRenamedTable | /volumeName/bucketName/objectID     :- renameFrom         |
- * |   compactionLogTable | dbTrxId-compactionTime              :- compactionLogEntry |
- * |----------------------------------------------------------------------------------|
- * }
- * </pre>
- * Note that renameFrom is one of the following:
- *   1. /volumeId/bucketId/parentId/dirName
- *   2. /volumeId/bucketId/parentId/fileName
- *   3. /volumeName/bucketName/keyName
+ * @see org.apache.hadoop.ozone.om.codec.OMDBDefinition
+ * @see DBDefinition
+ * @see DBDefinition.WithMap
  */
 public final class ReconOMDBDefinition extends DBDefinition.WithMap {
 
