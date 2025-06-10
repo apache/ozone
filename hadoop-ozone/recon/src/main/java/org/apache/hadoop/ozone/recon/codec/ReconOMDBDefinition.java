@@ -38,15 +38,11 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_ACCESS_ID_T
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_STATE_TABLE_DEF;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TRANSACTION_INFO_TABLE_DEF;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.USER_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE_DEF;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.fs.FileChecksum;
-import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -56,17 +52,11 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 
 /**
  * OM database definitions.
@@ -163,12 +153,6 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
 
   //---------------------------------------------------------------------------
   // Volume, Bucket, Prefix and Transaction Tables:
-  /** volumeTable: /volume :- VolumeInfo. */
-  public static final DBColumnFamilyDefinition<String, OmVolumeArgs> VOLUME_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(VOLUME_TABLE,
-          StringCodec.get(),
-          OmVolumeArgs.getCodec());
-
   private static final Codec<OmBucketInfo> CUSTOM_CODEC_FOR_BUCKET_TABLE = new DelegatedCodec<>(
       Proto2Codec.get(OzoneManagerProtocolProtos.BucketInfo.getDefaultInstance()),
       ReconOMDBDefinition::getOmBucketInfoFromProtobuf,
@@ -259,90 +243,12 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
    * @return instance of OmBucketInfo
    */
   public static OmBucketInfo getOmBucketInfoFromProtobuf(OzoneManagerProtocolProtos.BucketInfo bucketInfo) {
-    OmBucketInfo.Builder obib = OmBucketInfo.newBuilder()
-        .setVolumeName(bucketInfo.getVolumeName())
-        .setBucketName(bucketInfo.getBucketName())
-        .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
-        .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
-        .setCreationTime(bucketInfo.getCreationTime())
-        .setUsedBytes(bucketInfo.getUsedBytes())
-        .setModificationTime(bucketInfo.getModificationTime())
-        .setQuotaInBytes(bucketInfo.getQuotaInBytes())
-        .setUsedNamespace(bucketInfo.getUsedNamespace())
-        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace());
-
-    obib.setBucketLayout(
-        BucketLayout.fromProto(bucketInfo.getBucketLayout()));
-    if (bucketInfo.hasDefaultReplicationConfig()) {
-      obib.setDefaultReplicationConfig(
-          DefaultReplicationConfig.fromProto(
-              bucketInfo.getDefaultReplicationConfig()));
-    }
-    if (bucketInfo.hasObjectID()) {
-      obib.setObjectID(bucketInfo.getObjectID());
-    }
-    if (bucketInfo.hasUpdateID()) {
-      obib.setUpdateID(bucketInfo.getUpdateID());
-    }
-    if (bucketInfo.hasSourceVolume()) {
-      obib.setSourceVolume(bucketInfo.getSourceVolume());
-    }
-    if (bucketInfo.hasSourceBucket()) {
-      obib.setSourceBucket(bucketInfo.getSourceBucket());
-    }
-    if (bucketInfo.hasOwner()) {
-      obib.setOwner(bucketInfo.getOwner());
-    }
-    return obib.build();
+    return OmBucketInfo.newBuilderFromProtobufPartial(bucketInfo).build();
   }
 
   //---------------------------------------------------------------------------
   public static OmKeyInfo getOmKeyInfoFromProtobuf(OzoneManagerProtocolProtos.KeyInfo keyInfo) {
-    if (keyInfo == null) {
-      return null;
-    }
-
-    List<OmKeyLocationInfoGroup> omKeyLocationInfos = new ArrayList<>();
-    for (OzoneManagerProtocolProtos.KeyLocationList keyLocationList : keyInfo.getKeyLocationListList()) {
-      omKeyLocationInfos.add(
-          OmKeyLocationInfoGroup.getFromProtobuf(keyLocationList));
-    }
-
-    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
-        .setVolumeName(keyInfo.getVolumeName())
-        .setBucketName(keyInfo.getBucketName())
-        .setKeyName(keyInfo.getKeyName())
-        .setOmKeyLocationInfos(omKeyLocationInfos)
-        .setDataSize(keyInfo.getDataSize())
-        .setCreationTime(keyInfo.getCreationTime())
-        .setModificationTime(keyInfo.getModificationTime())
-        .setReplicationConfig(ReplicationConfig
-            .fromProto(keyInfo.getType(), keyInfo.getFactor(),
-                keyInfo.getEcReplicationConfig()))
-        .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()));
-    if (keyInfo.hasObjectID()) {
-      builder.setObjectID(keyInfo.getObjectID());
-    }
-    if (keyInfo.hasUpdateID()) {
-      builder.setUpdateID(keyInfo.getUpdateID());
-    }
-    if (keyInfo.hasParentID()) {
-      builder.setParentObjectID(keyInfo.getParentID());
-    }
-    if (keyInfo.hasFileChecksum()) {
-      FileChecksum fileChecksum = OMPBHelper.convert(keyInfo.getFileChecksum());
-      builder.setFileChecksum(fileChecksum);
-    }
-
-    if (keyInfo.hasIsFile()) {
-      builder.setFile(keyInfo.getIsFile());
-    }
-    if (keyInfo.hasOwnerName()) {
-      builder.setOwnerName(keyInfo.getOwnerName());
-    }
-    // not persisted to DB. FileName will be filtered out from keyName
-    builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
-    return builder.build();
+    return OmKeyInfo.newBuilderFromProtobufPartial(keyInfo).build();
   }
 
   public static RepeatedOmKeyInfo getRepeatedOmKeyInfoFromProto(
@@ -360,27 +266,7 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
    * @return instance of OmDirectoryInfo
    */
   public static OmDirectoryInfo getOmDirInfoFromProtobuf(OzoneManagerProtocolProtos.DirectoryInfo dirInfo) {
-    OmDirectoryInfo.Builder opib = OmDirectoryInfo.newBuilder()
-        .setName(dirInfo.getName())
-        .setCreationTime(dirInfo.getCreationTime())
-        .setModificationTime(dirInfo.getModificationTime());
-    if (dirInfo.getMetadataList() != null) {
-      opib.addAllMetadata(KeyValueUtil
-          .getFromProtobuf(dirInfo.getMetadataList()));
-    }
-    if (dirInfo.hasObjectID()) {
-      opib.setObjectID(dirInfo.getObjectID());
-    }
-    if (dirInfo.hasParentID()) {
-      opib.setParentObjectID(dirInfo.getParentID());
-    }
-    if (dirInfo.hasUpdateID()) {
-      opib.setUpdateID(dirInfo.getUpdateID());
-    }
-    if (dirInfo.hasOwnerName()) {
-      opib.setOwner(dirInfo.getOwnerName());
-    }
-    return opib.build();
+    return OmDirectoryInfo.newBuilderFromProtobufPartial(dirInfo).build();
   }
 
   public static ReconOMDBDefinition get() {

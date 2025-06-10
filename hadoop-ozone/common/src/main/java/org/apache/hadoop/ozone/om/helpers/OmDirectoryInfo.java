@@ -208,20 +208,14 @@ public class OmDirectoryInfo extends WithParentObjectId
     return pib.build();
   }
 
-  /**
-   * Parses DirectoryInfo protobuf and creates OmPrefixInfo.
-   * @param dirInfo
-   * @return instance of OmDirectoryInfo
-   */
-  public static OmDirectoryInfo getFromProtobuf(DirectoryInfo dirInfo) {
+  public static Builder newBuilderFromProtobufPartial(DirectoryInfo dirInfo) {
     OmDirectoryInfo.Builder opib = OmDirectoryInfo.newBuilder()
-            .setName(dirInfo.getName())
-            .setCreationTime(dirInfo.getCreationTime())
-            .setModificationTime(dirInfo.getModificationTime())
-            .setAcls(OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()));
+        .setName(dirInfo.getName())
+        .setCreationTime(dirInfo.getCreationTime())
+        .setModificationTime(dirInfo.getModificationTime());
     if (dirInfo.getMetadataList() != null) {
       opib.addAllMetadata(KeyValueUtil
-              .getFromProtobuf(dirInfo.getMetadataList()));
+          .getFromProtobuf(dirInfo.getMetadataList()));
     }
     if (dirInfo.hasObjectID()) {
       opib.setObjectID(dirInfo.getObjectID());
@@ -235,6 +229,17 @@ public class OmDirectoryInfo extends WithParentObjectId
     if (dirInfo.hasOwnerName()) {
       opib.setOwner(dirInfo.getOwnerName());
     }
+    return opib;
+  }
+
+  /**
+   * Parses DirectoryInfo protobuf and creates OmPrefixInfo.
+   * @param dirInfo
+   * @return instance of OmDirectoryInfo
+   */
+  public static OmDirectoryInfo getFromProtobuf(DirectoryInfo dirInfo) {
+    OmDirectoryInfo.Builder opib = OmDirectoryInfo.newBuilderFromProtobufPartial(dirInfo)
+        .setAcls(OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()));
     return opib.build();
   }
 

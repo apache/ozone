@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileChecksumProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
@@ -730,18 +731,18 @@ public final class OmKeyInfo extends WithParentObjectId
     return kb.build();
   }
 
-  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
+  public static Builder newBuilderFromProtobufPartial(KeyInfo keyInfo) {
     if (keyInfo == null) {
       return null;
     }
 
     List<OmKeyLocationInfoGroup> omKeyLocationInfos = new ArrayList<>();
-    for (KeyLocationList keyLocationList : keyInfo.getKeyLocationListList()) {
+    for (OzoneManagerProtocolProtos.KeyLocationList keyLocationList : keyInfo.getKeyLocationListList()) {
       omKeyLocationInfos.add(
           OmKeyLocationInfoGroup.getFromProtobuf(keyLocationList));
     }
 
-    Builder builder = new Builder()
+    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
         .setKeyName(keyInfo.getKeyName())
@@ -752,11 +753,7 @@ public final class OmKeyInfo extends WithParentObjectId
         .setReplicationConfig(ReplicationConfig
             .fromProto(keyInfo.getType(), keyInfo.getFactor(),
                 keyInfo.getEcReplicationConfig()))
-        .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
-        .addAllTags(KeyValueUtil.getFromProtobuf(keyInfo.getTagsList()))
-        .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
-            OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
-        .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
+        .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()));
     if (keyInfo.hasObjectID()) {
       builder.setObjectID(keyInfo.getObjectID());
     }
@@ -774,15 +771,24 @@ public final class OmKeyInfo extends WithParentObjectId
     if (keyInfo.hasIsFile()) {
       builder.setFile(keyInfo.getIsFile());
     }
-    if (keyInfo.hasExpectedDataGeneration()) {
-      builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
-    }
-
     if (keyInfo.hasOwnerName()) {
       builder.setOwnerName(keyInfo.getOwnerName());
     }
     // not persisted to DB. FileName will be filtered out from keyName
     builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
+    return builder;
+  }
+
+  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
+    Builder builder = OmKeyInfo.newBuilderFromProtobufPartial(keyInfo)
+        .addAllTags(KeyValueUtil.getFromProtobuf(keyInfo.getTagsList()))
+        .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
+            OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
+        .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
+
+    if (keyInfo.hasExpectedDataGeneration()) {
+      builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
+    }
     return builder.build();
   }
 
