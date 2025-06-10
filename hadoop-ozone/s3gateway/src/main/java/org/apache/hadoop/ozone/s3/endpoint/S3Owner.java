@@ -128,12 +128,12 @@ public class S3Owner {
     final String expectedDestOwner = headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER);
 
     // expectedSourceOwner is null, means the client does not want to check source owner
-    if (expectedSourceOwner != null && sourceOwner!= null && !sourceOwner.equals(expectedSourceOwner)) {
+    if (expectedSourceOwner != null && sourceOwner != null && !sourceOwner.equals(expectedSourceOwner)) {
       throw new OMException(ERROR_MESSAGE, OMException.ResultCodes.PERMISSION_DENIED);
     }
 
     // expectedDestOwner is null, means the client does not want to check destination owner
-    if (expectedDestOwner != null && destOwner!= null && !destOwner.equals(expectedDestOwner)) {
+    if (expectedDestOwner != null && destOwner != null && !destOwner.equals(expectedDestOwner)) {
       throw new OMException(ERROR_MESSAGE, OMException.ResultCodes.PERMISSION_DENIED);
     }
   }
