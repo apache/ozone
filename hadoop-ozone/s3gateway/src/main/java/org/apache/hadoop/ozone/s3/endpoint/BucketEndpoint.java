@@ -168,7 +168,7 @@ public class BucketEndpoint extends EndpointBase {
           && OZONE_URI_DELIMITER.equals(delimiter);
 
       bucket = getBucket(bucketName);
-      S3Owner.verify(hh, bucket.getOwner());
+      S3Owner.verifyBucketOwnerCondition(hh, bucket.getOwner());
 
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
     } catch (OMException ex) {
@@ -362,7 +362,7 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
 
     OzoneBucket bucket = getBucket(bucketName);
-    S3Owner.verify(httpHeaders, bucket.getOwner());
+    S3Owner.verifyBucketOwnerCondition(httpHeaders, bucket.getOwner());
 
     try {
       OzoneMultipartUploadList ozoneMultipartUploadList =
@@ -418,7 +418,7 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.HEAD_BUCKET;
     try {
       OzoneBucket bucket = getBucket(bucketName);
-      S3Owner.verify(httpHeaders, bucket.getOwner());
+      S3Owner.verifyBucketOwnerCondition(httpHeaders, bucket.getOwner());
       AUDIT.logReadSuccess(
           buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       getMetrics().updateHeadBucketSuccessStats(startNanos);
@@ -506,7 +506,7 @@ public class BucketEndpoint extends EndpointBase {
       }
       long startNanos = Time.monotonicNowNanos();
       try {
-        S3Owner.verify(httpHeaders, bucket.getOwner());
+        S3Owner.verifyBucketOwnerCondition(httpHeaders, bucket.getOwner());
         undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
         for (DeleteObject d : request.getObjects()) {
           ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
@@ -563,7 +563,7 @@ public class BucketEndpoint extends EndpointBase {
     S3BucketAcl result = new S3BucketAcl();
     try {
       OzoneBucket bucket = getBucket(bucketName);
-      S3Owner.verify(headers, bucket.getOwner());
+      S3Owner.verifyBucketOwnerCondition(headers, bucket.getOwner());
       S3Owner owner = S3Owner.of(bucket.getOwner());
       result.setOwner(owner);
 
@@ -613,7 +613,7 @@ public class BucketEndpoint extends EndpointBase {
 
     try {
       OzoneBucket bucket = getBucket(bucketName);
-      S3Owner.verify(httpHeaders, bucket.getOwner());
+      S3Owner.verifyBucketOwnerCondition(httpHeaders, bucket.getOwner());
       OzoneVolume volume = getVolume();
 
       List<OzoneAcl> ozoneAclListOnBucket = new ArrayList<>();

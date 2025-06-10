@@ -246,7 +246,7 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneVolume volume = getVolume();
       bucket = volume.getBucket(bucketName);
       String bucketOwner = bucket.getOwner();
-      S3Owner.verify(headers, bucketOwner);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketOwner);
       if (taggingMarker != null) {
         s3GAction = S3GAction.PUT_OBJECT_TAGGING;
         return putObjectTagging(volume, bucketName, keyPath, body);
@@ -432,7 +432,7 @@ public class ObjectEndpoint extends EndpointBase {
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
     try {
       OzoneBucket bucket = getBucket(bucketName);
-      S3Owner.verify(headers, bucket.getOwner());
+      S3Owner.verifyBucketOwnerCondition(headers, bucket.getOwner());
       if (taggingMarker != null) {
         s3GAction = S3GAction.GET_OBJECT_TAGGING;
         return getObjectTagging(bucket, keyPath);
@@ -627,7 +627,7 @@ public class ObjectEndpoint extends EndpointBase {
     OzoneKey key;
     try {
       OzoneBucket bucket = getBucket(bucketName);
-      S3Owner.verify(headers, bucket.getOwner());
+      S3Owner.verifyBucketOwnerCondition(headers, bucket.getOwner());
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
@@ -750,7 +750,7 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       OzoneVolume volume = getVolume();
       OzoneBucket bucket = volume.getBucket(bucketName);
-      S3Owner.verify(headers, bucket.getOwner());
+      S3Owner.verifyBucketOwnerCondition(headers, bucket.getOwner());
       if (taggingMarker != null) {
         s3GAction = S3GAction.DELETE_OBJECT_TAGGING;
         return deleteObjectTagging(bucket, keyPath);
@@ -826,7 +826,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
-      S3Owner.verify(headers, ozoneBucket.getOwner());
+      S3Owner.verifyBucketOwnerCondition(headers, ozoneBucket.getOwner());
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
       String storageConfig = headers.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
 
@@ -899,7 +899,7 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       OzoneVolume volume = getVolume();
       OzoneBucket ozoneBucket = volume.getBucket(bucket);
-      S3Owner.verify(headers, ozoneBucket.getOwner());
+      S3Owner.verifyBucketOwnerCondition(headers, ozoneBucket.getOwner());
 
       for (CompleteMultipartUploadRequest.Part part : partList) {
         partsMap.put(part.getPartNumber(), part.getETag());
@@ -1005,7 +1005,7 @@ public class ObjectEndpoint extends EndpointBase {
         String sourceBucket = result.getLeft();
         String sourceKey = result.getRight();
         String sourceBucketOwner = volume.getBucket(sourceBucket).getOwner();
-        S3Owner.verifyCopyOperation(headers, sourceBucketOwner, ozoneBucket.getOwner());
+        S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, sourceBucketOwner, ozoneBucket.getOwner());
 
         OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
             volume.getName(), sourceBucket, sourceKey);
@@ -1254,7 +1254,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     String sourceBucketOwner = volume.getBucket(sourceBucket).getOwner();
     String destBucketOwner = volume.getBucket(destBucket).getOwner();
-    S3Owner.verifyCopyOperation(headers, sourceBucketOwner, destBucketOwner);
+    S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, sourceBucketOwner, destBucketOwner);
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);

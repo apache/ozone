@@ -91,10 +91,9 @@ public class S3Owner {
    *
    * @param headers       HTTP headers
    * @param bucketOwner   bucket owner
-   * @throws OMException if the expected bucket owner does not match the actual
-   *                     bucket owner
+   * @throws OMException if the expected bucket owner does not match
    */
-  public static void verify(HttpHeaders headers, String bucketOwner) throws OMException {
+  public static void verifyBucketOwnerCondition(HttpHeaders headers, String bucketOwner) throws OMException {
     if (headers == null || bucketOwner == null) {
       return;
     }
@@ -111,15 +110,14 @@ public class S3Owner {
   }
 
   /**
-   * Verify the copy operation's source and destination bucket owners.
+   * Verify the bucket owner condition on copy operation.
    *
    * @param headers       HTTP headers
    * @param sourceOwner   source bucket owner
    * @param destOwner     destination bucket owner
-   * @throws OMException if the expected source or destination bucket owner does
-   *                     not match the actual owners
+   * @throws OMException if the expected source or destination bucket owner does not match
    */
-  public static void verifyCopyOperation(HttpHeaders headers, String sourceOwner, String destOwner) throws OMException {
+  public static void verifyBucketOwnerConditionOnCopyOperation(HttpHeaders headers, String sourceOwner, String destOwner) throws OMException {
     if (headers == null) {
       return;
     }
