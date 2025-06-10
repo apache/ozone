@@ -130,7 +130,7 @@ public class TestSCMBlockDeletingService {
         metrics.getNumBlockDeletionCommandSent());
     // Echo Command has one Transaction
     assertEquals(datanodeDetails.size() * 1,
-        metrics.getNumBlockDeletionTransactionSent());
+        metrics.getNumBlockDeletionTransactionsOnDatanodes());
   }
 
   private void callDeletedBlockTransactionScanner() throws Exception {
