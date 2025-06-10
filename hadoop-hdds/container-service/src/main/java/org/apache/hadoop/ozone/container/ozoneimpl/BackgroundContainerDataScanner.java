@@ -30,6 +30,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,6 +101,9 @@ public class BackgroundContainerDataScanner extends
           containerId, result.getException());
       metrics.incNumUnHealthyContainers();
       controller.markContainerUnhealthy(containerId, result);
+      LOG.info("Triggering a volume scan for volume [{}] as unhealthy container [{}] was on it.",
+          containerData.getVolume().getStorageDir().getPath(), containerId);
+      StorageVolumeUtil.onFailure(containerData.getVolume());
     }
 
     metrics.incNumContainersScanned();
