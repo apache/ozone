@@ -151,5 +151,5 @@ When a follower OM falls significantly behind and is unable to catch up with the
 
  * Check [this page]({{< ref "design/omha.md" >}}) for the links to the original design docs
  * Ozone distribution contains an example OM HA configuration, under the `compose/ozone-om-ha` directory which can be tested with the help of [docker-compose]({{< ref "start/RunningViaDocker.md" >}}).
- * [OzoneManagerStateMachine.notifyInstallSnapshotFromLeader source code](https://github.com/apache/ozone/blob/master/hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/ratis/OzoneManagerStateMachine.java)
+* [OzoneManagerStateMachine.notifyInstallSnapshotFromLeader source code](https://github.com/apache/ozone/blob/master/hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/ratis/OzoneManagerStateMachine.java#L530)
 * [Apache Ratis State Machine API documentation](https://github.com/apache/ratis/blob/master/ratis-server-api/src/main/java/org/apache/ratis/statemachine/StateMachine.java)
