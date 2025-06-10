@@ -43,7 +43,7 @@ author: Aravindan Vijayan
 
 ## How do you prepare an Ozone manager quorum
 
-    ozone admin om prepare -id=<om-sevice-id>
+    ozone admin om prepare -id=<om-service-id>
 
 This leaves the Ozone manager in a state where it cannot accept new writes.
 
