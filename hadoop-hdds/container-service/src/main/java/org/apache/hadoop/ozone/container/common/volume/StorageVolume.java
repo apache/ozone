@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
@@ -640,6 +642,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
         throw new InterruptedException("Directory check of volume " + this +
             " interrupted.");
       }
+      LOG.error("Directory check of volume {} failed.", this);
       return VolumeCheckResult.FAILED;
     }
 
@@ -727,5 +730,36 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     }
 
     return usageCheckFactory.paramsFor(root);
+  }
+
+  @VisibleForTesting
+  public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
+    if (getIoTestCount() == 0) {
+      return VolumeCheckResult.HEALTHY;
+    }
+
+    final boolean isVolumeTestResultHealthy = true;
+    try (ManagedOptions managedOptions = new ManagedOptions();
+         ManagedRocksDB readOnlyDb = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
+      getIoTestSlidingWindow().add(isVolumeTestResultHealthy);
+    } catch (Exception e) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Check of database for volume " + this + " interrupted.");
+      }
+      LOG.warn("Could not open Volume DB located at {}", dbFile, e);
+      getIoTestSlidingWindow().add(!isVolumeTestResultHealthy);
+    }
+
+    if (getIoTestSlidingWindow().isFailed()) {
+      LOG.error("Failed to open the database at \"{}\" for HDDS volume {}: " +
+              "encountered {} out of {} tolerated failures.",
+          dbFile, this, getIoTestSlidingWindow().getFailureCount(), getIoTestSlidingWindow().getFailureTolerance());
+      return VolumeCheckResult.FAILED;
+    }
+
+    LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}: " +
+            "encountered {} out of {} tolerated failures",
+        dbFile, this, getIoTestSlidingWindow().getFailureCount(), getIoTestSlidingWindow().getFailureTolerance());
+    return VolumeCheckResult.HEALTHY;
   }
 }

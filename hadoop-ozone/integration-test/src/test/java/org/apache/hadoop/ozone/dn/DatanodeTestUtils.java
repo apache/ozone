@@ -160,6 +160,7 @@ public final class DatanodeTestUtils {
     for (File dir : dirs) {
       if (dir.exists()) {
         assertTrue(dir.setWritable(false, false));
+        assertTrue(dir.setReadable(false, false));
       }
     }
   }
@@ -173,6 +174,7 @@ public final class DatanodeTestUtils {
     for (File dir : dirs) {
       if (dir.exists()) {
         assertTrue(dir.setWritable(true, true));
+        assertTrue(dir.setReadable(true, true));
       }
     }
   }

@@ -34,8 +34,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -292,37 +290,6 @@ public class HddsVolume extends StorageVolume {
     }
 
     return checkDbHealth(dbFile);
-  }
-
-  @VisibleForTesting
-  public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
-    if (getIoTestCount() == 0) {
-      return VolumeCheckResult.HEALTHY;
-    }
-
-    final boolean isVolumeTestResultHealthy = true;
-    try (ManagedOptions managedOptions = new ManagedOptions();
-         ManagedRocksDB readOnlyDb = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
-      getIoTestSlidingWindow().add(isVolumeTestResultHealthy);
-    } catch (Exception e) {
-      if (Thread.currentThread().isInterrupted()) {
-        throw new InterruptedException("Check of database for volume " + this + " interrupted.");
-      }
-      LOG.warn("Could not open Volume DB located at {}", dbFile, e);
-      getIoTestSlidingWindow().add(!isVolumeTestResultHealthy);
-    }
-
-    if (getIoTestSlidingWindow().isFailed()) {
-      LOG.error("Failed to open the database at \"{}\" for HDDS volume {}: " +
-              "encountered {} out of {} tolerated failures.",
-          dbFile, this, getIoTestSlidingWindow().getFailureCount(), getIoTestSlidingWindow().getFailureTolerance());
-      return VolumeCheckResult.FAILED;
-    }
-
-    LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}: " +
-            "encountered {} out of {} tolerated failures",
-        dbFile, this, getIoTestSlidingWindow().getFailureCount(), getIoTestSlidingWindow().getFailureTolerance());
-    return VolumeCheckResult.HEALTHY;
   }
 
   /**

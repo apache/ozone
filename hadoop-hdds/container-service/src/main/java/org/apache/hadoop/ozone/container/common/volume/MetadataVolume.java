@@ -17,7 +17,15 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.apache.hadoop.ozone.OzoneConsts.WITNESSED_CONTAINER_DB_NAME;
+
+import jakarta.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
+import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * MetadataVolume represents a volume in datanode for metadata(ratis).
@@ -25,7 +33,7 @@ import java.io.IOException;
  * and volume info for it.
  */
 public class MetadataVolume extends StorageVolume {
-
+  private static final Logger LOG = LoggerFactory.getLogger(MetadataVolume.class);
   private final VolumeType type = VolumeType.META_VOLUME;
 
   protected MetadataVolume(Builder b) throws IOException {
@@ -74,5 +82,24 @@ public class MetadataVolume extends StorageVolume {
   @Override
   public String getStorageID() {
     return "";
+  }
+
+  @Override
+  public synchronized VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
+    VolumeCheckResult result = super.check(unused);
+
+    if (result != VolumeCheckResult.HEALTHY) {
+      LOG.error("Volume failed health check.");
+      return result;
+    }
+
+    // Check that per-volume RocksDB is present.
+    File dbFile = new File(ServerUtils.getOzoneMetaDirPath(getConf()), WITNESSED_CONTAINER_DB_NAME);
+    if (!dbFile.exists() || !dbFile.canRead()) {
+      LOG.warn("Volume {} failed health check. Could not access RocksDB at {}", getStorageDir(), dbFile);
+      return VolumeCheckResult.FAILED;
+    }
+
+    return checkDbHealth(dbFile);
   }
 }
