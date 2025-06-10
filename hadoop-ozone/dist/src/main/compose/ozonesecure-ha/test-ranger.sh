@@ -45,10 +45,10 @@ export RANGER_OZONE_PLUGIN_DIR="${DOWNLOAD_DIR}/ranger-${RANGER_VERSION}-ozone-p
 chmod -R go+rX "${RANGER_OZONE_PLUGIN_DIR}"
 
 # customizations before install
-sed -i \
-  -e 's@^POLICY_MGR_URL=.*@POLICY_MGR_URL=http://ranger:6080@' \
-  -e 's@^REPOSITORY_NAME=.*@REPOSITORY_NAME=dev_ozone@' \
-  -e 's@^CUSTOM_USER=ozone@CUSTOM_USER=hadoop@' \
+perl -wpl -i \
+  -e 's@^POLICY_MGR_URL=.*@POLICY_MGR_URL=http://ranger:6080@;' \
+  -e 's@^REPOSITORY_NAME=.*@REPOSITORY_NAME=dev_ozone@;' \
+  -e 's@^CUSTOM_USER=ozone@CUSTOM_USER=hadoop@;' \
   "${RANGER_OZONE_PLUGIN_DIR}/install.properties"
 
 start_docker_env
