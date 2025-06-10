@@ -77,7 +77,7 @@ public final class ContainerCreateInfo {
   }
 
   public ContainerProtos.ContainerDataProto.State getState() {
-      return state;
+    return state;
   }
 
   /**
