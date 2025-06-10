@@ -45,7 +45,7 @@ public abstract class BackgroundService {
   private ThreadGroup threadGroup;
   private final String serviceName;
   private long interval;
-  private long serviceTimeoutInNanos;
+  private volatile long serviceTimeoutInNanos;
   private TimeUnit unit;
   private final int threadPoolSize;
   private final String threadNamePrefix;
