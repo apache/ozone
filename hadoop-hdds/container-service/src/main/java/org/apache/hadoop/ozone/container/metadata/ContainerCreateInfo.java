@@ -76,6 +76,10 @@ public final class ContainerCreateInfo {
     return ContainerCreateInfo.valueOf(proto.getState());
   }
 
+  public ContainerProtos.ContainerDataProto.State getState() {
+      return state;
+  }
+
   /**
    * ContainerCreateInfoCodec handles compatibility for containerIds Table, where old format from String is changed
    * to proto3 format, ContainerCreateInfo. So this codec can read both formats based on the HDDSLayoutFeature.
