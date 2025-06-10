@@ -270,7 +270,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
           .addGauge(DatanodeCommandDetails.COMMANDS_TIMEOUT_BY_DN,
               e.getValue().getCommandsTimeout())
           .addGauge(DatanodeCommandDetails.BLOCKS_SENT_TO_DN_COMMAND,
-          e.getValue().getCommandsTimeout());
+          e.getValue().getBlocksSent());
     }
     recordBuilder.endRecord();
   }
@@ -345,6 +345,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     
     public long getCommandsTimeout() {
       return commandsTimeout;
+    }
+
+    public long getBlocksSent() {
+      return blocksSent;
     }
 
     @Override
