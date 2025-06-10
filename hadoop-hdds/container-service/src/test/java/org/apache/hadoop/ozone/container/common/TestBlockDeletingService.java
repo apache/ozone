@@ -229,7 +229,7 @@ public class TestBlockDeletingService {
             container, blockID);
         kd.setChunks(chunks);
         metadata.getStore().getBlockDataTable().put(deleteStateName, kd);
-        container.getContainerData().incrPendingDeletionBlocks(1);
+        container.getContainerData().incrPendingDeletionBlocks(1, 256);
       }
       updateMetaData(data, container, numOfBlocksPerContainer,
           numOfChunksPerBlock);
@@ -261,7 +261,7 @@ public class TestBlockDeletingService {
         LOG.warn("Failed to put block: " + blockID.getLocalID()
             + " in BlockDataTable.");
       }
-      container.getContainerData().incrPendingDeletionBlocks(1);
+      container.getContainerData().incrPendingDeletionBlocks(1, 256);
 
       // Below we are creating one transaction per block just for
       // testing purpose
@@ -349,6 +349,9 @@ public class TestBlockDeletingService {
       metadata.getStore().getMetadataTable()
           .put(data.getPendingDeleteBlockCountKey(),
               (long) numOfBlocksPerContainer);
+      metadata.getStore().getMetadataTable()
+          .put(data.getPendingDeleteBlockBytesKey(),
+              (long) numOfBlocksPerContainer * 256);
     } catch (IOException exception) {
       LOG.warn("Meta Data update was not successful for container: "
           + container);
@@ -446,11 +449,13 @@ public class TestBlockDeletingService {
           incorrectData));
       assertEquals(0, db.getStore().getMetadataTable()
           .get(incorrectData.getPendingDeleteBlockCountKey()).longValue());
+      assertEquals(0, db.getStore().getMetadataTable()
+          .get(incorrectData.getPendingDeleteBlockBytesKey()).longValue());
       assertEquals(0,
           incorrectData.getNumPendingDeletionBlocks());
 
       // Alter the pending delete value in memory and the DB.
-      incorrectData.incrPendingDeletionBlocks(blockDeleteLimit);
+      incorrectData.incrPendingDeletionBlocks(blockDeleteLimit, 256);
       db.getStore().getMetadataTable().put(
           incorrectData.getPendingDeleteBlockCountKey(),
           (long)blockDeleteLimit);
@@ -615,6 +620,9 @@ public class TestBlockDeletingService {
       assertEquals(3,
           deletingServiceMetrics.getTotalPendingBlockCount());
 
+      assertEquals(3 * 256,
+          deletingServiceMetrics.getTotalPendingBlockBytes());
+
       deleteAndWait(svc, 2);
 
       containerData.forEach(c -> assertDeletionsInChecksumFile(c, 3));
@@ -648,6 +656,8 @@ public class TestBlockDeletingService {
       // So the Pending Block count will be 1
       assertEquals(1,
           deletingServiceMetrics.getTotalPendingBlockCount());
+      assertEquals(568,
+          deletingServiceMetrics.getTotalPendingBlockBytes());
     }
     svc.shutdown();
   }
@@ -726,7 +736,7 @@ public class TestBlockDeletingService {
 
       createTxn(ctr1, unrecordedBlockIds, 100, ctr1.getContainerID());
       ctr1.updateDeleteTransactionId(100);
-      ctr1.incrPendingDeletionBlocks(numUnrecordedBlocks);
+      ctr1.incrPendingDeletionBlocks(numUnrecordedBlocks, 256);
       updateMetaData(ctr1, (KeyValueContainer) containerSet.getContainer(
           ctr1.getContainerID()), 3, 1);
       // Ensure there are 3 + 4 = 7 blocks under deletion

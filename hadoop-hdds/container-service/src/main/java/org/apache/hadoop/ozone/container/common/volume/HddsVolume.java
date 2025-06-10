@@ -29,6 +29,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -44,6 +45,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
@@ -110,6 +112,9 @@ public class HddsVolume extends StorageVolume {
   private final int volumeTestFailureTolerance;
   private AtomicInteger volumeTestFailureCount;
   private Queue<Boolean> volumeTestResultQueue;
+
+  private volatile CachedPendingDeletion cachedPendingDeletion = null;
+  private Object cacheLock = new Object();
 
   /**
    * Builder for HddsVolume.
@@ -203,6 +208,7 @@ public class HddsVolume extends StorageVolume {
     StorageLocationReport.Builder builder = super.reportBuilder();
     if (!builder.isFailed()) {
       builder.setCommitted(getCommittedBytes())
+          .setPendingDeletions(getPendingDeletionBytes())
           .setFreeSpaceToSpare(getFreeSpaceToSpare(builder.getCapacity()));
     }
     return builder;
@@ -313,6 +319,34 @@ public class HddsVolume extends StorageVolume {
     }
 
     return checkDbHealth(dbFile);
+  }
+
+  public long getPendingDeletionBytes() {
+
+    CachedPendingDeletion currentCache = cachedPendingDeletion;
+    if (currentCache != null && !currentCache.isExpired()) {
+      return currentCache.getSize();
+    }
+
+    synchronized (cacheLock) {
+      currentCache = cachedPendingDeletion;
+      if (currentCache != null && !currentCache.isExpired()) {
+        return currentCache.getSize();
+      }
+
+      long total = 0L;
+      if (controller != null) {
+        Iterable<Container<?>> containers = controller.getContainers();
+        while (containers.iterator().hasNext()) {
+          Container<?> container = containers.iterator().next();
+          total += container.getContainerData().getStatistics().getBlockPendingDeletionBytes();
+        }
+      }
+
+      long cacheDurationMinutes = getDatanodeConfig().getBlockDeletionInterval().multipliedBy(5).toMinutes();
+      cachedPendingDeletion = new CachedPendingDeletion(total, cacheDurationMinutes);
+      return total;
+    }
   }
 
   @VisibleForTesting
@@ -622,6 +656,24 @@ public class HddsVolume extends StorageVolume {
           Time.monotonicNowNanos() - start);
     } catch (Exception e) {
       LOG.warn("compact rocksdb error in {}", dbFilePath, e);
+    }
+  }
+
+  private static class CachedPendingDeletion {
+    private final long size;
+    private final long expiryTimeMillis;
+
+    CachedPendingDeletion(long size, long cacheDurationMinutes) {
+      this.size = size;
+      this.expiryTimeMillis = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(cacheDurationMinutes);
+    }
+
+    public long getSize() {
+      return size;
+    }
+
+    public boolean isExpired() {
+      return System.currentTimeMillis() > expiryTimeMillis;
     }
   }
 }
