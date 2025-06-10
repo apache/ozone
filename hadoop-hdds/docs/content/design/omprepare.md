@@ -52,7 +52,7 @@ This leaves the Ozone manager in a state where it cannot accept new writes.
 In the case of a cancelled upgrade, the OM can be brought out off the
 prepared state by using the following command.
 
-    ozone admin om cancelprepare -id=<om-sevice-id>
+    ozone admin om cancelprepare -id=<om-service-id>
 
 # Link
 
