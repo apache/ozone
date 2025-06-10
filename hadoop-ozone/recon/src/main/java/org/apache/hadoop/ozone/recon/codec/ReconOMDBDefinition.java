@@ -96,12 +96,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
  *   ReconOMDBDefinition def = ReconOMDBDefinition.get();
  * </pre>
  *
- * <p>{@inheritDoc}</p>
- * Child methods:
- *
- * @see org.apache.hadoop.ozone.om.codec.OMDBDefinition
- * @see DBDefinition
- * @see DBDefinition.WithMap
  */
 public final class ReconOMDBDefinition extends DBDefinition.WithMap {
 
