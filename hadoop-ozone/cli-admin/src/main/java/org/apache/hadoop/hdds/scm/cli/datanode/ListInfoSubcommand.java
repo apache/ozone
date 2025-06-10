@@ -119,7 +119,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
           .compareToIgnoreCase(nodeState) == 0);
     }
 
-    allNodes = allNodes.limit(listLimitOptions.getLimit());
+    if(!listLimitOptions.isAll()){
+      allNodes = allNodes.limit(listLimitOptions.getLimit());
+    }
     
     if (json) {
       List<DatanodeWithAttributes> datanodeList = allNodes.collect(
