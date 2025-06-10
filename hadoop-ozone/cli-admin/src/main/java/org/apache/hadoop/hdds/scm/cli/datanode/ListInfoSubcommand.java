@@ -119,7 +119,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
           .compareToIgnoreCase(nodeState) == 0);
     }
 
-    if(!listLimitOptions.isAll()){
+    if (!listLimitOptions.isAll()) {
       allNodes = allNodes.limit(listLimitOptions.getLimit());
     }
     
