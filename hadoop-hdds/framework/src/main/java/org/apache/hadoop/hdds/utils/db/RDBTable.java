@@ -17,17 +17,26 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.utils.db.RocksDatabase.bytes2String;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Spliterator;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.RDBStoreAbstractIterator.AutoCloseableRawKeyValue;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.ReferenceCountedObject;
+import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * metadata store content. All other user's using Table should use TypedTable.
  */
 @InterfaceAudience.Private
-class RDBTable implements Table<byte[], byte[]> {
+class RDBTable implements BaseRDBTable<byte[], byte[]> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBTable.class);
@@ -94,7 +103,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public boolean isEmpty() throws IOException {
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> keyIter = iterator()) {
+    try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> keyIter = iterator()) {
       keyIter.seekToFirst();
       return !keyIter.hasNext();
     }
@@ -210,22 +219,49 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator()
+  public TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> iterator()
       throws IOException {
     return iterator((byte[])null);
   }
 
   @Override
-  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix)
+  public TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> iterator(byte[] prefix)
       throws IOException {
-    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
-        prefix);
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this, prefix);
   }
 
-  TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> iterator(
+  @Override
+  public KeyValueSpliterator<byte[], byte[]> spliterator(int maxParallelism, boolean closeOnException)
+      throws IOException {
+    return spliterator(null, null, maxParallelism, closeOnException);
+  }
+
+  @Override
+  public KeyValueSpliterator<byte[], byte[]> spliterator(byte[] startKey, byte[] prefix, int maxParallelism,
+      boolean closeOnException) throws IOException {
+    return newByteArraySpliterator(prefix, startKey, maxParallelism, closeOnException);
+  }
+
+  TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
+      CodecBuffer prefix, ManagedSnapshot snapshot) throws IOException {
+    return iterator(prefix, 1, snapshot);
+  }
+
+  TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
+      CodecBuffer prefix, int maxNumberOfBuffers, ManagedSnapshot snapshot) throws IOException {
+    return new RDBStoreCodecBufferIterator(db.newIterator(family, false, snapshot),
+        this, prefix, maxNumberOfBuffers);
+  }
+
+  TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
       CodecBuffer prefix) throws IOException {
+    return iterator(prefix, 1);
+  }
+
+  TableIterator<CodecBuffer, AutoCloseableRawKeyValue<CodecBuffer>> iterator(
+      CodecBuffer prefix, int maxNumberOfBuffers) throws IOException {
     return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
-        this, prefix);
+        this, prefix, maxNumberOfBuffers);
   }
 
   @Override
@@ -262,7 +298,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void deleteBatchWithPrefix(BatchOperation batch, byte[] prefix)
       throws IOException {
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter
+    try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iter
              = iterator(prefix)) {
       while (iter.hasNext()) {
         deleteWithBatch(batch, iter.next().getKey());
@@ -273,7 +309,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
       throws IOException {
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter = iterator(prefix);
+    try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iter = iterator(prefix);
          RDBSstFileWriter fileWriter = new RDBSstFileWriter(externalFile)) {
       while (iter.hasNext()) {
         final KeyValue<byte[], byte[]> entry = iter.next();
@@ -298,7 +334,7 @@ class RDBTable implements Table<byte[], byte[]> {
             "Invalid count given " + count + ", count must be greater than 0");
     }
     final List<KeyValue<byte[], byte[]>> result = new ArrayList<>();
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> it
+    try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> it
              = iterator(prefix)) {
       if (startKey == null) {
         it.seekToFirst();
@@ -356,5 +392,99 @@ class RDBTable implements Table<byte[], byte[]> {
       }
     }
     return result;
+  }
+
+  private RawSpliterator<byte[], byte[], byte[]> newByteArraySpliterator(byte[] prefix, byte[] startKey,
+      int maxParallelism, boolean closeOnException) throws IOException {
+    return new ByteArrayRawSpliterator(prefix, startKey, maxParallelism, closeOnException);
+  }
+
+  @Override
+  public List<LiveFileMetaData> getTableSstFiles() throws IOException {
+    return this.db.getSstFileList().stream()
+        .filter(liveFileMetaData -> getName().equals(bytes2String(liveFileMetaData.columnFamilyName())))
+        .collect(Collectors.toList());
+  }
+
+  @Override
+  public ManagedSnapshot takeTableSnapshot() throws IOException {
+    return db.takeSnapshot();
+  }
+
+  @Override
+  public TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> iterator(ManagedSnapshot snapshot)
+      throws IOException {
+    return iterator((byte[])null, snapshot);
+  }
+
+  @Override
+  public TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> iterator(byte[] prefix, ManagedSnapshot snapshot)
+      throws IOException {
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false, snapshot), this, prefix);
+  }
+
+  private final class ByteArrayRawSpliterator extends RDBRawSpliterator<byte[], byte[], byte[]> {
+
+    @Override
+    ManagedSnapshot getNewSnapshot() throws IOException {
+      return takeTableSnapshot();
+    }
+
+    private ByteArrayRawSpliterator(byte[] prefix, byte[] startKey, int maxParallelism, boolean closeOnException)
+        throws IOException {
+      super(prefix, startKey, maxParallelism, closeOnException);
+    }
+
+    private ByteArrayRawSpliterator(byte[] prefix, byte[] startKey, int maxParallelism, boolean closeOnException,
+        List<byte[]> boundKeys, ReferenceCountedObject<ManagedSnapshot> snapshot) throws IOException {
+      super(prefix, startKey, maxParallelism, closeOnException, boundKeys, snapshot);
+    }
+
+    @Override
+    KeyValue<byte[], byte[]> convert(RawKeyValue<byte[]> kv) {
+      final int rawSize = kv.getValue().length;
+      return Table.newKeyValue(kv.getKey(), kv.getValue(), rawSize);
+    }
+
+    @Override
+    List<byte[]> getBoundaryKeys(byte[] prefix, byte[] startKey) throws IOException {
+      return getTableSstFiles().stream()
+          .flatMap(liveFileMetaData -> Stream.of(liveFileMetaData.smallestKey(), liveFileMetaData.largestKey()))
+          .filter(value -> {
+            if (value.length < prefix.length) {
+              return false;
+            }
+            for (int i = 0; i < prefix.length; i++) {
+              if (value[i] != prefix[i]) {
+                return false;
+              }
+            }
+            return true;
+          }).filter(value -> ByteArrayCodec.getComparator().compare(value, startKey) >= 0)
+          .collect(Collectors.toList());
+    }
+
+    @Override
+    int compare(byte[] value1, byte[] value2) {
+      return ByteArrayCodec.getComparator().compare(value1, value2);
+    }
+
+    @Override
+    TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> getRawIterator(
+        byte[] prefix, byte[] startKey, int maxParallelism) throws IOException {
+      TableIterator<byte[], AutoCloseableRawKeyValue<byte[]>> itr = prefix == null ? iterator(getSnapshot().get()) :
+          iterator(prefix, getSnapshot().get());
+      if (startKey != null) {
+        itr.seek(startKey);
+      }
+      return itr;
+    }
+
+    @Override
+    Spliterator<KeyValue<byte[], byte[]>> createNewSpliterator(byte[] prefix, byte[] startKey, int maxParallelism,
+        boolean closeOnException, List<byte[]> boundaryKeys) throws IOException {
+      return new ByteArrayRawSpliterator(prefix, startKey, maxParallelism, closeOnException, boundaryKeys,
+          getSnapshot());
+    }
   }
 }

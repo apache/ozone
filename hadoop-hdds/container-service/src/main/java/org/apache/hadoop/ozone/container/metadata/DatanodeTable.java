@@ -90,6 +90,21 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public KeyValueSpliterator<KEY, VALUE> spliterator(int maxParallelism, boolean closeOnException) {
+    throw new UnsupportedOperationException("Iterating tables directly is not" +
+        " supported for datanode containers due to differing schema " +
+        "version.");
+  }
+
+  @Override
+  public KeyValueSpliterator<KEY, VALUE> spliterator(KEY startKey, KEY prefix, int maxParallelism,
+      boolean closeOnException) {
+    throw new UnsupportedOperationException("Iterating tables directly is not" +
+        " supported for datanode containers due to differing schema " +
+        "version.");
+  }
+
+  @Override
   public String getName() {
     return table.getName();
   }
