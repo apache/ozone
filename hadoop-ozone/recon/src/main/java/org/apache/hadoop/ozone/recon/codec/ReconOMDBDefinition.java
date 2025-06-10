@@ -62,7 +62,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
  * Recon-specific OM RocksDB schema definition.
  *
  * <p>
- * This is a specialized version of {@link org.apache.hadoop.ozone.om.codec.OMDBDefinition},
+ * This is a specialized version of {@code org.apache.hadoop.ozone.om.codec.OMDBDefinition},
  * used by the Recon service (the Ozone analytics layer). It uses lightweight,
  * “partial” Protobuf codecs for faster deserialization and to skip loading
  * ACL or permission details unnecessary for analytic workloads.
