@@ -123,11 +123,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return value == null ? null : valueCodec.toPersistedFormat(value);
   }
 
-  private KEY decodeKey(byte[] key) throws IOException {
+  private KEY decodeKey(byte[] key) throws CodecException {
     return key == null ? null : keyCodec.fromPersistedFormat(key);
   }
 
-  private VALUE decodeValue(byte[] value) throws IOException {
+  private VALUE decodeValue(byte[] value) throws CodecException {
     return value == null ? null : valueCodec.fromPersistedFormat(value);
   }
 
@@ -465,7 +465,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public List<TypedKeyValue> getRangeKVs(
+  public List<KeyValue<KEY, VALUE>> getRangeKVs(
           KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
@@ -477,15 +477,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
         rawTable.getRangeKVs(startKeyBytes, count, prefixBytes, filters);
-
-    List<TypedKeyValue> rangeKVs = new ArrayList<>();
-    rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
-
-    return rangeKVs;
+    return covert(rangeKVBytes);
   }
 
   @Override
-  public List<TypedKeyValue> getSequentialRangeKVs(
+  public List<KeyValue<KEY, VALUE>> getSequentialRangeKVs(
           KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
@@ -498,10 +494,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
         rawTable.getSequentialRangeKVs(startKeyBytes, count,
             prefixBytes, filters);
+    return covert(rangeKVBytes);
+  }
 
-    List<TypedKeyValue> rangeKVs = new ArrayList<>();
-    rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
-
+  private List<KeyValue<KEY, VALUE>> covert(List<? extends KeyValue<byte[], byte[]>> rangeKVBytes)
+      throws CodecException {
+    final List<KeyValue<KEY, VALUE>> rangeKVs = new ArrayList<>();
+    for (KeyValue<byte[], byte[]> kv : rangeKVBytes) {
+      rangeKVs.add(Table.newKeyValue(decodeKey(kv.getKey()), decodeValue(kv.getValue())));
+    }
     return rangeKVs;
   }
 
@@ -532,28 +533,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return cache;
   }
 
-  /**
-   * Key value implementation for strongly typed tables.
-   */
-  public final class TypedKeyValue implements KeyValue<KEY, VALUE> {
-
-    private final KeyValue<byte[], byte[]> rawKeyValue;
-
-    private TypedKeyValue(KeyValue<byte[], byte[]> rawKeyValue) {
-      this.rawKeyValue = rawKeyValue;
-    }
-
-    @Override
-    public KEY getKey() throws IOException {
-      return decodeKey(rawKeyValue.getKey());
-    }
-
-    @Override
-    public VALUE getValue() throws IOException {
-      return decodeValue(rawKeyValue.getValue());
-    }
-  }
-
   RawIterator<CodecBuffer> newCodecBufferTableIterator(
       TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> i) {
     return new RawIterator<CodecBuffer>(i) {
@@ -574,8 +553,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       }
 
       @Override
-      KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw)
-          throws IOException {
+      KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw) throws CodecException {
         final int rawSize = raw.getValue().readableBytes();
         final KEY key = keyCodec.fromCodecBuffer(raw.getKey());
         final VALUE value = valueCodec.fromCodecBuffer(raw.getValue());
@@ -600,8 +578,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
 
     @Override
-    KeyValue<KEY, VALUE> convert(KeyValue<byte[], byte[]> raw) {
-      return new TypedKeyValue(raw);
+    KeyValue<KEY, VALUE> convert(KeyValue<byte[], byte[]> raw) throws CodecException {
+      return Table.newKeyValue(decodeKey(raw.getKey()), decodeValue(raw.getValue()));
     }
   }
 
@@ -625,8 +603,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
      * Covert the given {@link Table.KeyValue}
      * from ({@link RAW}, {@link RAW}) to ({@link KEY}, {@link VALUE}).
      */
-    abstract KeyValue<KEY, VALUE> convert(KeyValue<RAW, RAW> raw)
-        throws IOException;
+    abstract KeyValue<KEY, VALUE> convert(KeyValue<RAW, RAW> raw) throws CodecException;
 
     @Override
     public void seekToFirst() {
