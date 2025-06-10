@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUti
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyLong;
@@ -194,7 +195,7 @@ class TestContainerImporter {
   }
 
   @Test
-  public void testImportContainerScansContainer() throws Exception {
+  public void testImportContainerTriggersOnDemandScanner() throws Exception {
     long containerId = 1;
     try (MockedStatic<OnDemandContainerDataScanner> mockedStatic = mockStatic(OnDemandContainerDataScanner.class)) {
       // create container
@@ -220,6 +221,7 @@ class TestContainerImporter {
 
       // verify static method was called
       mockedStatic.verify(() -> OnDemandContainerDataScanner.scanContainer(container), times(1));
+      assertNotNull(containerSet.getContainer(containerId));
     }
   }
 
