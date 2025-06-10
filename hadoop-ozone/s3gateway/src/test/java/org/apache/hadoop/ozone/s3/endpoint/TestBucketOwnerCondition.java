@@ -28,6 +28,10 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Unit test class for testing logic related to BucketOwnerCondition.
@@ -48,14 +52,32 @@ public class TestBucketOwnerCondition {
   }
 
   @Test
-  public void testBucketOwnerConditionNotEnable() {
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(null);
+  public void testServerBucketOwnerIsNull() {
+    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn("test");
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("test");
+    assertDoesNotThrow(() -> BucketOwnerCondition.verify(headers, null));
+    assertDoesNotThrow(() -> BucketOwnerCondition.verifyCopyOperation(headers, null, "test"));
+    assertDoesNotThrow(() -> BucketOwnerCondition.verifyCopyOperation(headers, "test", null));
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  public void testBucketOwnerConditionNotEnable(String bucketOwnerHeader) {
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(bucketOwnerHeader);
     assertDoesNotThrow(() -> BucketOwnerCondition.verify(headers, "test"));
 
-    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn(null);
+    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn(bucketOwnerHeader);
     assertDoesNotThrow(() -> BucketOwnerCondition.verifyCopyOperation(null, "test", "test"));
   }
 
+  @Test
+  public void testClientBucketOwnerIsNull() {
+    assertDoesNotThrow(() -> BucketOwnerCondition.verify(headers, null));
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("test");
+    assertDoesNotThrow(() -> BucketOwnerCondition.verifyCopyOperation(headers, null, "test"));
+    assertDoesNotThrow(() -> BucketOwnerCondition.verifyCopyOperation(headers, "test", null));
+  }
+  
   @Test
   public void testPassExpectedBucketOwner() {
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("test");
