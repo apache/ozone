@@ -143,7 +143,7 @@ When a follower OM falls significantly behind and is unable to catch up with the
   This logic is implemented in the `OzoneManagerStateMachine.notifyInstallSnapshotFromLeader()` method. The install is triggered automatically by the consensus layer (Ratis) when it detects that a follower cannot catch up by log replay alone.
 
 - **What this means for administrators:**
-  - In most scenarios, stale OMs will recover automatically after coming back online, even if they have missed a large number of operations.
+  - In most scenarios, stale OMs—whether they were temporarily offline or simply fell too far behind the leader while remaining online—will recover automatically, even if they have missed a large number of operations.
   - Manual intervention (such as running `ozone om --bootstrap`) is only required when adding a new OM node to the cluster or when explicitly requested by support instructions.
 
 
