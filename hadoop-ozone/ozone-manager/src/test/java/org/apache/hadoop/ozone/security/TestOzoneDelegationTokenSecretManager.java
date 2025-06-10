@@ -78,6 +78,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.event.Level;
 
+
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 /**
  * Test class for {@link OzoneDelegationTokenSecretManager}.
  */
@@ -229,6 +234,27 @@ public class TestOzoneDelegationTokenSecretManager {
     assertEquals(identifier.getOwner(), TEST_USER);
 
     validateHash(token.getPassword(), token.getIdentifier());
+  }
+
+  @Test
+  public void testExpiredSecretKey() throws Exception {
+    SecretKeyClient old = secretKeyClient;
+    secretKeyClient = spy(secretKeyClient);
+    doReturn(null).when(secretKeyClient).getSecretKey(any());
+
+    Text tester = new Text("tester");
+    OzoneTokenIdentifier identifier =
+        new OzoneTokenIdentifier(tester, tester, tester);
+    identifier.setSecretKeyId(UUID.randomUUID().toString());
+
+    om.getMetadataManager().getDelegationTokenTable().put(identifier, 12345L);
+    try {
+      secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+          expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
+    } finally {
+      verify(secretKeyClient, times(1)).getSecretKey(any());
+      secretKeyClient = old;
+    }
   }
 
   private void restartSecretManager() throws IOException {
