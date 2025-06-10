@@ -2178,6 +2178,7 @@
               <goal>analyze-only</goal>
             </goals>
             <configuration>
+              <failOnWarning>true</failOnWarning>
               <ignoreNonCompile>true</ignoreNonCompile>
               <excludedClasses>
                 <!-- disabled test -->
@@ -2680,6 +2681,7 @@
       <properties>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <maven.shade.skip>true</maven.shade.skip>
+        <mdep.analyze.skip>true</mdep.analyze.skip>
         <skip.installnodenpm>true</skip.installnodenpm>
         <skip.npx>true</skip.npx>
         <skipDocs>true</skipDocs>
