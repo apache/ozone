@@ -33,6 +33,11 @@ public class ContainerReplicaNotFoundException extends ContainerException {
     this(null, null);
   }
 
+  /** Required by {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()} */
+  public ContainerReplicaNotFoundException(String message) {
+    super(message, ResultCodes.CONTAINER_REPLICA_NOT_FOUND);
+  }
+
   public ContainerReplicaNotFoundException(ContainerID container, DatanodeDetails datanode) {
     super("Replica not found for container " + container + " and datanode " + datanode,
         ResultCodes.CONTAINER_REPLICA_NOT_FOUND);

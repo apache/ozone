@@ -26,7 +26,8 @@ public class ContainerNotFoundException extends ContainerException {
     this("Container not found for unknown id");
   }
 
-  private ContainerNotFoundException(String message) {
+  /** Required by {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()} */
+  public ContainerNotFoundException(String message) {
     super(message, ResultCodes.CONTAINER_NOT_FOUND);
   }
 

@@ -26,6 +26,16 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 public class ContainerException extends SCMException {
 
   /**
+   * Constructs a {@code ContainerException} with {@code null}
+   * as its result code. <p>
+   * Required for Unwrapping {@code RemoteException}. Used by
+   * {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()}
+   */
+  public ContainerException(String message) {
+    super(message);
+  }
+
+  /**
    * Constructs an {@code ContainerException} with the specified detail message.
    *
    * @param message
