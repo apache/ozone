@@ -62,8 +62,8 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
 
   @Test
   public void testValidateAndUpdateCache() throws IOException {
-    long initialSnapshotSetPropertyCount = getOmMetrics().getNumSnapshotSetProperties();
-    long initialSnapshotSetPropertyFailCount = getOmMetrics().getNumSnapshotSetPropertyFails();
+    long initialSnapshotSetPropertyCount = getOmSnapshotIntMetrics().getNumSnapshotSetProperties();
+    long initialSnapshotSetPropertyFailCount = getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails();
 
     createSnapshotDataForTest();
     assertFalse(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
@@ -91,8 +91,8 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
     }
 
     assertEquals(initialSnapshotSetPropertyCount + snapshotUpdateSizeRequests.size(),
-        getOmMetrics().getNumSnapshotSetProperties());
-    assertEquals(initialSnapshotSetPropertyFailCount, getOmMetrics().getNumSnapshotSetPropertyFails());
+        getOmSnapshotIntMetrics().getNumSnapshotSetProperties());
+    assertEquals(initialSnapshotSetPropertyFailCount, getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails());
     // Check if the exclusive size is set.
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
              iterator = getOmMetadataManager().getSnapshotInfoTable().iterator()) {
@@ -112,8 +112,8 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
    */
   @Test
   public void testValidateAndUpdateCacheFailure() throws IOException {
-    long initialSnapshotSetPropertyCount = getOmMetrics().getNumSnapshotSetProperties();
-    long initialSnapshotSetPropertyFailCount = getOmMetrics().getNumSnapshotSetPropertyFails();
+    long initialSnapshotSetPropertyCount = getOmSnapshotIntMetrics().getNumSnapshotSetProperties();
+    long initialSnapshotSetPropertyFailCount = getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails();
 
     createSnapshotDataForTest();
     assertFalse(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
@@ -138,9 +138,9 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
       assertEquals(INTERNAL_ERROR, omSnapshotSetPropertyResponse.getOMResponse().getStatus());
     }
 
-    assertEquals(initialSnapshotSetPropertyCount, getOmMetrics().getNumSnapshotSetProperties());
+    assertEquals(initialSnapshotSetPropertyCount, getOmSnapshotIntMetrics().getNumSnapshotSetProperties());
     assertEquals(initialSnapshotSetPropertyFailCount + snapshotUpdateSizeRequests.size(),
-        getOmMetrics().getNumSnapshotSetPropertyFails());
+        getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails());
   }
 
   private void assertCacheValues(String dbKey) {
