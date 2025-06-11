@@ -195,6 +195,7 @@ public class OzoneContainer {
     this.witnessedContainerMetadataStore = WitnessedContainerMetadataStoreImpl.get(conf);
     containerSet = ContainerSet.newRwContainerSet(witnessedContainerMetadataStore.getContainerIdsTable(),
         recoveringContainerTimeout);
+    volumeSet.setGatherContainerUsages(this::gatherContainerUsages);
     metadataScanner = null;
 
     metrics = ContainerMetrics.create(conf);
@@ -503,12 +504,14 @@ public class OzoneContainer {
     // Do an immediate check of all volumes to ensure datanode health before
     // proceeding.
     volumeSet.checkAllVolumes();
+    volumeSet.startAllVolume();
     metaVolumeSet.checkAllVolumes();
+    metaVolumeSet.startAllVolume();
     // DB volume set may be null if dedicated DB volumes are not used.
     if (dbVolumeSet != null) {
       dbVolumeSet.checkAllVolumes();
+      dbVolumeSet.startAllVolume();
     }
-
     LOG.info("Attempting to start container services.");
     startContainerScrub();
 
@@ -575,6 +578,15 @@ public class OzoneContainer {
     return containerSet;
   }
 
+  public Long gatherContainerUsages(HddsVolume storageVolume) {
+    Iterator<Container<?>> itr = containerSet.getContainerIterator(storageVolume);
+    long usages = 0;
+    while (itr.hasNext()) {
+      Container<?> next = itr.next();
+      usages += next.getContainerData().getBytesUsed();
+    }
+    return usages;
+  }
   /**
    * Returns container report.
    *
