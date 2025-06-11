@@ -217,7 +217,7 @@ public abstract class EndpointBase implements Auditor {
       throws IOException, OS3Exception {
     try {
       OzoneBucket bucket = getBucket(s3BucketName);
-      S3Owner.verifyBucketOwnerCondition(headers, bucket.getOwner());
+      S3Owner.verifyBucketOwnerCondition(headers, s3BucketName, bucket.getOwner());
       client.getObjectStore().deleteS3Bucket(s3BucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {

@@ -1151,7 +1151,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     private void verifyBucketOwnershipVerificationAccessDenied(Executable function) {
       S3Exception exception = assertThrows(S3Exception.class, function);
       assertEquals(403, exception.statusCode());
-      assertEquals("AccessDenied", exception.awsErrorDetails().errorCode());
+      assertEquals("Access Denied", exception.awsErrorDetails().errorCode());
     }
   }
 }
