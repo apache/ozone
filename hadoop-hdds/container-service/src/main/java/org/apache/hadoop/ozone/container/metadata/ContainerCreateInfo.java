@@ -122,10 +122,10 @@ public final class ContainerCreateInfo {
     @Override
     public CodecBuffer toCodecBuffer(ContainerCreateInfo object, CodecBuffer.Allocator allocator)
             throws CodecException {
-        if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
-          return CODEC.toCodecBuffer(object, allocator);
-        }
-        return StringCodec.get().toCodecBuffer(object.getState().name(), allocator);
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+        return CODEC.toCodecBuffer(object, allocator);
+      }
+      return StringCodec.get().toCodecBuffer(object.getState().name(), allocator);
     }
 
     @Override
