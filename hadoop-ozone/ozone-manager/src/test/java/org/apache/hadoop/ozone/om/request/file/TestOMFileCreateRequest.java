@@ -37,6 +37,8 @@ import static org.mockito.Mockito.when;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -46,6 +48,7 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -63,11 +66,19 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests OMFileCreateRequest.
  */
 public class TestOMFileCreateRequest extends TestOMKeyRequest {
+
+  public static Collection<Object[]> cacheEnabledValues() {
+    return Arrays.asList(new Object[][] {
+        {true},
+        {false}
+    });
+  }
 
   @Test
   public void testPreExecute() throws Exception {
@@ -129,8 +140,10 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     assertEquals(0, keyArgs.getKeyLocationsList().size());
   }
 
-  @Test
-  public void testValidateAndUpdateCache() throws Exception {
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCache(boolean cacheEnabled) throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
         false, true);
@@ -182,9 +195,11 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         .getLocalID(), omKeyLocationInfo.getLocalID());
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded()
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded(boolean cacheEnabled)
       throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     keyName = "test/" + keyName;
     OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
@@ -207,8 +222,10 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
-  @Test
-  public void testValidateAndUpdateEncryption() throws Exception {
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateEncryption(boolean cacheEnabled) throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     KeyProviderCryptoExtension.EncryptedKeyVersion eKV =
         KeyProviderCryptoExtension.EncryptedKeyVersion.createForDecryption(
             "key1", "v1", new byte[0], new byte[0]);
@@ -245,8 +262,10 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     when(ozoneManager.getKmsProvider()).thenReturn(null);
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithVolumeNotFound(boolean cacheEnabled) throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
             false, true);
@@ -282,8 +301,10 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         omFileCreateResponse.getOMResponse().getStatus());
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithNonRecursive() throws Exception {
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithNonRecursive(boolean cacheEnabled) throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     testNonRecursivePath(UUID.randomUUID().toString(), false, false, false);
     testNonRecursivePath("a/b", false, false, true);
 
@@ -312,8 +333,10 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     testNonRecursivePath("a/b/e", false, false, false);
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithRecursive() throws Exception {
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithRecursive(boolean cacheEnabled) throws Exception {
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     // Should be able to create file even if parent directories does not
     // exist and key already exist, as this is with overwrite enabled.
     testNonRecursivePath(UUID.randomUUID().toString(), false, false, false);
@@ -328,10 +351,11 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     testNonRecursivePath("a/b/c", false, true, false);
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithRecursiveAndOverWrite()
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithRecursiveAndOverWrite(boolean cacheEnabled)
       throws Exception {
-
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     String key = "c/d/e/f";
     // Should be able to create file even if parent directories does not exist
     testNonRecursivePath(key, false, true, false);
@@ -353,10 +377,11 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     testNonRecursivePath(key, false, true, true);
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithNonRecursiveAndOverWrite()
+  @ParameterizedTest
+  @MethodSource("cacheEnabledValues")
+  public void testValidateAndUpdateCacheWithNonRecursiveAndOverWrite(boolean cacheEnabled)
       throws Exception {
-
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     String key = "c/d/e/f";
     ReplicationConfig replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE);
