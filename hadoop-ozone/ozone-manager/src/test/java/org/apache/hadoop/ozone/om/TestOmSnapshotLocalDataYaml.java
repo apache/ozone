@@ -1,0 +1,239 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.om;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.FileSystemTestHelper;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.yaml.snakeyaml.Yaml;
+
+/**
+ * This class tests creating and reading snapshot data YAML files.
+ */
+public class TestOmSnapshotLocalDataYaml {
+
+  private static String testRoot = new FileSystemTestHelper().getTestRootDir();
+
+  private static final Instant NOW = Instant.now();
+  private OzoneConfiguration conf = new OzoneConfiguration();
+
+  @BeforeEach
+  public void setUp() {
+    assertTrue(new File(testRoot).mkdirs());
+  }
+
+  @AfterEach
+  public void cleanup() {
+    FileUtil.fullyDelete(new File(testRoot));
+  }
+
+  /**
+   * Creates a snapshot data YAML file.
+   */
+  private File createSnapshotDataFile(String snapshotName) throws IOException {
+    String yamlFilePath = snapshotName + ".yaml";
+
+    OmSnapshotLocalData snapshotData = new OmSnapshotLocalData();
+    snapshotData.setSstFiltered(true);
+
+    // Add some uncompacted SST files
+    snapshotData.addUncompactedSSTFile("table1", "sst1");
+    snapshotData.addUncompactedSSTFile("table1", "sst2");
+    snapshotData.addUncompactedSSTFile("table2", "sst3");
+
+    // Set last compaction time
+    snapshotData.setLastCompactionTime(new Timestamp(NOW.toEpochMilli()));
+
+    // Set needs compaction flag
+    snapshotData.setNeedsCompaction(true);
+
+    // Add some compacted SST files
+    snapshotData.addCompactedSSTFile(1, "table1", "compacted-sst1");
+    snapshotData.addCompactedSSTFile(1, "table2", "compacted-sst2");
+    snapshotData.addCompactedSSTFile(2, "table1", "compacted-sst3");
+
+    File yamlFile = new File(testRoot, yamlFilePath);
+
+    // Create YAML file with SnapshotData
+    OmSnapshotLocalDataYaml.createSnapshotFile(snapshotData, yamlFile);
+
+    // Check YAML file exists
+    assertTrue(yamlFile.exists());
+
+    return yamlFile;
+  }
+
+  @Test
+  public void testCreateSnapshotDataFile() throws IOException {
+    File yamlFile = createSnapshotDataFile("snapshot1");
+
+    // Read from YAML file, and verify data
+    OmSnapshotLocalData snapshotData =
+        OmSnapshotLocalDataYaml.readSnapshotFile(yamlFile);
+
+    assertTrue(snapshotData.isSstFiltered());
+
+    Map<String, List<String>> uncompactedFiles = snapshotData.getUncompactedSSTFileList();
+    assertEquals(2, uncompactedFiles.size());
+    assertEquals(2, uncompactedFiles.get("table1").size());
+    assertEquals(1, uncompactedFiles.get("table2").size());
+    assertTrue(uncompactedFiles.get("table1").contains("sst1"));
+    assertTrue(uncompactedFiles.get("table1").contains("sst2"));
+    assertTrue(uncompactedFiles.get("table2").contains("sst3"));
+
+    assertEquals(NOW.toEpochMilli(), snapshotData.getLastCompactionTime().getTime());
+    assertTrue(snapshotData.isNeedsCompaction());
+
+    Map<Integer, Map<String, List<String>>> compactedFiles = snapshotData.getCompactedSSTFileList();
+    assertEquals(2, compactedFiles.size());
+    assertTrue(compactedFiles.containsKey(1));
+    assertTrue(compactedFiles.containsKey(2));
+    assertEquals(2, compactedFiles.get(1).size());
+    assertEquals(1, compactedFiles.get(2).size());
+    assertTrue(compactedFiles.get(1).get("table1").contains("compacted-sst1"));
+    assertTrue(compactedFiles.get(1).get("table2").contains("compacted-sst2"));
+    assertTrue(compactedFiles.get(2).get("table1").contains("compacted-sst3"));
+  }
+
+  @Test
+  public void testUpdateSnapshotDataFile() throws IOException {
+    File yamlFile = createSnapshotDataFile("snapshot2");
+
+    // Read from YAML file
+    OmSnapshotLocalData snapshotData =
+        OmSnapshotLocalDataYaml.readSnapshotFile(yamlFile);
+
+    // Update snapshot data
+    snapshotData.setSstFiltered(false);
+    snapshotData.setNeedsCompaction(false);
+    snapshotData.addUncompactedSSTFile("table3", "sst4");
+    snapshotData.addCompactedSSTFile(3, "table3", "compacted-sst4");
+
+    // Write updated data back to file
+    OmSnapshotLocalDataYaml.createSnapshotFile(snapshotData, yamlFile);
+
+    // Read back the updated data
+    snapshotData = OmSnapshotLocalDataYaml.readSnapshotFile(yamlFile);
+
+    // Verify updated data
+    assertThat(snapshotData.isSstFiltered()).isFalse();
+    assertThat(snapshotData.isNeedsCompaction()).isFalse();
+
+    Map<String, List<String>> uncompactedFiles = snapshotData.getUncompactedSSTFileList();
+    assertEquals(3, uncompactedFiles.size());
+    assertTrue(uncompactedFiles.containsKey("table3"));
+    assertTrue(uncompactedFiles.get("table3").contains("sst4"));
+
+    Map<Integer, Map<String, List<String>>> compactedFiles = snapshotData.getCompactedSSTFileList();
+    assertEquals(3, compactedFiles.size());
+    assertTrue(compactedFiles.containsKey(3));
+    assertTrue(compactedFiles.get(3).containsKey("table3"));
+    assertTrue(compactedFiles.get(3).get("table3").contains("compacted-sst4"));
+  }
+
+  @Test
+  public void testEmptyFile() throws IOException {
+    File emptyFile = new File(testRoot, "empty.yaml");
+    assertTrue(emptyFile.createNewFile());
+
+    IOException ex = assertThrows(IOException.class, () ->
+        OmSnapshotLocalDataYaml.readSnapshotFile(emptyFile));
+
+    assertThat(ex).hasMessageContaining("Failed to load snapshot file. File is empty.");
+  }
+
+  @Test
+  public void testChecksum() throws IOException {
+    File yamlFile = createSnapshotDataFile("snapshot3");
+
+    // Read from YAML file
+    OmSnapshotLocalData snapshotData =
+        OmSnapshotLocalDataYaml.readSnapshotFile(yamlFile);
+
+    // Get the original checksum
+    String originalChecksum = snapshotData.getChecksum();
+
+    // Verify the checksum is not null or empty
+    assertThat(originalChecksum).isNotNull().isNotEmpty();
+
+    // Save the current timestamp value
+    Timestamp originalTimestamp = snapshotData.getLastCompactionTime();
+
+    // Recompute the checksum
+    Yaml yaml = OmSnapshotLocalDataYaml.getYamlForSnapshotData();
+    snapshotData.computeAndSetChecksum(yaml);
+
+    // Get the newly computed checksum
+    String recomputedChecksum = snapshotData.getChecksum();
+
+    // Create a new snapshot with the same data to verify checksum calculation
+    OmSnapshotLocalData newSnapshot = new OmSnapshotLocalData();
+    newSnapshot.setSstFiltered(snapshotData.isSstFiltered());
+    newSnapshot.setUncompactedSSTFileList(snapshotData.getUncompactedSSTFileList());
+    newSnapshot.setLastCompactionTime(originalTimestamp);
+    newSnapshot.setNeedsCompaction(snapshotData.isNeedsCompaction());
+    newSnapshot.setCompactedSSTFileList(snapshotData.getCompactedSSTFileList());
+
+    // Compute checksum for the new snapshot
+    newSnapshot.computeAndSetChecksum(yaml);
+
+    // Verify the checksum of the new snapshot matches the recomputed one
+    assertEquals(recomputedChecksum, newSnapshot.getChecksum());
+
+    // Modify data and verify checksum changes
+    newSnapshot.addUncompactedSSTFile("table4", "sst5");
+    newSnapshot.computeAndSetChecksum(yaml);
+
+    assertThat(newSnapshot.getChecksum())
+        .isNotNull()
+        .isNotEmpty()
+        .isNotEqualTo(recomputedChecksum);
+  }
+
+  @Test
+  public void testYamlContainsAllFields() throws IOException {
+    File yamlFile = createSnapshotDataFile("snapshot4");
+
+    String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
+
+    // Verify the YAML content contains all expected fields
+    assertThat(content).contains(OzoneConsts.IS_SST_FILTERED);
+    assertThat(content).contains(OzoneConsts.UNCOMPACTED_SST_FILE_LIST);
+    assertThat(content).contains(OzoneConsts.LAST_COMPACTION_TIME);
+    assertThat(content).contains(OzoneConsts.NEEDS_COMPACTION);
+    assertThat(content).contains(OzoneConsts.COMPACTED_SST_FILE_LIST);
+    assertThat(content).contains(OzoneConsts.CHECKSUM);
+  }
+}

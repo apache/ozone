@@ -87,16 +87,7 @@ public class SstFilteringService extends BackgroundService
   private final BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock();
 
   public static boolean isSstFiltered(OzoneConfiguration ozoneConfiguration, SnapshotInfo snapshotInfo) {
-    // First try to read the flag from YAML file
-    String yamlPath = OmSnapshotManager.getSnapshotLocalPropertyYamlPath(ozoneConfiguration, snapshotInfo);
-
-    try (OmSnapshotLocalProperty localProperties = new OmSnapshotLocalPropertyYamlImpl(yamlPath)) {
-      String sstFilteredProperty = localProperties.getProperty(SST_FILTERED_YAML_KEY);
-      return Boolean.parseBoolean(sstFilteredProperty);
-    } catch (Exception e) {
-      // If we can't read the YAML file, fall back to the existing checks
-      LOG.debug("Failed to read snapshot local properties from YAML file: {}", yamlPath, e);
-    }
+    // TODO: First try to read the YAML file
 
     // Fall back to existing checks
     Path sstFilteredFile = Paths.get(
@@ -156,16 +147,7 @@ public class SstFilteringService extends BackgroundService
         try {
           // Mark the snapshot as filtered by writing to YAML property file
           if (Files.exists(Paths.get(snapshotDir))) {
-            String yamlPath = OmSnapshotManager.getSnapshotLocalPropertyYamlPath(
-                ozoneManager.getConfiguration(), snapshotInfo);
-            try (OmSnapshotLocalProperty localProperties = new OmSnapshotLocalPropertyYamlImpl(yamlPath)) {
-              localProperties.setProperty(SST_FILTERED_YAML_KEY, "true");
-            } catch (Exception e) {
-              LOG.error("Failed to set SST filtered local property for snapshot: {}", snapshotInfo.getName(), e);
-            }
-
-            // For backward compatibility, still create the touch file (e.g. when upgraded but not finalized yet)
-            // TODO: When upgrade is finalized, this can be skipped
+            // TODO: Write to YAML
             Files.write(Paths.get(snapshotDir, SST_FILTERED_FILE), SST_FILTERED_FILE_CONTENT);
           }
         } finally {
