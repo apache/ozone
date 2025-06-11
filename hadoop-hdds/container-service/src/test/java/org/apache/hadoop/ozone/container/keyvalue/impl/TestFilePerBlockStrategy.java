@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataCheck
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
@@ -47,6 +48,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -184,10 +186,11 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkBuffer writeChunkData = ChunkBuffer.wrap(getData());
     KeyValueContainer kvContainer = getKeyValueContainer();
     KeyValueContainerData containerData = kvContainer.getContainerData();
-    closedKeyValueContainer();
     ContainerSet containerSet = newContainerSet();
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
+    keyValueHandler.markContainerForClose(kvContainer);
+    keyValueHandler.closeContainer(kvContainer);
     keyValueHandler.writeChunkForClosedContainer(getChunkInfo(), getBlockID(), writeChunkData, kvContainer);
     ChunkBufferToByteString readChunkData = keyValueHandler.getChunkManager().readChunk(kvContainer,
         getBlockID(), getChunkInfo(), WRITE_STAGE);
@@ -230,10 +233,13 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
   public void testPutBlockForClosedContainer() throws IOException {
     KeyValueContainer kvContainer = getKeyValueContainer();
     KeyValueContainerData containerData = kvContainer.getContainerData();
-    closedKeyValueContainer();
     ContainerSet containerSet = newContainerSet();
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
+    keyValueHandler.markContainerForClose(kvContainer);
+    keyValueHandler.closeContainer(kvContainer);
+    assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, containerData.getState());
+    assertEquals(0L, containerData.getDataChecksum());
     List<ContainerProtos.ChunkInfo> chunkInfoList = new ArrayList<>();
     ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 0), 0L, 20L);
 
@@ -244,9 +250,12 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkBuffer chunkData = ContainerTestHelper.getData(20);
     keyValueHandler.writeChunkForClosedContainer(info, getBlockID(), chunkData, kvContainer);
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 1L, true);
+    ContainerProtos.ContainerChecksumInfo containerChecksumInfo =
+        keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
     assertEquals(1L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
     assertEquals(20L, containerData.getBytesUsed());
+    assertEquals(ContainerChecksumTreeManager.getDataChecksum(containerChecksumInfo), containerData.getDataChecksum());
 
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
       long localID = putBlockData.getLocalID();
@@ -254,6 +263,8 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
           .get(containerData.getBlockKey(localID));
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
       assertEquals(20L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
+      assertEquals(containerData.getDataChecksum(), dbHandle.getStore().getMetadataTable()
+          .get(containerData.getContainerDataChecksumKey()));
     }
 
     // Add another chunk and check the put block data
@@ -264,6 +275,10 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     chunkData = ContainerTestHelper.getData(20);
     keyValueHandler.writeChunkForClosedContainer(newChunkInfo, getBlockID(), chunkData, kvContainer);
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    long previousDataChecksum = containerData.getDataChecksum();
+    containerChecksumInfo = keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
+    assertNotEquals(previousDataChecksum, containerData.getDataChecksum());
+    assertEquals(ContainerChecksumTreeManager.getDataChecksum(containerChecksumInfo), containerData.getDataChecksum());
     assertEquals(2L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
     assertEquals(40L, containerData.getBytesUsed());
@@ -274,6 +289,8 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
           .get(containerData.getBlockKey(localID));
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
       assertEquals(40L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
+      assertEquals(containerData.getDataChecksum(), dbHandle.getStore().getMetadataTable()
+          .get(containerData.getContainerDataChecksumKey()));
     }
 
     // Replace the last chunk with a chunk of greater size, This should only update the bytesUsed with
@@ -329,10 +346,6 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     MutableVolumeSet volumeSet = new MutableVolumeSet(dnUuid, conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
     return ContainerTestUtils.getKeyValueHandler(conf, dnUuid, containerSet, volumeSet);
-  }
-
-  public void closedKeyValueContainer() {
-    getKeyValueContainer().getContainerData().setState(ContainerProtos.ContainerDataProto.State.CLOSED);
   }
 
   @Override

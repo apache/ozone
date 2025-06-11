@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.checksum;
 
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM_EXTENSION;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -316,12 +317,12 @@ public class ContainerChecksumTreeManager {
    */
   @VisibleForTesting
   public static File getContainerChecksumFile(ContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
+    return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION);
   }
 
   @VisibleForTesting
   public static File getTmpContainerChecksumFile(ContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree.tmp");
+    return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION + ".tmp");
   }
 
   private Lock getLock(long containerID) {

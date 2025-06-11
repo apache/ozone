@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.utils.Archiver.includePath;
 import static org.apache.hadoop.hdds.utils.Archiver.readEntry;
 import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.hdds.utils.Archiver.untar;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM_EXTENSION;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 import java.io.File;
@@ -42,6 +43,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
@@ -87,7 +89,10 @@ public class TarContainerPacker
 
     Path dbRoot = getDbPath(containerUntarDir, containerData);
     Path chunksRoot = getChunkPath(containerUntarDir, containerData);
-    byte[] descriptorFileContent = innerUnpack(input, dbRoot, chunksRoot);
+    Path containerMetadataPath = Paths.get(container.getContainerData().getMetadataPath());
+    Path tempContainerMetadataPath = Paths.get(containerUntarDir.toString(),
+        containerMetadataPath.getName(containerMetadataPath.getNameCount() - 1).toString());
+    byte[] descriptorFileContent = innerUnpack(input, dbRoot, chunksRoot, tempContainerMetadataPath);
 
     if (!Files.exists(destContainerDir)) {
       Files.createDirectories(destContainerDir);
@@ -96,9 +101,6 @@ public class TarContainerPacker
       // Before the atomic move, the destination dir is empty and doesn't have a metadata directory.
       // Writing the .container file will fail as the metadata dir doesn't exist.
       // So we instead save the container file to the containerUntarDir.
-      Path containerMetadataPath = Paths.get(container.getContainerData().getMetadataPath());
-      Path tempContainerMetadataPath = Paths.get(containerUntarDir.toString(),
-          containerMetadataPath.getName(containerMetadataPath.getNameCount() - 1).toString());
       persistCustomContainerState(container, descriptorFileContent, State.RECOVERING, tempContainerMetadataPath);
       Files.move(containerUntarDir, destContainerDir,
               StandardCopyOption.ATOMIC_MOVE,
@@ -130,6 +132,11 @@ public class TarContainerPacker
     try (ArchiveOutputStream<TarArchiveEntry> archiveOutput = tar(compress(output))) {
       includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
           archiveOutput);
+
+      File containerChecksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(containerData);
+      if (containerChecksumFile.exists()) {
+        includeFile(containerChecksumFile, containerChecksumFile.getName(), archiveOutput);
+      }
 
       includePath(getDbPath(containerData), DB_DIR_NAME,
           archiveOutput);
@@ -200,7 +207,7 @@ public class TarContainerPacker
     return compression.wrap(output);
   }
 
-  private byte[] innerUnpack(InputStream input, Path dbRoot, Path chunksRoot)
+  private byte[] innerUnpack(InputStream input, Path dbRoot, Path chunksRoot, Path tempContainerMetadataPath)
       throws IOException {
     byte[] descriptorFileContent = null;
     try (ArchiveInputStream<TarArchiveEntry> archiveInput = untar(decompress(input))) {
@@ -217,6 +224,10 @@ public class TarContainerPacker
           Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
           extractEntry(entry, archiveInput, size, chunksRoot,
+              destinationPath);
+        } else if (name.endsWith(CONTAINER_DATA_CHECKSUM_EXTENSION)) {
+          Path destinationPath = tempContainerMetadataPath.resolve(name);
+          extractEntry(entry, archiveInput, size, tempContainerMetadataPath,
               destinationPath);
         } else if (CONTAINER_FILE_NAME.equals(name)) {
           //Don't do anything. Container file should be unpacked in a

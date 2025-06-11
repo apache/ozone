@@ -87,6 +87,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -96,6 +97,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
@@ -679,6 +681,10 @@ public class TestKeyValueHandler {
 
     // Initially, container should have no checksum information.
     assertEquals(0, containerData.getDataChecksum());
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+      assertEquals(0, dbDataChecksum, "DB should have 0 checksum.");
+    }
     assertFalse(checksumManager.read(containerData).isPresent());
     assertEquals(0, icrCount.get());
 
@@ -688,6 +694,10 @@ public class TestKeyValueHandler {
     assertEquals(1, icrCount.get());
     // Check checksum in memory.
     assertEquals(updatedDataChecksum, containerData.getDataChecksum());
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+      assertEquals(updatedDataChecksum, dbDataChecksum, "DB should have the updated data checksum.");
+    }
     // Check disk content.
     ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(containerData).get();
     assertTreesSortedAndMatch(treeWriter.toProto(), checksumInfo.getContainerMerkleTree());

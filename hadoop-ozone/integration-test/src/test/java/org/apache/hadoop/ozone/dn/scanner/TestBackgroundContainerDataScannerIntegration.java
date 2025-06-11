@@ -30,8 +30,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -78,6 +81,7 @@ class TestBackgroundContainerDataScannerIntegration
       throws Exception {
     pauseScanner();
 
+    OzoneConfiguration conf = new OzoneConfiguration();
     long containerID = writeDataThenCloseContainer();
     // Container corruption has not yet been introduced.
     Container<?> container = getDnContainer(containerID);
@@ -111,6 +115,11 @@ class TestBackgroundContainerDataScannerIntegration
       assertTrue(containerChecksumFileExists(containerID));
       ContainerProtos.ContainerChecksumInfo updatedChecksumInfo = readChecksumFile(container.getContainerData());
       assertEquals(newReportedDataChecksum, updatedChecksumInfo.getContainerMerkleTree().getDataChecksum());
+      KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+      try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+        Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+        assertEquals(newReportedDataChecksum, dbDataChecksum, "DB should have the updated data checksum.");
+      }
     }
 
     if (corruption == TestContainerCorruptions.TRUNCATED_BLOCK ||

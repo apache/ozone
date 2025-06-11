@@ -350,13 +350,18 @@ public class TestContainerReconciliationWithMockDatanodes {
      */
     public long checkAndGetDataChecksum(long containerID) {
       KeyValueContainer container = getContainer(containerID);
+      KeyValueContainerData containerData = container.getContainerData();
       long dataChecksum = 0;
       try {
         Optional<ContainerProtos.ContainerChecksumInfo> containerChecksumInfo =
-            handler.getChecksumManager().read(container.getContainerData());
+            handler.getChecksumManager().read(containerData);
         assertTrue(containerChecksumInfo.isPresent());
         dataChecksum = containerChecksumInfo.get().getContainerMerkleTree().getDataChecksum();
-        assertEquals(container.getContainerData().getDataChecksum(), dataChecksum);
+        assertEquals(containerData.getDataChecksum(), dataChecksum);
+        try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+          Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+          assertEquals(containerData.getDataChecksum(), dbDataChecksum, "DB should have the updated data checksum.");
+        }
       } catch (IOException ex) {
         fail("Failed to read container checksum from disk", ex);
       }
