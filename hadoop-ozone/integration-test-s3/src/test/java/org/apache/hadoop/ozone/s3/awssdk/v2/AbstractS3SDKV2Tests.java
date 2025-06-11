@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static software.amazon.awssdk.core.sync.RequestBody.fromString;
 
-import com.google.common.collect.ImmutableList;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -814,10 +813,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
       @Test
       public void testPutObjectTagging() {
-        List<Tag> tags = ImmutableList.of(
-            Tag.builder().key("env").value("test").build(),
-            Tag.builder().key("project").value("example").build()
-        );
+        List<Tag> tags = new ArrayList<>();
+        tags.add(Tag.builder().key("env").value("test").build());
+        tags.add(Tag.builder().key("project").value("example").build());
         PutObjectTaggingRequest wrongRequest = PutObjectTaggingRequest.builder()
             .bucket(DEFAULT_BUCKET_NAME)
             .key(BUCKET_VERIFICATION_TEST_KEY)
