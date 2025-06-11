@@ -20,15 +20,14 @@ package org.apache.hadoop;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
-
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.ipc.RemoteException;
 import org.junit.jupiter.api.Test;
 import org.reflections.Reflections;
 
 /** Testing {@link RemoteException#unwrapRemoteException()}. */
-public class TestRemoteException {
-  private static final Reflections REFLECTIONS = new Reflections(TestRemoteException.class.getPackage().getName());
+public class TestRemoteEx {
+  private static final Reflections REFLECTIONS = new Reflections(TestRemoteEx.class.getPackage().getName());
 
   /** An exception without a constructor with a single {@link String} parameter. */
   static class SomeException extends SCMException {
@@ -40,7 +39,7 @@ public class TestRemoteException {
   @Test
   public void testSCMException() {
     REFLECTIONS.getSubTypesOf(SCMException.class)
-        .forEach(TestRemoteException::runUnwrappingRemoteException);
+        .forEach(TestRemoteEx::runUnwrappingRemoteException);
   }
 
   static void runUnwrappingRemoteException(Class<? extends Exception> clazz) {
