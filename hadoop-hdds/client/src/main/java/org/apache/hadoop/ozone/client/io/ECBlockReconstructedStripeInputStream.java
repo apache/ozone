@@ -650,28 +650,27 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
   private void readFromCurrentLocation(int ind, ByteBuffer buf)
       throws IOException {
-    try (BlockExtendedInputStream stream = getOrOpenStream(ind)) {
-      seekStreamIfNecessary(stream, 0);
-      while (buf.hasRemaining()) {
-        int read = stream.read(buf);
-        if (read == EOF) {
-          // We should not reach EOF, as the block should have enough data to
-          // fill the buffer. If the block does not, then it indicates the
-          // block is not as long as it should be, based on the block length
-          // stored in OM. Therefore if there is any remaining space in the
-          // buffer, we should throw an exception.
-          if (buf.hasRemaining()) {
-            LOG.trace("{}: unexpected EOF with {} bytes remaining [{}]",
-                this, buf.remaining(), ind);
-            throw new IOException("Expected to read " + buf.remaining() +
-                " bytes from block " + getBlockID() + " EC index " + (ind + 1) +
-                " but reached EOF");
-          }
-          LOG.debug("{}: EOF for [{}]", this, ind);
-          break;
+    BlockExtendedInputStream stream = getOrOpenStream(ind);
+    seekStreamIfNecessary(stream, 0);
+    while (buf.hasRemaining()) {
+      int read = stream.read(buf);
+      if (read == EOF) {
+        // We should not reach EOF, as the block should have enough data to
+        // fill the buffer. If the block does not, then it indicates the
+        // block is not as long as it should be, based on the block length
+        // stored in OM. Therefore if there is any remaining space in the
+        // buffer, we should throw an exception.
+        if (buf.hasRemaining()) {
+          LOG.trace("{}: unexpected EOF with {} bytes remaining [{}]",
+              this, buf.remaining(), ind);
+          throw new IOException("Expected to read " + buf.remaining() +
+              " bytes from block " + getBlockID() + " EC index " + (ind + 1) +
+              " but reached EOF");
         }
-        LOG.trace("{}: read {} bytes for [{}]", this, read, ind);
+        LOG.debug("{}: EOF for [{}]", this, ind);
+        break;
       }
+      LOG.trace("{}: read {} bytes for [{}]", this, read, ind);
     }
   }
 

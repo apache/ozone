@@ -365,7 +365,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     int totalRead = 0;
     while (strategy.getTargetLength() > 0 && remaining() > 0) {
       int currentIndex = currentStreamIndex();
-      try (BlockExtendedInputStream stream = getOrOpenStream(currentIndex)) {
+      try {
+        BlockExtendedInputStream stream = getOrOpenStream(currentIndex);
         int read = readFromStream(stream, strategy);
         LOG.trace("{}: read {} bytes for [{}]", this, read, currentIndex);
         totalRead += read;
