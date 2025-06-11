@@ -540,11 +540,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NamespaceMetadataResponse'
-  /namespace/du:
+  /namespace/usage:
     get:
       tags:
         - Namespace Metadata
-      summary: Returns disk usage of all sub-paths under the path.
+      summary: Returns namespace usage of all sub-paths under the path.
       operationId: getDiskUsage
       parameters:
         - name: path
@@ -556,14 +556,14 @@ paths:
             type: string
         - name: files
           in: query
-          description: This boolean has a default value of false. When set to true, it calculates the disk usage for keys within the specified path and also provides a list of their corresponding sub-paths.
+          description: This boolean has a default value of false. When set to true, it calculates the namespace usage for keys within the specified path and also provides a list of their corresponding sub-paths.
           example: true
           required: false
           schema:
             type: boolean
         - name: replica
           in: query
-          description: A boolean with a default value of false. If set to true, computes disk usage with replicated size of keys.
+          description: A boolean with a default value of false. If set to true, computes namespace usage with replicated size of keys.
           example: true
           required: false
           schema:
@@ -573,7 +573,7 @@ paths:
           description: |
             Successful operation<br>
             #### **Note**:
-            #### The below example response is for the sample endpoint: **namespace/du?path=/vol1/bucket1&files=true&replica=true**
+            #### The below example response is for the sample endpoint: **namespace/usage?path=/vol1/bucket1&files=true&replica=true**
             #### status can be either **OK** if path exists else **PATH_NOT_FOUND**
             #### If files is set to **false**, sub-path **/vol1/bucket1/key1-1 is omitted**.
             #### If replica is set to **false**, **sizeWithReplica returns -1**.

@@ -538,6 +538,36 @@ public class TestHddsVolume {
     volume.shutdown();
   }
 
+  @Test
+  public void testVolumeUsagesMetrics() throws Exception {
+    // Build a volume with mocked usage, with reserved: 100B, Min free: 10B
+    CONF.set("hdds.datanode.volume.min.free.space", "10B");
+    volumeBuilder.usageCheckFactory(MockSpaceUsageCheckFactory.of(new SpaceUsageSource.Fixed(1000, 100, 700),
+        Duration.ZERO, inMemory(new AtomicLong(0))));
+    HddsVolume volume = volumeBuilder.build();
+    volume.incCommittedBytes(100);
+
+    // available space (>= 0) available - committed - min.free.space = 100 - 100 - 10 = -10,
+    // insufficient space unavailable
+    volume.checkVolumeUsages();
+    assertEquals(1, volume.getVolumeInfoStats().getAvailableSpaceInsufficient());
+    // reserved used = capacity - available - used = 1000 - 100 - 700 = 200 more than 100B for reserved,
+    // reserve usages crosses limit true
+    assertEquals(1, volume.getVolumeInfoStats().getReservedCrossesLimit());
+
+    // remove committed, sufficient space is available, reset the flag of metrics
+    volume.incCommittedBytes(-100);
+    volume.checkVolumeUsages();
+    assertEquals(0, volume.getVolumeInfoStats().getAvailableSpaceInsufficient());
+
+    // reduce available less then min.free.space
+    volume.incrementUsedSpace(100);
+    volume.checkVolumeUsages();
+    assertEquals(1, volume.getVolumeInfoStats().getAvailableSpaceInsufficient());
+
+    volume.shutdown();
+  }
+
   private MutableVolumeSet createDbVolumeSet() throws IOException {
     File dbVolumeDir = Files.createDirectory(folder.resolve("NewDir")).toFile();
     CONF.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,

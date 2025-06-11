@@ -21,8 +21,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -52,6 +52,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -140,7 +141,7 @@ class TestKeyDeletingService extends OzoneTestBase {
   private KeyManager keyManager;
   private OMMetadataManager metadataManager;
   private KeyDeletingService keyDeletingService;
-  private SnapshotDirectoryCleaningService snapshotDirectoryCleaningService;
+  private DirectoryDeletingService directoryDeletingService;
   private ScmBlockLocationTestingClient scmBlockTestingClient;
 
   @BeforeAll
@@ -156,7 +157,7 @@ class TestKeyDeletingService extends OzoneTestBase {
         100, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
         100, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL,
+    conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
         1, TimeUnit.SECONDS);
@@ -169,8 +170,9 @@ class TestKeyDeletingService extends OzoneTestBase {
   private void createSubject() throws Exception {
     OmTestManagers omTestManagers = new OmTestManagers(conf, scmBlockTestingClient, null);
     keyManager = omTestManagers.getKeyManager();
+
     keyDeletingService = keyManager.getDeletingService();
-    snapshotDirectoryCleaningService = keyManager.getSnapshotDirectoryService();
+    directoryDeletingService = keyManager.getDirDeletingService();
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();
     metadataManager = omTestManagers.getMetadataManager();
@@ -435,7 +437,7 @@ class TestKeyDeletingService extends OzoneTestBase {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void testRenamedKeyReclaimation(boolean testForSnapshot)
-        throws IOException, InterruptedException, TimeoutException {
+        throws IOException, InterruptedException, TimeoutException, ExecutionException {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
       Table<String, RepeatedOmKeyInfo> deletedTable =
@@ -524,6 +526,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Suspend KeyDeletingService
       keyDeletingService.suspend();
+      directoryDeletingService.suspend();
 
       final long initialSnapshotCount = metadataManager.countRowsInTable(snapshotInfoTable);
       final long initialKeyCount = metadataManager.countRowsInTable(keyTable);
@@ -571,6 +574,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, false);
 
       keyDeletingService.resume();
+      directoryDeletingService.resume();
 
       try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot =
                om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snap3)) {
@@ -640,6 +644,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Supspend KDS
       keyDeletingService.suspend();
+      directoryDeletingService.suspend();
 
       final long initialSnapshotCount = metadataManager.countRowsInTable(snapshotInfoTable);
       final long initialKeyCount = metadataManager.countRowsInTable(keyTable);
@@ -711,10 +716,11 @@ class TestKeyDeletingService extends OzoneTestBase {
       createAndCommitKey(testVolumeName, testBucketName, uniqueObjectName("key"), 3);
 
       long prevKdsRunCount = getRunCount();
-      long prevSnapshotDirectorServiceCnt = snapshotDirectoryCleaningService.getRunCount().get();
+      long prevSnapshotDirectorServiceCnt = directoryDeletingService.getRunCount().get();
+      directoryDeletingService.resume();
       // Let SnapshotDirectoryCleaningService to run for some iterations
       GenericTestUtils.waitFor(
-          () -> (snapshotDirectoryCleaningService.getRunCount().get() > prevSnapshotDirectorServiceCnt + 20),
+          () -> (directoryDeletingService.getRunCount().get() > prevSnapshotDirectorServiceCnt + 100),
           100, 100000);
       keyDeletingService.resume();
 
@@ -779,7 +785,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
     @Test
     @DisplayName("Should not update keys when purge request times out during key deletion")
-    public void testFailingModifiedKeyPurge() throws IOException, InterruptedException {
+    public void testFailingModifiedKeyPurge() throws IOException {
 
       try (MockedStatic<OzoneManagerRatisUtils> mocked =  mockStatic(OzoneManagerRatisUtils.class,
           CALLS_REAL_METHODS)) {

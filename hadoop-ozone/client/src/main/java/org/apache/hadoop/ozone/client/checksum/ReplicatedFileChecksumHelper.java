@@ -20,10 +20,7 @@ package org.apache.hadoop.ozone.client.checksum;
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -73,15 +70,8 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     // irrespective of the container state, we will always read via Standalone
     // protocol.
     Token<OzoneBlockTokenIdentifier> token = keyLocationInfo.getToken();
-    Pipeline pipeline = keyLocationInfo.getPipeline();
+    Pipeline pipeline = keyLocationInfo.getPipeline().copyForRead();
     BlockID blockID = keyLocationInfo.getBlockID();
-    if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
-      pipeline = Pipeline.newBuilder(pipeline)
-          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
-              ReplicationConfig
-                  .getLegacyFactor(pipeline.getReplicationConfig())))
-          .build();
-    }
 
     List<ContainerProtos.ChunkInfo> chunks;
     XceiverClientSpi xceiverClientSpi = null;
