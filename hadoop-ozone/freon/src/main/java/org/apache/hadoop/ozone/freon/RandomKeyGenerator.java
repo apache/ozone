@@ -1209,20 +1209,20 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
         try {
           KeyValidate kv = validationQueue.poll(5, TimeUnit.SECONDS);
           if (kv != null) {
-            OzoneInputStream is = kv.bucket.readKey(kv.keyName);
-            dig.getMessageDigest().reset();
-            byte[] curDigest = dig.digest(is);
-            totalWritesValidated.getAndIncrement();
-            if (MessageDigest.isEqual(kv.digest, curDigest)) {
-              writeValidationSuccessCount.getAndIncrement();
-            } else {
-              writeValidationFailureCount.getAndIncrement();
-              LOG.warn("Data validation error for key {}/{}/{}",
-                  kv.bucket.getVolumeName(), kv.bucket, kv.keyName);
-              LOG.warn("Expected checksum: {}, Actual checksum: {}",
-                  kv.digest, curDigest);
+            try (OzoneInputStream is = kv.bucket.readKey(kv.keyName)) {
+              dig.getMessageDigest().reset();
+              byte[] curDigest = dig.digest(is);
+              totalWritesValidated.getAndIncrement();
+              if (MessageDigest.isEqual(kv.digest, curDigest)) {
+                writeValidationSuccessCount.getAndIncrement();
+              } else {
+                writeValidationFailureCount.getAndIncrement();
+                LOG.warn("Data validation error for key {}/{}/{}",
+                    kv.bucket.getVolumeName(), kv.bucket, kv.keyName);
+                LOG.warn("Expected checksum: {}, Actual checksum: {}",
+                    kv.digest, curDigest);
+              }
             }
-            is.close();
           }
         } catch (IOException ex) {
           LOG.error("Exception while validating write.", ex);

@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -315,6 +316,51 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     // Try to create another snapshot - should fail as we've reached the limit  
     OMRequest snapshotRequest5 = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName5);
     omException = assertThrows(OMException.class, () -> doPreExecute(snapshotRequest5));
+    assertEquals(OMException.ResultCodes.TOO_MANY_SNAPSHOTS, omException.getResult());
+  }
+
+  @DisplayName("Snapshot limit is enforced even after failed creation attempts")
+  @Test
+  public void testSnapshotLimitWithFailures() throws Exception {
+    when(getOzoneManager().isAdmin(any())).thenReturn(true);
+    getOzoneManager().getOmSnapshotManager().close();
+    getOzoneManager().getConfiguration().setInt(OZONE_OM_FS_SNAPSHOT_MAX_LIMIT, 2);
+    OmSnapshotManager omSnapshotManager = new OmSnapshotManager(getOzoneManager());
+    when(getOzoneManager().getOmSnapshotManager()).thenReturn(omSnapshotManager);
+
+    // Create first snapshot successfully
+    String key1 = getTableKey(getVolumeName(), getBucketName(), snapshotName1);
+    OMRequest omRequest = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName1);
+    OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
+    omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 1);
+    assertNotNull(getOmMetadataManager().getSnapshotInfoTable().get(key1));
+
+    // Snapshot creation failure
+    OMRequest snapshotRequestFail = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName1);
+    OMSnapshotCreateRequest omSnapshotCreateRequestFail = doPreExecute(snapshotRequestFail);
+    OMClientResponse omClientResponse =
+        omSnapshotCreateRequestFail.validateAndUpdateCache(getOzoneManager(), 2);
+    OMResponse omResponse = omClientResponse.getOMResponse();
+    assertNotNull(omResponse.getCreateSnapshotResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS, omResponse.getStatus());
+
+    // Second snapshot in-flight
+    String key2 = getTableKey(getVolumeName(), getBucketName(), snapshotName2);
+    OMRequest snapshotRequest2 = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName2);
+    OMSnapshotCreateRequest omSnapshotCreateRequest2 = doPreExecute(snapshotRequest2);
+
+    // Third snapshot should fail as total 3 > limit 2 (1 in chain + 1 in-flight + 1 new)
+    OMRequest snapshotRequest3 = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName3);
+    OMException omException = assertThrows(OMException.class, () -> doPreExecute(snapshotRequest3));
+    assertEquals(OMException.ResultCodes.TOO_MANY_SNAPSHOTS, omException.getResult());
+
+    // Complete the in-flight snapshot successfully
+    omSnapshotCreateRequest2.validateAndUpdateCache(getOzoneManager(), 3);
+    assertNotNull(getOmMetadataManager().getSnapshotInfoTable().get(key2));
+
+    // Another snapshot should fail as total 3 > limit 2 (2 in chain + 1 new)
+    OMRequest snapshotRequest4 = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName4);
+    omException = assertThrows(OMException.class, () -> doPreExecute(snapshotRequest4));
     assertEquals(OMException.ResultCodes.TOO_MANY_SNAPSHOTS, omException.getResult());
   }
 

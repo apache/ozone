@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -82,7 +81,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   private final OzoneManager ozoneManager;
   private final OmSnapshotManager omSnapshotManager;
   private final SnapshotChainManager chainManager;
-  private final AtomicBoolean suspended;
   private final OzoneConfiguration conf;
   private final AtomicLong successRunCount;
   private final int keyLimitPerTask;
@@ -95,14 +93,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       throws IOException {
     super(SnapshotDeletingService.class.getSimpleName(), interval,
         TimeUnit.MILLISECONDS, SNAPSHOT_DELETING_CORE_POOL_SIZE,
-        serviceTimeout, ozoneManager, null);
+        serviceTimeout, ozoneManager);
     this.ozoneManager = ozoneManager;
     this.omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
     this.chainManager = omMetadataManager.getSnapshotChainManager();
     this.successRunCount = new AtomicLong(0);
-    this.suspended = new AtomicBoolean(false);
     this.conf = ozoneManager.getConfiguration();
     this.snapshotDeletionPerTask = conf.getInt(SNAPSHOT_DELETING_LIMIT_PER_TASK,
         SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT);
@@ -331,26 +328,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
     queue.add(new SnapshotDeletingTask());
     return queue;
-  }
-
-  private boolean shouldRun() {
-    return !suspended.get() && ozoneManager.isLeaderReady();
-  }
-
-  /**
-   * Suspend the service.
-   */
-  @VisibleForTesting
-  public void suspend() {
-    suspended.set(true);
-  }
-
-  /**
-   * Resume the service if suspended.
-   */
-  @VisibleForTesting
-  public void resume() {
-    suspended.set(false);
   }
 
   public long getSuccessfulRunCount() {

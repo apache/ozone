@@ -36,10 +36,10 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.3</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.31.54</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.31.59</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
-    <bouncycastle.version>1.80</bouncycastle.version>
-    <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
+    <bouncycastle.version>1.81</bouncycastle.version>
+    <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
     <cdi-api.version>2.0</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
@@ -123,7 +123,7 @@
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
     <jcip-annotations.version>1.0-1</jcip-annotations.version>
     <jersey.version>1.19.4</jersey.version>
-    <jersey2.version>2.46</jersey2.version>
+    <jersey2.version>2.47</jersey2.version>
     <jetty.version>9.4.57.v20241219</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
@@ -1719,6 +1719,11 @@
     <pluginManagement>
       <plugins>
         <plugin>
+          <groupId>com.coderplus.maven.plugins</groupId>
+          <artifactId>copy-rename-maven-plugin</artifactId>
+          <version>${copy-rename-maven-plugin.version}</version>
+        </plugin>
+        <plugin>
           <groupId>com.github.ekryd.sortpom</groupId>
           <artifactId>sortpom-maven-plugin</artifactId>
           <version>${sortpom-maven-plugin.version}</version>
@@ -2178,6 +2183,7 @@
               <goal>analyze-only</goal>
             </goals>
             <configuration>
+              <failOnWarning>true</failOnWarning>
               <ignoreNonCompile>true</ignoreNonCompile>
               <excludedClasses>
                 <!-- disabled test -->
@@ -2680,6 +2686,7 @@
       <properties>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <maven.shade.skip>true</maven.shade.skip>
+        <mdep.analyze.skip>true</mdep.analyze.skip>
         <skip.installnodenpm>true</skip.installnodenpm>
         <skip.npx>true</skip.npx>
         <skipDocs>true</skipDocs>
