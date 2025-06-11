@@ -435,7 +435,7 @@ public class ObjectEndpoint extends EndpointBase {
       S3Owner.verifyBucketOwnerCondition(headers, bucket.getOwner());
       if (taggingMarker != null) {
         s3GAction = S3GAction.GET_OBJECT_TAGGING;
-        return getObjectTagging(bucket, keyPath);
+        return getObjectTagging(bucketName, keyPath);
       }
 
       if (uploadId != null) {
@@ -753,7 +753,7 @@ public class ObjectEndpoint extends EndpointBase {
       S3Owner.verifyBucketOwnerCondition(headers, bucket.getOwner());
       if (taggingMarker != null) {
         s3GAction = S3GAction.DELETE_OBJECT_TAGGING;
-        return deleteObjectTagging(bucket, keyPath);
+        return deleteObjectTagging(volume, bucketName, keyPath);
       }
 
       if (uploadId != null && !uploadId.equals("")) {
@@ -1475,21 +1475,23 @@ public class ObjectEndpoint extends EndpointBase {
     return Response.ok().build();
   }
 
-  private Response getObjectTagging(OzoneBucket bucket, String keyName) throws IOException {
+  private Response getObjectTagging(String bucketName, String keyName) throws IOException {
     long startNanos = Time.monotonicNowNanos();
 
-    Map<String, String> tagMap = bucket.getObjectTagging(keyName);
+    OzoneVolume volume = getVolume();
+
+    Map<String, String> tagMap = volume.getBucket(bucketName).getObjectTagging(keyName);
 
     getMetrics().updateGetObjectTaggingSuccessStats(startNanos);
     return Response.ok(S3Tagging.fromMap(tagMap), MediaType.APPLICATION_XML_TYPE).build();
   }
 
-  private Response deleteObjectTagging(OzoneBucket bucket, String keyName)
+  private Response deleteObjectTagging(OzoneVolume volume, String bucketName, String keyName)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
 
     try {
-      bucket.deleteObjectTagging(keyName);
+      volume.getBucket(bucketName).deleteObjectTagging(keyName);
     } catch (OMException ex) {
       // Unlike normal key deletion that ignores the key not found exception
       // DeleteObjectTagging should throw the exception if the key does not exist
