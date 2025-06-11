@@ -57,7 +57,8 @@ docker compose ps
 
 You should see output similar to this:
 
-```docker-datanode-1   apache/ozone:2.0.0   "/usr/local/bin/dumb…"   datanode   14 seconds ago   Up 13 seconds   0.0.0.0:32958->9864/tcp, :::32958->9864/tcp
+```
+docker-datanode-1   apache/ozone:2.0.0   "/usr/local/bin/dumb…"   datanode   14 seconds ago   Up 13 seconds   0.0.0.0:32958->9864/tcp, :::32958->9864/tcp
 docker-datanode-2   apache/ozone:2.0.0   "/usr/local/bin/dumb…"   datanode   14 seconds ago   Up 13 seconds   0.0.0.0:32957->9864/tcp, :::32957->9864/tcp
 docker-datanode-3   apache/ozone:2.0.0   "/usr/local/bin/dumb…"   datanode   14 seconds ago   Up 12 seconds   0.0.0.0:32959->9864/tcp, :::32959->9864/tcp
 docker-om-1         apache/ozone:2.0.0   "/usr/local/bin/dumb…"   om         14 seconds ago   Up 13 seconds   0.0.0.0:9874->9874/tcp, :::9874->9874/tcp
@@ -79,6 +80,17 @@ connecting to the SCM's UI at [http://localhost:9876](http://localhost:9876).
 Navigate to the Recon server home page. The Ozone Recon server is at [http://localhost:9888](http://localhost:9888), which provides monitoring and management capabilities.
 
 ![Recon UI Screenshot](ozone-recon.png)
+
+## Other Commonly Used Commands
+
+- **View logs from the OM:**
+  ```bash
+  docker compose logs om
+  ```
+- **Stop and remove all containers:**
+  ```bash
+  docker compose down
+  ```
 
 ## Configuration
 You can customize your Ozone deployment by modifying the configuration parameters in the `docker-compose.yaml` file:
