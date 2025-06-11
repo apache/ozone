@@ -29,7 +29,7 @@ import org.reflections.Reflections;
 public class TestRemoteEx {
   private static final Reflections REFLECTIONS = new Reflections(TestRemoteEx.class.getPackage().getName());
 
-  /** An exception without a constructor with a single {@link String} parameter. */
+  /** An exception without a single {@link String} parameter constructor. */
   static class SomeException extends SCMException {
     SomeException(ResultCodes result) {
       super(result);
@@ -43,10 +43,13 @@ public class TestRemoteEx {
   }
 
   static void runUnwrappingRemoteException(Class<? extends Exception> clazz) {
-    final RemoteException remoteException = new RemoteException(clazz.getName(), "message");
-    System.out.println("Test " + remoteException);
+    final String message = clazz.getSimpleName() + "-message";
+    final RemoteException remoteException = new RemoteException(clazz.getName(), message);
+    System.out.println("Test      " + remoteException);
     final IOException unwrapped = remoteException.unwrapRemoteException();
+    System.out.println("unwrapped " + unwrapped);
     final Class<?> expected = clazz == SomeException.class ? RemoteException.class : clazz;
     assertEquals(expected, unwrapped.getClass());
+    assertEquals(message, unwrapped.getMessage());
   }
 }
