@@ -53,6 +53,10 @@ public final class ContainerCreateInfo {
     return CODEC_OLD_VERSION;
   }
 
+  public static Codec<ContainerCreateInfo> getNewCodec() {
+    return CODEC;
+  }
+
   private ContainerCreateInfo(ContainerProtos.ContainerDataProto.State state) {
     this.state = state;
     this.proto = MemoizedSupplier.valueOf(
@@ -109,28 +113,44 @@ public final class ContainerCreateInfo {
 
     @Override
     public byte[] toPersistedFormat(ContainerCreateInfo object) throws CodecException {
-      return CODEC.toPersistedFormat(object);
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+        return CODEC.toPersistedFormat(object);
+      }
+      return StringCodec.get().toPersistedFormat(object.getState().name());
     }
 
     @Override
     public CodecBuffer toCodecBuffer(ContainerCreateInfo object, CodecBuffer.Allocator allocator)
             throws CodecException {
-      return CODEC.toCodecBuffer(object, allocator);
+        if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+          return CODEC.toCodecBuffer(object, allocator);
+        }
+        return StringCodec.get().toCodecBuffer(object.getState().name(), allocator);
     }
 
     @Override
     public CodecBuffer toDirectCodecBuffer(ContainerCreateInfo object) throws CodecException {
-      return CODEC.toDirectCodecBuffer(object);
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+        return CODEC.toDirectCodecBuffer(object);
+      }
+      return StringCodec.get().toDirectCodecBuffer(object.getState().name());
     }
 
     @Override
     public CodecBuffer toHeapCodecBuffer(ContainerCreateInfo object) throws CodecException {
-      return CODEC.toHeapCodecBuffer(object);
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+        return CODEC.toHeapCodecBuffer(object);
+      }
+      return StringCodec.get().toHeapCodecBuffer(object.getState().name());
     }
 
     @Override
     public ContainerCreateInfo fromCodecBuffer(CodecBuffer buffer) throws CodecException {
-      return CODEC.fromCodecBuffer(buffer);
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+        return CODEC.fromCodecBuffer(buffer);
+      }
+      String val = StringCodec.get().fromCodecBuffer(buffer);
+      return valueOf(ContainerProtos.ContainerDataProto.State.valueOf(val));
     }
 
     @Override

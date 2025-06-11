@@ -19,8 +19,15 @@ package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -31,6 +38,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.ScmTestMock;
@@ -38,6 +50,9 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -95,15 +110,60 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     final long containerID = UpgradeTestHelper.addContainer(dispatcher, pipeline);
     Container<?> container = dsm.getContainer().getContainerSet().getContainer(containerID);
     assertEquals(OPEN, container.getContainerData().getState());
+
+    // check if the containerIds table is in old format
+    WitnessedContainerMetadataStore metadataStore = dsm.getContainer().getWitnessedContainerMetadataStore();
+    TypedTable<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
+        metadataStore.getContainerIdsTable().getName(), ContainerID.getCodec(), StringCodec.get());
+    assertEquals(OPEN.name(), tableWithStringCodec.get(ContainerID.valueOf(containerID)));
+
     // close container to allow upgrade.
     UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
 
     dsm.finalizeUpgrade();
     assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE));
-    ContainerCreateInfo containerCreateInfo =
-        dsm.getContainer().getWitnessedContainerMetadataStore().getContainerIdsTable()
-            .get(ContainerID.valueOf(containerID));
+    ContainerCreateInfo containerCreateInfo = metadataStore.getContainerIdsTable().get(
+        ContainerID.valueOf(containerID));
     // state is always open as state is update while create container only.
     assertEquals(OPEN, containerCreateInfo.getState());
+
+    // check if the containerIds table is in proto3 format
+    TypedTable<ContainerID, ContainerCreateInfo> tableWithProtoCodec =
+        metadataStore.getStore().getTable(metadataStore.getContainerIdsTable().getName(),
+            ContainerID.getCodec(), ContainerCreateInfo.getNewCodec());
+    assertEquals(OPEN, tableWithProtoCodec.get(ContainerID.valueOf(containerID)).getState());
+  }
+
+  @Test
+  public void testContainerTableAccessBeforeAndFinalizeFailure() throws Exception {
+    initTests();
+
+    HDDSLayoutVersionManager manager = mock(HDDSLayoutVersionManager.class);
+    VersionedDatanodeFeatures.initialize(manager);
+    when(manager.isAllowed(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)).thenReturn(false);
+
+    WitnessedContainerMetadataStore metadataStore = WitnessedContainerMetadataStoreImpl.get(conf);
+    WitnessedContainerMetadataStore spyMetaStore = spy(metadataStore);
+    DBStore spyDBStore = spy(metadataStore.getStore());
+    DatanodeStateMachine dsmMock = mock(DatanodeStateMachine.class);
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    when(dsmMock.getContainer()).thenReturn(ozoneContainer);
+    when(ozoneContainer.getWitnessedContainerMetadataStore()).thenReturn(spyMetaStore);
+
+    TypedTable<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
+        metadataStore.getContainerIdsTable().getName(), ContainerID.getCodec(), StringCodec.get());
+    tableWithStringCodec.put(ContainerID.valueOf(1L), OPEN.name());
+
+    when(spyMetaStore.getStore()).thenReturn(spyDBStore);
+    doThrow(new IOException()).when(spyDBStore).commitBatchOperation(any(BatchOperation.class));
+
+    // check if the containerIds table is in old format
+    assertEquals(OPEN.name(), tableWithStringCodec.get(ContainerID.valueOf(1L)));
+
+    ContainerTableSchemaFinalizeAction upgradeAction = new ContainerTableSchemaFinalizeAction();
+    assertThrows(Exception.class, () -> upgradeAction.execute(dsmMock));
+
+    // check still if the containerIds table is in old format after exception
+    assertEquals(OPEN.name(), tableWithStringCodec.get(ContainerID.valueOf(1L)));
   }
 }

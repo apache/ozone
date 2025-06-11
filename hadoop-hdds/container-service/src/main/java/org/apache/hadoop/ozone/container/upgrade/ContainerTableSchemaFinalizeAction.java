@@ -23,8 +23,10 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANO
 
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
@@ -45,16 +47,22 @@ public class ContainerTableSchemaFinalizeAction
   @Override
   public void execute(DatanodeStateMachine arg) throws Exception {
     WitnessedContainerMetadataStore metadataStore = arg.getContainer().getWitnessedContainerMetadataStore();
+    // containerIdsTable is in old format where String value type is mapped to ContainerCreateInfo before finalize
     Table<ContainerID, ContainerCreateInfo> containerIdsTable = metadataStore.getContainerIdsTable();
 
-    // during finalization, it will read entries in old format and write with new format in same table with
-    // customized coded.
-    try (TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, ContainerCreateInfo>> iterator =
-             containerIdsTable.iterator()) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<ContainerID, ContainerCreateInfo> next = iterator.next();
-        containerIdsTable.put(next.getKey(), next.getValue());
+    // to write to new format, we need to create a new table with explicit codec before finalize
+    TypedTable<ContainerID, ContainerCreateInfo> writeNewFormatTable = metadataStore.getStore().getTable(
+            containerIdsTable.getName(), ContainerID.getCodec(), ContainerCreateInfo.getNewCodec());
+    try (BatchOperation batch = metadataStore.getStore().initBatchOperation()) {
+      try (TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, ContainerCreateInfo>> iterator =
+                   containerIdsTable.iterator()) {
+        while (iterator.hasNext()) {
+          Table.KeyValue<ContainerID, ContainerCreateInfo> next = iterator.next();
+          writeNewFormatTable.putWithBatch(batch, next.getKey(), next.getValue());
+        }
       }
+      metadataStore.getStore().commitBatchOperation(batch);
+      LOG.info("Finished writing containerIds Table to proto format table");
     }
   }
 }
