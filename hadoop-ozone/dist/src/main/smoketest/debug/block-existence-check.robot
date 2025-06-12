@@ -14,21 +14,22 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test checksums in case of one datanode is dead
+Documentation       Test block existence in case a block does not exist
 Library             OperatingSystem
 Resource            ../lib/os.robot
-Resource            ozone-debug.robot
+Resource            ozone-debug-keywords.robot
 Test Timeout        5 minute
+
 *** Variables ***
 ${PREFIX}           ${EMPTY}
+${DATANODE}         ${EMPTY}
 ${VOLUME}           cli-debug-volume${PREFIX}
 ${BUCKET}           cli-debug-bucket
 ${TESTFILE}         testfile
+${CHECK_TYPE}       blockExistence
 
 *** Test Cases ***
-Test ozone debug checksums with one datanode DEAD
-    ${directory} =                 Execute replicas verify checksums CLI tool
-    Set Test Variable    ${DIR}         ${directory}
-
-    ${count_files} =               Count Files In Directory    ${directory}
-    Should Be Equal As Integers    ${count_files}     1
+Test block existence with a block missing on a replica
+    ${output} =         Execute replicas verify block existence debug tool
+    ${json} =           Parse replicas verify JSON output    ${output}
+    Check to Verify Replicas    ${json}  ${CHECK_TYPE}  ${DATANODE}  Unable to find the block
