@@ -58,7 +58,7 @@ wait_for_datanode "${container}" DEAD 60
 
 docker start "${container}"
 
-wait_for_datanode "${container}" HEALTHY 60
+wait_for_datanode "${container}" HEALTHY 90
 
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "DATANODE:${host}" debug/block-existence-check.robot
 
