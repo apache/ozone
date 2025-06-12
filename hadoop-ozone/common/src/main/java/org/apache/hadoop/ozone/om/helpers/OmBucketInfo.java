@@ -595,18 +595,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     return getFromProtobuf(bucketInfo, null);
   }
 
-  /**
-   * Parses BucketInfo protobuf and creates OmBucketInfo.
-   * @param bucketInfo
-   * @return instance of OmBucketInfo
-   */
-  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo,
-      BucketLayout buckLayout) {
-    Builder obib = OmBucketInfo.newBuilder()
+  public static Builder newBuilderFromProtobufPartial(BucketInfo bucketInfo) {
+    Builder builder = OmBucketInfo.newBuilder()
         .setVolumeName(bucketInfo.getVolumeName())
         .setBucketName(bucketInfo.getBucketName())
-        .setAcls(bucketInfo.getAclsList().stream().map(
-            OzoneAcl::fromProtobuf).collect(Collectors.toList()))
         .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
         .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
         .setCreationTime(bucketInfo.getCreationTime())
@@ -615,22 +607,48 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setQuotaInBytes(bucketInfo.getQuotaInBytes())
         .setUsedNamespace(bucketInfo.getUsedNamespace())
         .setQuotaInNamespace(bucketInfo.getQuotaInNamespace());
+
+    if (bucketInfo.hasDefaultReplicationConfig()) {
+      builder.setDefaultReplicationConfig(
+          DefaultReplicationConfig.fromProto(bucketInfo.getDefaultReplicationConfig()));
+    }
+    if (bucketInfo.hasObjectID()) {
+      builder.setObjectID(bucketInfo.getObjectID());
+    }
+    if (bucketInfo.hasUpdateID()) {
+      builder.setUpdateID(bucketInfo.getUpdateID());
+    }
+    if (bucketInfo.hasSourceVolume()) {
+      builder.setSourceVolume(bucketInfo.getSourceVolume());
+    }
+    if (bucketInfo.hasSourceBucket()) {
+      builder.setSourceBucket(bucketInfo.getSourceBucket());
+    }
+    if (bucketInfo.hasOwner()) {
+      builder.setOwner(bucketInfo.getOwner());
+    }
+    if (bucketInfo.hasBucketLayout()) {
+      builder.setBucketLayout(BucketLayout.fromProto(bucketInfo.getBucketLayout()));
+    }
+
+    return builder;
+  }
+
+  /**
+   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * @param bucketInfo
+   * @return instance of OmBucketInfo
+   */
+  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo,
+      BucketLayout buckLayout) {
+    Builder obib = OmBucketInfo.newBuilderFromProtobufPartial(bucketInfo)
+        .setAcls(bucketInfo.getAclsList().stream().map(
+            OzoneAcl::fromProtobuf).collect(Collectors.toList()));
     if (buckLayout != null) {
       obib.setBucketLayout(buckLayout);
     } else if (bucketInfo.getBucketLayout() != null) {
       obib.setBucketLayout(
           BucketLayout.fromProto(bucketInfo.getBucketLayout()));
-    }
-    if (bucketInfo.hasDefaultReplicationConfig()) {
-      obib.setDefaultReplicationConfig(
-          DefaultReplicationConfig.fromProto(
-              bucketInfo.getDefaultReplicationConfig()));
-    }
-    if (bucketInfo.hasObjectID()) {
-      obib.setObjectID(bucketInfo.getObjectID());
-    }
-    if (bucketInfo.hasUpdateID()) {
-      obib.setUpdateID(bucketInfo.getUpdateID());
     }
     if (bucketInfo.getMetadataList() != null) {
       obib.addAllMetadata(KeyValueUtil
@@ -638,15 +656,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
     if (bucketInfo.hasBeinfo()) {
       obib.setBucketEncryptionKey(OMPBHelper.convert(bucketInfo.getBeinfo()));
-    }
-    if (bucketInfo.hasSourceVolume()) {
-      obib.setSourceVolume(bucketInfo.getSourceVolume());
-    }
-    if (bucketInfo.hasSourceBucket()) {
-      obib.setSourceBucket(bucketInfo.getSourceBucket());
-    }
-    if (bucketInfo.hasOwner()) {
-      obib.setOwner(bucketInfo.getOwner());
     }
     return obib.build();
   }

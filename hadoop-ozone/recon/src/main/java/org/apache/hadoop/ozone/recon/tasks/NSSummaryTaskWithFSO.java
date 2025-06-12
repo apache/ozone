@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.recon.codec.ReconOMDBDefinition.CUSTOM_CODEC_FOR_DIR_TABLE;
+import static org.apache.hadoop.ozone.recon.codec.ReconOMDBDefinition.CUSTOM_CODEC_FOR_KEY_TABLE;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -28,8 +30,10 @@ import java.util.Iterator;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -183,8 +187,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
-      Table<String, OmDirectoryInfo> dirTable =
-          omMetadataManager.getDirectoryTable();
+      Table<String, OmDirectoryInfo> dirTable = omMetadataManager.getStore()
+          .getTable(DIRECTORY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_DIR_TABLE, TableCache.CacheType.NO_CACHE);
       try (TableIterator<String,
               ? extends Table.KeyValue<String, OmDirectoryInfo>>
                 dirTableIter = dirTable.iterator()) {
@@ -201,8 +205,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       }
 
       // Get fileTable used by FSO
-      Table<String, OmKeyInfo> keyTable =
-          omMetadataManager.getFileTable();
+      Table<String, OmKeyInfo> keyTable = omMetadataManager.getStore()
+          .getTable(FILE_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE, TableCache.CacheType.NO_CACHE);
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
               keyTableIter = keyTable.iterator()) {
