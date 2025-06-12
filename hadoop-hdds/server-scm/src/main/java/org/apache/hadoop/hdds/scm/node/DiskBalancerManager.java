@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -107,7 +108,23 @@ public class DiskBalancerManager {
     List<DatanodeDetails> filterDns = null;
     if (hosts.isPresent() && !hosts.get().isEmpty()) {
       filterDns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
-          useHostnames);
+          useHostnames).stream()
+          .filter(dn -> {
+            try {
+              NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
+              boolean isInService = nodeStatus.isInService();
+              boolean isHealthy = nodeStatus.isHealthy();
+              if (!isInService || !isHealthy) {
+                LOG.warn("Datanode {} is not in optimal state for disk balancing." +
+                    " Operational state: {}", dn.getHostName(), nodeStatus.getOperationalState());
+                return false;
+              }
+              return true;
+            } catch (NodeNotFoundException e) {
+              throw new RuntimeException(e);
+            }
+          })
+          .collect(Collectors.toList());
     }
 
     // Filter Running Status by default
