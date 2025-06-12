@@ -623,6 +623,7 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("path") String keyPath) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_KEY;
+
     OzoneKey key;
     try {
       OzoneBucket bucket = getBucket(bucketName);
@@ -889,6 +890,7 @@ public class ObjectEndpoint extends EndpointBase {
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.COMPLETE_MULTIPART_UPLOAD;
+    OzoneVolume volume = getVolume();
     // Using LinkedHashMap to preserve ordering of parts list.
     Map<Integer, String> partsMap = new LinkedHashMap<>();
     List<CompleteMultipartUploadRequest.Part> partList =
@@ -896,7 +898,6 @@ public class ObjectEndpoint extends EndpointBase {
 
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
-      OzoneVolume volume = getVolume();
       OzoneBucket ozoneBucket = volume.getBucket(bucket);
       S3Owner.verifyBucketOwnerCondition(headers, bucket, ozoneBucket.getOwner());
 

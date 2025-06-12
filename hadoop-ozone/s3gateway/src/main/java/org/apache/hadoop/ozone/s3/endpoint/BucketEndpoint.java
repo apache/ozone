@@ -357,7 +357,6 @@ public class BucketEndpoint extends EndpointBase {
           new Exception("max-uploads must be between 1 and 1000"));
     }
 
-
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
 
