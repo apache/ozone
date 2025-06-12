@@ -125,6 +125,7 @@ class TestBackgroundContainerDataScannerIntegration
       corruption.assertLogged(containerID, logCapturer);
     } else {
       // Other corruption types will only lead to a single error.
+      // TODO assert that checksum update log line is present here too.
       corruption.assertLogged(containerID, 1, logCapturer);
     }
   }

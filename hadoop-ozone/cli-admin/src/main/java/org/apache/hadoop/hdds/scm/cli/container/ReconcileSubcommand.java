@@ -41,6 +41,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     scmClient.reconcileContainer(containerId);
     System.out.println("Reconciliation has been triggered for container " + containerId);
+    // TODO link jira
     // TODO a better option to check status may be added later.
     System.out.println("Use \"ozone admin container info --json " + containerId + "\" to see the checksums of each " +
         "container replica");
