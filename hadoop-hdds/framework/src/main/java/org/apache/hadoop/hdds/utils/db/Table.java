@@ -325,94 +325,58 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   /**
    * Class used to represent the key and value pair of a db entry.
    */
-  interface KeyValue<KEY, VALUE> {
+  final class KeyValue<K, V> {
+    private final K key;
+    private final V value;
+    private final int rawSize;
 
-    KEY getKey() throws IOException;
+    private KeyValue(K key, V value, int rawSize) {
+      this.key = key;
+      this.value = value;
+      this.rawSize = rawSize;
+    }
 
-    VALUE getValue() throws IOException;
+    public K getKey() {
+      return key;
+    }
 
-    default int getRawSize()  throws IOException {
-      return 0;
+    public V getValue() {
+      return value;
+    }
+
+    public int getRawSize() {
+      return rawSize;
+    }
+
+    @Override
+    public String toString() {
+      return "(key=" + key + ", value=" + value + ")";
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      } else if (!(obj instanceof KeyValue)) {
+        return false;
+      }
+      final KeyValue<?, ?> that = (KeyValue<?, ?>) obj;
+      return this.getKey().equals(that.getKey())
+          && this.getValue().equals(that.getValue());
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(getKey(), getValue());
     }
   }
 
   static <K, V> KeyValue<K, V> newKeyValue(K key, V value) {
-    return new KeyValue<K, V>() {
-      @Override
-      public K getKey() {
-        return key;
-      }
-
-      @Override
-      public V getValue() {
-        return value;
-      }
-
-      @Override
-      public String toString() {
-        return "(key=" + key + ", value=" + value + ")";
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (!(obj instanceof KeyValue)) {
-          return false;
-        }
-        KeyValue<?, ?> kv = (KeyValue<?, ?>) obj;
-        try {
-          return getKey().equals(kv.getKey()) && getValue().equals(kv.getValue());
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      }
-
-      @Override
-      public int hashCode() {
-        return Objects.hash(getKey(), getValue());
-      }
-    };
+    return newKeyValue(key, value, 0);
   }
 
   static <K, V> KeyValue<K, V> newKeyValue(K key, V value, int rawSize) {
-    return new KeyValue<K, V>() {
-      @Override
-      public K getKey() {
-        return key;
-      }
-
-      @Override
-      public V getValue() {
-        return value;
-      }
-
-      @Override
-      public int getRawSize() throws IOException {
-        return rawSize;
-      }
-
-      @Override
-      public String toString() {
-        return "(key=" + key + ", value=" + value + ")";
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (!(obj instanceof KeyValue)) {
-          return false;
-        }
-        KeyValue<?, ?> kv = (KeyValue<?, ?>) obj;
-        try {
-          return getKey().equals(kv.getKey()) && getValue().equals(kv.getValue());
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      }
-
-      @Override
-      public int hashCode() {
-        return Objects.hash(getKey(), getValue());
-      }
-    };
+    return new KeyValue<>(key, value, rawSize);
   }
 
   /** A {@link TableIterator} to iterate {@link KeyValue}s. */
