@@ -153,21 +153,17 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   void deleteRange(KEY beginKey, KEY endKey) throws IOException;
 
-  /**
-   * Returns the iterator for this metadata store.
-   *
-   * @return MetaStoreIterator
-   * @throws IOException on failure.
-   */
-  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator()
-      throws IOException;
+  /** The same as iterator(null, true). */
+  default KeyValueIterator<KEY, VALUE> iterator() throws IOException {
+    return iterator(null);
+  }
 
-  /**
-   * Returns a prefixed iterator for this metadata store.
-   * @param prefix
-   * @return MetaStoreIterator
-   */
-  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix)
+  /** The same as iterator(prefix, true). */
+  default KeyValueIterator<KEY, VALUE> iterator(KEY prefix) throws IOException {
+    return iterator(prefix, KeyValueIterator.Type.KEY_AND_VALUE);
+  }
+
+  KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type)
       throws IOException;
 
   /**
@@ -328,12 +324,12 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   final class KeyValue<K, V> {
     private final K key;
     private final V value;
-    private final int rawSize;
+    private final int valueByteSize;
 
-    private KeyValue(K key, V value, int rawSize) {
+    private KeyValue(K key, V value, int valueByteSize) {
       this.key = key;
       this.value = value;
-      this.rawSize = rawSize;
+      this.valueByteSize = valueByteSize;
     }
 
     public K getKey() {
@@ -344,8 +340,8 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       return value;
     }
 
-    public int getRawSize() {
-      return rawSize;
+    public int getValueByteSize() {
+      return valueByteSize;
     }
 
     @Override
@@ -375,12 +371,32 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
     return newKeyValue(key, value, 0);
   }
 
-  static <K, V> KeyValue<K, V> newKeyValue(K key, V value, int rawSize) {
-    return new KeyValue<>(key, value, rawSize);
+  static <K, V> KeyValue<K, V> newKeyValue(K key, V value, int valueByteSize) {
+    return new KeyValue<>(key, value, valueByteSize);
   }
 
   /** A {@link TableIterator} to iterate {@link KeyValue}s. */
   interface KeyValueIterator<KEY, VALUE>
       extends TableIterator<KEY, KeyValue<KEY, VALUE>> {
+
+    /** The iterator type. */
+    enum Type {
+      /** Neither read key nor value. */
+      NEITHER,
+      /** Read key only. */
+      KEY_ONLY,
+      /** Read value only. */
+      VALUE_ONLY,
+      /** Read both key and value. */
+      KEY_AND_VALUE;
+
+      boolean readKey() {
+        return (this.ordinal() & KEY_ONLY.ordinal()) != 0;
+      }
+
+      boolean readValue() {
+        return (this.ordinal() & VALUE_ONLY.ordinal()) != 0;
+      }
+    }
   }
 }
