@@ -1445,8 +1445,8 @@ public class KeyValueHandler extends Handler {
         sendICR(container);
       }
 
-      String message = "Container data checksum updated from " + checksumToString(originalDataChecksum) + " to " +
-              checksumToString(updatedDataChecksum);
+      String message = "Container " + containerData.getContainerID() +  " data checksum updated from " +
+          checksumToString(originalDataChecksum) + " to " + checksumToString(updatedDataChecksum);
       if (hadDataChecksum) {
         LOG.warn(message);
         ContainerLogger.logChecksumUpdated(containerData, originalDataChecksum);
