@@ -25,7 +25,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Future;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -43,6 +45,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,9 +123,15 @@ public class ContainerImporter {
       try (InputStream input = Files.newInputStream(tarFilePath)) {
         Container container = controller.importContainer(
             containerData, input, packer);
-        // After container import is successful, increase used space for the volume
+        // After container import is successful, increase used space for the volume and schedule an OnDemand scan for it
         targetVolume.incrementUsedSpace(container.getContainerData().getBytesUsed());
         containerSet.addContainerByOverwriteMissingContainer(container);
+        Optional<Future<?>> scanFuture = OnDemandContainerDataScanner.scanContainer(container);
+        if (scanFuture.isPresent()) {
+          LOG.info("Scheduled on-demand scan for imported container {}", containerID);
+        } else {
+          LOG.debug("Skipped on-demand scan for imported container {}", containerID);
+        }
       }
     } finally {
       importContainerProgress.remove(containerID);
