@@ -56,8 +56,9 @@ public class ReplicasVerify extends Handler {
   private String uri;
 
   @CommandLine.Option(names = {"-o", "--output-dir"},
-      description = "Destination directory to save the generated output.",
-      required = true)
+      description = "Destination directory to save the generated output. " +
+          "If not specified, the output is printed to the console. " +
+          "Note: This option is currently not supported") // TODO: HDDS-13063
   private String outputDir;
 
   @CommandLine.Option(names = {"--all-results"},
