@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumMatches;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,7 +49,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -231,6 +231,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
 
   @Test
   public void testPutBlockForClosedContainer() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
     KeyValueContainer kvContainer = getKeyValueContainer();
     KeyValueContainerData containerData = kvContainer.getContainerData();
     ContainerSet containerSet = newContainerSet();
@@ -250,21 +251,18 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkBuffer chunkData = ContainerTestHelper.getData(20);
     keyValueHandler.writeChunkForClosedContainer(info, getBlockID(), chunkData, kvContainer);
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 1L, true);
-    ContainerProtos.ContainerChecksumInfo containerChecksumInfo =
-        keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
+    keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
     assertEquals(1L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
     assertEquals(20L, containerData.getBytesUsed());
-    assertEquals(ContainerChecksumTreeManager.getDataChecksum(containerChecksumInfo), containerData.getDataChecksum());
+    verifyAllDataChecksumMatches(containerData, conf);
 
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
       assertEquals(20L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
-      assertEquals(containerData.getDataChecksum(), dbHandle.getStore().getMetadataTable()
-          .get(containerData.getContainerDataChecksumKey()));
     }
 
     // Add another chunk and check the put block data
@@ -276,21 +274,19 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     keyValueHandler.writeChunkForClosedContainer(newChunkInfo, getBlockID(), chunkData, kvContainer);
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
     long previousDataChecksum = containerData.getDataChecksum();
-    containerChecksumInfo = keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
-    assertNotEquals(previousDataChecksum, containerData.getDataChecksum());
-    assertEquals(ContainerChecksumTreeManager.getDataChecksum(containerChecksumInfo), containerData.getDataChecksum());
+    keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
     assertEquals(2L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
     assertEquals(40L, containerData.getBytesUsed());
+    assertNotEquals(previousDataChecksum, containerData.getDataChecksum());
+    verifyAllDataChecksumMatches(containerData, conf);
 
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
       assertEquals(40L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
-      assertEquals(containerData.getDataChecksum(), dbHandle.getStore().getMetadataTable()
-          .get(containerData.getContainerDataChecksumKey()));
     }
 
     // Replace the last chunk with a chunk of greater size, This should only update the bytesUsed with
@@ -308,7 +304,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     // Old chunk size 20, new chunk size 30, difference 10. So bytesUsed should be 40 + 10 = 50
     assertEquals(50L, containerData.getBytesUsed());
 
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));

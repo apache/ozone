@@ -315,7 +315,6 @@ public class ContainerChecksumTreeManager {
   /**
    * Returns the container checksum tree file for the specified container without deserializing it.
    */
-  @VisibleForTesting
   public static File getContainerChecksumFile(ContainerData data) {
     return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION);
   }

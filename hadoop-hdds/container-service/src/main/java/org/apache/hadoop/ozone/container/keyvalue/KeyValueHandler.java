@@ -1409,6 +1409,7 @@ public class KeyValueHandler extends Handler {
    * This method does not send an ICR with the updated checksum info.
    * @param container - Container for which the container merkle tree needs to be updated.
    */
+  @VisibleForTesting
   public ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksumFromMetadata(
       KeyValueContainer container) throws IOException {
     ContainerMerkleTreeWriter merkleTree = new ContainerMerkleTreeWriter();
@@ -1442,11 +1443,14 @@ public class KeyValueHandler extends Handler {
     if (updatedDataChecksum != originalDataChecksum) {
       containerData.setDataChecksum(updatedDataChecksum);
       try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+        // This value is only used during the datanode startup. If the update fails, then it's okay as the merkle tree
+        // and in-memory checksum will still be the same. This will be updated when the next time we update the tree.
+        // Either scanner or reconciliation will update the checksum.
         dbHandle.getStore().getMetadataTable().put(containerData.getContainerDataChecksumKey(), updatedDataChecksum);
       } catch (IOException e) {
         LOG.error("Failed to update container data checksum in RocksDB for container {}. " +
                 "Continuing with original checksum for RocksDB {}.", containerData.getContainerID(),
-            originalDataChecksum, e);
+            checksumToString(originalDataChecksum), e);
       }
 
       String message =

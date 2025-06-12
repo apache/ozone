@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.checksum;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM_EXTENSION;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertContainerDiffMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
@@ -98,7 +97,9 @@ class TestContainerChecksumTreeManager {
     container = mock(KeyValueContainerData.class);
     when(container.getContainerID()).thenReturn(CONTAINER_ID);
     when(container.getMetadataPath()).thenReturn(testDir.getAbsolutePath());
-    checksumFile = new File(testDir, CONTAINER_ID + CONTAINER_DATA_CHECKSUM_EXTENSION);
+    // .tree is hardcoded here to check if the checksum file extension has changed.
+    // As a change in the extension will result in incompatibility.
+    checksumFile = new File(testDir, CONTAINER_ID + ".tree");
     checksumManager = new ContainerChecksumTreeManager(new OzoneConfiguration());
     metrics = checksumManager.getMetrics();
     config = new OzoneConfiguration();
