@@ -15,17 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.hdds.utils.db.iterator;
 
 import java.io.IOException;
 import java.util.Arrays;
+import org.apache.hadoop.hdds.utils.db.RDBTable;
+import org.apache.hadoop.hdds.utils.db.RawKeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.ratis.util.ReferenceCountedObject;
 
 /**
  * RocksDB store iterator using the byte[] API.
  */
-class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
-  RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
+public class ReferenceCountedRDBStoreByteArrayIterator extends ReferenceCountedRDBStoreAbstractIterator<byte[]> {
+  public ReferenceCountedRDBStoreByteArrayIterator(ManagedRocksIterator iterator,
       RDBTable table, byte[] prefix) {
     super(iterator, table,
         prefix == null ? null : Arrays.copyOf(prefix, prefix.length));
@@ -33,14 +36,10 @@ class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
   }
 
   @Override
-  byte[] key() {
-    return getRocksDBIterator().get().key();
-  }
-
-  @Override
-  RawKeyValue<byte[]> getKeyValue() {
+  ReferenceCountedObject<RawKeyValue<byte[]>> getKeyValue() {
     final ManagedRocksIterator i = getRocksDBIterator();
-    return RawKeyValue.create(i.get().key(), i.get().value());
+    RawKeyValue<byte[]> rawKV = RawKeyValue.create(i.get().key(), i.get().value());
+    return ReferenceCountedObject.wrap(rawKV);
   }
 
   @Override

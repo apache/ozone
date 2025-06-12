@@ -84,6 +84,13 @@ public class RocksDBConfiguration {
           + "Default 0 means no limit.")
   private long walSizeLimit = 0;
 
+  @Config(key = "rocksdb.threadsafe.iterator.enabled",
+      type = ConfigType.BOOLEAN,
+      defaultValue = "true",
+      tags = {OM, SCM, DATANODE},
+      description = "Flag value for allowing initialization of thread safe iterator")
+  private boolean threadSafeIteratorEnabled = true;
+
   public void setRocksdbLoggingEnabled(boolean enabled) {
     this.rocksdbLogEnabled = enabled;
   }
@@ -138,5 +145,9 @@ public class RocksDBConfiguration {
 
   public int getKeepLogFileNum() {
     return rocksdbKeepLogFileNum;
+  }
+
+  public boolean isThreadSafeIteratorEnabled() {
+    return threadSafeIteratorEnabled;
   }
 }

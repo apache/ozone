@@ -15,23 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.hdds.utils.db.iterator;
 
-import java.nio.ByteBuffer;
-import org.apache.ratis.util.function.CheckedFunction;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 /**
- * A function puts data from a source to the {@link ByteBuffer}
- * specified in the parameter.
- * The source may or may not be available.
- * This function must return the required size (possibly 0)
- * if the source is available; otherwise, return null.
- * When the {@link ByteBuffer}'s capacity is smaller than the required size,
- * partial data may be put to the {@link ByteBuffer}.
- *
- * @param <E> The exception type this function may throw.
+ * Base class for Raw DB TableIterator.
  */
-@FunctionalInterface
-public interface PutToByteBuffer<E extends Exception>
-    extends CheckedFunction<ByteBuffer, Integer, E> {
+public interface BaseDBTableIterator<RAW, V extends Table.KeyValue<RAW, RAW>> extends TableIterator<RAW, V> {
+  boolean isKVCloseable();
 }
