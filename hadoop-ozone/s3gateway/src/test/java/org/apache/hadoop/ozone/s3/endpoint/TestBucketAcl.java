@@ -21,6 +21,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -262,26 +263,20 @@ public class TestBucketAcl {
   }
 
   @Test
-  public void testPassBucketOwnerCondition() throws Exception {
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("defaultOwner");
-    when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
-    Response response =
-        bucketEndpoint.get(BUCKET_NAME, null, null, null, 0, null,
-            null, null, null, ACL_MARKER, null, null, 0, headers);
-    assertEquals(HTTP_OK, response.getStatus());
-  }
-
-  @Test
-  public void testFailedBucketOwnerCondition() {
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("wrongOwner");
+  public void testBucketOwnerCondition() throws Exception {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
 
-    OS3Exception exception =
-        assertThrows(OS3Exception.class, () -> bucketEndpoint.get(BUCKET_NAME, null, null, null, 0, null,
-            null, null, null, ACL_MARKER, null, null, 0, headers));
+    // use wrong bucket owner header to test access denied
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("wrongOwner");
+
+    OS3Exception exception = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.getAcl(headers, BUCKET_NAME));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("defaultOwner");
+
+    assertDoesNotThrow(() -> bucketEndpoint.getAcl(headers, BUCKET_NAME));
   }
 }

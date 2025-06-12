@@ -315,36 +315,23 @@ public class TestMultipartUploadWithCopy {
   }
 
   @Test
-  public void testPassBucketOwnerCondition() throws Exception {
-    String correctKey = "correctKey";
+  public void testBucketOwnerCondition() throws Exception {
+    String key = "key";
     // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(correctKey);
+    String uploadID = initiateMultipartUpload(key);
 
     List<Part> partsList = new ArrayList<>();
 
     // Upload parts
     String content = "Multipart Upload 1";
 
-    Part part1 = uploadPart(correctKey, uploadID, 1, content);
+    Part part1 = uploadPart(key, uploadID, 1, content);
     partsList.add(part1);
 
     Part part2 =
-        uploadPartWithCopy(correctKey, uploadID, 2,
+        uploadPartWithCopy(key, uploadID, 2,
             OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, null);
     partsList.add(part2);
-
-    Part part3 =
-        uploadPartWithCopy(correctKey, uploadID, 3,
-            OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3");
-    partsList.add(part3);
-
-    Part part4 =
-        uploadPartWithCopy(correctKey, uploadID, 3,
-            OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-            beforeSourceKeyModificationTimeStr,
-            afterSourceKeyModificationTimeStr
-        );
-    partsList.add(part4);
 
     // complete multipart upload
     CompleteMultipartUploadRequest completeMultipartUploadRequest = new
@@ -352,63 +339,26 @@ public class TestMultipartUploadWithCopy {
     completeMultipartUploadRequest.setPartList(partsList);
 
     HttpHeaders headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("defaultOwner");
-    REST.setHeaders(headers);
 
-    Response response = REST.completeMultipartUpload(OzoneConsts.S3_BUCKET, correctKey,
-        uploadID, completeMultipartUploadRequest);
-
-    assertEquals(200, response.getStatus());
-  }
-
-  @Test
-  public void testFailedBucketOwnerCondition() throws Exception {
-    String incorrectKey = "incorrectKey";
-    // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(incorrectKey);
-
-    List<Part> partsList = new ArrayList<>();
-
-    // Upload parts
-    String content = "Multipart Upload 1";
-
-    Part part1 = uploadPart(incorrectKey, uploadID, 1, content);
-    partsList.add(part1);
-
-    Part part2 =
-        uploadPartWithCopy(incorrectKey, uploadID, 2,
-            OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, null);
-    partsList.add(part2);
-
-    Part part3 =
-        uploadPartWithCopy(incorrectKey, uploadID, 3,
-            OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3");
-    partsList.add(part3);
-
-    Part part4 =
-        uploadPartWithCopy(incorrectKey, uploadID, 3,
-            OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-            beforeSourceKeyModificationTimeStr,
-            afterSourceKeyModificationTimeStr
-        );
-    partsList.add(part4);
-
-    // complete multipart upload
-    CompleteMultipartUploadRequest completeMultipartUploadRequest = new
-        CompleteMultipartUploadRequest();
-    completeMultipartUploadRequest.setPartList(partsList);
-
-    HttpHeaders headers = mock(HttpHeaders.class);
+    // use wrong bucket owner header to test access denied
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
     REST.setHeaders(headers);
 
     OS3Exception exception =
-        assertThrows(OS3Exception.class, () -> REST.completeMultipartUpload(OzoneConsts.S3_BUCKET, incorrectKey,
+        assertThrows(OS3Exception.class, () -> REST.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
             uploadID, completeMultipartUploadRequest));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    Response response = REST.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
+        uploadID, completeMultipartUploadRequest);
+
+    assertEquals(200, response.getStatus());
   }
 
   private String initiateMultipartUpload(String key) throws IOException,

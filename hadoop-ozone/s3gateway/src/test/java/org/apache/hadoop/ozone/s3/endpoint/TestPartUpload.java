@@ -259,7 +259,7 @@ public class TestPartUpload {
   }
 
   @Test
-  public void testPassBucketOwnerCondition() throws Exception {
+  public void testBucketOwnerCondition() throws Exception {
     Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
         OzoneConsts.KEY);
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
@@ -272,42 +272,31 @@ public class TestPartUpload {
         new ByteArrayInputStream(content.getBytes(UTF_8));
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    rest.setHeaders(headers);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn("mockSignature");
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("defaultOwner");
-    rest.setHeaders(headers);
 
-    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 1, uploadID, null, null, body);
 
-    assertEquals(200, response.getStatus());
-  }
-
-  @Test
-  public void testFailedBucketOwnerCondition() throws Exception {
-    Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
-        OzoneConsts.KEY);
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    String uploadID = multipartUploadInitiateResponse.getUploadID();
-
-    String content = "Multipart Upload";
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(content.getBytes(UTF_8));
-
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    // use wrong bucket owner header to test access denied
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
-    rest.setHeaders(headers);
+
     OS3Exception exception =
         assertThrows(OS3Exception.class, () -> rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
             content.length(), 1, uploadID, null, null, body));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        content.length(), 1, uploadID, null, null, body);
+
+    assertEquals(200, response.getStatus());
   }
 
   private void assertContentLength(String uploadID, String key,

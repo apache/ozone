@@ -115,33 +115,26 @@ public class TestObjectMultiDelete {
   }
 
   @Test
-  public void testPassBucketOwnerCondition() throws Exception {
+  public void testBucketOwnerCondition() {
     HttpHeaders headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("defaultOwner");
 
     MultiDeleteRequest mdr = new MultiDeleteRequest();
     mdr.getObjects().add(new DeleteObject("key1"));
     mdr.getObjects().add(new DeleteObject("key2"));
-    mdr.getObjects().add(new DeleteObject("key4"));
 
-    assertDoesNotThrow(() -> rest.multiDelete(BUCKET_NAME, "", mdr, headers));
-  }
-
-  @Test
-  public void testFailedBucketOwnerCondition() {
-    HttpHeaders headers = mock(HttpHeaders.class);
+    // use wrong bucket owner header to test access denied
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
-
-    MultiDeleteRequest mdr = new MultiDeleteRequest();
-    mdr.getObjects().add(new DeleteObject("key1"));
-    mdr.getObjects().add(new DeleteObject("key2"));
-    mdr.getObjects().add(new DeleteObject("key4"));
 
     OS3Exception exception =
         assertThrows(OS3Exception.class, () -> rest.multiDelete(BUCKET_NAME, "", mdr, headers));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    assertDoesNotThrow(() -> rest.multiDelete(BUCKET_NAME, "", mdr, headers));
   }
 }

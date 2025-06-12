@@ -287,13 +287,22 @@ public class TestObjectGet {
   }
 
   @Test
-  public void testFailedBucketOwnerCondition() {
+  public void testBucketOwnerCondition() throws Exception {
+    // use wrong bucket owner header to test access denied
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
-    rest.setHeaders(headers);
+
     OS3Exception exception =
         assertThrows(OS3Exception.class, () -> rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+
+    assertEquals(200, response.getStatus());
   }
 }

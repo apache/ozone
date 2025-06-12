@@ -150,8 +150,10 @@ public class TestListParts {
   }
 
   @Test
-  public void testFailedBucketOwnerCondition() {
+  public void testBucketOwnerCondition() throws Exception {
     HttpHeaders headers = mock(HttpHeaders.class);
+
+    // Use wrong bucket owner header to test access denied
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
     rest.setHeaders(headers);
@@ -161,5 +163,14 @@ public class TestListParts {
             uploadID, 3, "0", null));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    Response response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
+        uploadID, 3, "0", null);
+
+    assertEquals(200, response.getStatus());
   }
 }

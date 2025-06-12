@@ -110,7 +110,8 @@ public class TestBucketDelete {
   }
 
   @Test
-  public void testFailedBucketOwnerCondition() {
+  public void testBucketOwnerCondition() throws Exception {
+    // Use wrong bucket owner header to test access denied
     when(httpHeaders.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
 
@@ -118,5 +119,13 @@ public class TestBucketDelete {
         assertThrows(OS3Exception.class, () -> bucketEndpoint.delete(bucketName, httpHeaders));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // Use correct bucket owner header to pass bucket owner condition verification
+    when(httpHeaders.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    Response response = bucketEndpoint.delete(bucketName, httpHeaders);
+
+    assertEquals(HttpStatus.SC_NO_CONTENT, response.getStatus());
   }
 }

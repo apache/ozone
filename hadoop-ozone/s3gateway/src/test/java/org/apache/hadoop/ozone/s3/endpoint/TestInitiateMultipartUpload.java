@@ -92,10 +92,8 @@ public class TestInitiateMultipartUpload {
   }
 
   @Test
-  public void testPassBucketOwnerCondition() throws Exception {
+  public void testBucketOwnerCondition() throws Exception {
     HttpHeaders headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("defaultOwner");
     String bucket = OzoneConsts.S3_BUCKET;
     String key = OzoneConsts.KEY;
     OzoneClient client = new OzoneClientStub();
@@ -103,28 +101,23 @@ public class TestInitiateMultipartUpload {
     ObjectEndpoint rest = getObjectEndpoint(client, headers);
     client.getObjectStore().getS3Bucket(bucket)
         .setReplicationConfig(new ECReplicationConfig("rs-3-2-1024K"));
-    Response response = rest.initializeMultipartUpload(bucket, key);
 
-    assertEquals(200, response.getStatus());
-  }
-
-  @Test
-  public void testFailedBucketOwnerCondition() throws Exception {
-    HttpHeaders headers = mock(HttpHeaders.class);
+    // use wrong bucket owner header to test access denied
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
-    String bucket = OzoneConsts.S3_BUCKET;
-    String key = OzoneConsts.KEY;
-    OzoneClient client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket(bucket);
-    ObjectEndpoint rest = getObjectEndpoint(client, headers);
-    client.getObjectStore().getS3Bucket(bucket)
-        .setReplicationConfig(new ECReplicationConfig("rs-3-2-1024K"));
 
     OS3Exception exception =
         assertThrows(OS3Exception.class, () -> rest.initializeMultipartUpload(bucket, key));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    Response response = rest.initializeMultipartUpload(bucket, key);
+
+    assertEquals(200, response.getStatus());
   }
 
   @Nonnull

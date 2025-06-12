@@ -69,18 +69,10 @@ public class TestObjectDelete {
   }
 
   @Test
-  public void testPassBucketOwnerCondition() throws Exception {
+  public void testBucketOwnerCondition() throws Exception {
     HttpHeaders headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("defaultOwner");
-    rest.setHeaders(headers);
-    Response response = rest.delete(BUCKET_NAME, KEY, null, null);
-    assertEquals(204, response.getStatus());
-  }
 
-  @Test
-  public void testFailedBucketOwnerCondition() {
-    HttpHeaders headers = mock(HttpHeaders.class);
+    // Use wrong bucket owner header to fail bucket owner condition verification
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
     rest.setHeaders(headers);
@@ -89,5 +81,13 @@ public class TestObjectDelete {
         assertThrows(OS3Exception.class, () -> rest.delete(BUCKET_NAME, KEY, null, null));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    Response response = rest.delete(BUCKET_NAME, KEY, null, null);
+
+    assertEquals(204, response.getStatus());
   }
 }

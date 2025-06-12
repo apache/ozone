@@ -181,30 +181,27 @@ class TestObjectPut {
   }
 
   @Test
-  public void testObjectPutWithPassBucketOwnerCondition() throws Exception {
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn(DEFAULT_OWNER);
+  public void testPutObjectBucketOwnerCondition() throws Exception {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     long dataSize = CONTENT.length();
 
-    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, dataSize, 1, null, null, null, body);
-
-    assertEquals(200, response.getStatus());
-  }
-
-  @Test
-  public void testPutObjectWithFailedBucketOwnerCondition() {
+    // use wrong bucket owner header to test access denied
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    long dataSize = CONTENT.length();
 
     OS3Exception exception = assertThrows(OS3Exception.class,
         () -> objectEndpoint.put(BUCKET_NAME, KEY_NAME, dataSize, 1, null, null, null, body));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn(DEFAULT_OWNER);
+
+    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, dataSize, 1, null, null, null, body);
+
+    assertEquals(200, response.getStatus());
   }
 
   @Test
@@ -262,36 +259,30 @@ class TestObjectPut {
   }
 
   @Test
-  public void testCopyObjectWithPassBucketOwnerCondition() throws Exception {
+  public void testCopyObjectBucketOwnerCondition() throws Exception {
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn(DEFAULT_OWNER);
-
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
-    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-        1, null, null, null, body);
-
-    assertEquals(200, response.getStatus());
-  }
-
-  @Test
-  public void testCopyObjectWithFailedBucketOwnerCondition() {
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
-    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
+    // use wrong bucket owner header to test access denied
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
-
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
     OS3Exception exception =
         assertThrows(OS3Exception.class, () -> objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
             1, null, null, null, body));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn(DEFAULT_OWNER);
+
+    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
+        1, null, null, null, body);
+
+    assertEquals(200, response.getStatus());
   }
 
   @Test

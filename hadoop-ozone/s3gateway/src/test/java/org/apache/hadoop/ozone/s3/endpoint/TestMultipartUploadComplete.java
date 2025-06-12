@@ -270,40 +270,7 @@ public class TestMultipartUploadComplete {
   }
 
   @Test
-  public void testPassBucketOwnerCondition() throws Exception {
-
-    // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(OzoneConsts.KEY);
-
-    List<Part> partsList = new ArrayList<>();
-
-    // Upload parts
-    String content = "Multipart Upload 1";
-    int partNumber = 1;
-
-    Part part1 = uploadPart(OzoneConsts.KEY, uploadID, partNumber, content);
-    partsList.add(part1);
-
-    content = "Multipart Upload 2";
-    partNumber = 2;
-    Part part2 = uploadPart(OzoneConsts.KEY, uploadID, partNumber, content);
-    partsList.add(part2);
-
-    // complete multipart upload
-    CompleteMultipartUploadRequest completeMultipartUploadRequest = new
-        CompleteMultipartUploadRequest();
-    completeMultipartUploadRequest.setPartList(partsList);
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("defaultOwner");
-
-    Response response = rest.completeMultipartUpload(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        uploadID, completeMultipartUploadRequest);
-
-    assertEquals(200, response.getStatus());
-  }
-
-  @Test
-  public void testFailedBucketOwnerCondition() throws Exception {
+  public void testBucketOwnerCondition() throws Exception {
 
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(OzoneConsts.KEY);
@@ -327,6 +294,7 @@ public class TestMultipartUploadComplete {
         CompleteMultipartUploadRequest();
     completeMultipartUploadRequest.setPartList(partsList);
 
+    // use wrong bucket owner header to test access denied
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
 
@@ -335,5 +303,14 @@ public class TestMultipartUploadComplete {
             uploadID, completeMultipartUploadRequest));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    Response response = rest.completeMultipartUpload(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        uploadID, completeMultipartUploadRequest);
+
+    assertEquals(200, response.getStatus());
   }
 }

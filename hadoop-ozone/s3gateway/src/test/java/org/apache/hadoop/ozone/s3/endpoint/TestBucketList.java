@@ -597,17 +597,20 @@ public class TestBucketList {
 
     Response response =
         getBucket.get("b1", "/", null, null, 100, "",
-                null, null, null, null, null, null, 0, headers);
+                null, null, null, null, null, null,
+            0, headers);
+
     assertEquals(200, response.getStatus());
   }
 
   @Test
-  public void testFailedBucketOwnerCondition() throws Exception {
+  public void testBucketOwnerCondition() throws Exception {
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    OzoneClient client = createClientWithKeys("file1", "dir1/file2");
+
+    // Use wrong bucket owner header to fail bucket owner condition verification
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
-
-    OzoneClient client = createClientWithKeys("file1", "dir1/file2");
 
     BucketEndpoint getBucket = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
@@ -618,6 +621,17 @@ public class TestBucketList {
             null, null, null, null, null, null, 0, headers));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    Response response =
+        getBucket.get("b1", "/", null, null, 100, "",
+            null, null, null, null, null, null,
+            0, headers);
+
+    assertEquals(200, response.getStatus());
   }
 
   private void assertEncodingTypeObject(

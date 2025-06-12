@@ -193,7 +193,7 @@ public class TestObjectHead {
   }
 
   @Test
-  public void testPassBucketOwnerCondition() throws Exception {
+  public void testBucketOwnerCondition() throws Exception {
     String value = RandomStringUtils.secure().nextAlphanumeric(32);
     OzoneOutputStream out = bucket.createKey("key1",
         value.getBytes(UTF_8).length,
@@ -201,32 +201,24 @@ public class TestObjectHead {
             ReplicationFactor.ONE), new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
-
     HttpHeaders headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("defaultOwner");
     keyEndpoint.setHeaders(headers);
-    Response response = keyEndpoint.head(bucketName, "key1");
-    assertEquals(200, response.getStatus());
-  }
 
-  @Test
-  public void testFailedBucketOwnerCondition() throws Exception {
-    String value = RandomStringUtils.secure().nextAlphanumeric(32);
-    OzoneOutputStream out = bucket.createKey("key1",
-        value.getBytes(UTF_8).length,
-        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-            ReplicationFactor.ONE), new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
-
-    HttpHeaders headers = mock(HttpHeaders.class);
+    // use wrong bucket owner header to test access denied
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
-    keyEndpoint.setHeaders(headers);
+
     OS3Exception exception =
         assertThrows(OS3Exception.class, () -> keyEndpoint.head(bucketName, "key1"));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    Response response = keyEndpoint.head(bucketName, "key1");
+
+    assertEquals(200, response.getStatus());
   }
 }

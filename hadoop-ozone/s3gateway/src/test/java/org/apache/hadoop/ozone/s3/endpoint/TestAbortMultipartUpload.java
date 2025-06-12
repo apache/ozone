@@ -87,17 +87,8 @@ public class TestAbortMultipartUpload {
   }
 
   @Test
-  public void testPassBucketOwnerCondition() throws Exception {
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("defaultOwner");
-
-    Response response = rest.delete(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, uploadID, null);
-
-    assertEquals(204, response.getStatus());
-  }
-
-  @Test
-  public void testFailedBucketOwnerCondition() throws Exception {
+  public void testBucketOwnerCondition() throws Exception {
+    // use wrong bucket owner header to test access denied
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("wrongOwner");
 
@@ -105,5 +96,13 @@ public class TestAbortMultipartUpload {
         assertThrows(OS3Exception.class, () -> rest.delete(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, uploadID, null));
 
     assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
+
+    // use correct bucket owner header to pass bucket owner condition verification
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
+        .thenReturn("defaultOwner");
+
+    Response response = rest.delete(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, uploadID, null);
+
+    assertEquals(204, response.getStatus());
   }
 }
