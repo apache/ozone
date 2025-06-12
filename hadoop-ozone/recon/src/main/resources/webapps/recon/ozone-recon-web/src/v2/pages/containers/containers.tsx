@@ -175,7 +175,7 @@ const Containers: React.FC<{}> = () => {
         <span className='highlight-content-value'>{misReplicatedContainerData?.length ?? 'N/A'}</span>
       </div>
       <div className='highlight-content'>
-        Mismatched-Replica <br/>
+        Mismatched Replicas <br/>
         <span className='highlight-content-value'>{mismatchedReplicaContainerData?.length ?? 'N/A'}</span>
       </div>
     </div>
@@ -285,7 +285,7 @@ const Containers: React.FC<{}> = () => {
             </Tabs.TabPane>
             <Tabs.TabPane
               key='5'
-              tab='Mismatched-Replicas'>
+              tab='Mismatched Replicas'>
               <ContainerTable
                 data={mismatchedReplicaContainerData}
                 loading={loading}
