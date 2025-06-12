@@ -54,7 +54,10 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -1141,6 +1144,86 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
             .expectedBucketOwner(correctOwner)
             .build();
         verifyPassBucketOwnershipVerification(() -> s3Client.completeMultipartUpload(correctRequest));
+      }
+    }
+
+    @Nested
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    class LinkBucketTests {
+      private static final String NON_S3_VOLUME_NAME = "link-bucket-volume";
+      private OzoneVolume nonS3Volume;
+      private OzoneVolume s3Volume;
+
+      @BeforeAll
+      public void setup() throws Exception {
+        try (OzoneClient ozoneClient = cluster.newClient()) {
+          ozoneClient.getObjectStore().createVolume(NON_S3_VOLUME_NAME);
+          nonS3Volume = ozoneClient.getObjectStore().getVolume(NON_S3_VOLUME_NAME);
+          s3Volume = ozoneClient.getObjectStore().getS3Volume();
+        }
+      }
+
+      @Test
+      public void setBucketVerificationOnLinkBucket() throws Exception{
+        // create link bucket
+        String linkBucketName = "link-bucket";
+        nonS3Volume.createBucket(OzoneConsts.BUCKET);
+        BucketArgs.Builder bb = new BucketArgs.Builder()
+            .setStorageType(StorageType.DEFAULT)
+            .setVersioning(false)
+            .setSourceVolume(NON_S3_VOLUME_NAME)
+            .setSourceBucket(OzoneConsts.BUCKET);
+        s3Volume.createBucket(linkBucketName, bb.build());
+
+        GetBucketAclRequest wrongRequest = GetBucketAclRequest.builder()
+            .bucket(linkBucketName)
+            .expectedBucketOwner(WRONG_OWNER)
+            .build();
+
+        verifyBucketOwnershipVerificationAccessDenied(() -> s3Client.getBucketAcl(wrongRequest));
+
+        String owner = s3Client.getBucketAcl(GetBucketAclRequest.builder()
+            .bucket(linkBucketName)
+            .build()).owner().displayName();
+        GetBucketAclRequest correctRequest = GetBucketAclRequest.builder()
+            .bucket(linkBucketName)
+            .expectedBucketOwner(owner)
+            .build();
+
+        verifyPassBucketOwnershipVerification(() -> s3Client.getBucketAcl(correctRequest));
+      }
+
+      @Test
+      public void testDanglingBucket() throws Exception {
+        String sourceBucket = "source-bucket";
+        String linkBucket = "link-bucket-dangling";
+        nonS3Volume.createBucket(sourceBucket);
+        BucketArgs.Builder bb = new BucketArgs.Builder()
+            .setStorageType(StorageType.DEFAULT)
+            .setVersioning(false)
+            .setSourceVolume(NON_S3_VOLUME_NAME)
+            .setSourceBucket(sourceBucket);
+        s3Volume.createBucket(linkBucket, bb.build());
+
+        // remove source bucket to make dangling bucket
+        nonS3Volume.deleteBucket(sourceBucket);
+
+        GetBucketAclRequest wrongRequest = GetBucketAclRequest.builder()
+            .bucket(linkBucket)
+            .expectedBucketOwner(WRONG_OWNER)
+            .build();
+
+        verifyBucketOwnershipVerificationAccessDenied(() -> s3Client.getBucketAcl(wrongRequest));
+
+        String owner = s3Client.getBucketAcl(GetBucketAclRequest.builder()
+            .bucket(linkBucket)
+            .build()).owner().displayName();
+        GetBucketAclRequest correctRequest = GetBucketAclRequest.builder()
+            .bucket(linkBucket)
+            .expectedBucketOwner(owner)
+            .build();
+
+        verifyPassBucketOwnershipVerification(() -> s3Client.getBucketAcl(correctRequest));
       }
     }
 
