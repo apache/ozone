@@ -127,25 +127,18 @@ Note that using the _force_ option during bootstrap could crash the OM process i
 
 ## Automatic Snapshot Installation for Stale Ozone Managers
 
-In an Ozone Manager (OM) High Availability (HA) cluster, all OM nodes maintain a consistent metadata state using the Ratis consensus protocol. Sometimes, an OM follower node may be offline or fall so far behind the leader OM’s log that it cannot catch up by replaying individual log entries.
+Sometimes an OM follower node may be offline or fall so far behind the leader OM's log that it cannot catch up by replaying individual log entries.  The OM HA implementation includes an automatic snapshot installation and recovery process for such cases.
 
-The OM HA implementation includes an **automatic snapshot installation and recovery process** for such cases:
+How it works:
 
-- **Snapshot Installation Trigger:**  
-When a follower OM falls significantly behind and is unable to catch up with the leader OM through standard log replication, the Ratis consensus layer on the leader OM may determine that a snapshot installation is necessary. The leader then notifies the follower, and the snapshot installation on the follower is handled by its `OzoneManagerStateMachine`.
+1. Leader determines that the follower is too far behind.
+2. Leader notifies the follower to catch up via snapshot.
+3. The follower downloads and installs the latest snapshot from the leader.
+4. After installing the snapshot, the follower OM resumes normal operation and log replication from the new state.
 
-- **How it works:**
-  - The follower OM receives a snapshot installation notification from the leader via the consensus protocol.
-  - The follower OM then downloads and installs the latest consistent checkpoint (snapshot) from the leader OM.
-  - After installing the snapshot, the follower OM resumes normal operation and log replication from the new state.
+This logic is implemented in the [`OzoneManagerStateMachine.notifyInstallSnapshotFromLeader()` method](https://github.com/apache/ozone/blob/931bc2d8a9e8e8595bb49034c03c14e2b15be865/hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/ratis/OzoneManagerStateMachine.java#L521-L541).
 
-- **Relevant Implementation:**  
-  This logic is implemented in the `OzoneManagerStateMachine.notifyInstallSnapshotFromLeader()` method. The install is triggered automatically by the consensus layer (Ratis) when it detects that a follower cannot catch up by log replay alone.
-
-- **What this means for administrators:**
-  - In most scenarios, stale OMs—whether they were temporarily offline or simply fell too far behind the leader while remaining online—will recover automatically, even if they have missed a large number of operations.
-  - Manual intervention (such as running `ozone om --bootstrap`) is only required when adding a new OM node to the cluster or when explicitly requested by support instructions.
-
+In most scenarios, stale OMs will recover automatically, even if they have missed a large number of operations.  Manual intervention (such as running `ozone om --bootstrap`) is only required when adding a new OM node to the cluster or when explicitly requested by support instructions.
 
 ## References
 
