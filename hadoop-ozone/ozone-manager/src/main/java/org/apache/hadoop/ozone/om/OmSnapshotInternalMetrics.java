@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * This class contains internal Snapshot Operation metrics.
