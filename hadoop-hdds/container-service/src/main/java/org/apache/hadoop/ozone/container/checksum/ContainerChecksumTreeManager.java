@@ -91,7 +91,6 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getLock(containerID);
     writeLock.lock();
     try {
-      // If the file is not present, we will create the data for the first time. This happens under a write lock.
       ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = readOrCreate(data).toBuilder();
 
       ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
@@ -119,7 +118,6 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getLock(containerID);
     writeLock.lock();
     try {
-      // If the file is not present, we will create the data for the first time. This happens under a write lock.
       ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = readOrCreate(data).toBuilder();
 
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
@@ -398,7 +396,6 @@ public class ContainerChecksumTreeManager {
    * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
    * swapped into place.
    */
-  // TODO HDDS-12824 Once data checksum is stored in RocksDB this method can be removed.
   public static Optional<ContainerProtos.ContainerChecksumInfo> readChecksumInfo(ContainerData data)
       throws IOException {
     long containerID = data.getContainerID();
