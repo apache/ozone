@@ -83,7 +83,7 @@ public final class OmSnapshotLocalDataYaml {
       throws IOException {
     Preconditions.checkNotNull(snapshotFile, "snapshotFile cannot be null");
     try (InputStream inputFileStream = Files.newInputStream(snapshotFile.toPath())) {
-      return readSnapshot(inputFileStream);
+      return readSnapshotLocalData(inputFileStream);
     }
   }
 
@@ -91,16 +91,16 @@ public final class OmSnapshotLocalDataYaml {
    * Read the YAML file content byte array, and return OmSnapshotLocalData instance.
    * @throws IOException
    */
-  public static OmSnapshotLocalData readSnapshot(byte[] snapshotFileContent)
+  public static OmSnapshotLocalData readSnapshotLocalData(byte[] snapshotFileContent)
       throws IOException {
-    return readSnapshot(new ByteArrayInputStream(snapshotFileContent));
+    return readSnapshotLocalData(new ByteArrayInputStream(snapshotFileContent));
   }
 
   /**
    * Read the YAML content InputStream, and return OmSnapshotLocalData instance.
    * @throws IOException
    */
-  public static OmSnapshotLocalData readSnapshot(InputStream input)
+  public static OmSnapshotLocalData readSnapshotLocalData(InputStream input)
       throws IOException {
     OmSnapshotLocalData snapshotData;
     PropertyUtils propertyUtils = new PropertyUtils();
