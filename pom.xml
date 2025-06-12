@@ -1719,6 +1719,11 @@
     <pluginManagement>
       <plugins>
         <plugin>
+          <groupId>com.coderplus.maven.plugins</groupId>
+          <artifactId>copy-rename-maven-plugin</artifactId>
+          <version>${copy-rename-maven-plugin.version}</version>
+        </plugin>
+        <plugin>
           <groupId>com.github.ekryd.sortpom</groupId>
           <artifactId>sortpom-maven-plugin</artifactId>
           <version>${sortpom-maven-plugin.version}</version>
