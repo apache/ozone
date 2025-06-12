@@ -325,12 +325,12 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   /**
    * Class used to represent the key and value pair of a db entry.
    */
-  class KeyValue<K, V> {
+  final class KeyValue<K, V> {
     private final K key;
     private final V value;
     private final int rawSize;
 
-    KeyValue(K key, V value, int rawSize) {
+    private KeyValue(K key, V value, int rawSize) {
       this.key = key;
       this.value = value;
       this.rawSize = rawSize;

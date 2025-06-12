@@ -477,7 +477,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
         rawTable.getRangeKVs(startKeyBytes, count, prefixBytes, filters);
-    return covert(rangeKVBytes);
+    return convert(rangeKVBytes);
   }
 
   @Override
@@ -494,10 +494,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
         rawTable.getSequentialRangeKVs(startKeyBytes, count,
             prefixBytes, filters);
-    return covert(rangeKVBytes);
+    return convert(rangeKVBytes);
   }
 
-  private List<KeyValue<KEY, VALUE>> covert(List<? extends KeyValue<byte[], byte[]>> rangeKVBytes)
+  private List<KeyValue<KEY, VALUE>> convert(List<? extends KeyValue<byte[], byte[]>> rangeKVBytes)
       throws CodecException {
     final List<KeyValue<KEY, VALUE>> rangeKVs = new ArrayList<>();
     for (KeyValue<byte[], byte[]> kv : rangeKVBytes) {
