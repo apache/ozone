@@ -130,6 +130,7 @@ public final class OnDemandContainerDataScanner {
       return;
     }
 
+    long startTime = Instant.now().toEpochMilli();
     long containerId = container.getContainerData().getContainerID();
     try {
       ContainerData containerData = container.getContainerData();
@@ -146,12 +147,12 @@ public final class OnDemandContainerDataScanner {
       if (!result.isHealthy()) {
         LOG.error("Corruption detected in container [{}]." +
                 "Marking it UNHEALTHY.", containerId, result.getException());
-        instance.metrics.incNumUnHealthyContainers();
+        getMetrics().incNumUnHealthyContainers();
         instance.containerController.markContainerUnhealthy(containerId,
             result);
       }
 
-      instance.metrics.incNumContainersScanned();
+      getMetrics().incNumContainersScanned();
       Instant now = Instant.now();
       logScanCompleted(containerData, now);
       instance.containerController.updateDataScanTimestamp(containerId, now);
@@ -162,6 +163,8 @@ public final class OnDemandContainerDataScanner {
       // This should only happen as part of shutdown, which will stop the
       // ExecutorService.
       LOG.info("On demand container scan interrupted.");
+    } finally {
+      getMetrics().incTotalRunTime(Instant.now().toEpochMilli() - startTime);
     }
   }
 
