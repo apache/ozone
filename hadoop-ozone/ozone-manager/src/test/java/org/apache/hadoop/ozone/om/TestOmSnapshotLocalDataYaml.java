@@ -31,7 +31,6 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +44,6 @@ public class TestOmSnapshotLocalDataYaml {
   private static String testRoot = new FileSystemTestHelper().getTestRootDir();
 
   private static final Instant NOW = Instant.now();
-  private OzoneConfiguration conf = new OzoneConfiguration();
 
   @BeforeEach
   public void setUp() {
