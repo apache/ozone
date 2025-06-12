@@ -237,14 +237,13 @@ public class ObjectEndpoint extends EndpointBase {
 
     String copyHeader = null, storageType = null, storageConfig = null;
     DigestInputStream digestInputStream = null;
-    OzoneBucket bucket = null;
     try {
       if (aclMarker != null) {
         s3GAction = S3GAction.PUT_OBJECT_ACL;
         throw newError(NOT_IMPLEMENTED, keyPath);
       }
       OzoneVolume volume = getVolume();
-      bucket = volume.getBucket(bucketName);
+      OzoneBucket bucket = volume.getBucket(bucketName);
       String bucketOwner = bucket.getOwner();
       S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucketOwner);
       if (taggingMarker != null) {
@@ -442,7 +441,7 @@ public class ObjectEndpoint extends EndpointBase {
         // When we have uploadId, this is the request for list Parts.
         s3GAction = S3GAction.LIST_PARTS;
         int partMarker = parsePartNumberMarker(partNumberMarker);
-        Response response = listParts(bucket, keyPath, uploadId,
+        Response response = listParts(bucketName, keyPath, uploadId,
             partMarker, maxParts, perf);
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
             getAuditParameters(), perf));
@@ -1142,15 +1141,16 @@ public class ObjectEndpoint extends EndpointBase {
    * @throws IOException
    * @throws OS3Exception
    */
-  private Response listParts(OzoneBucket bucket, String key, String uploadID,
+  private Response listParts(String bucket, String key, String uploadID,
       int partNumberMarker, int maxParts, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     ListPartsResponse listPartsResponse = new ListPartsResponse();
     try {
+      OzoneBucket ozoneBucket = getBucket(bucket);
       OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
-          bucket.listParts(key, uploadID, partNumberMarker, maxParts);
-      listPartsResponse.setBucket(bucket.getName());
+          ozoneBucket.listParts(key, uploadID, partNumberMarker, maxParts);
+      listPartsResponse.setBucket(bucket);
       listPartsResponse.setKey(key);
       listPartsResponse.setUploadID(uploadID);
       listPartsResponse.setMaxParts(maxParts);
