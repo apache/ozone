@@ -34,13 +34,14 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
-import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -111,11 +112,11 @@ public class TestSnapshotDeletingServiceIntegrationTest {
   private OzoneManager om;
   private OzoneBucket bucket1;
   private OzoneClient client;
+  private final Deque<UncheckedAutoCloseableSupplier<OmSnapshot>> rcSnaps = new ArrayDeque<>();
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME_ONE = "bucket1";
   private static final String BUCKET_NAME_TWO = "bucket2";
   private static final String BUCKET_NAME_FSO = "bucketfso";
-  private static final Stack<UncheckedAutoCloseableSupplier<OmSnapshot>> RC_SNAPS = new Stack<>();
 
   private boolean runIndividualTest = true;
 
@@ -157,9 +158,15 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
   @AfterEach
   public void closeAllSnapshots() {
-    while (!RC_SNAPS.isEmpty()) {
-      RC_SNAPS.pop().close();
+    while (!rcSnaps.isEmpty()) {
+      rcSnaps.pop().close();
     }
+  }
+
+  private UncheckedAutoCloseableSupplier<OmSnapshot> getOmSnapshot(String volume, String bucket, String snapshotName)
+      throws IOException {
+    rcSnaps.push(om.getOmSnapshotManager().getSnapshot(volume, bucket, snapshotName));
+    return rcSnaps.peek();
   }
 
   @Test
@@ -179,8 +186,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       GenericTestUtils.waitFor(() -> snapshotDeletingService
           .getSuccessfulRunCount() >= 1, 1000, 10000);
     }
-    OmSnapshot bucket1snap3 = RC_SNAPS.push(om.getOmSnapshotManager()
-        .getSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3")).get();
+    OmSnapshot bucket1snap3 = getOmSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3").get();
 
     // Check bucket1key1 added to next non deleted snapshot db.
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> omKeyInfos =
@@ -411,8 +417,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     }
     om.getKeyManager().getDirDeletingService().suspend();
     om.getKeyManager().getDeletingService().suspend();
-    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap2 = RC_SNAPS.push(om.getOmSnapshotManager()
-        .getSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap2"));
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap2 =
+        getOmSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap2");
     OmSnapshot snap2 = rcSnap2.get();
     //Child directories should have moved to deleted Directory table to deleted directory table of snap2
     assertTableRowCount(dirTable, 0);
@@ -436,8 +442,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     assertTableRowCount(om.getMetadataManager().getSnapshotInfoTable(), 2);
 
     verifySnapshotChain(deletedSnap, "/vol1/bucketfso/snap3");
-    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap3 = RC_SNAPS.push(om.getOmSnapshotManager()
-        .getSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap3"));
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap3 = getOmSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap3");
     OmSnapshot snap3 = rcSnap3.get();
 
     Table<String, OmKeyInfo> snapDeletedDirTable =
@@ -490,9 +495,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     assertTableRowCount(deletedDirTable, 12);
     assertTableRowCount(deletedTable, 15);
 
-    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap1 =
-        RC_SNAPS.push(om.getOmSnapshotManager().getSnapshot(
-            VOLUME_NAME, BUCKET_NAME_FSO, "snap1"));
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap1 = getOmSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap1");
     OmSnapshot snap1 = rcSnap1.get();
     Table<String, OmKeyInfo> snap1KeyTable =
         snap1.getMetadataManager().getFileTable();
