@@ -486,12 +486,8 @@ class TestKeyDeletingService extends OzoneTestBase {
         assertTableRowCount(snapshotRenamedTable, initialRenamedCount + 1, metadataManager);
         try (TableIterator<String, ? extends Table.KeyValue<String, String>> itr = snapshotRenamedTable.iterator()) {
           itr.forEachRemaining(entry -> {
-            try {
-              String[] val = metadataManager.splitRenameKey(entry.getKey());
-              Assertions.assertEquals(Long.valueOf(val[2]), keyInfo.getObjectID());
-            } catch (IOException e) {
-              throw new UncheckedIOException(e);
-            }
+            String[] val = metadataManager.splitRenameKey(entry.getKey());
+            Assertions.assertEquals(Long.valueOf(val[2]), keyInfo.getObjectID());
           });
         }
       } finally {

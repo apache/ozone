@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
@@ -349,13 +350,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                  keyManager, lock)) {
           List<String> renamedTableEntries =
               keyManager.getRenamesKeyEntries(volume, bucket, null, renameEntryFilter, remainNum).stream()
-                  .map(entry -> {
-                    try {
-                      return entry.getKey();
-                    } catch (IOException e) {
-                      throw new UncheckedIOException(e);
-                    }
-                  }).collect(Collectors.toList());
+                  .map(Table.KeyValue::getKey)
+                  .collect(Collectors.toList());
           remainNum -= renamedTableEntries.size();
 
           // Get pending keys that can be deleted
