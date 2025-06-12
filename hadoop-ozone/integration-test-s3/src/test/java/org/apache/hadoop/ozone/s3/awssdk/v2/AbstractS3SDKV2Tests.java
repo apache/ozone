@@ -1164,7 +1164,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       }
 
       @Test
-      public void setBucketVerificationOnLinkBucket() throws Exception{
+      public void setBucketVerificationOnLinkBucket() throws Exception {
         // create link bucket
         String linkBucketName = "link-bucket";
         nonS3Volume.createBucket(OzoneConsts.BUCKET);
