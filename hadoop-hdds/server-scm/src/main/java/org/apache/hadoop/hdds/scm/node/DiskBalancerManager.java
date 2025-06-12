@@ -111,12 +111,9 @@ public class DiskBalancerManager {
           useHostnames).stream()
           .filter(dn -> {
             try {
-              NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
-              boolean isInService = nodeStatus.isInService();
-              boolean isHealthy = nodeStatus.isHealthy();
-              if (!isInService || !isHealthy) {
+              if (nodeManager.getNodeStatus(dn) != NodeStatus.inServiceHealthy()) {
                 LOG.warn("Datanode {} is not in optimal state for disk balancing." +
-                    " Operational state: {}", dn.getHostName(), nodeStatus.getOperationalState());
+                    " Operational state: {}", dn.getHostName(), nodeManager.getNodeStatus(dn).getOperationalState());
                 return false;
               }
               return true;
@@ -137,8 +134,7 @@ public class DiskBalancerManager {
           .map(dn -> getInfoProto(dn, clientVersion))
           .collect(Collectors.toList());
     } else {
-      return nodeManager.getNodes(IN_SERVICE,
-              HddsProtos.NodeState.HEALTHY).stream()
+      return nodeManager.getNodes(NodeStatus.inServiceHealthy()).stream()
           .filter(dn -> shouldReturnDatanode(filterStatus, dn))
           .map(dn -> getInfoProto((DatanodeInfo)dn, clientVersion))
           .collect(Collectors.toList());
