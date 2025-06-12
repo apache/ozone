@@ -18,6 +18,7 @@
 package org.apache.ozone.fs.http.server;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.HashSet;
 import java.util.Set;
 import javax.servlet.Filter;
@@ -52,7 +53,6 @@ public class CheckUploadContentTypeFilter implements Filter {
    * This implementation is a NOP.
    *
    * @param config filter configuration.
-   *
    * @throws ServletException thrown if the filter could not be initialized.
    */
   @Override
@@ -63,11 +63,10 @@ public class CheckUploadContentTypeFilter implements Filter {
    * Enforces the content-type to be application/octet-stream for
    * POST and PUT requests.
    *
-   * @param request servlet request.
+   * @param request  servlet request.
    * @param response servlet response.
-   * @param chain filter chain.
-   *
-   * @throws IOException thrown if an IO error occurs.
+   * @param chain    filter chain.
+   * @throws IOException      thrown if an IO error occurs.
    * @throws ServletException thrown if a servlet error occurs.
    */
   @Override
@@ -93,10 +92,20 @@ public class CheckUploadContentTypeFilter implements Filter {
     if (contentTypeOK) {
       chain.doFilter(httpReq, httpRes);
     } else {
-      httpRes.sendError(HttpServletResponse.SC_BAD_REQUEST,
-                        "Data upload requests must have content-type set to '" +
-                            HttpFSConstants.UPLOAD_CONTENT_TYPE + "'");
+      httpRes.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+      httpRes.setContentType("application/json");
+      httpRes.setCharacterEncoding("UTF-8");
 
+      String errorMessage = "Data upload requests must have content-type set to '" +
+          HttpFSConstants.UPLOAD_CONTENT_TYPE + "'";
+
+      // Create JSON response
+      String jsonResponse = "{\"error\":\"" + errorMessage + "\"}";
+
+      PrintWriter writer = httpRes.getWriter();
+      writer.write(jsonResponse);
+      writer.flush();
+      writer.close();
     }
   }
 
