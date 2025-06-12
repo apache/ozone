@@ -23,8 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,14 +47,13 @@ import org.yaml.snakeyaml.nodes.Tag;
 import org.yaml.snakeyaml.representer.Representer;
 
 /**
- * Class for creating and reading snapshot data YAML files.
- * Checksum of the YAML fields are computed and stored in the YAML file.
+ * Class for creating and reading snapshot local properties / data YAML files.
+ * Checksum of the YAML fields are computed and stored in the YAML file transparently to callers.
  * Inspired by {@link org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml}
  */
 public final class OmSnapshotLocalDataYaml {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmSnapshotLocalDataYaml.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OmSnapshotLocalDataYaml.class);
 
   public static final Tag SNAPSHOT_YAML_TAG = new Tag("OmSnapshotLocalData");
 
@@ -67,10 +64,10 @@ public final class OmSnapshotLocalDataYaml {
   /**
    * Creates a snapshot data file in YAML format.
    */
-  public static void createSnapshotFile(OmSnapshotLocalData snapshotData,
-      File snapshotFile) throws IOException {
+  public static void createSnapshotLocalDataFile(OmSnapshotLocalData snapshotData, File snapshotFile)
+      throws IOException {
     // Create Yaml
-    final Yaml yaml = getYamlForSnapshotData();
+    final Yaml yaml = getYamlForSnapshotLocalData();
     // Compute Checksum and update SnapshotData
     snapshotData.computeAndSetChecksum(yaml);
 
@@ -79,33 +76,28 @@ public final class OmSnapshotLocalDataYaml {
   }
 
   /**
-   * Read the YAML file, and return snapshotData.
-   *
+   * Read the YAML file, and return OmSnapshotLocalData instance.
    * @throws IOException
    */
-  public static OmSnapshotLocalData readSnapshotFile(File snapshotFile)
+  public static OmSnapshotLocalData readSnapshotLocalDataFile(File snapshotFile)
       throws IOException {
     Preconditions.checkNotNull(snapshotFile, "snapshotFile cannot be null");
-    try (InputStream inputFileStream = Files.newInputStream(
-        snapshotFile.toPath())) {
+    try (InputStream inputFileStream = Files.newInputStream(snapshotFile.toPath())) {
       return readSnapshot(inputFileStream);
     }
   }
 
   /**
-   * Read the YAML file content, and return snapshotData.
-   *
+   * Read the YAML file content byte array, and return OmSnapshotLocalData instance.
    * @throws IOException
    */
   public static OmSnapshotLocalData readSnapshot(byte[] snapshotFileContent)
       throws IOException {
-    return readSnapshot(
-        new ByteArrayInputStream(snapshotFileContent));
+    return readSnapshot(new ByteArrayInputStream(snapshotFileContent));
   }
 
   /**
-   * Read the YAML content, and return snapshotData.
-   *
+   * Read the YAML content InputStream, and return OmSnapshotLocalData instance.
    * @throws IOException
    */
   public static OmSnapshotLocalData readSnapshot(InputStream input)
@@ -115,11 +107,10 @@ public final class OmSnapshotLocalDataYaml {
     propertyUtils.setBeanAccess(BeanAccess.FIELD);
     propertyUtils.setAllowReadOnlyProperties(true);
 
-    Representer representer = new SnapshotDataRepresenter(
-        OmSnapshotLocalData.YAML_FIELDS);
+    Representer representer = new SnapshotLocalDataRepresenter(OmSnapshotLocalData.YAML_FIELDS);
     representer.setPropertyUtils(propertyUtils);
 
-    SafeConstructor snapshotDataConstructor = new SnapshotDataConstructor();
+    SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
 
     Yaml yaml = new Yaml(snapshotDataConstructor, representer);
     yaml.setBeanAccess(BeanAccess.FIELD);
@@ -142,21 +133,60 @@ public final class OmSnapshotLocalDataYaml {
   }
 
   /**
+   * Verifies the checksum of the snapshot data.
+   * @param snapshotData The snapshot data to verify
+   * @return true if the checksum is valid, false otherwise
+   * @throws IOException if there's an error computing the checksum
+   */
+  public static boolean verifyChecksum(OmSnapshotLocalData snapshotData)
+      throws IOException {
+    Preconditions.checkNotNull(snapshotData, "snapshotData cannot be null");
+
+    // Get the stored checksum
+    String storedChecksum = snapshotData.getChecksum();
+    if (storedChecksum == null) {
+      LOG.warn("No checksum found in snapshot data for verification");
+      return false;
+    }
+
+    // Create a copy of the snapshot data for computing checksum
+    OmSnapshotLocalData snapshotDataCopy = new OmSnapshotLocalData(snapshotData);
+
+    // Clear the existing checksum in the copy
+    snapshotDataCopy.setChecksum(null);
+
+    // Get the YAML representation
+    final Yaml yaml = getYamlForSnapshotLocalData();
+
+    // Compute new checksum
+    snapshotDataCopy.computeAndSetChecksum(yaml);
+
+    // Compare the stored and computed checksums
+    String computedChecksum = snapshotDataCopy.getChecksum();
+    boolean isValid = storedChecksum.equals(computedChecksum);
+
+    if (!isValid) {
+      LOG.warn("Checksum verification failed for snapshot local data. " +
+          "Stored: {}, Computed: {}", storedChecksum, computedChecksum);
+    }
+
+    return isValid;
+  }
+
+  /**
    * Returns a Yaml representation of the snapshot properties.
-   *
    * @return Yaml representation of snapshot properties
    */
-  public static Yaml getYamlForSnapshotData() {
+  public static Yaml getYamlForSnapshotLocalData() {
     PropertyUtils propertyUtils = new PropertyUtils();
     propertyUtils.setBeanAccess(BeanAccess.FIELD);
     propertyUtils.setAllowReadOnlyProperties(true);
 
-    Representer representer = new SnapshotDataRepresenter(
-        OmSnapshotLocalData.YAML_FIELDS);
+    Representer representer = new SnapshotLocalDataRepresenter(OmSnapshotLocalData.YAML_FIELDS);
     representer.setPropertyUtils(propertyUtils);
     representer.addClassTag(OmSnapshotLocalData.class, SNAPSHOT_YAML_TAG);
 
-    SafeConstructor snapshotDataConstructor = new SnapshotDataConstructor();
+    SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
 
     return new Yaml(snapshotDataConstructor, representer);
   }
@@ -164,25 +194,19 @@ public final class OmSnapshotLocalDataYaml {
   /**
    * Representer class to define which fields need to be stored in yaml file.
    */
-  private static class SnapshotDataRepresenter extends Representer {
+  private static class SnapshotLocalDataRepresenter extends Representer {
 
     private List<String> yamlFields;
 
-    SnapshotDataRepresenter(List<String> yamlFields) {
+    SnapshotLocalDataRepresenter(List<String> yamlFields) {
       super(new DumperOptions());
       this.yamlFields = yamlFields;
-
-      // Add custom representer for Timestamp to output epoch milliseconds
-      representers.put(Timestamp.class, data -> {
-        Timestamp timestamp = (Timestamp) data;
-        return represent(timestamp.getTime());
-      });
     }
 
     @Override
-    protected Set<Property> getProperties(Class<? extends Object> type) {
+    protected Set<Property> getProperties(Class<?> type) {
       Set<Property> set = super.getProperties(type);
-      Set<Property> filtered = new TreeSet<Property>();
+      Set<Property> filtered = new TreeSet<>();
 
       if (type.equals(OmSnapshotLocalData.class)) {
         // filter properties
@@ -211,15 +235,14 @@ public final class OmSnapshotLocalDataYaml {
   /**
    * Constructor class for OmSnapshotLocalData, which will be used by Yaml.
    */
-  private static class SnapshotDataConstructor extends SafeConstructor {
-    SnapshotDataConstructor() {
+  private static class SnapshotLocalDataConstructor extends SafeConstructor {
+    SnapshotLocalDataConstructor() {
       super(new LoaderOptions());
       //Adding our own specific constructors for tags.
-      this.yamlConstructors.put(
-          SNAPSHOT_YAML_TAG, new ConstructSnapshotData());
+      this.yamlConstructors.put(SNAPSHOT_YAML_TAG, new ConstructSnapshotLocalData());
     }
 
-    private final class ConstructSnapshotData extends AbstractConstruct {
+    private final class ConstructSnapshotLocalData extends AbstractConstruct {
       @SuppressWarnings("unchecked")
       @Override
       public Object construct(Node node) {
@@ -229,43 +252,19 @@ public final class OmSnapshotLocalDataYaml {
         OmSnapshotLocalData snapshotData = new OmSnapshotLocalData();
 
         // Set fields from parsed YAML
-        snapshotData.setSstFiltered((Boolean) nodes.getOrDefault(
-            OzoneConsts.IS_SST_FILTERED, false));
+        snapshotData.setSstFiltered((Boolean) nodes.getOrDefault(OzoneConsts.IS_SST_FILTERED, false));
 
         Map<String, List<String>> uncompactedSSTFileList =
-            (Map<String, List<String>>) nodes.get(
-                OzoneConsts.UNCOMPACTED_SST_FILE_LIST);
+            (Map<String, List<String>>) nodes.get(OzoneConsts.UNCOMPACTED_SST_FILE_LIST);
         if (uncompactedSSTFileList != null) {
           snapshotData.setUncompactedSSTFileList(uncompactedSSTFileList);
         }
 
-        Object lastCompactionTimeObj = nodes.get(
-            OzoneConsts.LAST_COMPACTION_TIME);
-        if (lastCompactionTimeObj != null) {
-          if (lastCompactionTimeObj instanceof Long) {
-            snapshotData.setLastCompactionTime(
-                new Timestamp((Long) lastCompactionTimeObj));
-          } else if (lastCompactionTimeObj instanceof Timestamp) {
-            snapshotData.setLastCompactionTime(
-                (Timestamp) lastCompactionTimeObj);
-          } else if (lastCompactionTimeObj instanceof String) {
-            // Handle timestamp as ISO-8601 string (common in YAML)
-            try {
-              Instant instant = Instant.parse((String) lastCompactionTimeObj);
-              snapshotData.setLastCompactionTime(new Timestamp(instant.toEpochMilli()));
-            } catch (Exception e) {
-              // If parsing fails, use default timestamp
-              snapshotData.setLastCompactionTime(new Timestamp(0));
-            }
-          }
-        }
-
-        snapshotData.setNeedsCompaction((Boolean) nodes.getOrDefault(
-            OzoneConsts.NEEDS_COMPACTION, false));
+        snapshotData.setLastCompactionTime((Long) nodes.getOrDefault(OzoneConsts.LAST_COMPACTION_TIME, -1L));
+        snapshotData.setNeedsCompaction((Boolean) nodes.getOrDefault(OzoneConsts.NEEDS_COMPACTION, false));
 
         Map<Integer, Map<String, List<String>>> compactedSSTFileList =
-            (Map<Integer, Map<String, List<String>>>) nodes.get(
-                OzoneConsts.COMPACTED_SST_FILE_LIST);
+            (Map<Integer, Map<String, List<String>>>) nodes.get(OzoneConsts.COMPACTED_SST_FILE_LIST);
         if (compactedSSTFileList != null) {
           snapshotData.setCompactedSSTFileList(compactedSSTFileList);
         }

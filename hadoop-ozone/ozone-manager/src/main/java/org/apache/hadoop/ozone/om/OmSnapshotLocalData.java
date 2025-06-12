@@ -22,7 +22,6 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -37,14 +36,17 @@ import org.yaml.snakeyaml.Yaml;
  */
 public class OmSnapshotLocalData {
 
+  // Checksum of the YAML representation
+  private String checksum;
+
   // Whether SST is filtered
   private boolean isSSTFiltered;
 
   // Map of Table to uncompacted SST file list on snapshot create
   private Map<String, List<String>> uncompactedSSTFileList;
 
-  // Timestamp of the last compaction
-  private Timestamp lastCompactionTime;
+  // Time of last compaction, in epoch milliseconds
+  private long lastCompactionTime;
 
   // Whether the snapshot needs compaction
   private boolean needsCompaction;
@@ -52,9 +54,6 @@ public class OmSnapshotLocalData {
   // Map of version to compacted SST file list
   // Map<version, Map<Table, sstFileList>>
   private Map<Integer, Map<String, List<String>>> compactedSSTFileList;
-
-  // Checksum of the YAML representation
-  private String checksum;
 
   // Common Fields that need to be stored in the yaml file
   public static final List<String> YAML_FIELDS =
@@ -75,22 +74,59 @@ public class OmSnapshotLocalData {
   public OmSnapshotLocalData() {
     this.isSSTFiltered = false;
     this.uncompactedSSTFileList = new HashMap<>();
-    this.lastCompactionTime = new Timestamp(0);
+    this.lastCompactionTime = 0L;
     this.needsCompaction = false;
     this.compactedSSTFileList = new HashMap<>();
     setChecksumTo0ByteArray();
   }
 
   /**
-   * Returns whether SST is filtered.
+   * Copy constructor to create a deep copy of OmSnapshotLocalData object.
+   * @param source The source OmSnapshotLocalData to copy from
+   */
+  public OmSnapshotLocalData(OmSnapshotLocalData source) {
+    // Copy primitive fields directly
+    this.isSSTFiltered = source.isSSTFiltered;
+    this.lastCompactionTime = source.lastCompactionTime;
+    this.needsCompaction = source.needsCompaction;
+    this.checksum = source.checksum;
+
+    // Deep copy for uncompactedSSTFileList
+    this.uncompactedSSTFileList = new HashMap<>();
+    for (Map.Entry<String, List<String>> entry :
+        source.uncompactedSSTFileList.entrySet()) {
+      this.uncompactedSSTFileList.put(
+          entry.getKey(),
+          Lists.newArrayList(entry.getValue()));
+    }
+
+    // Deep copy for compactedSSTFileList
+    this.compactedSSTFileList = new HashMap<>();
+    for (Map.Entry<Integer, Map<String, List<String>>> versionEntry :
+        source.compactedSSTFileList.entrySet()) {
+      Map<String, List<String>> tableMap = new HashMap<>();
+
+      for (Map.Entry<String, List<String>> tableEntry :
+          versionEntry.getValue().entrySet()) {
+        tableMap.put(
+            tableEntry.getKey(),
+            Lists.newArrayList(tableEntry.getValue()));
+      }
+
+      this.compactedSSTFileList.put(versionEntry.getKey(), tableMap);
+    }
+  }
+
+  /**
+   * Returns whether SST is filtered for this snapshot.
    * @return true if SST is filtered, false otherwise
    */
-  public boolean isSstFiltered() {
+  public boolean getSstFiltered() {
     return isSSTFiltered;
   }
 
   /**
-   * Sets whether SST is filtered.
+   * Sets whether SST is filtered for this snapshot.
    * @param sstFiltered
    */
   public void setSstFiltered(boolean sstFiltered) {
@@ -126,18 +162,18 @@ public class OmSnapshotLocalData {
   }
 
   /**
-   * Returns the last compaction time.
+   * Returns the last compaction time, in epoch milliseconds.
    * @return Timestamp of the last compaction
    */
-  public Timestamp getLastCompactionTime() {
+  public long getLastCompactionTime() {
     return lastCompactionTime;
   }
 
   /**
-   * Sets the last compaction time.
+   * Sets the last compaction time, in epoch milliseconds.
    * @param lastCompactionTime Timestamp of the last compaction
    */
-  public void setLastCompactionTime(Timestamp lastCompactionTime) {
+  public void setLastCompactionTime(Long lastCompactionTime) {
     this.lastCompactionTime = lastCompactionTime;
   }
 
@@ -145,7 +181,7 @@ public class OmSnapshotLocalData {
    * Returns whether the snapshot needs compaction.
    * @return true if the snapshot needs compaction, false otherwise
    */
-  public boolean isNeedsCompaction() {
+  public boolean getNeedsCompaction() {
     return needsCompaction;
   }
 
@@ -228,7 +264,6 @@ public class OmSnapshotLocalData {
 
   /**
    * Computes SHA-256 hash for a given string.
-   *
    * @param data String data for which checksum needs to be calculated
    * @return SHA-256 checksum as hex string
    * @throws IOException If checksum calculation fails

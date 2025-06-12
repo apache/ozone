@@ -202,7 +202,7 @@ public final class OzoneConsts {
 
   public static final String SCM_CONTEXT_ATTRIBUTE = "ozone.scm";
 
-  // YAML field constants for OmSnapshotLocalData .snapshot files
+  // YAML field constants for OmSnapshotLocalData .yaml files
   public static final String IS_SST_FILTERED = "isSSTFiltered";
   public static final String UNCOMPACTED_SST_FILE_LIST = "uncompactedSSTFileList";
   public static final String LAST_COMPACTION_TIME = "lastCompactionTime";
