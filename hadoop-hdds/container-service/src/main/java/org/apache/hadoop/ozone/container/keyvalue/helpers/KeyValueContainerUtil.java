@@ -278,8 +278,15 @@ public final class KeyValueContainerUtil {
     }
   }
 
-  private static void populateContainerDataChecksum(KeyValueContainerData kvContainerData) {
+  private static void loadAndSetContainerDataChecksum(KeyValueContainerData kvContainerData,
+                                                      Table<String, Long> metadataTable) throws IOException {
     if (kvContainerData.isOpen()) {
+      return;
+    }
+
+    Long containerDataChecksum = metadataTable.get(kvContainerData.getContainerDataChecksumKey());
+    if (containerDataChecksum != null) {
+      kvContainerData.setDataChecksum(containerDataChecksum);
       return;
     }
 
@@ -288,7 +295,9 @@ public final class KeyValueContainerUtil {
           .readChecksumInfo(kvContainerData);
       if (optionalContainerChecksumInfo.isPresent()) {
         ContainerChecksumInfo containerChecksumInfo = optionalContainerChecksumInfo.get();
-        kvContainerData.setDataChecksum(containerChecksumInfo.getContainerMerkleTree().getDataChecksum());
+        containerDataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+        kvContainerData.setDataChecksum(containerDataChecksum);
+        metadataTable.put(kvContainerData.getContainerDataChecksumKey(), containerDataChecksum);
       }
     } catch (IOException ex) {
       LOG.warn("Failed to read checksum info for container {}", kvContainerData.getContainerID(), ex);
@@ -367,6 +376,8 @@ public final class KeyValueContainerUtil {
       kvContainerData.markAsEmpty();
     }
 
+    loadAndSetContainerDataChecksum(kvContainerData, metadataTable);
+
     // Run advanced container inspection/repair operations if specified on
     // startup. If this method is called but not as a part of startup,
     // The inspectors will be unloaded and this will be a no-op.
@@ -374,7 +385,6 @@ public final class KeyValueContainerUtil {
 
     // Load finalizeBlockLocalIds for container in memory.
     populateContainerFinalizeBlock(kvContainerData, store);
-    populateContainerDataChecksum(kvContainerData);
   }
 
   /**
