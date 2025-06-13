@@ -144,8 +144,7 @@ see the [code](https://github.com/apache/ozone/blob/ozone-2.0.0/hadoop-ozone/ozo
 in Release 2.0.0.
 
 In most scenarios, stale OMs will recover automatically, even if they have missed a large number of operations.
-Manual intervention (such as running `ozone om --bootstrap`) is only required when adding a new OM node to the cluster
-or when explicitly requested by support instructions.
+Manual intervention (such as running `ozone om --bootstrap`) is only required when adding a new OM node to the cluster.
 
 **Important Note on Ozone Manager (OM) Disk Space for Snapshots**
 
