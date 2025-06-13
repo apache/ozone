@@ -84,19 +84,12 @@ public class RocksDBConfiguration {
           + "Default 0 means no limit.")
   private long walSizeLimit = 0;
 
-  @Config(key = "rocksdb.max.compaction.bytes",
-      type = ConfigType.SIZE,
-      defaultValue = "0",
-      tags = {OM, SCM, DATANODE},
-      description = "Maximum bytes allowed for a single compaction. 0 means no limit.")
-  private long maxCompactionBytes = 0;
-
-  @Config(key = "rocksdb.max.sub.compactions",
+  @Config(key = "rocksdb.manual.compaction.max.sub.compactions",
       type = ConfigType.INT,
-      defaultValue = "0",
-      tags = {OM, SCM, DATANODE},
-      description = "Maximum number of sub compactions to use when compacting. 0 means no limit.")
-  private int maxSubCompactions = 0;
+      defaultValue = "1",
+      tags = {OM},
+      description = "Maximum number of sub compactions to use when manual compacting. Default 1 means no limit.")
+  private int manualCompactionMaxSubCompactions = 1;
 
   public void setRocksdbLoggingEnabled(boolean enabled) {
     this.rocksdbLogEnabled = enabled;
@@ -154,19 +147,7 @@ public class RocksDBConfiguration {
     return rocksdbKeepLogFileNum;
   }
 
-  public void setMaxCompactionBytes(long bytes) {
-    this.maxCompactionBytes = bytes;
-  }
-
-  public long getMaxCompactionBytes() {
-    return maxCompactionBytes;
-  }
-
-  public void setMaxSubCompactions(int subCompactions) {
-    this.maxSubCompactions = subCompactions;
-  }
-
-  public int getMaxSubCompactions() {
-    return maxSubCompactions;
+  public int getManualCompactionMaxSubCompactions() {
+    return manualCompactionMaxSubCompactions;
   }
 }

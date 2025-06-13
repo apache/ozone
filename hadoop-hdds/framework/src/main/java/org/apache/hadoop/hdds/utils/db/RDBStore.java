@@ -73,12 +73,11 @@ public class RDBStore implements DBStore {
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
-  private final ManagedCompactRangeOptions rangeCompactionOptions;
+  private final int manualCompactionMaxSubCompactions;
 
   @SuppressWarnings("parameternumber")
   RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
-                  ManagedCompactRangeOptions rangeCompactionOptions,
                   boolean readOnly,
                   String dbJmxBeanName, boolean enableCompactionDag,
                   long maxDbUpdatesSizeThreshold,
@@ -94,7 +93,8 @@ public class RDBStore implements DBStore {
     dbLocation = dbFile;
     this.dbOptions = dbOptions;
     this.statistics = statistics;
-    this.rangeCompactionOptions = rangeCompactionOptions;
+    this.manualCompactionMaxSubCompactions = configuration.getObject(RocksDBConfiguration.class)
+        .getManualCompactionMaxSubCompactions();
 
     Exception exception = null;
     try {
@@ -219,12 +219,18 @@ public class RDBStore implements DBStore {
 
   @Override
   public void compactDB() throws IOException {
-    db.compactDB(rangeCompactionOptions);
+    try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
+      options.setMaxSubcompactions(manualCompactionMaxSubCompactions);
+      db.compactDB(options);
+    }
   }
 
   @Override
   public void compactTable(String tableName) throws IOException {
-    compactTable(tableName, rangeCompactionOptions);
+    try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
+      options.setMaxSubcompactions(manualCompactionMaxSubCompactions);
+      compactTable(tableName, options);
+    }
   }
 
   @Override
@@ -251,9 +257,6 @@ public class RDBStore implements DBStore {
     }
     if (statistics != null) {
       IOUtils.close(LOG, statistics);
-    }
-    if (rangeCompactionOptions != null) {
-      IOUtils.close(LOG, rangeCompactionOptions);
     }
     IOUtils.close(LOG, db, dbOptions);
   }

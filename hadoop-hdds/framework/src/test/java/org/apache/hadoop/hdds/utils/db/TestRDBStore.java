@@ -42,7 +42,6 @@ import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.junit.jupiter.api.AfterEach;
@@ -89,7 +88,6 @@ public class TestRDBStore {
       long maxDbUpdatesSizeThreshold)
       throws IOException {
     return new RDBStore(dbFile, options, null, new ManagedWriteOptions(), families,
-        new ManagedCompactRangeOptions(),
         false, null, false,
         maxDbUpdatesSizeThreshold, true, null, true);
   }
