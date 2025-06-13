@@ -486,16 +486,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   " iteration.", snapInfo);
               return EmptyTaskResult.newResult();
             }
-          } else {
-            TransactionInfo lastAOSTransactionId = getMetrics().getLastAOSTransactionId();
-            TransactionInfo flushedTransactionId = TransactionInfo.readTransactionInfo(
-                getOzoneManager().getMetadataManager());
-            if (lastAOSTransactionId.compareTo(flushedTransactionId) > 0) {
-              LOG.info("Skipping AOS processing since changes to deleted space of AOS have not been flushed to disk " +
-                  "last Purge Transaction: {}, Flushed Disk Transaction: {}", lastAOSTransactionId,
-                  flushedTransactionId);
-              return EmptyTaskResult.newResult();
-            }
+          } else if (!isPreviousPurgeTransactionFlushed()) {
+            return EmptyTaskResult.newResult();
           }
           try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = snapInfo == null ? null :
               omSnapshotManager.getActiveSnapshot(snapInfo.getVolumeName(), snapInfo.getBucketName(),
