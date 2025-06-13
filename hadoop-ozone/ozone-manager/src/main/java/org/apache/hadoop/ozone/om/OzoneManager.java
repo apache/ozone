@@ -1573,12 +1573,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private void initializeRatisDirs(OzoneConfiguration conf) throws IOException {
     // Create Ratis storage dir
-    String omRatisDirectory =
-        OzoneManagerRatisUtils.getOMRatisDirectory(conf);
+    String omRatisDirectory = OzoneManagerRatisUtils.getOMRatisDirectory(conf);
     if (omRatisDirectory == null || omRatisDirectory.isEmpty()) {
-      throw new IllegalArgumentException(HddsConfigKeys.OZONE_METADATA_DIRS +
-          " must be defined.");
+      throw new IllegalArgumentException(
+          OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR + " or " + HddsConfigKeys.OZONE_METADATA_DIRS + " must be defined.");
     }
+
     OmUtils.createOMDir(omRatisDirectory);
 
     String scmStorageDir = SCMHAUtils.getRatisStorageDir(conf);
@@ -1595,6 +1595,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omRatisSnapshotDir = OmUtils.createOMDir(
         OzoneManagerRatisUtils.getOMRatisSnapshotDirectory(conf));
 
+    File omRatisDir = new File(omRatisDirectory);
+    // omMetaDir and omRatisDirectory must be under the same mount point for hard links to work properly
+    if (!OmUtils.isUnderSameMountPoint(omMetaDir, omRatisSnapshotDir)) {
+      throw new IOException(
+          HddsConfigKeys.OZONE_METADATA_DIRS + " and " + OMConfigKeys.OZONE_OM_DB_DIRS +
+              " must be on the same mount point for hard links to work properly." +
+              " Please check the configuration.");
+    }
+
     // Before starting ratis server, check if previous installation has
     // snapshot directory in Ratis storage directory. if yes, move it to
     // new snapshot directory.
@@ -1606,7 +1615,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           omRatisSnapshotDir.toPath());
     }
 
-    File omRatisDir = new File(omRatisDirectory);
     String groupIDfromServiceID = RaftGroupId.valueOf(
         getRaftGroupIdFromOmServiceId(getOMServiceId())).getUuid().toString();
 
