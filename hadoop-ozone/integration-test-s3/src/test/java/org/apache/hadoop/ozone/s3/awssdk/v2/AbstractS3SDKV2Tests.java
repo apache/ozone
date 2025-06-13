@@ -653,7 +653,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
   @Nested
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-  class S3BucketVerificationConditionTests {
+  class S3BucketOwnershipVerificationConditionsTests {
 
     private static final String DEFAULT_BUCKET_NAME = "default-bucket";
     private String correctOwner;
@@ -690,7 +690,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       }
 
       @Test
-      public void testListObject() {
+      public void testListObjects() {
         ListObjectsRequest correctRequest = ListObjectsRequest.builder()
             .bucket(DEFAULT_BUCKET_NAME)
             .expectedBucketOwner(correctOwner)
@@ -721,7 +721,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       }
 
       @Test
-      public void testPutAcl() {
+      public void testPutBucketAcl() {
         PutBucketAclRequest correctRequest = PutBucketAclRequest.builder()
             .bucket(DEFAULT_BUCKET_NAME)
             .grantRead("")
