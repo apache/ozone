@@ -189,8 +189,6 @@ public class DBCheckpointServlet extends HttpServlet
       }
     }
 
-    DBCheckpoint checkpoint = null;
-
     boolean flush = false;
     String flushParam =
         request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
@@ -198,17 +196,17 @@ public class DBCheckpointServlet extends HttpServlet
       flush = Boolean.parseBoolean(flushParam);
     }
 
-    processMetadataSnapshotRequest(request, response, isFormData, checkpoint, flush);
+    processMetadataSnapshotRequest(request, response, isFormData, flush);
   }
 
   private void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
-      boolean isFormData, DBCheckpoint checkpoint, boolean flush) {
+      boolean isFormData, boolean flush) {
     List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?
         parseFormDataParameters(request) : request.getParameterValues(
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
     Set<String> receivedSstFiles = fetchSstFilesReceived(sstParam);
-
+    DBCheckpoint checkpoint = null;
     Path tmpdir = null;
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
       tmpdir = Files.createTempDirectory(bootstrapTempData.toPath(),
