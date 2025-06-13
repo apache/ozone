@@ -292,6 +292,8 @@ public class HddsVolume extends StorageVolume {
   @Override
   public synchronized VolumeCheckResult check(@Nullable Boolean unused)
       throws Exception {
+    checkVolumeUsages();
+
     VolumeCheckResult result = super.check(unused);
 
     if (isDbLoadFailure()) {
@@ -351,6 +353,33 @@ public class HddsVolume extends StorageVolume {
             "the last {} runs encountered {} out of {} tolerated failures",
         dbFile, this, volumeTestResultQueue.size(), volumeTestFailureTolerance, volumeTestFailureTolerance);
     return VolumeCheckResult.HEALTHY;
+  }
+
+  @VisibleForTesting
+  public void checkVolumeUsages() {
+    boolean isEnoughSpaceAvailable = true;
+    SpaceUsageSource currentUsage = getCurrentUsage();
+    long getFreeSpaceToSpare = getFreeSpaceToSpare(currentUsage.getCapacity());
+    if (currentUsage.getAvailable() < getFreeSpaceToSpare) {
+      LOG.warn("Volume {} has insufficient space for write operation. Available: {}, Free space to spare: {}",
+          getStorageDir(), currentUsage.getAvailable(), getFreeSpaceToSpare);
+      isEnoughSpaceAvailable = false;
+    } else if (committedBytes.get() > 0 && currentUsage.getAvailable() < committedBytes.get() + getFreeSpaceToSpare) {
+      LOG.warn("Volume {} has insufficient space for on-going container write operation. " +
+              "Committed: {}, Available: {}, Free space to spare: {}",
+          getStorageDir(), committedBytes.get(), currentUsage.getAvailable(), getFreeSpaceToSpare);
+      isEnoughSpaceAvailable = false;
+    }
+
+    volumeInfoMetrics.setAvailableSpaceInsufficient(!isEnoughSpaceAvailable);
+
+    if (!getVolumeUsage().map(VolumeUsage::isReservedUsagesInRange).orElse(true)) {
+      LOG.warn("Volume {} reserved usages is higher than actual allocated reserved space.",
+          getStorageDir());
+      volumeInfoMetrics.setReservedCrossesLimit(true);
+    } else {
+      volumeInfoMetrics.setReservedCrossesLimit(false);
+    }
   }
 
   /**

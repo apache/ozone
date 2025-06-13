@@ -188,9 +188,10 @@ public class TestHddsDispatcher {
       verify(context, times(0))
           .addContainerActionIfAbsent(any(ContainerAction.class));
       // increment used space of both containers
-      containerData.setBytesUsed(Double.valueOf(
+      containerData.getStatistics().setBlockBytesForTesting(Double.valueOf(
           StorageUnit.MB.toBytes(950)).longValue());
-      containerData2.setBytesUsed(Double.valueOf(StorageUnit.MB.toBytes(950)).longValue());
+      containerData2.getStatistics().setBlockBytesForTesting(Double.valueOf(
+          StorageUnit.MB.toBytes(950)).longValue());
       ContainerCommandResponseProto responseTwo = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L), null);
       ContainerCommandResponseProto responseThree = hddsDispatcher

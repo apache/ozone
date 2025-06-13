@@ -262,7 +262,7 @@ public class TestBlockDeletion {
     assertTrue(
         e.getMessage().startsWith("expected: <null> but was:"));
 
-    assertEquals(0L, metrics.getNumBlockDeletionTransactionSent());
+    assertEquals(0L, metrics.getNumBlockDeletionTransactionsOnDatanodes());
     // close the containers which hold the blocks for the key
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
 
@@ -322,9 +322,9 @@ public class TestBlockDeletion {
     assertThat(metrics.getNumBlockDeletionCommandSent())
         .isGreaterThanOrEqualTo(metrics.getNumBlockDeletionCommandSuccess() +
             metrics.getBNumBlockDeletionCommandFailure());
-    assertThat(metrics.getNumBlockDeletionTransactionSent())
-        .isGreaterThanOrEqualTo(metrics.getNumBlockDeletionTransactionFailure() +
-            metrics.getNumBlockDeletionTransactionSuccess());
+    assertThat(metrics.getNumBlockDeletionTransactionsOnDatanodes())
+        .isGreaterThanOrEqualTo(metrics.getNumBlockDeletionTransactionFailureOnDatanodes() +
+            metrics.getNumBlockDeletionTransactionSuccessOnDatanodes());
     LOG.info(metrics.toString());
 
     // Datanode should receive retried requests with continuous retry counts.
