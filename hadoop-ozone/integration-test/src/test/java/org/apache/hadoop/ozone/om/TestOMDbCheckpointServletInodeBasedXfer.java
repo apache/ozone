@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -63,7 +62,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -72,7 +70,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -181,8 +178,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock).
         processMetadataSnapshotRequest(any(), any(), anyBoolean(), any(), anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getBootstrapTempData();
-    doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(),any(),any(),any());
-    doCallRealMethod().when(omDbCheckpointServletMock).writeDBToArchive(any(),any(),any(),any(),any(),any(),any());
+    doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(), any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(), anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getCompactionLogDir();
     doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
@@ -231,7 +227,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       List<Path> files = filesInTarball.collect(Collectors.toList());
       for (Path p : files) {
         File file = p.toFile();
-        if (file.getName().equals(OmSnapshotManager.OM_HARDLINK_FILE)){
+        if (file.getName().equals(OmSnapshotManager.OM_HARDLINK_FILE)) {
           continue;
         }
         String inode = getInode(file.getName());
@@ -249,6 +245,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     }
 
     // all files from the checkpoint should be in the tarball
+    assertTrue(!inodesFromTarball.isEmpty());
     assertTrue(inodesFromTarball.containsAll(inodesFromOmDbCheckpoint));
   }
 
