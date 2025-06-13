@@ -121,7 +121,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
 
     dsm.finalizeUpgrade();
-    assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE));
+    assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
     ContainerCreateInfo containerCreateInfo = metadataStore.getContainerIdsTable().get(
         ContainerID.valueOf(containerID));
     // state is always open as state is update while create container only.
@@ -140,7 +140,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
 
     HDDSLayoutVersionManager manager = mock(HDDSLayoutVersionManager.class);
     VersionedDatanodeFeatures.initialize(manager);
-    when(manager.isAllowed(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)).thenReturn(false);
+    when(manager.isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)).thenReturn(false);
 
     WitnessedContainerMetadataStore metadataStore = WitnessedContainerMetadataStoreImpl.get(conf);
     WitnessedContainerMetadataStore spyMetaStore = spy(metadataStore);

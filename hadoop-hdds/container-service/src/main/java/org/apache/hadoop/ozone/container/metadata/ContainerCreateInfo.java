@@ -40,17 +40,17 @@ public final class ContainerCreateInfo {
       Proto3Codec.get(ContainerProtos.ContainerCreateInfo.getDefaultInstance()),
       ContainerCreateInfo::getFromProtobuf, ContainerCreateInfo::getProtobuf,
       ContainerCreateInfo.class);
-  private static final Codec<ContainerCreateInfo> CODEC_OLD_VERSION = new ContainerCreateInfoCodec();
+  private static final Codec<ContainerCreateInfo> CODEC_UPGRADE_STRING_OR_CREATE_INFO = new ContainerCreateInfoCodec();
 
   private final ContainerProtos.ContainerDataProto.State state;
   private final Supplier<ContainerProtos.ContainerCreateInfo> proto;
 
   public static Codec<ContainerCreateInfo> getCodec() {
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
       // If the container ID table schema is finalized, we can use the proto3 codec directly.
       return CODEC;
     }
-    return CODEC_OLD_VERSION;
+    return CODEC_UPGRADE_STRING_OR_CREATE_INFO;
   }
 
   public static Codec<ContainerCreateInfo> getNewCodec() {
@@ -86,9 +86,7 @@ public final class ContainerCreateInfo {
 
   /**
    * ContainerCreateInfoCodec handles compatibility for containerIds Table, where old format from String is changed
-   * to proto3 format, ContainerCreateInfo. So this codec can read both formats based on the HDDSLayoutFeature.
-   * For write case, it will create ContainerCreateInfo in proto3 format, but write is allowed only after the
-   * finalization  of feature.
+   * to proto3 format, ContainerCreateInfo. So this codec can read / write both formats based on the HDDSLayoutFeature.
    */
   public static class ContainerCreateInfoCodec implements Codec<ContainerCreateInfo> {
     @Override
@@ -103,7 +101,7 @@ public final class ContainerCreateInfo {
 
     @Override
     public ContainerCreateInfo fromPersistedFormat(byte[] rawData) throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
         // If the container ID table schema is finalized, we can use the proto3 codec directly.
         return CODEC.fromPersistedFormat(rawData);
       }
@@ -113,7 +111,7 @@ public final class ContainerCreateInfo {
 
     @Override
     public byte[] toPersistedFormat(ContainerCreateInfo object) throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
         return CODEC.toPersistedFormat(object);
       }
       return StringCodec.get().toPersistedFormat(object.getState().name());
@@ -122,7 +120,7 @@ public final class ContainerCreateInfo {
     @Override
     public CodecBuffer toCodecBuffer(ContainerCreateInfo object, CodecBuffer.Allocator allocator)
             throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
         return CODEC.toCodecBuffer(object, allocator);
       }
       return StringCodec.get().toCodecBuffer(object.getState().name(), allocator);
@@ -130,7 +128,7 @@ public final class ContainerCreateInfo {
 
     @Override
     public CodecBuffer toDirectCodecBuffer(ContainerCreateInfo object) throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
         return CODEC.toDirectCodecBuffer(object);
       }
       return StringCodec.get().toDirectCodecBuffer(object.getState().name());
@@ -138,7 +136,7 @@ public final class ContainerCreateInfo {
 
     @Override
     public CodecBuffer toHeapCodecBuffer(ContainerCreateInfo object) throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
         return CODEC.toHeapCodecBuffer(object);
       }
       return StringCodec.get().toHeapCodecBuffer(object.getState().name());
@@ -146,7 +144,7 @@ public final class ContainerCreateInfo {
 
     @Override
     public ContainerCreateInfo fromCodecBuffer(CodecBuffer buffer) throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)) {
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
         return CODEC.fromCodecBuffer(buffer);
       }
       String val = StringCodec.get().fromCodecBuffer(buffer);

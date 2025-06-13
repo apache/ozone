@@ -42,7 +42,7 @@ public enum HDDSLayoutFeature implements LayoutFeature {
                                      "to DatanodeDetails."),
   HBASE_SUPPORT(8, "Datanode RocksDB Schema Version 3 has an extra table " +
           "for the last chunk of blocks to support HBase.)"),
-  CONTAINERID_TABLE_SCHEMA_CHANGE(9, "ContainerID table schema to use value type as proto");
+  WITNESSED_CONTAINER_DB_PROTO_VALUE(9, "ContainerID table schema to use value type as proto");
 
   //////////////////////////////  //////////////////////////////
 

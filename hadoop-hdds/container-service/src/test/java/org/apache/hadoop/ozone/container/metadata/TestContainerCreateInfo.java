@@ -64,7 +64,7 @@ public class TestContainerCreateInfo {
   public void testCodecCompatibility() throws CodecException {
     HDDSLayoutVersionManager manager = mock(HDDSLayoutVersionManager.class);
     VersionedDatanodeFeatures.initialize(manager);
-    when(manager.isAllowed(HDDSLayoutFeature.CONTAINERID_TABLE_SCHEMA_CHANGE)).thenReturn(false);
+    when(manager.isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)).thenReturn(false);
     String state = ContainerProtos.ContainerDataProto.State.CLOSED.name();
     // Serialize to bytes as old format of StringCodec value type
     byte[] persistedFormat = StringCodec.get().toPersistedFormat(state);
