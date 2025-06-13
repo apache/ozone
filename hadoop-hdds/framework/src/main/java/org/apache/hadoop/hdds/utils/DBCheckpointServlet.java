@@ -33,8 +33,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -130,12 +132,12 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
-  private static void logSstFileList(List<String>sstList, String msg, int sampleSize) {
+  private static void logSstFileList(Collection<String> sstList, String msg, int sampleSize) {
     int count = sstList.size();
     if (LOG.isDebugEnabled()) {
       LOG.debug(msg, count, "", sstList);
     } else if (count > sampleSize) {
-      List<String> sample = sstList.subList(0, sampleSize);
+      List<String> sample = sstList.stream().limit(sampleSize).collect(Collectors.toList());
       LOG.info(msg, count, ", sample", sample);
     } else {
       LOG.info(msg, count, "", sstList);
@@ -196,20 +198,16 @@ public class DBCheckpointServlet extends HttpServlet
       flush = Boolean.parseBoolean(flushParam);
     }
 
-    List<String> receivedSstList = new ArrayList<>();
+    processMetadataSnapshotRequest(request, response, isFormData, checkpoint, flush);
+  }
+
+  private void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+      boolean isFormData, DBCheckpoint checkpoint, boolean flush) {
     List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?
         parseFormDataParameters(request) : request.getParameterValues(
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
-    if (sstParam != null) {
-      receivedSstList.addAll(
-          Arrays.stream(sstParam)
-              .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
-              .distinct()
-              .collect(Collectors.toList()));
-      logSstFileList(receivedSstList,
-          "Received list of {} SST files to be excluded{}: {}", 5);
-    }
+    Set<String> receivedSstFiles = fetchSstFilesReceived(sstParam);
 
     Path tmpdir = null;
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
@@ -235,8 +233,8 @@ public class DBCheckpointServlet extends HttpServlet
                file + ".tar\"");
 
       Instant start = Instant.now();
-      writeDbDataToStream(checkpoint, request,
-          response.getOutputStream(), receivedSstList, excludedSstList, tmpdir);
+      writeDbDataToStream(checkpoint, request, response.getOutputStream(),
+          receivedSstFiles, tmpdir);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
@@ -274,6 +272,16 @@ public class DBCheckpointServlet extends HttpServlet
         }
       }
     }
+  }
+
+  protected static Set<String> fetchSstFilesReceived(String[] sstParam) {
+    Set<String> receivedSstFiles = new HashSet<>();
+    if (sstParam != null) {
+      receivedSstFiles.addAll(
+          Arrays.stream(sstParam).filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX)).distinct().collect(Collectors.toList()));
+      logSstFileList(receivedSstFiles, "Received list of {} SST files to be excluded{}: {}", 5);
+    }
+    return receivedSstFiles;
   }
 
   public DBCheckpoint getCheckpoint(Path ignoredTmpdir, boolean flush)
@@ -346,20 +354,16 @@ public class DBCheckpointServlet extends HttpServlet
    *        (Parameter is ignored in this class but used in child classes).
    * @param destination The stream to write to.
    * @param toExcludeList the files to be excluded
-   * @param excludedList  the files excluded
    *
    */
   public void writeDbDataToStream(DBCheckpoint checkpoint,
       HttpServletRequest ignoredRequest,
       OutputStream destination,
-      List<String> toExcludeList,
-      List<String> excludedList, Path tmpdir)
+      Set<String> toExcludeList,
+      Path tmpdir)
       throws IOException, InterruptedException {
     Objects.requireNonNull(toExcludeList);
-    Objects.requireNonNull(excludedList);
-
-    writeDBCheckpointToStream(checkpoint, destination,
-        toExcludeList, excludedList);
+    writeDBCheckpointToStream(checkpoint, destination, toExcludeList);
   }
 
   public DBStore getDbStore() {

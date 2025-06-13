@@ -41,9 +41,10 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Stream;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
@@ -114,7 +115,7 @@ public class TestSCMDbCheckpointServlet {
         Collections.emptyList(),
         false);
     doCallRealMethod().when(scmDbCheckpointServletMock)
-        .writeDbDataToStream(any(), any(), any(), any(), any(), any());
+        .writeDbDataToStream(any(), any(), any(), any(), any());
     doCallRealMethod().when(scmDbCheckpointServletMock).doPost(requestMock,
         responseMock);
     doCallRealMethod().when(scmDbCheckpointServletMock).doGet(requestMock,
@@ -145,7 +146,7 @@ public class TestSCMDbCheckpointServlet {
       throws ServletException, IOException, InterruptedException {
     this.method = httpMethod;
 
-    List<String> toExcludeList = new ArrayList<>();
+    Set<String> toExcludeList = new HashSet<>();
     toExcludeList.add("sstFile1.sst");
     toExcludeList.add("sstFile2.sst");
 
@@ -197,7 +198,7 @@ public class TestSCMDbCheckpointServlet {
         .isGreaterThan(initialCheckpointCount);
 
     verify(scmDbCheckpointServletMock).writeDbDataToStream(any(),
-        any(), any(), eq(toExcludeList), any(), any());
+        any(), any(), eq(toExcludeList), any());
   }
 
   @Test
@@ -235,7 +236,7 @@ public class TestSCMDbCheckpointServlet {
    * @param toExcludeList SST file names to be excluded.
    * @throws IOException
    */
-  private void setupHttpMethod(List<String> toExcludeList) throws IOException {
+  private void setupHttpMethod(Collection<String> toExcludeList) throws IOException {
     if (method.equals("POST")) {
       setupPostMethod(toExcludeList);
     } else {
@@ -248,7 +249,7 @@ public class TestSCMDbCheckpointServlet {
    * @param toExcludeList SST file names to be excluded.
    * @throws IOException
    */
-  private void setupPostMethod(List<String> toExcludeList)
+  private void setupPostMethod(Collection<String> toExcludeList)
       throws IOException {
     when(requestMock.getMethod()).thenReturn("POST");
     when(requestMock.getContentType()).thenReturn("multipart/form-data; " +
@@ -286,7 +287,7 @@ public class TestSCMDbCheckpointServlet {
    * Setups details for HTTP GET request.
    * @param toExcludeList SST file names to be excluded.
    */
-  private void setupGetMethod(List<String> toExcludeList) {
+  private void setupGetMethod(Collection<String> toExcludeList) {
     when(requestMock.getMethod()).thenReturn("GET");
     when(requestMock
         .getParameterValues(OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST))
