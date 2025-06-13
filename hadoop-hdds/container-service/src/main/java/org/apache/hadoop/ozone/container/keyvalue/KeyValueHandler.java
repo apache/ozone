@@ -1367,7 +1367,6 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    updateContainerChecksumFromMetadataIfNeeded(container);
     ContainerLogger.logClosing(container.getContainerData());
     sendICR(container);
   }
