@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
