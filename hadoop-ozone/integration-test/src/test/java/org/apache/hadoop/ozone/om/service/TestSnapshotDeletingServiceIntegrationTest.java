@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANI
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_GC_LOCK;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -621,7 +622,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
   private MockedConstruction<ReclaimableKeyFilter> getMockedReclaimableKeyFilter(String volume, String bucket,
       SnapshotInfo snapshotInfo, AtomicBoolean kdsWaitStarted, AtomicBoolean sdsLockWaitStarted,
-      AtomicBoolean kdsFinished) throws IOException {
+      AtomicBoolean sdsLockAcquired, AtomicBoolean kdsFinished) throws IOException {
     ReclaimableKeyFilter keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
         ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(),
         snapshotInfo, om.getKeyManager(), om.getMetadataManager().getLock());
@@ -642,6 +643,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
             return keyFilter.apply(i.getArgument(0));
           });
           doAnswer(i -> {
+            assertTrue(sdsLockWaitStarted.get());
+            assertFalse(sdsLockAcquired.get());
             kdsFinished.set(true);
             keyFilter.close();
             return null;
@@ -698,7 +701,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     AtomicBoolean kdsWaitStarted = new AtomicBoolean(false);
     AtomicBoolean kdsFinished = new AtomicBoolean(false);
     AtomicBoolean sdsLockWaitStarted = new AtomicBoolean(false);
-    AtomicBoolean sdsLockAcquired = new AtomicBoolean(true);
+    AtomicBoolean sdsLockAcquired = new AtomicBoolean(false);
 
     try (MockedConstruction<MultiSnapshotLocks> mockedMultiSnapshotLock = mockConstruction(MultiSnapshotLocks.class,
         (mocked, context) -> when(mocked.acquireLock(anyList())).thenAnswer(i -> {
@@ -720,7 +723,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       SnapshotInfo snapInfo = kdsRunningOnAOS ? null : SnapshotUtils.getSnapshotInfo(om, volume, bucket, "snap3");
       CompletableFuture.supplyAsync(() -> {
         try (MockedConstruction<ReclaimableKeyFilter> mockedReclaimableFilter = getMockedReclaimableKeyFilter(
-            volume, bucket, snapInfo, kdsWaitStarted, sdsLockWaitStarted, kdsFinished)) {
+            volume, bucket, snapInfo, kdsWaitStarted, sdsLockWaitStarted, sdsLockAcquired, kdsFinished)) {
           return task.call();
         } catch (IOException e) {
           throw new RuntimeException(e);
