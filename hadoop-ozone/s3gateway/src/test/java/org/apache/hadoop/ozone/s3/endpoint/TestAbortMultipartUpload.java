@@ -17,11 +17,9 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -32,8 +30,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -41,43 +37,41 @@ import org.junit.jupiter.api.Test;
  */
 public class TestAbortMultipartUpload {
 
-  private HttpHeaders headers;
-  private ObjectEndpoint rest;
-  private String uploadID;
+  @Test
+  public void testAbortMultipartUpload() throws Exception {
 
-  @BeforeEach
-  public void setup() throws Exception {
+    String bucket = OzoneConsts.S3_BUCKET;
+    String key = OzoneConsts.KEY;
     OzoneClient client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
+    client.getObjectStore().createS3Bucket(bucket);
 
-    headers = mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    rest = EndpointBuilder.newObjectEndpointBuilder()
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(client)
         .build();
 
-    Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
+
+    Response response = rest.initializeMultipartUpload(bucket, key);
 
     assertEquals(200, response.getStatus());
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
         (MultipartUploadInitiateResponse) response.getEntity();
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    uploadID = multipartUploadInitiateResponse.getUploadID();
-  }
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
 
-  @Test
-  public void testAbortMultipartUpload() throws Exception {
+
     // Abort multipart upload
-    Response response = rest.delete(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, uploadID, null);
+    response = rest.delete(bucket, key, uploadID, null);
 
     assertEquals(204, response.getStatus());
 
     // test with unknown upload Id.
     try {
-      rest.delete(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, "random", null);
+      rest.delete(bucket, key, "random", null);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),

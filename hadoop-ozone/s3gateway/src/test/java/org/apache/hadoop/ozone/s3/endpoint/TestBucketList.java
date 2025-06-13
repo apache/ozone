@@ -525,6 +525,7 @@ public class TestBucketList {
   @Test
   public void testListObjectsWithInvalidMaxKeys() throws Exception {
     OzoneClient client = createClientWithKeys("file1");
+    client.getObjectStore().createS3Bucket("bucket");
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();

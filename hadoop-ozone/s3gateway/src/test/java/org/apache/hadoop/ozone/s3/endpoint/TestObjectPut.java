@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
@@ -78,7 +77,6 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -99,7 +97,6 @@ class TestObjectPut {
   private static final String DEST_BUCKET_NAME = "b2";
   private static final String DEST_KEY = "key=value/2";
   private static final String NO_SUCH_BUCKET = "nonexist";
-  private static final String DEFAULT_OWNER = "defaultOwner";
 
   private OzoneClient clientStub;
   private ObjectEndpoint objectEndpoint;
@@ -147,7 +144,6 @@ class TestObjectPut {
     OzoneVolume volume = clientStub.getObjectStore().getVolume(volumeName);
     BucketArgs fsoBucketArgs = BucketArgs.newBuilder()
         .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .setOwner(DEFAULT_OWNER)
         .build();
     volume.createBucket(FSO_BUCKET_NAME, fsoBucketArgs);
     fsoBucket = volume.getBucket(FSO_BUCKET_NAME);

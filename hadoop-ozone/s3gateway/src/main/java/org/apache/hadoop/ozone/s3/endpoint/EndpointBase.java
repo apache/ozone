@@ -210,14 +210,11 @@ public abstract class EndpointBase implements Auditor {
   /**
    * Deletes an s3 bucket and removes mapping of Ozone volume/bucket.
    * @param s3BucketName - S3 Bucket Name.
-   * @param headers - HttpHeaders
    * @throws  IOException in case the bucket cannot be deleted.
    */
-  protected void deleteS3Bucket(String s3BucketName, HttpHeaders headers)
+  protected void deleteS3Bucket(String s3BucketName)
       throws IOException, OS3Exception {
     try {
-      OzoneBucket bucket = getBucket(s3BucketName);
-      S3Owner.verifyBucketOwnerCondition(headers, s3BucketName, bucket.getOwner());
       client.getObjectStore().deleteS3Bucket(s3BucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {

@@ -661,7 +661,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     private static final String BUCKET_VERIFICATION_TEST_KEY = "test-key";
 
     @BeforeAll
-    public void setup() throws Exception {
+    public void setup() {
       // create bucket to verify bucket ownership
       s3Client.createBucket(b -> b.bucket(DEFAULT_BUCKET_NAME));
       GetBucketAclRequest normalRequest = GetBucketAclRequest.builder().bucket(DEFAULT_BUCKET_NAME).build();

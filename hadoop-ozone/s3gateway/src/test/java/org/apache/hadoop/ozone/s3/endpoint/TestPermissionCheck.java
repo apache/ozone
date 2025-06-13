@@ -93,7 +93,6 @@ public class TestPermissionCheck {
     clientProtocol = mock(ClientProtocol.class);
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
-    when(bucket.getOwner()).thenReturn("ozone");
   }
 
   /**
@@ -139,7 +138,6 @@ public class TestPermissionCheck {
   public void testDeleteBucket() throws IOException {
     doThrow(exception).when(objectStore).deleteS3Bucket(anyString());
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(null);
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
@@ -156,7 +154,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.listMultipartUploads("bucketName", "prefix", "", "", 10, headers));
+        bucketEndpoint.listMultipartUploads("bucketName", "prefix", "", "", 10));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -251,7 +249,6 @@ public class TestPermissionCheck {
   public void testGetKey() throws IOException {
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(null);
     doThrow(exception).when(clientProtocol)
         .getS3KeyDetails(anyString(), anyString());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -287,7 +284,6 @@ public class TestPermissionCheck {
   public void testDeleteKey() throws IOException {
     when(objectStore.getS3Volume()).thenReturn(volume);
     when(volume.getBucket(anyString())).thenReturn(bucket);
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(null);
     doThrow(exception).when(clientProtocol).deleteKey(anyString(), anyString(),
         anyString(), anyBoolean());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()

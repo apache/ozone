@@ -110,7 +110,6 @@ public final class OzoneVolumeStub extends OzoneVolume {
     createBucket(bucketName, new BucketArgs.Builder()
         .setStorageType(StorageType.DEFAULT)
         .setVersioning(false)
-        .setOwner("defaultOwner")
         .build());
   }
 
@@ -119,7 +118,6 @@ public final class OzoneVolumeStub extends OzoneVolume {
     buckets.put(bucketName, OzoneBucketStub.newBuilder()
         .setVolumeName(getName())
         .setName(bucketName)
-        .setOwner(bucketArgs.getOwner())
         .setDefaultReplicationConfig(new DefaultReplicationConfig(
             RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.THREE)))
