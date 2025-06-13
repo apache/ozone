@@ -54,13 +54,12 @@ public class ContainerTableSchemaFinalizeAction
         WitnessedContainerDBDefinition.CONTAINER_IDS_TABLE.getTable(metadataStore.getStore());
 
     // data is moved from old table to new table, no need cleanup if previous exist as this is just overwrite of data
-    try (BatchOperation batch = metadataStore.getStore().initBatchOperation()) {
-      try (TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, ContainerCreateInfo>> iterator =
-                   previousTable.iterator()) {
-        while (iterator.hasNext()) {
-          Table.KeyValue<ContainerID, ContainerCreateInfo> next = iterator.next();
-          currTable.putWithBatch(batch, next.getKey(), next.getValue());
-        }
+    try (BatchOperation batch = metadataStore.getStore().initBatchOperation();
+         TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, ContainerCreateInfo>> iterator =
+             previousTable.iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<ContainerID, ContainerCreateInfo> next = iterator.next();
+        currTable.putWithBatch(batch, next.getKey(), next.getValue());
       }
       metadataStore.getStore().commitBatchOperation(batch);
       LOG.info("Finished copy to containerIdsTable from previous table");
