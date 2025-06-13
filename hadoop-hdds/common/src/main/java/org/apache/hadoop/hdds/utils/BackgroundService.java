@@ -45,7 +45,7 @@ public abstract class BackgroundService {
   private ThreadGroup threadGroup;
   private final String serviceName;
   private long interval;
-  private final long serviceTimeoutInNanos;
+  private volatile long serviceTimeoutInNanos;
   private TimeUnit unit;
   private final int threadPoolSize;
   private final String threadNamePrefix;
@@ -90,6 +90,11 @@ public abstract class BackgroundService {
     // the corePoolSize will always less maximumPoolSize.
     // So we can directly set the corePoolSize
     exec.setCorePoolSize(size);
+  }
+
+  public synchronized void setServiceTimeoutInNanos(long newTimeout) {
+    LOG.info("{} timeout is set to {} {}", serviceName, newTimeout, TimeUnit.NANOSECONDS.name().toLowerCase());
+    this.serviceTimeoutInNanos = newTimeout;
   }
 
   @VisibleForTesting

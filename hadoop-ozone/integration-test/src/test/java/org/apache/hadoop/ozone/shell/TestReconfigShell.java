@@ -112,7 +112,7 @@ public abstract class TestReconfigShell implements NonHATests.TestCase {
         String.format("SUCCESS: Changed property %s", OZONE_DIR_DELETING_SERVICE_INTERVAL)
     );
     assertThat(logCapturer.getOutput()).contains(
-        String.format("Updating and restarting DirectoryDeletingService with interval: %d %s",
+        String.format("Updating and restarting DirectoryDeletingService with interval %d %s",
             intervalFromXMLInSeconds, TimeUnit.SECONDS.name().toLowerCase())
     );
   }
