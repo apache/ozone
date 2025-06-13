@@ -36,12 +36,4 @@ public class ManagedCompactRangeOptions extends CompactRangeOptions {
       leakTracker.close();
     }
   }
-
-  @Override
-  public ManagedCompactRangeOptions setMaxSubcompactions(int maxSubcompactions) {
-    if (maxSubcompactions > 0) {
-      super.setMaxSubcompactions(maxSubcompactions);
-    }
-    return this;
-  }
 }
