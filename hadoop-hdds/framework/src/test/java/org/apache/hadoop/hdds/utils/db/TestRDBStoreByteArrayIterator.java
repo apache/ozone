@@ -95,8 +95,7 @@ public class TestRDBStoreByteArrayIterator {
     RDBStoreByteArrayIterator iter = newIterator();
     iter.forEachRemaining(consumerStub);
 
-    ArgumentCaptor<RawKeyValue.ByteArray> capture =
-        forClass(RawKeyValue.ByteArray.class);
+    final ArgumentCaptor<Table.KeyValue<byte[], byte[]>> capture = forClass(Table.KeyValue.class);
     verify(consumerStub, times(3)).accept(capture.capture());
     assertArrayEquals(
         new byte[]{0x00}, capture.getAllValues().get(0).getKey());

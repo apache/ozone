@@ -154,6 +154,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                 snapInfo.getTableKey());
             continue;
           }
+          // nextSnapshot = null means entries would be moved to AOS.
+          if (nextSnapshot == null) {
+            LOG.info("Snapshot: {} entries will be moved to AOS.", snapInfo.getTableKey());
+          } else {
+            LOG.info("Snapshot: {} entries will be moved to next active snapshot: {}",
+                snapInfo.getTableKey(), nextSnapshot.getTableKey());
+          }
           lockIds.clear();
           lockIds.add(snapInfo.getSnapshotId());
           if (nextSnapshot != null) {
@@ -162,14 +169,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           // Acquire write lock on current snapshot and next snapshot in chain.
           if (!snapshotIdLocks.acquireLock(lockIds).isLockAcquired()) {
             continue;
-          }
-
-          // nextSnapshot = null means entries would be moved to AOS.
-          if (nextSnapshot == null) {
-            LOG.info("Snapshot: {} entries will be moved to AOS.", snapInfo.getTableKey());
-          } else {
-            LOG.info("Snapshot: {} entries will be moved to next active snapshot: {}",
-                snapInfo.getTableKey(), nextSnapshot.getTableKey());
           }
           try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(
               snapInfo.getVolumeName(), snapInfo.getBucketName(), snapInfo.getName())) {

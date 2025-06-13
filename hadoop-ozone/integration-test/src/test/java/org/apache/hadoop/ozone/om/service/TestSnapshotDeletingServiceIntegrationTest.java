@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANI
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_GC_LOCK;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,9 +37,11 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -50,7 +53,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -60,13 +62,13 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -80,6 +82,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
@@ -88,7 +91,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.MockedConstruction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,6 +113,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
   private OzoneManager om;
   private OzoneBucket bucket1;
   private OzoneClient client;
+  private final Deque<UncheckedAutoCloseableSupplier<OmSnapshot>> rcSnaps = new ArrayDeque<>();
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME_ONE = "bucket1";
   private static final String BUCKET_NAME_TWO = "bucket2";
@@ -153,6 +157,23 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     }
   }
 
+  @AfterEach
+  public void closeAllSnapshots() {
+    while (!rcSnaps.isEmpty()) {
+      rcSnaps.pop().close();
+    }
+    // Resume services
+    om.getKeyManager().getDirDeletingService().resume();
+    om.getKeyManager().getDeletingService().resume();
+    om.getKeyManager().getSnapshotDeletingService().resume();
+  }
+
+  private UncheckedAutoCloseableSupplier<OmSnapshot> getOmSnapshot(String volume, String bucket, String snapshotName)
+      throws IOException {
+    rcSnaps.push(om.getOmSnapshotManager().getSnapshot(volume, bucket, snapshotName));
+    return rcSnaps.peek();
+  }
+
   @Test
   @Order(2)
   @Flaky("HDDS-11130")
@@ -170,8 +191,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       GenericTestUtils.waitFor(() -> snapshotDeletingService
           .getSuccessfulRunCount() >= 1, 1000, 10000);
     }
-    OmSnapshot bucket1snap3 = om.getOmSnapshotManager()
-        .getSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3").get();
+    OmSnapshot bucket1snap3 = getOmSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3").get();
 
     // Check bucket1key1 added to next non deleted snapshot db.
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> omKeyInfos =
@@ -402,9 +422,9 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     }
     om.getKeyManager().getDirDeletingService().suspend();
     om.getKeyManager().getDeletingService().suspend();
-
-    OmSnapshot snap2 = om.getOmSnapshotManager()
-        .getSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap2").get();
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap2 =
+        getOmSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap2");
+    OmSnapshot snap2 = rcSnap2.get();
     //Child directories should have moved to deleted Directory table to deleted directory table of snap2
     assertTableRowCount(dirTable, 0);
     assertTableRowCount(keyTable, 11);
@@ -413,7 +433,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     client.getObjectStore().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_FSO,
         "snap2");
-
+    rcSnap2.close();
 
     assertTableRowCount(snapshotInfoTable, 2);
 
@@ -427,8 +447,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     assertTableRowCount(om.getMetadataManager().getSnapshotInfoTable(), 2);
 
     verifySnapshotChain(deletedSnap, "/vol1/bucketfso/snap3");
-    OmSnapshot snap3 = om.getOmSnapshotManager()
-        .getSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap3").get();
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap3 = getOmSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap3");
+    OmSnapshot snap3 = rcSnap3.get();
 
     Table<String, OmKeyInfo> snapDeletedDirTable =
         snap3.getMetadataManager().getDeletedDirTable();
@@ -470,6 +490,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     // Delete Snapshot3 and check entries moved to active DB
     client.getObjectStore().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_FSO,
         "snap3");
+    rcSnap3.close();
+
     om.getKeyManager().getDirDeletingService().resume();
     om.getKeyManager().getDeletingService().resume();
     // Check entries moved to active DB
@@ -478,9 +500,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     assertTableRowCount(deletedDirTable, 12);
     assertTableRowCount(deletedTable, 15);
 
-    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap1 =
-        om.getOmSnapshotManager().getSnapshot(
-            VOLUME_NAME, BUCKET_NAME_FSO, "snap1");
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap1 = getOmSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap1");
     OmSnapshot snap1 = rcSnap1.get();
     Table<String, OmKeyInfo> snap1KeyTable =
         snap1.getMetadataManager().getFileTable();
@@ -515,7 +535,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     assertTableRowCount(deletedTable, 15);
 
     snap1 = null;
-    rcSnap1.close();
   }
 
   /*
@@ -606,11 +625,9 @@ public class TestSnapshotDeletingServiceIntegrationTest {
   }
 
   private MockedConstruction<ReclaimableKeyFilter> getMockedReclaimableKeyFilter(String volume, String bucket,
-      SnapshotInfo snapshotInfo, AtomicBoolean kdsWaitStarted, AtomicBoolean sdsLockWaitStarted,
-      AtomicBoolean kdsFinished) throws IOException {
-    ReclaimableKeyFilter keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
-        ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(),
-        snapshotInfo, om.getKeyManager(), om.getMetadataManager().getLock());
+      AtomicBoolean kdsWaitStarted, AtomicBoolean sdsLockWaitStarted,
+      AtomicBoolean sdsLockAcquired, AtomicBoolean kdsFinished, ReclaimableKeyFilter keyFilter) throws IOException {
+
     return mockConstruction(ReclaimableKeyFilter.class,
         (mocked, context) -> {
           when(mocked.apply(any())).thenAnswer(i -> {
@@ -628,6 +645,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
             return keyFilter.apply(i.getArgument(0));
           });
           doAnswer(i -> {
+            assertTrue(sdsLockWaitStarted.get());
+            assertFalse(sdsLockAcquired.get());
             kdsFinished.set(true);
             keyFilter.close();
             return null;
@@ -638,14 +657,30 @@ public class TestSnapshotDeletingServiceIntegrationTest {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
+  @CsvSource({"true, 0", "true, 1", "false, 0", "false, 1", "false, 2"})
   @DisplayName("Tests Snapshot Deleting Service while KeyDeletingService is already running.")
-  public void testSnapshotDeletingServiceWaitsForKeyDeletingService(boolean kdsRunningOnAOS) throws Exception {
+  @Order(4)
+  public void testSnapshotDeletingServiceWaitsForKeyDeletingService(boolean kdsRunningOnAOS,
+      int snasphotDeleteIndex) throws Exception {
+    SnapshotChainManager snapshotChainManager =
+        ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Iterator<UUID> itr = snapshotChainManager.iterator(false);
+        while (itr.hasNext()) {
+          SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(om, snapshotChainManager, itr.next());
+          assertEquals(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, snapshotInfo.getSnapshotStatus());
+        }
+        return true;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 30000);
+    om.awaitDoubleBufferFlush();
     // Suspend the services first
     om.getKeyManager().getDirDeletingService().suspend();
     om.getKeyManager().getDeletingService().suspend();
     om.getKeyManager().getSnapshotDeletingService().suspend();
-
     String volume = "vol" + RandomStringUtils.secure().nextNumeric(3),
         bucket = "bucket" + RandomStringUtils.secure().nextNumeric(3);
     client.getObjectStore().createVolume(volume);
@@ -653,29 +688,44 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     ozoneVolume.createBucket(bucket);
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucket);
 
+    // Create snap0
+    client.getObjectStore().createSnapshot(volume, bucket, "snap0");
+    client.getObjectStore().getSnapshotInfo(volume, bucket, "snap0");
+    UUID snap1Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap0").getSnapshotId();
+
     // Create snap1
-    client.getObjectStore().createSnapshot(volume, bucket, "snap1");
-    OzoneSnapshot snap1 = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap1");
-    // Create snap2
     TestDataUtil.createKey(ozoneBucket, "key", CONTENT.array());
-    client.getObjectStore().createSnapshot(volume, bucket, "snap2");
-    UUID snap2Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap2").getSnapshotId();
+    client.getObjectStore().createSnapshot(volume, bucket, "snap1");
+    UUID snap2Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap1").getSnapshotId();
 
     ozoneBucket.renameKey("key", "renamedKey");
     ozoneBucket.deleteKey("renamedKey");
+    om.awaitDoubleBufferFlush();
     UUID snap3Id;
+    ReclaimableKeyFilter keyFilter;
+    SnapshotInfo snapInfo;
     // Create snap3 to test snapshot 3 deep cleaning otherwise just run on AOS.
     if (kdsRunningOnAOS) {
       snap3Id = null;
+      snapInfo = null;
+      keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
+          ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(),
+          snapInfo, om.getKeyManager(), om.getMetadataManager().getLock());
     } else {
-      client.getObjectStore().createSnapshot(volume, bucket, "snap3");
-      snap3Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap3").getSnapshotId();
+
+      client.getObjectStore().createSnapshot(volume, bucket, "snap2");
+      snap3Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap2").getSnapshotId();
       om.awaitDoubleBufferFlush();
-      SnapshotInfo snap = om.getMetadataManager().getSnapshotInfo(volume, bucket, "snap3");
+      SnapshotInfo snap = om.getMetadataManager().getSnapshotInfo(volume, bucket, "snap2");
       snap.setDeepCleanedDeletedDir(true);
       om.getMetadataManager().getSnapshotInfoTable().put(snap.getTableKey(), snap);
-      assertTrue(om.getMetadataManager().getSnapshotInfo(volume, bucket, "snap3")
+      assertTrue(om.getMetadataManager().getSnapshotInfo(volume, bucket, "snap2")
           .isDeepCleanedDeletedDir());
+      snapInfo = SnapshotUtils.getSnapshotInfo(om, volume, bucket, "snap2");
+      keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
+          ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(),
+          snapInfo, getOmSnapshot(volume, bucket, "snap2").get().getKeyManager(),
+          om.getMetadataManager().getLock());
     }
 
 
@@ -684,29 +734,36 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     AtomicBoolean kdsWaitStarted = new AtomicBoolean(false);
     AtomicBoolean kdsFinished = new AtomicBoolean(false);
     AtomicBoolean sdsLockWaitStarted = new AtomicBoolean(false);
-    AtomicBoolean sdsLockAcquired = new AtomicBoolean(true);
+    AtomicBoolean sdsLockAcquired = new AtomicBoolean(false);
 
     try (MockedConstruction<MultiSnapshotLocks> mockedMultiSnapshotLock = mockConstruction(MultiSnapshotLocks.class,
-        (mocked, context) -> when(mocked.acquireLock(anyList())).thenAnswer(i -> {
-          List<UUID> ids = i.getArgument(0);
-          List<UUID> expectedIds = Arrays.asList(snap2Id, snap3Id);
-          if (expectedIds.equals(ids)) {
-            sdsLockWaitStarted.set(true);
-            OMLockDetails lockDetails = sdsMultiLocks.acquireLock(ids);
-            assertTrue(kdsFinished::get);
-            sdsLockAcquired.set(true);
-            return lockDetails;
-          }
-          return sdsMultiLocks.acquireLock(ids);
-        }))) {
+        (mocked, context) -> {
+          when(mocked.acquireLock(anyList())).thenAnswer(i -> {
+            List<UUID> ids = i.getArgument(0);
+            List<UUID> expectedIds = Arrays.asList(snap1Id, snap2Id, snap3Id).subList(snasphotDeleteIndex, Math.min(3,
+                snasphotDeleteIndex + 2)).stream().filter(Objects::nonNull).collect(Collectors.toList());
+            if (expectedIds.equals(ids) && !sdsLockWaitStarted.get() && !sdsLockAcquired.get()) {
+              sdsLockWaitStarted.set(true);
+              OMLockDetails lockDetails = sdsMultiLocks.acquireLock(ids);
+              assertTrue(kdsFinished::get);
+              sdsLockAcquired.set(true);
+              return lockDetails;
+            }
+            return sdsMultiLocks.acquireLock(ids);
+          });
+          doAnswer(i -> {
+            sdsMultiLocks.releaseLock();
+            return null;
+          }).when(mocked).releaseLock();
+        })) {
       KeyDeletingService kds = new KeyDeletingService(om, om.getScmClient().getBlockClient(), 500, 10000,
           om.getConfiguration(), 1, true);
       kds.shutdown();
       KeyDeletingService.KeyDeletingTask task = kds.new KeyDeletingTask(snap3Id);
-      SnapshotInfo snapInfo = kdsRunningOnAOS ? null : SnapshotUtils.getSnapshotInfo(om, volume, bucket, "snap3");
-      CompletableFuture<BackgroundTaskResult> future = CompletableFuture.supplyAsync(() -> {
+
+      CompletableFuture.supplyAsync(() -> {
         try (MockedConstruction<ReclaimableKeyFilter> mockedReclaimableFilter = getMockedReclaimableKeyFilter(
-            volume, bucket, snapInfo, kdsWaitStarted, sdsLockWaitStarted, kdsFinished)) {
+            volume, bucket, kdsWaitStarted, sdsLockWaitStarted, sdsLockAcquired, kdsFinished, keyFilter)) {
           return task.call();
         } catch (IOException e) {
           throw new RuntimeException(e);
@@ -715,86 +772,18 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
       SnapshotDeletingService sds = new SnapshotDeletingService(500, 10000, om);
       sds.shutdown();
-      GenericTestUtils.waitFor(kdsWaitStarted::get, 1000, 10000);
-      client.getObjectStore().deleteSnapshot(volume, bucket, "snap2");
+      GenericTestUtils.waitFor(kdsWaitStarted::get, 1000, 30000);
+      client.getObjectStore().deleteSnapshot(volume, bucket, "snap" + snasphotDeleteIndex);
       sds.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
+      if (snasphotDeleteIndex == 2) {
+        sds.runPeriodicalTaskNow();
+      }
+      assertTrue(sdsLockWaitStarted.get());
       assertTrue(sdsLockAcquired.get());
-      assertThrows(IOException.class, () -> SnapshotUtils.getSnapshotInfo(om, volume, bucket, "snap2"));
+      assertThrows(IOException.class, () -> SnapshotUtils.getSnapshotInfo(om, volume, bucket,
+          "snap" + snasphotDeleteIndex));
     }
-    // Resume services
-    om.getKeyManager().getDirDeletingService().resume();
-    om.getKeyManager().getDeletingService().resume();
-    om.getKeyManager().getSnapshotDeletingService().resume();
-  }
-
-  /*
-      Flow
-      ----
-      create dir0/key0
-      create dir1/key1
-      overwrite dir0/key0
-      create dir2/key2
-      create snap1
-      rename dir1/key1 -> dir1/key10
-      delete dir1/key10
-      delete dir2
-      create snap2
-      delete snap2
-   */
-  private synchronized void createSnapshotFSODataForBucket(OzoneBucket bucket) throws Exception {
-    Table<String, SnapshotInfo> snapshotInfoTable =
-        om.getMetadataManager().getSnapshotInfoTable();
-    Table<String, RepeatedOmKeyInfo> deletedTable =
-        om.getMetadataManager().getDeletedTable();
-    Table<String, OmKeyInfo> deletedDirTable =
-        om.getMetadataManager().getDeletedDirTable();
-    Table<String, OmKeyInfo> keyTable =
-        om.getMetadataManager().getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    Table<String, OmDirectoryInfo> dirTable =
-        om.getMetadataManager().getDirectoryTable();
-    Table<String, String> renameTable = om.getMetadataManager().getSnapshotRenamedTable();
-    OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
-        om.getMetadataManager();
-    Map<String, Integer> countMap =
-        metadataManager.listTables().entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, e -> {
-              try {
-                return (int)metadataManager.countRowsInTable(e.getValue());
-              } catch (IOException ex) {
-                throw new RuntimeException(ex);
-              }
-            }));
-    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", CONTENT.array());
-    TestDataUtil.createKey(bucket, "dir1/" + bucket.getName() + "key1", CONTENT.array());
-    assertTableRowCount(keyTable, countMap.get(keyTable.getName()) + 2);
-    assertTableRowCount(dirTable, countMap.get(dirTable.getName()) + 2);
-
-    // Overwrite bucket1key0, This is a newer version of the key which should
-    // reclaimed as this is a different version of the key.
-    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", CONTENT.array());
-    TestDataUtil.createKey(bucket, "dir2/" + bucket.getName() + "key2", CONTENT.array());
-    assertTableRowCount(keyTable, countMap.get(keyTable.getName()) + 3);
-    assertTableRowCount(dirTable, countMap.get(dirTable.getName()) + 3);
-    assertTableRowCount(deletedTable, countMap.get(deletedTable.getName()) + 1);
-    // create snap1
-    client.getProxy().createSnapshot(bucket.getVolumeName(), bucket.getName(),
-        bucket.getName() + "snap1");
-    bucket.renameKey("dir1/" + bucket.getName() + "key1", "dir1/" + bucket.getName() + "key10");
-    bucket.renameKey("dir1/", "dir10/");
-    assertTableRowCount(renameTable, countMap.get(renameTable.getName()) + 2);
-    client.getProxy().deleteKey(bucket.getVolumeName(), bucket.getName(),
-        "dir10/" + bucket.getName() + "key10", false);
-    assertTableRowCount(deletedTable, countMap.get(deletedTable.getName()) + 1);
-    // Key 2 is deleted here, which will be reclaimed here as
-    // it is not being referenced by previous snapshot.
-    client.getProxy().deleteKey(bucket.getVolumeName(), bucket.getName(), "dir2", true);
-    assertTableRowCount(deletedDirTable, countMap.get(deletedDirTable.getName()) + 1);
-    client.getProxy().createSnapshot(bucket.getVolumeName(), bucket.getName(),
-        bucket.getName() + "snap2");
-    // Delete Snapshot 2.
-    client.getProxy().deleteSnapshot(bucket.getVolumeName(), bucket.getName(),
-        bucket.getName() + "snap2");
-    assertTableRowCount(snapshotInfoTable, countMap.get(snapshotInfoTable.getName()) +  2);
   }
 
   private void verifySnapshotChain(SnapshotInfo deletedSnapshot,

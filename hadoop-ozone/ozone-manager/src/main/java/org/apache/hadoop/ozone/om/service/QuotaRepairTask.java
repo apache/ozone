@@ -399,22 +399,18 @@ public class QuotaRepairTask {
       Table.KeyValue<String, VALUE> kv,
       Map<String, CountPair> prefixUsageMap,
       boolean haveValue) {
-    try {
-      String prefix = getVolumeBucketPrefix(kv.getKey());
-      CountPair usage = prefixUsageMap.get(prefix);
-      if (null == usage) {
-        return;
+    String prefix = getVolumeBucketPrefix(kv.getKey());
+    CountPair usage = prefixUsageMap.get(prefix);
+    if (null == usage) {
+      return;
+    }
+    usage.incrNamespace(1L);
+    // avoid decode of value
+    if (haveValue) {
+      VALUE value = kv.getValue();
+      if (value instanceof OmKeyInfo) {
+        usage.incrSpace(((OmKeyInfo) value).getReplicatedSize());
       }
-      usage.incrNamespace(1L);
-      // avoid decode of value
-      if (haveValue) {
-        VALUE value = kv.getValue();
-        if (value instanceof OmKeyInfo) {
-          usage.incrSpace(((OmKeyInfo) value).getReplicatedSize());
-        }
-      }
-    } catch (IOException ex) {
-      throw new UncheckedIOException(ex);
     }
   }
   
