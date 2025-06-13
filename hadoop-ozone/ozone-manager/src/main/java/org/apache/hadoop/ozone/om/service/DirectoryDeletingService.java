@@ -106,15 +106,15 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.isRunningOnAOS = new AtomicBoolean(false);
     this.dirDeletingCorePoolSize = dirDeletingServiceCorePoolSize;
     deletedDirSupplier = new DeletedDirSupplier();
-    registerReconfigCallbacks(ozoneManager.getReconfigurationHandler(), configuration);
+    registerReconfigCallbacks(ozoneManager.getReconfigurationHandler());
     taskCount.set(0);
   }
 
-  public void registerReconfigCallbacks(ReconfigurationHandler handler, OzoneConfiguration conf) {
+  public void registerReconfigCallbacks(ReconfigurationHandler handler) {
     handler.registerCompleteCallback((changedKeys, newConf) -> {
       if (changedKeys.containsKey(OZONE_DIR_DELETING_SERVICE_INTERVAL) ||
           changedKeys.containsKey(OZONE_THREAD_NUMBER_DIR_DELETION)) {
-        updateAndRestart(conf);
+        updateAndRestart((OzoneConfiguration) newConf);
       }
     });
   }

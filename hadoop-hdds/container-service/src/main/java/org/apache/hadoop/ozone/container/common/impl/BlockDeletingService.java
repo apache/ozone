@@ -102,19 +102,19 @@ public class BlockDeletingService extends BackgroundService {
     dnConf = conf.getObject(DatanodeConfiguration.class);
     if (reconfigurationHandler != null) {
       reconfigurationHandler.register(dnConf);
-      registerReconfigCallbacks(reconfigurationHandler, (OzoneConfiguration) conf);
+      registerReconfigCallbacks(reconfigurationHandler);
     }
     this.blockDeletingMaxLockHoldingTime =
         dnConf.getBlockDeletingMaxLockHoldingTime();
     metrics = BlockDeletingServiceMetrics.create();
   }
 
-  public void registerReconfigCallbacks(ReconfigurationHandler handler, OzoneConfiguration ozoneConf) {
+  public void registerReconfigCallbacks(ReconfigurationHandler handler) {
     handler.registerCompleteCallback((changedKeys, newConf) -> {
       if (changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_INTERVAL) ||
           changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT) ||
           changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_WORKERS)) {
-        updateAndRestart(ozoneConf);
+        updateAndRestart((OzoneConfiguration) newConf);
       }
     });
   }
