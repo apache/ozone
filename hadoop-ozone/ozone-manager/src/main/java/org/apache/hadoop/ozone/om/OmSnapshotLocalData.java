@@ -32,9 +32,9 @@ import org.yaml.snakeyaml.Yaml;
 
 /**
  * OmSnapshotLocalData is the in-memory representation of snapshot local metadata.
- * Inspired by {@link org.apache.hadoop.ozone.container.common.impl.ContainerData}
+ * Inspired by org.apache.hadoop.ozone.container.common.impl.ContainerData
  */
-public class OmSnapshotLocalData {
+public abstract class OmSnapshotLocalData {
 
   // Checksum of the YAML representation
   private String checksum;

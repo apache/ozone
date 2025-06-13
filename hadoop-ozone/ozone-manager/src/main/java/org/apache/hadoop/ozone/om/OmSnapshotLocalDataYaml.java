@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,87 +48,27 @@ import org.yaml.snakeyaml.representer.Representer;
 /**
  * Class for creating and reading snapshot local properties / data YAML files.
  * Checksum of the YAML fields are computed and stored in the YAML file transparently to callers.
- * Inspired by {@link org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml}
+ * Inspired by org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml
  */
-public final class OmSnapshotLocalDataYaml {
+public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
 
   private static final Logger LOG = LoggerFactory.getLogger(OmSnapshotLocalDataYaml.class);
 
   public static final Tag SNAPSHOT_YAML_TAG = new Tag("OmSnapshotLocalData");
 
-  private OmSnapshotLocalDataYaml() {
-
+  /**
+   * Creates a new OmSnapshotLocalDataYaml with default values.
+   */
+  public OmSnapshotLocalDataYaml() {
+    super();
   }
 
   /**
-   * Creates a snapshot data file in YAML format.
+   * Copy constructor to create a deep copy.
+   * @param source The source OmSnapshotLocalData to copy from
    */
-  public static void createSnapshotLocalDataFile(OmSnapshotLocalData snapshotData, File snapshotFile)
-      throws IOException {
-    // Create Yaml
-    final Yaml yaml = getYamlForSnapshotLocalData();
-    // Compute Checksum and update SnapshotData
-    snapshotData.computeAndSetChecksum(yaml);
-
-    // Write the SnapshotData with checksum to Yaml file.
-    YamlUtils.dump(yaml, snapshotData, snapshotFile, LOG);
-  }
-
-  /**
-   * Read the YAML file, and return OmSnapshotLocalData instance.
-   * @throws IOException
-   */
-  public static OmSnapshotLocalData readSnapshotLocalDataFile(File snapshotFile)
-      throws IOException {
-    Preconditions.checkNotNull(snapshotFile, "snapshotFile cannot be null");
-    try (InputStream inputFileStream = Files.newInputStream(snapshotFile.toPath())) {
-      return readSnapshotLocalData(inputFileStream);
-    }
-  }
-
-  /**
-   * Read the YAML file content byte array, and return OmSnapshotLocalData instance.
-   * @throws IOException
-   */
-  public static OmSnapshotLocalData readSnapshotLocalData(byte[] snapshotFileContent)
-      throws IOException {
-    return readSnapshotLocalData(new ByteArrayInputStream(snapshotFileContent));
-  }
-
-  /**
-   * Read the YAML content InputStream, and return OmSnapshotLocalData instance.
-   * @throws IOException
-   */
-  public static OmSnapshotLocalData readSnapshotLocalData(InputStream input)
-      throws IOException {
-    OmSnapshotLocalData snapshotData;
-    PropertyUtils propertyUtils = new PropertyUtils();
-    propertyUtils.setBeanAccess(BeanAccess.FIELD);
-    propertyUtils.setAllowReadOnlyProperties(true);
-
-    Representer representer = new SnapshotLocalDataRepresenter(OmSnapshotLocalData.YAML_FIELDS);
-    representer.setPropertyUtils(propertyUtils);
-
-    SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
-
-    Yaml yaml = new Yaml(snapshotDataConstructor, representer);
-    yaml.setBeanAccess(BeanAccess.FIELD);
-
-    try {
-      snapshotData = yaml.load(input);
-    } catch (YAMLException ex) {
-      // Unchecked exception. Convert to IOException
-      throw new IOException(ex);
-    }
-
-    if (snapshotData == null) {
-      // If Yaml#load returned null, then the file is empty. This is valid yaml
-      // but considered an error in this case since we have lost data about
-      // the snapshot.
-      throw new IOException("Failed to load snapshot file. File is empty.");
-    }
-
-    return snapshotData;
+  public OmSnapshotLocalDataYaml(OmSnapshotLocalData source) {
+    super(source);
   }
 
   /**
@@ -150,7 +89,7 @@ public final class OmSnapshotLocalDataYaml {
     }
 
     // Create a copy of the snapshot data for computing checksum
-    OmSnapshotLocalData snapshotDataCopy = new OmSnapshotLocalData(snapshotData);
+    OmSnapshotLocalDataYaml snapshotDataCopy = new OmSnapshotLocalDataYaml(snapshotData);
 
     // Clear the existing checksum in the copy
     snapshotDataCopy.setChecksum(null);
@@ -184,7 +123,7 @@ public final class OmSnapshotLocalDataYaml {
 
     Representer representer = new SnapshotLocalDataRepresenter(OmSnapshotLocalData.YAML_FIELDS);
     representer.setPropertyUtils(propertyUtils);
-    representer.addClassTag(OmSnapshotLocalData.class, SNAPSHOT_YAML_TAG);
+    representer.addClassTag(OmSnapshotLocalDataYaml.class, SNAPSHOT_YAML_TAG);
 
     SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
 
@@ -208,7 +147,7 @@ public final class OmSnapshotLocalDataYaml {
       Set<Property> set = super.getProperties(type);
       Set<Property> filtered = new TreeSet<>();
 
-      if (type.equals(OmSnapshotLocalData.class)) {
+      if (type.equals(OmSnapshotLocalDataYaml.class)) {
         // filter properties
         for (Property prop : set) {
           String name = prop.getName();
@@ -249,7 +188,7 @@ public final class OmSnapshotLocalDataYaml {
         MappingNode mnode = (MappingNode) node;
         Map<Object, Object> nodes = constructMapping(mnode);
 
-        OmSnapshotLocalData snapshotData = new OmSnapshotLocalData();
+        OmSnapshotLocalDataYaml snapshotData = new OmSnapshotLocalDataYaml();
 
         // Set fields from parsed YAML
         snapshotData.setSstFiltered((Boolean) nodes.getOrDefault(OzoneConsts.IS_SST_FILTERED, false));
@@ -277,5 +216,78 @@ public final class OmSnapshotLocalDataYaml {
         return snapshotData;
       }
     }
+  }
+
+  /**
+   * Returns the YAML representation of this object as a String
+   * (without triggering checksum computation or persistence).
+   * @return YAML string representation
+   */
+  public String getYaml() {
+    final Yaml yaml = getYamlForSnapshotLocalData();
+    return yaml.dump(this);
+  }
+
+  /**
+   * Computes checksum (stored in this object), and writes this object to a YAML file.
+   * @param yamlFile The file to write to
+   * @throws IOException If there's an error writing to the file
+   */
+  public void writeToYaml(File yamlFile) throws IOException {
+    // Create Yaml
+    final Yaml yaml = getYamlForSnapshotLocalData();
+    // Compute Checksum and update SnapshotData
+    computeAndSetChecksum(yaml);
+    // Write the SnapshotData with checksum to Yaml file.
+    YamlUtils.dump(yaml, this, yamlFile, LOG);
+  }
+
+  /**
+   * Creates a OmSnapshotLocalDataYaml instance from a YAML file.
+   * @param yamlFile The YAML file to read from
+   * @return A new OmSnapshotLocalDataYaml instance
+   * @throws IOException If there's an error reading the file
+   */
+  public static OmSnapshotLocalDataYaml getFromYamlFile(File yamlFile) throws IOException {
+    Preconditions.checkNotNull(yamlFile, "yamlFile cannot be null");
+    try (InputStream inputFileStream = Files.newInputStream(yamlFile.toPath())) {
+      return getFromYamlStream(inputFileStream);
+    }
+  }
+
+  /**
+   * Read the YAML content InputStream, and return OmSnapshotLocalDataYaml instance.
+   * @throws IOException
+   */
+  public static OmSnapshotLocalDataYaml getFromYamlStream(InputStream input)
+      throws IOException {
+    OmSnapshotLocalDataYaml snapshotData;
+    PropertyUtils propertyUtils = new PropertyUtils();
+    propertyUtils.setBeanAccess(BeanAccess.FIELD);
+    propertyUtils.setAllowReadOnlyProperties(true);
+
+    Representer representer = new SnapshotLocalDataRepresenter(OmSnapshotLocalData.YAML_FIELDS);
+    representer.setPropertyUtils(propertyUtils);
+
+    SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
+
+    Yaml yaml = new Yaml(snapshotDataConstructor, representer);
+    yaml.setBeanAccess(BeanAccess.FIELD);
+
+    try {
+      snapshotData = yaml.load(input);
+    } catch (YAMLException ex) {
+      // Unchecked exception. Convert to IOException
+      throw new IOException(ex);
+    }
+
+    if (snapshotData == null) {
+      // If Yaml#load returned null, then the file is empty. This is valid yaml
+      // but considered an error in this case since we have lost data about
+      // the snapshot.
+      throw new IOException("Failed to load snapshot file. File is empty.");
+    }
+
+    return snapshotData;
   }
 }

@@ -58,32 +58,32 @@ public class TestOmSnapshotLocalDataYaml {
   /**
    * Creates a snapshot local data YAML file.
    */
-  private File createSnapshotLocalDataFile(String snapshotName) throws IOException {
+  private File writeToYaml(String snapshotName) throws IOException {
     String yamlFilePath = snapshotName + ".yaml";
 
-    OmSnapshotLocalData snapshotData = new OmSnapshotLocalData();
-    snapshotData.setSstFiltered(true);
+    OmSnapshotLocalDataYaml dataYaml = new OmSnapshotLocalDataYaml();
+    dataYaml.setSstFiltered(true);
 
     // Add some uncompacted SST files
-    snapshotData.addUncompactedSSTFile("table1", "sst1");
-    snapshotData.addUncompactedSSTFile("table1", "sst2");
-    snapshotData.addUncompactedSSTFile("table2", "sst3");
+    dataYaml.addUncompactedSSTFile("table1", "sst1");
+    dataYaml.addUncompactedSSTFile("table1", "sst2");
+    dataYaml.addUncompactedSSTFile("table2", "sst3");
 
     // Set last compaction time
-    snapshotData.setLastCompactionTime(NOW.toEpochMilli());
+    dataYaml.setLastCompactionTime(NOW.toEpochMilli());
 
     // Set needs compaction flag
-    snapshotData.setNeedsCompaction(true);
+    dataYaml.setNeedsCompaction(true);
 
     // Add some compacted SST files
-    snapshotData.addCompactedSSTFile(1, "table1", "compacted-sst1");
-    snapshotData.addCompactedSSTFile(1, "table2", "compacted-sst2");
-    snapshotData.addCompactedSSTFile(2, "table1", "compacted-sst3");
+    dataYaml.addCompactedSSTFile(1, "table1", "compacted-sst1");
+    dataYaml.addCompactedSSTFile(1, "table2", "compacted-sst2");
+    dataYaml.addCompactedSSTFile(2, "table1", "compacted-sst3");
 
     File yamlFile = new File(testRoot, yamlFilePath);
 
     // Create YAML file with SnapshotData
-    OmSnapshotLocalDataYaml.createSnapshotLocalDataFile(snapshotData, yamlFile);
+    OmSnapshotLocalDataYaml.writeToYaml(dataYaml, yamlFile);
 
     // Check YAML file exists
     assertTrue(yamlFile.exists());
@@ -92,11 +92,11 @@ public class TestOmSnapshotLocalDataYaml {
   }
 
   @Test
-  public void testCreateSnapshotLocalDataFile() throws IOException {
-    File yamlFile = createSnapshotLocalDataFile("snapshot1");
+  public void testWriteToYaml() throws IOException {
+    File yamlFile = writeToYaml("snapshot1");
 
     // Read from YAML file
-    OmSnapshotLocalData snapshotData = OmSnapshotLocalDataYaml.readSnapshotLocalDataFile(yamlFile);
+    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
 
     // Verify fields
     assertTrue(snapshotData.getSstFiltered());
@@ -125,11 +125,11 @@ public class TestOmSnapshotLocalDataYaml {
 
   @Test
   public void testUpdateSnapshotDataFile() throws IOException {
-    File yamlFile = createSnapshotLocalDataFile("snapshot2");
+    File yamlFile = writeToYaml("snapshot2");
 
     // Read from YAML file
-    OmSnapshotLocalData snapshotData =
-        OmSnapshotLocalDataYaml.readSnapshotLocalDataFile(yamlFile);
+    OmSnapshotLocalDataYaml snapshotData =
+        OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
 
     // Update snapshot data
     snapshotData.setSstFiltered(false);
@@ -138,10 +138,10 @@ public class TestOmSnapshotLocalDataYaml {
     snapshotData.addCompactedSSTFile(3, "table3", "compacted-sst4");
 
     // Write updated data back to file
-    OmSnapshotLocalDataYaml.createSnapshotLocalDataFile(snapshotData, yamlFile);
+    OmSnapshotLocalDataYaml.writeToYaml(snapshotData, yamlFile);
 
     // Read back the updated data
-    snapshotData = OmSnapshotLocalDataYaml.readSnapshotLocalDataFile(yamlFile);
+    snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
 
     // Verify updated data
     assertThat(snapshotData.getSstFiltered()).isFalse();
@@ -165,17 +165,17 @@ public class TestOmSnapshotLocalDataYaml {
     assertTrue(emptyFile.createNewFile());
 
     IOException ex = assertThrows(IOException.class, () ->
-        OmSnapshotLocalDataYaml.readSnapshotLocalDataFile(emptyFile));
+        OmSnapshotLocalDataYaml.getFromYamlFile(emptyFile));
 
     assertThat(ex).hasMessageContaining("Failed to load snapshot file. File is empty.");
   }
 
   @Test
   public void testChecksum() throws IOException {
-    File yamlFile = createSnapshotLocalDataFile("snapshot3");
+    File yamlFile = writeToYaml("snapshot3");
 
     // Read from YAML file
-    OmSnapshotLocalData snapshotData = OmSnapshotLocalDataYaml.readSnapshotLocalDataFile(yamlFile);
+    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
 
     // Get the original checksum
     String originalChecksum = snapshotData.getChecksum();
@@ -183,12 +183,12 @@ public class TestOmSnapshotLocalDataYaml {
     // Verify the checksum is not null or empty
     assertThat(originalChecksum).isNotNull().isNotEmpty();
 
-    OmSnapshotLocalDataYaml.verifyChecksum(snapshotData);
+    assertTrue(OmSnapshotLocalDataYaml.verifyChecksum(snapshotData));
   }
 
   @Test
   public void testYamlContainsAllFields() throws IOException {
-    File yamlFile = createSnapshotLocalDataFile("snapshot4");
+    File yamlFile = writeToYaml("snapshot4");
 
     String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
 
