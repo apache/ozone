@@ -84,12 +84,7 @@ public class DeletedBlockLogStateManagerImpl
         while (iter.hasNext()) {
           TypedTable.KeyValue<Long, DeletedBlocksTransaction> next = iter
               .next();
-          long txID;
-          try {
-            txID = next.getKey();
-          } catch (IOException e) {
-            throw new IllegalStateException("");
-          }
+          final long txID = next.getKey();
 
           if ((deletingTxIDs == null || !deletingTxIDs.contains(txID)) && (
               skippingRetryTxIDs == null || !skippingRetryTxIDs
@@ -146,7 +141,7 @@ public class DeletedBlockLogStateManagerImpl
       }
 
       @Override
-      public void removeFromDB() throws IOException {
+      public void removeFromDB() {
         throw new UnsupportedOperationException("read-only");
       }
     };

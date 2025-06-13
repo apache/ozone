@@ -34,7 +34,9 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -81,6 +83,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
@@ -109,6 +112,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
   private OzoneManager om;
   private OzoneBucket bucket1;
   private OzoneClient client;
+  private final Deque<UncheckedAutoCloseableSupplier<OmSnapshot>> rcSnaps = new ArrayDeque<>();
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME_ONE = "bucket1";
   private static final String BUCKET_NAME_TWO = "bucket2";
@@ -152,6 +156,19 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     }
   }
 
+  @AfterEach
+  public void closeAllSnapshots() {
+    while (!rcSnaps.isEmpty()) {
+      rcSnaps.pop().close();
+    }
+  }
+
+  private UncheckedAutoCloseableSupplier<OmSnapshot> getOmSnapshot(String volume, String bucket, String snapshotName)
+      throws IOException {
+    rcSnaps.push(om.getOmSnapshotManager().getSnapshot(volume, bucket, snapshotName));
+    return rcSnaps.peek();
+  }
+
   @Test
   @Order(2)
   @Flaky("HDDS-11130")
@@ -169,8 +186,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       GenericTestUtils.waitFor(() -> snapshotDeletingService
           .getSuccessfulRunCount() >= 1, 1000, 10000);
     }
-    OmSnapshot bucket1snap3 = om.getOmSnapshotManager()
-        .getSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3").get();
+    OmSnapshot bucket1snap3 = getOmSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3").get();
 
     // Check bucket1key1 added to next non deleted snapshot db.
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> omKeyInfos =
@@ -401,9 +417,9 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     }
     om.getKeyManager().getDirDeletingService().suspend();
     om.getKeyManager().getDeletingService().suspend();
-
-    OmSnapshot snap2 = om.getOmSnapshotManager()
-        .getSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap2").get();
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap2 =
+        getOmSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap2");
+    OmSnapshot snap2 = rcSnap2.get();
     //Child directories should have moved to deleted Directory table to deleted directory table of snap2
     assertTableRowCount(dirTable, 0);
     assertTableRowCount(keyTable, 11);
@@ -412,7 +428,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     client.getObjectStore().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_FSO,
         "snap2");
-
+    rcSnap2.close();
 
     assertTableRowCount(snapshotInfoTable, 2);
 
@@ -426,8 +442,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     assertTableRowCount(om.getMetadataManager().getSnapshotInfoTable(), 2);
 
     verifySnapshotChain(deletedSnap, "/vol1/bucketfso/snap3");
-    OmSnapshot snap3 = om.getOmSnapshotManager()
-        .getSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap3").get();
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap3 = getOmSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap3");
+    OmSnapshot snap3 = rcSnap3.get();
 
     Table<String, OmKeyInfo> snapDeletedDirTable =
         snap3.getMetadataManager().getDeletedDirTable();
@@ -469,6 +485,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     // Delete Snapshot3 and check entries moved to active DB
     client.getObjectStore().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_FSO,
         "snap3");
+    rcSnap3.close();
+
     om.getKeyManager().getDirDeletingService().resume();
     om.getKeyManager().getDeletingService().resume();
     // Check entries moved to active DB
@@ -477,9 +495,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     assertTableRowCount(deletedDirTable, 12);
     assertTableRowCount(deletedTable, 15);
 
-    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap1 =
-        om.getOmSnapshotManager().getSnapshot(
-            VOLUME_NAME, BUCKET_NAME_FSO, "snap1");
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap1 = getOmSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap1");
     OmSnapshot snap1 = rcSnap1.get();
     Table<String, OmKeyInfo> snap1KeyTable =
         snap1.getMetadataManager().getFileTable();
@@ -514,7 +530,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     assertTableRowCount(deletedTable, 15);
 
     snap1 = null;
-    rcSnap1.close();
   }
 
   private DirectoryDeletingService getMockedDirectoryDeletingService(AtomicBoolean dirDeletionWaitStarted,
