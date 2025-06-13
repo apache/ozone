@@ -237,7 +237,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     }
     Container<?> removed = containerMap.remove(containerId);
     if (removeFromDB) {
-      deleteContainerTable(containerId);
+      deleteFromContainerTable(containerId);
     }
     if (removed == null) {
       LOG.debug("Container with containerId {} is not present in " +
@@ -250,7 +250,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     }
   }
 
-  private void deleteContainerTable(long containerId) throws StorageContainerException {
+  private void deleteFromContainerTable(long containerId) throws StorageContainerException {
     if (null != metadataStore) {
       try {
         metadataStore.getContainerIdsTable().delete(ContainerID.valueOf(containerId));
