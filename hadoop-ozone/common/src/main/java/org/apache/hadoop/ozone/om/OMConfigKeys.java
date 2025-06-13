@@ -323,11 +323,6 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL =
       "ozone.om.security.admin.protocol.acl";
 
-  public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
-          "ozone.om.keyname.character.check.enabled";
-  public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
-          false;
-
   @Deprecated
   public static final String OZONE_OM_ENABLE_FILESYSTEM_PATHS =
       OmConfig.Keys.ENABLE_FILESYSTEM_PATHS;

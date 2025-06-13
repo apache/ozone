@@ -77,6 +77,7 @@ class TestOmConfig {
     OmConfig subject = conf.getObject(OmConfig.class);
     OmConfig updated = conf.getObject(OmConfig.class);
     updated.setFileSystemPathEnabled(!updated.isFileSystemPathEnabled());
+    updated.setKeyNameCharacterCheckEnabled(!updated.isKeyNameCharacterCheckEnabled());
     updated.setMaxListSize(updated.getMaxListSize() + 1);
     updated.setMaxUserVolumeCount(updated.getMaxUserVolumeCount() + 1);
 
@@ -88,6 +89,7 @@ class TestOmConfig {
   private static void assertConfigEquals(OmConfig expected, OmConfig actual) {
     assertEquals(expected.getMaxListSize(), actual.getMaxListSize());
     assertEquals(expected.isFileSystemPathEnabled(), actual.isFileSystemPathEnabled());
+    assertEquals(expected.isKeyNameCharacterCheckEnabled(), actual.isKeyNameCharacterCheckEnabled());
     assertEquals(expected.getMaxUserVolumeCount(), actual.getMaxUserVolumeCount());
   }
 

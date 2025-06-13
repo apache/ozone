@@ -64,7 +64,6 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -244,10 +243,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (validateKeyArgs.isValidateSnapshotReserved()) {
       OmUtils.verifyKeyNameWithSnapshotReservedWord(validateKeyArgs.getSnapshotReservedWord());
     }
-    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
-        .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-            OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if (validateKeyArgs.isValidateKeyName() && checkKeyNameEnabled) {
+    if (validateKeyArgs.isValidateKeyName() && ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
       OmUtils.validateKeyName(validateKeyArgs.getKeyName());
     }
   }
