@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
 import static org.apache.hadoop.hdds.utils.Archiver.linkAndIncludeFile;
 import static org.apache.hadoop.hdds.utils.Archiver.tar;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
@@ -131,6 +132,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
       tmpdir = Files.createTempDirectory(getBootstrapTempData().toPath(),
           "bootstrap-data-");
+      if (tmpdir == null) {
+        throw new IOException("tmp dir is null");
+      }
       String tarName = "om.data-" + System.currentTimeMillis() + ".tar";
       response.setContentType("application/x-tar");
       response.setHeader("Content-Disposition", "attachment; filename=\"" + tarName + "\"");
@@ -152,7 +156,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           FileUtils.deleteDirectory(tmpdir.toFile());
         }
       } catch (IOException e) {
-        LOG.error("unable to delete: " + tmpdir);
+        LOG.error("unable to delete: " + tmpdir, e.toString());
       }
     }
   }
@@ -328,7 +332,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @return true if processing should continue, false if size limit reached
    * @throws IOException if an I/O error occurs
    */
-  boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dbDir, AtomicLong maxTotalSstSize,
+  private boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dbDir, AtomicLong maxTotalSstSize,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, Path tmpDir,
       Map<String, String> hardLinkFileMap, Path destDir) throws IOException {
     try (Stream<Path> files = Files.list(dbDir)) {
@@ -336,11 +340,15 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       for (Path dbFile : iterable) {
         if (!Files.isDirectory(dbFile)) {
           String fileId = OmSnapshotUtils.getInodeAndMtime(dbFile);
-          String absolutePath = dbFile.toFile().getAbsolutePath();
+          String path = dbFile.toFile().getAbsolutePath();
           if (destDir != null) {
-            absolutePath = destDir.resolve(dbFile.getFileName()).toString();
+            path = destDir.resolve(dbFile.getFileName()).toString();
           }
-          hardLinkFileMap.put(absolutePath, fileId);
+          // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
+          if (path.contains(OM_CHECKPOINT_DIR)){
+            path = getDbStore().getDbLocation().toPath().resolve(dbFile.getFileName()).toAbsolutePath().toString();
+          }
+          hardLinkFileMap.put(path, fileId);
           if (!sstFilesToExclude.contains(fileId)) {
             long fileSize = Files.size(dbFile);
             if (maxTotalSstSize.get() - fileSize <= 0) {
