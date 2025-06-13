@@ -53,6 +53,7 @@ public class CheckUploadContentTypeFilter implements Filter {
    * This implementation is a NOP.
    *
    * @param config filter configuration.
+   *
    * @throws ServletException thrown if the filter could not be initialized.
    */
   @Override
@@ -63,10 +64,11 @@ public class CheckUploadContentTypeFilter implements Filter {
    * Enforces the content-type to be application/octet-stream for
    * POST and PUT requests.
    *
-   * @param request  servlet request.
+   * @param request servlet request.
    * @param response servlet response.
-   * @param chain    filter chain.
-   * @throws IOException      thrown if an IO error occurs.
+   * @param chain filter chain.
+   *
+   * @throws IOException thrown if an IO error occurs.
    * @throws ServletException thrown if a servlet error occurs.
    */
   @Override
