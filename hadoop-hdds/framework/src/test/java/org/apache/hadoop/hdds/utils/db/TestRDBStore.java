@@ -41,8 +41,10 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,9 +89,9 @@ public class TestRDBStore {
       Set<TableConfig> families,
       long maxDbUpdatesSizeThreshold)
       throws IOException {
-    return new RDBStore(dbFile, options, null, new ManagedWriteOptions(), families,
+    return new RDBStore(dbFile, options, new ManagedStatistics(), new ManagedWriteOptions(), families,
         false, null, false,
-        maxDbUpdatesSizeThreshold, true, null, true);
+        maxDbUpdatesSizeThreshold, true, new OzoneConfiguration(), true);
   }
 
   @BeforeEach
