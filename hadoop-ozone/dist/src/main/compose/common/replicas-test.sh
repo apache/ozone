@@ -49,14 +49,12 @@ echo "Overwriting container.db with the backup db"
 target_container_dir=$(docker exec "${container}" find "${container_db_path}" -name "container.db" | xargs dirname)
 docker cp "${local_db_backup_path}/container.db" "${container}:${target_container_dir}/"
 
-docker-compose stop "${container}"
+docker stop "${container}"
 
 wait_for_datanode "${container}" STALE 60
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "STALE_DATANODE:${host}" debug/stale-datanode-checksum.robot
 
-wait_for_datanode "${container}" DEAD 60
-
-docker-compose start "${container}"
+docker start "${container}"
 
 wait_for_datanode "${container}" HEALTHY 90
 
