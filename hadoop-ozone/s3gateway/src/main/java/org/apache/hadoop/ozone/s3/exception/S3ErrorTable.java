@@ -157,7 +157,7 @@ public final class S3ErrorTable {
       HTTP_BAD_REQUEST);
 
   public static final OS3Exception BUCKET_OWNER_MISSMATCH = new OS3Exception(
-      "Access Denied", "User don't have permission to access this resource due to a " +
+      "Access Denied", "User doesn't have permission to access this resource due to a " +
       "bucket ownership mismatch.", HTTP_FORBIDDEN);
 
   private static Function<Exception, OS3Exception> generateInternalError =
