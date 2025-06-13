@@ -23,30 +23,31 @@ key="testfile"
 
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
 
+#TODO HDDS-12890: Add acceptance robot tests for ozone debug replicas verify
 # get block locations for key
-chunkinfo="${key}-blocks-${prefix}"
-docker-compose exec -T ${SCM} bash -c "ozone debug replicas chunk-info ${volume}/${bucket}/${key}" > "$chunkinfo"
-host="$(jq -r '.KeyLocations[0][0]["Datanode-HostName"]' ${chunkinfo})"
-container="${host%%.*}"
+#chunkinfo="${key}-blocks-${prefix}"
+#docker-compose exec -T ${SCM} bash -c "ozone debug replicas chunk-info ${volume}/${bucket}/${key}" > "$chunkinfo"
+#host="$(jq -r '.KeyLocations[0][0]["Datanode-HostName"]' ${chunkinfo})"
+#container="${host%%.*}"
+#
+## corrupt the first block of key on one of the datanodes
+#datafile="$(jq -r '.KeyLocations[0][0].Locations.files[0]' ${chunkinfo})"
+#docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
+#
+#execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/ozone-debug-corrupt-block.robot
+#
+#docker stop "${container}"
+#
+#wait_for_datanode "${container}" STALE 60
+#execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "STALE_DATANODE:${host}" debug/ozone-debug-stale-datanode.robot
+#
+#wait_for_datanode "${container}" DEAD 60
+#execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-dead-datanode.robot
+#
+#docker start "${container}"
+#
+#wait_for_datanode "${container}" HEALTHY 60
 
-# corrupt the first block of key on one of the datanodes
-datafile="$(jq -r '.KeyLocations[0][0].Locations.files[0]' ${chunkinfo})"
-docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
-
-execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/ozone-debug-corrupt-block.robot
-
-docker stop "${container}"
-
-wait_for_datanode "${container}" STALE 60
-execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "STALE_DATANODE:${host}" debug/ozone-debug-stale-datanode.robot
-
-wait_for_datanode "${container}" DEAD 60
-execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-dead-datanode.robot
-
-docker start "${container}"
-
-wait_for_datanode "${container}" HEALTHY 60
-
-start_docker_env 9
-execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests-ec3-2.robot
-execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests-ec6-3.robot
+#start_docker_env 9
+#execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests-ec3-2.robot
+#execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests-ec6-3.robot

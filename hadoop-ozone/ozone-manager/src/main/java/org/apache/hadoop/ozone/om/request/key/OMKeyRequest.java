@@ -28,10 +28,9 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -54,7 +53,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -69,6 +67,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -113,8 +112,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   // bits are set aside for this in ObjectID.
   private static final long MAX_NUM_OF_RECURSIVE_DIRS = 255;
 
-  @VisibleForTesting
-  public static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
+  protected static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
@@ -405,7 +403,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   protected List<OzoneAcl> getAclsForKey(KeyArgs keyArgs,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
-      PrefixManager prefixManager, OzoneConfiguration config) throws OMException {
+      PrefixManager prefixManager, OmConfig config) throws OMException {
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.addAll(getDefaultAclList(createUGIForApi(), config));
@@ -421,7 +419,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
               keyArgs.getBucketName() + OZONE_URI_DELIMITER +
               keyArgs.getKeyName());
 
-      if (prefixList.size() > 0) {
+      if (!prefixList.isEmpty()) {
         // Add all acls from direct parent to key.
         OmPrefixInfo prefixInfo = prefixList.get(prefixList.size() - 1);
         if (prefixInfo  != null) {
@@ -465,7 +463,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @return Acls which inherited parent DEFAULT and keyArgs ACCESS acls.
    */
   protected List<OzoneAcl> getAclsForDir(KeyArgs keyArgs, OmBucketInfo bucketInfo,
-      OMFileRequest.OMPathInfo omPathInfo, OzoneConfiguration config) throws OMException {
+      OMFileRequest.OMPathInfo omPathInfo, OmConfig config) throws OMException {
     // Acls inherited from parent or bucket will convert to DEFAULT scope
     List<OzoneAcl> acls = new ArrayList<>();
     // add default ACLs
@@ -530,7 +528,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           missingKey);
       OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(missingKey,
           keyArgs, nextObjId, lastKnownParentId, trxnLogIndex,
-          bucketInfo, pathInfo, ozoneManager.getConfiguration());
+          bucketInfo, pathInfo, ozoneManager.getConfig());
       objectCount++;
 
       missingParentInfos.add(dirInfo);
@@ -586,7 +584,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OmKeyInfo parentKeyInfo =
           createDirectoryKeyInfoWithACL(missingKey, keyArgs, nextObjId,
               bucketInfo, omPathInfo, trxnLogIndex,
-              ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfiguration());
+              ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfig());
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
@@ -611,7 +609,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       String dirName, KeyArgs keyArgs, long objectId,
       long parentObjectId, long transactionIndex,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
-      OzoneConfiguration config) throws OMException {
+      OmConfig config) throws OMException {
     return OmDirectoryInfo.newBuilder()
         .setName(dirName)
         .setOwner(keyArgs.getOwnerName())
@@ -642,7 +640,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected OmKeyInfo createDirectoryKeyInfoWithACL(String keyName,
       KeyArgs keyArgs, long objectId, OmBucketInfo bucketInfo,
       OMFileRequest.OMPathInfo omPathInfo, long transactionIndex,
-      ReplicationConfig serverDefaultReplConfig, OzoneConfiguration config) throws OMException {
+      ReplicationConfig serverDefaultReplConfig, OmConfig config) throws OMException {
     return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId,
         serverDefaultReplConfig)
         .setAcls(getAclsForDir(keyArgs, bucketInfo, omPathInfo, config))
@@ -1008,7 +1006,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID,
-          ReplicationConfig replicationConfig, OzoneConfiguration config)
+          ReplicationConfig replicationConfig, OmConfig config)
           throws IOException {
 
     return prepareFileInfo(omMetadataManager, keyArgs, dbKeyInfo, size,
@@ -1032,7 +1030,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID,
           ReplicationConfig replicationConfig,
-          OzoneConfiguration config) throws IOException {
+          OmConfig config) throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartFileInfo(omMetadataManager, keyArgs,
               size, locations, encInfo, prefixManager, omBucketInfo,
@@ -1097,7 +1095,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable OmBucketInfo omBucketInfo,
       OMFileRequest.OMPathInfo omPathInfo,
       long transactionLogIndex, long objectID,
-      OzoneConfiguration config) throws OMException {
+      OmConfig config) throws OMException {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
@@ -1145,7 +1143,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfo omPathInfo,
           @Nonnull long transactionLogIndex, long objectID,
-          OzoneConfiguration configuration) throws IOException {
+          OmConfig configuration) throws IOException {
 
     Preconditions.checkArgument(args.getMultipartNumber() > 0,
             "PartNumber Should be greater than zero");

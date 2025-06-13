@@ -1407,7 +1407,7 @@ public class OzoneBucket extends WithMetadata {
           proxy.listStatusLight(volumeName, name, delimiterKeyPrefix, false,
               startKey, listCacheSize, false);
 
-      if (addedKeyPrefix && statuses.size() > 0) {
+      if (addedKeyPrefix && !statuses.isEmpty()) {
         // previous round already include the startKey, so remove it
         statuses.remove(0);
       } else {
@@ -1454,11 +1454,10 @@ public class OzoneBucket extends WithMetadata {
         keyInfo.getModificationTime(),
         keyInfo.getReplicationConfig(),
         metadata,
-        keyInfo.isFile(),
+        status.isFile(),
         keyInfo.getOwnerName(),
         Collections.emptyMap());
   }
-
 
   /**
    * An Iterator to iterate over {@link OzoneKey} list.

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.volume;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -84,7 +84,7 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
     String oldOwnerKey = omMetadataManager.getUserKey(oldOwner);
     String newOwnerKey =
         omMetadataManager.getUserKey(newOwnerVolumeArgs.getOwnerName());
-    if (oldOwnerVolumeList.getVolumeNamesList().size() == 0) {
+    if (oldOwnerVolumeList.getVolumeNamesList().isEmpty()) {
       omMetadataManager.getUserTable().deleteWithBatch(batchOperation,
           oldOwnerKey);
     } else {

@@ -163,7 +163,6 @@ public class ContainerReplicaPendingOps {
     return completed;
   }
 
-
   /**
    * Remove a stored ContainerReplicaOp from the given ContainerID as it has
    * been deleted successfully.
@@ -233,7 +232,7 @@ public class ContainerReplicaPendingOps {
             updateTimeoutMetrics(op);
           }
         }
-        if (ops.size() == 0) {
+        if (ops.isEmpty()) {
           pendingOps.remove(containerID);
         }
       } finally {
@@ -304,7 +303,7 @@ public class ContainerReplicaPendingOps {
             decrementCounter(op.getOpType(), replicaIndex);
           }
         }
-        if (ops.size() == 0) {
+        if (ops.isEmpty()) {
           pendingOps.remove(containerID);
         }
       }

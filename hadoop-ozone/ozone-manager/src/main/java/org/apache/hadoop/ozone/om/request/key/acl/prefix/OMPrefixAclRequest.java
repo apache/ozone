@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.PREFIX_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.PREFIX_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -115,7 +115,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       // the existing acl list, if list size becomes zero, delete the
       // prefix from prefix table.
       if (getOmRequest().hasRemoveAclRequest() &&
-          omPrefixInfo.getAcls().size() == 0) {
+          omPrefixInfo.getAcls().isEmpty()) {
         omMetadataManager.getPrefixTable().addCacheEntry(
             new CacheKey<>(prefixPath),
             CacheValue.get(trxnLogIndex));

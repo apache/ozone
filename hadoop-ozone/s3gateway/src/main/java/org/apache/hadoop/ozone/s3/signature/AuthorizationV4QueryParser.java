@@ -32,8 +32,6 @@ import java.util.Map;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Parser for getting auth info from query parameters.
@@ -42,9 +40,6 @@ import org.slf4j.LoggerFactory;
  * .com/AmazonS3/latest/API/sigv4-query-string-auth.html
  */
 public class AuthorizationV4QueryParser implements SignatureParser {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(AuthorizationV4QueryParser.class);
 
   private final Map<String, String> queryParameters;
 
@@ -131,8 +126,8 @@ public class AuthorizationV4QueryParser implements SignatureParser {
     final String expiresString = queryParameters.get("X-Amz-Expires");
     if (dateString == null ||
         expiresString == null ||
-        dateString.length() == 0 ||
-        expiresString.length() == 0) {
+        dateString.isEmpty() ||
+        expiresString.isEmpty()) {
       throw new MalformedResourceException(
           "dateString or expiresString are missing or empty.");
     }

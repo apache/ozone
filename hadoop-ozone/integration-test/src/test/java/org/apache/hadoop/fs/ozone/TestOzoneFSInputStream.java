@@ -27,11 +27,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -54,7 +54,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -62,7 +61,6 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test OzoneFSInputStream by reading through multiple interfaces.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
   private OzoneClient client;
@@ -83,8 +81,8 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
         OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
     fs =  FileSystem.get(URI.create(uri), cluster().getConf());
     int fileLen = 30 * 1024 * 1024;
-    data = string2Bytes(RandomStringUtils.randomAlphanumeric(fileLen));
-    filePath = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
+    data = string2Bytes(RandomStringUtils.secure().nextAlphanumeric(fileLen));
+    filePath = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
     try (FSDataOutputStream stream = fs.create(filePath)) {
       stream.write(data);
     }
@@ -286,8 +284,8 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
   @Test
   public void testSequenceFileReaderSync() throws IOException {
     File srcfile = new File("src/test/resources/testSequenceFile");
-    Path path = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
-    InputStream input = new BufferedInputStream(new FileInputStream(srcfile));
+    Path path = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
+    InputStream input = new BufferedInputStream(Files.newInputStream(srcfile.toPath()));
 
     // Upload test SequenceFile file
     FSDataOutputStream output = fs.create(path);
@@ -308,8 +306,8 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
   @Test
   public void testSequenceFileReaderSyncEC() throws IOException {
     File srcfile = new File("src/test/resources/testSequenceFile");
-    Path path = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
-    InputStream input = new BufferedInputStream(new FileInputStream(srcfile));
+    Path path = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
+    InputStream input = new BufferedInputStream(Files.newInputStream(srcfile.toPath()));
 
     // Upload test SequenceFile file
     FSDataOutputStream output = ecFs.create(path);

@@ -79,7 +79,7 @@ public class SCMNodeInfo {
     if (scmServiceId != null) {
       ArrayList< String > scmNodeIds = new ArrayList<>(
           HddsUtils.getSCMNodeIds(conf, scmServiceId));
-      if (scmNodeIds.size() == 0) {
+      if (scmNodeIds.isEmpty()) {
         throw new ConfigurationException(
             String.format("Configuration does not have any value set for %s " +
                     "for the SCM serviceId %s. List of SCM Node ID's should " +
@@ -182,7 +182,7 @@ public class SCMNodeInfo {
   }
 
   private static String buildAddress(String address, int port) {
-    return new StringBuilder().append(address).append(":")
+    return new StringBuilder().append(address).append(':')
         .append(port).toString();
   }
 

@@ -32,10 +32,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
-import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
-import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize;
@@ -54,26 +52,21 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerSizeCountTask.class);
 
-  private StorageContainerServiceProvider scmClient;
   private ContainerManager containerManager;
   private final long interval;
   private ContainerCountBySizeDao containerCountBySizeDao;
   private DSLContext dslContext;
   private HashMap<ContainerID, Long> processedContainers = new HashMap<>();
-  private Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
-      unhealthyContainerStateStatsMap;
   private ReadWriteLock lock = new ReentrantReadWriteLock(true);
   private final ReconTaskStatusUpdater taskStatusUpdater;
 
   public ContainerSizeCountTask(
       ContainerManager containerManager,
-      StorageContainerServiceProvider scmClient,
       ReconTaskConfig reconTaskConfig,
       ContainerCountBySizeDao containerCountBySizeDao,
       UtilizationSchemaDefinition utilizationSchemaDefinition,
       ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
     super(taskStatusUpdaterManager);
-    this.scmClient = scmClient;
     this.containerManager = containerManager;
     this.containerCountBySizeDao = containerCountBySizeDao;
     this.dslContext = utilizationSchemaDefinition.getDSLContext();
@@ -206,7 +199,6 @@ public class ContainerSizeCountTask extends ReconScmTask {
       lock.writeLock().unlock();
     }
   }
-
 
   /**
    * Populate DB with the counts of container sizes calculated
@@ -360,7 +352,6 @@ public class ContainerSizeCountTask extends ReconScmTask {
     return new ContainerSizeCountKey(
         ReconUtils.getContainerSizeUpperBound(containerSize));
   }
-
 
   /**
    *  The ContainerSizeCountKey class is a simple key class that has a single

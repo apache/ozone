@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
@@ -85,7 +84,6 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
         withDeadlineAfter(timeout, TimeUnit.SECONDS);
   }
 
-
   @Override
   public CompletableFuture<Path> download(final Path outputPath) {
     // By default, on every checkpoint, the rocks db will be flushed
@@ -133,7 +131,7 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
       this.outputPath = outputPath;
       try {
         Preconditions.checkNotNull(outputPath, "Output path cannot be null");
-        stream = new FileOutputStream(outputPath.toFile());
+        stream = Files.newOutputStream(outputPath);
       } catch (IOException e) {
         throw new UncheckedIOException(
             "Output path can't be used: " + outputPath, e);

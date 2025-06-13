@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import static org.apache.hadoop.hdds.conf.ConfigurationReflectionUtil.getFullKey;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -47,7 +49,8 @@ import javax.tools.StandardLocation;
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class ConfigFileGenerator extends AbstractProcessor {
 
-  public static final String OUTPUT_FILE_NAME = "ozone-default-generated.xml";
+  private static final String OUTPUT_FILE_NAME = "ozone-default-generated.xml";
+  private static final String OUTPUT_FILE_POSTFIX = "-default.xml";
 
   private static final SimpleTypeVisitor8<Element, Void> GET_PARENT_ELEMENT =
       new SimpleTypeVisitor8<Element, Void>() {
@@ -56,7 +59,6 @@ public class ConfigFileGenerator extends AbstractProcessor {
           return t.asElement();
         }
       };
-
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
@@ -72,9 +74,16 @@ public class ConfigFileGenerator extends AbstractProcessor {
       //load existing generated config (if exists)
       boolean resourceExists = true;
       ConfigFileAppender appender = new ConfigFileAppender();
+      String currentArtifactId = processingEnv.getOptions().get("artifactId");
+      String outputFileName;
+      if (currentArtifactId == null || currentArtifactId.isEmpty()) {
+        outputFileName = OUTPUT_FILE_NAME;
+      } else {
+        outputFileName = currentArtifactId + OUTPUT_FILE_POSTFIX;
+      }
       try (InputStream input = filer
           .getResource(StandardLocation.CLASS_OUTPUT, "",
-              OUTPUT_FILE_NAME).openInputStream()) {
+              outputFileName).openInputStream()) {
         appender.load(input);
       } catch (FileNotFoundException | NoSuchFileException ex) {
         appender.init();
@@ -109,7 +118,7 @@ public class ConfigFileGenerator extends AbstractProcessor {
       if (!resourceExists) {
         FileObject resource = filer
             .createResource(StandardLocation.CLASS_OUTPUT, "",
-                OUTPUT_FILE_NAME);
+                outputFileName);
 
         try (Writer writer = new OutputStreamWriter(
             resource.openOutputStream(), StandardCharsets.UTF_8)) {
@@ -133,17 +142,7 @@ public class ConfigFileGenerator extends AbstractProcessor {
 
           Config configAnnotation = element.getAnnotation(Config.class);
 
-          if (configAnnotation.key().startsWith(configGroup.prefix())) {
-            String msg = String.format(
-                "@%s(key = \"%s\") should not duplicate prefix from @%s(\"%s\")",
-                Config.class.getSimpleName(), configAnnotation.key(),
-                ConfigGroup.class.getSimpleName(), configGroup.prefix());
-            processingEnv.getMessager().printMessage(Kind.ERROR, msg, element);
-            continue;
-          }
-
-          String key = configGroup.prefix() + "."
-              + configAnnotation.key();
+          String key = getFullKey(configGroup, configAnnotation);
 
           appender.addConfig(key,
               configAnnotation.defaultValue(),

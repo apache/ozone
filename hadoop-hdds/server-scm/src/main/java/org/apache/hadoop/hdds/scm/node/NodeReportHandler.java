@@ -22,16 +22,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Handles Node Reports from datanode.
  */
 public class NodeReportHandler implements EventHandler<NodeReportFromDatanode> {
 
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(NodeReportHandler.class);
   private final NodeManager nodeManager;
 
   public NodeReportHandler(NodeManager nodeManager) {

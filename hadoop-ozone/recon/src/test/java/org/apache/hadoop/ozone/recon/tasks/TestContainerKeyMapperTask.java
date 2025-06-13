@@ -132,10 +132,10 @@ public class TestContainerKeyMapperTask {
         VOLUME_NAME,
         Collections.singletonList(omKeyLocationInfoGroup));
 
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
+        new ContainerKeyMapperTaskOBS(reconContainerMetadataManager,
             omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager);
 
     keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(1);
@@ -205,10 +205,10 @@ public class TestContainerKeyMapperTask {
         KEY_ONE_SIZE);
 
     // Reprocess container key mappings
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
+        new ContainerKeyMapperTaskFSO(reconContainerMetadataManager,
             omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager);
 
     // Check the key prefixes for container 1
     keyPrefixesForContainer =
@@ -314,10 +314,10 @@ public class TestContainerKeyMapperTask {
           add(keyEvent2);
         }}, 0L);
 
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
+        new ContainerKeyMapperTaskOBS(reconContainerMetadataManager,
             omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager);
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -336,7 +336,7 @@ public class TestContainerKeyMapperTask {
     assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(3L));
 
     // Process PUT & DELETE event.
-    containerKeyMapperTask.process(omUpdateEventBatch, Collections.emptyMap());
+    containerKeyMapperTaskOBS.process(omUpdateEventBatch, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -384,8 +384,8 @@ public class TestContainerKeyMapperTask {
         new OmKeyLocationInfoGroup(0L, omKeyLocationInfoList);
 
     // Reprocess container key mappings
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
+        new ContainerKeyMapperTaskFSO(reconContainerMetadataManager,
             omConfiguration);
 
     String bucket = BUCKET_NAME;
@@ -427,7 +427,7 @@ public class TestContainerKeyMapperTask {
         }, 0L);
 
     // Process PUT event for both the keys
-    containerKeyMapperTask.process(omUpdateEventBatch, Collections.emptyMap());
+    containerKeyMapperTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -460,7 +460,7 @@ public class TestContainerKeyMapperTask {
         }, 0L);
 
     // Process DELETE event for key2
-    containerKeyMapperTask.process(omUpdateEventBatch2, Collections.emptyMap());
+    containerKeyMapperTaskFSO.process(omUpdateEventBatch2, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -470,6 +470,122 @@ public class TestContainerKeyMapperTask {
     firstKeyPrefix = iterator.next();
     assertEquals("/" + VOLUME_NAME + "/" + BUCKET_NAME + "/" + INSERTED_KEY,
         firstKeyPrefix.getKeyPrefix());
+  }
+
+  @Test
+  public void testDuplicateFSOKeysInDifferentDirectories() throws Exception {
+    // Ensure container 1 is initially empty.
+    Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
+        reconContainerMetadataManager.getKeyPrefixesForContainer(1L);
+    assertThat(keyPrefixesForContainer).isEmpty();
+
+    Pipeline pipeline = getRandomPipeline();
+    // Create a common OmKeyLocationInfoGroup for all keys.
+    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
+    BlockID blockID = new BlockID(1L, 1L);
+    OmKeyLocationInfo omKeyLocationInfo = getOmKeyLocationInfo(blockID, pipeline);
+    omKeyLocationInfoList.add(omKeyLocationInfo);
+    OmKeyLocationInfoGroup omKeyLocationInfoGroup =
+        new OmKeyLocationInfoGroup(0L, omKeyLocationInfoList);
+
+    // Define file names.
+    String file1Key = "file1";
+    String file2Key = "file2";
+
+    // Define directory (parent) object IDs with shorter values.
+    long dir1Id = -101L;
+    long dir2Id = -102L;
+    long dir3Id = -103L;
+
+    // Write three FSO keys for "file1" with different parent object IDs.
+    writeKeyToOm(reconOMMetadataManager,
+        file1Key,                // keyName
+        BUCKET_NAME,             // bucketName
+        VOLUME_NAME,             // volName
+        file1Key,                // fileName
+        KEY_ONE_OBJECT_ID,       // objectId
+        dir1Id,                  // ObjectId for first directory
+        BUCKET_ONE_OBJECT_ID,    // bucketObjectId
+        VOL_OBJECT_ID,           // volumeObjectId
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        file1Key,
+        BUCKET_NAME,
+        VOLUME_NAME,
+        file1Key,
+        KEY_ONE_OBJECT_ID,
+        dir2Id,            // ObjectId for second directory
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        file1Key,
+        BUCKET_NAME,
+        VOLUME_NAME,
+        file1Key,
+        KEY_ONE_OBJECT_ID,
+        dir3Id,            // ObjectId for third directory
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    // Write three FSO keys for "file2" with different parent object IDs.
+    writeKeyToOm(reconOMMetadataManager,
+        "fso-file2",
+        BUCKET_NAME,
+        VOLUME_NAME,
+        file2Key,
+        KEY_ONE_OBJECT_ID,
+        dir1Id,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        "fso-file2",
+        BUCKET_NAME,
+        VOLUME_NAME,
+        file2Key,
+        KEY_ONE_OBJECT_ID,
+        dir2Id,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        "fso-file2",
+        BUCKET_NAME,
+        VOLUME_NAME,
+        file2Key,
+        KEY_ONE_OBJECT_ID,
+        dir3Id,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    // Reprocess container key mappings.
+    ContainerKeyMapperTaskFSO containerKeyMapperTask =
+        new ContainerKeyMapperTaskFSO(reconContainerMetadataManager, omConfiguration);
+    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+
+    // With our changes using the raw key prefix as the unique identifier,
+    // we expect six distinct entries in container 1.
+    keyPrefixesForContainer = reconContainerMetadataManager.getKeyPrefixesForContainer(1L);
+    assertEquals(6, keyPrefixesForContainer.size());
   }
 
   private OmKeyInfo buildOmKeyInfo(String volume,

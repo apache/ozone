@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
@@ -117,7 +116,6 @@ import org.slf4j.LoggerFactory;
 public final class OzoneManagerRatisUtils {
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneManagerRatisUtils.class);
-  private static final RpcController NULL_RPC_CONTROLLER = null;
 
   private OzoneManagerRatisUtils() {
   }
@@ -518,5 +516,21 @@ public final class OzoneManagerRatisUtils {
   public static OzoneManagerProtocolProtos.OMResponse submitRequest(
       OzoneManager om, OMRequest omRequest, ClientId clientId, long callId) throws ServiceException {
     return om.getOmRatisServer().submitRequest(omRequest, clientId, callId);
+  }
+
+  public static OzoneManagerProtocolProtos.OMResponse createErrorResponse(
+      OMRequest omRequest, IOException exception) {
+    // Added all write command types here, because in future if any of the
+    // preExecute is changed to return IOException, we can return the error
+    // OMResponse to the client.
+    OzoneManagerProtocolProtos.OMResponse.Builder omResponse = OzoneManagerProtocolProtos.OMResponse.newBuilder()
+        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
+        .setCmdType(omRequest.getCmdType())
+        .setTraceID(omRequest.getTraceID())
+        .setSuccess(false);
+    if (exception.getMessage() != null) {
+      omResponse.setMessage(exception.getMessage());
+    }
+    return omResponse.build();
   }
 }

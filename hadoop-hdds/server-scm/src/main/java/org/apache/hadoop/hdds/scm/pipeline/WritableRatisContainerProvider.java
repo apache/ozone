@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -41,21 +40,18 @@ public class WritableRatisContainerProvider
   private static final Logger LOG = LoggerFactory
       .getLogger(WritableRatisContainerProvider.class);
 
-  private final ConfigurationSource conf;
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
 
-  public WritableRatisContainerProvider(ConfigurationSource conf,
+  public WritableRatisContainerProvider(
       PipelineManager pipelineManager,
       ContainerManager containerManager,
       PipelineChoosePolicy pipelineChoosePolicy) {
-    this.conf = conf;
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
   }
-
 
   @Override
   public ContainerInfo getContainer(final long size,
@@ -168,7 +164,7 @@ public class WritableRatisContainerProvider
     List<Pipeline> pipelines = pipelineManager.getPipelines(repConfig,
             pipelineState, excludeList.getDatanodes(),
             excludeList.getPipelineIds());
-    if (pipelines.size() == 0 && !excludeList.isEmpty()) {
+    if (pipelines.isEmpty() && !excludeList.isEmpty()) {
       // if no pipelines can be found, try finding pipeline without
       // exclusion
       pipelines = pipelineManager.getPipelines(repConfig, pipelineState);

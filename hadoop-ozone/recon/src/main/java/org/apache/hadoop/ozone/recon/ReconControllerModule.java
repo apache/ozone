@@ -58,7 +58,8 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTaskFSO;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
@@ -68,7 +69,6 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ozone.recon.schema.generated.tables.daos.ClusterGrowthDailyDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
@@ -131,7 +131,8 @@ public class ReconControllerModule extends AbstractModule {
     protected void configure() {
       Multibinder<ReconOmTask> taskBinder =
           Multibinder.newSetBinder(binder(), ReconOmTask.class);
-      taskBinder.addBinding().to(ContainerKeyMapperTask.class);
+      taskBinder.addBinding().to(ContainerKeyMapperTaskFSO.class);
+      taskBinder.addBinding().to(ContainerKeyMapperTaskOBS.class);
       taskBinder.addBinding().to(FileSizeCountTaskFSO.class);
       taskBinder.addBinding().to(FileSizeCountTaskOBS.class);
       taskBinder.addBinding().to(OmTableInsightTask.class);

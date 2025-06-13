@@ -81,6 +81,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneClientUtils;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -119,7 +120,7 @@ import org.slf4j.LoggerFactory;
 public class BasicRootedOzoneClientAdapterImpl
     implements OzoneClientAdapter {
 
-  static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BasicRootedOzoneClientAdapterImpl.class);
 
   private OzoneClient ozoneClient;
@@ -536,7 +537,7 @@ public class BasicRootedOzoneClientAdapterImpl
       // given in pathStr, so getBucket above should handle the creation
       // of volume and bucket. We won't feed empty keyStr to
       // bucket.createDirectory as that would be a NPE.
-      if (keyStr != null && keyStr.length() > 0) {
+      if (keyStr != null && !keyStr.isEmpty()) {
         bucket.createDirectory(keyStr);
       }
     } catch (OMException e) {
@@ -563,7 +564,7 @@ public class BasicRootedOzoneClientAdapterImpl
     incrementCounter(Statistic.OBJECTS_DELETED, 1);
     OFSPath ofsPath = new OFSPath(path, config);
     String keyName = ofsPath.getKeyName();
-    if (keyName.length() == 0) {
+    if (keyName.isEmpty()) {
       return false;
     }
     try {
@@ -619,7 +620,7 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   @Override
   public boolean deleteObjects(List<String> keyNameList) {
-    if (keyNameList.size() == 0) {
+    if (keyNameList.isEmpty()) {
       return true;
     }
     // Sanity check. Support only deleting a list of keys in the same bucket
@@ -683,19 +684,20 @@ public class BasicRootedOzoneClientAdapterImpl
    * valid bucket path or valid snapshot path.
    * Throws exception in case of failure.
    */
-  private FileStatusAdapter getFileStatusForKeyOrSnapshot(OFSPath ofsPath, URI uri, Path qualifiedPath, String userName)
+  private FileStatusAdapter getFileStatusForKeyOrSnapshot(
+      OFSPath ofsPath, URI uri, Path qualifiedPath, String userName)
       throws IOException {
-    String volumeName = ofsPath.getVolumeName();
-    String bucketName = ofsPath.getBucketName();
     String key = ofsPath.getKeyName();
     try {
+      OzoneBucket bucket = getBucket(ofsPath, false);
       if (ofsPath.isSnapshotPath()) {
-        OzoneVolume volume = objectStore.getVolume(volumeName);
-        OzoneBucket bucket = getBucket(volumeName, bucketName, false);
-        return getFileStatusAdapterWithSnapshotIndicator(volume, bucket, uri);
+        OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+        return getFileStatusAdapterWithSnapshotIndicator(
+            volume, bucket, uri);
       } else {
-        OzoneFileStatus status = proxy.getOzoneFileStatus(volumeName, bucketName, key);
-        return toFileStatusAdapter(status, userName, uri, qualifiedPath, ofsPath.getNonKeyPath());
+        OzoneFileStatus status = bucket.getFileStatus(key);
+        return toFileStatusAdapter(status, userName, uri, qualifiedPath,
+            ofsPath.getNonKeyPath());
       }
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
@@ -1367,7 +1369,7 @@ public class BasicRootedOzoneClientAdapterImpl
           getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot, volume,
               bucket, "");
       aggregated = report;
-      while (!report.getToken().isEmpty()) {
+      while (StringUtils.isNotEmpty(report.getToken())) {
         LOG.info(
             "Total Snapshot Diff length between snapshot {} and {} exceeds"
                 + " max page size, Performing another" +

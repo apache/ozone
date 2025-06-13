@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.ozone.OzoneConsts.DOUBLE_SLASH_OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -84,7 +85,7 @@ import org.slf4j.LoggerFactory;
  * communication.
  */
 public final class OmUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(OmUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OmUtils.class);
   private static final SecureRandom SRAND = new SecureRandom();
   private static byte[] randomBytes = new byte[32];
 
@@ -200,7 +201,7 @@ public final class OmUtils {
    */
   public static boolean isServiceIdsDefined(ConfigurationSource conf) {
     String val = conf.get(OZONE_OM_SERVICE_IDS_KEY);
-    return val != null && val.length() > 0;
+    return val != null && !val.isEmpty();
   }
 
   /**
@@ -273,6 +274,8 @@ public final class OmUtils {
     case TransferLeadership:
     case SetSafeMode:
     case PrintCompactionLogDag:
+      // printCompactionLogDag is deprecated by HDDS-12053,
+      // keeping it here for compatibility
     case GetSnapshotInfo:
     case GetObjectTagging:
     case GetQuotaRepairStatus:
@@ -760,7 +763,7 @@ public final class OmUtils {
     if (!StringUtils.isBlank(keyName)) {
       String normalizedKeyName;
       if (keyName.startsWith(OM_KEY_PREFIX)) {
-        normalizedKeyName = new Path(keyName).toUri().getPath();
+        normalizedKeyName = new Path(normalizeLeadingSlashes(keyName)).toUri().getPath();
       } else {
         normalizedKeyName = new Path(OM_KEY_PREFIX + keyName)
             .toUri().getPath();
@@ -775,6 +778,20 @@ public final class OmUtils {
       return normalizedKeyName.substring(1);
     }
 
+    return keyName;
+  }
+
+  /**
+   * Normalizes paths by replacing multiple leading slashes with a single slash.
+   */
+  private static String normalizeLeadingSlashes(String keyName) {
+    if (keyName.startsWith(DOUBLE_SLASH_OM_KEY_PREFIX)) {
+      int index = 0;
+      while (index < keyName.length() && keyName.charAt(index) == OM_KEY_PREFIX.charAt(0)) {
+        index++;
+      }
+      return OM_KEY_PREFIX + keyName.substring(index);
+    }
     return keyName;
   }
 
@@ -818,7 +835,6 @@ public final class OmUtils {
 
     return normalizedPath.toString();
   }
-
 
   /**
    * For a given service ID, return list of configured OM hosts.
@@ -905,10 +921,10 @@ public final class OmUtils {
     }
     printString.append(omList.get(0).getOMPrintInfo());
     for (int i = 1; i < omList.size(); i++) {
-      printString.append(",")
+      printString.append(',')
           .append(omList.get(i).getOMPrintInfo());
     }
-    printString.append("]");
+    printString.append(']');
     return printString.toString();
   }
 

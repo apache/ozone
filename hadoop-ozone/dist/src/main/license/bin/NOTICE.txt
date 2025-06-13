@@ -1,5 +1,5 @@
 Apache Ozone
-Copyright 2022 The Apache Software Foundation
+Copyright 2025 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
@@ -214,14 +214,6 @@ benchmarking framework, which can be obtained at:
   * HOMEPAGE:
     * https://github.com/google/caliper
 
-This product optionally depends on 'Apache Commons Logging', a logging
-framework, which can be obtained at:
-
-  * LICENSE:
-    * license/LICENSE.commons-logging.txt (Apache License 2.0)
-  * HOMEPAGE:
-    * http://commons.apache.org/logging/
-
 This product optionally depends on 'Apache Log4J', a logging framework, which
 can be obtained at:
 
@@ -395,17 +387,6 @@ com.jolbox:bonecp
    This product includes software developed by
    Wallace Wadge (http://jolbox.com/).
 
-org.codehaus.jackson:jackson-mapper-asl
-====================
-
-This product currently only contains code developed by authors
-of specific components, as identified by the source code files;
-if such notes are missing files have been created by
-Tatu Saloranta.
-
-For additional credits (generally to people who reported problems)
-see CREDITS file.
-
 
 com.google.inject:guice
 ====================
@@ -431,32 +412,6 @@ This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
 
-
-
-org.codehaus.jackson:jackson-xc
-====================
-
-This product currently only contains code developed by authors
-of specific components, as identified by the source code files;
-if such notes are missing files have been created by
-Tatu Saloranta.
-
-For additional credits (generally to people who reported problems)
-see CREDITS file.
-
-
-org.codehaus.jackson:jackson-jaxrs
-====================
-
-This product currently only contains code developed by authors
-of specific components, as identified by the source code files;
-if such notes are missing files have been created by
-Tatu Saloranta.
-
-For additional credits (generally to people who reported problems)
-see CREDITS file.
-
-
 com.google.inject.extensions:guice-servlet
 ====================
 
@@ -468,18 +423,6 @@ This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
 
-
-
-org.codehaus.jackson:jackson-core-asl
-====================
-
-This product currently only contains code developed by authors
-of specific components, as identified by the source code files;
-if such notes are missing files have been created by
-Tatu Saloranta.
-
-For additional credits (generally to people who reported problems)
-see CREDITS file.
 
 
 org.bouncycastle:bcpkix-jdk18on
@@ -508,3 +451,10 @@ The Apache Software Foundation (http://www.apache.org/).
 ====================
 ratis-thirdparty-misc is a shaded dependency which includes additional 3rd party dependencies in shaded form.
 For the detailed list of the dependencies and the associated NOTICE file see licenses/NOTICE-ratis-thirdparty-misc.txt.
+
+====================
+Apache Hadoop Third-party Libs
+Copyright 2020 and onwards The Apache Software Foundation.
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).

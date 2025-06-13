@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,14 +56,6 @@ import org.rocksdb.StatsLevel;
  * RDBStore Tests.
  */
 public class TestRDBStore {
-  public static RDBStore newRDBStore(File dbFile, ManagedDBOptions options,
-      Set<TableConfig> families,
-      long maxDbUpdatesSizeThreshold)
-      throws IOException {
-    return new RDBStore(dbFile, options, null, new ManagedWriteOptions(), families,
-        CodecRegistry.newBuilder().build(), false, 1000, null, false,
-        maxDbUpdatesSizeThreshold, true, null, "");
-  }
 
   public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private final List<String> families =
@@ -73,20 +64,39 @@ public class TestRDBStore {
           "Fourth", "Fifth",
           "Sixth");
   private RDBStore rdbStore = null;
-  private ManagedDBOptions options = null;
+  private ManagedDBOptions options;
   private Set<TableConfig> configSet;
 
-  @BeforeEach
-  public void setUp(@TempDir File tempDir) throws Exception {
-    CodecBuffer.enableLeakDetection();
-
-    options = new ManagedDBOptions();
+  static ManagedDBOptions newManagedDBOptions() {
+    final ManagedDBOptions options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
 
     Statistics statistics = new Statistics();
     statistics.setStatsLevel(StatsLevel.ALL);
     options.setStatistics(statistics);
+    return options;
+  }
+
+  static RDBStore newRDBStore(File dbFile, ManagedDBOptions options, Set<TableConfig> families)
+      throws IOException {
+    return newRDBStore(dbFile, options, families, MAX_DB_UPDATES_SIZE_THRESHOLD);
+  }
+
+  public static RDBStore newRDBStore(File dbFile, ManagedDBOptions options,
+      Set<TableConfig> families,
+      long maxDbUpdatesSizeThreshold)
+      throws IOException {
+    return new RDBStore(dbFile, options, null, new ManagedWriteOptions(), families,
+        false, null, false,
+        maxDbUpdatesSizeThreshold, true, null, true);
+  }
+
+  @BeforeEach
+  public void setUp(@TempDir File tempDir) throws Exception {
+    CodecBuffer.enableLeakDetection();
+
+    options = newManagedDBOptions();
     configSet = new HashSet<>();
     for (String name : families) {
       TableConfig newConfig = new TableConfig(name,
@@ -112,9 +122,9 @@ public class TestRDBStore {
       assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         byte[] value =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
       }
     } catch (Exception e) {
@@ -142,6 +152,23 @@ public class TestRDBStore {
   }
 
   @Test
+  public void compactTable() throws Exception {
+    assertNotNull(rdbStore, "DBStore cannot be null");
+
+    for (int j = 0; j <= 20; j++) {
+      insertRandomData(rdbStore, 0);
+      rdbStore.flushDB();
+    }
+
+    int metaSizeBeforeCompact = rdbStore.getDb().getLiveFilesMetaDataSize();
+    rdbStore.compactTable(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY));
+    int metaSizeAfterCompact = rdbStore.getDb().getLiveFilesMetaDataSize();
+
+    assertThat(metaSizeAfterCompact).isLessThan(metaSizeBeforeCompact);
+    assertThat(metaSizeAfterCompact).isEqualTo(1);
+  }
+
+  @Test
   public void close() throws Exception {
     assertNotNull(rdbStore, "DBStore cannot be null");
     // This test does not assert anything if there is any error this test
@@ -160,9 +187,9 @@ public class TestRDBStore {
   @Test
   public void moveKey() throws Exception {
     byte[] key =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
     byte[] value =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
 
     try (Table firstTable = rdbStore.getTable(families.get(1))) {
       firstTable.put(key, value);
@@ -183,12 +210,12 @@ public class TestRDBStore {
   @Test
   public void moveWithValue() throws Exception {
     byte[] key =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
     byte[] value =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
 
     byte[] nextValue =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
     try (Table firstTable = rdbStore.getTable(families.get(1))) {
       firstTable.put(key, value);
       try (Table<byte[], byte[]> secondTable = rdbStore
@@ -346,7 +373,7 @@ public class TestRDBStore {
       try (Table table = rdbStore.getTable(family)) {
         byte[] key = family.getBytes(StandardCharsets.UTF_8);
         byte[] value =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         table.put(key, value);
       }
     }
@@ -430,8 +457,8 @@ public class TestRDBStore {
       long length2 = fileInCk2.length();
       assertEquals(length1, length2, name);
 
-      try (InputStream fileStream1 = new FileInputStream(fileInCk1);
-           InputStream fileStream2 = new FileInputStream(fileInCk2)) {
+      try (InputStream fileStream1 = Files.newInputStream(fileInCk1.toPath());
+           InputStream fileStream2 = Files.newInputStream(fileInCk2.toPath())) {
         byte[] content1 = new byte[fileStream1.available()];
         byte[] content2 = new byte[fileStream2.available()];
         fileStream1.read(content1);

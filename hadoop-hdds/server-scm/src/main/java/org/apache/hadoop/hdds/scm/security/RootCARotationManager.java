@@ -75,7 +75,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RootCARotationManager extends StatefulService {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(RootCARotationManager.class);
 
   private static final String SERVICE_NAME =
@@ -485,6 +485,7 @@ public class RootCARotationManager extends StatefulService {
     isProcessing.set(false);
     processStartTime.set(null);
   }
+
   /**
    * Calculate time before root certificate will enter 2 * expiry grace period.
    * @return Duration, time before certificate enters the 2 * grace

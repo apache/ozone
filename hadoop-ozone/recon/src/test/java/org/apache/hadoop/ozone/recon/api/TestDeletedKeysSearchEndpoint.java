@@ -80,7 +80,6 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
   private ReconOMMetadataManager reconOMMetadataManager;
   private OMDBInsightEndpoint omdbInsightEndpoint;
   private OzoneConfiguration ozoneConfiguration;
-  private static final String ROOT_PATH = "/";
   private OMMetadataManager omMetadataManager;
 
   @BeforeEach
@@ -108,7 +107,6 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     omdbInsightEndpoint = reconTestInjector.getInstance(OMDBInsightEndpoint.class);
     populateOMDB();
   }
-
 
   private static OMMetadataManager initializeNewOmMetadataManager(File omDbDir) throws IOException {
     OzoneConfiguration omConfiguration = new OzoneConfiguration();
@@ -442,7 +440,6 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(3, result.getRepeatedOmKeyInfoList().size());
     assertEquals("fileb3", result.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0).getKeyName());
   }
-
 
   /**
    * Populates the OMDB with a set of deleted keys for testing purposes.

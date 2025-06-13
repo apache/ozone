@@ -60,7 +60,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -68,7 +67,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Test the network topology functions. */
-@Timeout(30)
 class TestNetworkTopologyImpl {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestNetworkTopologyImpl.class);
@@ -487,7 +485,7 @@ class TestNetworkTopologyImpl {
             excludedList, ancestorGen);
         for (Node key : dataNodes) {
           if (excludedList.contains(key) ||
-              (ancestorList.size() > 0 &&
+              (!ancestorList.isEmpty() &&
                   ancestorList.stream()
                       .map(a -> (InnerNode) a)
                       .anyMatch(a -> a.isAncestor(key)))) {
@@ -558,7 +556,7 @@ class TestNetworkTopologyImpl {
                 excludedList, ancestorGen);
             for (Node key : dataNodes) {
               if (excludedList.contains(key) || key.isDescendant(path) ||
-                  (ancestorList.size() > 0 &&
+                  (!ancestorList.isEmpty() &&
                       ancestorList.stream()
                           .map(a -> (InnerNode) a)
                           .anyMatch(a -> a.isAncestor(key)))) {

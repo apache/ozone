@@ -52,52 +52,8 @@ public class ReplicationManagerReport {
   public static final int SAMPLE_LIMIT = 100;
   private long reportTimeStamp;
 
-  /**
-   * Enum representing various health states a container can be in.
-   */
-  public enum HealthState {
-    UNDER_REPLICATED("Containers with insufficient replicas",
-        "UnderReplicatedContainers"),
-    MIS_REPLICATED("Containers with insufficient racks",
-        "MisReplicatedContainers"),
-    OVER_REPLICATED("Containers with more replicas than required",
-        "OverReplicatedContainers"),
-    MISSING("Containers with no online replicas",
-        "MissingContainers"),
-    UNHEALTHY(
-        "Containers Closed or Quasi_Closed having some replicas in " +
-            "a different state", "UnhealthyContainers"),
-    EMPTY("Containers having no blocks", "EmptyContainers"),
-    OPEN_UNHEALTHY(
-        "Containers open and having replicas with different states",
-        "OpenUnhealthyContainers"),
-    QUASI_CLOSED_STUCK(
-        "Containers QuasiClosed with insufficient datanode origins",
-        "StuckQuasiClosedContainers"),
-    OPEN_WITHOUT_PIPELINE(
-        "Containers in OPEN state without any healthy Pipeline",
-        "OpenContainersWithoutPipeline");
-
-    private String description;
-    private String metricName;
-
-    HealthState(String desc, String name) {
-      this.description = desc;
-      this.metricName = name;
-    }
-
-    public String getMetricName() {
-      return this.metricName;
-    }
-
-    public String getDescription() {
-      return this.description;
-    }
-  }
-
   private final Map<String, LongAdder> stats;
-  private final Map<String, List<ContainerID>> containerSample
-      = new ConcurrentHashMap<>();
+  private final Map<String, List<ContainerID>> containerSample = new ConcurrentHashMap<>();
 
   public static ReplicationManagerReport fromProtobuf(
       HddsProtos.ReplicationManagerReportProto proto) {
@@ -305,4 +261,46 @@ public class ReplicationManagerReport {
     return proto.build();
   }
 
+  /**
+   * Enum representing various health states a container can be in.
+   */
+  public enum HealthState {
+    UNDER_REPLICATED("Containers with insufficient replicas",
+        "UnderReplicatedContainers"),
+    MIS_REPLICATED("Containers with insufficient racks",
+        "MisReplicatedContainers"),
+    OVER_REPLICATED("Containers with more replicas than required",
+        "OverReplicatedContainers"),
+    MISSING("Containers with no online replicas",
+        "MissingContainers"),
+    UNHEALTHY(
+        "Containers Closed or Quasi_Closed having some replicas in " +
+            "a different state", "UnhealthyContainers"),
+    EMPTY("Containers having no blocks", "EmptyContainers"),
+    OPEN_UNHEALTHY(
+        "Containers open and having replicas with different states",
+        "OpenUnhealthyContainers"),
+    QUASI_CLOSED_STUCK(
+        "Containers QuasiClosed with insufficient datanode origins",
+        "StuckQuasiClosedContainers"),
+    OPEN_WITHOUT_PIPELINE(
+        "Containers in OPEN state without any healthy Pipeline",
+        "OpenContainersWithoutPipeline");
+
+    private String description;
+    private String metricName;
+
+    HealthState(String desc, String name) {
+      this.description = desc;
+      this.metricName = name;
+    }
+
+    public String getMetricName() {
+      return this.metricName;
+    }
+
+    public String getDescription() {
+      return this.description;
+    }
+  }
 }

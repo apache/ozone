@@ -44,7 +44,6 @@ import com.google.protobuf.ServiceException;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
@@ -90,7 +89,6 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.SizeInBytes;
-import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,7 +98,6 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public final class HddsUtils {
-
 
   private static final Logger LOG = LoggerFactory.getLogger(HddsUtils.class);
 
@@ -207,7 +204,7 @@ public final class HddsUtils {
       return Optional.empty();
     }
     String hostname = value.replaceAll("\\:[0-9]+$", "");
-    if (hostname.length() == 0) {
+    if (hostname.isEmpty()) {
       return Optional.empty();
     } else {
       return Optional.of(hostname);
@@ -373,7 +370,6 @@ public final class HddsUtils {
 
       if (dnsInterface == null) {
         // Try the legacy configuration keys.
-        dnsInterface = conf.get(HDDS_DATANODE_DNS_INTERFACE_KEY);
         dnsInterface = conf.get(HDDS_DATANODE_DNS_INTERFACE_KEY);
         nameServer = conf.get(HDDS_DATANODE_DNS_NAMESERVER_KEY);
       } else {
@@ -634,7 +630,7 @@ public final class HddsUtils {
         "Ancestor should not be null");
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
-        "Path should be a descendant of %s", ancestor);
+        "Path %s should be a descendant of %s", path, ancestor);
   }
 
   public static File createDir(String dirPath) {
@@ -822,25 +818,6 @@ public final class HddsUtils {
   }
 
   /**
-   * Execute some code and ensure thread name is not changed
-   * (workaround for HADOOP-18433).
-   */
-  public static <T, E extends IOException> T preserveThreadName(
-      CheckedSupplier<T, E> supplier) throws E {
-    final Thread thread = Thread.currentThread();
-    final String threadName = thread.getName();
-
-    try {
-      return supplier.get();
-    } finally {
-      if (!Objects.equals(threadName, thread.getName())) {
-        LOG.info("Restoring thread name: {}", threadName);
-        thread.setName(threadName);
-      }
-    }
-  }
-
-  /**
    * Transform a protobuf UUID to Java UUID.
    */
   public static UUID fromProtobuf(HddsProtos.UUID uuid) {
@@ -868,7 +845,7 @@ public final class HddsUtils {
     if (elements != null && elements.length > startIndex) {
       final StringBuilder sb = new StringBuilder();
       for (int line = startIndex; line < elements.length; line++) {
-        sb.append(elements[line]).append("\n");
+        sb.append(elements[line]).append('\n');
       }
       return sb.toString();
     }

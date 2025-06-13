@@ -34,8 +34,6 @@ import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Full-featured Hadoop RPC implementation with failover support.
@@ -46,9 +44,6 @@ public class Hadoop3OmTransport implements OmTransport {
    * RpcController is not used and hence is set to null.
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(Hadoop3OmTransport.class);
 
   private final HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider;
 
