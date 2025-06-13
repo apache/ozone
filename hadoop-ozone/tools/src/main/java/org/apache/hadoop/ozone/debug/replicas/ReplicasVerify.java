@@ -55,12 +55,6 @@ public class ReplicasVerify extends Handler {
       description = Shell.OZONE_URI_DESCRIPTION)
   private String uri;
 
-  @CommandLine.Option(names = {"-o", "--output-dir"},
-      description = "Destination directory to save the generated output. " +
-          "If not specified, the output is printed to the console. " +
-          "Note: This option is currently not supported") // TODO: HDDS-13063
-  private String outputDir;
-
   @CommandLine.Option(names = {"--all-results"},
       description = "Print results for all passing and failing keys")
   private boolean allResults;
