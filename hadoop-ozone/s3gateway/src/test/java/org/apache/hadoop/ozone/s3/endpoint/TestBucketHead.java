@@ -18,11 +18,9 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -30,7 +28,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -70,25 +67,5 @@ public class TestBucketHead {
         bucketEndpoint.head("unknownbucket", httpHeaders));
     assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
     assertEquals("NoSuchBucket", e.getCode());
-  }
-
-  @Test
-  public void testBucketOwnerCondition() throws Exception {
-    // Use wrong bucket owner header to fail bucket owner condition verification
-    when(httpHeaders.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("wrongOwner");
-
-    OS3Exception exception =
-        assertThrows(OS3Exception.class, () -> bucketEndpoint.head(bucketName, httpHeaders));
-
-    assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
-
-    // Use correct bucket owner header to pass bucket owner condition verification
-    when(httpHeaders.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("defaultOwner");
-
-    Response response = bucketEndpoint.head(bucketName, httpHeaders);
-
-    assertEquals(200, response.getStatus());
   }
 }

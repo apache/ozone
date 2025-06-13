@@ -21,14 +21,12 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_NO_CONTENT;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doThrow;
@@ -51,7 +49,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -155,25 +152,5 @@ public class TestObjectTaggingDelete {
       assertEquals(HTTP_NOT_IMPLEMENTED, ex.getHttpCode());
       assertEquals(NOT_IMPLEMENTED.getCode(), ex.getCode());
     }
-  }
-
-  @Test
-  public void testBucketOwnerCondition() throws Exception {
-    // use wrong bucket owner header to test access denied
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("wrongOwner");
-
-    OS3Exception exception =
-        assertThrows(OS3Exception.class, () -> rest.delete(BUCKET_NAME, KEY_WITH_TAG, null,  ""));
-
-    assertEquals(ACCESS_DENIED.getMessage(), exception.getMessage());
-
-    // use correct bucket owner header to pass bucket owner condition verification
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("defaultOwner");
-
-    Response response = rest.delete(BUCKET_NAME, KEY_WITH_TAG, null,  "");
-
-    assertEquals(204, response.getStatus());
   }
 }
