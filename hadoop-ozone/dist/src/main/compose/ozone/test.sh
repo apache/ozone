@@ -49,7 +49,6 @@ execute_robot_test scm cli
 execute_robot_test scm admincli
 
 execute_robot_test scm -v USERNAME:httpfs httpfs
-source "$COMPOSE_DIR/../common/replicas-test.sh"
 
 execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-bucket ozonefs/ozonefs.robot
 execute_robot_test scm -v SCHEME:ofs -N ozonefs-obs ozonefs/ozonefs-obs.robot
