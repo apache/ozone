@@ -167,7 +167,7 @@ class TestReconAndAdminContainerCLI {
     String bucketName = "bucket1";
 
     ozoneBucket = TestDataUtil.createVolumeAndBucket(
-        client, volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+        client, volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED, null);
 
     String keyNameR3 = "key1";
     containerIdR3 = setupRatisKey(recon, keyNameR3,
