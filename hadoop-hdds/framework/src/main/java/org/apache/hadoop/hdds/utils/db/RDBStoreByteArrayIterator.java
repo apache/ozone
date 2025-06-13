@@ -40,7 +40,7 @@ class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
   @Override
   Table.KeyValue<byte[], byte[]> getKeyValue() {
     final ManagedRocksIterator i = getRocksDBIterator();
-    return RawKeyValue.create(i.get().key(), i.get().value());
+    return Table.newKeyValue(i.get().key(), i.get().value());
   }
 
   @Override

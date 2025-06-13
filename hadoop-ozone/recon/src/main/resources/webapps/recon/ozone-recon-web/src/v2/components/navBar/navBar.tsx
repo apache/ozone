@@ -134,7 +134,7 @@ const NavBar: React.FC<NavBarProps> = ({
   ), (
     <Menu.Item key='/DiskUsage'
       icon={<PieChartOutlined />}>
-      <span>Disk Usage</span>
+      <span>Namespace Usage</span>
       <Link to='/DiskUsage' />
     </Menu.Item>
   ), (
