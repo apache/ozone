@@ -89,7 +89,7 @@ public class TestUnknownContainerReport {
     this.publisher = mock(EventPublisher.class);
 
     when(containerManager.getContainer(any(ContainerID.class)))
-        .thenThrow(new ContainerNotFoundException());
+        .thenThrow(ContainerNotFoundException.newInstanceForTesting());
   }
 
   @AfterEach
