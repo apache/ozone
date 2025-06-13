@@ -81,7 +81,6 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Class used for testing the OM DB Checkpoint provider servlet using inode based transfer logic.
  */
-@Unhealthy("HDDS-13227")
 public class TestOMDbCheckpointServletInodeBasedXfer {
 
   private MiniOzoneCluster cluster;
@@ -179,6 +178,15 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(),
         anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any());
+    doCallRealMethod().when(omDbCheckpointServletMock).
+        processMetadataSnapshotRequest(any(), any(), anyBoolean(), any(), anyBoolean());
+    doCallRealMethod().when(omDbCheckpointServletMock).getBootstrapTempData();
+    doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(),any(),any(),any());
+    doCallRealMethod().when(omDbCheckpointServletMock).writeDBToArchive(any(),any(),any(),any(),any(),any(),any());
+    doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(), anyBoolean());
+    doCallRealMethod().when(omDbCheckpointServletMock).getCompactionLogDir();
+    doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
+    doCallRealMethod().when(omDbCheckpointServletMock).getDbStore();
   }
 
   @Test
@@ -191,7 +199,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Create a "spy" dbstore keep track of the checkpoint.
     writeData();
     DBStore dbStore = om.getMetadataManager().getStore();
-    RDBStore rdbStore = (RDBStore) dbStore;
     DBStore spyDbStore = spy(dbStore);
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     when(spyDbStore.getCheckpoint(true)).thenAnswer(b -> {
@@ -217,28 +224,37 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     File newDbDir = new File(newDbDirName);
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
-    Set<String> inodesFromOmDb = new HashSet<>();
+    Set<String> inodesFromOmDbCheckpoint = new HashSet<>();
 
     Set<String> inodesFromTarball = new HashSet<>();
     try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
       List<Path> files = filesInTarball.collect(Collectors.toList());
       for (Path p : files) {
-        inodesFromTarball.add(p.toFile().getName());
+        File file = p.toFile();
+        if (file.getName().equals(OmSnapshotManager.OM_HARDLINK_FILE)){
+          continue;
+        }
+        String inode = getInode(file.getName());
+        inodesFromTarball.add(inode);
       }
     }
-
-    try (Stream<Path> filesInOmDb = Files.walk(rdbStore.getDbLocation().toPath())) {
+    try (Stream<Path> filesInOmDb = Files.walk(realCheckpoint.get().getCheckpointLocation())) {
       List<Path> files = filesInOmDb.collect(Collectors.toList());
       for (Path p : files) {
         if (Files.isDirectory(p)) {
           continue;
         }
-        inodesFromOmDb.add(OmSnapshotUtils.getInodeAndMtime(p));
+        inodesFromOmDbCheckpoint.add(getInode(OmSnapshotUtils.getInodeAndMtime(p)));
       }
     }
 
-    assertEquals(inodesFromOmDb, inodesFromTarball);
+    // all files from the checkpoint should be in the tarball
+    assertTrue(inodesFromTarball.containsAll(inodesFromOmDbCheckpoint));
+  }
 
+  private static String getInode(String inodeAndMtime) {
+    String inode = inodeAndMtime.split("-")[0];
+    return inode;
   }
 
   private void writeData() throws Exception {

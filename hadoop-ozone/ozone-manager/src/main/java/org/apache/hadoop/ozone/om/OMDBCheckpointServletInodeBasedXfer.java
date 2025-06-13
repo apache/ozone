@@ -155,7 +155,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         LOG.error("unable to delete: " + tmpdir);
       }
     }
-    super.processMetadataSnapshotRequest(request, response, isFormData, checkpoint, flush);
   }
 
   Path getSstBackupDir() {
@@ -355,5 +354,19 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       }
     }
     return true;
+  }
+
+  @Override
+  public DBCheckpoint getCheckpoint(Path tmpdir, boolean flush) throws IOException {
+    // make tmp directories to contain the copies
+    Path tmpCompactionLogDir = tmpdir.resolve(getCompactionLogDir().getFileName());
+    Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());
+
+    // Create checkpoint and then copy the files so that it has all the compaction entries and files.
+    DBCheckpoint dbCheckpoint = getDbStore().getCheckpoint(flush);
+    FileUtils.copyDirectory(getCompactionLogDir().toFile(), tmpCompactionLogDir.toFile());
+    OmSnapshotUtils.linkFiles(getSstBackupDir().toFile(), tmpSstBackupDir.toFile());
+
+    return dbCheckpoint;
   }
 }

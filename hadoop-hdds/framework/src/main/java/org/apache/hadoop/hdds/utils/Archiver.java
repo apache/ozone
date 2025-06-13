@@ -126,10 +126,9 @@ public final class Archiver {
    */
   public static void linkAndIncludeFile(File file, String entryName,
       ArchiveOutputStream<TarArchiveEntry> archiveOutput, Path tmpDir) throws IOException {
-    File link = null;
+    File link = tmpDir.resolve(entryName).toFile();
     try {
-      Files.createLink(tmpDir.resolve(entryName), file.toPath());
-      link = tmpDir.resolve(file.getName()).toFile();
+      Files.createLink(link.toPath(), file.toPath());
       TarArchiveEntry entry = archiveOutput.createArchiveEntry(link, entryName);
       archiveOutput.putArchiveEntry(entry);
       try (InputStream input = Files.newInputStream(link.toPath())) {
