@@ -35,6 +35,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -270,22 +271,18 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
 
   @Test
   public void testCreateRatis() throws Exception {
-    ContainerWithPipeline container = storageClient.createContainer(
-        ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE),
-        OzoneConsts.OZONE);
-
-    assertEquals(container.getContainerInfo().getContainerID(),
-        storageClient.getContainer(container.getContainerInfo().getContainerID())
-            .getContainerID());
+    testCreateContainer(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
   }
 
   @Test
   public void testCreateEC() throws Exception {
-    ECReplicationConfig ecConfig = new ECReplicationConfig("RS-3-2-1024k");
-    ContainerWithPipeline container = storageClient.createContainer(ecConfig, OzoneConsts.OZONE);
+    ECReplicationConfig ecConfig = new ECReplicationConfig(3, 2);
+    testCreateContainer(ecConfig);
+  }
 
+  private void testCreateContainer(ReplicationConfig replicationConfig) throws Exception {
+    ContainerWithPipeline container = storageClient.createContainer(replicationConfig, OzoneConsts.OZONE);
     assertEquals(container.getContainerInfo().getContainerID(),
-        storageClient.getContainer(container.getContainerInfo().getContainerID())
-            .getContainerID());
+        storageClient.getContainer(container.getContainerInfo().getContainerID()).getContainerID());
   }
 }

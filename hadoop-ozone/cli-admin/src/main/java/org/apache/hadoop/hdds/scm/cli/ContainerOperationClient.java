@@ -201,24 +201,9 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, String owner) throws IOException {
-    XceiverClientSpi client = null;
-    XceiverClientManager clientManager = getXceiverClientManager();
-    try {
-      // allocate container on SCM.
-      ContainerWithPipeline containerWithPipeline =
-          storageContainerLocationClient.allocateContainer(type, factor,
-              owner);
-      Pipeline pipeline = containerWithPipeline.getPipeline();
-      // connect to pipeline leader and allocate container on leader datanode.
-      client = clientManager.acquireClient(pipeline);
-      createContainer(client,
-          containerWithPipeline.getContainerInfo().getContainerID());
-      return containerWithPipeline;
-    } finally {
-      if (client != null) {
-        clientManager.releaseClient(client, false);
-      }
-    }
+    ReplicationConfig replicationConfig =
+        ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor);
+    return createContainer(replicationConfig, owner);
   }
 
   @Override
@@ -226,17 +211,8 @@ public class ContainerOperationClient implements ScmClient {
     XceiverClientSpi client = null;
     XceiverClientManager clientManager = getXceiverClientManager();
     try {
-      ContainerWithPipeline containerWithPipeline;
-      if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.EC) {
-        containerWithPipeline =
-            storageContainerLocationClient.allocateContainer(replicationConfig,
-                owner);
-      } else {
-        containerWithPipeline =
-            storageContainerLocationClient.allocateContainer(replicationConfig.getReplicationType(),
-                HddsProtos.ReplicationFactor.valueOf(replicationConfig.getReplication()), 
-                owner);
-      }
+      ContainerWithPipeline containerWithPipeline = 
+          storageContainerLocationClient.allocateContainer(replicationConfig, owner);
       Pipeline pipeline = containerWithPipeline.getPipeline();
       // connect to pipeline leader and allocate container on leader datanode.
       client = clientManager.acquireClient(pipeline);

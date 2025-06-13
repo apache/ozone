@@ -249,9 +249,7 @@ public class SCMClientProtocolServer implements
       }
       getScm().checkAdminAccess(getRemoteUser(), false);
       final ContainerInfo container = scm.getContainerManager()
-          .allocateContainer(
-              replicationConfig,
-              owner);
+          .allocateContainer(replicationConfig, owner);
       final Pipeline pipeline = scm.getPipelineManager()
           .getPipeline(container.getPipelineID());
       ContainerWithPipeline cp = new ContainerWithPipeline(container, pipeline);

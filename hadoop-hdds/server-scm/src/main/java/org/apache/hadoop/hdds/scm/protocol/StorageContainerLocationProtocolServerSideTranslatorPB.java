@@ -753,15 +753,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public ContainerResponseProto allocateContainer(ContainerRequestProto request,
       int clientVersion) throws IOException {
-    ContainerWithPipeline cp;
-    if (request.getReplicationType() == HddsProtos.ReplicationType.EC) {
-      cp = impl
-          .allocateContainer(new ECReplicationConfig(request.getEcReplicationConfig()), request.getOwner());
-    } else {
-      cp = impl
-          .allocateContainer(request.getReplicationType(), 
-              request.getReplicationFactor(), request.getOwner());
-    }
+    ReplicationConfig replicationConfig = ReplicationConfig.fromProto(request.getReplicationType(), 
+        request.getReplicationFactor(),
+        request.getEcReplicationConfig()
+    );
+    ContainerWithPipeline cp = impl.allocateContainer(replicationConfig, request.getOwner());
     return ContainerResponseProto.newBuilder()
         .setContainerWithPipeline(cp.getProtobuf(clientVersion))
         .setErrorCode(ContainerResponseProto.Error.success)

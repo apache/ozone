@@ -232,23 +232,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public ContainerWithPipeline allocateContainer(
       ReplicationConfig replicationConfig, String owner) throws IOException {
 
-    ContainerRequestProto request;
+    ContainerRequestProto.Builder request = ContainerRequestProto.newBuilder()
+          .setTraceID(TracingUtil.exportCurrentSpan())
+          .setReplicationType(replicationConfig.getReplicationType())
+          .setOwner(owner);
+
     if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.EC) {
-      HddsProtos.ECReplicationConfig ecProto = ((ECReplicationConfig) replicationConfig).toProto();
-      request = ContainerRequestProto.newBuilder()
-          .setTraceID(TracingUtil.exportCurrentSpan())
-          .setEcReplicationConfig(ecProto)
-          .setReplicationFactor(ReplicationFactor.ONE)// Set for backward compatibility, ignored for EC.
-          .setReplicationType(replicationConfig.getReplicationType())
-          .setOwner(owner)
-          .build();
+      HddsProtos.ECReplicationConfig ecProto =
+          ((ECReplicationConfig) replicationConfig).toProto();
+      request.setEcReplicationConfig(ecProto);
+      request.setReplicationFactor(ReplicationFactor.ONE); // Set for backward compatibility, ignored for EC.
     } else {
-      request = ContainerRequestProto.newBuilder()
-          .setTraceID(TracingUtil.exportCurrentSpan())
-          .setReplicationFactor(ReplicationFactor.valueOf(replicationConfig.getReplication()))
-          .setReplicationType(replicationConfig.getReplicationType())
-          .setOwner(owner)
-          .build();
+      request.setReplicationFactor(ReplicationFactor.valueOf(replicationConfig.getReplication()));
     }
 
     ContainerResponseProto response =
