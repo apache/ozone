@@ -56,6 +56,7 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.HadoopKerberosName;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Daemon;
+import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -533,6 +534,12 @@ public class OzoneDelegationTokenSecretManager
     if (StringUtils.isNotEmpty(identifier.getSecretKeyId())) {
       ManagedSecretKey signKey = secretKeyClient.getSecretKey(UUID.fromString(identifier.getSecretKeyId()));
       if (signKey == null) {
+        // if delegation token expired, remove it from the store.
+        if (renewDate < Time.now()) {
+          LOG.info("Removing expired persisted delegation token {} from DB", identifier);
+          this.store.removeToken(identifier);
+        }
+
         throw new IOException("Secret key " + UUID.fromString(identifier.getSecretKeyId()) +
             " not found for token " + formatTokenId(identifier));
       }

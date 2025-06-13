@@ -245,13 +245,29 @@ public class TestOzoneDelegationTokenSecretManager {
     OzoneTokenIdentifier identifier =
         new OzoneTokenIdentifier(tester, tester, tester);
     identifier.setSecretKeyId(UUID.randomUUID().toString());
+    identifier.setOmServiceId(OzoneConsts.OM_SERVICE_ID_DEFAULT);
 
-    om.getMetadataManager().getDelegationTokenTable().put(identifier, 12345L);
+    // case 1: Secret key not found, and delegation token is valid.
+    om.getMetadataManager().getDelegationTokenTable().put(identifier, Long.MAX_VALUE);
     try {
       secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
           expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
+      om.getMetadataManager().getDelegationTokenTable().delete(identifier);
+
+      // case 2: Secret key not found, and delegation token is expired.
+      OzoneTokenIdentifier identifier2 =
+          new OzoneTokenIdentifier(tester, tester, tester);
+      identifier2.setSecretKeyId(UUID.randomUUID().toString());
+      identifier2.setOmServiceId(OzoneConsts.OM_SERVICE_ID_DEFAULT);
+
+      om.getMetadataManager().getDelegationTokenTable().put(identifier2, Time.now() - 1);
+      secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+          expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
+      // expired token should be removed from the table.
+      assertFalse(om.getMetadataManager().getDelegationTokenTable().isExist(identifier2),
+          "Expired token " + identifier2 + " should be removed from the table");
     } finally {
-      verify(secretKeyClient, times(1)).getSecretKey(any());
+      verify(secretKeyClient, times(2)).getSecretKey(any());
       secretKeyClient = old;
     }
   }
