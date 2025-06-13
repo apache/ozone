@@ -17,11 +17,16 @@
 
 package org.apache.hadoop.ozone.scm.node;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +42,8 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DiskBalancerManager;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
@@ -130,7 +137,53 @@ public class TestDiskBalancer {
   }
 
   @Test
-  public void testDatanodeDiskBalancerStatus() throws IOException {
-    // TODO: Test status command with datanodes in balancing
+  public void testDatanodeDiskBalancerStatus() throws IOException, InterruptedException, TimeoutException {
+    List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
+    DatanodeDetails toDecommission = dns.get(0).getDatanodeDetails();
+
+    diskBalancerManager.startDiskBalancer(
+        Optional.of(10.0), // threshold
+        Optional.of(10L),  // bandwidth in MB
+        Optional.of(5),    // parallel threads
+        Optional.of(true), // stopAfterDiskEven
+        Optional.empty());
+
+    //all DNs IN_SERVICE, so disk balancer status for all should be present
+    List<HddsProtos.DatanodeDiskBalancerInfoProto> statusProtoList =
+        diskBalancerManager.getDiskBalancerStatus(Optional.empty(),
+            Optional.empty(),
+            ClientVersion.CURRENT_VERSION);
+    assertEquals(3, statusProtoList.size());
+
+    NodeManager nm = cluster.getStorageContainerManager().getScmNodeManager();
+
+    // Decommission the first DN
+    storageClient.decommissionNodes(Arrays.asList(
+        getDNHostAndPort(toDecommission)), false);
+    waitForDnToReachOpState(nm, toDecommission, DECOMMISSIONING);
+
+    //one DN is in DECOMMISSIONING state, so disk balancer status for it should not be present
+    statusProtoList = diskBalancerManager.getDiskBalancerStatus(Optional.empty(),
+        Optional.empty(),
+        ClientVersion.CURRENT_VERSION);
+    assertEquals(2, statusProtoList.size());
+
+    // Check status for the decommissioned DN should not be present
+    statusProtoList = diskBalancerManager.getDiskBalancerStatus(
+        Optional.of(Collections.singletonList(getDNHostAndPort(toDecommission))),
+        Optional.empty(),
+        ClientVersion.CURRENT_VERSION);
+    assertEquals(0, statusProtoList.size());
+
+    storageClient.recommissionNodes(Arrays.asList(
+        getDNHostAndPort(toDecommission)));
+    waitForDnToReachOpState(nm, toDecommission, IN_SERVICE);
+
+    // Check status for the recommissioned DN should now be present
+    statusProtoList = diskBalancerManager.getDiskBalancerStatus(
+        Optional.of(Collections.singletonList(getDNHostAndPort(toDecommission))),
+        Optional.empty(),
+        ClientVersion.CURRENT_VERSION);
+    assertEquals(1, statusProtoList.size());
   }
 }

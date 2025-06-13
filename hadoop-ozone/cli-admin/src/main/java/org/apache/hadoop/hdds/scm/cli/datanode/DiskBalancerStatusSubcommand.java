@@ -34,7 +34,7 @@ import picocli.CommandLine.Option;
  */
 @Command(
     name = "status",
-    description = "Get Datanode DiskBalancer Status",
+    description = "Get Datanode DiskBalancer Status for inServiceHealthy DNs",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class DiskBalancerStatusSubcommand extends ScmSubcommand {

@@ -111,9 +111,10 @@ public class DiskBalancerManager {
           useHostnames).stream()
           .filter(dn -> {
             try {
-              if (nodeManager.getNodeStatus(dn) != NodeStatus.inServiceHealthy()) {
+              NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
+              if (nodeStatus != NodeStatus.inServiceHealthy()) {
                 LOG.warn("Datanode {} is not in optimal state for disk balancing." +
-                    " Operational state: {}", dn.getHostName(), nodeManager.getNodeStatus(dn).getOperationalState());
+                    " NodeStatus: {}", dn.getHostName(), nodeStatus);
                 return false;
               }
               return true;
