@@ -37,9 +37,13 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /** Create and extract archives. */
 public final class Archiver {
+
+  static final int MIN_BUFFER_SIZE = 8 * (int) OzoneConsts.KB; // same as IOUtils.DEFAULT_BUFFER_SIZE
+  static final int MAX_BUFFER_SIZE = (int) OzoneConsts.MB;
 
   private Archiver() {
     // no instances (for now)
@@ -68,15 +72,7 @@ public final class Archiver {
   public static byte[] readEntry(InputStream input, final long size)
       throws IOException {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
-    int bufferSize = 1024;
-    byte[] buffer = new byte[bufferSize + 1];
-    long remaining = size;
-    while (remaining > 0) {
-      int len = (int) Math.min(remaining, bufferSize);
-      int read = input.read(buffer, 0, len);
-      remaining -= read;
-      output.write(buffer, 0, read);
-    }
+    IOUtils.copy(input, output, getBufferSize(size));
     return output.toByteArray();
   }
 
@@ -109,7 +105,7 @@ public final class Archiver {
     TarArchiveEntry entry = archiveOutput.createArchiveEntry(file, entryName);
     archiveOutput.putArchiveEntry(entry);
     try (InputStream input = Files.newInputStream(file.toPath())) {
-      bytes = IOUtils.copyLarge(input, archiveOutput);
+      bytes = IOUtils.copy(input, archiveOutput, getBufferSize(file.length()));
     }
     archiveOutput.closeArchiveEntry();
     return bytes;
@@ -129,19 +125,7 @@ public final class Archiver {
 
       try (OutputStream fileOutput = Files.newOutputStream(path);
            OutputStream output = new BufferedOutputStream(fileOutput)) {
-        int bufferSize = 1024;
-        byte[] buffer = new byte[bufferSize + 1];
-        long remaining = size;
-        while (remaining > 0) {
-          int len = (int) Math.min(remaining, bufferSize);
-          int read = input.read(buffer, 0, len);
-          if (read >= 0) {
-            remaining -= read;
-            output.write(buffer, 0, read);
-          } else {
-            remaining = 0;
-          }
-        }
+        IOUtils.copy(input, output, getBufferSize(size));
       }
     }
   }
@@ -155,6 +139,10 @@ public final class Archiver {
     os.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
     os.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
     return os;
+  }
+
+  static int getBufferSize(long fileSize) {
+    return Math.toIntExact(Math.min(MAX_BUFFER_SIZE, Math.max(fileSize, MIN_BUFFER_SIZE)));
   }
 
 }
