@@ -26,10 +26,11 @@ import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,22 +48,22 @@ public class ContainerTableSchemaFinalizeAction
   @Override
   public void execute(DatanodeStateMachine arg) throws Exception {
     WitnessedContainerMetadataStore metadataStore = arg.getContainer().getWitnessedContainerMetadataStore();
-    // containerIdsTable is in old format where String value type is mapped to ContainerCreateInfo before finalize
-    Table<ContainerID, ContainerCreateInfo> containerIdsTable = metadataStore.getContainerIdsTable();
+    Table<ContainerID, ContainerCreateInfo> previousTable
+        = ((WitnessedContainerMetadataStoreImpl) metadataStore).getPreviousVersionBasedTable().getContainerIdsTable();
+    Table<ContainerID, ContainerCreateInfo> currTable =
+        WitnessedContainerDBDefinition.CONTAINER_IDS_TABLE.getTable(metadataStore.getStore());
 
-    // to write to new format, we need to create a new table with explicit codec before finalize
-    TypedTable<ContainerID, ContainerCreateInfo> writeNewFormatTable = metadataStore.getStore().getTable(
-            containerIdsTable.getName(), ContainerID.getCodec(), ContainerCreateInfo.getNewCodec());
+    // data is moved from old table to new table, no need cleanup if previous exist as this is just overwrite of data
     try (BatchOperation batch = metadataStore.getStore().initBatchOperation()) {
       try (TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, ContainerCreateInfo>> iterator =
-                   containerIdsTable.iterator()) {
+                   previousTable.iterator()) {
         while (iterator.hasNext()) {
           Table.KeyValue<ContainerID, ContainerCreateInfo> next = iterator.next();
-          writeNewFormatTable.putWithBatch(batch, next.getKey(), next.getValue());
+          currTable.putWithBatch(batch, next.getKey(), next.getValue());
         }
       }
       metadataStore.getStore().commitBatchOperation(batch);
-      LOG.info("Finished writing containerIds Table to proto format table");
+      LOG.info("Finished copy to containerIdsTable from previous table");
     }
   }
 }

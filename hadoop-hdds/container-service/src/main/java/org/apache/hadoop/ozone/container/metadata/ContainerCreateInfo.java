@@ -20,14 +20,9 @@ package org.apache.hadoop.ozone.container.metadata;
 import java.util.function.Supplier;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.CodecBuffer;
-import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto3Codec;
-import org.apache.hadoop.hdds.utils.db.StringCodec;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.ratis.util.MemoizedSupplier;
 
 /**
@@ -40,17 +35,12 @@ public final class ContainerCreateInfo {
       Proto3Codec.get(ContainerProtos.ContainerCreateInfo.getDefaultInstance()),
       ContainerCreateInfo::getFromProtobuf, ContainerCreateInfo::getProtobuf,
       ContainerCreateInfo.class);
-  private static final Codec<ContainerCreateInfo> CODEC_UPGRADE_STRING_OR_CREATE_INFO = new ContainerCreateInfoCodec();
 
   private final ContainerProtos.ContainerDataProto.State state;
   private final Supplier<ContainerProtos.ContainerCreateInfo> proto;
 
   public static Codec<ContainerCreateInfo> getCodec() {
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
-      // If the container ID table schema is finalized, we can use the proto3 codec directly.
-      return CODEC;
-    }
-    return CODEC_UPGRADE_STRING_OR_CREATE_INFO;
+    return CODEC;
   }
 
   public static Codec<ContainerCreateInfo> getNewCodec() {
@@ -82,78 +72,5 @@ public final class ContainerCreateInfo {
 
   public ContainerProtos.ContainerDataProto.State getState() {
     return state;
-  }
-
-  /**
-   * ContainerCreateInfoCodec handles compatibility for containerIds Table, where old format from String is changed
-   * to proto3 format, ContainerCreateInfo. So this codec can read / write both formats based on the HDDSLayoutFeature.
-   */
-  public static class ContainerCreateInfoCodec implements Codec<ContainerCreateInfo> {
-    @Override
-    public Class<ContainerCreateInfo> getTypeClass() {
-      return ContainerCreateInfo.class;
-    }
-
-    @Override
-    public boolean supportCodecBuffer() {
-      return CODEC.supportCodecBuffer();
-    }
-
-    @Override
-    public ContainerCreateInfo fromPersistedFormat(byte[] rawData) throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
-        // If the container ID table schema is finalized, we can use the proto3 codec directly.
-        return CODEC.fromPersistedFormat(rawData);
-      }
-      String val = StringCodec.get().fromPersistedFormat(rawData);
-      return valueOf(ContainerProtos.ContainerDataProto.State.valueOf(val));
-    }
-
-    @Override
-    public byte[] toPersistedFormat(ContainerCreateInfo object) throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
-        return CODEC.toPersistedFormat(object);
-      }
-      return StringCodec.get().toPersistedFormat(object.getState().name());
-    }
-
-    @Override
-    public CodecBuffer toCodecBuffer(ContainerCreateInfo object, CodecBuffer.Allocator allocator)
-            throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
-        return CODEC.toCodecBuffer(object, allocator);
-      }
-      return StringCodec.get().toCodecBuffer(object.getState().name(), allocator);
-    }
-
-    @Override
-    public CodecBuffer toDirectCodecBuffer(ContainerCreateInfo object) throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
-        return CODEC.toDirectCodecBuffer(object);
-      }
-      return StringCodec.get().toDirectCodecBuffer(object.getState().name());
-    }
-
-    @Override
-    public CodecBuffer toHeapCodecBuffer(ContainerCreateInfo object) throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
-        return CODEC.toHeapCodecBuffer(object);
-      }
-      return StringCodec.get().toHeapCodecBuffer(object.getState().name());
-    }
-
-    @Override
-    public ContainerCreateInfo fromCodecBuffer(CodecBuffer buffer) throws CodecException {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
-        return CODEC.fromCodecBuffer(buffer);
-      }
-      String val = StringCodec.get().fromCodecBuffer(buffer);
-      return valueOf(ContainerProtos.ContainerDataProto.State.valueOf(val));
-    }
-
-    @Override
-    public ContainerCreateInfo copyObject(ContainerCreateInfo object) {
-      return CODEC.copyObject(object);
-    }
   }
 }

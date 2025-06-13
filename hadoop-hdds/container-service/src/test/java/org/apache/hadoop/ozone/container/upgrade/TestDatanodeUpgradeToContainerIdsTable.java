@@ -115,6 +115,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     WitnessedContainerMetadataStore metadataStore = dsm.getContainer().getWitnessedContainerMetadataStore();
     TypedTable<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
         metadataStore.getContainerIdsTable().getName(), ContainerID.getCodec(), StringCodec.get());
+    assertEquals("containerIds", metadataStore.getContainerIdsTable().getName());
     assertEquals(OPEN.name(), tableWithStringCodec.get(ContainerID.valueOf(containerID)));
 
     // close container to allow upgrade.
@@ -122,16 +123,11 @@ public class TestDatanodeUpgradeToContainerIdsTable {
 
     dsm.finalizeUpgrade();
     assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
+    assertEquals("containerIdsTable", metadataStore.getContainerIdsTable().getName());
     ContainerCreateInfo containerCreateInfo = metadataStore.getContainerIdsTable().get(
         ContainerID.valueOf(containerID));
     // state is always open as state is update while create container only.
     assertEquals(OPEN, containerCreateInfo.getState());
-
-    // check if the containerIds table is in proto3 format
-    TypedTable<ContainerID, ContainerCreateInfo> tableWithProtoCodec =
-        metadataStore.getStore().getTable(metadataStore.getContainerIdsTable().getName(),
-            ContainerID.getCodec(), ContainerCreateInfo.getNewCodec());
-    assertEquals(OPEN, tableWithProtoCodec.get(ContainerID.valueOf(containerID)).getState());
   }
 
   @Test
@@ -153,6 +149,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     TypedTable<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
         metadataStore.getContainerIdsTable().getName(), ContainerID.getCodec(), StringCodec.get());
     tableWithStringCodec.put(ContainerID.valueOf(1L), OPEN.name());
+    assertEquals("containerIds", metadataStore.getContainerIdsTable().getName());
 
     when(spyMetaStore.getStore()).thenReturn(spyDBStore);
     doThrow(new IOException()).when(spyDBStore).commitBatchOperation(any(BatchOperation.class));
@@ -164,6 +161,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     assertThrows(Exception.class, () -> upgradeAction.execute(dsmMock));
 
     // check still if the containerIds table is in old format after exception
+    assertEquals("containerIds", metadataStore.getContainerIdsTable().getName());
     assertEquals(OPEN.name(), tableWithStringCodec.get(ContainerID.valueOf(1L)));
   }
 }

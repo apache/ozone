@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
  */
 public final class WitnessedContainerDBDefinition extends DBDefinition.WithMap {
 
-  private static final String CONTAINER_IDS_TABLE_NAME = "containerIds";
+  private static final String CONTAINER_IDS_TABLE_NAME = "containerIdsTable";
 
   public static final DBColumnFamilyDefinition<ContainerID, ContainerCreateInfo>
       CONTAINER_IDS_TABLE = new DBColumnFamilyDefinition<>(
