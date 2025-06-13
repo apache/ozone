@@ -20,10 +20,14 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -35,14 +39,21 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -108,6 +119,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     om = cluster.getOzoneManager();
+    conf.setBoolean(OZONE_ACL_ENABLED, false);
+    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
   }
 
   private void setupMocks() throws Exception {
@@ -186,14 +199,14 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   }
 
   @Test
-  void testContentsOfTarball() throws Exception {
-    conf.setBoolean(OZONE_ACL_ENABLED, false);
-    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
+  void testContentsOfTarballWithSnapshot() throws Exception {
     setupCluster();
     setupMocks();
-    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("false");
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("true");
+    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
     // Create a "spy" dbstore keep track of the checkpoint.
-    writeData();
+    writeData(volumeName, bucketName, true);
     DBStore dbStore = om.getMetadataManager().getStore();
     DBStore spyDbStore = spy(dbStore);
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
@@ -220,8 +233,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     File newDbDir = new File(newDbDirName);
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
-    Set<String> inodesFromOmDbCheckpoint = new HashSet<>();
-
+    List<String> snapshotPaths = new ArrayList<>();
+    client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
+        .forEachRemaining(snapInfo -> snapshotPaths.add(getSnapshotDBPath(snapInfo.getCheckpointDir())));
+    Set<String> inodesFromOmDataDir = new HashSet<>();
     Set<String> inodesFromTarball = new HashSet<>();
     try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
       List<Path> files = filesInTarball.collect(Collectors.toList());
@@ -234,19 +249,85 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         inodesFromTarball.add(inode);
       }
     }
-    try (Stream<Path> filesInOmDb = Files.walk(realCheckpoint.get().getCheckpointLocation())) {
-      List<Path> files = filesInOmDb.collect(Collectors.toList());
-      for (Path p : files) {
-        if (Files.isDirectory(p)) {
+    Map<String, List<String>> hardLinkMapFromOmData = new HashMap<>();
+    Path checkpointLocation = realCheckpoint.get().getCheckpointLocation();
+    populateInodesOfFilesInDirectory(dbStore, checkpointLocation,
+        inodesFromOmDataDir, hardLinkMapFromOmData);
+    for (String snapshotPath : snapshotPaths) {
+      populateInodesOfFilesInDirectory(dbStore, Paths.get(snapshotPath),
+          inodesFromOmDataDir, hardLinkMapFromOmData);
+    }
+    Map<String, List<String>> hardlinkMapFromTarball = readFileToMap(newDbDir.toPath()
+        .resolve(OmSnapshotManager.OM_HARDLINK_FILE).toString());
+
+    // verify that all entries in hardLinkMapFromOmData are present in hardlinkMapFromTarball.
+    // entries in hardLinkMapFromOmData are from the snapshots + OM db checkpoint so they
+    // should be present in the tarball.
+
+    for (Map.Entry<String, List<String>> entry : hardLinkMapFromOmData.entrySet()) {
+      String key = entry.getKey();
+      List<String> value = entry.getValue();
+      assertTrue(hardlinkMapFromTarball.containsKey(key));
+      assertEquals(value, hardlinkMapFromTarball.get(key));
+    }
+    // all files from the checkpoint should be in the tarball
+    assertFalse(inodesFromTarball.isEmpty());
+    assertTrue(inodesFromTarball.containsAll(inodesFromOmDataDir));
+  }
+
+  public static Map<String, List<String>> readFileToMap(String filePath) throws IOException {
+    Map<String, List<String>> dataMap = new HashMap<>();
+    try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        String trimmedLine = line.trim();
+        if (trimmedLine.isEmpty() || !trimmedLine.contains("\t")) {
           continue;
         }
-        inodesFromOmDbCheckpoint.add(getInode(OmSnapshotUtils.getInodeAndMtime(p)));
+        int tabIndex = trimmedLine.indexOf("\t");
+        if (tabIndex > 0) {
+          String key = getInode(trimmedLine.substring(0, tabIndex).trim());
+          // Value starts after the tab, trimming any extra whitespace
+          String value = trimmedLine.substring(tabIndex + 1).trim();
+          if (!key.isEmpty() && !value.isEmpty()) {
+            dataMap.computeIfAbsent(key, k -> new ArrayList<>()).add(value);
+          }
+        }
       }
     }
+    for (Map.Entry<String, List<String>> entry : dataMap.entrySet()) {
+      Collections.sort(entry.getValue());
+    }
+    return dataMap;
+  }
 
-    // all files from the checkpoint should be in the tarball
-    assertTrue(!inodesFromTarball.isEmpty());
-    assertTrue(inodesFromTarball.containsAll(inodesFromOmDbCheckpoint));
+  private  void populateInodesOfFilesInDirectory(DBStore dbStore, Path dbLocation,
+      Set<String> inodesFromOmDbCheckpoint, Map<String, List<String>> hardlinkMap) throws IOException {
+    try (Stream<Path> filesInOmDb = Files.list(dbLocation)) {
+      List<Path> files = filesInOmDb.collect(Collectors.toList());
+      for (Path p : files) {
+        if (Files.isDirectory(p) || p.toFile().getName().equals(OmSnapshotManager.OM_HARDLINK_FILE)) {
+          continue;
+        }
+        String inode = getInode(OmSnapshotUtils.getInodeAndMtime(p));
+        Path metadataDir = OMStorage.getOmDbDir(conf).toPath();
+        String path  = metadataDir.relativize(p).toString();
+        if (path.contains(OM_CHECKPOINT_DIR)) {
+          path = metadataDir.relativize(dbStore.getDbLocation().toPath().resolve(p.getFileName())).toString();
+        }
+        hardlinkMap.computeIfAbsent(inode, k -> new ArrayList<>()).add(path);
+        inodesFromOmDbCheckpoint.add(inode);
+      }
+    }
+    for (Map.Entry<String, List<String>> entry : hardlinkMap.entrySet()) {
+      Collections.sort(entry.getValue());
+    }
+  }
+
+  private String getSnapshotDBPath(String checkPointDir) {
+    return OMStorage.getOmDbDir(cluster.getConf()) +
+        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
+        OM_DB_NAME + checkPointDir;
   }
 
   private static String getInode(String inodeAndMtime) {
@@ -254,16 +335,23 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     return inode;
   }
 
-  private void writeData() throws Exception {
-    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+  private void writeData(String volumeName, String bucketName, boolean includeSnapshots) throws Exception {
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
     for (int i = 0; i < 10; i++) {
       TestDataUtil.createKey(bucket, "key" + i,
           ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
           "sample".getBytes(StandardCharsets.UTF_8));
-      client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot" + i);
-      client.getObjectStore().deleteSnapshot(volumeName, bucketName, "snapshot" + i);
+      om.getMetadataManager().getStore().flushDB();
+    }
+    if (includeSnapshots) {
+      TestDataUtil.createKey(bucket, "keysnap1",
+          ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+          "sample".getBytes(StandardCharsets.UTF_8));
+      TestDataUtil.createKey(bucket, "keysnap2",
+          ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+          "sample".getBytes(StandardCharsets.UTF_8));
+      client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot10");
+      client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot20");
     }
   }
 }

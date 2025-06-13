@@ -227,12 +227,14 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         Path checkpointDir = checkpoint.getCheckpointLocation();
         writeDBToArchive(sstFilesToExclude, checkpointDir,
             maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap);
-        Path tmpCompactionLogDir = tmpdir.resolve(getCompactionLogDir().getFileName());
-        Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());
-        writeDBToArchive(sstFilesToExclude, tmpCompactionLogDir, maxTotalSstSize, archiveOutputStream, tmpdir,
-            hardLinkFileMap, getCompactionLogDir());
-        writeDBToArchive(sstFilesToExclude, tmpSstBackupDir, maxTotalSstSize, archiveOutputStream, tmpdir,
-            hardLinkFileMap, getSstBackupDir());
+        if (includeSnapshotData) {
+          Path tmpCompactionLogDir = tmpdir.resolve(getCompactionLogDir().getFileName());
+          Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());
+          writeDBToArchive(sstFilesToExclude, tmpCompactionLogDir, maxTotalSstSize, archiveOutputStream, tmpdir,
+              hardLinkFileMap, getCompactionLogDir());
+          writeDBToArchive(sstFilesToExclude, tmpSstBackupDir, maxTotalSstSize, archiveOutputStream, tmpdir,
+              hardLinkFileMap, getSstBackupDir());
+        }
         writeHardlinkFile(getConf(), hardLinkFileMap, archiveOutputStream);
       }
 
@@ -335,6 +337,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   private boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dbDir, AtomicLong maxTotalSstSize,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, Path tmpDir,
       Map<String, String> hardLinkFileMap, Path destDir) throws IOException {
+    if (!Files.exists(dbDir)) {
+      LOG.warn("DB directory {} does not exist. Skipping.", dbDir);
+      return true;
+    }
     try (Stream<Path> files = Files.list(dbDir)) {
       Iterable<Path> iterable = files::iterator;
       for (Path dbFile : iterable) {
