@@ -93,7 +93,7 @@ public abstract class BackgroundService {
   }
 
   public synchronized void setServiceTimeoutInNanos(long newTimeout) {
-    LOG.info("{} timeout is {} {}", serviceName, newTimeout, TimeUnit.NANOSECONDS.name().toLowerCase());
+    LOG.info("{} timeout is set to {} {}", serviceName, newTimeout, TimeUnit.NANOSECONDS.name().toLowerCase());
     this.serviceTimeoutInNanos = newTimeout;
   }
 
