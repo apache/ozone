@@ -166,7 +166,7 @@ public final class DeletingServiceMetrics {
     this.numRenameEntriesPurged.incr(renameEntriesPurged);
   }
 
-  public TransactionInfo getLastAOSTransactionId() {
+  public synchronized TransactionInfo getLastAOSTransactionId() {
     return TransactionInfo.valueOf(lastAOSPurgeTermId.value(), lastAOSPurgeTransactionId.value());
   }
 
