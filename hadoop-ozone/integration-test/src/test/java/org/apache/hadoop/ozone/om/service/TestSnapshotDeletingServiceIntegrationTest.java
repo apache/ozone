@@ -37,9 +37,8 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.ArrayDeque;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -50,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -82,7 +83,6 @@ import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
@@ -91,7 +91,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.MockedConstruction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -162,6 +162,10 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     while (!rcSnaps.isEmpty()) {
       rcSnaps.pop().close();
     }
+    // Resume services
+    om.getKeyManager().getDirDeletingService().resume();
+    om.getKeyManager().getDeletingService().resume();
+    om.getKeyManager().getSnapshotDeletingService().resume();
   }
 
   private UncheckedAutoCloseableSupplier<OmSnapshot> getOmSnapshot(String volume, String bucket, String snapshotName)
@@ -621,11 +625,9 @@ public class TestSnapshotDeletingServiceIntegrationTest {
   }
 
   private MockedConstruction<ReclaimableKeyFilter> getMockedReclaimableKeyFilter(String volume, String bucket,
-      SnapshotInfo snapshotInfo, AtomicBoolean kdsWaitStarted, AtomicBoolean sdsLockWaitStarted,
-      AtomicBoolean sdsLockAcquired, AtomicBoolean kdsFinished) throws IOException {
-    ReclaimableKeyFilter keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
-        ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(),
-        snapshotInfo, om.getKeyManager(), om.getMetadataManager().getLock());
+      AtomicBoolean kdsWaitStarted, AtomicBoolean sdsLockWaitStarted,
+      AtomicBoolean sdsLockAcquired, AtomicBoolean kdsFinished, ReclaimableKeyFilter keyFilter) throws IOException {
+
     return mockConstruction(ReclaimableKeyFilter.class,
         (mocked, context) -> {
           when(mocked.apply(any())).thenAnswer(i -> {
@@ -655,14 +657,30 @@ public class TestSnapshotDeletingServiceIntegrationTest {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
+  @CsvSource({"true, 0", "true, 1", "false, 0", "false, 1", "false, 2"})
   @DisplayName("Tests Snapshot Deleting Service while KeyDeletingService is already running.")
-  public void testSnapshotDeletingServiceWaitsForKeyDeletingService(boolean kdsRunningOnAOS) throws Exception {
+  @Order(4)
+  public void testSnapshotDeletingServiceWaitsForKeyDeletingService(boolean kdsRunningOnAOS,
+      int snasphotDeleteIndex) throws Exception {
+    SnapshotChainManager snapshotChainManager =
+        ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Iterator<UUID> itr = snapshotChainManager.iterator(false);
+        while (itr.hasNext()) {
+          SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(om, snapshotChainManager, itr.next());
+          assertEquals(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, snapshotInfo.getSnapshotStatus());
+        }
+        return true;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 30000);
+    om.awaitDoubleBufferFlush();
     // Suspend the services first
     om.getKeyManager().getDirDeletingService().suspend();
     om.getKeyManager().getDeletingService().suspend();
     om.getKeyManager().getSnapshotDeletingService().suspend();
-
     String volume = "vol" + RandomStringUtils.secure().nextNumeric(3),
         bucket = "bucket" + RandomStringUtils.secure().nextNumeric(3);
     client.getObjectStore().createVolume(volume);
@@ -670,29 +688,44 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     ozoneVolume.createBucket(bucket);
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucket);
 
+    // Create snap0
+    client.getObjectStore().createSnapshot(volume, bucket, "snap0");
+    client.getObjectStore().getSnapshotInfo(volume, bucket, "snap0");
+    UUID snap1Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap0").getSnapshotId();
+
     // Create snap1
-    client.getObjectStore().createSnapshot(volume, bucket, "snap1");
-    client.getObjectStore().getSnapshotInfo(volume, bucket, "snap1");
-    // Create snap2
     TestDataUtil.createKey(ozoneBucket, "key", CONTENT.array());
-    client.getObjectStore().createSnapshot(volume, bucket, "snap2");
-    UUID snap2Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap2").getSnapshotId();
+    client.getObjectStore().createSnapshot(volume, bucket, "snap1");
+    UUID snap2Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap1").getSnapshotId();
 
     ozoneBucket.renameKey("key", "renamedKey");
     ozoneBucket.deleteKey("renamedKey");
+    om.awaitDoubleBufferFlush();
     UUID snap3Id;
+    ReclaimableKeyFilter keyFilter;
+    SnapshotInfo snapInfo;
     // Create snap3 to test snapshot 3 deep cleaning otherwise just run on AOS.
     if (kdsRunningOnAOS) {
       snap3Id = null;
+      snapInfo = null;
+      keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
+          ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(),
+          snapInfo, om.getKeyManager(), om.getMetadataManager().getLock());
     } else {
-      client.getObjectStore().createSnapshot(volume, bucket, "snap3");
-      snap3Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap3").getSnapshotId();
+
+      client.getObjectStore().createSnapshot(volume, bucket, "snap2");
+      snap3Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap2").getSnapshotId();
       om.awaitDoubleBufferFlush();
-      SnapshotInfo snap = om.getMetadataManager().getSnapshotInfo(volume, bucket, "snap3");
+      SnapshotInfo snap = om.getMetadataManager().getSnapshotInfo(volume, bucket, "snap2");
       snap.setDeepCleanedDeletedDir(true);
       om.getMetadataManager().getSnapshotInfoTable().put(snap.getTableKey(), snap);
-      assertTrue(om.getMetadataManager().getSnapshotInfo(volume, bucket, "snap3")
+      assertTrue(om.getMetadataManager().getSnapshotInfo(volume, bucket, "snap2")
           .isDeepCleanedDeletedDir());
+      snapInfo = SnapshotUtils.getSnapshotInfo(om, volume, bucket, "snap2");
+      keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
+          ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(),
+          snapInfo, getOmSnapshot(volume, bucket, "snap2").get().getKeyManager(),
+          om.getMetadataManager().getLock());
     }
 
 
@@ -704,26 +737,33 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     AtomicBoolean sdsLockAcquired = new AtomicBoolean(false);
 
     try (MockedConstruction<MultiSnapshotLocks> mockedMultiSnapshotLock = mockConstruction(MultiSnapshotLocks.class,
-        (mocked, context) -> when(mocked.acquireLock(anyList())).thenAnswer(i -> {
-          List<UUID> ids = i.getArgument(0);
-          List<UUID> expectedIds = Arrays.asList(snap2Id, snap3Id);
-          if (expectedIds.equals(ids)) {
-            sdsLockWaitStarted.set(true);
-            OMLockDetails lockDetails = sdsMultiLocks.acquireLock(ids);
-            assertTrue(kdsFinished::get);
-            sdsLockAcquired.set(true);
-            return lockDetails;
-          }
-          return sdsMultiLocks.acquireLock(ids);
-        }))) {
+        (mocked, context) -> {
+          when(mocked.acquireLock(anyList())).thenAnswer(i -> {
+            List<UUID> ids = i.getArgument(0);
+            List<UUID> expectedIds = Arrays.asList(snap1Id, snap2Id, snap3Id).subList(snasphotDeleteIndex, Math.min(3,
+                snasphotDeleteIndex + 2)).stream().filter(Objects::nonNull).collect(Collectors.toList());
+            if (expectedIds.equals(ids) && !sdsLockWaitStarted.get() && !sdsLockAcquired.get()) {
+              sdsLockWaitStarted.set(true);
+              OMLockDetails lockDetails = sdsMultiLocks.acquireLock(ids);
+              assertTrue(kdsFinished::get);
+              sdsLockAcquired.set(true);
+              return lockDetails;
+            }
+            return sdsMultiLocks.acquireLock(ids);
+          });
+          doAnswer(i -> {
+            sdsMultiLocks.releaseLock();
+            return null;
+          }).when(mocked).releaseLock();
+        })) {
       KeyDeletingService kds = new KeyDeletingService(om, om.getScmClient().getBlockClient(), 500, 10000,
           om.getConfiguration(), 1, true);
       kds.shutdown();
       KeyDeletingService.KeyDeletingTask task = kds.new KeyDeletingTask(snap3Id);
-      SnapshotInfo snapInfo = kdsRunningOnAOS ? null : SnapshotUtils.getSnapshotInfo(om, volume, bucket, "snap3");
+
       CompletableFuture.supplyAsync(() -> {
         try (MockedConstruction<ReclaimableKeyFilter> mockedReclaimableFilter = getMockedReclaimableKeyFilter(
-            volume, bucket, snapInfo, kdsWaitStarted, sdsLockWaitStarted, sdsLockAcquired, kdsFinished)) {
+            volume, bucket, kdsWaitStarted, sdsLockWaitStarted, sdsLockAcquired, kdsFinished, keyFilter)) {
           return task.call();
         } catch (IOException e) {
           throw new RuntimeException(e);
@@ -732,16 +772,18 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
       SnapshotDeletingService sds = new SnapshotDeletingService(500, 10000, om);
       sds.shutdown();
-      GenericTestUtils.waitFor(kdsWaitStarted::get, 1000, 10000);
-      client.getObjectStore().deleteSnapshot(volume, bucket, "snap2");
+      GenericTestUtils.waitFor(kdsWaitStarted::get, 1000, 30000);
+      client.getObjectStore().deleteSnapshot(volume, bucket, "snap" + snasphotDeleteIndex);
       sds.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
+      if (snasphotDeleteIndex == 2) {
+        sds.runPeriodicalTaskNow();
+      }
+      assertTrue(sdsLockWaitStarted.get());
       assertTrue(sdsLockAcquired.get());
-      assertThrows(IOException.class, () -> SnapshotUtils.getSnapshotInfo(om, volume, bucket, "snap2"));
+      assertThrows(IOException.class, () -> SnapshotUtils.getSnapshotInfo(om, volume, bucket,
+          "snap" + snasphotDeleteIndex));
     }
-    // Resume services
-    om.getKeyManager().getDirDeletingService().resume();
-    om.getKeyManager().getDeletingService().resume();
-    om.getKeyManager().getSnapshotDeletingService().resume();
   }
 
   private void verifySnapshotChain(SnapshotInfo deletedSnapshot,
