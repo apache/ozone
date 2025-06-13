@@ -19,7 +19,9 @@ package org.apache.ozone.fs.http.server;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -101,8 +103,10 @@ public class CheckUploadContentTypeFilter implements Filter {
       String errorMessage = "Data upload requests must have content-type set to '" +
           HttpFSConstants.UPLOAD_CONTENT_TYPE + "'";
 
-      // Create JSON response
-      String jsonResponse = "{\"error\":\"" + errorMessage + "\"}";
+      Map<String, String> errorMap = new HashMap<>();
+      errorMap.put("error", errorMessage);
+
+      String jsonResponse = JsonUtil.toJsonString(errorMap);
 
       PrintWriter writer = httpRes.getWriter();
       writer.write(jsonResponse);
