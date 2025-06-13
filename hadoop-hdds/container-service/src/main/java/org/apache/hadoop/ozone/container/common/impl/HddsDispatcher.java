@@ -583,7 +583,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     // We have to find a more efficient way to close a container.
     boolean isOpen = container != null && container.getContainerState() == State.OPEN;
     boolean isVolumeFull = isOpen && isVolumeFullExcludingCommittedSpace(container);
-    boolean isSpaceFull = isContainerFull(container) || isVolumeFull;
+    boolean isSpaceFull = isVolumeFull || isContainerFull(container);
     boolean shouldClose = isSpaceFull || isContainerUnhealthy(container);
     if (shouldClose) {
       ContainerData containerData = container.getContainerData();
