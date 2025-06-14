@@ -246,7 +246,7 @@ public class TestTypedRDBTableStore {
   @Test
   public void testIteratorOnException() throws Exception {
     RDBTable rdbTable = mock(RDBTable.class);
-    when(rdbTable.iterator((CodecBuffer) null))
+    when(rdbTable.iterator((CodecBuffer) null, Table.KeyValueIterator.Type.KEY_AND_VALUE))
         .thenThrow(new IOException());
     try (Table<String, String> testTable = new TypedTable<>(rdbTable,
         StringCodec.get(), StringCodec.get(), CacheType.PARTIAL_CACHE)) {
