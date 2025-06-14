@@ -124,11 +124,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   private KEY decodeKey(byte[] key) throws CodecException {
-    return key == null ? null : keyCodec.fromPersistedFormat(key);
+    return key != null && key.length > 0 ? keyCodec.fromPersistedFormat(key) : null;
   }
 
   private VALUE decodeValue(byte[] value) throws CodecException {
-    return value == null ? null : valueCodec.fromPersistedFormat(value);
+    return value != null && value.length > 0 ? valueCodec.fromPersistedFormat(value) : null;
   }
 
   @Override
@@ -548,10 +548,14 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
       @Override
       KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw) throws CodecException {
-        final int rawSize = raw.getValue().readableBytes();
-        final KEY key = keyCodec.fromCodecBuffer(raw.getKey());
-        final VALUE value = valueCodec.fromCodecBuffer(raw.getValue());
-        return Table.newKeyValue(key, value, rawSize);
+        final CodecBuffer keyBuffer = raw.getKey();
+        final KEY key = keyBuffer.readableBytes() > 0 ? keyCodec.fromCodecBuffer(keyBuffer) : null;
+
+        final CodecBuffer valueBuffer = raw.getValue();
+        final int valueByteSize = valueBuffer.readableBytes();
+        final VALUE value = valueByteSize > 0 ? valueCodec.fromCodecBuffer(valueBuffer) : null;
+
+        return Table.newKeyValue(key, value, valueByteSize);
       }
     };
   }
@@ -572,7 +576,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     KeyValue<KEY, VALUE> convert(KeyValue<byte[], byte[]> raw) throws CodecException {
-      return Table.newKeyValue(decodeKey(raw.getKey()), decodeValue(raw.getValue()));
+      final byte[] valueBytes = raw.getValue();
+      return Table.newKeyValue(decodeKey(raw.getKey()), decodeValue(valueBytes), valueBytes.length);
     }
   }
 
