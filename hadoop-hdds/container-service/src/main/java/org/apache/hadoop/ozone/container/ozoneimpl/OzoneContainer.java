@@ -90,6 +90,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
@@ -193,8 +194,7 @@ public class OzoneContainer {
         OZONE_RECOVERING_CONTAINER_TIMEOUT,
         OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.witnessedContainerMetadataStore = WitnessedContainerMetadataStoreImpl.get(conf);
-    containerSet = ContainerSet.newRwContainerSet(witnessedContainerMetadataStore.getContainerIdsTable(),
-        recoveringContainerTimeout);
+    containerSet = ContainerSet.newRwContainerSet(witnessedContainerMetadataStore, recoveringContainerTimeout);
     metadataScanner = null;
 
     metrics = ContainerMetrics.create(conf);
@@ -344,8 +344,8 @@ public class OzoneContainer {
       for (Thread volumeThread : volumeThreads) {
         volumeThread.join();
       }
-      try (TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, String>> itr =
-               containerSet.getContainerIdsTable().iterator()) {
+      try (TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, ContainerCreateInfo>> itr =
+               getWitnessedContainerMetadataStore().getContainerIdsTable().iterator()) {
         final Map<ContainerID, Long> containerIds = new HashMap<>();
         while (itr.hasNext()) {
           containerIds.put(itr.next().getKey(), 0L);
@@ -668,4 +668,7 @@ public class OzoneContainer {
     }
   }
 
+  public WitnessedContainerMetadataStore getWitnessedContainerMetadataStore() {
+    return witnessedContainerMetadataStore;
+  }
 }

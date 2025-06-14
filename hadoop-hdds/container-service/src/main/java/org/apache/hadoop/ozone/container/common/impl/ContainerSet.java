@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Message;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -43,11 +44,12 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,24 +68,26 @@ public class ContainerSet implements Iterable<Container<?>> {
       new ConcurrentSkipListMap<>();
   private final Clock clock;
   private long recoveringTimeout;
-  private final Table<ContainerID, String> containerIdsTable;
+  @Nullable
+  private final WitnessedContainerMetadataStore metadataStore;
 
   public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
     return new ContainerSet(null, recoveringTimeout);
   }
 
-  public static ContainerSet newRwContainerSet(Table<ContainerID, String> containerIdsTable, long recoveringTimeout) {
-    Objects.requireNonNull(containerIdsTable, "containerIdsTable == null");
-    return new ContainerSet(containerIdsTable, recoveringTimeout);
+  public static ContainerSet newRwContainerSet(
+      WitnessedContainerMetadataStore metadataStore, long recoveringTimeout) {
+    Objects.requireNonNull(metadataStore, "WitnessedContainerMetadataStore == null");
+    return new ContainerSet(metadataStore, recoveringTimeout);
   }
 
-  private ContainerSet(Table<ContainerID, String> continerIdsTable, long recoveringTimeout) {
-    this(continerIdsTable, recoveringTimeout, null);
+  private ContainerSet(WitnessedContainerMetadataStore metadataStore, long recoveringTimeout) {
+    this(metadataStore, recoveringTimeout, null);
   }
 
-  ContainerSet(Table<ContainerID, String> continerIdsTable, long recoveringTimeout, Clock clock) {
+  ContainerSet(WitnessedContainerMetadataStore metadataStore, long recoveringTimeout, Clock clock) {
     this.clock = clock != null ? clock : Clock.systemUTC();
-    this.containerIdsTable = continerIdsTable;
+    this.metadataStore = metadataStore;
     this.recoveringTimeout = recoveringTimeout;
   }
 
@@ -146,13 +150,7 @@ public class ContainerSet implements Iterable<Container<?>> {
         LOG.debug("Container with container Id {} is added to containerMap",
             containerId);
       }
-      try {
-        if (containerIdsTable != null) {
-          containerIdsTable.put(ContainerID.valueOf(containerId), containerState.toString());
-        }
-      } catch (IOException e) {
-        throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
-      }
+      updateContainerIdTable(containerId, containerState);
       missingContainerSet.remove(containerId);
       if (container.getContainerData().getState() == RECOVERING) {
         recoveringContainerMap.put(
@@ -164,6 +162,17 @@ public class ContainerSet implements Iterable<Container<?>> {
       throw new StorageContainerException("Container already exists with " +
           "container Id " + containerId,
           ContainerProtos.Result.CONTAINER_EXISTS);
+    }
+  }
+
+  private void updateContainerIdTable(long containerId, State containerState) throws StorageContainerException {
+    if (null != metadataStore) {
+      try {
+        metadataStore.getContainerIdsTable().put(ContainerID.valueOf(containerId),
+            ContainerCreateInfo.valueOf(containerState));
+      } catch (IOException e) {
+        throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
+      }
     }
   }
 
@@ -228,13 +237,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     }
     Container<?> removed = containerMap.remove(containerId);
     if (removeFromDB) {
-      try {
-        if (containerIdsTable != null) {
-          containerIdsTable.delete(ContainerID.valueOf(containerId));
-        }
-      } catch (IOException e) {
-        throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
-      }
+      deleteFromContainerTable(containerId);
     }
     if (removed == null) {
       LOG.debug("Container with containerId {} is not present in " +
@@ -244,6 +247,16 @@ public class ContainerSet implements Iterable<Container<?>> {
       LOG.debug("Container with containerId {} is removed from containerMap",
           containerId);
       return true;
+    }
+  }
+
+  private void deleteFromContainerTable(long containerId) throws StorageContainerException {
+    if (null != metadataStore) {
+      try {
+        metadataStore.getContainerIdsTable().delete(ContainerID.valueOf(containerId));
+      } catch (IOException e) {
+        throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
+      }
     }
   }
 
@@ -459,10 +472,6 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   public Set<Long> getMissingContainerSet() {
     return missingContainerSet;
-  }
-
-  public Table<ContainerID, String> getContainerIdsTable() {
-    return containerIdsTable;
   }
 
   /**
