@@ -194,6 +194,9 @@ public class ContainerManagerImpl implements ContainerManager {
     if (pipelines.isEmpty()) {
       try {
         pipeline = pipelineManager.createPipeline(replicationConfig);
+        if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.EC) {
+          pipelineManager.openPipeline(pipeline.getId());
+        }
         pipelineManager.waitPipelineReady(pipeline.getId(), 0);
       } catch (IOException e) {
         scmContainerManagerMetrics.incNumFailureCreateContainers();

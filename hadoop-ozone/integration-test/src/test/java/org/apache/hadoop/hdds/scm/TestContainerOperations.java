@@ -34,6 +34,9 @@ import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -264,5 +267,22 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     } finally {
       nm.setNodeOperationalState(node, originalState);
     }
+  }
+
+  @Test
+  public void testCreateRatis() throws Exception {
+    testCreateContainer(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+  }
+
+  @Test
+  public void testCreateEC() throws Exception {
+    ECReplicationConfig ecConfig = new ECReplicationConfig(3, 2);
+    testCreateContainer(ecConfig);
+  }
+
+  private void testCreateContainer(ReplicationConfig replicationConfig) throws Exception {
+    ContainerWithPipeline container = storageClient.createContainer(replicationConfig, OzoneConsts.OZONE);
+    assertEquals(container.getContainerInfo().getContainerID(),
+        storageClient.getContainer(container.getContainerInfo().getContainerID()).getContainerID());
   }
 }
