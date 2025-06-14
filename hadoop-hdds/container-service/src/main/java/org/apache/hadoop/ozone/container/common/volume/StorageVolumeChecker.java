@@ -65,10 +65,7 @@ public class StorageVolumeChecker {
 
   private AsyncChecker<Boolean, VolumeCheckResult> delegateChecker;
 
-  private final AtomicLong numVolumeChecks = new AtomicLong(0);
-  private final AtomicLong numAllVolumeChecks = new AtomicLong(0);
-  private final AtomicLong numAllVolumeSetsChecks = new AtomicLong(0);
-  private final AtomicLong numSkippedChecks = new AtomicLong(0);
+  private final StorageVolumeCheckerMetrics metrics;
 
   /**
    * Max allowed time for a disk check in milliseconds. If the check
@@ -107,6 +104,8 @@ public class StorageVolumeChecker {
    */
   public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
       String threadNamePrefix) {
+
+    metrics = StorageVolumeCheckerMetrics.create();
 
     this.timer = timer;
 
@@ -165,7 +164,7 @@ public class StorageVolumeChecker {
   public synchronized void checkAllVolumeSets() {
     final long gap = timer.monotonicNow() - lastAllVolumeSetsCheckComplete;
     if (gap < minDiskCheckGapMs) {
-      numSkippedChecks.incrementAndGet();
+      metrics.incNumSkippedChecks();
       if (LOG.isTraceEnabled()) {
         LOG.trace(
             "Skipped checking all volumes, time since last check {} is less " +
@@ -181,7 +180,7 @@ public class StorageVolumeChecker {
       }
 
       lastAllVolumeSetsCheckComplete = timer.monotonicNow();
-      numAllVolumeSetsChecks.incrementAndGet();
+      metrics.incNumAllVolumeSetsChecks();
     } catch (IOException e) {
       LOG.warn("Exception while checking disks", e);
     }
@@ -232,7 +231,7 @@ public class StorageVolumeChecker {
           maxAllowedTimeForCheckMs);
     }
 
-    numAllVolumeChecks.incrementAndGet();
+    metrics.incNumAllVolumeChecks();
     synchronized (this) {
       // All volumes that have not been detected as healthy should be
       // considered failed. This is a superset of 'failedVolumes'.
@@ -277,7 +276,7 @@ public class StorageVolumeChecker {
     Optional<ListenableFuture<VolumeCheckResult>> olf =
         delegateChecker.schedule(volume, null);
     if (olf.isPresent()) {
-      numVolumeChecks.incrementAndGet();
+      metrics.incNumVolumeChecks();
       Futures.addCallback(olf.get(),
           new ResultHandler(volume,
               ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(),
@@ -401,6 +400,7 @@ public class StorageVolumeChecker {
       periodicDiskChecker.cancel(true);
       diskCheckerservice.shutdownNow();
       checkVolumeResultHandlerExecutorService.shutdownNow();
+      metrics.unregister();
       try {
         delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
       } catch (InterruptedException e) {
@@ -422,32 +422,8 @@ public class StorageVolumeChecker {
     delegateChecker = testDelegate;
   }
 
-  /**
-   * Return the number of {@link #checkVolume} invocations.
-   */
-  public long getNumVolumeChecks() {
-    return numVolumeChecks.get();
-  }
-
-  /**
-   * Return the number of {@link #checkAllVolumes(Collection)} ()} invocations.
-   */
-  public long getNumAllVolumeChecks() {
-    return numAllVolumeChecks.get();
-  }
-
-  /**
-   * Return the number of {@link #checkAllVolumeSets()} invocations.
-   */
-  public long getNumAllVolumeSetsChecks() {
-    return numAllVolumeSetsChecks.get();
-  }
-
-  /**
-   * Return the number of checks skipped because the minimum gap since the
-   * last check had not elapsed.
-   */
-  public long getNumSkippedChecks() {
-    return numSkippedChecks.get();
+  @VisibleForTesting
+  public StorageVolumeCheckerMetrics getMetrics() {
+    return metrics;
   }
 }
