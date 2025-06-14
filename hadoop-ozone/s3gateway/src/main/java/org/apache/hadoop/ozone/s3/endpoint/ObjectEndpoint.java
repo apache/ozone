@@ -40,6 +40,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CHECKSUM_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
@@ -342,6 +343,13 @@ public class ObjectEndpoint extends EndpointBase {
           output.getMetadata().put(ETAG, eTag);
         }
       }
+
+      String encodedClientETag = headers.getHeaderString(CHECKSUM_HEADER);
+      if (S3Utils.isEtagMisMatch(encodedClientETag, eTag)) {
+        delete(bucketName, keyPath, uploadID, null);
+        throw newError(S3ErrorTable.BAD_DIGEST, eTag);
+      }
+
       getMetrics().incPutKeySuccessLength(putLength);
       perf.appendSizeBytes(putLength);
       return Response.ok()
@@ -887,7 +895,6 @@ public class ObjectEndpoint extends EndpointBase {
     List<CompleteMultipartUploadRequest.Part> partList =
         multipartUploadRequest.getPartList();
 
-    OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
       for (CompleteMultipartUploadRequest.Part part : partList) {
         partsMap.put(part.getPartNumber(), part.getETag());
@@ -896,15 +903,21 @@ public class ObjectEndpoint extends EndpointBase {
         LOG.debug("Parts map {}", partsMap);
       }
 
-      omMultipartUploadCompleteInfo = getClientProtocol()
+      OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo = getClientProtocol()
           .completeMultipartUpload(volume.getName(), bucket, key, uploadID,
               partsMap);
+      String serverEtag = omMultipartUploadCompleteInfo.getHash();
+      String encodedClientETag = headers.getHeaderString(CHECKSUM_HEADER);
+      if (S3Utils.isEtagMisMatch(encodedClientETag, serverEtag)) {
+        abortMultipartUpload(volume, bucket, key, uploadID);
+        throw newError(S3ErrorTable.BAD_DIGEST, serverEtag);
+      }
+
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
           new CompleteMultipartUploadResponse();
       completeMultipartUploadResponse.setBucket(bucket);
       completeMultipartUploadResponse.setKey(key);
-      completeMultipartUploadResponse.setETag(
-          wrapInQuotes(omMultipartUploadCompleteInfo.getHash()));
+      completeMultipartUploadResponse.setETag(wrapInQuotes(serverEtag));
       // Location also setting as bucket name.
       completeMultipartUploadResponse.setLocation(bucket);
       AUDIT.logWriteSuccess(
