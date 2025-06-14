@@ -81,6 +81,47 @@ For example:
 
 Now, all data written to `/vol1/encrypted_bucket` will be encrypted at rest. As long as the client is configured correctly to use the key, such encryption is completely transparent to the end users.
 
+### Performance Optimization for TDE
+
+Since Ozone leverages Hadoop's encryption library, performance optimization strategies similar to HDFS encryption apply:
+
+{{<requirements warning>}}
+**Hardware Acceleration: Architecture Support**
+The OpenSSL-based hardware acceleration discussed below is currently only supported on x86 architectures. ARM64 architectures are not supported at this time.
+{{</requirements>}}
+
+1. **Enable AES-NI Hardware Acceleration:**
+  * Install OpenSSL development libraries: On most Linux distributions, install `openssl-devel` (or `libssl-dev` on Debian/Ubuntu) to provide `libcrypto.so`, which is utilized by the Hadoop native library for hardware-accelerated encryption.
+   * Use servers with CPUs that support the AES-NI instruction set and RDRAND instruction (most modern Intel and AMD CPUs do)
+
+2. **Install and Configure Native Libraries:**
+   * Ensure that the native `libhadoop.so` library is properly installed
+   ```shell
+   ozone debug checknative
+   ```
+   * The output should show "true" for the hadoop library
+   * To troubleshoot native library loading issues on Ozone Datanode and applications, configure their log level to DEBUG. The log messages below are examples, and actual paths may vary. The following log message indicates that the libhadoop native library fails to load:
+   ```
+   25/06/14 01:25:21 DEBUG util.NativeCodeLoader: Trying to load the custom-built native-hadoop library...
+   25/06/14 01:25:21 DEBUG util.NativeCodeLoader: Failed to load native-hadoop with error: java.lang.UnsatisfiedLinkError: no hadoop in java.library.path
+   25/06/14 01:25:21 DEBUG util.NativeCodeLoader: java.library.path=/opt/hadoop/lib/native:/usr/java/packages/lib/amd64:/usr/lib64:/lib64:/lib:/usr/lib
+   25/06/14 01:25:21 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+   ```
+   * And the following log message indicates OpenSSL library fails to load:
+   ```
+   25/06/14 01:18:53 DEBUG crypto.OpensslCipher: Failed to load OpenSSL Cipher.
+   java.lang.UnsatisfiedLinkError: Cannot load libcrypto.so (libcrypto.so: cannot open shared object file: No such file or directory)!
+   at org.apache.hadoop.crypto.OpensslCipher.initIDs(Native Method)
+   at org.apache.hadoop.crypto.OpensslCipher.<clinit>(OpensslCipher.java:89)
+   at org.apache.hadoop.crypto.OpensslAesCtrCryptoCodec.<init>(OpensslAesCtrCryptoCodec.java:50)
+   ```
+
+3. **Validate Hardware Acceleration:**
+   * To verify if AES-NI is being utilized, check OpenSSL acceleration:
+   ```shell
+   openssl speed -evp aes-256-ctr
+   ```
+
 ### Using Transparent Data Encryption from S3G
 
 Ozone’s S3 Gateway (S3G) allows you to access encrypted buckets. However, it's important to note that **Ozone does not support S3-SSE (Server-Side Encryption) or S3-CSE (Client-Side Encryption) in the way AWS S3 does.** That said, Ozone S3 buckets can be encrypted using Ranger KMS or Hadoop KMS to provide a guarantee similar to S3-SSE with client-supplied keys (SSE-C).
@@ -180,3 +221,4 @@ Refer to the Ranger documentation for detailed instructions on configuring KMS p
 
 * For more background on Transparent Data Encryption concepts, you can refer to the [Transparent Encryption in HDFS documentation](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/TransparentEncryption.html).
 * For detailed information on Hadoop KMS, see the [Hadoop KMS documentation](https://hadoop.apache.org/docs/r3.4.1/hadoop-kms/index.html).
+* For OpenSSL crypto performance tuning, refer to [Intel's AES-NI optimization guide](https://software.intel.com/content/www/us/en/develop/articles/intel-advanced-encryption-standard-aes-instructions-set.html).
