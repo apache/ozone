@@ -19,9 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.mock;
 
-import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -43,7 +41,6 @@ public class TestBucketDelete {
   private OzoneClient clientStub;
   private ObjectStore objectStoreStub;
   private BucketEndpoint bucketEndpoint;
-  private HttpHeaders httpHeaders;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -58,12 +55,11 @@ public class TestBucketDelete {
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
         .build();
-    httpHeaders = mock(HttpHeaders.class);
   }
 
   @Test
   public void testBucketEndpoint() throws Exception {
-    Response response = bucketEndpoint.delete(bucketName, httpHeaders);
+    Response response = bucketEndpoint.delete(bucketName);
     assertEquals(HttpStatus.SC_NO_CONTENT, response.getStatus());
 
   }
@@ -71,7 +67,7 @@ public class TestBucketDelete {
   @Test
   public void testDeleteWithNoSuchBucket() throws Exception {
     try {
-      bucketEndpoint.delete("unknownbucket", httpHeaders);
+      bucketEndpoint.delete("unknownbucket");
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
@@ -86,7 +82,7 @@ public class TestBucketDelete {
     try {
       ObjectStoreStub stub = (ObjectStoreStub) objectStoreStub;
       stub.setBucketEmptyStatus(bucketName, false);
-      bucketEndpoint.delete(bucketName, httpHeaders);
+      bucketEndpoint.delete(bucketName);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.BUCKET_NOT_EMPTY.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.BUCKET_NOT_EMPTY.getErrorMessage(),

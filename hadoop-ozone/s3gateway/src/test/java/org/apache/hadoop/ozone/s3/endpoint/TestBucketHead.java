@@ -20,9 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
 
-import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -39,13 +37,11 @@ public class TestBucketHead {
   private String bucketName = OzoneConsts.BUCKET;
   private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
-  private HttpHeaders httpHeaders;
 
   @BeforeEach
   public void setup() throws Exception {
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
-    httpHeaders = mock(HttpHeaders.class);
 
     // Create HeadBucket and setClient to OzoneClientStub
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
@@ -56,7 +52,7 @@ public class TestBucketHead {
   @Test
   public void testHeadBucket() throws Exception {
 
-    Response response = bucketEndpoint.head(bucketName, httpHeaders);
+    Response response = bucketEndpoint.head(bucketName);
     assertEquals(200, response.getStatus());
 
   }
@@ -64,7 +60,7 @@ public class TestBucketHead {
   @Test
   public void testHeadFail() throws Exception {
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.head("unknownbucket", httpHeaders));
+        bucketEndpoint.head("unknownbucket"));
     assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
     assertEquals("NoSuchBucket", e.getCode());
   }

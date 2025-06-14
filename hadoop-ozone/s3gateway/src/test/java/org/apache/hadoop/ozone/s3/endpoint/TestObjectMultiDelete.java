@@ -55,7 +55,7 @@ public class TestObjectMultiDelete {
     mdr.getObjects().add(new DeleteObject("key4"));
 
     //WHEN
-    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr, null);
+    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
 
     //THEN
     Set<String> keysAtTheEnd = Sets.newHashSet(bucket.listKeys("")).stream()
@@ -88,7 +88,7 @@ public class TestObjectMultiDelete {
     mdr.getObjects().add(new DeleteObject("key4"));
 
     //WHEN
-    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr, null);
+    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
 
     //THEN
     Set<String> keysAtTheEnd = Sets.newHashSet(bucket.listKeys("")).stream()

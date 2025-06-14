@@ -121,7 +121,7 @@ public class TestS3GatewayAuditLog {
   public void testHeadBucket() throws Exception {
     parametersMap.put("bucket", "[bucket]");
 
-    bucketEndpoint.head(bucketName, null);
+    bucketEndpoint.head(bucketName);
 
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
         "op=HEAD_BUCKET {bucket=[bucket], x-amz-request-id=" + 
