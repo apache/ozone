@@ -55,8 +55,6 @@ public class TestBucketDelete {
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
         .build();
-
-
   }
 
   @Test
