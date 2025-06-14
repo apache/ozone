@@ -85,10 +85,10 @@ Now, all data written to `/vol1/encrypted_bucket` will be encrypted at rest. As 
 
 Since Ozone leverages Hadoop's encryption library, performance optimization strategies similar to HDFS encryption apply:
 
-{{<requirements warning >}}
+{{<requirements warning>}}
 **Hardware Acceleration: Architecture Support**
 The OpenSSL-based hardware acceleration discussed below is currently only supported on x86 architectures. ARM64 architectures are not supported at this time.
-{{</requirements >}}
+{{</requirements>}}
 
 1. **Enable AES-NI Hardware Acceleration:**
   * Install OpenSSL development libraries: On most Linux distributions, install `openssl-devel` (or `libssl-dev` on Debian/Ubuntu) to provide `libcrypto.so`, which is utilized by the Hadoop native library for hardware-accelerated encryption.
