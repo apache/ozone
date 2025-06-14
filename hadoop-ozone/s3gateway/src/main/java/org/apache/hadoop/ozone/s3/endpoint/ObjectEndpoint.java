@@ -1252,8 +1252,8 @@ public class ObjectEndpoint extends EndpointBase {
     DigestInputStream sourceDigestInputStream = null;
 
     String sourceBucketOwner = volume.getBucket(sourceBucket).getOwner();
-    String destBucketOwner = volume.getBucket(destBucket).getOwner();
-    S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, destBucket, sourceBucketOwner, destBucketOwner);
+    // The destBucket owner has already been checked in the caller method
+    S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, destBucket, sourceBucketOwner, null);
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);
