@@ -108,7 +108,7 @@ public class S3Owner {
     if (expectedBucketOwner.equals(bucketOwner)) {
       return;
     }
-    throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISSMATCH, bucketName);
+    throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, bucketName);
   }
 
   /**
@@ -131,11 +131,11 @@ public class S3Owner {
     final String expectedDestOwner = headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER);
 
     if (expectedSourceOwner != null && sourceOwner != null && !sourceOwner.equals(expectedSourceOwner)) {
-      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISSMATCH, bucketName);
+      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, bucketName);
     }
 
     if (expectedDestOwner != null && destOwner != null && !destOwner.equals(expectedDestOwner)) {
-      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISSMATCH, bucketName);
+      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, bucketName);
     }
   }
 }

@@ -89,7 +89,7 @@ public class TestS3Owner {
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("wrong");
     OS3Exception exception =
         assertThrows(OS3Exception.class, () -> S3Owner.verifyBucketOwnerCondition(headers, BUCKET_NAME, "test"));
-    assertThat(exception.getErrorMessage()).isEqualTo(S3ErrorTable.BUCKET_OWNER_MISSMATCH.getErrorMessage());
+    assertThat(exception.getErrorMessage()).isEqualTo(S3ErrorTable.BUCKET_OWNER_MISMATCH.getErrorMessage());
   }
 
   @Test
@@ -106,7 +106,7 @@ public class TestS3Owner {
     OS3Exception exception =
         assertThrows(OS3Exception.class,
             () -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, BUCKET_NAME, "wrong", "dest"));
-    assertThat(exception.getErrorMessage()).isEqualTo(S3ErrorTable.BUCKET_OWNER_MISSMATCH.getErrorMessage());
+    assertThat(exception.getErrorMessage()).isEqualTo(S3ErrorTable.BUCKET_OWNER_MISMATCH.getErrorMessage());
   }
 
   @Test
@@ -116,6 +116,6 @@ public class TestS3Owner {
     OS3Exception exception =
         assertThrows(OS3Exception.class,
             () -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, BUCKET_NAME, "source", "wrong"));
-    assertThat(exception.getErrorMessage()).isEqualTo(S3ErrorTable.BUCKET_OWNER_MISSMATCH.getErrorMessage());
+    assertThat(exception.getErrorMessage()).isEqualTo(S3ErrorTable.BUCKET_OWNER_MISMATCH.getErrorMessage());
   }
 }

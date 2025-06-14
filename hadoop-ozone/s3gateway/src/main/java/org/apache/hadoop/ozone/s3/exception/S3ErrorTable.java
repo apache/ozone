@@ -156,7 +156,7 @@ public final class S3ErrorTable {
       "a valid custom EC storage config for if using STANDARD_IA.",
       HTTP_BAD_REQUEST);
 
-  public static final OS3Exception BUCKET_OWNER_MISSMATCH = new OS3Exception(
+  public static final OS3Exception BUCKET_OWNER_MISMATCH = new OS3Exception(
       "Access Denied", "User doesn't have permission to access this resource due to a " +
       "bucket ownership mismatch.", HTTP_FORBIDDEN);
 
