@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
 import java.util.Collections;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
+import org.apache.hadoop.crypto.OpensslCipher;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
@@ -39,12 +40,20 @@ import picocli.CommandLine;
 public class CheckNative extends AbstractSubcommand implements Callable<Void>, DebugSubcommand {
 
   private static class LibraryCheckResult {
-    final boolean loaded;
-    final String detail;
+    private final boolean loaded;
+    private final String detail;
 
     LibraryCheckResult(boolean loaded, String detail) {
       this.loaded = loaded;
       this.detail = detail;
+    }
+
+    public boolean isLoaded() {
+      return loaded;
+    }
+
+    public String getDetail() {
+      return detail;
     }
   }
 
@@ -75,16 +84,16 @@ public class CheckNative extends AbstractSubcommand implements Callable<Void>, D
           ErasureCodeNative::getLoadingFailureReason,
           ErasureCodeNative::getLibraryName
       );
-      isalLoaded = isalStatus.loaded;
-      isalDetail = isalStatus.detail;
+      isalLoaded = isalStatus.isLoaded();
+      isalDetail = isalStatus.getDetail();
 
       // Check OpenSSL status
       LibraryCheckResult opensslStatus = getLibraryStatus(
-          org.apache.hadoop.crypto.OpensslCipher::getLoadingFailureReason,
-          org.apache.hadoop.crypto.OpensslCipher::getLibraryName
+          OpensslCipher::getLoadingFailureReason,
+          OpensslCipher::getLibraryName
       );
-      opensslLoaded = opensslStatus.loaded;
-      opensslDetail = opensslStatus.detail;
+      opensslLoaded = opensslStatus.isLoaded();
+      opensslDetail = opensslStatus.getDetail();
     }
     out().println("Native library checking:");
     out().printf("hadoop:  %b %s%n", nativeHadoopLoaded,
