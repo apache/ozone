@@ -37,7 +37,8 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
  */
 public class TestS3Owner {
 
-  private static final String BUCKET_NAME = "test-bucket";
+  private static final String SOURCE_BUCKET_NAME = "source-bucket";
+  private static final String DEST_BUCKET_NAME = "dest-bucket";
   private HttpHeaders headers;
 
   @BeforeEach
@@ -47,48 +48,54 @@ public class TestS3Owner {
 
   @Test
   public void testHeaderIsNull() {
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerCondition(null, BUCKET_NAME, "test"));
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(null, BUCKET_NAME, "test", "test"));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerCondition(null, SOURCE_BUCKET_NAME, "test"));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(null, SOURCE_BUCKET_NAME, "test",
+        SOURCE_BUCKET_NAME, "test"));
   }
 
   @Test
   public void testServerBucketOwnerIsNull() {
     when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn("test");
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("test");
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerCondition(headers, BUCKET_NAME, null));
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, BUCKET_NAME, null, "test"));
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, BUCKET_NAME, "test", null));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerCondition(headers, SOURCE_BUCKET_NAME, null));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, SOURCE_BUCKET_NAME, null,
+        SOURCE_BUCKET_NAME, "test"));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, SOURCE_BUCKET_NAME, "test",
+        SOURCE_BUCKET_NAME, null));
   }
 
   @ParameterizedTest
   @NullAndEmptySource
   public void testS3OwnerNotEnable(String bucketOwnerHeader) {
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(bucketOwnerHeader);
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerCondition(headers, BUCKET_NAME, "test"));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerCondition(headers, SOURCE_BUCKET_NAME, "test"));
 
     when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn(bucketOwnerHeader);
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(null, BUCKET_NAME, "test", "test"));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(null, SOURCE_BUCKET_NAME, "test",
+        SOURCE_BUCKET_NAME, "test"));
   }
 
   @Test
   public void testClientBucketOwnerIsNull() {
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerCondition(headers, BUCKET_NAME, null));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerCondition(headers, SOURCE_BUCKET_NAME, null));
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("test");
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, BUCKET_NAME, null, "test"));
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, BUCKET_NAME, "test", null));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, SOURCE_BUCKET_NAME, null,
+        SOURCE_BUCKET_NAME, "test"));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, SOURCE_BUCKET_NAME, "test",
+        SOURCE_BUCKET_NAME, null));
   }
 
   @Test
   public void testPassExpectedBucketOwner() {
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("test");
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerCondition(headers, BUCKET_NAME, "test"));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerCondition(headers, SOURCE_BUCKET_NAME, "test"));
   }
 
   @Test
   public void testFailExpectedBucketOwner() {
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("wrong");
     OS3Exception exception =
-        assertThrows(OS3Exception.class, () -> S3Owner.verifyBucketOwnerCondition(headers, BUCKET_NAME, "test"));
+        assertThrows(OS3Exception.class, () -> S3Owner.verifyBucketOwnerCondition(headers, SOURCE_BUCKET_NAME, "test"));
     assertThat(exception.getErrorMessage()).isEqualTo(S3ErrorTable.BUCKET_OWNER_MISMATCH.getErrorMessage());
   }
 
@@ -96,7 +103,8 @@ public class TestS3Owner {
   public void testCopyOperationPass() {
     when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn("source");
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("dest");
-    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, BUCKET_NAME, "source", "dest"));
+    assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, SOURCE_BUCKET_NAME, "source",
+        SOURCE_BUCKET_NAME, "dest"));
   }
 
   @Test
@@ -105,8 +113,10 @@ public class TestS3Owner {
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("dest");
     OS3Exception exception =
         assertThrows(OS3Exception.class,
-            () -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, BUCKET_NAME, "wrong", "dest"));
+            () -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, SOURCE_BUCKET_NAME, "wrong",
+                DEST_BUCKET_NAME, "dest"));
     assertThat(exception.getErrorMessage()).isEqualTo(S3ErrorTable.BUCKET_OWNER_MISMATCH.getErrorMessage());
+    assertThat(exception.getResource()).isEqualTo(SOURCE_BUCKET_NAME);
   }
 
   @Test
@@ -115,7 +125,9 @@ public class TestS3Owner {
     when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("dest");
     OS3Exception exception =
         assertThrows(OS3Exception.class,
-            () -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, BUCKET_NAME, "source", "wrong"));
+            () -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, SOURCE_BUCKET_NAME, "source",
+                DEST_BUCKET_NAME, "wrong"));
     assertThat(exception.getErrorMessage()).isEqualTo(S3ErrorTable.BUCKET_OWNER_MISMATCH.getErrorMessage());
+    assertThat(exception.getResource()).isEqualTo(DEST_BUCKET_NAME);
   }
 }

@@ -114,14 +114,16 @@ public class S3Owner {
   /**
    * Verify the bucket owner condition on copy operation.
    *
-   * @param headers       HTTP headers
-   * @param bucketName    bucket name
-   * @param sourceOwner   source bucket owner
-   * @param destOwner     destination bucket owner
+   * @param headers          HTTP headers
+   * @param sourceBucketName source bucket name
+   * @param sourceOwner      source bucket owner
+   * @param destBucketName   dest bucket name
+   * @param destOwner        destination bucket owner
    * @throws OS3Exception if the expected source or destination bucket owner does not match
    */
-  public static void verifyBucketOwnerConditionOnCopyOperation(HttpHeaders headers, String bucketName,
-                                                               String sourceOwner, String destOwner)
+  public static void verifyBucketOwnerConditionOnCopyOperation(HttpHeaders headers, String sourceBucketName,
+                                                               String sourceOwner, String destBucketName,
+                                                               String destOwner)
       throws OS3Exception {
     if (headers == null) {
       return;
@@ -131,11 +133,11 @@ public class S3Owner {
     final String expectedDestOwner = headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER);
 
     if (expectedSourceOwner != null && sourceOwner != null && !sourceOwner.equals(expectedSourceOwner)) {
-      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, bucketName);
+      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, sourceBucketName);
     }
 
     if (expectedDestOwner != null && destOwner != null && !destOwner.equals(expectedDestOwner)) {
-      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, bucketName);
+      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, destBucketName);
     }
   }
 }
