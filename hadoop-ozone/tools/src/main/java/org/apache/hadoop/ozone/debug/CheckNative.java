@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
 
 import java.util.Collections;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
@@ -37,27 +38,59 @@ import picocli.CommandLine;
 @MetaInfServices(DebugSubcommand.class)
 public class CheckNative extends AbstractSubcommand implements Callable<Void>, DebugSubcommand {
 
+  private static class LibraryCheckResult {
+    final boolean loaded;
+    final String detail;
+
+    LibraryCheckResult(boolean loaded, String detail) {
+      this.loaded = loaded;
+      this.detail = detail;
+    }
+  }
+
+  private LibraryCheckResult getLibraryStatus(
+      Supplier<String> failureReasonSupplier,
+      Supplier<String> libraryNameSupplier) {
+    String failureReason = failureReasonSupplier.get();
+    if (failureReason != null) {
+      return new LibraryCheckResult(false, failureReason);
+    } else {
+      return new LibraryCheckResult(true, libraryNameSupplier.get());
+    }
+  }
+
   @Override
   public Void call() throws Exception {
     boolean nativeHadoopLoaded = org.apache.hadoop.util.NativeCodeLoader.isNativeCodeLoaded();
     String hadoopLibraryName = "";
     String isalDetail = "";
     boolean isalLoaded = false;
+    String opensslDetail = "";
+    boolean opensslLoaded = false;
+
     if (nativeHadoopLoaded) {
       hadoopLibraryName = org.apache.hadoop.util.NativeCodeLoader.getLibraryName();
 
-      isalDetail = ErasureCodeNative.getLoadingFailureReason();
-      if (isalDetail != null) {
-        isalLoaded = false;
-      } else {
-        isalDetail = ErasureCodeNative.getLibraryName();
-        isalLoaded = true;
-      }
+      LibraryCheckResult isalStatus = getLibraryStatus(
+          ErasureCodeNative::getLoadingFailureReason,
+          ErasureCodeNative::getLibraryName
+      );
+      isalLoaded = isalStatus.loaded;
+      isalDetail = isalStatus.detail;
+
+      // Check OpenSSL status
+      LibraryCheckResult opensslStatus = getLibraryStatus(
+          org.apache.hadoop.crypto.OpensslCipher::getLoadingFailureReason,
+          org.apache.hadoop.crypto.OpensslCipher::getLibraryName
+      );
+      opensslLoaded = opensslStatus.loaded;
+      opensslDetail = opensslStatus.detail;
     }
     out().println("Native library checking:");
     out().printf("hadoop:  %b %s%n", nativeHadoopLoaded,
         hadoopLibraryName);
     out().printf("ISA-L:   %b %s%n", isalLoaded, isalDetail);
+    out().printf("OpenSSL: %b %s%n", opensslLoaded, opensslDetail);
 
     // Attempt to load the rocks-tools lib
     boolean nativeRocksToolsLoaded = NativeLibraryLoader.getInstance().loadLibrary(
