@@ -28,7 +28,9 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,9 +43,11 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
@@ -124,6 +128,16 @@ public class TestBackgroundContainerDataScanner extends
     verifyContainerMarkedUnhealthy(openContainer, never());
     // Deleted containers should not be marked unhealthy
     verifyContainerMarkedUnhealthy(deletedContainer, never());
+  }
+
+  @Test
+  @Override
+  public void testUnhealthyContainersTriggersVolumeScan() throws Exception {
+    try (MockedStatic<StorageVolumeUtil> mockedStatic = mockStatic(StorageVolumeUtil.class)) {
+      scanner.runIteration();
+      verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
+      mockedStatic.verify(() -> StorageVolumeUtil.onFailure(corruptData.getContainerData().getVolume()), times(1));
+    }
   }
 
   @Test
