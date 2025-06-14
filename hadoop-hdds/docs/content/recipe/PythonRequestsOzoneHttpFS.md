@@ -33,31 +33,9 @@ This tutorial demonstrates how to access Apache Ozone using the HTTPFS REST API 
 
 ### 1️⃣ Start Ozone in Docker
 
-Download the latest Docker Compose configuration file:
-
+Download the latest Docker Compose file for Ozone and start the cluster with 3 DataNodes:
 ```bash
-curl -O https://raw.githubusercontent.com/apache/ozone-docker/refs/heads/latest/docker-compose.yaml
-```
-
-Add httpfs container configurations and environment variable overrides at the bottom of `docker-compose.yaml`:
-
-```yaml
-   httpfs:
-     <<: *image
-     ports:
-       - 14000:14000
-     environment:
-       CORE-SITE.XML_fs.defaultFS: "ofs://om"
-       CORE-SITE.XML_hadoop.proxyuser.hadoop.hosts: "*"
-       CORE-SITE.XML_hadoop.proxyuser.hadoop.groups: "*"
-       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
-       <<: *common-config
-     command: [ "ozone","httpfs" ]
-```
-
-Start the cluster:
-
-```bash
+curl -O https://raw.githubusercontent.com/apache/ozone-docker/latest/docker-compose.yaml
 docker compose up -d --scale datanode=3
 ```
 
