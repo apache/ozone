@@ -74,11 +74,21 @@ public class DiskBalancerCommandHandler implements CommandHandler {
     try {
       switch (opType) {
       case START:
-        diskBalancerInfo.setShouldRun(true);
+        HddsProtos.NodeOperationalState state = context.getParent().getDatanodeDetails().getPersistedOpState();
+
+        if (state == HddsProtos.NodeOperationalState.IN_SERVICE) {
+          diskBalancerInfo.setShouldRun(true);
+          diskBalancerInfo.setPaused(false);
+        } else {
+          LOG.warn("Cannot start DiskBalancer as node is in {} state. Pausing instead.", state);
+          diskBalancerInfo.setShouldRun(false);
+          diskBalancerInfo.setPaused(true);
+        }
         diskBalancerInfo.updateFromConf(diskBalancerConf);
         break;
       case STOP:
         diskBalancerInfo.setShouldRun(false);
+        diskBalancerInfo.setPaused(false);
         break;
       case UPDATE:
         diskBalancerInfo.updateFromConf(diskBalancerConf);

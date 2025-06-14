@@ -131,7 +131,7 @@ public class TestDiskBalancerService {
     assertEquals(5, svc.getDiskBalancerInfo().getParallelThread());
     assertTrue(svc.getDiskBalancerInfo().isStopAfterDiskEven());
 
-    DiskBalancerInfo newInfo = new DiskBalancerInfo(false, 20.0d, 5L, 10, false);
+    DiskBalancerInfo newInfo = new DiskBalancerInfo(false, 20.0d, 5L, 10, false, false);
     svc.refresh(newInfo);
 
     assertFalse(svc.getDiskBalancerInfo().isShouldRun());
