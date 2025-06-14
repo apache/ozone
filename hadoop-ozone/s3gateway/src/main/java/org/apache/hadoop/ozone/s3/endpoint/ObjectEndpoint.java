@@ -908,9 +908,7 @@ public class ObjectEndpoint extends EndpointBase {
         LOG.debug("Parts map {}", partsMap);
       }
 
-      omMultipartUploadCompleteInfo = getClientProtocol()
-          .completeMultipartUpload(volume.getName(), bucket, key, uploadID,
-              partsMap);
+      omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(key, uploadID, partsMap);
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
           new CompleteMultipartUploadResponse();
       completeMultipartUploadResponse.setBucket(bucket);
