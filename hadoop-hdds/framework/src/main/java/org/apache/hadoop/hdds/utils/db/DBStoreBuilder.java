@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
@@ -33,13 +31,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
@@ -52,7 +47,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.eclipse.jetty.util.StringUtil;
-import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.InfoLogLevel;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
@@ -84,6 +78,7 @@ public final class DBStoreBuilder {
 
   private String dbname;
   private Path dbPath;
+  private Path optionsPath;
   private String dbJmxBeanNameName;
   // Maps added column family names to the column family options they were
   // added with. Value will be null if the column family was not added with
@@ -91,8 +86,6 @@ public final class DBStoreBuilder {
   private Map<String, ManagedColumnFamilyOptions> cfOptions;
   private ConfigurationSource configuration;
   private String rocksDbStat;
-  // RocksDB column family write buffer size
-  private long rocksDbCfWriteBufferSize;
   private RocksDBConfiguration rocksDBConfiguration;
   // Flag to indicate if the RocksDB should be opened readonly.
   private boolean openReadOnly = false;
@@ -134,10 +127,6 @@ public final class DBStoreBuilder {
     this.rocksDbStat = configuration.getTrimmed(
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
-    this.rocksDbCfWriteBufferSize = (long) configuration.getStorageSize(
-        OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE,
-        OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE_DEFAULT,
-        StorageUnit.BYTES);
     this.rocksDBConfiguration = rocksDBConfiguration;
 
     // Get default DBOptions and ColumnFamilyOptions from the default DB
@@ -212,7 +201,7 @@ public final class DBStoreBuilder {
 
     try {
       if (rocksDBOption == null) {
-        rocksDBOption = getDefaultDBOptions(tableConfigs);
+        rocksDBOption = getDefaultDBOptions();
       }
       setDBOptionsProps(rocksDBOption);
       ManagedWriteOptions writeOptions = new ManagedWriteOptions();
@@ -294,8 +283,10 @@ public final class DBStoreBuilder {
    * {@link ManagedColumnFamilyOptions} based on {@code prof}.
    */
   public DBStoreBuilder setProfile(DBProfile prof) {
-    setDBOptions(prof.getDBOptions());
-    setDefaultCFOptions(prof.getColumnFamilyOptions());
+    Path candidateOptionsPath = optionsPath != null ? optionsPath : dbPath;
+    setDBOptions(prof.getDBOptions(candidateOptionsPath));
+    setDefaultCFOptions(prof.getColumnFamilyOptions(candidateOptionsPath,
+        StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY)));
     return this;
   }
 
@@ -314,8 +305,7 @@ public final class DBStoreBuilder {
     Set<TableConfig> tableConfigs = new HashSet<>();
 
     // If default column family was not added, add it with the default options.
-    cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME,
-            getCfOptions(rocksDbCfWriteBufferSize));
+    cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME, getDefaultCFOptions());
 
     for (Map.Entry<String, ManagedColumnFamilyOptions> entry:
         cfOptions.entrySet()) {
@@ -324,8 +314,7 @@ public final class DBStoreBuilder {
 
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
-        tableConfigs.add(new TableConfig(name,
-                getCfOptions(rocksDbCfWriteBufferSize)));
+        tableConfigs.add(new TableConfig(name, getDefaultCFOptions()));
       } else {
         tableConfigs.add(new TableConfig(name, options));
       }
@@ -334,35 +323,17 @@ public final class DBStoreBuilder {
     return tableConfigs;
   }
 
-  private ManagedColumnFamilyOptions getDefaultCfOptions() {
-    return Optional.ofNullable(defaultCfOptions)
-        .orElseGet(defaultCfProfile::getColumnFamilyOptions);
-  }
-
   /**
    * Pass true to disable auto compaction for Column Family by default.
    * Sets Disable auto compaction flag for Default Column Family option
+   *
    * @param defaultCFAutoCompaction
    */
-  public DBStoreBuilder disableDefaultCFAutoCompaction(
-          boolean defaultCFAutoCompaction) {
-    ManagedColumnFamilyOptions defaultCFOptions =
-            getDefaultCfOptions();
+  public DBStoreBuilder disableDefaultCFAutoCompaction(boolean defaultCFAutoCompaction) {
+    ManagedColumnFamilyOptions defaultCFOptions = getDefaultCFOptions();
     defaultCFOptions.setDisableAutoCompactions(defaultCFAutoCompaction);
     setDefaultCFOptions(defaultCFOptions);
     return this;
-  }
-
-  /**
-   * Get default column family options, but with column family write buffer
-   * size limit overridden.
-   * @param writeBufferSize Specify column family write buffer size.
-   * @return ManagedColumnFamilyOptions
-   */
-  private ManagedColumnFamilyOptions getCfOptions(long writeBufferSize) {
-    ManagedColumnFamilyOptions cfOpts = getDefaultCfOptions();
-    cfOpts.setWriteBufferSize(writeBufferSize);
-    return cfOpts;
   }
 
   /**
@@ -374,20 +345,11 @@ public final class DBStoreBuilder {
    * will also have statistics added if they are not turned off in the
    * builder's {@link ConfigurationSource}.
    *
-   * @param tableConfigs Configurations for each column family, used when
-   * reading DB options from the ini file.
-   *
    * @return The {@link ManagedDBOptions} that should be used as the default
    * value for this builder if one is not specified by the caller.
    */
-  private ManagedDBOptions getDefaultDBOptions(
-      Collection<TableConfig> tableConfigs) {
-    ManagedDBOptions dbOptions = getDBOptionsFromFile(tableConfigs);
-
-    if (dbOptions == null) {
-      dbOptions = defaultCfProfile.getDBOptions();
-      LOG.debug("Using RocksDB DBOptions from default profile.");
-    }
+  private ManagedDBOptions getDefaultDBOptions() {
+    ManagedDBOptions dbOptions = defaultCfProfile.getDBOptions(dbPath);
 
     // Apply logging settings.
     if (rocksDBConfiguration.isRocksdbLoggingEnabled()) {
@@ -410,38 +372,19 @@ public final class DBStoreBuilder {
   }
 
   /**
-   * Attempts to construct a {@link ManagedDBOptions} object from the
-   * configuration directory with name equal to {@code database name}.ini,
-   * where {@code database name} is the property set by
-   * {@link DBStoreBuilder#setName(String)}.
+   * Attempts to get RocksDB {@link ManagedColumnFamilyOptions} from an ini config
+   * file. If that file does not exist, the value of {@code getColumnFamilyOptions}
+   * is used instead.
+   *
+   * @return The {@link ManagedColumnFamilyOptions} that should be used as the default
+   * value for this builder if one is not specified by the caller.
    */
-  private ManagedDBOptions getDBOptionsFromFile(
-      Collection<TableConfig> tableConfigs) {
-    ManagedDBOptions option = null;
-
-    List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
-
-    if (StringUtil.isNotBlank(dbname)) {
-      for (TableConfig tc : tableConfigs) {
-        columnFamilyDescriptors.add(tc.getDescriptor());
-      }
-
-      if (!columnFamilyDescriptors.isEmpty()) {
-        try {
-          option = DBConfigFromFile.readFromFile(dbname,
-              columnFamilyDescriptors);
-          if (option != null) {
-            LOG.info("Using RocksDB DBOptions from {}.ini file", dbname);
-          }
-        } catch (IOException ex) {
-          LOG.info("Unable to read RocksDB DBOptions from {}", dbname, ex);
-        } finally {
-          columnFamilyDescriptors.forEach(d -> d.getOptions().close());
-        }
-      }
+  private ManagedColumnFamilyOptions getDefaultCFOptions() {
+    if (Objects.nonNull(defaultCfOptions)) {
+      return defaultCfOptions;
     }
-
-    return option;
+    Path configuredPath = optionsPath != null ? optionsPath : dbPath;
+    return defaultCfProfile.getColumnFamilyOptions(configuredPath, DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME);
   }
 
   private File getDBFile() throws IOException {
