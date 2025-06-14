@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -89,7 +90,7 @@ public class TestRDBStore {
       throws IOException {
     return new RDBStore(dbFile, options, null, new ManagedWriteOptions(), families,
         false, null, false,
-        maxDbUpdatesSizeThreshold, true, null, true);
+        maxDbUpdatesSizeThreshold, true, new OzoneConfiguration(), true);
   }
 
   @BeforeEach

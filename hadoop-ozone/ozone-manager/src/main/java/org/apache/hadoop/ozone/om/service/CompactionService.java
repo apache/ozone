@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -56,6 +57,7 @@ public class CompactionService extends BackgroundService {
   private final AtomicBoolean suspended;
   // list of tables that can be compacted
   private final List<String> compactableTables;
+  private final int manualCompactionMaxSubCompactions;
 
   public CompactionService(OzoneManager ozoneManager, TimeUnit unit, long interval, long timeout,
                            List<String> tables) {
@@ -68,6 +70,8 @@ public class CompactionService extends BackgroundService {
     this.numCompactions = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
     this.compactableTables = validateTables(tables);
+    this.manualCompactionMaxSubCompactions = ozoneManager.getConfiguration().getObject(RocksDBConfiguration.class)
+        .getManualCompactionMaxSubCompactions();
   }
 
   private List<String> validateTables(List<String> tables) {
@@ -140,6 +144,7 @@ public class CompactionService extends BackgroundService {
     try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
       options.setBottommostLevelCompaction(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
       options.setExclusiveManualCompaction(true);
+      options.setMaxSubcompactions(manualCompactionMaxSubCompactions);
       RocksDatabase rocksDatabase = ((RDBStore) omMetadataManager.getStore()).getDb();
 
       try {
