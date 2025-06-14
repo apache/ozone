@@ -362,6 +362,7 @@ public class TestHddsClientUtils {
 
     for (String name : validNames) {
       HddsClientUtils.verifyKeyName(name);
+      HddsClientUtils.verifyKeyName(name + OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX);
     }
   }
 
