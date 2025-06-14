@@ -71,6 +71,7 @@ public class SstFilteringService extends BackgroundService
   private static final int SST_FILTERING_CORE_POOL_SIZE = 1;
 
   public static final String SST_FILTERED_FILE = "sstFiltered";
+  public static final String SST_FILTERED_YAML_KEY = "sstFiltered";
   private static final byte[] SST_FILTERED_FILE_CONTENT = StringUtils.string2Bytes("This file holds information " +
       "if a particular snapshot has filtered out the relevant sst files or not.\nDO NOT add, change or delete " +
       "any files in this directory unless you know what you are doing.\n");
@@ -86,8 +87,11 @@ public class SstFilteringService extends BackgroundService
   private final BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock();
 
   public static boolean isSstFiltered(OzoneConfiguration ozoneConfiguration, SnapshotInfo snapshotInfo) {
-    Path sstFilteredFile = Paths.get(OmSnapshotManager.getSnapshotPath(ozoneConfiguration,
-        snapshotInfo), SST_FILTERED_FILE);
+    // TODO: First try to read the YAML file
+
+    // Fall back to existing checks
+    Path sstFilteredFile = Paths.get(
+        OmSnapshotManager.getSnapshotPath(ozoneConfiguration, snapshotInfo), SST_FILTERED_FILE);
     return snapshotInfo.isSstFiltered() || sstFilteredFile.toFile().exists();
   }
 
@@ -119,14 +123,14 @@ public class SstFilteringService extends BackgroundService
     running.set(true);
   }
 
-  private class SstFilteringTask implements BackgroundTask {
+  private final class SstFilteringTask implements BackgroundTask {
 
     private boolean isSnapshotDeleted(SnapshotInfo snapshotInfo) {
       return snapshotInfo == null || snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
     }
 
     /**
-     * Marks the snapshot as SSTFiltered by creating a file in snapshot directory.
+     * Marks the snapshot as SSTFiltered.
      * @param snapshotInfo snapshotInfo
      * @throws IOException
      */
@@ -140,8 +144,9 @@ public class SstFilteringService extends BackgroundService
       if (acquiredSnapshotLock) {
         String snapshotDir = OmSnapshotManager.getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo);
         try {
-          // mark the snapshot as filtered by creating a file.
+          // Mark the snapshot as filtered by writing to YAML property file
           if (Files.exists(Paths.get(snapshotDir))) {
+            // TODO: Write to YAML
             Files.write(Paths.get(snapshotDir, SST_FILTERED_FILE), SST_FILTERED_FILE_CONTENT);
           }
         } finally {
