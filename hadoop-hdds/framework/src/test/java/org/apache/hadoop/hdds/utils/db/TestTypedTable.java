@@ -39,10 +39,10 @@ import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -180,6 +180,7 @@ public class TestTypedTable {
       assertFalse(neither.hasNext());
     }
   }
+
   static <K, V> void assertKeyValue(K expectedKey, V expectedValue, int expectedValueSize,
       Table.KeyValueIterator<K, V> iterator) {
     assertTrue(iterator.hasNext());
