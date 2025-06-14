@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.debug;
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 import org.apache.hadoop.crypto.OpensslCipher;
@@ -28,6 +30,7 @@ import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.io.erasurecode.ErasureCodeNative;
+import org.apache.hadoop.util.NativeCodeLoader;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
@@ -39,77 +42,45 @@ import picocli.CommandLine;
 @MetaInfServices(DebugSubcommand.class)
 public class CheckNative extends AbstractSubcommand implements Callable<Void>, DebugSubcommand {
 
-  private static class LibraryCheckResult {
-    private final boolean loaded;
-    private final String detail;
-
-    LibraryCheckResult(boolean loaded, String detail) {
-      this.loaded = loaded;
-      this.detail = detail;
-    }
-
-    public boolean isLoaded() {
-      return loaded;
-    }
-
-    public String getDetail() {
-      return detail;
-    }
-  }
-
-  private LibraryCheckResult getLibraryStatus(
-      Supplier<String> failureReasonSupplier,
-      Supplier<String> libraryNameSupplier) {
-    String failureReason = failureReasonSupplier.get();
-    if (failureReason != null) {
-      return new LibraryCheckResult(false, failureReason);
-    } else {
-      return new LibraryCheckResult(true, libraryNameSupplier.get());
-    }
-  }
-
   @Override
   public Void call() throws Exception {
-    boolean nativeHadoopLoaded = org.apache.hadoop.util.NativeCodeLoader.isNativeCodeLoaded();
-    String hadoopLibraryName = "";
-    String isalDetail = "";
-    boolean isalLoaded = false;
-    String opensslDetail = "";
-    boolean opensslLoaded = false;
+    Map<String, Object> results = new LinkedHashMap<>();
 
-    if (nativeHadoopLoaded) {
-      hadoopLibraryName = org.apache.hadoop.util.NativeCodeLoader.getLibraryName();
+    // Hadoop
+    results.put("hadoop", checkLibrary(NativeCodeLoader.isNativeCodeLoaded(), NativeCodeLoader::getLibraryName));
+    results.put("ISA-L", checkLibrary(ErasureCodeNative.getLoadingFailureReason(), ErasureCodeNative::getLibraryName));
+    results.put("OpenSSL", checkLibrary(
+        // OpensslCipher provides cryptic reason if Hadoop native library itself is not loaded
+        NativeCodeLoader.isNativeCodeLoaded() ? OpensslCipher.getLoadingFailureReason() : "",
+        OpensslCipher::getLibraryName
+    ));
 
-      LibraryCheckResult isalStatus = getLibraryStatus(
-          ErasureCodeNative::getLoadingFailureReason,
-          ErasureCodeNative::getLibraryName
-      );
-      isalLoaded = isalStatus.isLoaded();
-      isalDetail = isalStatus.getDetail();
-
-      // Check OpenSSL status
-      LibraryCheckResult opensslStatus = getLibraryStatus(
-          OpensslCipher::getLoadingFailureReason,
-          OpensslCipher::getLibraryName
-      );
-      opensslLoaded = opensslStatus.isLoaded();
-      opensslDetail = opensslStatus.getDetail();
-    }
-    out().println("Native library checking:");
-    out().printf("hadoop:  %b %s%n", nativeHadoopLoaded,
-        hadoopLibraryName);
-    out().printf("ISA-L:   %b %s%n", isalLoaded, isalDetail);
-    out().printf("OpenSSL: %b %s%n", opensslLoaded, opensslDetail);
-
-    // Attempt to load the rocks-tools lib
-    boolean nativeRocksToolsLoaded = NativeLibraryLoader.getInstance().loadLibrary(
+    // Ozone
+    NativeLibraryLoader.getInstance().loadLibrary(
         ROCKS_TOOLS_NATIVE_LIBRARY_NAME,
         Collections.singletonList(ManagedRocksObjectUtils.getRocksDBLibFileName()));
-    String rocksToolsDetail = "";
-    if (nativeRocksToolsLoaded) {
-      rocksToolsDetail = NativeLibraryLoader.getJniLibraryFileName();
-    }
-    out().printf("rocks-tools: %b %s%n", nativeRocksToolsLoaded, rocksToolsDetail);
+    results.put("rocks-tools", checkLibrary(
+        NativeLibraryLoader.isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME),
+        NativeLibraryLoader::getJniLibraryFileName));
+
+    final int maxLength = results.keySet().stream()
+        .mapToInt(String::length)
+        .max()
+        .getAsInt();
+
+    out().println("Native library checking:");
+    results.forEach((name, result) -> out().printf("%" + maxLength + "s:  %s%n", name, result));
+
     return null;
+  }
+
+  private static Object checkLibrary(boolean loaded, Supplier<String> libraryName) {
+    return checkLibrary(loaded ? null : "", libraryName);
+  }
+
+  private static Object checkLibrary(String failureReason, Supplier<String> libraryName) {
+    boolean loaded = failureReason == null;
+    String detail = loaded ? libraryName.get() : failureReason;
+    return String.format("%-5b  %s", loaded, detail);
   }
 }
