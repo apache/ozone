@@ -86,12 +86,12 @@ Now, all data written to `/vol1/encrypted_bucket` will be encrypted at rest. As 
 Since Ozone leverages Hadoop's encryption library, performance optimization strategies similar to HDFS encryption apply:
 
 {{<requirements warning >}}
-**Architecture Limitation**  
+**Hardware Acceleration: Architecture Support**
 The OpenSSL-based hardware acceleration discussed below is currently only supported on x86 architectures. ARM64 architectures are not supported at this time.
 {{</requirements >}}
 
 1. **Enable AES-NI Hardware Acceleration:**
-   * Install OpenSSL development libraries: On most Linux distributions, install `openssl-devel` (or `libssl-dev` on Debian/Ubuntu) to provide `libcrypto.so`
+  * Install OpenSSL development libraries: On most Linux distributions, install `openssl-devel` (or `libssl-dev` on Debian/Ubuntu) to provide `libcrypto.so`, which is utilized by the Hadoop native library for hardware-accelerated encryption.
    * Use servers with CPUs that support the AES-NI instruction set and RDRAND instruction (most modern Intel and AMD CPUs do)
 
 2. **Install and Configure Native Libraries:**
@@ -100,7 +100,7 @@ The OpenSSL-based hardware acceleration discussed below is currently only suppor
    ozone checknative
    ```
    * The output should show "true" for the hadoop library
-   * To troubleshoot native library loading issues, configure the application to use DEBUG log level. The following log message indicates that the libhadoop native library fails to load:
+   * To troubleshoot native library loading issues on Ozone Datanode and applications, configure their log level to DEBUG. The log messages below are examples, and actual paths may vary. The following log message indicates that the libhadoop native library fails to load:
    ```
    25/06/14 01:25:21 DEBUG util.NativeCodeLoader: Trying to load the custom-built native-hadoop library...
    25/06/14 01:25:21 DEBUG util.NativeCodeLoader: Failed to load native-hadoop with error: java.lang.UnsatisfiedLinkError: no hadoop in java.library.path
