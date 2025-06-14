@@ -35,7 +35,7 @@ This tutorial demonstrates how to access Apache Ozone using the HTTPFS REST API 
 
 Download the latest Docker Compose file for Ozone and start the cluster with 3 DataNodes:
 ```bash
-curl -O https://raw.githubusercontent.com/apache/ozone-docker/refs/heads/latest/docker-compose.yaml
+curl -O https://raw.githubusercontent.com/apache/ozone-docker/latest/docker-compose.yaml
 docker compose up -d --scale datanode=3
 ```
 
