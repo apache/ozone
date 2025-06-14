@@ -59,13 +59,13 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -371,9 +371,7 @@ public class TestBlockDeletingService {
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
           (DatanodeStoreSchemaTwoImpl) ds;
-      try (
-          TableIterator<Long, ? extends Table.KeyValue<Long,
-              StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>>
+      try (Table.KeyValueIterator<Long, DeletedBlocksTransaction>
               iter = dnStoreTwoImpl.getDeleteTransactionTable().iterator()) {
         while (iter.hasNext()) {
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
@@ -387,9 +385,7 @@ public class TestBlockDeletingService {
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
           (DatanodeStoreSchemaThreeImpl) ds;
-      try (
-          TableIterator<String, ? extends Table.KeyValue<String,
-              StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>>
+      try (Table.KeyValueIterator<String, DeletedBlocksTransaction>
               iter = dnStoreThreeImpl.getDeleteTransactionTable()
               .iterator(data.containerPrefix())) {
         while (iter.hasNext()) {

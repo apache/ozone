@@ -94,7 +94,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public boolean isEmpty() throws IOException {
-    try (KeyValueIterator<byte[], byte[]> keyIter = iterator((byte[]) null, KeyValueIterator.Type.NEITHER)) {
+    try (KeyValueIterator<byte[], byte[]> keyIter = iterator(KeyValueIterator.Type.NEITHER)) {
       keyIter.seekToFirst();
       return !keyIter.hasNext();
     }

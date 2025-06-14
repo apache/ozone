@@ -241,7 +241,7 @@ public class QuotaRepairTask {
       return;
     }
     try (Table.KeyValueIterator<String, OmBucketInfo> iterator
-             = metadataManager.getBucketTable().iterator(null, VALUE_ONLY)) {
+             = metadataManager.getBucketTable().iterator(VALUE_ONLY)) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmBucketInfo> entry = iterator.next();
         OmBucketInfo bucketInfo = entry.getValue();
@@ -353,7 +353,7 @@ public class QuotaRepairTask {
     int count = 0;
     long startTime = Time.monotonicNow();
     try (Table.KeyValueIterator<String, VALUE> keyIter
-             = table.iterator(null, haveValue ? KEY_AND_VALUE : KEY_ONLY)) {
+             = table.iterator(haveValue ? KEY_AND_VALUE : KEY_ONLY)) {
       while (keyIter.hasNext()) {
         count++;
         kvList.add(keyIter.next());

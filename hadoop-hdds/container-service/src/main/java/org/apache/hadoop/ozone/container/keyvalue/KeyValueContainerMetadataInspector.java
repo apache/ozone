@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.VALUE_ONLY;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -35,7 +36,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -500,8 +500,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     Table<Long, DeletedBlocksTransaction> delTxTable =
         schemaTwoStore.getDeleteTransactionTable();
 
-    try (TableIterator<Long, ? extends Table.KeyValue<Long,
-        DeletedBlocksTransaction>> iterator = delTxTable.iterator()) {
+    try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iterator = delTxTable.iterator(VALUE_ONLY)) {
       while (iterator.hasNext()) {
         DeletedBlocksTransaction txn = iterator.next().getValue();
         final List<Long> localIDs = txn.getLocalIDList();
@@ -544,11 +543,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       KeyValueContainerData containerData) throws IOException {
     long pendingDeleteBlockCountTotal = 0;
     long pendingDeleteBytes = 0;
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String,
-            DeletedBlocksTransaction>>
-            iter = store.getDeleteTransactionTable()
-            .iterator(containerData.containerPrefix())) {
+    try (Table.KeyValueIterator<String, DeletedBlocksTransaction> iter
+             = store.getDeleteTransactionTable().iterator(containerData.containerPrefix(), VALUE_ONLY)) {
       while (iter.hasNext()) {
         DeletedBlocksTransaction delTx = iter.next().getValue();
         final List<Long> localIDs = delTx.getLocalIDList();

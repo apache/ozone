@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
@@ -208,9 +207,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
     private static final Logger LOG = LoggerFactory.getLogger(
             KeyValueBlockIterator.class);
 
-    private final TableIterator<String, ? extends Table.KeyValue<String,
-            BlockData>>
-            blockIterator;
+    private final Table.KeyValueIterator<String, BlockData> blockIterator;
     private static final KeyPrefixFilter DEFAULT_BLOCK_FILTER =
             MetadataKeyFilters.getUnprefixedKeyFilter();
     private final KeyPrefixFilter blockFilter;
@@ -221,9 +218,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
      * KeyValueBlockIterator to iterate unprefixed blocks in a container.
      * @param iterator - The underlying iterator to apply the block filter to.
      */
-    KeyValueBlockIterator(long containerID,
-            TableIterator<String, ? extends Table.KeyValue<String, BlockData>>
-                    iterator) {
+    KeyValueBlockIterator(long containerID, Table.KeyValueIterator<String, BlockData> iterator) {
       this.containerID = containerID;
       this.blockIterator = iterator;
       this.blockFilter = DEFAULT_BLOCK_FILTER;
@@ -235,8 +230,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
      * @param filter - Block filter, filter to be applied for blocks
      */
     KeyValueBlockIterator(long containerID,
-            TableIterator<String, ? extends Table.KeyValue<String, BlockData>>
-                    iterator, KeyPrefixFilter filter) {
+        Table.KeyValueIterator<String, BlockData> iterator, KeyPrefixFilter filter) {
       this.containerID = containerID;
       this.blockIterator = iterator;
       this.blockFilter = filter;
@@ -313,8 +307,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
     private static final Logger LOG = LoggerFactory.getLogger(
         KeyValueBlockLocalIdIterator.class);
 
-    private final TableIterator<String, ? extends Table.KeyValue<String,
-        Long>> blockLocalIdIterator;
+    private final Table.KeyValueIterator<String, Long> blockLocalIdIterator;
     private final KeyPrefixFilter localIdFilter;
     private Long nextLocalId;
     private final long containerID;
@@ -325,8 +318,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
      * @param filter - BlockLocalId filter to be applied for block localIds.
      */
     KeyValueBlockLocalIdIterator(long containerID,
-        TableIterator<String, ? extends Table.KeyValue<String, Long>>
-        iterator, KeyPrefixFilter filter) {
+        Table.KeyValueIterator<String, Long> iterator, KeyPrefixFilter filter) {
       this.containerID = containerID;
       this.blockLocalIdIterator = iterator;
       this.localIdFilter = filter;

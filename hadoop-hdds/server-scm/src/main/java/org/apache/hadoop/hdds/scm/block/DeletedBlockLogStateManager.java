@@ -22,8 +22,6 @@ import java.util.ArrayList;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 /**
  * DeletedBlockLogStateManager interface to
@@ -46,8 +44,7 @@ public interface DeletedBlockLogStateManager {
   int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
       throws IOException;
 
-  TableIterator<Long,
-      KeyValue<Long, DeletedBlocksTransaction>> getReadOnlyIterator()
+  Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator()
       throws IOException;
 
   void onFlush();

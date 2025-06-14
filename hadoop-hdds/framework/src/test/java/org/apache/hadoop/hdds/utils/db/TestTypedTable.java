@@ -156,10 +156,10 @@ public class TestTypedTable {
     // test iterator type
     try (TypedTable<Long, String> longTable = newTypedTable(
         1, LongCodec.get(), StringCodec.get());
-         Table.KeyValueIterator<Long, String> neither = longTable.iterator(null, NEITHER);
-         Table.KeyValueIterator<Long, String> keyOnly = longTable.iterator(null, KEY_ONLY);
-         Table.KeyValueIterator<Long, String> valueOnly = longTable.iterator(null, VALUE_ONLY);
-         Table.KeyValueIterator<Long, String> keyAndValue = longTable.iterator(null, KEY_AND_VALUE)) {
+         Table.KeyValueIterator<Long, String> neither = longTable.iterator(NEITHER);
+         Table.KeyValueIterator<Long, String> keyOnly = longTable.iterator(KEY_ONLY);
+         Table.KeyValueIterator<Long, String> valueOnly = longTable.iterator(VALUE_ONLY);
+         Table.KeyValueIterator<Long, String> keyAndValue = longTable.iterator(KEY_AND_VALUE)) {
       while (keyAndValue.hasNext()) {
         final Table.KeyValue<Long, String> keyValue = keyAndValue.next();
         final Long expectedKey = Objects.requireNonNull(keyValue.getKey());

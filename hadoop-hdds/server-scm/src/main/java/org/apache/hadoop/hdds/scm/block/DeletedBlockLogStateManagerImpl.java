@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,14 +65,11 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
-  public TableIterator<Long, TypedTable.KeyValue<Long,
-      DeletedBlocksTransaction>> getReadOnlyIterator() throws IOException {
-    return new TableIterator<Long, TypedTable.KeyValue<Long,
-        DeletedBlocksTransaction>>() {
+  public Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator()
+      throws IOException {
+    return new Table.KeyValueIterator<Long, DeletedBlocksTransaction>() {
 
-      private TableIterator<Long,
-          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-          deletedTable.iterator();
+      private final Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter = deletedTable.iterator();
       private TypedTable.KeyValue<Long, DeletedBlocksTransaction> nextTx;
 
       {

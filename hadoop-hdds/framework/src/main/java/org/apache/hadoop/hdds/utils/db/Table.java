@@ -153,14 +153,19 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   void deleteRange(KEY beginKey, KEY endKey) throws IOException;
 
-  /** The same as iterator(null). */
+  /** The same as iterator(null, KEY_AND_VALUE). */
   default KeyValueIterator<KEY, VALUE> iterator() throws IOException {
-    return iterator(null);
+    return iterator(null, KeyValueIterator.Type.KEY_AND_VALUE);
   }
 
   /** The same as iterator(prefix, KEY_AND_VALUE). */
   default KeyValueIterator<KEY, VALUE> iterator(KEY prefix) throws IOException {
     return iterator(prefix, KeyValueIterator.Type.KEY_AND_VALUE);
+  }
+
+  /** The same as iterator(null, type). */
+  default KeyValueIterator<KEY, VALUE> iterator(KeyValueIterator.Type type) throws IOException {
+    return iterator(null, type);
   }
 
   /**
