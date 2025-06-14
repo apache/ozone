@@ -105,14 +105,14 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public List<? extends KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey, int count, KEY prefix,
+  public List<KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey, int count, KEY prefix,
                                                           MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public List<? extends KeyValue<KEY, VALUE>> getSequentialRangeKVs(KEY startKey, int count, KEY prefix,
+  public List<KeyValue<KEY, VALUE>> getSequentialRangeKVs(KEY startKey, int count, KEY prefix,
                                                                     MetadataKeyFilters.MetadataKeyFilter... filters) {
     throw new UnsupportedOperationException();
   }
