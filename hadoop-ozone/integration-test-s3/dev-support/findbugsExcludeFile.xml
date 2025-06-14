@@ -14,7 +14,7 @@
 -->
 <FindBugsFilter>
   <Match>
-    <Class name="org.apache.hadoop.ozone.s3.awssdk.v2.AbstractS3SDKV2Tests$S3BucketVerificationConditionTests"/>
+    <Class name="org.apache.hadoop.ozone.s3.awssdk.v2.AbstractS3SDKV2Tests$S3BucketOwnershipVerificationConditionsTests"/>
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC"/>
   </Match>
 </FindBugsFilter>
