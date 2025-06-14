@@ -40,18 +40,14 @@ Under the hood, each operation is translated into the appropriate Ozone calls:
 
 ### Mapping S3 to Ozone Concepts
 
-In Ozone, data is organized into **volumes**, **buckets**, and **keys**. By default, the S3 Gateway uses a special volume named `/s3v` to store all S3 buckets.
+In Ozone, data is organized into **volumes**, **buckets**, and **keys**. By default, the S3 Gateway uses a special
+volume named `/s3v` to store all S3 buckets (this is configurable via the `ozone.s3g.volume.name` property).
 
 Each S3 bucket created is represented as a bucket under the `/s3v` volume in Ozone. Objects (keys) are stored within those buckets. This mapping is transparent to the end user.
 
 ## S3 Gateway in the Ozone Architecture
 
-Ozone separates metadata and data management:
-- **Ozone Manager (OM):** Handles volumes, buckets, keys.
-- **Storage Container Manager (SCM):** Manages DataNodes and allocates containers (storage units).
-- **DataNodes:** Store the actual data chunks.
-
-The S3 Gateway sits at the edge:
+The S3 Gateway does the following:
 - It receives S3 REST API calls from clients.
 - It translates them and forwards metadata operations to OM.
 - It streams data directly to and from DataNodes.
@@ -96,7 +92,7 @@ Supports AWS Signature-style authentication (if enabled):
 - Uses OM’s stored credentials
 - Relies on OM for final authorization
 
-In unsecured mode, allows anonymous or dummy access depending on config.
+Supports Kerberos authentication for secure clusters;  In unsecured mode, allows anonymous or dummy access.
 
 ## Summary
 
