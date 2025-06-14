@@ -143,6 +143,8 @@ This logic is implemented in the `OzoneManagerStateMachine.notifyInstallSnapshot
 see the [code](https://github.com/apache/ozone/blob/ozone-2.0.0/hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/ratis/OzoneManagerStateMachine.java#L520-L531)
 in Release 2.0.0.
 
+Note that this `Raft Snapshot`, used for OM HA state synchronization, is distinct from `Ozone Snapshot`, which is used for data backup and recovery purposes.
+
 In most scenarios, stale OMs will recover automatically, even if they have missed a large number of operations.
 Manual intervention (such as running `ozone om --bootstrap`) is only required when adding a new OM node to the cluster.
 
