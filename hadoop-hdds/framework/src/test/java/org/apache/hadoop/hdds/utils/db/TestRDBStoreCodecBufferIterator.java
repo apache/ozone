@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_AND_VALUE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -72,12 +73,11 @@ public class TestRDBStoreCodecBufferIterator {
   }
 
   RDBStoreCodecBufferIterator newIterator() {
-    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null);
+    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null, KEY_AND_VALUE);
   }
 
   RDBStoreCodecBufferIterator newIterator(CodecBuffer prefix) {
-    return new RDBStoreCodecBufferIterator(
-        managedRocksIterator, rdbTableMock, prefix);
+    return new RDBStoreCodecBufferIterator(managedRocksIterator, rdbTableMock, prefix, KEY_AND_VALUE);
   }
 
   Answer<Integer> newAnswerInt(String name, int b) {

@@ -33,16 +33,16 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   private final AtomicBoolean closed = new AtomicBoolean();
 
   RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
-      CodecBuffer prefix) {
+      CodecBuffer prefix, Type type) {
     super(iterator, table, prefix);
 
     final String name = table != null ? table.getName() : null;
     this.keyBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-key", 1 << 10),
-        buffer -> getRocksDBIterator().get().key(buffer));
+        type.readKey() ? buffer -> getRocksDBIterator().get().key(buffer) : null);
     this.valueBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-value", 4 << 10),
-        buffer -> getRocksDBIterator().get().value(buffer));
+        type.readValue() ? buffer -> getRocksDBIterator().get().value(buffer) : null);
     seekToFirst();
   }
 
@@ -130,6 +130,10 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
     }
 
     CodecBuffer getFromDb() {
+      if (source == null) {
+        return CodecBuffer.getEmptyBuffer();
+      }
+
       for (prepare(); ; allocate()) {
         final Integer required = buffer.putFromSource(source);
         if (required == null) {

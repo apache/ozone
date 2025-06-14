@@ -614,7 +614,7 @@ public class TestRDBTableStore {
         assertEquals(prefix,
             entry.getKey().substring(0, PREFIX_LENGTH));
         assertEquals(entry.getValue().getBytes(StandardCharsets.UTF_8).length,
-            entry.getRawSize());
+            entry.getValueByteSize());
       }
       assertEquals(expectedCount, keyCount);
 
