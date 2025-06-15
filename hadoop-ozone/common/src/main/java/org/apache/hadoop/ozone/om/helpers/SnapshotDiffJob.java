@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
@@ -315,7 +316,7 @@ public class SnapshotDiffJob {
     }
 
     @Override
-    public byte[] toPersistedFormatImpl(SnapshotDiffJob object) throws IOException {
+    public byte[] toPersistedFormat(SnapshotDiffJob object) {
       return object.toProtoBuf().toByteArray();
     }
 
@@ -324,7 +325,8 @@ public class SnapshotDiffJob {
       try {
         SnapshotDiffJobProto proto = SnapshotDiffJobProto.parseFrom(rawData);
         return SnapshotDiffJob.getFromProtoBuf(proto);
-      } catch (IOException e) {
+      } catch (InvalidProtocolBufferException e) {
+        // the rawData was in old format, fallback to the old implementation
         return MAPPER.readValue(rawData, SnapshotDiffJob.class);
       }
     }
