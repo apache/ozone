@@ -215,7 +215,7 @@ public class TestKeyValueContainer {
 
     // When the container is loaded, the missing chunks directory should
     // be created.
-    KeyValueContainerUtil.parseKVContainerData(data, CONF);
+    KeyValueContainerUtil.parseKVContainerData(data, CONF, false);
     assertTrue(chunksDir.exists());
   }
 
@@ -387,6 +387,8 @@ public class TestKeyValueContainer {
           containerData.getMaxSize());
       assertEquals(keyValueContainerData.getBytesUsed(),
           containerData.getBytesUsed());
+      assertNotNull(containerData.getChecksum());
+      assertNotEquals(containerData.DUMMY_CHECKSUM, container.getContainerData().getChecksum());
 
       //Can't overwrite existing container
       KeyValueContainer finalContainer = container;
