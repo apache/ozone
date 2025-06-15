@@ -127,7 +127,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
-
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getDeletedSubFilesList()) {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
@@ -139,7 +138,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 volumeName, bucketName);
             lockSet.add(volBucketPair);
           }
-
           // If omKeyInfo has hsync metadata, delete its corresponding open key as well
           String dbOpenKey;
           String hsyncClientId = keyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
@@ -176,7 +174,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           if (deletedDirInfo != null) {
             OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
                 deletedDirInfo.getVolumeName(), deletedDirInfo.getBucketName());
-            omBucketInfo.purgePendingDeleteSnapshotNamespace(1);
+            if (omBucketInfo != null) {
+              omBucketInfo.purgePendingDeleteSnapshotNamespace(1);
+            }
           }
           numDirsDeleted++;
         }
