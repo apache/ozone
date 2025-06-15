@@ -90,12 +90,7 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix) {
+  public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type) {
     throw new UnsupportedOperationException();
   }
 

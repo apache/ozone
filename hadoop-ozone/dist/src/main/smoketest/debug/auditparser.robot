@@ -28,9 +28,9 @@ ${auditworkdir}      /tmp
 
 *** Keywords ***
 Set username
-    ${hostname} =          Execute         hostname
-    Set Suite Variable     ${user}         testuser/${hostname}@EXAMPLE.COM
-    [return]               ${user}
+    ${principal} =     Get test user principal    testuser
+    Set Suite Variable    ${user}    ${principal}
+    [Return]      ${principal}
 
 Create data
     Freon OMBG    prefix=auditparser    n=${buckets}
