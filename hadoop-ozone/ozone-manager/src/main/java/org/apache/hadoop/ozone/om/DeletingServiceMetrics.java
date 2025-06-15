@@ -173,7 +173,7 @@ public final class DeletingServiceMetrics {
   public synchronized void setLastAOSTransactionId(TransactionInfo transactionInfo) {
     TransactionInfo previousTransactionInfo = getLastAOSTransactionId();
     if (transactionInfo.compareTo(previousTransactionInfo) > 0) {
-      this.lastAOSPurgeTransactionId.set(transactionInfo.getTerm());
+      this.lastAOSPurgeTermId.set(transactionInfo.getTerm());
       this.lastAOSPurgeTransactionId.set(transactionInfo.getTransactionIndex());
     }
   }
