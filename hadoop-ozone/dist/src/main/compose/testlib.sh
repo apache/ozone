@@ -575,7 +575,6 @@ wait_for_datanode() {
     local command="ozone admin datanode list"
     docker-compose exec -T ${SCM} bash -c "$command" | grep -A2 "$datanode" > /tmp/dn_check
     local health=$(grep -c "State: $state" /tmp/dn_check)
-    echo "$datanode is $state"
 
     if [[ "$health" -eq 1 ]]; then
       echo "$datanode is $state"
