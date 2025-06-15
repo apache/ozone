@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,6 +150,9 @@ public final class OnDemandContainerDataScanner {
         instance.metrics.incNumUnHealthyContainers();
         instance.containerController.markContainerUnhealthy(containerId,
             result);
+        LOG.info("Triggering a volume scan for volume [{}] as unhealthy container [{}] was on it.",
+            containerData.getVolume().getStorageDir().getPath(), containerId);
+        StorageVolumeUtil.onFailure(containerData.getVolume());
       }
 
       instance.metrics.incNumContainersScanned();
