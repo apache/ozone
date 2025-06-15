@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -67,6 +68,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
@@ -190,6 +192,12 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
           "volumes, buckets and keys."
   )
   private boolean cleanObjects = false;
+
+  @Option(
+      names = "--bucket-layout",
+      description = "Specifies the bucket layout (e.g., FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY)."
+  )
+  private BucketLayout bucketLayout;
 
   private ReplicationConfig replicationConfig;
 
@@ -647,6 +655,16 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   }
 
   /**
+   * Returns the current size of the buckets map.
+   *
+   * @return number of buckets created and added to the map
+   */
+  @VisibleForTesting
+  int getBucketMapSize() {
+    return buckets.size();
+  }
+
+  /**
    * Wrapper to hold ozone keyValidate entry.
    */
   private static class KeyValidate {
@@ -757,7 +775,14 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
         .createActivatedSpan("createBucket")) {
 
       long start = System.nanoTime();
-      volume.createBucket(bucketName);
+      if (bucketLayout != null) {
+        BucketArgs bucketArgs = BucketArgs.newBuilder()
+            .setBucketLayout(bucketLayout)
+            .build();
+        volume.createBucket(bucketName, bucketArgs);
+      } else {
+        volume.createBucket(bucketName);
+      }
       long bucketCreationDuration = System.nanoTime() - start;
       histograms.get(FreonOps.BUCKET_CREATE.ordinal())
           .update(bucketCreationDuration);
@@ -880,7 +905,8 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     return waitUntilAddedToMap(volumes, volumeNumber);
   }
 
-  private OzoneBucket getBucket(Integer bucketNumber) {
+  @VisibleForTesting
+  OzoneBucket getBucket(Integer bucketNumber) {
     return waitUntilAddedToMap(buckets, bucketNumber);
   }
 
@@ -1183,20 +1209,20 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
         try {
           KeyValidate kv = validationQueue.poll(5, TimeUnit.SECONDS);
           if (kv != null) {
-            OzoneInputStream is = kv.bucket.readKey(kv.keyName);
-            dig.getMessageDigest().reset();
-            byte[] curDigest = dig.digest(is);
-            totalWritesValidated.getAndIncrement();
-            if (MessageDigest.isEqual(kv.digest, curDigest)) {
-              writeValidationSuccessCount.getAndIncrement();
-            } else {
-              writeValidationFailureCount.getAndIncrement();
-              LOG.warn("Data validation error for key {}/{}/{}",
-                  kv.bucket.getVolumeName(), kv.bucket, kv.keyName);
-              LOG.warn("Expected checksum: {}, Actual checksum: {}",
-                  kv.digest, curDigest);
+            try (OzoneInputStream is = kv.bucket.readKey(kv.keyName)) {
+              dig.getMessageDigest().reset();
+              byte[] curDigest = dig.digest(is);
+              totalWritesValidated.getAndIncrement();
+              if (MessageDigest.isEqual(kv.digest, curDigest)) {
+                writeValidationSuccessCount.getAndIncrement();
+              } else {
+                writeValidationFailureCount.getAndIncrement();
+                LOG.warn("Data validation error for key {}/{}/{}",
+                    kv.bucket.getVolumeName(), kv.bucket, kv.keyName);
+                LOG.warn("Expected checksum: {}, Actual checksum: {}",
+                    kv.digest, curDigest);
+              }
             }
-            is.close();
           }
         } catch (IOException ex) {
           LOG.error("Exception while validating write.", ex);

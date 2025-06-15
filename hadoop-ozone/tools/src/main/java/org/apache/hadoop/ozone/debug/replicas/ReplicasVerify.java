@@ -55,17 +55,20 @@ public class ReplicasVerify extends Handler {
       description = Shell.OZONE_URI_DESCRIPTION)
   private String uri;
 
-  @CommandLine.Option(names = {"-o", "--output-dir"},
-      description = "Destination directory to save the generated output.",
-      required = true)
-  private String outputDir;
-
   @CommandLine.Option(names = {"--all-results"},
       description = "Print results for all passing and failing keys")
   private boolean allResults;
 
   @CommandLine.ArgGroup(exclusive = false, multiplicity = "1")
   private Verification verification;
+
+  @CommandLine.Option(names = {"--container-cache-size"},
+      description = "Size (in number of containers) of the in-memory cache for container state verification " +
+          "'--container-state'. Default is 1 million containers (which takes around 43MB). " +
+          "Value must be greater than zero, otherwise the default of 1 million is considered. " +
+          "Note: This option is ignored if '--container-state' option is not used.",
+      defaultValue = "1000000")
+  private long containerCacheSize;
 
   private List<ReplicaVerifier> replicaVerifiers;
 
@@ -79,6 +82,9 @@ public class ReplicasVerify extends Handler {
 
     if (verification.doExecuteBlockExistence) {
       replicaVerifiers.add(new BlockExistenceVerifier(getConf()));
+    }
+    if (verification.doExecuteReplicaState) {
+      replicaVerifiers.add(new ContainerStateVerifier(getConf(), containerCacheSize));
     }
 
     findCandidateKeys(client, address);
@@ -173,7 +179,7 @@ public class ReplicasVerify extends Handler {
         int replicaIndex = keyLocation.getPipeline().getReplicaIndex(datanode);
 
         for (ReplicaVerifier verifier : replicaVerifiers) {
-          BlockVerificationResult result = verifier.verifyBlock(datanode, keyLocation, replicaIndex);
+          BlockVerificationResult result = verifier.verifyBlock(datanode, keyLocation);
           ObjectNode checkNode = checksArray.addObject();
           checkNode.put("type", verifier.getType());
           checkNode.put("completed", result.isCompleted());
@@ -221,6 +227,13 @@ public class ReplicasVerify extends Handler {
         description = "Check for block existence on datanodes.",
         defaultValue = "false")
     private boolean doExecuteBlockExistence;
+
+    @CommandLine.Option(names = "--container-state",
+        description = "Check the container and replica states. " +
+            "Containers in [DELETING, DELETED] states, or " +
+            "it's replicas in [DELETED, UNHEALTHY, INVALID] states fail the check.",
+        defaultValue = "false")
+    private boolean doExecuteReplicaState;
 
   }
 }

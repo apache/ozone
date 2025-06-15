@@ -152,7 +152,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.checkpointDir = checkpointDir;
   }
 
-  public boolean getDeepClean() {
+  public boolean isDeepCleaned() {
     return deepClean;
   }
 
@@ -627,7 +627,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     return exclusiveReplicatedSize;
   }
 
-  public boolean getDeepCleanedDeletedDir() {
+  public boolean isDeepCleanedDeletedDir() {
     return deepCleanedDeletedDir;
   }
 

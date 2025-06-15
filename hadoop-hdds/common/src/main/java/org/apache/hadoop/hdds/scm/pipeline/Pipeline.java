@@ -39,7 +39,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -49,6 +51,7 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -425,8 +428,32 @@ public final class Pipeline {
     return toBuilder().setNodesInOrder(nodes).build();
   }
 
+  public Pipeline copyForRead() {
+    if (replicationConfig.getReplicationType() == ReplicationType.STAND_ALONE) {
+      return this;
+    }
+
+    HddsProtos.ReplicationFactor factor = replicationConfig instanceof ReplicatedReplicationConfig
+        ? ((ReplicatedReplicationConfig) replicationConfig).getReplicationFactor()
+        : HddsProtos.ReplicationFactor.ONE;
+
+    return toBuilder()
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(factor))
+        .build();
+  }
+
+  public Pipeline copyForReadFromNode(DatanodeDetails node) {
+    Preconditions.assertTrue(nodeStatus.containsKey(node), () -> node + " is not part of the pipeline " + id.getId());
+
+    return toBuilder()
+        .setNodes(Collections.singletonList(node))
+        .setReplicaIndexes(Collections.singletonMap(node, getReplicaIndex(node)))
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .build();
+  }
+
   public Builder toBuilder() {
-    return newBuilder(this);
+    return new Builder(this);
   }
 
   public static Builder toBuilder(HddsProtos.Pipeline pipeline) {
@@ -465,7 +492,8 @@ public final class Pipeline {
     final ReplicationConfig config = ReplicationConfig
         .fromProto(pipeline.getType(), pipeline.getFactor(),
             pipeline.getEcReplicationConfig());
-    return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
+    return newBuilder()
+        .setId(PipelineID.getFromProtobuf(pipeline.getId()))
         .setReplicationConfig(config)
         .setState(PipelineState.fromProtobuf(pipeline.getState()))
         .setNodes(new ArrayList<>(nodes.keySet()))
@@ -531,14 +559,10 @@ public final class Pipeline {
     return new Builder();
   }
 
-  public static Builder newBuilder(Pipeline pipeline) {
-    return new Builder(pipeline);
-  }
-
   /**
    * Builder class for Pipeline.
    */
-  public static class Builder {
+  public static final class Builder {
     private PipelineID id = null;
     private ReplicationConfig replicationConfig = null;
     private PipelineState state = null;
@@ -550,9 +574,9 @@ public final class Pipeline {
     private DatanodeID suggestedLeaderId = null;
     private Map<DatanodeDetails, Integer> replicaIndexes = ImmutableMap.of();
 
-    public Builder() { }
+    private Builder() { }
 
-    public Builder(Pipeline pipeline) {
+    private Builder(Pipeline pipeline) {
       this.id = pipeline.id;
       this.replicationConfig = pipeline.replicationConfig;
       this.state = pipeline.state;
@@ -599,8 +623,20 @@ public final class Pipeline {
     }
 
     public Builder setNodes(List<DatanodeDetails> nodes) {
-      this.nodeStatus = new LinkedHashMap<>();
-      nodes.forEach(node -> nodeStatus.put(node, -1L));
+      Map<DatanodeDetails, Long> newNodeStatus = new LinkedHashMap<>();
+      nodes.forEach(node -> newNodeStatus.put(node, -1L));
+
+      // replace pipeline ID if nodes are not the same
+      if (nodeStatus != null && !nodeStatus.keySet().equals(newNodeStatus.keySet())) {
+        if (nodes.size() == 1) {
+          setId(nodes.iterator().next().getID());
+        } else {
+          setId(PipelineID.randomId());
+        }
+      }
+
+      nodeStatus = newNodeStatus;
+
       if (nodesInOrder != null) {
         // nodesInOrder may belong to another pipeline, avoid overwriting it
         nodesInOrder = new LinkedList<>(nodesInOrder);
