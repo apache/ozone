@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -96,24 +97,33 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
       List<String> keysList = bucketWithDeleteKeys.getKeysList();
       keysToBePurgedList.addAll(keysList);
       numKeysDeleted = numKeysDeleted + keysList.size();
+      OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+          bucketWithDeleteKeys.getVolumeName(), bucketWithDeleteKeys.getBucketName());
+      // Check null if bucket has been deleted.
+      if (omBucketInfo != null) {
+        omBucketInfo.purgePendingDeleteSnapshotBytes(bucketWithDeleteKeys.getPurgedBytes());
+        omBucketInfo.purgePendingDeleteSnapshotNamespace(bucketWithDeleteKeys.getPurgedNamespace());
+      }
     }
     DeletingServiceMetrics deletingServiceMetrics = ozoneManager.getDeletionMetrics();
     deletingServiceMetrics.incrNumKeysPurged(numKeysDeleted);
     deletingServiceMetrics.incrNumRenameEntriesPurged(renamedKeysToBePurged.size());
 
-    if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {
+    if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty() && keysToUpdateList.isEmpty()) {
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
-          new OMException("None of the keys can be purged be purged since a new snapshot was created for all the " +
-              "buckets, making this request invalid", OMException.ResultCodes.KEY_DELETION_ERROR)));
+          new OMException("Invalid request since there are no keys to be purged or modified.",
+              OMException.ResultCodes.KEY_DELETION_ERROR)));
     }
-
     // Setting transaction info for snapshot, this is to prevent duplicate purge requests to OM from background
     // services.
     try {
+      TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
       if (fromSnapshotInfo != null) {
-        fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
+        fromSnapshotInfo.setLastTransactionInfo(transactionInfo.toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
             CacheValue.get(context.getIndex(), fromSnapshotInfo));
+      } else {
+        deletingServiceMetrics.setLastAOSTransactionId(transactionInfo);
       }
     } catch (IOException e) {
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
