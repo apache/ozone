@@ -63,7 +63,7 @@ public class PendingKeysDeletion {
     private final String volume;
     private final String bucket;
     private final BlockGroup blockGroup;
-    private long purgedBytes;
+    private final long purgedBytes;
 
     public PurgedKey(String volume, String bucket, BlockGroup group, long purgedBytes) {
       this.volume = volume;
@@ -86,6 +86,16 @@ public class PendingKeysDeletion {
 
     public String getBucket() {
       return bucket;
+    }
+
+    @Override
+    public String toString() {
+      return "PurgedKey{" +
+          "blockGroup=" + blockGroup +
+          ", volume='" + volume + '\'' +
+          ", bucket='" + bucket + '\'' +
+          ", purgedBytes=" + purgedBytes +
+          '}';
     }
   }
 }
