@@ -85,7 +85,7 @@ public class RatisClientConfig {
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "The sleep duration obtained from exponential backoff "
           + "policy is limited by the configured max sleep. Refer "
-          + "dfs.ratis.client.exponential.backoff.base.sleep for further "
+          + "hdds.ratis.client.exponential.backoff.base.sleep for further "
           + "details.")
   private Duration exponentialPolicyMaxSleep = Duration.ofSeconds(40);
 
