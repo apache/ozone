@@ -113,7 +113,7 @@ ozone sh volume create my-volume
 ozone sh bucket create /my-volume/my-bucket
 ```
 
-```c
+```shell
 // o3fs_write writes a 100-byte file named 'file1' using a 100-byte buffer to the 'my-bucket' bucket in the 'my-volume' volume,
 // connecting to an Ozone Manager (om) on port 9862.
 ./o3fs_write file1 100 100 om 9862 my-bucket my-volume
