@@ -237,4 +237,14 @@ public class VolumeUsage {
 
     return (long) Math.ceil(capacity * percentage);
   }
+
+  public boolean isReservedUsagesInRange() {
+    SpaceUsageSource spaceUsageSource = realUsage();
+    long reservedUsed = getOtherUsed(spaceUsageSource);
+    if (reservedInBytes > 0 && reservedUsed > reservedInBytes) {
+      LOG.warn("Reserved usages {} is higher than actual allocated reserved space {}.", reservedUsed, reservedInBytes);
+      return false;
+    }
+    return true;
+  }
 }

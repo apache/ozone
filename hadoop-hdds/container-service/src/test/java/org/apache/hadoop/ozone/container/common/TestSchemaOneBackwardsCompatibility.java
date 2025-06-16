@@ -192,7 +192,7 @@ public class TestSchemaOneBackwardsCompatibility {
               refCountedDB.getStore().getDeletedBlocksTable();
 
       // Test rangeKVs.
-      List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
+      List<Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
               deletedBlocksTable.getRangeKVs(cData.startKeyEmpty(), 100,
                   cData.containerPrefix());
 
@@ -357,7 +357,7 @@ public class TestSchemaOneBackwardsCompatibility {
     KeyValueContainerData cData = newKvData();
     try (DBHandle refCountedDB = BlockUtils.getDB(cData, conf)) {
       // Read blocks that were already deleted before the upgrade.
-      List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
+      List<Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
               refCountedDB.getStore().getDeletedBlocksTable()
                   .getRangeKVs(cData.startKeyEmpty(), 100,
                       cData.containerPrefix());
@@ -416,7 +416,7 @@ public class TestSchemaOneBackwardsCompatibility {
       }
 
       // Test decoding keys from the database.
-      List<? extends Table.KeyValue<String, BlockData>> blockKeyValues =
+      List<Table.KeyValue<String, BlockData>> blockKeyValues =
           blockDataTable.getRangeKVs(cData.startKeyEmpty(), 100,
               cData.containerPrefix(), cData.getUnprefixedKeyFilter());
 
@@ -462,7 +462,7 @@ public class TestSchemaOneBackwardsCompatibility {
       }
 
       // Test decoding keys from the database.
-      List<? extends Table.KeyValue<String, BlockData>> blockKeyValues =
+      List<Table.KeyValue<String, BlockData>> blockKeyValues =
           blockDataTable.getRangeKVs(cData.startKeyEmpty(), 100,
               cData.containerPrefix(), cData.getDeletingBlockKeyFilter());
 
@@ -535,7 +535,7 @@ public class TestSchemaOneBackwardsCompatibility {
       }
 
       // Test decoding keys from the database.
-      List<? extends Table.KeyValue<String, ChunkInfoList>> chunkInfoKeyValues =
+      List<Table.KeyValue<String, ChunkInfoList>> chunkInfoKeyValues =
           deletedBlocksTable.getRangeKVs(cData.startKeyEmpty(), 100,
               cData.containerPrefix());
 

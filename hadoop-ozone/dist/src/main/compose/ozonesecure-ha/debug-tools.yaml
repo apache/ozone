@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+x-debug-tools-config:
+  &common-env-file
+  dns_search: .
+  image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+  env_file:
+    - ./docker-config
+
+x-volumes:
+  - &keytabs ../_keytabs:/etc/security/keytabs
+  - &krb5conf ./krb5.conf:/etc/krb5.conf
+  - &ozone-dir ../..:/opt/hadoop
+  - &transformation ../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+
+services:
+  kdc:
+    volumes:
+      - *keytabs
+      - *ozone-dir
+  kms:
+    volumes:
+      - ${OZONE_VOLUME}/kms:/data
+      - *keytabs
+      - *krb5conf
+      - *transformation
+  datanode1:
+    <<: *common-env-file
+    volumes:
+      - ${OZONE_VOLUME}/dn1:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  datanode2:
+    <<: *common-env-file
+    volumes:
+      - ${OZONE_VOLUME}/dn2:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  datanode3:
+    <<: *common-env-file
+    volumes:
+      - ${OZONE_VOLUME}/dn3:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  datanode4:
+    <<: *common-env-file
+    ports:
+      - 9870:9999
+    command: ["/opt/hadoop/bin/ozone","datanode"]
+    extra_hosts:
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
+      - "recon=172.25.0.115"
+    environment:
+      WAITFOR: scm3.org:9894
+      OZONE_OPTS:
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.105
+    volumes:
+      - ${OZONE_VOLUME}/dn4:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  datanode5:
+    <<: *common-env-file
+    ports:
+      - 9872:9999
+    command: [ "/opt/hadoop/bin/ozone","datanode" ]
+    extra_hosts:
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
+      - "recon=172.25.0.115"
+    environment:
+      WAITFOR: scm3.org:9894
+      OZONE_OPTS:
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.106
+    volumes:
+      - ${OZONE_VOLUME}/dn5:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  om1:
+    <<: *common-env-file
+    volumes:
+      - ${OZONE_VOLUME}/om1:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  om2:
+    <<: *common-env-file
+    volumes:
+      - ${OZONE_VOLUME}/om2:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  om3:
+    <<: *common-env-file
+    volumes:
+      - ${OZONE_VOLUME}/om3:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  s3g:
+    <<: *common-env-file
+    volumes:
+      - ${OZONE_VOLUME}/s3g:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  scm1.org:
+    <<: *common-env-file
+    volumes:
+      - ${OZONE_VOLUME}/scm1:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  scm2.org:
+    <<: *common-env-file
+    volumes:
+      - ${OZONE_VOLUME}/scm2:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  scm3.org:
+    <<: *common-env-file
+    volumes:
+      - ${OZONE_VOLUME}/scm3:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+  recon:
+    <<: *common-env-file
+    volumes:
+      - ${OZONE_VOLUME}/recon:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+
+

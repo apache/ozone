@@ -32,6 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -580,7 +581,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
    */
   private void sendCloseContainerActionIfNeeded(Container container) {
     // We have to find a more efficient way to close a container.
-    boolean isSpaceFull = isContainerFull(container) || isVolumeFull(container);
+    boolean isOpen = container != null && container.getContainerState() == State.OPEN;
+    boolean isVolumeFull = isOpen && isVolumeFullExcludingCommittedSpace(container);
+    boolean isSpaceFull = isVolumeFull || isContainerFull(container);
     boolean shouldClose = isSpaceFull || isContainerUnhealthy(container);
     if (shouldClose) {
       ContainerData containerData = container.getContainerData();
@@ -591,6 +594,21 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           .setContainerID(containerData.getContainerID())
           .setAction(ContainerAction.Action.CLOSE).setReason(reason).build();
       context.addContainerActionIfAbsent(action);
+      if (isVolumeFull) {
+        HddsVolume volume = containerData.getVolume();
+        LOG.warn("Volume [{}] is full. containerID: {}. Volume usage: [{}].", volume, containerData.getContainerID(),
+            volume.getCurrentUsage());
+      }
+      AtomicBoolean immediateCloseActionSent = containerData.getImmediateCloseActionSent();
+      // if an immediate heartbeat has not been triggered already, trigger it now
+      if (immediateCloseActionSent.compareAndSet(false, true)) {
+        context.getParent().triggerHeartbeat();
+        if (isVolumeFull) {
+          // log only if volume is full
+          // don't want to log if only container is full because that is expected to happen frequently
+          LOG.warn("Triggered immediate heartbeat because of full volume.");
+        }
+      }
     }
   }
 
@@ -608,20 +626,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
-  private boolean isVolumeFull(Container container) {
-    boolean isOpen = Optional.ofNullable(container)
-        .map(cont -> cont.getContainerState() == ContainerDataProto.State.OPEN)
-        .orElse(Boolean.FALSE);
-    if (isOpen) {
-      HddsVolume volume = container.getContainerData().getVolume();
-      StorageLocationReport volumeReport = volume.getReport();
-      boolean full = volumeReport.getUsableSpace() <= 0;
-      if (full) {
-        LOG.info("Container {} volume is full: {}", container.getContainerData().getContainerID(), volumeReport);
-      }
-      return full;
-    }
-    return false;
+  private boolean isVolumeFullExcludingCommittedSpace(Container container) {
+    return container.getContainerData().getVolume().isVolumeFull();
   }
 
   private boolean isContainerUnhealthy(Container container) {

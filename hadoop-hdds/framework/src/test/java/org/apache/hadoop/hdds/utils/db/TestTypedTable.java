@@ -17,7 +17,13 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_AND_VALUE;
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ONLY;
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.NEITHER;
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.VALUE_ONLY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,12 +32,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
@@ -99,6 +107,7 @@ public class TestTypedTable {
       final long key = ThreadLocalRandom.current().nextLong(Long.MAX_VALUE) + 1;
       put(map, key, constructor);
     }
+    System.out.println("generated " + map.size() + " keys");
     return map;
   }
 
@@ -143,5 +152,41 @@ public class TestTypedTable {
         assertEquals(expected, longValue);
       }
     }
+
+    // test iterator type
+    try (TypedTable<Long, String> longTable = newTypedTable(
+        1, LongCodec.get(), StringCodec.get());
+         Table.KeyValueIterator<Long, String> neither = longTable.iterator(null, NEITHER);
+         Table.KeyValueIterator<Long, String> keyOnly = longTable.iterator(null, KEY_ONLY);
+         Table.KeyValueIterator<Long, String> valueOnly = longTable.iterator(null, VALUE_ONLY);
+         Table.KeyValueIterator<Long, String> keyAndValue = longTable.iterator(null, KEY_AND_VALUE)) {
+      while (keyAndValue.hasNext()) {
+        final Table.KeyValue<Long, String> keyValue = keyAndValue.next();
+        final Long expectedKey = Objects.requireNonNull(keyValue.getKey());
+
+        final String expectedValue = Objects.requireNonNull(keyValue.getValue());
+        assertEquals(keys.get(expectedKey).toString(), expectedValue);
+
+        final int expectedValueSize = keyValue.getValueByteSize();
+        assertEquals(expectedValue.length(), expectedValueSize);
+
+        assertKeyValue(expectedKey, null, 0, keyOnly);
+        assertKeyValue(null, expectedValue, expectedValueSize, valueOnly);
+        assertKeyValue(null, null, 0, neither);
+      }
+
+      assertFalse(keyOnly.hasNext());
+      assertFalse(valueOnly.hasNext());
+      assertFalse(neither.hasNext());
+    }
+  }
+
+  static <K, V> void assertKeyValue(K expectedKey, V expectedValue, int expectedValueSize,
+      Table.KeyValueIterator<K, V> iterator) {
+    assertTrue(iterator.hasNext());
+    final KeyValue<K, V> computed = iterator.next();
+    assertEquals(expectedKey, computed.getKey());
+    assertEquals(expectedValue, computed.getValue());
+    assertEquals(expectedValueSize, computed.getValueByteSize());
   }
 }

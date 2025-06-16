@@ -145,10 +145,6 @@
       <artifactId>log4j-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-core</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
     </dependency>
@@ -187,12 +183,6 @@
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-metrics-dropwizard3</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>io.dropwizard.metrics</groupId>
-          <artifactId>metrics-core</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
@@ -251,8 +241,15 @@
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-annotation-processing</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <!-- required for HttpServer2 -->
       <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-reload4j</artifactId>
+      <artifactId>jcl-over-slf4j</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <!-- required for async logging in Log4j2 -->
@@ -284,6 +281,11 @@
     <dependency>
       <groupId>org.apache.kerby</groupId>
       <artifactId>kerb-util</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -335,20 +337,6 @@
 
   <build>
     <plugins>
-      <plugin>
-        <groupId>com.coderplus.maven.plugins</groupId>
-        <artifactId>copy-rename-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>rename-generated-config</id>
-            <phase>process-classes</phase>
-          </execution>
-          <execution>
-            <id>rename-generated-test-config</id>
-            <phase>process-test-classes</phase>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>

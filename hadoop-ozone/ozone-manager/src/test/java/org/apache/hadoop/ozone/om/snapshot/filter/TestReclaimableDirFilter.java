@@ -72,7 +72,7 @@ public class TestReclaimableDirFilter extends AbstractReclaimableFilterTest {
     List<SnapshotInfo> snapshotInfos = getLastSnapshotInfos(volume, bucket, 1, index);
     assertEquals(snapshotInfos.size(), 1);
     SnapshotInfo prevSnapshotInfo = snapshotInfos.get(0);
-    OmBucketInfo bucketInfo = getOzoneManager().getBucketInfo(volume, bucket);
+    OmBucketInfo bucketInfo = getOzoneManager().getBucketManager().getBucketInfo(volume, bucket);
     long volumeId = getOzoneManager().getMetadataManager().getVolumeId(volume);
     KeyManager keyManager = getKeyManager();
     if (prevSnapshotInfo != null) {

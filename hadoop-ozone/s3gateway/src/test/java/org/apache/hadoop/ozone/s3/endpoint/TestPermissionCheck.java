@@ -130,13 +130,14 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.put("bucketName", null, null, null));
+        bucketEndpoint.put("bucketName", null, null));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
   public void testDeleteBucket() throws IOException {
     doThrow(exception).when(objectStore).deleteS3Bucket(anyString());
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
@@ -168,7 +169,7 @@ public class TestPermissionCheck {
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
         "bucketName", null, null, null, 1000,
-        null, null, null, null, null, null, null, 0, null));
+        null, null, null, null, null, null, null, 0));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -210,10 +211,11 @@ public class TestPermissionCheck {
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
+        .setHeaders(headers)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
             "bucketName", null, null, null, 1000, null, null, null, null, "acl",
-            null, null, 0, null), "Expected OS3Exception with FORBIDDEN http code.");
+            null, null, 0), "Expected OS3Exception with FORBIDDEN http code.");
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -232,9 +234,10 @@ public class TestPermissionCheck {
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
+        .setHeaders(headers)
         .build();
     try {
-      bucketEndpoint.put("bucketName", "acl", headers, null);
+      bucketEndpoint.put("bucketName", "acl", null);
     } catch (Exception e) {
       assertTrue(e instanceof OS3Exception &&
           ((OS3Exception)e).getHttpCode() == HTTP_FORBIDDEN);
@@ -247,6 +250,7 @@ public class TestPermissionCheck {
   @Test
   public void testGetKey() throws IOException {
     when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(clientProtocol)
         .getS3KeyDetails(anyString(), anyString());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -281,6 +285,7 @@ public class TestPermissionCheck {
   @Test
   public void testDeleteKey() throws IOException {
     when(objectStore.getS3Volume()).thenReturn(volume);
+    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(clientProtocol).deleteKey(anyString(), anyString(),
         anyString(), anyBoolean());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()

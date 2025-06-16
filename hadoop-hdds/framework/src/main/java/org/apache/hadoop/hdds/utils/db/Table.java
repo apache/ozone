@@ -153,21 +153,24 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   void deleteRange(KEY beginKey, KEY endKey) throws IOException;
 
-  /**
-   * Returns the iterator for this metadata store.
-   *
-   * @return MetaStoreIterator
-   * @throws IOException on failure.
-   */
-  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator()
-      throws IOException;
+  /** The same as iterator(null). */
+  default KeyValueIterator<KEY, VALUE> iterator() throws IOException {
+    return iterator(null);
+  }
+
+  /** The same as iterator(prefix, KEY_AND_VALUE). */
+  default KeyValueIterator<KEY, VALUE> iterator(KEY prefix) throws IOException {
+    return iterator(prefix, KeyValueIterator.Type.KEY_AND_VALUE);
+  }
 
   /**
-   * Returns a prefixed iterator for this metadata store.
-   * @param prefix
-   * @return MetaStoreIterator
+   * Iterate the elements in this table.
+   *
+   * @param prefix The prefix of the elements to be iterated.
+   * @param type Specify whether key and/or value are required.
+   * @return an iterator.
    */
-  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix)
+  KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type)
       throws IOException;
 
   /**
@@ -270,7 +273,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * @throws IOException if there are I/O errors.
    * @throws IllegalArgumentException if count is less than 0.
    */
-  List<? extends KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey,
+  List<KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey,
           int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException;
@@ -292,7 +295,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * @throws IOException
    * @throws IllegalArgumentException
    */
-  List<? extends KeyValue<KEY, VALUE>> getSequentialRangeKVs(KEY startKey,
+  List<KeyValue<KEY, VALUE>> getSequentialRangeKVs(KEY startKey,
           int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException;
@@ -325,98 +328,82 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   /**
    * Class used to represent the key and value pair of a db entry.
    */
-  interface KeyValue<KEY, VALUE> {
+  final class KeyValue<K, V> {
+    private final K key;
+    private final V value;
+    private final int valueByteSize;
 
-    KEY getKey() throws IOException;
+    private KeyValue(K key, V value, int valueByteSize) {
+      this.key = key;
+      this.value = value;
+      this.valueByteSize = valueByteSize;
+    }
 
-    VALUE getValue() throws IOException;
+    public K getKey() {
+      return key;
+    }
 
-    default int getRawSize()  throws IOException {
-      return 0;
+    public V getValue() {
+      return value;
+    }
+
+    public int getValueByteSize() {
+      return valueByteSize;
+    }
+
+    @Override
+    public String toString() {
+      return "(key=" + key + ", value=" + value + ")";
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      } else if (!(obj instanceof KeyValue)) {
+        return false;
+      }
+      final KeyValue<?, ?> that = (KeyValue<?, ?>) obj;
+      return this.getKey().equals(that.getKey())
+          && this.getValue().equals(that.getValue());
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(getKey(), getValue());
     }
   }
 
   static <K, V> KeyValue<K, V> newKeyValue(K key, V value) {
-    return new KeyValue<K, V>() {
-      @Override
-      public K getKey() {
-        return key;
-      }
-
-      @Override
-      public V getValue() {
-        return value;
-      }
-
-      @Override
-      public String toString() {
-        return "(key=" + key + ", value=" + value + ")";
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (!(obj instanceof KeyValue)) {
-          return false;
-        }
-        KeyValue<?, ?> kv = (KeyValue<?, ?>) obj;
-        try {
-          return getKey().equals(kv.getKey()) && getValue().equals(kv.getValue());
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      }
-
-      @Override
-      public int hashCode() {
-        return Objects.hash(getKey(), getValue());
-      }
-    };
+    return newKeyValue(key, value, 0);
   }
 
-  static <K, V> KeyValue<K, V> newKeyValue(K key, V value, int rawSize) {
-    return new KeyValue<K, V>() {
-      @Override
-      public K getKey() {
-        return key;
-      }
-
-      @Override
-      public V getValue() {
-        return value;
-      }
-
-      @Override
-      public int getRawSize() throws IOException {
-        return rawSize;
-      }
-
-      @Override
-      public String toString() {
-        return "(key=" + key + ", value=" + value + ")";
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (!(obj instanceof KeyValue)) {
-          return false;
-        }
-        KeyValue<?, ?> kv = (KeyValue<?, ?>) obj;
-        try {
-          return getKey().equals(kv.getKey()) && getValue().equals(kv.getValue());
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      }
-
-      @Override
-      public int hashCode() {
-        return Objects.hash(getKey(), getValue());
-      }
-    };
+  static <K, V> KeyValue<K, V> newKeyValue(K key, V value, int valueByteSize) {
+    return new KeyValue<>(key, value, valueByteSize);
   }
 
   /** A {@link TableIterator} to iterate {@link KeyValue}s. */
   interface KeyValueIterator<KEY, VALUE>
       extends TableIterator<KEY, KeyValue<KEY, VALUE>> {
+
+    /** The iterator type. */
+    enum Type {
+      /** Neither read key nor value. */
+      NEITHER,
+      /** Read key only. */
+      KEY_ONLY,
+      /** Read value only. */
+      VALUE_ONLY,
+      /** Read both key and value. */
+      KEY_AND_VALUE;
+
+      boolean readKey() {
+        return (this.ordinal() & KEY_ONLY.ordinal()) != 0;
+      }
+
+      boolean readValue() {
+        return (this.ordinal() & VALUE_ONLY.ordinal()) != 0;
+      }
+    }
   }
 }

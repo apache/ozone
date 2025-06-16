@@ -71,10 +71,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numSnapshotCreates;
   private @Metric MutableCounterLong numSnapshotDeletes;
   private @Metric MutableCounterLong numSnapshotLists;
+  private @Metric MutableCounterLong numSnapshotRenames;
   private @Metric MutableCounterLong numSnapshotDiffJobs;
   private @Metric MutableCounterLong numSnapshotInfos;
-  private @Metric MutableCounterLong numSnapshotPurges;
-  private @Metric MutableCounterLong numSnapshotSetProperties;
+  private @Metric MutableCounterLong numCancelSnapshotDiffs;
+  private @Metric MutableCounterLong numListSnapshotDiffJobs;
 
   private @Metric MutableGaugeInt numSnapshotCacheSize;
   private @Metric MutableCounterLong numGetFileStatus;
@@ -138,12 +139,13 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
   private @Metric MutableCounterLong numExpiredMPUAbortRequestFails;
   private @Metric MutableCounterLong numSnapshotCreateFails;
+  private @Metric MutableCounterLong numSnapshotRenameFails;
   private @Metric MutableCounterLong numSnapshotDeleteFails;
   private @Metric MutableCounterLong numSnapshotListFails;
   private @Metric MutableCounterLong numSnapshotDiffJobFails;
   private @Metric MutableCounterLong numSnapshotInfoFails;
-  private @Metric MutableCounterLong numSnapshotPurgeFails;
-  private @Metric MutableCounterLong numSnapshotSetPropertyFails;
+  private @Metric MutableCounterLong numCancelSnapshotDiffFails;
+  private @Metric MutableCounterLong numListSnapshotDiffJobFails;
 
   private @Metric MutableCounterLong numSnapshotActive;
   private @Metric MutableCounterLong numSnapshotDeleted;
@@ -477,6 +479,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotCreateFails.incr();
   }
 
+  public void incNumSnapshotRenames() {
+    numSnapshotRenames.incr();
+  }
+
+  public void incNumSnapshotRenameFails() {
+    numSnapshotRenameFails.incr();
+  }
+
   public void incNumSnapshotDeletes() {
     numSnapshotDeletes.incr();
   }
@@ -493,16 +503,24 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotInfos.incr();
   }
 
-  public void incNumSnapshotPurges() {
-    numSnapshotPurges.incr();
-  }
-
-  public void incNumSnapshotSetProperties() {
-    numSnapshotSetProperties.incr();
-  }
-
   public void incNumSnapshotDiffJobs() {
     numSnapshotDiffJobs.incr();
+  }
+
+  public void incNumCancelSnapshotDiffs() {
+    numCancelSnapshotDiffs.incr();
+  }
+
+  public void incNumCancelSnapshotDiffJobFails() {
+    numCancelSnapshotDiffFails.incr();
+  }
+
+  public void incNumListSnapshotDiffJobs() {
+    numListSnapshotDiffJobs.incr();
+  }
+
+  public void incNumListSnapshotDiffJobFails() {
+    numListSnapshotDiffJobFails.incr();
   }
 
   public void incNumSnapshotListFails() {
@@ -515,14 +533,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumSnapshotInfoFails() {
     numSnapshotInfoFails.incr();
-  }
-
-  public void incNumSnapshotPurgeFails() {
-    numSnapshotPurgeFails.incr();
-  }
-
-  public void incNumSnapshotSetPropertyFails() {
-    numSnapshotSetPropertyFails.incr();
   }
 
   public void setNumSnapshotActive(long num) {
@@ -1354,14 +1364,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     return numSnapshotDiffJobs.value();
   }
 
-  public long getNumSnapshotPurges() {
-    return numSnapshotPurges.value();
-  }
-
-  public long getNumSnapshotSetProperties() {
-    return numSnapshotSetProperties.value();
-  }
-
   public long getNumSnapshotCreateFails() {
     return numSnapshotCreateFails.value();
   }
@@ -1384,14 +1386,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public long getNumSnapshotDeleted() {
     return numSnapshotDeleted.value();
-  }
-
-  public long getNumSnapshotPurgeFails() {
-    return numSnapshotPurgeFails.value();
-  }
-
-  public long getNumSnapshotSetPropertyFails() {
-    return numSnapshotSetPropertyFails.value();
   }
 
   public void incNumTrashRenames() {
