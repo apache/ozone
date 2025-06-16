@@ -31,8 +31,10 @@ export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
 export SECURITY_ENABLED=true
 
-curl -LO https://downloads.apache.org/ranger/KEYS
-gpg --import KEYS
+if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" != "true" ]]; then
+  curl -LO https://downloads.apache.org/ranger/KEYS
+  gpg --import KEYS
+fi
 
 download_and_verify_apache_release "ranger/${RANGER_VERSION}/apache-ranger-${RANGER_VERSION}.tar.gz"
 tar -C "${DOWNLOAD_DIR}" -x -z -f "${DOWNLOAD_DIR}/apache-ranger-${RANGER_VERSION}.tar.gz"
