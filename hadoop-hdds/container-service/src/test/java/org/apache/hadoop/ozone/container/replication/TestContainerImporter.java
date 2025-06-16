@@ -82,29 +82,35 @@ class TestContainerImporter {
 
   private OzoneConfiguration conf;
   private VolumeChoosingPolicy volumeChoosingPolicy;
+  private KeyValueContainerData containerData;
+  private KeyValueContainer container;
+  private ContainerController controllerMock;
+  private long containerId = 1;
+  private ContainerSet containerSet;
+  private MutableVolumeSet volumeSet;
+  private ContainerImporter containerImporter;
 
   @BeforeEach
-  void setup() {
+  void setup() throws IOException {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.getAbsolutePath());
     volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
+    // create container
+    containerData = new KeyValueContainerData(containerId,
+        ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
+    container = new KeyValueContainer(containerData, conf);
+    controllerMock = mock(ContainerController.class);
+    containerSet = newContainerSet(0);
+    volumeSet = new MutableVolumeSet("test", conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    // create containerImporter object
+    containerImporter = new ContainerImporter(conf,
+        containerSet, controllerMock, volumeSet, volumeChoosingPolicy);
   }
 
   @Test
   void importSameContainerWhenAlreadyImport() throws Exception {
-    long containerId = 1;
-    // create container
-    KeyValueContainerData containerData = new KeyValueContainerData(containerId,
-        ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
-    KeyValueContainer container = new KeyValueContainer(containerData, conf);
-    ContainerController controllerMock = mock(ContainerController.class);
-    // create containerImporter object
-    ContainerSet containerSet = newContainerSet(0);
     containerSet.addContainer(container);
-    MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
-        StorageVolume.VolumeType.DATA_VOLUME, null);
-    ContainerImporter containerImporter = new ContainerImporter(conf,
-        containerSet, controllerMock, volumeSet, volumeChoosingPolicy);
     File tarFile = new File("dummy.tar");
     // second import should fail immediately
     StorageContainerException ex = assertThrows(StorageContainerException.class,
@@ -116,25 +122,13 @@ class TestContainerImporter {
 
   @Test
   void importSameContainerWhenFirstInProgress() throws Exception {
-    long containerId = 1;
-    // create container
-    KeyValueContainerData containerData = new KeyValueContainerData(containerId,
-        ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
-    KeyValueContainer container = new KeyValueContainer(containerData, conf);
     // mock controller for return container data with delay
-    ContainerController controllerMock = mock(ContainerController.class);
     Semaphore semaphore = new Semaphore(0);
     when(controllerMock.importContainer(any(), any(), any()))
         .thenAnswer((invocation) -> {
           semaphore.acquire();
           return container;
         });
-    // create containerImporter object
-    ContainerSet containerSet = newContainerSet(0);
-    MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
-        StorageVolume.VolumeType.DATA_VOLUME, null);
-    ContainerImporter containerImporter = new ContainerImporter(conf,
-        containerSet, controllerMock, volumeSet, volumeChoosingPolicy);
     // run import async first time having delay
     File tarFile = containerTarFile(containerId, containerData);
     CompletableFuture.runAsync(() -> {
@@ -160,18 +154,12 @@ class TestContainerImporter {
 
   @Test
   public void testInconsistentChecksumContainerShouldThrowError() throws Exception {
-    // create container
-    long containerId = 1;
+    // create container with mock to return different checksums
     KeyValueContainerData containerData = spy(new KeyValueContainerData(containerId,
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test"));
-    // mock to return different checksum
     when(containerData.getChecksum()).thenReturn("checksum1", "checksum2");
     doNothing().when(containerData).setChecksumTo0ByteArray();
-    // create containerImporter object
-    ContainerController controllerMock = mock(ContainerController.class);
-    ContainerSet containerSet = newContainerSet(0);
-    MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
-        StorageVolume.VolumeType.DATA_VOLUME, null);
+    // create containerImporter object with mock
     ContainerImporter containerImporter = spy(new ContainerImporter(conf,
         containerSet, controllerMock, volumeSet, volumeChoosingPolicy));
 
@@ -196,23 +184,11 @@ class TestContainerImporter {
 
   @Test
   public void testImportContainerTriggersOnDemandScanner() throws Exception {
-    long containerId = 1;
     try (MockedStatic<OnDemandContainerDataScanner> mockedStatic = mockStatic(OnDemandContainerDataScanner.class)) {
-      // create container
-      KeyValueContainerData containerData = new KeyValueContainerData(containerId,
-          ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
-      KeyValueContainer container = new KeyValueContainer(containerData, conf);
-      ContainerController controllerMock = mock(ContainerController.class);
       when(controllerMock.importContainer(any(), any(), any())).thenReturn(container);
-
       // create containerImporter object
-      ContainerSet containerSet = newContainerSet(0);
-      MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
-          StorageVolume.VolumeType.DATA_VOLUME, null);
       HddsVolume targetVolume = mock(HddsVolume.class);
       doNothing().when(targetVolume).incrementUsedSpace(anyLong());
-      ContainerImporter containerImporter = new ContainerImporter(conf,
-          containerSet, controllerMock, volumeSet, volumeChoosingPolicy);
 
       // import the container
       File tarFile = containerTarFile(containerId, containerData);
@@ -220,7 +196,7 @@ class TestContainerImporter {
           targetVolume, NO_COMPRESSION);
 
       // verify static method was called
-      mockedStatic.verify(() -> OnDemandContainerDataScanner.scanContainer(container), times(1));
+      mockedStatic.verify(() -> OnDemandContainerDataScanner.scanContainer(container, any()), times(1));
       assertNotNull(containerSet.getContainer(containerId));
     }
   }
