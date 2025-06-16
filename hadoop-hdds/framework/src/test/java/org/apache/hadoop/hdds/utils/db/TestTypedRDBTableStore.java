@@ -41,7 +41,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
@@ -227,7 +226,7 @@ public class TestTypedRDBTableStore {
       }
       int localCount = 0;
 
-      try (TableIterator<String, ? extends KeyValue<String, String>> iter =
+      try (Table.KeyValueIterator<String, String> iter =
           testTable.iterator()) {
         while (iter.hasNext()) {
           Table.KeyValue keyValue = iter.next();
@@ -246,7 +245,7 @@ public class TestTypedRDBTableStore {
   @Test
   public void testIteratorOnException() throws Exception {
     RDBTable rdbTable = mock(RDBTable.class);
-    when(rdbTable.iterator((CodecBuffer) null))
+    when(rdbTable.iterator((CodecBuffer) null, Table.KeyValueIterator.Type.KEY_AND_VALUE))
         .thenThrow(new IOException());
     try (Table<String, String> testTable = new TypedTable<>(rdbTable,
         StringCodec.get(), StringCodec.get(), CacheType.PARTIAL_CACHE)) {

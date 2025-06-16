@@ -17,10 +17,15 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import javax.ws.rs.core.HttpHeaders;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
  * Represents an owner of S3 resources in the Ozone S3 compatibility layer.
@@ -79,5 +84,60 @@ public class S3Owner {
         "displayName='" + displayName + '\'' +
         ", id='" + id + '\'' +
         '}';
+  }
+
+  /**
+   * Verify the bucket owner condition.
+   *
+   * @param headers       HTTP headers
+   * @param bucketName    bucket name
+   * @param bucketOwner   bucket owner
+   * @throws OS3Exception if the expected bucket owner does not match
+   */
+  public static void verifyBucketOwnerCondition(HttpHeaders headers, String bucketName, String bucketOwner)
+      throws OS3Exception {
+    if (headers == null || bucketOwner == null) {
+      return;
+    }
+
+    final String expectedBucketOwner = headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER);
+
+    if (StringUtils.isEmpty(expectedBucketOwner)) {
+      return;
+    }
+    if (expectedBucketOwner.equals(bucketOwner)) {
+      return;
+    }
+    throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, bucketName);
+  }
+
+  /**
+   * Verify the bucket owner condition on copy operation.
+   *
+   * @param headers          HTTP headers
+   * @param sourceBucketName source bucket name
+   * @param sourceOwner      source bucket owner
+   * @param destBucketName   dest bucket name
+   * @param destOwner        destination bucket owner
+   * @throws OS3Exception if the expected source or destination bucket owner does not match
+   */
+  public static void verifyBucketOwnerConditionOnCopyOperation(HttpHeaders headers, String sourceBucketName,
+                                                               String sourceOwner, String destBucketName,
+                                                               String destOwner)
+      throws OS3Exception {
+    if (headers == null) {
+      return;
+    }
+
+    final String expectedSourceOwner = headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER);
+    final String expectedDestOwner = headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER);
+
+    if (expectedSourceOwner != null && sourceOwner != null && !sourceOwner.equals(expectedSourceOwner)) {
+      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, sourceBucketName);
+    }
+
+    if (expectedDestOwner != null && destOwner != null && !destOwner.equals(expectedDestOwner)) {
+      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, destBucketName);
+    }
   }
 }

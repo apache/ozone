@@ -47,7 +47,6 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableConfig;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
@@ -190,7 +189,7 @@ public class TestRDBSnapshotProvider {
         final String name = families.get(i);
         final Table<byte[], byte[]> table1 = rdbStore1.getTable(name);
         final Table<byte[], byte[]> table2 = rdbStore2.getTable(name);
-        try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator
+        try (Table.KeyValueIterator<byte[], byte[]> iterator
                  = table1.iterator()) {
           while (iterator.hasNext()) {
             KeyValue<byte[], byte[]> keyValue = iterator.next();
