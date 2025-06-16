@@ -66,7 +66,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         getOmRequest().getPurgeDirectoriesRequest();
     String fromSnapshot = purgeDirsRequest.hasSnapshotTableKey() ?
         purgeDirsRequest.getSnapshotTableKey() : null;
-
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
     Set<Pair<String, String>> lockSet = new HashSet<>();
@@ -117,9 +116,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
           // or key does not belong to bucket as bucket is recreated
-          if (null != omBucketInfo
-              && omBucketInfo.getObjectID() == path.getBucketId()) {
-            omBucketInfo.incrUsedNamespace(-1L);
+          if (null != omBucketInfo && omBucketInfo.getObjectID() == path.getBucketId()) {
+            omBucketInfo.decrUsedNamespace(1L, true);
             String ozoneDbKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
                 path.getBucketId(), keyInfo.getParentObjectID(), keyInfo.getFileName());
             omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(ozoneDbKey),
@@ -159,8 +157,11 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           // or key does not belong to bucket as bucket is recreated
           if (null != omBucketInfo
               && omBucketInfo.getObjectID() == path.getBucketId()) {
-            omBucketInfo.incrUsedBytes(-sumBlockLengths(keyInfo));
-            omBucketInfo.incrUsedNamespace(-1L);
+            long totalSize = sumBlockLengths(keyInfo);
+            omBucketInfo.decrUsedBytes(totalSize, true);
+            omBucketInfo.decrUsedNamespace(1L, true);
+            omBucketInfo.incrPendingSnapshotDeleteBytes(totalSize);
+            omBucketInfo.incrPendingSnapshotDeleteNamespace(1L);
             String ozoneDbKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
                 path.getBucketId(), keyInfo.getParentObjectID(), keyInfo.getFileName());
             omMetadataManager.getFileTable().addCacheEntry(new CacheKey<>(ozoneDbKey),
@@ -206,7 +207,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         entry.setValue(entry.getValue().copyObject());
       }
     }
-
     return new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests,
         getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);

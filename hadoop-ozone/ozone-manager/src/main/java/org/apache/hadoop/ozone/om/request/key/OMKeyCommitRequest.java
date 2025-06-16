@@ -318,12 +318,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
       } else if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
-        // Subtract the size of blocks to be overwritten.
-        correctedSpace -= keyToDelete.getReplicatedSize();
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
             keyToDelete, trxnLogIndex);
-        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
-            correctedSpace);
         // using pseudoObjId as objectId can be same in case of overwrite key
         long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(
@@ -337,10 +333,22 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         // Otherwise, it causes data loss once those shared blocks are added
         // to deletedTable and processed by KeyDeletingService for deletion.
         filterOutBlocksStillInUse(omKeyInfo, oldVerKeyInfo);
-
+        long totalSize = 0;
+        long totalNamespace = 0;
         if (!oldVerKeyInfo.getOmKeyInfoList().isEmpty()) {
           oldKeyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
+          for (OmKeyInfo olderKeyVersions : oldVerKeyInfo.getOmKeyInfoList()) {
+            totalSize += sumBlockLengths(olderKeyVersions);
+            totalNamespace += 1;
+          }
         }
+        checkBucketQuotaInNamespace(omBucketInfo, 1L);
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
+        // Subtract the size of blocks to be overwritten.
+        correctedSpace -= totalSize;
+        omBucketInfo.incrPendingSnapshotDeleteNamespace(totalNamespace);
+        omBucketInfo.incrPendingSnapshotDeleteBytes(totalSize);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,

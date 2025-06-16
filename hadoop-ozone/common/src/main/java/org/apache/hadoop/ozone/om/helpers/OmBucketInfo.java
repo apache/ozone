@@ -280,41 +280,33 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   }
 
   public void incrUsedBytes(long bytes) {
-    incrUsedBytes(bytes, true);
+    this.usedBytes += bytes;
   }
 
-  public void incrUsedBytes(long bytes, boolean increasePendingDeleteBytes) {
-    if (bytes >= 0) {
-      this.usedBytes += bytes;
-    } else {
-      deleteUsedBytes(-bytes, increasePendingDeleteBytes);
-    }
-  }
-
-  private void deleteUsedBytes(long bytes, boolean increasePendingDeleteBytes) {
+  public void decrUsedBytes(long bytes, boolean increasePendingDeleteBytes) {
     this.usedBytes -= bytes;
     if (increasePendingDeleteBytes) {
-      this.pendingSnapshotDeleteBytes += bytes;
+      incrPendingSnapshotDeleteBytes(bytes);
     }
+  }
+
+  public void incrPendingSnapshotDeleteBytes(long bytes) {
+    this.pendingSnapshotDeleteBytes += bytes;
   }
 
   public void incrUsedNamespace(long namespaceToUse) {
-    incrUsedNamespace(namespaceToUse, true);
+    this.usedNamespace += namespaceToUse;
   }
 
-  public void incrUsedNamespace(long namespaceToUse, boolean increasePendingDeleteNamespace) {
-    if (namespaceToUse >= 0) {
-      this.usedNamespace += namespaceToUse;
-    } else {
-      deleteUsedNamespace(-namespaceToUse, increasePendingDeleteNamespace);
-    }
-  }
-
-  private void deleteUsedNamespace(long namespaceUsed, boolean increasePendingDeleteNamespace) {
-    this.usedNamespace -= namespaceUsed;
+  public void decrUsedNamespace(long namespaceToUse, boolean increasePendingDeleteNamespace) {
+    this.usedNamespace -= namespaceToUse;
     if (increasePendingDeleteNamespace) {
-      this.pendingSnapshotDeleteNamespace += namespaceUsed;
+      incrPendingSnapshotDeleteNamespace(namespaceToUse);
     }
+  }
+
+  public void incrPendingSnapshotDeleteNamespace(long namespaceToUse) {
+    this.pendingSnapshotDeleteNamespace += namespaceToUse;
   }
 
   public void purgePendingDeleteSnapshotBytes(long bytes) {

@@ -122,8 +122,8 @@ public class OMQuotaRepairRequest extends OMClientRequest {
         // bucket might be deleted when running repair count parallel
         return;
       }
-      bucketInfo.incrUsedBytes(bucketCountInfo.getDiffUsedBytes(), false);
-      bucketInfo.incrUsedNamespace(bucketCountInfo.getDiffUsedNamespace(), false);
+      bucketInfo.incrUsedBytes(bucketCountInfo.getDiffUsedBytes());
+      bucketInfo.incrUsedNamespace(bucketCountInfo.getDiffUsedNamespace());
       if (bucketCountInfo.getSupportOldQuota()) {
         OmBucketInfo.Builder builder = bucketInfo.toBuilder();
         if (bucketInfo.getQuotaInBytes() == OLD_QUOTA_DEFAULT) {

@@ -221,14 +221,21 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
+      long totalPendingDeleteSpace = 0;
+      int pendingDeleteNamespace = 0;
       if (null != oldPartKeyInfo) {
         OmKeyInfo partKeyToBeDeleted =
             OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
         correctedSpace -= partKeyToBeDeleted.getReplicatedSize();
+        totalPendingDeleteSpace += sumBlockLengths(partKeyToBeDeleted);
+        pendingDeleteNamespace += 1;
       }
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
-          correctedSpace);
+          correctedSpace + totalPendingDeleteSpace);
+      checkBucketQuotaInNamespace(omBucketInfo, 1);
       omBucketInfo.incrUsedBytes(correctedSpace);
+      omBucketInfo.incrPendingSnapshotDeleteBytes(totalPendingDeleteSpace);
+      omBucketInfo.incrPendingSnapshotDeleteNamespace(pendingDeleteNamespace);
 
       MultipartCommitUploadPartResponse.Builder commitResponseBuilder = MultipartCommitUploadPartResponse.newBuilder()
           .setPartName(partName);

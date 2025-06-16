@@ -196,8 +196,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       quotaReleased =
           markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
               dirList, omMetadataManager, quotaReleased, openKeyInfoMap);
-      omBucketInfo.incrUsedBytes(-quotaReleased);
-      omBucketInfo.incrUsedNamespace(-1L * omKeyInfoList.size());
+      omBucketInfo.decrUsedBytes(quotaReleased, true);
+      omBucketInfo.decrUsedNamespace(omKeyInfoList.size(), true);
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       omClientResponse =
