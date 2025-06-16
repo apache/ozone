@@ -915,7 +915,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
       long usedBytes = omBucketInfo.getTotalBucketSpace();
       long quotaInBytes = omBucketInfo.getQuotaInBytes();
-      if (quotaInBytes - usedBytes  < allocateSize) {
+      if (quotaInBytes - usedBytes < allocateSize) {
         throw new OMException("The DiskSpace quota of bucket:"
             + omBucketInfo.getBucketName() + " exceeded quotaInBytes: "
             + quotaInBytes + " Bytes but diskspace consumed: " + (usedBytes

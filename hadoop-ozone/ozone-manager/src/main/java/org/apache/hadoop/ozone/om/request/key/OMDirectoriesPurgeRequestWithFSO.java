@@ -191,6 +191,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
             CacheValue.get(context.getIndex(), fromSnapshotInfo));
       } else {
+        // Update the deletingServiceMetrics with the transaction index to indicate the
+        // last purge transaction when running for AOS
         deletingServiceMetrics.setLastAOSTransactionId(transactionInfo);
       }
     } catch (IOException ex) {
