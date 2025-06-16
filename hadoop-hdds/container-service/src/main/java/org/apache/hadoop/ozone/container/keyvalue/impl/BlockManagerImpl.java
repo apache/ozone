@@ -351,7 +351,7 @@ public class BlockManagerImpl implements BlockManager {
         result = new ArrayList<>();
         String startKey = (startLocalID == -1) ? cData.startKeyEmpty()
             : cData.getBlockKey(startLocalID);
-        List<? extends Table.KeyValue<String, BlockData>> range =
+        List<Table.KeyValue<String, BlockData>> range =
             db.getStore().getBlockDataTable()
                 .getSequentialRangeKVs(startKey, count,
                     cData.containerPrefix(), cData.getUnprefixedKeyFilter());

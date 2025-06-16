@@ -172,7 +172,7 @@ public final class SCMCertStore implements CertificateStore {
         .collect(Collectors.toList());
   }
 
-  private List<? extends Table.KeyValue<BigInteger, X509Certificate>>
+  private List<Table.KeyValue<BigInteger, X509Certificate>>
       getValidCertTableList(NodeType role, BigInteger startSerialID, int count)
       throws IOException {
     // Implemented for role SCM and CertType VALID_CERTS.

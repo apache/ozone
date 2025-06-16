@@ -181,8 +181,7 @@ public class BlockDeletingTask implements BackgroundTask {
 
       // # of blocks to delete is throttled
       KeyPrefixFilter filter = containerData.getDeletingBlockKeyFilter();
-      List<? extends Table.KeyValue<String, BlockData>> toDeleteBlocks =
-          blockDataTable
+      List<Table.KeyValue<String, BlockData>> toDeleteBlocks = blockDataTable
               .getSequentialRangeKVs(containerData.startKeyEmpty(),
                   (int) blocksToDelete, containerData.containerPrefix(),
                   filter);

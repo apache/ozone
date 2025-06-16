@@ -99,7 +99,7 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   @Override
-  public List<? extends KeyValue<String, ChunkInfoList>> getRangeKVs(
+  public List<KeyValue<String, ChunkInfoList>> getRangeKVs(
           String startKey, int count, String prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
@@ -112,7 +112,7 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   @Override
-  public List<? extends KeyValue<String, ChunkInfoList>> getSequentialRangeKVs(
+  public List<KeyValue<String, ChunkInfoList>> getSequentialRangeKVs(
           String startKey, int count, String prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
@@ -143,7 +143,7 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   private static List<KeyValue<String, ChunkInfoList>> unprefix(
-      List<? extends KeyValue<String, ChunkInfoList>> kvs) {
+      List<KeyValue<String, ChunkInfoList>> kvs) {
 
     return kvs.stream()
         .map(kv -> Table.newKeyValue(unprefix(kv.getKey()), kv.getValue()))

@@ -111,7 +111,7 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public List<? extends KeyValue<KEY, VALUE>> getRangeKVs(
+  public List<KeyValue<KEY, VALUE>> getRangeKVs(
           KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
@@ -119,7 +119,7 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public List<? extends KeyValue<KEY, VALUE>> getSequentialRangeKVs(
+  public List<KeyValue<KEY, VALUE>> getSequentialRangeKVs(
           KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
