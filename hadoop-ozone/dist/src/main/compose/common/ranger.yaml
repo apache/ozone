@@ -45,3 +45,7 @@ services:
     environment:
       RANGER_DB_TYPE: postgres
       RANGER_VERSION:
+    healthcheck:
+      test: 'grep "Successfully retrieved .*dev_ozone" /var/log/ranger/ranger-admin*log'
+      interval: 2s
+      retries: 60

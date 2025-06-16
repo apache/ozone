@@ -58,4 +58,8 @@ perl -wpl -i \
 start_docker_env
 wait_for_port ranger 6080 120
 
+execute_robot_test s3g -v testuser:hdfs kinit.robot
+execute_robot_test s3g freon/generate.robot
+execute_robot_test s3g freon/validate.robot
+
 # execute_robot_test scm security/ozone-secure-tenant.robot
