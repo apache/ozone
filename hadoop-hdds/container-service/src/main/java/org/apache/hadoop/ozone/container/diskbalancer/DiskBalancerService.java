@@ -31,7 +31,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -76,16 +75,43 @@ public class DiskBalancerService extends BackgroundService {
 
   private static final String DISK_BALANCER_TMP_DIR = "tmp";
 
+  /**
+   * Defines the operational states of the DiskBalancerService.
+   */
+  public enum DiskBalancerOperationalState {
+    /**
+     * DiskBalancer is stopped and will not run unless explicitly started.
+     * This is the initial state, can be set by admin STOP commands,
+     * or if the balancer stops itself after disks are even.
+     */
+    STOPPED,
+
+    /**
+     * DiskBalancer is running normally.
+     * The service is actively performing disk balancing operations.
+     */
+    RUNNING,
+
+    /**
+     * DiskBalancer was running but is temporarily paused due to node state changes
+     * (e.g., node entering maintenance or decommissioning).
+     * When the node returns to IN_SERVICE, it can resume to RUNNING state.
+     */
+    PAUSED_BY_NODE_STATE
+  }
+
   private OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
 
-  private boolean shouldRun = false;
   private double threshold;
   private long bandwidthInMB;
   private int parallelThread;
   private boolean stopAfterDiskEven;
-
   private DiskBalancerVersion version;
+
+  // State field using the new enum
+  private volatile DiskBalancerOperationalState operationalState =
+      DiskBalancerOperationalState.STOPPED;
 
   private AtomicLong totalBalancedBytes = new AtomicLong(0L);
   private AtomicLong balancedBytesInLastWindow = new AtomicLong(0L);
@@ -112,16 +138,6 @@ public class DiskBalancerService extends BackgroundService {
 
   private DiskBalancerServiceMetrics metrics;
   private long bytesToMove;
-
-  /**
-   * Tracks whether the DiskBalancerService is paused.
-   * If true, the service is temporarily stopped but can be resumed later.
-   *
-   * In maintenance/decommissioning state of dn, if disk balancer
-   * is stopped by client, this will be set to false, although it
-   * was true stating disk balancer is stopped manually by client.
-   */
-  private final AtomicBoolean paused = new AtomicBoolean(false);
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
@@ -214,19 +230,49 @@ public class DiskBalancerService extends BackgroundService {
     // First store in local file, then update in memory variables
     writeDiskBalancerInfoTo(diskBalancerInfo, diskBalancerInfoFile);
 
-    setShouldRun(diskBalancerInfo.isShouldRun());
+    updateOperationalStateFromInfo(diskBalancerInfo);
+
     setThreshold(diskBalancerInfo.getThreshold());
     setBandwidthInMB(diskBalancerInfo.getBandwidthInMB());
     setParallelThread(diskBalancerInfo.getParallelThread());
     setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
-    setIsPaused(diskBalancerInfo.isPaused());
 
     // Default executorService is ScheduledThreadPoolExecutor, so we can
     // update the poll size by setting corePoolSize.
     if ((getExecutorService() instanceof ScheduledThreadPoolExecutor)) {
       ((ScheduledThreadPoolExecutor) getExecutorService())
           .setCorePoolSize(parallelThread);
+    }
+  }
+
+  /**
+   * Determines the new operational state based on the provided DiskBalancerInfo
+   * and updates the service's operationalState if it has changed.
+   *
+   * @param diskBalancerInfo The DiskBalancerInfo containing shouldRun and paused flags.
+   */
+  private void updateOperationalStateFromInfo(DiskBalancerInfo diskBalancerInfo) {
+    DiskBalancerOperationalState newOperationalState;
+    if (diskBalancerInfo.isShouldRun()) {
+      // This corresponds to an intent to RUN (e.g., START command when IN_SERVICE)
+      newOperationalState = DiskBalancerOperationalState.RUNNING;
+    } else {
+      if (diskBalancerInfo.isPaused()) {
+        // This corresponds to PAUSED_BY_NODE_STATE (e.g., START command when not IN_SERVICE, or auto-pause)
+        newOperationalState = DiskBalancerOperationalState.PAUSED_BY_NODE_STATE;
+      } else {
+        // This corresponds to STOPPED (e.g., STOP command)
+        newOperationalState = DiskBalancerOperationalState.STOPPED;
+      }
+    }
+
+    if (this.operationalState != newOperationalState) {
+      LOG.info("DiskBalancer operational state changing from {} to {} " +
+              "based on DiskBalancerInfo (shouldRun={}, paused={}).",
+          this.operationalState, newOperationalState,
+          diskBalancerInfo.isShouldRun(), diskBalancerInfo.isPaused());
+      this.operationalState = newOperationalState;
     }
   }
 
@@ -293,10 +339,6 @@ public class DiskBalancerService extends BackgroundService {
     DiskBalancerYaml.createDiskBalancerInfoFile(diskBalancerInfo, path);
   }
 
-  public void setShouldRun(boolean shouldRun) {
-    this.shouldRun = shouldRun;
-  }
-
   public void setThreshold(double threshold) {
     this.threshold = threshold;
   }
@@ -320,7 +362,7 @@ public class DiskBalancerService extends BackgroundService {
   public DiskBalancerReportProto getDiskBalancerReportProto() {
     DiskBalancerReportProto.Builder builder =
         DiskBalancerReportProto.newBuilder();
-    return builder.setIsRunning(shouldRun)
+    return builder.setIsRunning(this.operationalState == DiskBalancerOperationalState.RUNNING)
         .setBalancedBytes(totalBalancedBytes.get())
         .setDiskBalancerConf(
             HddsProtos.DiskBalancerConfigurationProto.newBuilder()
@@ -336,7 +378,8 @@ public class DiskBalancerService extends BackgroundService {
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
 
-    if (!shouldRun) {
+    if (this.operationalState == DiskBalancerOperationalState.STOPPED ||
+        this.operationalState == DiskBalancerOperationalState.PAUSED_BY_NODE_STATE) {
       return queue;
     }
     metrics.incrRunningLoopCount();
@@ -377,7 +420,7 @@ public class DiskBalancerService extends BackgroundService {
       if (stopAfterDiskEven) {
         LOG.info("Disk balancer is stopped due to disk even as" +
             " the property StopAfterDiskEven is set to true.");
-        setShouldRun(false);
+        this.operationalState = DiskBalancerOperationalState.STOPPED;
         try {
           // Persist the updated shouldRun status into the YAML file
           writeDiskBalancerInfoTo(getDiskBalancerInfo(), diskBalancerInfoFile);
@@ -547,9 +590,27 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   public DiskBalancerInfo getDiskBalancerInfo() {
+    boolean shouldRun;
+    boolean isPaused;
+
+    switch (this.operationalState) {
+    case RUNNING:
+      shouldRun = true;
+      isPaused = false;
+      break;
+    case PAUSED_BY_NODE_STATE:
+      shouldRun = false;
+      isPaused = true;
+      break;
+    case STOPPED:
+    default:
+      shouldRun = false;
+      isPaused = false;
+      break;
+    }
     return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
         parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
-        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), isPaused());
+        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), isPaused);
   }
 
   public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {
@@ -613,46 +674,37 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   /**
-   * Stops the DiskBalancerService if it is running.
-   */
-  public void stopDiskBalancer() {
-    paused.set(shouldRun);
-    setShouldRun(false);
-    LOG.info("DiskBalancerService stopped.");
-  }
-
-  /**
-   * Resume the DiskBalancerService if it was running previously.
-   */
-  public void resumeDiskBalancer() {
-    if (paused.getAndSet(false)) {
-      setShouldRun(true);
-      LOG.info("DiskBalancerService resumed.");
-    }
-  }
-
-  /**
-   * @return true, if DiskBalancerService was running before pause.
-   */
-  public boolean isPaused() {
-    return paused.get();
-  }
-
-  public void setIsPaused(boolean pause) {
-    this.paused.set(pause);
-  }
-
-  /**
    * Handle state changes for DiskBalancerService.
    */
-  public synchronized void nodeStateChange(HddsProtos.NodeOperationalState state) {
+  public synchronized void nodeStateUpdated(HddsProtos.NodeOperationalState state) {
+    DiskBalancerOperationalState originalServiceState = this.operationalState;
+    boolean stateChanged = false;
+
     if ((state == HddsProtos.NodeOperationalState.DECOMMISSIONING ||
-        state == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE) && shouldRun) {
+        state == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE) &&
+        this.operationalState == DiskBalancerOperationalState.RUNNING) {
       LOG.info("Stopping DiskBalancerService as Node state changed to {}.", state);
-      stopDiskBalancer();
-    } else if (state == HddsProtos.NodeOperationalState.IN_SERVICE && isPaused()) {
+      this.operationalState = DiskBalancerOperationalState.PAUSED_BY_NODE_STATE;
+      stateChanged = true;
+    } else if (state == HddsProtos.NodeOperationalState.IN_SERVICE &&
+        this.operationalState == DiskBalancerOperationalState.PAUSED_BY_NODE_STATE) {
       LOG.info("Resuming DiskBalancerService to running state as Node state changed to {}. ", state);
-      resumeDiskBalancer();
+      this.operationalState = DiskBalancerOperationalState.RUNNING;
+      stateChanged = true;
+    }
+
+    if (stateChanged) {
+      LOG.info("DiskBalancer operational state changed from {} to {} due to Datanode state update . Persisting.",
+          originalServiceState, this.operationalState);
+      try {
+        writeDiskBalancerInfoTo(getDiskBalancerInfo(), diskBalancerInfoFile);
+      } catch (IOException e) {
+        LOG.error("Failed to persist DiskBalancerInfo after state change in nodeStateUpdated. " +
+            "Reverting operational state to {} to maintain consistency.", originalServiceState, e);
+        // Revert state on persistence error to keep in-memory state consistent with last known persisted state.
+        this.operationalState = originalServiceState;
+        LOG.warn("DiskBalancer operational state reverted to {} due to persistence failure.", this.operationalState);
+      }
     }
   }
 

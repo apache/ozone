@@ -256,7 +256,7 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new CreatePipelineCommandHandler(conf,
             pipelineCommandExecutorService))
         .addHandler(new SetNodeOperationalStateCommandHandler(conf,
-            supervisor::nodeStateUpdated))
+            supervisor::nodeStateUpdated, container.getDiskBalancerService()::nodeStateUpdated))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
         .addHandler(new DiskBalancerCommandHandler())

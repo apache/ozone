@@ -116,12 +116,9 @@ public class TestDiskBalancerService {
         getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
 
     // Set a low bandwidth to delay job
-    svc.setShouldRun(true);
-    svc.setThreshold(10.0d);
-    svc.setBandwidthInMB(1L);
-    svc.setParallelThread(5);
-    svc.setStopAfterDiskEven(true);
-    svc.setVersion(DiskBalancerVersion.DEFAULT_VERSION);
+    DiskBalancerInfo initialInfo = new DiskBalancerInfo(true, 10.0d, 1L, 5,
+        true, DiskBalancerVersion.DEFAULT_VERSION, false);
+    svc.refresh(initialInfo);
 
     svc.start();
 
