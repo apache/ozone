@@ -134,15 +134,11 @@ public class TestKeyManagerImpl {
         volumeNamePrefix, bucketNamePrefix, keyPrefix, volumeNumber, bucketNumber, startVolumeNumber, startBucketNumber,
         startKeyNumber, filter, numberOfEntries).stream()
         .map(kv -> {
-          try {
-            String key = kv.getKey();
-            RepeatedOmKeyInfo value = kv.getValue();
-            List<OmKeyInfo> omKeyInfos = Collections.singletonList(Mockito.mock(OmKeyInfo.class));
-            when(value.cloneOmKeyInfoList()).thenReturn(omKeyInfos);
-            return Table.newKeyValue(key, omKeyInfos);
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
+          String key = kv.getKey();
+          RepeatedOmKeyInfo value = kv.getValue();
+          List<OmKeyInfo> omKeyInfos = Collections.singletonList(Mockito.mock(OmKeyInfo.class));
+          when(value.cloneOmKeyInfoList()).thenReturn(omKeyInfos);
+          return Table.newKeyValue(key, omKeyInfos);
         }).collect(Collectors.toList());
     String volumeName = volumeNumber == null ? null : (String.format("%s%010d", volumeNamePrefix, volumeNumber));
     String bucketName = bucketNumber == null ? null : (String.format("%s%010d", bucketNamePrefix, bucketNumber));
