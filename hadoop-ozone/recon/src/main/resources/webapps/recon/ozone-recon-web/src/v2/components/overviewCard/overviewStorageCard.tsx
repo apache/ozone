@@ -239,7 +239,7 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
         data-testid='capacity-info-modal'>
         <p>Cluster capacity fetches the data from Datanode reports that Recon receives.</p>
         <p>
-          The displayed sizes include the replicated data size.<br />
+          The displayed sizes <strong>include</strong> the replicated data size.<br />
           Ex: A <strong>1KB key will display 3KB</strong> in <strong>RATIS (THREE)</strong> replication
         </p>
         <Table
