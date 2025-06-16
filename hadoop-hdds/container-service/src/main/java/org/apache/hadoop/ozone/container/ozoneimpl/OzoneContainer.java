@@ -46,6 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -579,13 +580,13 @@ public class OzoneContainer {
   }
 
   public Long gatherContainerUsages(HddsVolume storageVolume) {
-    Iterator<Container<?>> itr = containerSet.getContainerIterator(storageVolume);
-    long usages = 0;
-    while (itr.hasNext()) {
-      Container<?> next = itr.next();
-      usages += next.getContainerData().getBytesUsed();
-    }
-    return usages;
+    AtomicLong usages = new AtomicLong();
+    containerSet.getContainerMapIterator().forEachRemaining(e -> {
+      if (e.getValue().getContainerData().getVolume().getStorageID().equals(storageVolume.getStorageID())) {
+        usages.addAndGet(e.getValue().getContainerData().getBytesUsed());
+      }
+    });
+    return usages.get();
   }
   /**
    * Returns container report.
