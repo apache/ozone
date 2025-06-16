@@ -177,7 +177,6 @@ jobs:
     needs:
       - build-info
       - build
-      - basic
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:
@@ -191,7 +190,6 @@ jobs:
     needs:
       - build-info
       - build
-      - basic
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:
