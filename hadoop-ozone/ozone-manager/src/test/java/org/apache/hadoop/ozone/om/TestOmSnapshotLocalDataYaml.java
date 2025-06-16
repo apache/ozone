@@ -83,7 +83,7 @@ public class TestOmSnapshotLocalDataYaml {
     File yamlFile = new File(testRoot, yamlFilePath);
 
     // Create YAML file with SnapshotData
-    OmSnapshotLocalDataYaml.writeToYaml(dataYaml, yamlFile);
+    dataYaml.writeToYaml(yamlFile);
 
     // Check YAML file exists
     assertTrue(yamlFile.exists());
@@ -128,31 +128,31 @@ public class TestOmSnapshotLocalDataYaml {
     File yamlFile = writeToYaml("snapshot2");
 
     // Read from YAML file
-    OmSnapshotLocalDataYaml snapshotData =
+    OmSnapshotLocalDataYaml dataYaml =
         OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
 
     // Update snapshot data
-    snapshotData.setSstFiltered(false);
-    snapshotData.setNeedsCompaction(false);
-    snapshotData.addUncompactedSSTFile("table3", "sst4");
-    snapshotData.addCompactedSSTFile(3, "table3", "compacted-sst4");
+    dataYaml.setSstFiltered(false);
+    dataYaml.setNeedsCompaction(false);
+    dataYaml.addUncompactedSSTFile("table3", "sst4");
+    dataYaml.addCompactedSSTFile(3, "table3", "compacted-sst4");
 
     // Write updated data back to file
-    OmSnapshotLocalDataYaml.writeToYaml(snapshotData, yamlFile);
+    dataYaml.writeToYaml(yamlFile);
 
     // Read back the updated data
-    snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
+    dataYaml = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
 
     // Verify updated data
-    assertThat(snapshotData.getSstFiltered()).isFalse();
-    assertThat(snapshotData.getNeedsCompaction()).isFalse();
+    assertThat(dataYaml.getSstFiltered()).isFalse();
+    assertThat(dataYaml.getNeedsCompaction()).isFalse();
 
-    Map<String, List<String>> uncompactedFiles = snapshotData.getUncompactedSSTFileList();
+    Map<String, List<String>> uncompactedFiles = dataYaml.getUncompactedSSTFileList();
     assertEquals(3, uncompactedFiles.size());
     assertTrue(uncompactedFiles.containsKey("table3"));
     assertTrue(uncompactedFiles.get("table3").contains("sst4"));
 
-    Map<Integer, Map<String, List<String>>> compactedFiles = snapshotData.getCompactedSSTFileList();
+    Map<Integer, Map<String, List<String>>> compactedFiles = dataYaml.getCompactedSSTFileList();
     assertEquals(3, compactedFiles.size());
     assertTrue(compactedFiles.containsKey(3));
     assertTrue(compactedFiles.get(3).containsKey("table3"));
