@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.dn.scanner;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Collection;
+import java.util.EnumSet;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -65,14 +67,9 @@ class TestOnDemandContainerScannerIntegration
   }
 
   static Collection<ContainerCorruptions> supportedCorruptionTypesForOpen() {
-    return ContainerCorruptions.getAllParamsExcept(
-        ContainerCorruptions.MISSING_METADATA_DIR,
-        ContainerCorruptions.MISSING_CONTAINER_FILE,
-        ContainerCorruptions.CORRUPT_CONTAINER_FILE,
-        ContainerCorruptions.TRUNCATED_CONTAINER_FILE,
-        ContainerCorruptions.CORRUPT_BLOCK,
-        ContainerCorruptions.TRUNCATED_BLOCK,
-        ContainerCorruptions.MISSING_BLOCK);
+    Set<ContainerCorruptions> set = EnumSet.copyOf(supportedCorruptionTypes());
+    set.remove(ContainerCorruptions.MISSING_BLOCK);
+    return set;
   }
 
   @BeforeAll
