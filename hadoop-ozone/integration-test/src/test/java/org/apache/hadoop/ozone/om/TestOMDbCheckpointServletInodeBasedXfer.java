@@ -41,7 +41,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -151,14 +150,11 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       }
     };
 
-    omDbCheckpointServletMock =
-        mock(OMDBCheckpointServletInodeBasedXfer.class);
+    omDbCheckpointServletMock = mock(OMDBCheckpointServletInodeBasedXfer.class);
 
-    BootstrapStateHandler.Lock lock =
-        new OMDBCheckpointServlet.Lock(om);
+    BootstrapStateHandler.Lock lock = new OMDBCheckpointServlet.Lock(om);
     doCallRealMethod().when(omDbCheckpointServletMock).init();
-    assertNull(
-        doCallRealMethod().when(omDbCheckpointServletMock).getDbStore());
+    assertNull(doCallRealMethod().when(omDbCheckpointServletMock).getDbStore());
 
     requestMock = mock(HttpServletRequest.class);
     // Return current user short name when asked
@@ -185,17 +181,14 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
-    doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(),
-        anyBoolean());
+    doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(), anyBoolean());
+    assertNull(doCallRealMethod().when(omDbCheckpointServletMock).getBootstrapTempData());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any());
     doCallRealMethod().when(omDbCheckpointServletMock).
         processMetadataSnapshotRequest(any(), any(), anyBoolean(), anyBoolean());
-    doCallRealMethod().when(omDbCheckpointServletMock).getBootstrapTempData();
     doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(), any(), any(), any());
-    doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(), anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getCompactionLogDir();
     doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
-    doCallRealMethod().when(omDbCheckpointServletMock).getDbStore();
   }
 
   @Test
@@ -277,7 +270,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
   public static Map<String, List<String>> readFileToMap(String filePath) throws IOException {
     Map<String, List<String>> dataMap = new HashMap<>();
-    try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+    try (BufferedReader reader = Files.newBufferedReader(Paths.get(filePath), StandardCharsets.UTF_8)) {
       String line;
       while ((line = reader.readLine()) != null) {
         String trimmedLine = line.trim();
