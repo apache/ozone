@@ -23,11 +23,11 @@ ${OM_SERVICE_ID}                    %{OM_SERVICE_ID}
 
 *** Keywords ***
 Execute replicas verify checksums debug tool
-    ${output}      Execute          ozone debug replicas verify --checksums o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} --output-dir ${TEMP_DIR} --all-results
+    ${output}      Execute          ozone debug replicas verify --checksums o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} --all-results
     [Return]       ${output}
 
 Execute replicas verify block existence debug tool
-    ${output}      Execute          ozone debug replicas verify --block-existence o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} --output-dir ${TEMP_DIR} --all-results
+    ${output}      Execute          ozone debug replicas verify --block-existence o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} --all-results
     [Return]       ${output}
 
 Parse replicas verify JSON output
