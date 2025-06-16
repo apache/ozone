@@ -17,6 +17,13 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Duration;
@@ -26,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -94,10 +102,39 @@ public class BlockDeletingService extends BackgroundService {
     dnConf = conf.getObject(DatanodeConfiguration.class);
     if (reconfigurationHandler != null) {
       reconfigurationHandler.register(dnConf);
+      registerReconfigCallbacks(reconfigurationHandler);
     }
     this.blockDeletingMaxLockHoldingTime =
         dnConf.getBlockDeletingMaxLockHoldingTime();
     metrics = BlockDeletingServiceMetrics.create();
+  }
+
+  public void registerReconfigCallbacks(ReconfigurationHandler handler) {
+    handler.registerCompleteCallback((changedKeys, newConf) -> {
+      if (changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_INTERVAL) ||
+          changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT) ||
+          changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_WORKERS)) {
+        updateAndRestart((OzoneConfiguration) newConf);
+      }
+    });
+  }
+
+  public synchronized void updateAndRestart(OzoneConfiguration ozoneConf) {
+    long newInterval = ozoneConf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
+        OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
+    int newCorePoolSize = ozoneConf.getInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
+        OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT);
+    long newTimeout = ozoneConf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+        OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT, TimeUnit.NANOSECONDS);
+    LOG.info("Updating and restarting BlockDeletingService with interval {} {}" +
+            ", core pool size {} and timeout {} {}",
+        newInterval, TimeUnit.SECONDS.name().toLowerCase(), newCorePoolSize, newTimeout,
+        TimeUnit.NANOSECONDS.name().toLowerCase());
+    shutdown();
+    setInterval(newInterval, TimeUnit.SECONDS);
+    setPoolSize(newCorePoolSize);
+    setServiceTimeoutInNanos(newTimeout);
+    start();
   }
 
   /**
