@@ -75,31 +75,6 @@ public class DiskBalancerService extends BackgroundService {
 
   private static final String DISK_BALANCER_TMP_DIR = "tmp";
 
-  /**
-   * Defines the operational states of the DiskBalancerService.
-   */
-  public enum DiskBalancerOperationalState {
-    /**
-     * DiskBalancer is stopped and will not run unless explicitly started.
-     * This is the initial state, can be set by admin STOP commands,
-     * or if the balancer stops itself after disks are even.
-     */
-    STOPPED,
-
-    /**
-     * DiskBalancer is running normally.
-     * The service is actively performing disk balancing operations.
-     */
-    RUNNING,
-
-    /**
-     * DiskBalancer was running but is temporarily paused due to node state changes
-     * (e.g., node entering maintenance or decommissioning).
-     * When the node returns to IN_SERVICE, it can resume to RUNNING state.
-     */
-    PAUSED_BY_NODE_STATE
-  }
-
   private OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
 
@@ -138,6 +113,31 @@ public class DiskBalancerService extends BackgroundService {
 
   private DiskBalancerServiceMetrics metrics;
   private long bytesToMove;
+
+  /**
+   * Defines the operational states of the DiskBalancerService.
+   */
+  public enum DiskBalancerOperationalState {
+    /**
+     * DiskBalancer is stopped and will not run unless explicitly started.
+     * This is the initial state, can be set by admin STOP commands,
+     * or if the balancer stops itself after disks are even.
+     */
+    STOPPED,
+
+    /**
+     * DiskBalancer is running normally.
+     * The service is actively performing disk balancing operations.
+     */
+    RUNNING,
+
+    /**
+     * DiskBalancer was running but is temporarily paused due to node state changes
+     * (e.g., node entering maintenance or decommissioning).
+     * When the node returns to IN_SERVICE, it can resume to RUNNING state.
+     */
+    PAUSED_BY_NODE_STATE
+  }
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
