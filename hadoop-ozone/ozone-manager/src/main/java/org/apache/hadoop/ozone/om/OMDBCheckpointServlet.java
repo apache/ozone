@@ -328,7 +328,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       throws IOException {
     Set<Path> snapshotPaths = new HashSet<>();
     if (includeSnapshotData) {
-      snapshotPaths = getSnapshotDirs(checkpoint, true);
+      // since this is an estimate we can avoid waiting for dir to exist.
+      snapshotPaths = getSnapshotDirs(checkpoint, false);
     }
     OMDBCheckpointUtils.logEstimatedTarballSize(checkpoint.getCheckpointLocation(), snapshotPaths);
   }
