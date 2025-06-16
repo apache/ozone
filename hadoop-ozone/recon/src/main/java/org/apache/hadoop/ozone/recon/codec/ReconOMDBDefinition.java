@@ -149,22 +149,7 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
   // Merged column family map: OM base + Recon overrides
   public static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES;
 
-
   //---------------------------------------------------------------------------
-  // Helper to build Recon-specific overrides map
-  private static Map<String, DBColumnFamilyDefinition<?, ?>> buildOverrides() {
-    return DBColumnFamilyDefinition.newUnmodifiableMap(
-        BUCKET_TABLE_DEF,
-        DELETED_TABLE_DEF,
-        DELETED_DIR_TABLE_DEF,
-        DIRECTORY_TABLE_DEF,
-        FILE_TABLE_DEF,
-        KEY_TABLE_DEF,
-        OPEN_FILE_TABLE_DEF,
-        OPEN_KEY_TABLE_DEF
-    );
-  }
-
   static {
     Map<String, DBColumnFamilyDefinition<?, ?>> merged =
         new HashMap<>(OMDBDefinition.get().getMap());
@@ -224,5 +209,18 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
     return OMConfigKeys.OZONE_OM_DB_DIRS;
   }
 
+  // Helper to build Recon-specific overrides map
+  private static Map<String, DBColumnFamilyDefinition<?, ?>> buildOverrides() {
+    return DBColumnFamilyDefinition.newUnmodifiableMap(
+        BUCKET_TABLE_DEF,
+        DELETED_TABLE_DEF,
+        DELETED_DIR_TABLE_DEF,
+        DIRECTORY_TABLE_DEF,
+        FILE_TABLE_DEF,
+        KEY_TABLE_DEF,
+        OPEN_FILE_TABLE_DEF,
+        OPEN_KEY_TABLE_DEF
+    );
+  }
 }
 
