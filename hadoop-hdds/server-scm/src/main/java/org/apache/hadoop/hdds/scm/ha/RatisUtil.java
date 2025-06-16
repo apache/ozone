@@ -198,8 +198,8 @@ public final class RatisUtil {
     Log.setSegmentCacheNumMax(properties, 2);
 
     // This avoids writing commit metadata to Raft Log, which can be used to recover the
-    // commit index even if a majority of servers are dead. We don't need this for OzoneManager,
-    // disabling this will avoid the additional disk IO which will have an impact on the performance.
+    // commit index even if a majority of servers are dead. We don't need this for StorageContainerManager,
+    // disabling this will avoid the additional disk IO.
     Log.setLogMetadataEnabled(properties, false);
 
     return logAppenderQueueByteLimit;

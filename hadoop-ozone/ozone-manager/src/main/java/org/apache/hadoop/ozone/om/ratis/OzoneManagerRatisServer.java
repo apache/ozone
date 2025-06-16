@@ -724,7 +724,7 @@ public final class OzoneManagerRatisServer {
 
     // This avoids writing commit metadata to Raft Log, which can be used to recover the
     // commit index even if a majority of servers are dead. We don't need this for OzoneManager,
-    // disabling this will avoid the additional disk IO which will have an impact on the performance.
+    // disabling this will avoid the additional disk IO.
     RaftServerConfigKeys.Log.setLogMetadataEnabled(properties, false);
 
     // Set the number of maximum cached segments
