@@ -272,7 +272,7 @@ public class TestDeadNodeHandler {
     // Now set the node to anything other than IN_MAINTENANCE and the relevant
     // replicas should be removed
     DeleteBlocksCommand cmd = new DeleteBlocksCommand(Collections.emptyList());
-    nodeManager.addDatanodeCommand(datanode1.getUuid(), cmd);
+    nodeManager.addDatanodeCommand(datanode1.getID(), cmd);
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_SERVICE);
     deadNodeHandler.onMessage(datanode1, publisher);

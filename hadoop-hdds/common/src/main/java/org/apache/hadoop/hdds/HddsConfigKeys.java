@@ -84,7 +84,7 @@ public final class HddsConfigKeys {
   public static final boolean HDDS_SCM_SAFEMODE_ENABLED_DEFAULT = true;
   public static final String HDDS_SCM_SAFEMODE_MIN_DATANODE =
       "hdds.scm.safemode.min.datanode";
-  public static final int HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT = 1;
+  public static final int HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT = 3;
 
   public static final String
       HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT =

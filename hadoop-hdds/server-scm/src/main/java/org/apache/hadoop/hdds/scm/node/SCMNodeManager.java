@@ -611,7 +611,7 @@ public class SCMNodeManager implements NodeManager {
               scmStatus.getOperationalState(),
               scmStatus.getOpStateExpiryEpochSeconds());
           command.setTerm(scmContext.getTermOfLeader());
-          addDatanodeCommand(reportedDn.getUuid(), command);
+          addDatanodeCommand(reportedDn.getID(), command);
         } catch (NotLeaderException nle) {
           LOG.warn("Skip sending SetNodeOperationalStateCommand,"
               + " since current SCM is not leader.", nle);
@@ -1663,7 +1663,8 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand<?> command) {
+  public void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command) {
+    final UUID dnId = datanodeID.getUuid();
     writeLock().lock();
     try {
       this.commandQueue.addCommand(dnId, command);
@@ -1688,7 +1689,7 @@ public class SCMNodeManager implements NodeManager {
       return;
     }
     getNodes(IN_SERVICE, HEALTHY).forEach(datanode ->
-        addDatanodeCommand(datanode.getUuid(), refreshVolumeUsageCommand));
+        addDatanodeCommand(datanode.getID(), refreshVolumeUsageCommand));
   }
 
   /**

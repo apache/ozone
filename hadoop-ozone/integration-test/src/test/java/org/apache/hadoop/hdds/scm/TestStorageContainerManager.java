@@ -71,6 +71,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -708,8 +709,8 @@ public class TestStorageContainerManager {
       NodeManager nodeManager = mock(NodeManager.class);
       setInternalState(rm, "nodeManager", nodeManager);
 
-      UUID dnUuid = cluster.getHddsDatanodes().iterator().next()
-          .getDatanodeDetails().getUuid();
+      final DatanodeID dnUuid = cluster.getHddsDatanodes().iterator().next()
+          .getDatanodeDetails().getID();
 
       CloseContainerCommand closeContainerCommand =
           new CloseContainerCommand(selectedContainer.getContainerID(),
@@ -740,7 +741,7 @@ public class TestStorageContainerManager {
       queues.add(new ContainerReportQueue());
     }
     ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
-    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    DatanodeDetails dn = DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .build();
     ContainerReportFromDatanode dndata
         = new ContainerReportFromDatanode(dn, report);
@@ -812,13 +813,13 @@ public class TestStorageContainerManager {
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
     ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
-    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    DatanodeDetails dn = DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .build();
     ContainerReportFromDatanode dndata1
         = new ContainerReportFromDatanode(dn, report);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata1);
 
-    dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    dn = DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .build();
     ContainerReportFromDatanode dndata2
         = new ContainerReportFromDatanode(dn, report);
@@ -838,7 +839,7 @@ public class TestStorageContainerManager {
     for (int i = 0; i < 1; ++i) {
       queues.add(new ContainerReportQueue());
     }
-    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    DatanodeDetails dn = DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .build();
     IncrementalContainerReportProto report
         = IncrementalContainerReportProto.getDefaultInstance();
