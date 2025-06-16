@@ -109,26 +109,8 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
   }
 
   /**
-   * Returns a Yaml representation of the snapshot properties.
-   * @return Yaml representation of snapshot properties
-   */
-  public static Yaml getYamlForSnapshotLocalData() {
-    PropertyUtils propertyUtils = new PropertyUtils();
-    propertyUtils.setBeanAccess(BeanAccess.FIELD);
-    propertyUtils.setAllowReadOnlyProperties(true);
-
-    DumperOptions options = new DumperOptions();
-    Representer representer = new Representer(options);
-    representer.setPropertyUtils(propertyUtils);
-    representer.addClassTag(OmSnapshotLocalDataYaml.class, SNAPSHOT_YAML_TAG);
-
-    SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
-
-    return new Yaml(snapshotDataConstructor, representer);
-  }
-
-  /**
-   * Constructor class for OmSnapshotLocalData, which will be used by Yaml.
+   * Constructor class for OmSnapshotLocalData.
+   * This is used when parsing YAML files into OmSnapshotLocalDataYaml objects.
    */
   private static class SnapshotLocalDataConstructor extends SafeConstructor {
     SnapshotLocalDataConstructor() {
@@ -212,12 +194,30 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
   }
 
   /**
+   * Returns a Yaml representation of the snapshot properties.
+   * @return Yaml representation of snapshot properties
+   */
+  public static Yaml getYamlForSnapshotLocalData() {
+    PropertyUtils propertyUtils = new PropertyUtils();
+    propertyUtils.setBeanAccess(BeanAccess.FIELD);
+    propertyUtils.setAllowReadOnlyProperties(true);
+
+    DumperOptions options = new DumperOptions();
+    Representer representer = new Representer(options);
+    representer.setPropertyUtils(propertyUtils);
+    representer.addClassTag(OmSnapshotLocalDataYaml.class, SNAPSHOT_YAML_TAG);
+
+    SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
+    return new Yaml(snapshotDataConstructor, representer);
+  }
+
+  /**
    * Read the YAML content InputStream, and return OmSnapshotLocalDataYaml instance.
    * @throws IOException
    */
-  public static OmSnapshotLocalDataYaml getFromYamlStream(InputStream input)
-      throws IOException {
-    OmSnapshotLocalDataYaml snapshotData;
+  public static OmSnapshotLocalDataYaml getFromYamlStream(InputStream input) throws IOException {
+    OmSnapshotLocalDataYaml dataYaml;
+
     PropertyUtils propertyUtils = new PropertyUtils();
     propertyUtils.setBeanAccess(BeanAccess.FIELD);
     propertyUtils.setAllowReadOnlyProperties(true);
@@ -229,22 +229,21 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
     SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
 
     Yaml yaml = new Yaml(snapshotDataConstructor, representer);
-    yaml.setBeanAccess(BeanAccess.FIELD);
 
     try {
-      snapshotData = yaml.load(input);
+      dataYaml = yaml.load(input);
     } catch (YAMLException ex) {
       // Unchecked exception. Convert to IOException
       throw new IOException(ex);
     }
 
-    if (snapshotData == null) {
+    if (dataYaml == null) {
       // If Yaml#load returned null, then the file is empty. This is valid yaml
       // but considered an error in this case since we have lost data about
       // the snapshot.
       throw new IOException("Failed to load snapshot file. File is empty.");
     }
 
-    return snapshotData;
+    return dataYaml;
   }
 }
