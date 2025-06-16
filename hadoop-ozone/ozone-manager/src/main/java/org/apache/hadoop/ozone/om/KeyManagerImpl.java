@@ -2189,7 +2189,7 @@ public class KeyManagerImpl implements KeyManager {
       while (iterator.hasNext() && remainingBufLimit > 0) {
         KeyValue<String, T> entry = iterator.next();
         T withParentObjectId = entry.getValue();
-        long objectSerializedSize = entry.getRawSize();
+        final long objectSerializedSize = entry.getValueByteSize();
         if (!OMFileRequest.isImmediateChild(withParentObjectId.getParentObjectID(),
             parentInfo.getObjectID())) {
           processedSubPaths = true;
