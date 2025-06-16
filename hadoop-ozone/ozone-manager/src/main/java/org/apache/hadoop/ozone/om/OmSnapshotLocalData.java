@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -54,16 +53,6 @@ public abstract class OmSnapshotLocalData {
   // Map of version to compacted SST file list
   // Map<version, Map<Table, sstFileList>>
   private Map<Integer, Map<String, List<String>>> compactedSSTFileList;
-
-  // Common Fields that need to be stored in the yaml file
-  public static final List<String> YAML_FIELDS =
-      Collections.unmodifiableList(Lists.newArrayList(
-          OzoneConsts.CHECKSUM,
-          OzoneConsts.IS_SST_FILTERED,
-          OzoneConsts.UNCOMPACTED_SST_FILE_LIST,
-          OzoneConsts.LAST_COMPACTION_TIME,
-          OzoneConsts.NEEDS_COMPACTION,
-          OzoneConsts.COMPACTED_SST_FILE_LIST));
 
   public static final Charset CHARSET_ENCODING = StandardCharsets.UTF_8;
   private static final String DUMMY_CHECKSUM = new String(new byte[64], CHARSET_ENCODING);

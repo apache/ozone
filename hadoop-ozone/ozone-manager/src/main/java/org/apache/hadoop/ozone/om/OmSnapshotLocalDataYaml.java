@@ -24,8 +24,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import org.apache.hadoop.hdds.server.YamlUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
@@ -37,11 +35,9 @@ import org.yaml.snakeyaml.constructor.AbstractConstruct;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.error.YAMLException;
 import org.yaml.snakeyaml.introspector.BeanAccess;
-import org.yaml.snakeyaml.introspector.Property;
 import org.yaml.snakeyaml.introspector.PropertyUtils;
 import org.yaml.snakeyaml.nodes.MappingNode;
 import org.yaml.snakeyaml.nodes.Node;
-import org.yaml.snakeyaml.nodes.NodeTuple;
 import org.yaml.snakeyaml.nodes.Tag;
 import org.yaml.snakeyaml.representer.Representer;
 
@@ -121,54 +117,14 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
     propertyUtils.setBeanAccess(BeanAccess.FIELD);
     propertyUtils.setAllowReadOnlyProperties(true);
 
-    Representer representer = new SnapshotLocalDataRepresenter(OmSnapshotLocalData.YAML_FIELDS);
+    DumperOptions options = new DumperOptions();
+    Representer representer = new Representer(options);
     representer.setPropertyUtils(propertyUtils);
     representer.addClassTag(OmSnapshotLocalDataYaml.class, SNAPSHOT_YAML_TAG);
 
     SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
 
     return new Yaml(snapshotDataConstructor, representer);
-  }
-
-  /**
-   * Representer class to define which fields need to be stored in yaml file.
-   */
-  private static class SnapshotLocalDataRepresenter extends Representer {
-
-    private List<String> yamlFields;
-
-    SnapshotLocalDataRepresenter(List<String> yamlFields) {
-      super(new DumperOptions());
-      this.yamlFields = yamlFields;
-    }
-
-    @Override
-    protected Set<Property> getProperties(Class<?> type) {
-      Set<Property> set = super.getProperties(type);
-      Set<Property> filtered = new TreeSet<>();
-
-      if (type.equals(OmSnapshotLocalDataYaml.class)) {
-        // filter properties
-        for (Property prop : set) {
-          String name = prop.getName();
-          if (yamlFields.contains(name)) {
-            filtered.add(prop);
-          }
-        }
-      }
-      return filtered;
-    }
-
-    /**
-     * Omit properties with null value.
-     */
-    @Override
-    protected NodeTuple representJavaBeanProperty(
-        Object bean, Property property, Object value, Tag tag) {
-      return value == null
-          ? null
-          : super.representJavaBeanProperty(bean, property, value, tag);
-    }
   }
 
   /**
@@ -266,7 +222,8 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
     propertyUtils.setBeanAccess(BeanAccess.FIELD);
     propertyUtils.setAllowReadOnlyProperties(true);
 
-    Representer representer = new SnapshotLocalDataRepresenter(OmSnapshotLocalData.YAML_FIELDS);
+    DumperOptions options = new DumperOptions();
+    Representer representer = new Representer(options);
     representer.setPropertyUtils(propertyUtils);
 
     SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
