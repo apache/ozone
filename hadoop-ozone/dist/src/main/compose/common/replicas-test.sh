@@ -49,7 +49,6 @@ echo "Overwriting container.db with the backup db"
 target_container_dir=$(docker exec "${container}" find "${container_db_path}" -name "container.db" | xargs dirname)
 docker exec "${container}" find "${target_container_dir}" -ls
 docker cp "${local_db_backup_path}/container.db" "${container}:${target_container_dir}/"
-docker exec "${container}" sudo chown -R hadoop:hadoop "${target_container_dir}"
 docker exec "${container}" find "${target_container_dir}" -ls
 
 docker stop "${container}"
