@@ -183,13 +183,6 @@ When you use snapshots in Apache Ozone, deleting data (keys or directories) does
 This is because snapshots can retain data even after it has been "deleted" from the active bucket.
 Ozone now tracks and calculates bucket quotas more clearly to give you an accurate view of your usage.
 
-**Pending Delete Tracking**
-
-Ozone now tracks items marked for deletion. These are items still retained by snapshots or waiting for background cleanup.
-This means the system distinguishes between:
-*   Actively used data/namespace.
-*   Data/namespace pending deletion (i.e., `pendingDeleteSnapshotBytes` and `pendingDeleteSnapshotNamespace`).
-
 **How Your Quota is Calculated and Reported**
 
 Your bucket's total reported quota usage is now a sum of both actively used resources and those pending deletion:
