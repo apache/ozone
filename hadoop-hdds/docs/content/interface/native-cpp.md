@@ -26,7 +26,7 @@ type: docs
 
 ## Overview
 
-Native C/C++ applications can access to Ozone volumes and buckets using Hadoop HDFS's `libhdfs` JNI library.
+Native C/C++ applications can access Ozone volumes and buckets using Hadoop HDFS's `libhdfs` JNI library.
 As an example, Apache Impala uses this library to access Ozone.
 
 To demonstrate, we built a simple wrapper [`libo3fs`](https://github.com/apache/hadoop-ozone/tree/master/hadoop-ozone/native-client/libo3fs) around `libhdfs`.
