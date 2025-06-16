@@ -205,7 +205,7 @@ public class DBCheckpointServlet extends HttpServlet
     String[] sstParam = isFormData ?
         parseFormDataParameters(request) : request.getParameterValues(
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
-    Set<String> receivedSstFiles = fetchSstFilesReceived(sstParam);
+    Set<String> receivedSstFiles = extractSstFilesToExclude(sstParam);
     DBCheckpoint checkpoint = null;
     Path tmpdir = null;
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
@@ -272,7 +272,7 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
-  protected static Set<String> fetchSstFilesReceived(String[] sstParam) {
+  protected static Set<String> extractSstFilesToExclude(String[] sstParam) {
     Set<String> receivedSstFiles = new HashSet<>();
     if (sstParam != null) {
       receivedSstFiles.addAll(

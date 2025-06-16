@@ -68,7 +68,7 @@ public final class OMDBCheckpointUtils {
           Files.walkFileTree(snapshotDir, visitor);
         }
       }
-      LOG.info("Estimates for Checkpoint Tarball Stream - Data size: {} KB, " + "SST files: {}{}",
+      LOG.info("Estimates for Checkpoint Tarball Stream - Data size: {} KB, SST files: {}{}",
           counters.getByteCounter().get() / (1024),
           counters.getFileCounter().get(),
           (includeSnapshotData ? ", snapshots: " + totalSnapshots : ""));
