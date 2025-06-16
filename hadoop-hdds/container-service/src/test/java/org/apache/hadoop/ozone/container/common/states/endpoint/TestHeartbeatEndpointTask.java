@@ -57,7 +57,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
@@ -81,7 +81,7 @@ public class TestHeartbeatEndpointTask {
     datanodeStateMachine = mock(DatanodeStateMachine.class);
     container = mock(OzoneContainer.class);
     when(container.getDiskBalancerInfo()).thenReturn(new DiskBalancerInfo(
-        DiskBalancerService.DiskBalancerOperationalState.RUNNING, 10, 20, 30, true));
+        DiskBalancerOperationalState.RUNNING, 10, 20, 30, true));
     when(datanodeStateMachine.getContainer()).thenReturn(container);
     PipelineReportsProto pipelineReportsProto = mock(PipelineReportsProto.class);
     when(pipelineReportsProto.getPipelineReportList()).thenReturn(Collections.emptyList());

@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBa
  */
 public class DiskBalancerInfo {
   private DiskBalancerOperationalState operationalState;
-  private boolean shouldRun;
   private double threshold;
   private long bandwidthInMB;
   private int parallelThread;
@@ -39,7 +38,6 @@ public class DiskBalancerInfo {
   private long failureCount;
   private long bytesToMove;
   private long balancedBytes;
-  private boolean paused;
 
   public DiskBalancerInfo(DiskBalancerOperationalState operationalState, double threshold,
       long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven) {
