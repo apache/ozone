@@ -38,12 +38,15 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Create and extract archives. */
 public final class Archiver {
 
   static final int MIN_BUFFER_SIZE = 8 * (int) OzoneConsts.KB; // same as IOUtils.DEFAULT_BUFFER_SIZE
   static final int MAX_BUFFER_SIZE = (int) OzoneConsts.MB;
+  private static final Logger LOG = LoggerFactory.getLogger(Archiver.class);
 
   private Archiver() {
     // no instances (for now)
@@ -108,6 +111,34 @@ public final class Archiver {
       bytes = IOUtils.copy(input, archiveOutput, getBufferSize(file.length()));
     }
     archiveOutput.closeArchiveEntry();
+    return bytes;
+  }
+
+  /**
+   * Creates a hardlink for the given file in a temporary directory, adds it
+   * as an entry in the archive, and includes its contents in the archive output.
+   * The temporary hardlink is deleted after processing.
+   */
+  public static long linkAndIncludeFile(File file, String entryName,
+      ArchiveOutputStream<TarArchiveEntry> archiveOutput, Path tmpDir) throws IOException {
+    File link = tmpDir.resolve(entryName).toFile();
+    long bytes = 0;
+    try {
+      Files.createLink(link.toPath(), file.toPath());
+      TarArchiveEntry entry = archiveOutput.createArchiveEntry(link, entryName);
+      archiveOutput.putArchiveEntry(entry);
+      try (InputStream input = Files.newInputStream(link.toPath())) {
+        bytes = IOUtils.copyLarge(input, archiveOutput);
+      }
+      archiveOutput.closeArchiveEntry();
+    } catch (IOException ioe) {
+      LOG.error("Couldn't create hardlink for file {} while including it in tarball.",
+          file.getAbsolutePath(), ioe);
+    } finally {
+      if (link != null) {
+        Files.deleteIfExists(link.toPath());
+      }
+    }
     return bytes;
   }
 
