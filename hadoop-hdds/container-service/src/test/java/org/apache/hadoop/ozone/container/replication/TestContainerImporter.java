@@ -155,28 +155,28 @@ class TestContainerImporter {
   @Test
   public void testInconsistentChecksumContainerShouldThrowError() throws Exception {
     // create container with mock to return different checksums
-    KeyValueContainerData containerData = spy(new KeyValueContainerData(containerId,
+    KeyValueContainerData data = spy(new KeyValueContainerData(containerId,
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test"));
-    when(containerData.getChecksum()).thenReturn("checksum1", "checksum2");
-    doNothing().when(containerData).setChecksumTo0ByteArray();
+    when(data.getChecksum()).thenReturn("checksum1", "checksum2");
+    doNothing().when(data).setChecksumTo0ByteArray();
     // create containerImporter object with mock
-    ContainerImporter containerImporter = spy(new ContainerImporter(conf,
+    ContainerImporter importer = spy(new ContainerImporter(conf,
         containerSet, controllerMock, volumeSet, volumeChoosingPolicy));
 
     TarContainerPacker packer = mock(TarContainerPacker.class);
     when(packer.unpackContainerDescriptor(any())).thenReturn("test".getBytes(
         StandardCharsets.UTF_8));
-    when(containerImporter.getPacker(any())).thenReturn(packer);
+    when(importer.getPacker(any())).thenReturn(packer);
 
-    doReturn(containerData).when(containerImporter).getKeyValueContainerData(any(byte[].class));
-    when(containerImporter.getImportContainerProgress()).thenReturn(new HashSet<>());
+    doReturn(data).when(importer).getKeyValueContainerData(any(byte[].class));
+    when(importer.getImportContainerProgress()).thenReturn(new HashSet<>());
 
     File tarFile = File.createTempFile("temp_" + System
         .currentTimeMillis(), ".tar");
 
     StorageContainerException scException =
         assertThrows(StorageContainerException.class,
-            () -> containerImporter.importContainer(containerId,
+            () -> importer.importContainer(containerId,
                 tarFile.toPath(), null, NO_COMPRESSION));
     Assertions.assertTrue(scException.getMessage().
         contains("Container checksum error"));
@@ -196,17 +196,16 @@ class TestContainerImporter {
           targetVolume, NO_COMPRESSION);
 
       // verify static method was called
-      mockedStatic.verify(() -> OnDemandContainerDataScanner.scanContainer(container, any()), times(1));
+      mockedStatic.verify(() -> OnDemandContainerDataScanner.scanContainer(container, "Container import"), times(1));
       assertNotNull(containerSet.getContainer(containerId));
     }
   }
 
-  private File containerTarFile(
-      long containerId, ContainerData containerData) throws IOException {
+  private File containerTarFile(long id, ContainerData data) throws IOException {
     File yamlFile = new File(tempDir, "container.yaml");
-    ContainerDataYaml.createContainerFile(containerData, yamlFile);
+    ContainerDataYaml.createContainerFile(data, yamlFile);
     File tarFile = new File(tempDir,
-        ContainerUtils.getContainerTarName(containerId));
+        ContainerUtils.getContainerTarName(id));
     try (OutputStream output = Files.newOutputStream(tarFile.toPath())) {
       ArchiveOutputStream<TarArchiveEntry> archive = new TarArchiveOutputStream(output);
       TarArchiveEntry entry = archive.createArchiveEntry(yamlFile,
