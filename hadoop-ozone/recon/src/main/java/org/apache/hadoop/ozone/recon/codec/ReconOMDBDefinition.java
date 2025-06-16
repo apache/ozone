@@ -146,6 +146,11 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> DELETED_DIR_TABLE_DEF
       = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
 
+  // Merged column family map: OM base + Recon overrides
+  public static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES;
+
+  private static final ReconOMDBDefinition INSTANCE = new ReconOMDBDefinition();
+
   //---------------------------------------------------------------------------
   // Helper to build Recon-specific overrides map
   private static Map<String, DBColumnFamilyDefinition<?, ?>> buildOverrides() {
@@ -161,17 +166,12 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
     );
   }
 
-  // Merged column family map: OM base + Recon overrides
-  public static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES;
-
   static {
     Map<String, DBColumnFamilyDefinition<?, ?>> merged =
         new HashMap<>(OMDBDefinition.get().getMap());
     merged.putAll(buildOverrides());
     COLUMN_FAMILIES = Collections.unmodifiableMap(merged);
   }
-
-  private static final ReconOMDBDefinition INSTANCE = new ReconOMDBDefinition();
 
   /**
    * Parses BucketInfo protobuf and creates OmBucketInfo without deserializing ACL list.
