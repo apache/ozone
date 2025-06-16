@@ -1433,7 +1433,7 @@ public class KeyValueHandler extends Handler {
     // checksum to prevent divergence from what SCM sees in the ICR vs what datanode peers will see when pulling the
     // merkle tree.
     long originalDataChecksum = containerData.getDataChecksum();
-    boolean hadDataChecksum = containerData.needsDataChecksum();
+    boolean hadDataChecksum = !containerData.needsDataChecksum();
     ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.writeContainerDataTree(containerData,
         treeWriter);
     long updatedDataChecksum = updateChecksumInfo.getContainerMerkleTree().getDataChecksum();
