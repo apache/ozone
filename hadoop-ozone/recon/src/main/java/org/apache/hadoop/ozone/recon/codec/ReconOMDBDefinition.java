@@ -18,29 +18,17 @@
 package org.apache.hadoop.ozone.recon.codec;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.COMPACTION_LOG_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELEGATION_TOKEN_TABLE_DEF;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE_DEF;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_ACCESS_ID_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_STATE_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TRANSACTION_INFO_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.USER_TABLE_DEF;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE_DEF;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -52,6 +40,7 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -158,30 +147,29 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
       = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
 
   //---------------------------------------------------------------------------
-  public static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
-      = DBColumnFamilyDefinition.newUnmodifiableMap(
-      BUCKET_TABLE_DEF,
-      DELETED_DIR_TABLE_DEF,
-      DELETED_TABLE_DEF,
-      DIRECTORY_TABLE_DEF,
-      DELEGATION_TOKEN_TABLE_DEF,
-      FILE_TABLE_DEF,
-      KEY_TABLE_DEF,
-      META_TABLE_DEF,
-      MULTIPART_INFO_TABLE_DEF,
-      OPEN_FILE_TABLE_DEF,
-      OPEN_KEY_TABLE_DEF,
-      PREFIX_TABLE_DEF,
-      PRINCIPAL_TO_ACCESS_IDS_TABLE_DEF,
-      S3_SECRET_TABLE_DEF,
-      SNAPSHOT_INFO_TABLE_DEF,
-      SNAPSHOT_RENAMED_TABLE_DEF,
-      COMPACTION_LOG_TABLE_DEF,
-      TENANT_ACCESS_ID_TABLE_DEF,
-      TENANT_STATE_TABLE_DEF,
-      TRANSACTION_INFO_TABLE_DEF,
-      USER_TABLE_DEF,
-      VOLUME_TABLE_DEF);
+  // Helper to build Recon-specific overrides map
+  private static Map<String, DBColumnFamilyDefinition<?, ?>> buildOverrides() {
+    return DBColumnFamilyDefinition.newUnmodifiableMap(
+        BUCKET_TABLE_DEF,
+        DELETED_TABLE_DEF,
+        DELETED_DIR_TABLE_DEF,
+        DIRECTORY_TABLE_DEF,
+        FILE_TABLE_DEF,
+        KEY_TABLE_DEF,
+        OPEN_FILE_TABLE_DEF,
+        OPEN_KEY_TABLE_DEF
+    );
+  }
+
+  // Merged column family map: OM base + Recon overrides
+  public static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES;
+
+  static {
+    Map<String, DBColumnFamilyDefinition<?, ?>> merged =
+        new HashMap<>(OMDBDefinition.get().getMap());
+    merged.putAll(buildOverrides());
+    COLUMN_FAMILIES = Collections.unmodifiableMap(merged);
+  }
 
   private static final ReconOMDBDefinition INSTANCE = new ReconOMDBDefinition();
 
