@@ -49,7 +49,7 @@ The native client leverages the Hadoop `libhdfs` C API for low-level JNI binding
 - Java 8 or later
 - Linux (kernel > 2.6.9)
 
-The following steps assume you have the Ozone built from source code and Hadoop binary checked out
+The following steps assume you have Ozone built from source code, the Hadoop binary distribution downloaded and extracted,
 and the environment variables `OZONE_HOME` and `HADOOP_HOME` set to their respective directories.
 
 ### 0. Download Hadoop binary distribution (optional)
