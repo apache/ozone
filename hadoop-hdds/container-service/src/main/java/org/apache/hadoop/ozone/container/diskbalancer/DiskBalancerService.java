@@ -590,27 +590,9 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   public DiskBalancerInfo getDiskBalancerInfo() {
-    boolean shouldRun;
-    boolean isPaused;
-
-    switch (this.operationalState) {
-    case RUNNING:
-      shouldRun = true;
-      isPaused = false;
-      break;
-    case PAUSED_BY_NODE_STATE:
-      shouldRun = false;
-      isPaused = true;
-      break;
-    case STOPPED:
-    default:
-      shouldRun = false;
-      isPaused = false;
-      break;
-    }
-    return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
+    return new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
         parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
-        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), isPaused);
+        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes());
   }
 
   public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {
