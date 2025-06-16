@@ -149,7 +149,6 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
   // Merged column family map: OM base + Recon overrides
   public static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES;
 
-  private static final ReconOMDBDefinition INSTANCE = new ReconOMDBDefinition();
 
   //---------------------------------------------------------------------------
   // Helper to build Recon-specific overrides map
@@ -172,6 +171,8 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
     merged.putAll(buildOverrides());
     COLUMN_FAMILIES = Collections.unmodifiableMap(merged);
   }
+
+  private static final ReconOMDBDefinition INSTANCE = new ReconOMDBDefinition();
 
   /**
    * Parses BucketInfo protobuf and creates OmBucketInfo without deserializing ACL list.
