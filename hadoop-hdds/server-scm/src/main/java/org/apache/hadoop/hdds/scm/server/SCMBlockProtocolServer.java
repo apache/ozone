@@ -268,7 +268,7 @@ public class SCMBlockProtocolServer implements
       List<DeletedBlockGroup> keyBlocksInfoList) throws IOException {
     long totalBlocks = 0;
     for (DeletedBlockGroup bg : keyBlocksInfoList) {
-      totalBlocks += bg.getBlockIDList().size();
+      totalBlocks += bg.getAllBlocks().size();
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("SCM is informed by OM to delete {} blocks",
