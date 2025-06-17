@@ -620,10 +620,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         LOG.warn("Volume [{}] is full. containerID: {}. Volume usage: [{}].", volume, containerData.getContainerID(),
             volume.getCurrentUsage());
         if (cmdType == Type.WriteChunk || cmdType == Type.PutBlock || cmdType == Type.PutSmallFile) {
-          // If the container is full, we should not allow any more writes.
-          // This will prevent the client from writing to a full container.
-          throw new StorageContainerException("Container creation failed, due to volume out of space",
-              DISK_OUT_OF_SPACE);
+          // If the volume is full, we should not allow more writes.
+          throw new StorageContainerException("Container creation failed due to volume " + volume.getStorageID()
+              + " out of space " + volume.getCurrentUsage(), DISK_OUT_OF_SPACE);
         }
       }
     }
