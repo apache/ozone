@@ -31,11 +31,17 @@ public class ContainerDiffReport {
   private final List<ContainerProtos.BlockMerkleTree> missingBlocks;
   private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> missingChunks;
   private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks;
+  private final long containerID;
 
-  public ContainerDiffReport() {
+  public ContainerDiffReport(long containerID) {
     this.missingBlocks = new ArrayList<>();
     this.missingChunks = new HashMap<>();
     this.corruptChunks = new HashMap<>();
+    this.containerID = containerID;
+  }
+
+  public long getContainerID() {
+    return containerID;
   }
 
   public void addMissingBlock(ContainerProtos.BlockMerkleTree missingBlockMerkleTree) {
@@ -74,7 +80,7 @@ public class ContainerDiffReport {
   // TODO: HDDS-11763 - Add metrics for missing blocks, missing chunks, corrupt chunks.
   @Override
   public String toString() {
-    return "ContainerDiffReport:" +
+    return "Diff report for container " + containerID + ":" +
         " MissingBlocks= " + missingBlocks.size() + " blocks" +
         ", MissingChunks= " + missingChunks.values().stream().mapToInt(List::size).sum()
         + " chunks from " + missingChunks.size() + " blocks" +
