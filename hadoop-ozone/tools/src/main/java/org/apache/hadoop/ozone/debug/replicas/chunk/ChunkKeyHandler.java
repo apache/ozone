@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.debug.replicas.chunk;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
@@ -27,7 +25,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
@@ -106,9 +103,7 @@ public class ChunkKeyHandler extends KeyHandler {
                 HddsProtos.ReplicationType.EC;
         Pipeline pipeline;
         if (!isECKey && keyPipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
-          pipeline = Pipeline.newBuilder(keyPipeline)
-              .setReplicationConfig(StandaloneReplicationConfig
-                  .getInstance(ONE)).build();
+          pipeline = keyPipeline.copyForRead();
         } else {
           pipeline = keyPipeline;
         }
@@ -190,9 +185,13 @@ public class ChunkKeyHandler extends KeyHandler {
             }
 
             if (isECKey) {
-              ChunkType blockChunksType = isECParityBlock(keyPipeline, entry.getKey()) ?
-                  ChunkType.PARITY : ChunkType.DATA;
-              jsonObj.put("chunkType", blockChunksType.name());
+              int replicaIndex = keyPipeline.getReplicaIndex(entry.getKey());
+              int dataCount = ((ECReplicationConfig) keyPipeline.getReplicationConfig()).getData();
+              // Index is 1-based,
+              // e.g. for RS-3-2 we will have data indexes 1,2,3 and parity indexes 4,5
+              ChunkType chunkType = (replicaIndex > dataCount) ? ChunkType.PARITY : ChunkType.DATA;
+              jsonObj.put("chunkType", chunkType.name());
+              jsonObj.put("replicaIndex", replicaIndex);
             }
           }
         } catch (InterruptedException e) {
@@ -204,12 +203,5 @@ public class ChunkKeyHandler extends KeyHandler {
       String prettyJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(result);
       System.out.println(prettyJson);
     }
-  }
-
-  private boolean isECParityBlock(Pipeline pipeline, DatanodeDetails dn) {
-    //index is 1-based,
-    //e.g. for RS-3-2 we will have data indexes 1,2,3 and parity indexes 4,5
-    return pipeline.getReplicaIndex(dn) >
-        ((ECReplicationConfig) pipeline.getReplicationConfig()).getData();
   }
 }

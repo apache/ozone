@@ -30,13 +30,19 @@ import java.util.List;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.metrics2.MetricsRecord;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock.Resource;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Class tests OzoneManagerLock.
@@ -117,6 +123,26 @@ class TestOzoneManagerLock {
 
   @ParameterizedTest
   @EnumSource
+  public void testFlatLockWithParallelResource(FlatResource flatResource) {
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    List<Resource> resources = new ArrayList<>();
+    resources.addAll(Arrays.stream(LeveledResource.values()).collect(Collectors.toList()));
+    resources.addAll(Arrays.stream(FlatResource.values()).collect(Collectors.toList()));
+    for (Resource otherResource : resources) {
+      String[] otherResourceName = generateResourceName(otherResource);
+      String[] flatResourceName = generateResourceName(flatResource);
+      lock.acquireWriteLock(otherResource, otherResourceName);
+      try {
+        lock.acquireWriteLock(flatResource, flatResourceName);
+      } finally {
+        lock.releaseWriteLock(otherResource, otherResourceName);
+        lock.releaseWriteLock(flatResource, flatResourceName);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource
   void testLockViolationsWithOneHigherLevelLock(LeveledResource resource) {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
     for (LeveledResource higherResource : LeveledResource.values()) {
@@ -181,7 +207,7 @@ class TestOzoneManagerLock {
         () -> lock.releaseWriteLock(LeveledResource.USER_LOCK, "user3"));
   }
 
-  private String[] generateResourceName(LeveledResource resource) {
+  private String[] generateResourceName(Resource resource) {
     if (resource == LeveledResource.BUCKET_LOCK) {
       return new String[]{UUID.randomUUID().toString(),
           UUID.randomUUID().toString()};
@@ -255,34 +281,119 @@ class TestOzoneManagerLock {
     lock.releaseMultiUserLock("user1", "user2");
   }
 
-  @Test
-  void testLockResourceParallel() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testLockResourceParallel(boolean fullResourceLock) throws Exception {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    for (LeveledResource resource :
-        LeveledResource.values()) {
+    for (Resource resource : Stream.of(LeveledResource.values(), FlatResource.values())
+        .flatMap(Arrays::stream).collect(Collectors.toList())) {
       final String[] resourceName = generateResourceName(resource);
-      lock.acquireWriteLock(resource, resourceName);
+      if (fullResourceLock) {
+        lock.acquireResourceWriteLock(resource);
+      } else {
+        lock.acquireWriteLock(resource, resourceName);
+      }
 
       AtomicBoolean gotLock = new AtomicBoolean(false);
       new Thread(() -> {
-        lock.acquireWriteLock(resource, resourceName);
+        if (fullResourceLock) {
+          lock.acquireResourceWriteLock(resource);
+        } else {
+          lock.acquireWriteLock(resource, resourceName);
+        }
         gotLock.set(true);
-        lock.releaseWriteLock(resource, resourceName);
+        if (fullResourceLock) {
+          lock.releaseResourceWriteLock(resource);
+        } else {
+          lock.releaseWriteLock(resource, resourceName);
+        }
+
       }).start();
       // Let's give some time for the new thread to run
       Thread.sleep(100);
       // Since the new thread is trying to get lock on same resource,
       // it will wait.
       assertFalse(gotLock.get());
-      lock.releaseWriteLock(resource, resourceName);
+      if (fullResourceLock) {
+        lock.releaseResourceWriteLock(resource);
+      } else {
+        lock.releaseWriteLock(resource, resourceName);
+      }
       // Since we have released the lock, the new thread should have the lock
       // now.
       // Let's give some time for the new thread to run
       Thread.sleep(100);
       assertTrue(gotLock.get());
     }
+  }
 
+  @ParameterizedTest
+  @CsvSource(value = {
+      "true, true",
+      "true, false",
+      "false, true",
+      "false, false"
+  })
+  void testResourceLockFullResourceLockParallel(boolean mainThreadAcquireResourceLock, boolean acquireWriteLock)
+      throws Exception {
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+
+    for (Resource resource : Stream.of(LeveledResource.values(), FlatResource.values())
+        .flatMap(Arrays::stream).collect(Collectors.toList())) {
+      final String[] resourceName = generateResourceName(resource);
+      if (mainThreadAcquireResourceLock) {
+        lock.acquireResourceWriteLock(resource);
+      } else {
+        if (acquireWriteLock) {
+          lock.acquireWriteLock(resource, resourceName);
+        } else {
+          lock.acquireReadLock(resource, resourceName);
+        }
+      }
+
+      AtomicBoolean gotLock = new AtomicBoolean(false);
+      new Thread(() -> {
+        if (!mainThreadAcquireResourceLock) {
+          lock.acquireResourceWriteLock(resource);
+        } else {
+          if (acquireWriteLock) {
+            lock.acquireWriteLock(resource, resourceName);
+          } else {
+            lock.acquireReadLock(resource, resourceName);
+          }
+        }
+        gotLock.set(true);
+        if (!mainThreadAcquireResourceLock) {
+          lock.releaseResourceWriteLock(resource);
+        } else {
+          if (acquireWriteLock) {
+            lock.releaseWriteLock(resource, resourceName);
+          } else {
+            lock.releaseReadLock(resource, resourceName);
+          }
+        }
+      }).start();
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
+      // Since the new thread is trying to get lock on same resource,
+      // it will wait.
+      assertFalse(gotLock.get());
+      if (mainThreadAcquireResourceLock) {
+        lock.releaseResourceWriteLock(resource);
+      } else {
+        if (acquireWriteLock) {
+          lock.releaseWriteLock(resource, resourceName);
+        } else {
+          lock.releaseReadLock(resource, resourceName);
+        }
+      }
+      // Since we have released the lock, the new thread should have the lock
+      // now.
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
+      assertTrue(gotLock.get());
+    }
   }
 
   @Test

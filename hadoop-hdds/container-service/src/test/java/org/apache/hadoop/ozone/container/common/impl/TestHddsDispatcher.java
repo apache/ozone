@@ -79,6 +79,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.Op;
@@ -125,6 +126,16 @@ public class TestHddsDispatcher {
     volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(new OzoneConfiguration());
   }
 
+  /**
+   * Tests that close container action is sent when a container is full. First two containers are created. Then we
+   * write to one of them to confirm normal writes are successful. Then we increase the used space of both containers
+   * such that they're close to full, and write to both of them simultaneously. The expectation is that close
+   * container action should be added for both of them and two immediate heartbeats should be sent. Next, we write
+   * again to the first container. This time the close container action should be queued but immediate heartbeat
+   * should not be sent because of throttling. This confirms that the throttling is per container.
+   * @param layout
+   * @throws IOException
+   */
   @ContainerLayoutTestInfo.ContainerTest
   public void testContainerCloseActionWhenFull(
       ContainerLayoutVersion layout) throws IOException {
@@ -141,16 +152,23 @@ public class TestHddsDispatcher {
       UUID scmId = UUID.randomUUID();
       ContainerSet containerSet = newContainerSet();
       StateContext context = ContainerTestUtils.getMockContext(dd, conf);
+      // create both containers
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
           layout,
           (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
           dd.getUuidString());
+      KeyValueContainerData containerData2 = new KeyValueContainerData(2L,
+          layout, (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(), dd.getUuidString());
       Container container = new KeyValueContainer(containerData, conf);
+      Container container2 = new KeyValueContainer(containerData2, conf);
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
       container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
           scmId.toString());
+      container2.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+          scmId.toString());
       containerSet.addContainer(container);
+      containerSet.addContainer(container2);
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
       for (ContainerType containerType : ContainerType.values()) {
@@ -159,6 +177,7 @@ public class TestHddsDispatcher {
                 context.getParent().getDatanodeDetails().getUuidString(),
                 containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER));
       }
+      // write successfully to first container
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
       hddsDispatcher.setClusterId(scmId.toString());
@@ -168,15 +187,30 @@ public class TestHddsDispatcher {
           responseOne.getResult());
       verify(context, times(0))
           .addContainerActionIfAbsent(any(ContainerAction.class));
-      containerData.setBytesUsed(Double.valueOf(
+      // increment used space of both containers
+      containerData.getStatistics().setBlockBytesForTesting(Double.valueOf(
+          StorageUnit.MB.toBytes(950)).longValue());
+      containerData2.getStatistics().setBlockBytesForTesting(Double.valueOf(
           StorageUnit.MB.toBytes(950)).longValue());
       ContainerCommandResponseProto responseTwo = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L), null);
+      ContainerCommandResponseProto responseThree = hddsDispatcher
+          .dispatch(getWriteChunkRequest(dd.getUuidString(), 2L, 1L), null);
       assertEquals(ContainerProtos.Result.SUCCESS,
           responseTwo.getResult());
-      verify(context, times(1))
+      assertEquals(ContainerProtos.Result.SUCCESS, responseThree.getResult());
+      // container action should be added for both containers
+      verify(context, times(2))
           .addContainerActionIfAbsent(any(ContainerAction.class));
+      DatanodeStateMachine stateMachine = context.getParent();
+      // immediate heartbeat should be triggered for both the containers
+      verify(stateMachine, times(2)).triggerHeartbeat();
 
+      // if we write again to container 1, the container action should get added but heartbeat should not get triggered
+      // again because of throttling
+      hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 3L), null);
+      verify(context, times(3)).addContainerActionIfAbsent(any(ContainerAction.class));
+      verify(stateMachine, times(2)).triggerHeartbeat(); // was called twice before
     } finally {
       volumeSet.shutdown();
       ContainerMetrics.remove();
@@ -276,6 +310,7 @@ public class TestHddsDispatcher {
       UUID scmId = UUID.randomUUID();
       ContainerSet containerSet = newContainerSet();
       StateContext context = ContainerTestUtils.getMockContext(dd, conf);
+      DatanodeStateMachine stateMachine = context.getParent();
       // create a 50 byte container
       // available (160) > 100 (min free space) + 50 (container size)
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
@@ -300,14 +335,21 @@ public class TestHddsDispatcher {
           conf, containerSet, volumeSet, handlers, context, metrics, null);
       hddsDispatcher.setClusterId(scmId.toString());
       containerData.getVolume().getVolumeUsage()
-          .ifPresent(usage -> usage.incrementUsedSpace(50));
-      usedSpace.addAndGet(50);
+          .ifPresent(usage -> usage.incrementUsedSpace(60));
+      usedSpace.addAndGet(60);
       ContainerCommandResponseProto response = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
       assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
       verify(context, times(1))
           .addContainerActionIfAbsent(any(ContainerAction.class));
+      // verify that immediate heartbeat is triggered
+      verify(stateMachine, times(1)).triggerHeartbeat();
+      // the volume has reached the min free space boundary but this time the heartbeat should not be triggered because
+      // of throttling
+      hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L), null);
+      verify(context, times(2)).addContainerActionIfAbsent(any(ContainerAction.class));
+      verify(stateMachine, times(1)).triggerHeartbeat(); // was called once before
 
       // try creating another container now as the volume used has crossed
       // threshold

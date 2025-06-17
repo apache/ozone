@@ -23,7 +23,6 @@ import java.util.List;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 /**
  * Wrapper class to represent a table in a datanode RocksDB instance.
@@ -75,15 +74,7 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public final TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator() {
-    throw new UnsupportedOperationException("Iterating tables directly is not" +
-            " supported for datanode containers due to differing schema " +
-            "version.");
-  }
-
-  @Override
-  public final TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(
-      KEY prefix) {
+  public final KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type) {
     throw new UnsupportedOperationException("Iterating tables directly is not" +
         " supported for datanode containers due to differing schema " +
         "version.");
@@ -120,7 +111,7 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public List<? extends KeyValue<KEY, VALUE>> getRangeKVs(
+  public List<KeyValue<KEY, VALUE>> getRangeKVs(
           KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
@@ -128,7 +119,7 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public List<? extends KeyValue<KEY, VALUE>> getSequentialRangeKVs(
+  public List<KeyValue<KEY, VALUE>> getSequentialRangeKVs(
           KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {

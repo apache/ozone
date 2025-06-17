@@ -151,8 +151,8 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-    long initialSnapshotPurgeCount = getOmMetrics().getNumSnapshotPurges();
-    long initialSnapshotPurgeFailCount = getOmMetrics().getNumSnapshotPurgeFails();
+    long initialSnapshotPurgeCount = getOmSnapshotIntMetrics().getNumSnapshotPurges();
+    long initialSnapshotPurgeFailCount = getOmSnapshotIntMetrics().getNumSnapshotPurgeFails();
 
     List<String> snapshotDbKeysToPurge = createSnapshots(10);
     assertFalse(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
@@ -180,8 +180,8 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
     for (Path checkpoint : checkpointPaths) {
       assertFalse(Files.exists(checkpoint));
     }
-    assertEquals(initialSnapshotPurgeCount + 1, getOmMetrics().getNumSnapshotPurges());
-    assertEquals(initialSnapshotPurgeFailCount, getOmMetrics().getNumSnapshotPurgeFails());
+    assertEquals(initialSnapshotPurgeCount + 1, getOmSnapshotIntMetrics().getNumSnapshotPurges());
+    assertEquals(initialSnapshotPurgeFailCount, getOmSnapshotIntMetrics().getNumSnapshotPurgeFails());
   }
 
   @Test
@@ -225,8 +225,8 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
    */
   @Test
   public void testValidateAndUpdateCacheFailure() throws Exception {
-    long initialSnapshotPurgeCount = getOmMetrics().getNumSnapshotPurges();
-    long initialSnapshotPurgeFailCount = getOmMetrics().getNumSnapshotPurgeFails();
+    long initialSnapshotPurgeCount = getOmSnapshotIntMetrics().getNumSnapshotPurges();
+    long initialSnapshotPurgeFailCount = getOmSnapshotIntMetrics().getNumSnapshotPurgeFails();
 
     List<String> snapshotDbKeysToPurge = createSnapshots(10);
 
@@ -244,8 +244,8 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
         omSnapshotPurgeRequest.validateAndUpdateCache(getOzoneManager(), 200L);
 
     assertEquals(INTERNAL_ERROR, omSnapshotPurgeResponse.getOMResponse().getStatus());
-    assertEquals(initialSnapshotPurgeCount, getOmMetrics().getNumSnapshotPurges());
-    assertEquals(initialSnapshotPurgeFailCount + 1, getOmMetrics().getNumSnapshotPurgeFails());
+    assertEquals(initialSnapshotPurgeCount, getOmSnapshotIntMetrics().getNumSnapshotPurges());
+    assertEquals(initialSnapshotPurgeFailCount + 1, getOmSnapshotIntMetrics().getNumSnapshotPurgeFails());
   }
 
   // TODO: clean up: Do we this test after
@@ -394,7 +394,11 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
             SnapshotInfo.getTableKey(getVolumeName(), bucket, snapshotName);
         SnapshotInfo snapshotInfo =
             getOmMetadataManager().getSnapshotInfoTable().get(snapshotTableKey);
-        snapshotInfoList.add(snapshotInfo);
+        snapshotInfo.setDeepClean(true);
+        snapshotInfo.setDeepCleanedDeletedDir(true);
+        getOmMetadataManager().getSnapshotInfoTable().addCacheEntry(snapshotTableKey, snapshotInfo,
+            System.currentTimeMillis());
+        snapshotInfoList.add(getOmMetadataManager().getSnapshotInfoTable().get(snapshotTableKey));
       }
     }
 
@@ -403,13 +407,16 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
     assertEquals(totalKeys, numberOfSnapshotBeforePurge);
     assertEquals(totalKeys, chainManager.getGlobalSnapshotChain().size());
     Map<UUID, ByteString> expectedTransactionInfos = new HashMap<>();
+    Map<UUID, Boolean> expectedDeepCleanFlags = new HashMap<>();
     // Ratis transaction uses term index 1 while creating snapshot.
     ByteString expectedLastTransactionVal = TransactionInfo.valueOf(TransactionInfo.getTermIndex(1L))
         .toByteString();
     for (SnapshotInfo snapshotInfo : snapshotInfoList) {
       expectedTransactionInfos.put(snapshotInfo.getSnapshotId(), expectedLastTransactionVal);
+      expectedDeepCleanFlags.put(snapshotInfo.getSnapshotId(), true);
     }
-    validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(snapshotInfoList, expectedTransactionInfos);
+    validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(snapshotInfoList, expectedTransactionInfos,
+        expectedDeepCleanFlags);
     // Ratis transaction uses term index 200 while purging snapshot.
     expectedLastTransactionVal = TransactionInfo.valueOf(TransactionInfo.getTermIndex(200L))
         .toByteString();
@@ -422,8 +429,15 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
         expectedTransactionInfos.put(chainManager.nextGlobalSnapshot(snapId), expectedLastTransactionVal);
       }
       if (chainManager.hasNextPathSnapshot(purgeSnapshotInfo.getSnapshotPath(), snapId)) {
-        expectedTransactionInfos.put(chainManager.nextPathSnapshot(purgeSnapshotInfo.getSnapshotPath(), snapId),
-            expectedLastTransactionVal);
+        UUID nextPathSnapshot = chainManager.nextPathSnapshot(purgeSnapshotInfo.getSnapshotPath(), snapId);
+        expectedTransactionInfos.put(nextPathSnapshot, expectedLastTransactionVal);
+        expectedDeepCleanFlags.put(nextPathSnapshot, false);
+        if (chainManager.hasNextPathSnapshot(purgeSnapshotInfo.getSnapshotPath(), nextPathSnapshot)) {
+          UUID nextToNextPathSnapshot = chainManager.nextPathSnapshot(purgeSnapshotInfo.getSnapshotPath(),
+              nextPathSnapshot);
+          expectedTransactionInfos.put(nextToNextPathSnapshot, expectedLastTransactionVal);
+          expectedDeepCleanFlags.put(nextToNextPathSnapshot, false);
+        }
       }
       String purgeSnapshotKey = SnapshotInfo.getTableKey(getVolumeName(),
           purgeSnapshotInfo.getBucketName(),
@@ -453,16 +467,20 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
         actualNumberOfSnapshotAfterPurge);
     assertEquals(expectNumberOfSnapshotAfterPurge, chainManager
         .getGlobalSnapshotChain().size());
-    validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(snapshotInfoListAfterPurge, expectedTransactionInfos);
+    validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(snapshotInfoListAfterPurge, expectedTransactionInfos,
+        expectedDeepCleanFlags);
   }
 
   private void validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(
-      List<SnapshotInfo> snapshotInfoList, Map<UUID, ByteString> expectedTransactionInfos) throws IOException {
+      List<SnapshotInfo> snapshotInfoList, Map<UUID, ByteString> expectedTransactionInfos,
+      Map<UUID, Boolean> expectedDeepCleanFlags) throws IOException {
     if (snapshotInfoList.isEmpty()) {
       return;
     }
     for (SnapshotInfo snapshotInfo : snapshotInfoList) {
       assertEquals(snapshotInfo.getLastTransactionInfo(), expectedTransactionInfos.get(snapshotInfo.getSnapshotId()));
+      assertEquals(snapshotInfo.isDeepCleaned(), expectedDeepCleanFlags.get(snapshotInfo.getSnapshotId()));
+      assertEquals(snapshotInfo.isDeepCleanedDeletedDir(), expectedDeepCleanFlags.get(snapshotInfo.getSnapshotId()));
     }
     OmMetadataManagerImpl metadataManager =
         (OmMetadataManagerImpl) getOmMetadataManager();
