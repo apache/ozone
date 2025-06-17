@@ -22,7 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
 import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -273,7 +273,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
         diskBalancerManager.getDiskBalancerStatus(Optional.of(dnAddressList),
             Optional.empty(),
             ClientVersion.CURRENT_VERSION).stream().findFirst().orElse(null);
-    assertEquals(statusAfterRecommission.getRunningStatus(), HddsProtos.DiskBalancerRunningStatus.STOPPED);
+    assertEquals(HddsProtos.DiskBalancerRunningStatus.STOPPED, statusAfterRecommission.getRunningStatus());
   }
 
   @Test
