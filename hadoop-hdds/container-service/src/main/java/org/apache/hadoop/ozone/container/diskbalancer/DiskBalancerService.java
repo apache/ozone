@@ -253,23 +253,11 @@ public class DiskBalancerService extends BackgroundService {
    * @param diskBalancerInfo The DiskBalancerInfo containing shouldRun and paused flags.
    */
   private void updateOperationalStateFromInfo(DiskBalancerInfo diskBalancerInfo) {
-    DiskBalancerOperationalState newOperationalState;
-    if (diskBalancerInfo.isShouldRun()) {
-      // This corresponds to an intent to RUN (e.g., START command when IN_SERVICE)
-      newOperationalState = DiskBalancerOperationalState.RUNNING;
-    } else {
-      if (diskBalancerInfo.isPaused()) {
-        // This corresponds to PAUSED_BY_NODE_STATE (e.g., START command when not IN_SERVICE, or auto-pause)
-        newOperationalState = DiskBalancerOperationalState.PAUSED_BY_NODE_STATE;
-      } else {
-        // This corresponds to STOPPED (e.g., STOP command)
-        newOperationalState = DiskBalancerOperationalState.STOPPED;
-      }
-    }
+    DiskBalancerOperationalState newOperationalState = diskBalancerInfo.getOperationalState();
 
     if (this.operationalState != newOperationalState) {
       LOG.info("DiskBalancer operational state changing from {} to {} " +
-              "based on DiskBalancerInfo (shouldRun={}, paused={}).",
+              "based on DiskBalancerInfo (derived: shouldRun={}, paused={}).",
           this.operationalState, newOperationalState,
           diskBalancerInfo.isShouldRun(), diskBalancerInfo.isPaused());
       this.operationalState = newOperationalState;
