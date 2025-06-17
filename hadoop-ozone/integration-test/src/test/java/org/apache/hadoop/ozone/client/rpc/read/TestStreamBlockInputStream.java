@@ -119,7 +119,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       checkBufferSizeAndCapacity(block0Stream.getCachedBuffers());
 
       // Read the last byte of chunk and verify that the buffers are released.
-      block0Stream.read(new byte[1]);
+      IOUtils.readFully(block0Stream, new byte[1]);
       assertNull(block0Stream.getCachedBuffers(),
           "ChunkInputStream did not release buffers after reaching EOF.");
     }
@@ -238,7 +238,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       assertTrue(keyInputStream.getPartStreams().isEmpty());
       IOUtils.readFully(keyInputStream, readData);
       for (byte b : readData) {
-        assertEquals(b, (byte) 0);
+        assertEquals((byte) 0, b);
       }
     }
   }
