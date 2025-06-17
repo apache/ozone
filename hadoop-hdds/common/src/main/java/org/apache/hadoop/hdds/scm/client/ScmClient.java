@@ -179,9 +179,12 @@ public interface ScmClient extends Closeable {
    * @return ContainerInfo
    * @throws IOException - in case of error.
    */
+  @Deprecated
   ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor replicationFactor,
       String owner) throws IOException;
+
+  ContainerWithPipeline createContainer(ReplicationConfig replicationConfig, String owner) throws IOException;
 
   /**
    * Gets the list of underReplicated and unClosed containers on a decommissioning node.

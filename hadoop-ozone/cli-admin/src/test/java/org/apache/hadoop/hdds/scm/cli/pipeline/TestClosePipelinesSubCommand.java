@@ -148,7 +148,7 @@ class TestClosePipelinesSubCommand {
 
   private Pipeline createPipeline(ReplicationConfig repConfig,
                                   Pipeline.PipelineState state) {
-    return new Pipeline.Builder()
+    return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setCreateTimestamp(System.currentTimeMillis())
         .setState(state)

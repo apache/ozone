@@ -102,7 +102,7 @@ public final class HddsTestUtils {
   public static DatanodeDetails getDatanodeDetails(
       RegisteredCommand registeredCommand) {
     return MockDatanodeDetails.createDatanodeDetails(
-        registeredCommand.getDatanode().getUuidString(),
+        registeredCommand.getDatanode().getID(),
         registeredCommand.getDatanode().getHostName(),
         registeredCommand.getDatanode().getIpAddress(),
         null);

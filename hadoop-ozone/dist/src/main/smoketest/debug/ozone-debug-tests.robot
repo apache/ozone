@@ -37,7 +37,7 @@ Write keys
 
 *** Test Cases ***
 Test ozone debug replicas verify checksums
-    ${output} =    Execute   ozone debug replicas verify --checksums --block-existence --container-state o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} --output-dir ${TEMP_DIR}
+    ${output} =    Execute   ozone debug replicas verify --checksums --block-existence --container-state o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE}
     ${json} =      Evaluate  json.loads('''${output}''')      json
 
     # 'keys' array should be empty if all keys and their replicas passed checksum verification

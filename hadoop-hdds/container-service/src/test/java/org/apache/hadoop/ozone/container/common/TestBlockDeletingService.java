@@ -329,7 +329,7 @@ public class TestBlockDeletingService {
       int numOfChunksPerBlock) {
     long chunkLength = 100;
     try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
-      container.getContainerData().setBlockCount(numOfBlocksPerContainer);
+      container.getContainerData().getStatistics().setBlockCountForTesting(numOfBlocksPerContainer);
       // Set block count, bytes used and pending delete block count.
       metadata.getStore().getMetadataTable()
           .put(data.getBlockCountKey(), (long) numOfBlocksPerContainer);

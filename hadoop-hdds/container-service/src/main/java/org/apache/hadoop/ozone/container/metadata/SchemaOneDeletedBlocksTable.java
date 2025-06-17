@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -99,7 +99,7 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   @Override
-  public List<? extends KeyValue<String, ChunkInfoList>> getRangeKVs(
+  public List<KeyValue<String, ChunkInfoList>> getRangeKVs(
           String startKey, int count, String prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
@@ -112,7 +112,7 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   @Override
-  public List<? extends KeyValue<String, ChunkInfoList>> getSequentialRangeKVs(
+  public List<KeyValue<String, ChunkInfoList>> getSequentialRangeKVs(
           String startKey, int count, String prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
@@ -143,41 +143,15 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   private static List<KeyValue<String, ChunkInfoList>> unprefix(
-      List<? extends KeyValue<String, ChunkInfoList>> kvs) {
+      List<KeyValue<String, ChunkInfoList>> kvs) {
 
-    List<KeyValue<String, ChunkInfoList>> processedKVs = new ArrayList<>();
-    kvs.forEach(kv -> processedKVs.add(new UnprefixedKeyValue(kv)));
-
-    return processedKVs;
+    return kvs.stream()
+        .map(kv -> Table.newKeyValue(unprefix(kv.getKey()), kv.getValue()))
+        .collect(Collectors.toList());
   }
 
   private static MetadataKeyFilters.KeyPrefixFilter getDeletedFilter() {
     return (new MetadataKeyFilters.KeyPrefixFilter())
             .addFilter(DELETED_KEY_PREFIX);
-  }
-
-  /**
-   * {@link KeyValue} implementation that removes the deleted key prefix from
-   * an existing {@link KeyValue}.
-   */
-  private static class UnprefixedKeyValue implements KeyValue<String,
-        ChunkInfoList> {
-
-    private final KeyValue<String, ChunkInfoList> prefixedKeyValue;
-
-    UnprefixedKeyValue(
-            KeyValue<String, ChunkInfoList> prefixedKeyValue) {
-      this.prefixedKeyValue = prefixedKeyValue;
-    }
-
-    @Override
-    public String getKey() throws IOException {
-      return unprefix(prefixedKeyValue.getKey());
-    }
-
-    @Override
-    public ChunkInfoList getValue() throws IOException {
-      return prefixedKeyValue.getValue();
-    }
   }
 }

@@ -120,7 +120,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
 
       // remove commands in command queue for the DN
       final List<SCMCommand<?>> cmdList = nodeManager.getCommandQueue(
-          datanodeDetails.getUuid());
+          datanodeDetails.getID());
       LOG.info("Clearing command queue of size {} for DN {}",
           cmdList.size(), datanodeDetails);
 

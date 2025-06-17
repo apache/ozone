@@ -896,57 +896,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * Returns KeyValueContainerReport for the KeyValueContainer.
    */
   @Override
-  public ContainerReplicaProto getContainerReport()
-      throws StorageContainerException {
-    ContainerReplicaProto.Builder ciBuilder =
-        ContainerReplicaProto.newBuilder();
-    ciBuilder.setContainerID(containerData.getContainerID())
-        .setReadCount(containerData.getReadCount())
-        .setWriteCount(containerData.getWriteCount())
-        .setReadBytes(containerData.getReadBytes())
-        .setWriteBytes(containerData.getWriteBytes())
-        .setKeyCount(containerData.getBlockCount())
-        .setUsed(containerData.getBytesUsed())
-        .setState(getHddsState())
-        .setReplicaIndex(containerData.getReplicaIndex())
-        .setDeleteTransactionId(containerData.getDeleteTransactionId())
-        .setBlockCommitSequenceId(containerData.getBlockCommitSequenceId())
-        .setOriginNodeId(containerData.getOriginNodeId())
-        .setIsEmpty(containerData.isEmpty());
-    return ciBuilder.build();
-  }
-
-  /**
-   * Returns LifeCycle State of the container.
-   * @return LifeCycle State of the container in HddsProtos format
-   * @throws StorageContainerException
-   */
-  private ContainerReplicaProto.State getHddsState()
-      throws StorageContainerException {
-    ContainerReplicaProto.State state;
-    switch (containerData.getState()) {
-    case OPEN:
-      state = ContainerReplicaProto.State.OPEN;
-      break;
-    case CLOSING:
-      state = ContainerReplicaProto.State.CLOSING;
-      break;
-    case QUASI_CLOSED:
-      state = ContainerReplicaProto.State.QUASI_CLOSED;
-      break;
-    case CLOSED:
-      state = ContainerReplicaProto.State.CLOSED;
-      break;
-    case UNHEALTHY:
-      state = ContainerReplicaProto.State.UNHEALTHY;
-      break;
-    case DELETED:
-      state = ContainerReplicaProto.State.DELETED;
-      break;
-    default:
-      throw new StorageContainerException("Invalid Container state: " + containerData, INVALID_CONTAINER_STATE);
-    }
-    return state;
+  public ContainerReplicaProto getContainerReport() throws StorageContainerException {
+    return containerData.buildContainerReplicaProto();
   }
 
   /**

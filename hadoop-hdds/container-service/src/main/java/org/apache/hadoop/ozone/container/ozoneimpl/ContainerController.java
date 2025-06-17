@@ -30,6 +30,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -94,7 +95,7 @@ public class ContainerController {
         warning = "The Container is not found. ContainerID: " + containerId;
       }
       LOG.warn(warning);
-      throw new ContainerNotFoundException(warning);
+      throw new ContainerNotFoundException(ContainerID.valueOf(containerId));
     } else {
       if (container.getContainerState() == State.OPEN) {
         getHandler(container).markContainerForClose(container);
