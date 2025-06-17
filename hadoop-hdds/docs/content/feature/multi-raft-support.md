@@ -23,7 +23,7 @@ summary: "Enables each DataNode to participate in multiple Ratis pipelines concu
 -->
 
 ## Overview
-The early Ozone versions supported one Raft pipeline per DataNode, which means each DataNode can accept only one write request at a time, leading to under-utilization of resources.
+The early Ozone versions supported one Raft pipeline per DataNode, which meant each DataNode could only participate in one Ratis replication group (pipeline) at a time. This limited its concurrent write handling capacity for replicated data and could lead to under-utilization of resources.
 
 Multi-Raft support allows a DataNode to be part of multiple Ratis pipelines at once,
 improving write throughput and ensuring better utilization of disk and network resources.
