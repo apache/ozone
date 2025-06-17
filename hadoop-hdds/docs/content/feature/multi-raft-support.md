@@ -32,7 +32,7 @@ This is particularly useful when DataNodes have multiple disks.
 ## Prerequisites
 - Ozone 0.5.0 or later
 - Replication type: RATIS
-- Multiple metadata volumes on each DataNode (via `dfs.container.ratis.datanode.storage.dir`)
+- Multiple metadata volumes on each DataNode (via `hdds.container.ratis.datanode.storage.dir`)
 - Adequate CPU, memory, and network bandwidth
 
 ## How It Works
