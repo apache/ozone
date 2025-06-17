@@ -74,7 +74,7 @@ SCM can now create overlapping pipelines: each DataNode can join multiple Raft g
 ## Operational Tips
 - Monitor with `ozone admin` CLI and Recon UI
 - Ensure pipeline count matches expectations
-- Balance Raft logs across disks
+For optimal I/O isolation, configure `hdds.container.ratis.datanode.storage.dir` with paths on multiple distinct physical disks. Ratis will distribute pipeline logs accordingly.
 - Be cautious with very high pipeline counts (memory/CPU overhead)
 
 ## Limitations
