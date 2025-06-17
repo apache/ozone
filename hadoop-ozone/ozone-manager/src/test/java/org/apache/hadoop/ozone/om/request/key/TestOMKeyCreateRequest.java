@@ -142,7 +142,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCache(
-      boolean setKeyPathLock, boolean setFileSystemPaths, boolean  cacheEnabled) throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean cacheEnabled) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
     ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);

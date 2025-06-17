@@ -32,11 +32,11 @@ public class OMBlockPrefetchMetrics {
   @Metric(about = "Latency of reading from the prefetch queue in nanoseconds")
   private MutableRate readFromQueueLatencyNs;
 
-  @Metric(about = "Latency of writing to the prefetch queue in nanoseconds")
-  private MutableRate writeToQueueLatencyNs;
-
   @Metric(about = "Latency for performing sorting in nanoseconds")
   private MutableRate sortingLogicLatencyNs;
+
+  @Metric(about = "Latency for prefetching blocks in nanoseconds")
+  private MutableRate prefetchLatencyNs;
 
   @Metric(about = "Number of cache hits")
   private MutableCounterLong cacheHits;
@@ -60,12 +60,12 @@ public class OMBlockPrefetchMetrics {
     readFromQueueLatencyNs.add(latencyInNs);
   }
 
-  public void addWriteToQueueLatency(long latencyInNs) {
-    writeToQueueLatencyNs.add(latencyInNs);
-  }
-
   public void addSortingLogicLatency(long latencyInNs) {
     sortingLogicLatencyNs.add(latencyInNs);
+  }
+
+  public MutableRate getPrefetchLatencyNs() {
+    return prefetchLatencyNs;
   }
 
   public void incrementCacheHits() {

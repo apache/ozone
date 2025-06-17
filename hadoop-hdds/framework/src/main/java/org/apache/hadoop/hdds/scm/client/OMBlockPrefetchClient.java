@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOC
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MIN_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MIN_BLOCKS_DEFAULT;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -288,8 +289,9 @@ public class OMBlockPrefetchClient {
 
     prefetchExecutor.submit(() -> {
       try {
-        List<AllocatedBlock> prefetchedBlocks = scmBlockLocationProtocol.allocateBlock(blockSize, blocksToPrefetch,
-            repConfig, serviceID, (ExcludeList) Collections.emptyList(), null);
+        List<AllocatedBlock> prefetchedBlocks = captureLatencyNs(metrics.getPrefetchLatencyNs(),
+            () -> scmBlockLocationProtocol.allocateBlock(blockSize, blocksToPrefetch,
+            repConfig, serviceID, (ExcludeList) Collections.emptyList(), null));
         if (prefetchedBlocks != null && !prefetchedBlocks.isEmpty()) {
           ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(repConfig);
           if (queue != null) {
