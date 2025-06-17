@@ -648,13 +648,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     ContainerProtos.ReadBlockResponseProto.Builder readBlock =
         ContainerProtos.ReadBlockResponseProto.newBuilder();
     checkOpen(dn);
+    DatanodeID dnId = dn.getID();
     Type cmdType = request.getCmdType();
     semaphore.acquire();
     long requestTime = System.currentTimeMillis();
     metrics.incrPendingContainerOpsMetrics(cmdType);
 
     final StreamObserver<ContainerCommandRequestProto> requestObserver =
-        asyncStubs.get(dn.getUuid()).withDeadlineAfter(timeout, TimeUnit.SECONDS)
+        asyncStubs.get(dnId).withDeadlineAfter(timeout, TimeUnit.SECONDS)
             .send(new StreamObserver<ContainerCommandResponseProto>() {
               @Override
               public void onNext(

@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.om.TestBucket;
+import org.junit.Assert;
 
 /**
  * Tests {@link StreamBlockInputStream}.
@@ -83,7 +85,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
 
       // To read 1 byte of chunk data, ChunkInputStream should get one full
       // checksum boundary worth of data from Container and store it in buffers.
-      block0Stream.read(new byte[1]);
+      IOUtils.readFully(block0Stream, new byte[1]);
       checkBufferSizeAndCapacity(block0Stream.getCachedBuffers());
 
       // Read > checksum boundary of data from chunk0
@@ -201,14 +203,14 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
                                    int offset, int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
     streamBlockInputStream.seek(offset);
-    streamBlockInputStream.read(readData, 0, readDataLength);
+    IOUtils.readFully(streamBlockInputStream, readData);
     return readData;
   }
 
   private byte[] readDataFromBlock(StreamBlockInputStream streamBlockInputStream,
                                    int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
-    streamBlockInputStream.read(readData, 0, readDataLength);
+    IOUtils.readFully(streamBlockInputStream, readData);
     return readData;
   }
 
@@ -235,7 +237,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
 
       byte[] readData = new byte[dataLength];
       assertTrue(keyInputStream.getPartStreams().isEmpty());
-      keyInputStream.read(readData);
+      IOUtils.readFully(keyInputStream, readData);
       for (byte b : readData) {
         assertEquals(b, (byte) 0);
       }
