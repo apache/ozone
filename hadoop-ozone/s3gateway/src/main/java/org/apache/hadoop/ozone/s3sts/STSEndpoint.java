@@ -15,28 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.endpoint;
-
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
+package org.apache.hadoop.ozone.s3sts;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.UUID;
+import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.hadoop.ozone.audit.S3GAction;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,13 +37,15 @@ import org.slf4j.LoggerFactory;
  * AWS STS (Security Token Service) compatible endpoint for Ozone S3 Gateway.
  * 
  * This endpoint provides temporary security credentials compatible with
- * AWS STS API. This is an experimental implementation with dummy responses
- * that conform to the AWS STS API contract.
+ * AWS STS API, exposed on the webadmin port (19878) at /sts endpoint.
+ * 
+ * Currently supports only AssumeRole operation. Other STS operations will
+ * return appropriate error responses.
  * 
  * @see <a href="https://docs.aws.amazon.com/STS/latest/APIReference/">AWS STS API Reference</a>
  */
 @Path("/")
-public class STSEndpoint extends EndpointBase {
+public class STSEndpoint {
 
   private static final Logger LOG = LoggerFactory.getLogger(STSEndpoint.class);
   
@@ -60,6 +55,9 @@ public class STSEndpoint extends EndpointBase {
   private static final String GET_SESSION_TOKEN_ACTION = "GetSessionToken";
   private static final String ASSUME_ROLE_WITH_SAML_ACTION = "AssumeRoleWithSAML";
   private static final String ASSUME_ROLE_WITH_WEB_IDENTITY_ACTION = "AssumeRoleWithWebIdentity";
+  private static final String GET_CALLER_IDENTITY_ACTION = "GetCallerIdentity";
+  private static final String DECODE_AUTHORIZATION_MESSAGE_ACTION = "DecodeAuthorizationMessage";
+  private static final String GET_ACCESS_KEY_INFO_ACTION = "GetAccessKeyInfo";
   
   // Default token duration (in seconds) - AWS default is 3600 (1 hour)
   private static final int DEFAULT_DURATION_SECONDS = 3600;
@@ -67,18 +65,15 @@ public class STSEndpoint extends EndpointBase {
   private static final int MIN_DURATION_SECONDS = 900;   // 15 minutes
 
   /**
-   * STS endpoint that handles both GET and POST requests.
-   * AWS STS supports both GET (with query parameters) and POST (with form data).
+   * STS endpoint that handles GET requests with query parameters.
+   * AWS STS supports both GET and POST requests.
    * 
    * @param action The STS action to perform (AssumeRole, GetSessionToken, etc.)
    * @param roleArn The ARN of the role to assume (for AssumeRole)
    * @param roleSessionName Session name for the role (for AssumeRole)
    * @param durationSeconds Duration of the token validity in seconds
    * @param version AWS STS API version (should be "2011-06-15")
-   * @param httpHeaders HTTP headers for the request
-   * @return Response containing STS response XML
-   * @throws OS3Exception if there's an error processing the request
-   * @throws IOException if there's an I/O error
+   * @return Response containing STS response XML or error
    */
   @GET
   @Produces(MediaType.APPLICATION_XML)
@@ -87,103 +82,90 @@ public class STSEndpoint extends EndpointBase {
       @QueryParam("RoleArn") String roleArn,
       @QueryParam("RoleSessionName") String roleSessionName,
       @QueryParam("DurationSeconds") Integer durationSeconds,
-      @QueryParam("Version") String version,
-      @Context HttpHeaders httpHeaders) throws OS3Exception, IOException {
+      @QueryParam("Version") String version) {
     
     return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds, version);
   }
 
   /**
    * STS endpoint that handles POST requests with form data.
+   * AWS STS typically uses POST requests with form-encoded parameters.
    * 
    * @param action The STS action to perform
    * @param roleArn The ARN of the role to assume
    * @param roleSessionName Session name for the role
    * @param durationSeconds Duration of the token validity
    * @param version AWS STS API version
-   * @param httpHeaders HTTP headers for the request
-   * @return Response containing STS response XML
-   * @throws OS3Exception if there's an error processing the request
-   * @throws IOException if there's an I/O error
+   * @return Response containing STS response XML or error
    */
   @POST
   @Produces(MediaType.APPLICATION_XML)
   public Response handleSTSPost(
-      @QueryParam("Action") String action,
-      @QueryParam("RoleArn") String roleArn,
-      @QueryParam("RoleSessionName") String roleSessionName,
-      @QueryParam("DurationSeconds") Integer durationSeconds,
-      @QueryParam("Version") String version,
-      @Context HttpHeaders httpHeaders) throws OS3Exception, IOException {
+      @FormParam("Action") String action,
+      @FormParam("RoleArn") String roleArn,
+      @FormParam("RoleSessionName") String roleSessionName,
+      @FormParam("DurationSeconds") Integer durationSeconds,
+      @FormParam("Version") String version) {
     
     return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds, version);
   }
 
   private Response handleSTSRequest(String action, String roleArn, String roleSessionName,
-      Integer durationSeconds, String version) throws OS3Exception, IOException {
-    
-    long startNanos = Time.monotonicNowNanos();
-    S3GAction s3GAction = S3GAction.STS_GET_SESSION_TOKEN;
+      Integer durationSeconds, String version) {
     
     try {
-      // Validate version
+      // Validate version - AWS STS API version is always 2011-06-15
       if (version != null && !"2011-06-15".equals(version)) {
-        throw newError(S3ErrorTable.INVALID_REQUEST, "Unsupported STS API version: " + version);
+        return createErrorResponse("InvalidParameterValue", 
+            "Invalid API version. Expected: 2011-06-15, Got: " + version);
       }
       
-      // Default action if not specified
+      // Default action if not specified (following AWS behavior)
       if (action == null) {
-        action = GET_SESSION_TOKEN_ACTION;
+        return createErrorResponse("MissingParameter", "Missing required parameter: Action");
       }
       
-      // Validate duration
-      int duration = validateDuration(durationSeconds);
+      // Validate and normalize duration
+      int duration;
+      try {
+        duration = validateDuration(durationSeconds);
+      } catch (IllegalArgumentException e) {
+        return createErrorResponse("InvalidParameterValue", e.getMessage());
+      }
       
-      String responseXml;
+      // Handle different STS actions
       switch (action) {
         case ASSUME_ROLE_ACTION:
-          s3GAction = S3GAction.STS_ASSUME_ROLE;
-          responseXml = handleAssumeRole(roleArn, roleSessionName, duration);
-          break;
+          return handleAssumeRole(roleArn, roleSessionName, duration);
+          
+        // All other STS operations are not supported yet
         case GET_SESSION_TOKEN_ACTION:
-          s3GAction = S3GAction.STS_GET_SESSION_TOKEN;
-          responseXml = handleGetSessionToken(duration);
-          break;
-        case ASSUME_ROLE_WITH_SAML_ACTION: // handle that it is not supported
-          s3GAction = S3GAction.STS_ASSUME_ROLE_WITH_SAML;
-          responseXml = handleAssumeRoleWithSAML(roleArn, roleSessionName, duration);
-          break;
+        case ASSUME_ROLE_WITH_SAML_ACTION:
         case ASSUME_ROLE_WITH_WEB_IDENTITY_ACTION:
-          s3GAction = S3GAction.STS_ASSUME_ROLE_WITH_WEB_IDENTITY;
-          responseXml = handleAssumeRoleWithWebIdentity(roleArn, roleSessionName, duration);
-          break;
+        case GET_CALLER_IDENTITY_ACTION:
+        case DECODE_AUTHORIZATION_MESSAGE_ACTION:
+        case GET_ACCESS_KEY_INFO_ACTION:
+          return createErrorResponse("UnsupportedOperation", 
+              "The operation '" + action + "' is not currently supported by Ozone STS");
+          
         default:
-          throw newError(S3ErrorTable.INVALID_REQUEST, "Unsupported STS action: " + action);
+          return createErrorResponse("InvalidAction", "Invalid or unknown action: " + action);
       }
       
-      AUDIT.logReadSuccess(
-          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
-      getMetrics().updateSTSSuccessStats(startNanos);
-      
-      return Response.ok(responseXml)
-          .header("Content-Type", "text/xml")
-          .build();
-          
     } catch (Exception ex) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
-      getMetrics().updateSTSFailureStats(startNanos);
-      throw ex;
+      LOG.error("Unexpected error processing STS request", ex);
+      return createErrorResponse("InternalFailure", 
+          "An internal error occurred while processing the request");
     }
   }
 
-  private int validateDuration(Integer durationSeconds) throws OS3Exception {
+  private int validateDuration(Integer durationSeconds) throws IllegalArgumentException {
     if (durationSeconds == null) {
       return DEFAULT_DURATION_SECONDS;
     }
     
     if (durationSeconds < MIN_DURATION_SECONDS || durationSeconds > MAX_DURATION_SECONDS) {
-      throw newError(S3ErrorTable.INVALID_REQUEST, 
+      throw new IllegalArgumentException(
           "DurationSeconds must be between " + MIN_DURATION_SECONDS + 
           " and " + MAX_DURATION_SECONDS + " seconds");
     }
@@ -191,55 +173,54 @@ public class STSEndpoint extends EndpointBase {
     return durationSeconds;
   }
 
-  private String handleAssumeRole(String roleArn, String roleSessionName, int duration) 
-      throws OS3Exception {
+  private Response handleAssumeRole(String roleArn, String roleSessionName, int duration) {
     
+    // Validate required parameters for AssumeRole
     if (roleArn == null || roleArn.trim().isEmpty()) {
-      throw newError(S3ErrorTable.INVALID_REQUEST, "RoleArn parameter is required for AssumeRole");
+      return createErrorResponse("MissingParameter", 
+          "Missing required parameter: RoleArn");
     }
     
     if (roleSessionName == null || roleSessionName.trim().isEmpty()) {
-      throw newError(S3ErrorTable.INVALID_REQUEST, 
-          "RoleSessionName parameter is required for AssumeRole");
+      return createErrorResponse("MissingParameter", 
+          "Missing required parameter: RoleSessionName");
     }
     
-    return generateAssumeRoleResponse(roleArn, roleSessionName, duration);
-  }
-
-  private String handleGetSessionToken(int duration) {
-    return generateGetSessionTokenResponse(duration);
-  }
-
-  private String handleAssumeRoleWithSAML(String roleArn, String roleSessionName, int duration) 
-      throws OS3Exception {
-    
-    if (roleArn == null || roleArn.trim().isEmpty()) {
-      throw newError(S3ErrorTable.INVALID_REQUEST, 
-          "RoleArn parameter is required for AssumeRoleWithSAML");
+    // Validate role session name format (AWS requirements)
+    if (!isValidRoleSessionName(roleSessionName)) {
+      return createErrorResponse("InvalidParameterValue", 
+          "RoleSessionName must be 2-64 characters long and contain only alphanumeric characters, " +
+          "plus signs (+), equal signs (=), commas (,), periods (.), at symbols (@), and hyphens (-)");
     }
     
-    return generateAssumeRoleResponse(roleArn, 
-        roleSessionName != null ? roleSessionName : "SAMLSession", duration);
+    // Generate AssumeRole response
+    String responseXml = generateAssumeRoleResponse(roleArn, roleSessionName, duration);
+    
+    return Response.ok(responseXml)
+        .header("Content-Type", "text/xml")
+        .build();
   }
 
-  private String handleAssumeRoleWithWebIdentity(String roleArn, String roleSessionName, 
-      int duration) throws OS3Exception {
-    
-    if (roleArn == null || roleArn.trim().isEmpty()) {
-      throw newError(S3ErrorTable.INVALID_REQUEST, 
-          "RoleArn parameter is required for AssumeRoleWithWebIdentity");
+  private boolean isValidRoleSessionName(String roleSessionName) {
+    if (roleSessionName.length() < 2 || roleSessionName.length() > 64) {
+      return false;
     }
     
-    return generateAssumeRoleResponse(roleArn, 
-        roleSessionName != null ? roleSessionName : "WebIdentitySession", duration);
+    // AWS allows: alphanumeric, +, =, ,, ., @, -
+    return roleSessionName.matches("[a-zA-Z0-9+=,.@-]+");
   }
 
   private String generateAssumeRoleResponse(String roleArn, String roleSessionName, int duration) {
-    String accessKeyId = "ASIAI" + generateRandomString(15);
-    String secretAccessKey = generateRandomString(40);
+    // Generate realistic-looking temporary credentials
+    String accessKeyId = "ASIA" + generateRandomAlphanumeric(16); // AWS temp keys start with ASIA
+    String secretAccessKey = generateRandomBase64(40);
     String sessionToken = generateSessionToken();
     String expiration = getExpirationTime(duration);
-    String assumedRoleId = "AROLEID" + generateRandomString(15) + ":" + roleSessionName;
+    
+    // Generate AssumedRoleId (format: AROLEID:RoleSessionName)
+    String roleId = "AROA" + generateRandomAlphanumeric(16);
+    String assumedRoleId = roleId + ":" + roleSessionName;
+    
     String requestId = UUID.randomUUID().toString();
     
     return String.format(
@@ -265,33 +246,56 @@ public class STSEndpoint extends EndpointBase {
         assumedRoleId, roleArn, requestId);
   }
 
-  private String generateGetSessionTokenResponse(int duration) {
-    String accessKeyId = "ASIAI" + generateRandomString(15);
-    String secretAccessKey = generateRandomString(40);
-    String sessionToken = generateSessionToken();
-    String expiration = getExpirationTime(duration);
+  private Response createErrorResponse(String errorCode, String errorMessage) {
     String requestId = UUID.randomUUID().toString();
     
-    return String.format(
+    String errorXml = String.format(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-        "<GetSessionTokenResponse xmlns=\"https://sts.amazonaws.com/doc/2011-06-15/\">\n" +
-        "  <GetSessionTokenResult>\n" +
-        "    <Credentials>\n" +
-        "      <AccessKeyId>%s</AccessKeyId>\n" +
-        "      <SecretAccessKey>%s</SecretAccessKey>\n" +
-        "      <SessionToken>%s</SessionToken>\n" +
-        "      <Expiration>%s</Expiration>\n" +
-        "    </Credentials>\n" +
-        "  </GetSessionTokenResult>\n" +
-        "  <ResponseMetadata>\n" +
-        "    <RequestId>%s</RequestId>\n" +
-        "  </ResponseMetadata>\n" +
-        "</GetSessionTokenResponse>",
-        accessKeyId, secretAccessKey, sessionToken, expiration, requestId);
+        "<ErrorResponse xmlns=\"https://sts.amazonaws.com/doc/2011-06-15/\">\n" +
+        "  <Error>\n" +
+        "    <Type>Sender</Type>\n" +
+        "    <Code>%s</Code>\n" +
+        "    <Message>%s</Message>\n" +
+        "  </Error>\n" +
+        "  <RequestId>%s</RequestId>\n" +
+        "</ErrorResponse>",
+        errorCode, errorMessage, requestId);
+    
+    // Determine HTTP status code based on error type
+    Response.Status status;
+    switch (errorCode) {
+      case "MissingParameter":
+      case "InvalidParameterValue":
+      case "InvalidAction":
+        status = Response.Status.BAD_REQUEST;
+        break;
+      case "UnsupportedOperation":
+        status = Response.Status.BAD_REQUEST; // AWS uses 400 for unsupported operations
+        break;
+      case "InternalFailure":
+        status = Response.Status.INTERNAL_SERVER_ERROR;
+        break;
+      default:
+        status = Response.Status.BAD_REQUEST;
+    }
+    
+    return Response.status(status)
+        .entity(errorXml)
+        .header("Content-Type", "text/xml")
+        .build();
   }
 
-  private String generateRandomString(int length) {
-    String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  private String generateRandomAlphanumeric(int length) {
+    String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < length; i++) {
+      sb.append(chars.charAt((int) (Math.random() * chars.length())));
+    }
+    return sb.toString();
+  }
+
+  private String generateRandomBase64(int length) {
+    String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < length; i++) {
       sb.append(chars.charAt((int) (Math.random() * chars.length())));
@@ -301,7 +305,7 @@ public class STSEndpoint extends EndpointBase {
 
   private String generateSessionToken() {
     // Generate a realistic-looking session token (base64 encoded)
-    byte[] tokenBytes = new byte[96]; // 128 characters when base64 encoded
+    byte[] tokenBytes = new byte[128]; // Longer session tokens like AWS
     for (int i = 0; i < tokenBytes.length; i++) {
       tokenBytes[i] = (byte) (Math.random() * 256);
     }
@@ -311,10 +315,5 @@ public class STSEndpoint extends EndpointBase {
   private String getExpirationTime(int durationSeconds) {
     Instant expiration = Instant.now().plusSeconds(durationSeconds);
     return DateTimeFormatter.ISO_INSTANT.format(expiration);
-  }
-
-  @Override
-  public void init() {
-    // No special initialization needed
   }
 }
