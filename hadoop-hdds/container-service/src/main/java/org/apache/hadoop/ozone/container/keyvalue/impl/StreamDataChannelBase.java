@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
 import java.io.File;
@@ -91,6 +92,14 @@ abstract class StreamDataChannelBase
   @Override
   public final boolean isOpen() {
     return getChannel().isOpen();
+  }
+
+  protected void assertSpaceAvailability() throws IOException {
+    if (containerData.getVolume().isVolumeFull()) {
+      throw new StorageContainerException("write failed for container " + containerData.getContainerID()
+          + " due to volume " + containerData.getVolume().getStorageID() + " out of space "
+          + containerData.getVolume().getCurrentUsage(), DISK_OUT_OF_SPACE);
+    }
   }
 
   public void setLinked() {
