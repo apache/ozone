@@ -252,11 +252,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return dbCheckpoint;
   }
 
-
   // Convenience class for keeping track of the tmp dirs.
   static class DirectoryData {
     private final File originalDir;
     private final File tmpDir;
+
     DirectoryData(Path tmpdir, String dirStr) throws IOException {
       originalDir = new File(dirStr);
       tmpDir = new File(tmpdir.toString(), getOriginalDir().getName());
@@ -704,9 +704,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
       locks = Stream.of(
           om.getKeyManager().getDeletingService(),
+          om.getKeyManager().getDirDeletingService(),
           om.getKeyManager().getSnapshotSstFilteringService(),
           om.getKeyManager().getSnapshotDeletingService(),
-          om.getKeyManager().getSnapshotDirectoryService(),
           om.getMetadataManager().getStore().getRocksDBCheckpointDiffer()
       )
           .filter(Objects::nonNull)

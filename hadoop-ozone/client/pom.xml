@@ -16,8 +16,9 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>ozone</artifactId>
+    <artifactId>hdds-hadoop-dependency-client</artifactId>
     <version>2.1.0-SNAPSHOT</version>
+    <relativePath>../../hadoop-hdds/hadoop-dependency-client</relativePath>
   </parent>
   <artifactId>ozone-client</artifactId>
   <version>2.1.0-SNAPSHOT</version>
@@ -49,6 +50,10 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -125,39 +130,8 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <annotationProcessorPaths>
-            <path>
-              <groupId>org.apache.ozone</groupId>
-              <artifactId>hdds-config</artifactId>
-              <version>${hdds.version}</version>
-            </path>
-          </annotationProcessorPaths>
-          <annotationProcessors>
-            <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
-          </annotationProcessors>
+          <proc>none</proc>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>ban-annotations</id>
-            <!-- override default restriction from root POM -->
-            <configuration>
-              <rules>
-                <restrictImports>
-                  <reason>Only selected annotation processors are enabled, see configuration of maven-compiler-plugin.</reason>
-                  <bannedImports>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
-                    <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
-                    <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
-                  </bannedImports>
-                </restrictImports>
-              </rules>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>

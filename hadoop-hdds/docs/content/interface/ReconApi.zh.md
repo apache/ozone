@@ -582,7 +582,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
 
 如果任何 `num` 字段为 `-1`，则该路径请求不适用于该实体类型。
 
-### GET /api/v1/namespace/du
+### GET /api/v1/namespace/usage
 
 **参数**
 
@@ -605,7 +605,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
 
 如果路径存在，则 `status` 为 `OK`，否则为 `PATH_NOT_FOUND`。
 
-示例: /api/v1/namespace/du?path=/vol1/bucket1&files=true&replica=true
+示例: /api/v1/namespace/usage?path=/vol1/bucket1&files=true&replica=true
 ```json
     {
       "status": OK,

@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CloseContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
@@ -61,6 +62,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Reco
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -89,8 +91,7 @@ import org.slf4j.LoggerFactory;
  * State Machine Class.
  */
 public class DatanodeStateMachine implements Closeable {
-  @VisibleForTesting
-  static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeStateMachine.class);
   private final ExecutorService executorService;
   private final ExecutorService pipelineCommandExecutorService;
@@ -98,6 +99,7 @@ public class DatanodeStateMachine implements Closeable {
   private final SCMConnectionManager connectionManager;
   private final ECReconstructionCoordinator ecReconstructionCoordinator;
   private StateContext context;
+  private VolumeChoosingPolicy volumeChoosingPolicy;
   private final OzoneContainer container;
   private final DatanodeDetails datanodeDetails;
   private final CommandDispatcher commandDispatcher;
@@ -130,6 +132,7 @@ public class DatanodeStateMachine implements Closeable {
 
   private final DatanodeQueueMetrics queueMetrics;
   private final ReconfigurationHandler reconfigurationHandler;
+
   /**
    * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
@@ -174,13 +177,14 @@ public class DatanodeStateMachine implements Closeable {
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this,
         threadNamePrefix);
+    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     // OzoneContainer instance is used in a non-thread safe way by the context
     // past to its constructor, so we much synchronize its access. See
     // HDDS-3116 for more details.
     constructionLock.writeLock().lock();
     try {
       container = new OzoneContainer(hddsDatanodeService, this.datanodeDetails,
-          conf, context, certClient, secretKeyClient);
+          conf, context, certClient, secretKeyClient, volumeChoosingPolicy);
     } finally {
       constructionLock.writeLock().unlock();
     }
@@ -189,7 +193,8 @@ public class DatanodeStateMachine implements Closeable {
     ContainerImporter importer = new ContainerImporter(conf,
         container.getContainerSet(),
         container.getController(),
-        container.getVolumeSet());
+        container.getVolumeSet(),
+        volumeChoosingPolicy);
     ContainerReplicator pullReplicator = new DownloadAndImportReplicator(
         conf, container.getContainerSet(),
         importer,
@@ -304,7 +309,6 @@ public class DatanodeStateMachine implements Closeable {
   public DatanodeDetails getDatanodeDetails() {
     return datanodeDetails;
   }
-
 
   /**
    * Returns the Connection manager for this state machine.
@@ -555,6 +559,7 @@ public class DatanodeStateMachine implements Closeable {
           ExitUtils.terminate(1, message, ex, LOG);
         })
         .build().newThread(startStateMachineTask);
+    stateMachineThread.setPriority(Thread.MAX_PRIORITY);
     stateMachineThread.start();
   }
 
@@ -678,6 +683,7 @@ public class DatanodeStateMachine implements Closeable {
 
     // We will have only one thread for command processing in a datanode.
     cmdProcessThread = getCommandHandlerThread(processCommandQueue);
+    cmdProcessThread.setPriority(Thread.NORM_PRIORITY);
     cmdProcessThread.start();
   }
 
@@ -730,6 +736,7 @@ public class DatanodeStateMachine implements Closeable {
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
         true);
   }
+
   public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
     return upgradeFinalizer;
   }
@@ -744,5 +751,17 @@ public class DatanodeStateMachine implements Closeable {
 
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
+  }
+
+  public Thread getStateMachineThread() {
+    return stateMachineThread;
+  }
+
+  public Thread getCmdProcessThread() {
+    return cmdProcessThread;
+  }
+
+  public VolumeChoosingPolicy getVolumeChoosingPolicy() {
+    return volumeChoosingPolicy;
   }
 }

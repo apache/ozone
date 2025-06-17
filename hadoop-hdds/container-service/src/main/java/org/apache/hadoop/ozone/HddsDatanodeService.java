@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
@@ -34,7 +36,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -163,10 +164,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
   }
 
-  public static Logger getLogger() {
-    return LOG;
-  }
-
   @Override
   public Void call() throws Exception {
     OzoneConfiguration configuration = getOzoneConf();
@@ -225,23 +222,21 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
     try {
       String hostname = HddsUtils.getHostName(conf);
-      String ip = InetAddress.getByName(hostname).getHostAddress();
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
       serviceRuntimeInfo.setHostName(hostname);
-      datanodeDetails.setIpAddress(ip);
+      datanodeDetails.validateDatanodeIpAddress();
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
       datanodeDetails.setSetupTime(Time.now());
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       TracingUtil.initTracing(
-          "HddsDatanodeService." + datanodeDetails.getUuidString()
-              .substring(0, 8), conf);
-      LOG.info("HddsDatanodeService host:{} ip:{}", hostname, ip);
+          "HddsDatanodeService." + datanodeDetails.getID(), conf);
+      LOG.info("HddsDatanodeService {}", datanodeDetails);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        component = "dn-" + datanodeDetails.getUuidString();
+        component = "dn-" + datanodeDetails.getID();
         secConf = new SecurityConfig(conf);
 
         if (SecurityUtil.getAuthenticationMethod(conf).equals(
@@ -291,8 +286,14 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
                   this::reconfigDeletingServiceWorkers)
+              .register(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
+                  this::reconfigBlockDeletingServiceInterval)
+              .register(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+                  this::reconfigBlockDeletingServiceTimeout)
               .register(REPLICATION_STREAMS_LIMIT_KEY,
                   this::reconfigReplicationStreamsLimit);
+
+      reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
 
       datanodeStateMachine = new DatanodeStateMachine(this, datanodeDetails, conf,
           dnCertClient, secretKeyClient, this::terminateDatanode,
@@ -661,10 +662,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   }
 
   private String reconfigDeletingServiceWorkers(String value) {
+    Preconditions.checkArgument(Integer.parseInt(value) >= 0,
+        OZONE_BLOCK_DELETING_SERVICE_WORKERS + " cannot be negative.");
     getConf().set(OZONE_BLOCK_DELETING_SERVICE_WORKERS, value);
-
-    getDatanodeStateMachine().getContainer().getBlockDeletingService()
-        .setPoolSize(Integer.parseInt(value));
     return value;
   }
 
@@ -673,6 +673,16 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
     getDatanodeStateMachine().getContainer().getReplicationServer()
         .setPoolSize(Integer.parseInt(value));
+    return value;
+  }
+
+  private String reconfigBlockDeletingServiceInterval(String value) {
+    getConf().set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, value);
+    return value;
+  }
+
+  private String reconfigBlockDeletingServiceTimeout(String value) {
+    getConf().set(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT, value);
     return value;
   }
 

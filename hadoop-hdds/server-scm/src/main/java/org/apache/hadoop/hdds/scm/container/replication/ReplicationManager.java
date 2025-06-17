@@ -103,7 +103,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ReplicationManager implements SCMService, ContainerReplicaPendingOpsSubscriber {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
 
   /**
@@ -111,12 +111,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    */
   private final ContainerManager containerManager;
 
-
   /**
    * SCMContext from StorageContainerManager.
    */
-  private final SCMContext scmContext;
-
+  private SCMContext scmContext;
 
   /**
    * ReplicationManager specific configuration.
@@ -632,6 +630,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     command.setPriority(ReplicationCommandPriority.LOW);
     sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
   }
+
   /**
    * Sends a command to a datanode with the command deadline set to the default
    * in ReplicationManager config.
@@ -667,7 +666,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         scmDeadlineEpochMs);
     command.setTerm(getScmTerm());
     command.setDeadline(datanodeDeadline);
-    nodeManager.addDatanodeCommand(target.getUuid(), command);
+    nodeManager.addDatanodeCommand(target.getID(), command);
     adjustPendingOpsAndMetrics(containerInfo, command, target,
         scmDeadlineEpochMs);
   }
@@ -918,6 +917,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     return containerReport;
   }
 
+  public boolean isThreadWaiting() {
+    return replicationMonitor.getState() == Thread.State.TIMED_WAITING;
+  }
+
   /**
    * ReplicationMonitor thread runnable. This wakes up at configured
    * interval and processes all the containers in the system.
@@ -1128,13 +1131,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + "sent to datanodes. After this timeout the command will be "
             + "retried.")
     private long eventTimeout = Duration.ofMinutes(12).toMillis();
-    public void setInterval(Duration interval) {
-      this.interval = interval;
-    }
-
-    public void setEventTimeout(Duration timeout) {
-      this.eventTimeout = timeout.toMillis();
-    }
 
     /**
      * When a command has a deadline in SCM, the datanode timeout should be
@@ -1152,13 +1148,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + "the datanodes will not process a command after SCM believes it "
             + "should have expired.")
     private long datanodeTimeoutOffset = Duration.ofMinutes(6).toMillis();
-    public long getDatanodeTimeoutOffset() {
-      return datanodeTimeoutOffset;
-    }
-
-    public void setDatanodeTimeoutOffset(long val) {
-      datanodeTimeoutOffset = val;
-    }
 
     /**
      * The number of container replica which must be available for a node to
@@ -1175,10 +1164,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             " container below this level, the node will remain in the " +
             " entering maintenance state until a new replica is created.")
     private int maintenanceReplicaMinimum = 2;
-
-    public void setMaintenanceReplicaMinimum(int replicaCount) {
-      this.maintenanceReplicaMinimum = replicaCount;
-    }
 
     /**
      * Defines how many redundant replicas of a container must be online for a
@@ -1230,10 +1215,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int datanodeReplicationLimit = 20;
 
-    public int getDatanodeReplicationLimit() {
-      return datanodeReplicationLimit;
-    }
-
     @Config(key = "datanode.reconstruction.weight",
         type = ConfigType.INT,
         defaultValue = "3",
@@ -1246,10 +1227,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int reconstructionCommandWeight = 3;
 
-    public int getReconstructionCommandWeight() {
-      return reconstructionCommandWeight;
-    }
-
     @Config(key = "datanode.delete.container.limit",
         type = ConfigType.INT,
         defaultValue = "40",
@@ -1261,10 +1238,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             "limiting load"
     )
     private int datanodeDeleteLimit = 40;
-
-    public int getDatanodeDeleteLimit() {
-      return datanodeDeleteLimit;
-    }
 
     @Config(key = "inflight.limit.factor",
         type = ConfigType.DOUBLE,
@@ -1284,12 +1257,32 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private double inflightReplicationLimitFactor = 0.75;
 
+    public long getDatanodeTimeoutOffset() {
+      return datanodeTimeoutOffset;
+    }
+
+    public void setDatanodeTimeoutOffset(long val) {
+      datanodeTimeoutOffset = val;
+    }
+
+    public int getReconstructionCommandWeight() {
+      return reconstructionCommandWeight;
+    }
+
+    public int getDatanodeDeleteLimit() {
+      return datanodeDeleteLimit;
+    }
+
     public double getInflightReplicationLimitFactor() {
       return inflightReplicationLimitFactor;
     }
 
     public void setInflightReplicationLimitFactor(double factor) {
       this.inflightReplicationLimitFactor = factor;
+    }
+
+    public int getDatanodeReplicationLimit() {
+      return datanodeReplicationLimit;
     }
 
     public void setDatanodeReplicationLimit(int limit) {
@@ -1306,6 +1299,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     public Duration getInterval() {
       return interval;
+    }
+
+    public void setInterval(Duration interval) {
+      this.interval = interval;
     }
 
     public Duration getUnderReplicatedInterval() {
@@ -1328,8 +1325,16 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       return eventTimeout;
     }
 
+    public void setEventTimeout(Duration timeout) {
+      this.eventTimeout = timeout.toMillis();
+    }
+
     public int getMaintenanceReplicaMinimum() {
       return maintenanceReplicaMinimum;
+    }
+
+    public void setMaintenanceReplicaMinimum(int replicaCount) {
+      this.maintenanceReplicaMinimum = replicaCount;
     }
 
     public boolean isPush() {
@@ -1408,6 +1413,11 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     } finally {
       serviceLock.unlock();
     }
+  }
+
+  @VisibleForTesting
+  public void setScmContext(SCMContext context) {
+    scmContext = context;
   }
 
   @Override
@@ -1489,6 +1499,37 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       return scmContext.getScm().getPipelineManager()
           .getPipeline(container.getPipelineID()) != null;
     } catch (PipelineNotFoundException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Notify the ReplicationManager that a node state has changed, which might
+   * require container replication. This will wake up the replication monitor
+   * thread if it's sleeping and there's no active replication work in progress.
+   * 
+   * @return true if the replication monitor was woken up, false otherwise
+   */
+  public synchronized boolean notifyNodeStateChange() {
+    if (!running || serviceStatus == ServiceStatus.PAUSING) {
+      return false;
+    }
+
+    if (!isThreadWaiting()) {
+      LOG.debug("Replication monitor is running, not need to wake it up");
+      return false;
+    }
+
+    // Only wake up the thread if there's no active replication work
+    // This prevents creating a new replication queue over and over
+    // when multiple nodes change state in quick succession
+    if (getQueue().isEmpty()) {
+      LOG.debug("Waking up replication monitor due to node state change");
+      // Notify the replication monitor thread to wake up
+      notify();
+      return true;
+    } else {
+      LOG.debug("Replication queue is not empty, not waking up replication monitor");
       return false;
     }
   }

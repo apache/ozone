@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -71,15 +70,12 @@ public class ContainerImporter {
   public ContainerImporter(@Nonnull ConfigurationSource conf,
                            @Nonnull ContainerSet containerSet,
                            @Nonnull ContainerController controller,
-                           @Nonnull MutableVolumeSet volumeSet) {
+                           @Nonnull MutableVolumeSet volumeSet,
+                           @Nonnull VolumeChoosingPolicy volumeChoosingPolicy) {
     this.containerSet = containerSet;
     this.controller = controller;
     this.volumeSet = volumeSet;
-    try {
-      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    this.volumeChoosingPolicy = volumeChoosingPolicy;
     containerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -92,7 +88,7 @@ public class ContainerImporter {
   }
 
   public void importContainer(long containerID, Path tarFilePath,
-      HddsVolume hddsVolume, CopyContainerCompression compression)
+      HddsVolume targetVolume, CopyContainerCompression compression)
       throws IOException {
     if (!importContainerProgress.add(containerID)) {
       deleteFileQuietely(tarFilePath);
@@ -110,11 +106,6 @@ public class ContainerImporter {
             ContainerProtos.Result.CONTAINER_EXISTS);
       }
 
-      HddsVolume targetVolume = hddsVolume;
-      if (targetVolume == null) {
-        targetVolume = chooseNextVolume();
-      }
-
       KeyValueContainerData containerData;
       TarContainerPacker packer = getPacker(compression);
 
@@ -129,6 +120,8 @@ public class ContainerImporter {
       try (InputStream input = Files.newInputStream(tarFilePath)) {
         Container container = controller.importContainer(
             containerData, input, packer);
+        // After container import is successful, increase used space for the volume
+        targetVolume.incrementUsedSpace(container.getContainerData().getBytesUsed());
         containerSet.addContainerByOverwriteMissingContainer(container);
       }
     } finally {
@@ -150,7 +143,7 @@ public class ContainerImporter {
     // Choose volume that can hold both container in tmp and dest directory
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        HddsServerUtil.requiredReplicationSpace(containerSize));
+        getDefaultReplicationSpace());
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)
@@ -173,4 +166,7 @@ public class ContainerImporter {
     return new TarContainerPacker(compression);
   }
 
+  public long getDefaultReplicationSpace() {
+    return HddsServerUtil.requiredReplicationSpace(containerSize);
+  }
 }

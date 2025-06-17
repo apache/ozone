@@ -89,7 +89,7 @@ public class TestUnknownContainerReport {
     this.publisher = mock(EventPublisher.class);
 
     when(containerManager.getContainer(any(ContainerID.class)))
-        .thenThrow(new ContainerNotFoundException());
+        .thenThrow(ContainerNotFoundException.newInstanceForTesting());
   }
 
   @AfterEach
@@ -115,7 +115,7 @@ public class TestUnknownContainerReport {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(
         ScmConfig.HDDS_SCM_UNKNOWN_CONTAINER_ACTION,
-        ContainerReportHandler.UNKNOWN_CONTAINER_ACTION_DELETE);
+        ContainerReportHandler.UnknownContainerAction.DELETE.name());
 
     sendContainerReport(conf);
     verify(publisher, times(1)).fireEvent(

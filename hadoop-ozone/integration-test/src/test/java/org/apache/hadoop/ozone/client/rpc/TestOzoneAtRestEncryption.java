@@ -77,6 +77,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
@@ -85,6 +86,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -109,10 +111,8 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.test.Whitebox;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -120,7 +120,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
-@Unhealthy("HDDS-11879")
 class TestOzoneAtRestEncryption {
 
   private static MiniOzoneCluster cluster = null;
@@ -237,12 +236,11 @@ class TestOzoneAtRestEncryption {
 
   private KMSClientProvider getKMSClientProvider() {
     LoadBalancingKMSClientProvider lbkmscp =
-        (LoadBalancingKMSClientProvider) Whitebox.getInternalState(
+        (LoadBalancingKMSClientProvider) HddsWhiteboxTestUtils.getInternalState(
             cluster.getOzoneManager().getKmsProvider(), "extension");
     assert lbkmscp.getProviders().length == 1;
     return lbkmscp.getProviders()[0];
   }
-
 
   @ParameterizedTest
   @EnumSource
@@ -300,22 +298,19 @@ class TestOzoneAtRestEncryption {
     Instant testStartTime = getTestStartTime();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
-    try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(StandardCharsets.UTF_8).length,
+
+    TestDataUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-        new HashMap<>())) {
-      out.write(value.getBytes(StandardCharsets.UTF_8));
-    }
+        value.getBytes(StandardCharsets.UTF_8));
+
     verifyKeyData(bucket, keyName, value, testStartTime);
     OzoneKeyDetails key1 = bucket.getKey(keyName);
 
     // Overwrite the key
-    try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(StandardCharsets.UTF_8).length,
+    TestDataUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-        new HashMap<>())) {
-      out.write(value.getBytes(StandardCharsets.UTF_8));
-    }
+        value.getBytes(StandardCharsets.UTF_8));
+
     OzoneKeyDetails key2 = bucket.getKey(keyName);
     assertNotEquals(key1.getFileEncryptionInfo().toString(), key2.getFileEncryptionInfo().toString());
   }

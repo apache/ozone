@@ -17,10 +17,11 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+
 import com.google.inject.Inject;
 import java.util.Map;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
@@ -57,7 +58,7 @@ public class FileSizeCountTaskOBS implements ReconOmTask {
     // This task listens only on the KEY_TABLE.
     return FileSizeCountTaskHelper.processEvents(
         events,
-        OmMetadataManagerImpl.KEY_TABLE,
+        KEY_TABLE,
         dslContext,
         fileCountBySizeDao,
         getTaskName());

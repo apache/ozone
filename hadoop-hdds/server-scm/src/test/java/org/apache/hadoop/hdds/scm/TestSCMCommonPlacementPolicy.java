@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto.DISK;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -47,6 +47,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -67,7 +68,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestSCMCommonPlacementPolicy {
 
-  private NodeManager nodeManager;
+  private MockNodeManager nodeManager;
   private OzoneConfiguration conf;
 
   @BeforeEach
@@ -356,10 +357,10 @@ public class TestSCMCommonPlacementPolicy {
             ContainerID.valueOf(1), CLOSED, 0, 0, 0, list.subList(3, 6)));
     Set<ContainerReplica> replicasToBeRemoved = Sets.newHashSet(
             HddsTestUtils.getReplicaBuilder(ContainerID.valueOf(1), CLOSED, 0, 0, 0,
-                    list.get(7).getUuid(), list.get(7))
+                    list.get(7).getID(), list.get(7))
                     .setReplicaIndex(1).build(),
             HddsTestUtils.getReplicaBuilder(ContainerID.valueOf(1), CLOSED, 0, 0, 0,
-                    list.get(8).getUuid(), list.get(8)).setReplicaIndex(1)
+                    list.get(8).getID(), list.get(8)).setReplicaIndex(1)
                     .build());
     replicas.addAll(replicasToBeRemoved);
 
@@ -467,28 +468,28 @@ public class TestSCMCommonPlacementPolicy {
   @Test
   public void testDatanodeIsInvalidInCaseOfIncreasingCommittedBytes() {
     NodeManager nodeMngr = mock(NodeManager.class);
-    UUID datanodeUuid = UUID.randomUUID();
+    final DatanodeID datanodeID = DatanodeID.of(UUID.randomUUID());
     DummyPlacementPolicy placementPolicy =
         new DummyPlacementPolicy(nodeMngr, conf, 1);
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
-    when(datanodeDetails.getUuid()).thenReturn(datanodeUuid);
+    when(datanodeDetails.getID()).thenReturn(datanodeID);
 
     DatanodeInfo datanodeInfo = mock(DatanodeInfo.class);
     NodeStatus nodeStatus = mock(NodeStatus.class);
     when(nodeStatus.isNodeWritable()).thenReturn(true);
     when(datanodeInfo.getNodeStatus()).thenReturn(nodeStatus);
-    when(nodeMngr.getNodeByUuid(eq(datanodeUuid))).thenReturn(datanodeInfo);
+    when(nodeMngr.getNode(eq(datanodeID))).thenReturn(datanodeInfo);
 
     // capacity = 200000, used = 90000, remaining = 101000, committed = 500
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =
-        HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
+        HddsTestUtils.createStorageReport(DatanodeID.randomID(), "/data/hdds",
                 200000, 90000, 101000, DISK).toBuilder()
             .setCommitted(500)
             .setFreeSpaceToSpare(10000)
             .build();
     // capacity = 200000, used = 90000, remaining = 101000, committed = 1000
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport2 =
-        HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
+        HddsTestUtils.createStorageReport(DatanodeID.randomID(), "/data/hdds",
                 200000, 90000, 101000, DISK).toBuilder()
             .setCommitted(1000)
             .setFreeSpaceToSpare(100000)
@@ -524,7 +525,6 @@ public class TestSCMCommonPlacementPolicy {
     private List<Node> racks;
     private int rackCnt;
 
-
     /**
      * Creates Dummy Placement Policy with dn index to rack Mapping
      * in round robin fashion (rack Index = dn Index % total number of racks).
@@ -535,7 +535,7 @@ public class TestSCMCommonPlacementPolicy {
     DummyPlacementPolicy(NodeManager nodeManager, ConfigurationSource conf,
         int rackCnt) {
       this(nodeManager, conf,
-           IntStream.range(0, nodeManager.getAllNodes().size()).boxed()
+           IntStream.range(0, nodeManager.getAllNodeCount()).boxed()
            .collect(Collectors.toMap(Function.identity(),
                    idx -> idx % rackCnt)), rackCnt);
     }
@@ -552,14 +552,12 @@ public class TestSCMCommonPlacementPolicy {
       this.rackCnt = rackCnt;
       this.racks = IntStream.range(0, rackCnt)
       .mapToObj(i -> mock(Node.class)).collect(Collectors.toList());
-      List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
+      final List<? extends DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
       rackMap = datanodeRackMap.entrySet().stream()
               .collect(Collectors.toMap(
                       entry -> datanodeDetails.get(entry.getKey()),
                       entry -> racks.get(entry.getValue())));
     }
-
-
 
     @Override
     public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {

@@ -346,7 +346,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     boolean okForRead =
         pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
             || pipeline.getType() == HddsProtos.ReplicationType.EC;
-    Pipeline readPipeline = okForRead ? pipeline : Pipeline.newBuilder(pipeline)
+    Pipeline readPipeline = okForRead ? pipeline : pipeline.copyForRead().toBuilder()
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(
             getLegacyFactor(pipeline.getReplicationConfig())))
         .build();
@@ -652,8 +652,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
         // number of bytes in a list. Compute the index of the first
         // checksum to match with the read data
 
-        Checksum.verifyChecksum(byteStrings, checksumData, startIndex,
-            false);
+        Checksum.verifyChecksum(byteStrings, checksumData, startIndex);
       }
     }
   }

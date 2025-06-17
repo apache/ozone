@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -55,6 +55,11 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeySetTimesRequest.class);
 
+  private final String volumeName;
+  private final String bucketName;
+  private final String keyName;
+  private final long modificationTime;
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     OMRequest request = super.preExecute(ozoneManager);
@@ -80,11 +85,6 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
                 .setMtime(getModificationTime()))
         .build();
   }
-
-  private final String volumeName;
-  private final String bucketName;
-  private final String keyName;
-  private final long modificationTime;
 
   public OMKeySetTimesRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);

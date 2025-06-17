@@ -31,13 +31,68 @@ import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.fs.CachingSpaceUsageSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Class that wraps the space df of the Datanode Volumes used by SCM
- * containers.
+ * Stores information about a disk/volume.
+ *
+ * Since we have a reserved space for each volume for other usage,
+ * let's clarify the space values a bit here:
+ * - used: hdds actual usage.
+ * - avail: remaining space for hdds usage.
+ * - reserved: total space for other usage.
+ * - capacity: total space for hdds usage.
+ * - other: space used by other service consuming the same volume.
+ * - fsAvail: reported remaining space from local fs.
+ * - fsUsed: reported total used space from local fs.
+ * - fsCapacity: reported total capacity from local fs.
+ * - minVolumeFreeSpace (mvfs) : determines the free space for closing
+     containers.This is like adding a few reserved bytes to reserved space.
+     Dn's will send close container action to SCM at this limit, and it is
+     configurable.
+
+ *
+ * <pre>
+ * {@code
+ * |----used----|   (avail)   |++mvfs++|++++reserved+++++++|
+ * |<-     capacity                  ->|
+ *              |     fsAvail      |-------other-----------|
+ * |<-                   fsCapacity                      ->|
+ * }</pre>
+ * <pre>
+ * What we could directly get from local fs:
+ *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsAvail)
+ * We could get from config:
+ *     reserved
+ * Get from cmd line:
+ *     used: from cmd 'du' (by default)
+ * Get from calculation:
+ *     capacity = fsCapacity - reserved
+ *     other = fsUsed - used
+ *
+ * The avail is the result we want from calculation.
+ * So, it could be:
+ * A) avail = capacity - used
+ * B) avail = fsAvail - Max(reserved - other, 0);
+ *
+ * To be Conservative, we could get min
+ *     avail = Max(Min(A, B), 0);
+ *
+ * If we have a dedicated disk for hdds and are not using the reserved space,
+ * then we should use DedicatedDiskSpaceUsage for
+ * `hdds.datanode.du.factory.classname`,
+ * Then it is much simpler, since we don't care about other usage:
+ * {@code
+ *  |----used----|             (avail)/fsAvail              |
+ *  |<-              capacity/fsCapacity                  ->|
+ * }
+ *
+ *  We have avail == fsAvail.
+ *  </pre>
  */
 public class VolumeUsage {
 
@@ -120,15 +175,21 @@ public class VolumeUsage {
     source.refreshNow();
   }
 
-  public long getReservedBytes() {
+  public long getReservedInBytes() {
     return reservedInBytes;
   }
 
-  public static boolean hasVolumeEnoughSpace(long volumeAvailableSpace,
-                                             long volumeCommittedBytesCount,
-                                             long requiredSpace,
-                                             long volumeFreeSpaceToSpare) {
-    return (volumeAvailableSpace - volumeCommittedBytesCount - volumeFreeSpaceToSpare) > requiredSpace;
+  private static long getUsableSpace(
+      long available, long committed, long minFreeSpace) {
+    return available - committed - minFreeSpace;
+  }
+
+  public static long getUsableSpace(StorageReportProto report) {
+    return getUsableSpace(report.getRemaining(), report.getCommitted(), report.getFreeSpaceToSpare());
+  }
+
+  public static long getUsableSpace(StorageLocationReport report) {
+    return getUsableSpace(report.getRemaining(), report.getCommitted(), report.getFreeSpaceToSpare());
   }
 
   private static long getReserved(ConfigurationSource conf, String rootDir,
@@ -176,5 +237,15 @@ public class VolumeUsage {
     }
 
     return (long) Math.ceil(capacity * percentage);
+  }
+
+  public boolean isReservedUsagesInRange() {
+    SpaceUsageSource spaceUsageSource = realUsage();
+    long reservedUsed = getOtherUsed(spaceUsageSource);
+    if (reservedInBytes > 0 && reservedUsed > reservedInBytes) {
+      LOG.warn("Reserved usages {} is higher than actual allocated reserved space {}.", reservedUsed, reservedInBytes);
+      return false;
+    }
+    return true;
   }
 }

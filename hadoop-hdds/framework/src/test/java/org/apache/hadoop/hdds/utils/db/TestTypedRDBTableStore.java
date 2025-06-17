@@ -41,9 +41,9 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.ozone.test.GenericTestUtils;
@@ -69,7 +69,6 @@ public class TestTypedRDBTableStore {
           "Ninth", "Ten");
   private RDBStore rdbStore = null;
   private ManagedDBOptions options = null;
-  private CodecRegistry codecRegistry;
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
@@ -91,9 +90,6 @@ public class TestTypedRDBTableStore {
     }
     rdbStore = TestRDBStore.newRDBStore(tempDir, options, configSet,
         MAX_DB_UPDATES_SIZE_THRESHOLD);
-
-    codecRegistry = CodecRegistry.newBuilder().build();
-
   }
 
   @AfterEach
@@ -109,8 +105,8 @@ public class TestTypedRDBTableStore {
     try (Table<String, String> testTable = createTypedTable(
         "First")) {
       String key =
-          RandomStringUtils.random(10);
-      String value = RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
+      String value = RandomStringUtils.secure().next(10);
       testTable.put(key, value);
       assertFalse(testTable.isEmpty());
       String readValue = testTable.get(key);
@@ -123,10 +119,9 @@ public class TestTypedRDBTableStore {
 
   private Table<String, String> createTypedTable(String name)
       throws IOException {
-    return new TypedTable<String, String>(
+    return new TypedTable<>(
         rdbStore.getTable(name),
-        codecRegistry,
-        String.class, String.class);
+        StringCodec.get(), StringCodec.get(), CacheType.PARTIAL_CACHE);
   }
 
   @Test
@@ -134,15 +129,15 @@ public class TestTypedRDBTableStore {
     List<String> deletedKeys = new LinkedList<>();
     List<String> validKeys = new LinkedList<>();
     String value =
-        RandomStringUtils.random(10);
+        RandomStringUtils.secure().next(10);
     for (int x = 0; x < 100; x++) {
       deletedKeys.add(
-          RandomStringUtils.random(10));
+          RandomStringUtils.secure().next(10));
     }
 
     for (int x = 0; x < 100; x++) {
       validKeys.add(
-          RandomStringUtils.random(10));
+          RandomStringUtils.secure().next(10));
     }
 
     // Write all the keys and delete the keys scheduled for delete.
@@ -176,9 +171,9 @@ public class TestTypedRDBTableStore {
         BatchOperation batch = rdbStore.initBatchOperation()) {
       //given
       String key =
-          RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
       String value =
-          RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
 
       //when
       testTable.putWithBatch(batch, key, value);
@@ -197,9 +192,9 @@ public class TestTypedRDBTableStore {
 
       //given
       String key =
-          RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
       String value =
-          RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
       testTable.put(key, value);
 
       //when
@@ -224,14 +219,14 @@ public class TestTypedRDBTableStore {
         "Sixth")) {
       for (int x = 0; x < iterCount; x++) {
         String key =
-            RandomStringUtils.random(10);
+            RandomStringUtils.secure().next(10);
         String value =
-            RandomStringUtils.random(10);
+            RandomStringUtils.secure().next(10);
         testTable.put(key, value);
       }
       int localCount = 0;
 
-      try (TableIterator<String, ? extends KeyValue<String, String>> iter =
+      try (Table.KeyValueIterator<String, String> iter =
           testTable.iterator()) {
         while (iter.hasNext()) {
           Table.KeyValue keyValue = iter.next();
@@ -250,10 +245,10 @@ public class TestTypedRDBTableStore {
   @Test
   public void testIteratorOnException() throws Exception {
     RDBTable rdbTable = mock(RDBTable.class);
-    when(rdbTable.iterator((CodecBuffer) null))
+    when(rdbTable.iterator((CodecBuffer) null, Table.KeyValueIterator.Type.KEY_AND_VALUE))
         .thenThrow(new IOException());
     try (Table<String, String> testTable = new TypedTable<>(rdbTable,
-        codecRegistry, String.class, String.class)) {
+        StringCodec.get(), StringCodec.get(), CacheType.PARTIAL_CACHE)) {
       assertThrows(IOException.class, testTable::iterator);
     }
   }
@@ -341,12 +336,12 @@ public class TestTypedRDBTableStore {
     try (Table<String, String> testTable = createTypedTable(
         "Eighth")) {
       String key =
-          RandomStringUtils.random(10);
-      String value = RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
+      String value = RandomStringUtils.secure().next(10);
       testTable.put(key, value);
       assertTrue(testTable.isExist(key));
 
-      String invalidKey = key + RandomStringUtils.random(1);
+      String invalidKey = key + RandomStringUtils.secure().next(1);
       assertFalse(testTable.isExist(invalidKey));
 
       testTable.delete(key);
@@ -359,12 +354,12 @@ public class TestTypedRDBTableStore {
     try (Table<String, String> testTable = createTypedTable(
         "Eighth")) {
       String key =
-          RandomStringUtils.random(10);
-      String value = RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
+      String value = RandomStringUtils.secure().next(10);
       testTable.put(key, value);
       assertNotNull(testTable.getIfExist(key));
 
-      String invalidKey = key + RandomStringUtils.random(1);
+      String invalidKey = key + RandomStringUtils.secure().next(1);
       assertNull(testTable.getIfExist(invalidKey));
 
       testTable.delete(key);
@@ -377,8 +372,8 @@ public class TestTypedRDBTableStore {
     try (Table<String, String> testTable = createTypedTable(
         "Eighth")) {
       String key =
-          RandomStringUtils.random(10);
-      String value = RandomStringUtils.random(10);
+          RandomStringUtils.secure().next(10);
+      String value = RandomStringUtils.secure().next(10);
       testTable.addCacheEntry(new CacheKey<>(key),
           CacheValue.get(1L, value));
       assertTrue(testTable.isExist(key));
@@ -397,8 +392,8 @@ public class TestTypedRDBTableStore {
       final int numKeys = 12345;
       for (int i = 0; i < numKeys; i++) {
         String key =
-            RandomStringUtils.random(10);
-        String value = RandomStringUtils.random(10);
+            RandomStringUtils.secure().next(10);
+        String value = RandomStringUtils.secure().next(10);
         testTable.put(key, value);
       }
       long keyCount = testTable.getEstimatedKeyCount();
@@ -411,8 +406,7 @@ public class TestTypedRDBTableStore {
   public void testByteArrayTypedTable() throws Exception {
     try (Table<byte[], byte[]> testTable = new TypedTable<>(
             rdbStore.getTable("Ten"),
-            codecRegistry,
-            byte[].class, byte[].class)) {
+            ByteArrayCodec.get(), ByteArrayCodec.get(), CacheType.PARTIAL_CACHE)) {
       byte[] key = new byte[] {1, 2, 3};
       byte[] value = new byte[] {4, 5, 6};
       testTable.put(key, value);

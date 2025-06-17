@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedDirToOm;
@@ -101,7 +101,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   private static final String DIR_ONE = "dir1";
   private static final String DIR_TWO = "dir2";
   private static final String DIR_THREE = "dir3";
-
 
   private static final long VOL_OBJECT_ID = 0L;
   private static final long BUCKET_ONE_OBJECT_ID = 1L;
@@ -351,8 +350,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
       when(omMetadataManager.getTable(tableName)).thenReturn(table);
       when(mockIter.hasNext()).thenReturn(true, true, true, true, true, false);
 
-      TypedTable.TypedKeyValue mockKeyValue =
-          mock(TypedTable.TypedKeyValue.class);
+      final Table.KeyValue mockKeyValue = mock(Table.KeyValue.class);
 
       if (tableName.equals(DELETED_TABLE)) {
         RepeatedOmKeyInfo keyInfo = mock(RepeatedOmKeyInfo.class);

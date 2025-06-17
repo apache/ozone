@@ -45,7 +45,6 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -70,6 +69,7 @@ public class CertificateCodec {
   private final Set<PosixFilePermission> permissionSet =
       Stream.of(OWNER_READ, OWNER_WRITE, OWNER_EXECUTE)
           .collect(Collectors.toSet());
+
   /**
    * Creates a CertificateCodec with component name.
    *
@@ -137,10 +137,8 @@ public class CertificateCodec {
     try {
       return writePEMEncoded(certificate, new StringWriter()).toString();
     } catch (IOException e) {
-      LOG.error("Error in encoding certificate." + certificate
-          .getSubjectDN().toString(), e);
-      throw new SCMSecurityException("PEM Encoding failed for certificate." +
-          certificate.getSubjectDN().toString(), e, PEM_ENCODE_FAILED);
+      throw new SCMSecurityException("Failed to getPEMEncodedString for certificate with subject "
+          + certificate.getSubjectDN(), e, PEM_ENCODE_FAILED);
     }
   }
 
@@ -149,41 +147,36 @@ public class CertificateCodec {
    * containing multiple certificates. To get all certificates, use
    * {@link #getCertPathFromPemEncodedString(String)}.
    *
-   * @param pemEncodedString - PEM encoded String.
+   * @param pemEncoded - PEM encoded String.
    * @return X509Certificate  - Certificate.
    * @throws CertificateException - Thrown on Failure.
    */
-  public static X509Certificate getX509Certificate(String pemEncodedString)
+  public static X509Certificate getX509Certificate(String pemEncoded)
       throws CertificateException {
-    return getX509Certificate(pemEncodedString, Function.identity());
+    return getX509Certificate(pemEncoded.getBytes(DEFAULT_CHARSET));
   }
 
-  public static <E extends Exception> X509Certificate getX509Certificate(
-      String pemEncoded, Function<CertificateException, E> convertor)
-      throws E {
+  public static X509Certificate getX509Certificate(byte[] pemEncoded)
+      throws CertificateException {
     // ByteArrayInputStream.close(), which is a noop, can be safely ignored.
-    final ByteArrayInputStream input = new ByteArrayInputStream(
-        pemEncoded.getBytes(DEFAULT_CHARSET));
-    return readX509Certificate(input, convertor);
+    final ByteArrayInputStream input = new ByteArrayInputStream(pemEncoded);
+    return readX509Certificate(input);
   }
 
-  private static <E extends Exception> X509Certificate readX509Certificate(
-      InputStream input, Function<CertificateException, E> convertor)
-      throws E {
-    try {
-      return (X509Certificate) getCertFactory().generateCertificate(input);
-    } catch (CertificateException e) {
-      throw convertor.apply(e);
+  public static X509Certificate readX509Certificate(InputStream input) throws CertificateException {
+    final Certificate cert = getCertFactory().generateCertificate(input);
+    if (cert instanceof X509Certificate) {
+      return (X509Certificate) cert;
     }
+    throw new CertificateException("Certificate is not a X509Certificate: " + cert.getClass() + ", " + cert);
   }
 
-  public static X509Certificate readX509Certificate(InputStream input)
-      throws IOException {
-    return readX509Certificate(input, CertificateCodec::toIOException);
-  }
-
-  public static IOException toIOException(CertificateException e) {
-    return new IOException("Failed to engineGenerateCertificate", e);
+  public static X509Certificate readX509Certificate(String pemEncoded) throws IOException {
+    try {
+      return getX509Certificate(pemEncoded);
+    } catch (CertificateException e) {
+      throw new IOException("Failed to getX509Certificate from " + pemEncoded, e);
+    }
   }
 
   public static X509Certificate firstCertificateFrom(CertPath certificatePath) {

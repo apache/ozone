@@ -27,6 +27,7 @@
   <properties>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
+    <mdep.analyze.skip>true</mdep.analyze.skip>
     <ozone.shaded.native.prefix>org_apache_ozone_shaded</ozone.shaded.native.prefix>
     <!-- refer to ratis thirdparty ratis.thirdparty.shaded.native.prefix -->
     <ratis.thirdparty.shaded.native.prefix>org_apache_ratis_thirdparty_</ratis.thirdparty.shaded.native.prefix>
@@ -189,9 +190,6 @@
                   </resources>
                 </transformer>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-                <transformer implementation="org.apache.maven.plugins.shade.resource.XmlAppendingTransformer">
-                  <resource>ozone-default-generated.xml</resource>
-                </transformer>
               </transformers>
               <relocations>
                 <relocation>

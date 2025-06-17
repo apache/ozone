@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
@@ -81,7 +82,7 @@ public final class OzoneAcl {
     return new OzoneAcl(type, name, scope, toInt(acls));
   }
 
-  public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, EnumSet<ACLType> acls) {
+  public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, Set<ACLType> acls) {
     return new OzoneAcl(type, name, scope, toInt(acls));
   }
 
@@ -96,7 +97,6 @@ public final class OzoneAcl {
     this.hashCodeMethod = MemoizedSupplier.valueOf(() -> Objects.hash(getName(),
         BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer()), getType().toString(), getAclScope()));
   }
-
 
   private static int toInt(int aclTypeOrdinal) {
     return 1 << aclTypeOrdinal;
@@ -320,6 +320,10 @@ public final class OzoneAcl {
 
   public List<ACLType> getAclList() {
     return getAclList(aclBits, Function.identity());
+  }
+
+  public Set<ACLType> getAclSet() {
+    return Collections.unmodifiableSet(EnumSet.copyOf(getAclList()));
   }
 
   private static <T> List<T> getAclList(int aclBits, Function<ACLType, T> converter) {

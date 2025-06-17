@@ -23,10 +23,13 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_KEYS_LIMIT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -37,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -53,7 +57,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.S3GAction;
@@ -90,7 +93,11 @@ public class BucketEndpoint extends EndpointBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(BucketEndpoint.class);
 
+  @Context
+  private HttpHeaders headers;
+
   private boolean listKeysShallowEnabled;
+  private int maxKeysLimit = 1000;
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
@@ -116,8 +123,7 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("acl") String aclMarker,
       @QueryParam("key-marker") String keyMarker,
       @QueryParam("upload-id-marker") String uploadIdMarker,
-      @DefaultValue("1000") @QueryParam("max-uploads") int maxUploads,
-      @Context HttpHeaders hh) throws OS3Exception, IOException {
+      @DefaultValue("1000") @QueryParam("max-uploads") int maxUploads) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_BUCKET;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
@@ -128,6 +134,8 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = null;
 
     try {
+      bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       if (aclMarker != null) {
         s3GAction = S3GAction.GET_ACL;
         S3BucketAcl result = getAcl(bucketName);
@@ -141,6 +149,8 @@ public class BucketEndpoint extends EndpointBase {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
         return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
+
+      maxKeys = validateMaxKeys(maxKeys);
 
       if (prefix == null) {
         prefix = "";
@@ -161,7 +171,6 @@ public class BucketEndpoint extends EndpointBase {
       boolean shallow = listKeysShallowEnabled
           && OZONE_URI_DELIMITER.equals(delimiter);
 
-      bucket = getBucket(bucketName);
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
 
     } catch (OMException ex) {
@@ -292,10 +301,17 @@ public class BucketEndpoint extends EndpointBase {
     return Response.ok(response).build();
   }
 
+  private int validateMaxKeys(int maxKeys) throws OS3Exception {
+    if (maxKeys <= 0) {
+      throw newError(S3ErrorTable.INVALID_ARGUMENT, "maxKeys must be > 0");
+    }
+
+    return Math.min(maxKeys, maxKeysLimit);
+  }
+
   @PUT
   public Response put(@PathParam("bucket") String bucketName,
                       @QueryParam("acl") String aclMarker,
-                      @Context HttpHeaders httpHeaders,
                       InputStream body) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
@@ -303,7 +319,7 @@ public class BucketEndpoint extends EndpointBase {
     try {
       if (aclMarker != null) {
         s3GAction = S3GAction.PUT_ACL;
-        Response response =  putAcl(bucketName, httpHeaders, body);
+        Response response =  putAcl(bucketName, body);
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
         return response;
@@ -399,7 +415,8 @@ public class BucketEndpoint extends EndpointBase {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_BUCKET;
     try {
-      getBucket(bucketName);
+      OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       AUDIT.logReadSuccess(
           buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       getMetrics().updateHeadBucketSuccessStats(startNanos);
@@ -424,6 +441,8 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.DELETE_BUCKET;
 
     try {
+      OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       deleteS3Bucket(bucketName);
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
@@ -478,6 +497,7 @@ public class BucketEndpoint extends EndpointBase {
       }
       long startNanos = Time.monotonicNowNanos();
       try {
+        S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
         undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
         for (DeleteObject d : request.getObjects()) {
           ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
@@ -526,10 +546,7 @@ public class BucketEndpoint extends EndpointBase {
     S3BucketAcl result = new S3BucketAcl();
     try {
       OzoneBucket bucket = getBucket(bucketName);
-      OzoneVolume volume = getVolume();
-      // TODO: use bucket owner instead of volume owner here once bucket owner
-      // TODO: is supported.
-      S3Owner owner = new S3Owner(volume.getOwner(), volume.getOwner());
+      S3Owner owner = S3Owner.of(bucket.getOwner());
       result.setOwner(owner);
 
       // TODO: remove this duplication avoid logic when ACCESS and DEFAULT scope
@@ -567,17 +584,18 @@ public class BucketEndpoint extends EndpointBase {
    * <p>
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAcl.html
    */
-  public Response putAcl(String bucketName, HttpHeaders httpHeaders,
+  public Response putAcl(String bucketName,
                          InputStream body) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
-    String grantReads = httpHeaders.getHeaderString(S3Acl.GRANT_READ);
-    String grantWrites = httpHeaders.getHeaderString(S3Acl.GRANT_WRITE);
-    String grantReadACP = httpHeaders.getHeaderString(S3Acl.GRANT_READ_CAP);
-    String grantWriteACP = httpHeaders.getHeaderString(S3Acl.GRANT_WRITE_CAP);
-    String grantFull = httpHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL);
+    String grantReads = headers.getHeaderString(S3Acl.GRANT_READ);
+    String grantWrites = headers.getHeaderString(S3Acl.GRANT_WRITE);
+    String grantReadACP = headers.getHeaderString(S3Acl.GRANT_READ_CAP);
+    String grantWriteACP = headers.getHeaderString(S3Acl.GRANT_WRITE_CAP);
+    String grantFull = headers.getHeaderString(S3Acl.GRANT_FULL_CONTROL);
 
     try {
       OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       OzoneVolume volume = getVolume();
 
       List<OzoneAcl> ozoneAclListOnBucket = new ArrayList<>();
@@ -738,24 +756,37 @@ public class BucketEndpoint extends EndpointBase {
     if (eTag != null) {
       keyMetadata.setETag(ObjectEndpoint.wrapInQuotes(eTag));
     }
-    if (next.getReplicationType().toString().equals(ReplicationType
-        .STAND_ALONE.toString())) {
-      keyMetadata.setStorageClass(S3StorageType.REDUCED_REDUNDANCY.toString());
-    } else {
-      keyMetadata.setStorageClass(S3StorageType.STANDARD.toString());
-    }
+    keyMetadata.setStorageClass(S3StorageType.fromReplicationConfig(
+        next.getReplicationConfig()).toString());
     keyMetadata.setLastModified(next.getModificationTime());
-    String ownerName = next.getOwner();
-    String displayName = ownerName;
-    // Use ownerName to fill displayName
-    keyMetadata.setOwner(new S3Owner(ownerName, displayName));
+    String displayName = next.getOwner();
+    keyMetadata.setOwner(S3Owner.of(displayName));
     response.addKey(keyMetadata);
   }
 
+  @VisibleForTesting
+  public void setOzoneConfiguration(OzoneConfiguration config) {
+    this.ozoneConfiguration = config;
+  }
+
+  @VisibleForTesting
+  public OzoneConfiguration getOzoneConfiguration() {
+    return this.ozoneConfiguration;
+  }
+
+  @VisibleForTesting
+  public void setHeaders(HttpHeaders headers) {
+    this.headers = headers;
+  }
+
   @Override
+  @PostConstruct
   public void init() {
     listKeysShallowEnabled = ozoneConfiguration.getBoolean(
         OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED,
         OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT);
+    maxKeysLimit = ozoneConfiguration.getInt(
+        OZONE_S3G_LIST_MAX_KEYS_LIMIT,
+        OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT);
   }
 }

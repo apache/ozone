@@ -26,7 +26,6 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -107,15 +106,16 @@ import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Tests to test block deleting service.
  */
-@Timeout(30)
 public class TestBlockDeletingService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TestBlockDeletingService.class);
 
   @TempDir
   private File testRoot;
@@ -329,7 +329,7 @@ public class TestBlockDeletingService {
       int numOfChunksPerBlock) {
     long chunkLength = 100;
     try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
-      container.getContainerData().setBlockCount(numOfBlocksPerContainer);
+      container.getContainerData().getStatistics().setBlockCountForTesting(numOfBlocksPerContainer);
       // Set block count, bytes used and pending delete block count.
       metadata.getStore().getMetadataTable()
           .put(data.getBlockCountKey(), (long) numOfBlocksPerContainer);
@@ -815,7 +815,7 @@ public class TestBlockDeletingService {
         10, conf);
     svc.start();
 
-    LogCapturer log = LogCapturer.captureLogs(BackgroundService.LOG);
+    LogCapturer log = LogCapturer.captureLogs(BackgroundService.class);
     GenericTestUtils.waitFor(() -> {
       if (log.getOutput().contains("Background task execution took")) {
         log.stopCapturing();
@@ -842,7 +842,7 @@ public class TestBlockDeletingService {
         (KeyValueContainer) containerSet.iterator().next();
     KeyValueContainerData data = container.getContainerData();
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
-      LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.LOG);
+      LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.class);
       GenericTestUtils.waitFor(() -> {
         try {
           return getUnderDeletionBlocksCount(meta, data) == 0;
@@ -951,9 +951,7 @@ public class TestBlockDeletingService {
   public void testContainerMaxLockHoldingTime(
       ContainerTestVersionInfo versionInfo) throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
-    GenericTestUtils.LogCapturer log =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(BlockDeletingTask.class));
+    LogCapturer log = LogCapturer.captureLogs(BlockDeletingTask.class);
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
 
     // Ensure that the lock holding timeout occurs every time a deletion

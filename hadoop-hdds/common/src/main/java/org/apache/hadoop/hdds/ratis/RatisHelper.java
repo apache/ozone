@@ -30,12 +30,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import javax.net.ssl.TrustManager;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -66,6 +66,7 @@ import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.util.JavaUtils;
@@ -411,11 +412,9 @@ public final class RatisHelper {
     });
   }
 
-
   private static Map<String, String> getDatanodeRatisPrefixProps(
       ConfigurationSource configuration) {
-    return configuration.getPropsMatchPrefixAndTrimPrefix(
-        StringUtils.appendIfNotPresent(HDDS_DATANODE_RATIS_PREFIX_KEY, '.'));
+    return configuration.getPropsMatchPrefixAndTrimPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY + '.');
   }
 
   // For External gRPC client to server with gRPC TLS.
@@ -528,7 +527,6 @@ public final class RatisHelper {
         HIGHER_PRIORITY : NEUTRAL_PRIORITY;
     return RaftPeer.newBuilder(peer).setPriority(priority).build();
   }
-
 
   /**
    * Use raft client to send admin request, transfer the leadership.
@@ -643,6 +641,17 @@ public final class RatisHelper {
     final long interval = pollInterval.toMillis();
     assertTrue(max >= interval, () -> "max: " + maxDuration + " < interval:" + pollInterval);
     return (int) (max / interval);
+  }
+
+  public static void setFirstElectionTimeoutDuration(
+      ConfigurationSource conf, RaftProperties properties, String configKey) {
+    long firstElectionTimeout = conf.getTimeDuration(configKey, -1, TimeUnit.MILLISECONDS);
+    if (firstElectionTimeout > 0) {
+      RaftServerConfigKeys.Rpc.setFirstElectionTimeoutMin(
+          properties,  TimeDuration.valueOf(firstElectionTimeout, TimeUnit.MILLISECONDS));
+      RaftServerConfigKeys.Rpc.setFirstElectionTimeoutMax(
+          properties,  TimeDuration.valueOf(firstElectionTimeout + 200, TimeUnit.MILLISECONDS));
+    }
   }
 
 }

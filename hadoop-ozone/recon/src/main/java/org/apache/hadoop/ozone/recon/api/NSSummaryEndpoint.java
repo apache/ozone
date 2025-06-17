@@ -51,6 +51,7 @@ public class NSSummaryEndpoint {
   private final ReconOMMetadataManager omMetadataManager;
 
   private final OzoneStorageContainerManager reconSCM;
+
   @Inject
   public NSSummaryEndpoint(ReconNamespaceSummaryManager namespaceSummaryManager,
                            ReconOMMetadataManager omMetadataManager,
@@ -105,7 +106,7 @@ public class NSSummaryEndpoint {
    * @throws IOException
    */
   @GET
-  @Path("/du")
+  @Path("/usage")
   @SuppressWarnings("methodlength")
   public Response getDiskUsage(@QueryParam("path") String path,
                                @DefaultValue("false") @QueryParam("files") boolean listFile,

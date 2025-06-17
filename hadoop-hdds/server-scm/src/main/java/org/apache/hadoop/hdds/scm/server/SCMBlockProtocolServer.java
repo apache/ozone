@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -191,6 +192,7 @@ public class SCMBlockProtocolServer implements
       String owner, ExcludeList excludeList,
       String clientMachine
   ) throws IOException {
+    long startNanos = Time.monotonicNowNanos();
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
     auditMap.put("num", String.valueOf(num));
@@ -234,17 +236,21 @@ public class SCMBlockProtocolServer implements
         AUDIT.logWriteFailure(buildAuditMessageForFailure(
             SCMAction.ALLOCATE_BLOCK, auditMap, null)
         );
+        perfMetrics.updateAllocateBlockFailureLatencyNs(startNanos);
       } else {
         AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
             SCMAction.ALLOCATE_BLOCK, auditMap));
+        perfMetrics.updateAllocateBlockSuccessLatencyNs(startNanos);
       }
 
       return blocks;
     } catch (TimeoutException ex) {
+      perfMetrics.updateAllocateBlockFailureLatencyNs(startNanos);
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.ALLOCATE_BLOCK, auditMap, ex));
       throw new IOException(ex);
     } catch (Exception ex) {
+      perfMetrics.updateAllocateBlockFailureLatencyNs(startNanos);
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.ALLOCATE_BLOCK, auditMap, ex));
       throw ex;
@@ -260,11 +266,14 @@ public class SCMBlockProtocolServer implements
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("SCM is informed by OM to delete {} blocks",
-          keyBlocksInfoList.size());
+    long totalBlocks = 0;
+    for (BlockGroup bg : keyBlocksInfoList) {
+      totalBlocks += bg.getBlockIDList().size();
     }
-
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("SCM is informed by OM to delete {} keys. Total blocks to deleted {}.",
+          keyBlocksInfoList.size(), totalBlocks);
+    }
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
@@ -272,12 +281,17 @@ public class SCMBlockProtocolServer implements
     long startNanos = Time.monotonicNowNanos();
     try {
       scm.getScmBlockManager().deleteBlocks(keyBlocksInfoList);
-      perfMetrics.updateDeleteKeySuccessStats(startNanos);
+      perfMetrics.updateDeleteKeySuccessBlocks(totalBlocks);
+      perfMetrics.updateDeleteKeySuccessStats(keyBlocksInfoList.size(), startNanos);
       resultCode = ScmBlockLocationProtocolProtos.
           DeleteScmBlockResult.Result.success;
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Total number of blocks ACK by SCM in this cycle: " + totalBlocks);
+      }
     } catch (IOException ioe) {
       e = ioe;
-      perfMetrics.updateDeleteKeyFailureStats(startNanos);
+      perfMetrics.updateDeleteKeyFailedBlocks(totalBlocks);
+      perfMetrics.updateDeleteKeyFailureStats(keyBlocksInfoList.size(), startNanos);
       LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ioe);
       switch (ioe instanceof SCMException ? ((SCMException) ioe).getResult() :
           IO_EXCEPTION) {
@@ -378,7 +392,7 @@ public class SCMBlockProtocolServer implements
       final Node client = getClientNode(clientMachine);
       List<DatanodeDetails> nodeList = new ArrayList<>();
       nodes.forEach(uuid -> {
-        DatanodeDetails node = nodeManager.getNodeByUuid(uuid);
+        DatanodeDetails node = nodeManager.getNode(DatanodeID.fromUuidString(uuid));
         if (node != null) {
           nodeList.add(node);
         }

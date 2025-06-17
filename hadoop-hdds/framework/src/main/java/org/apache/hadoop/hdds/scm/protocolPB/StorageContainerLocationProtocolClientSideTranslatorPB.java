@@ -27,7 +27,6 @@ import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GetScmInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
@@ -160,12 +160,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   private final SCMContainerLocationFailoverProxyProvider fpp;
 
   /**
-   * This is used to check if 'leader' or 'follower' exists,
-   * in order to confirm whether we have enabled Ratis.
-   */
-  private final List<String> scmRatisRolesToCheck = Arrays.asList("leader", "follower");
-
-  /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
    *
    * @param proxyProvider {@link SCMContainerLocationFailoverProxyProvider}
@@ -229,13 +223,28 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public ContainerWithPipeline allocateContainer(
       HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
       String owner) throws IOException {
+    ReplicationConfig replicationConfig =
+        ReplicationConfig.fromProtoTypeAndFactor(type, factor);
+    return allocateContainer(replicationConfig, owner);
+  }
 
-    ContainerRequestProto request = ContainerRequestProto.newBuilder()
-        .setTraceID(TracingUtil.exportCurrentSpan())
-        .setReplicationFactor(factor)
-        .setReplicationType(type)
-        .setOwner(owner)
-        .build();
+  @Override
+  public ContainerWithPipeline allocateContainer(
+      ReplicationConfig replicationConfig, String owner) throws IOException {
+
+    ContainerRequestProto.Builder request = ContainerRequestProto.newBuilder()
+          .setTraceID(TracingUtil.exportCurrentSpan())
+          .setReplicationType(replicationConfig.getReplicationType())
+          .setOwner(owner);
+
+    if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.EC) {
+      HddsProtos.ECReplicationConfig ecProto =
+          ((ECReplicationConfig) replicationConfig).toProto();
+      request.setEcReplicationConfig(ecProto);
+      request.setReplicationFactor(ReplicationFactor.ONE); // Set for backward compatibility, ignored for EC.
+    } else {
+      request.setReplicationFactor(ReplicationFactor.valueOf(replicationConfig.getReplication()));
+    }
 
     ContainerResponseProto response =
         submitRequest(Type.AllocateContainer,
@@ -246,8 +255,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       throw new IOException(response.hasErrorMessage() ?
           response.getErrorMessage() : "Allocate container failed.");
     }
-    return ContainerWithPipeline.fromProtobuf(
-        response.getContainerWithPipeline());
+    return ContainerWithPipeline.fromProtobuf(response.getContainerWithPipeline());
   }
 
   @Override
@@ -376,12 +384,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .getContainerWithPipelinesList();
 
     for (HddsProtos.ContainerWithPipeline cp : protoCps) {
-      try {
-        cps.add(ContainerWithPipeline.fromProtobuf(cp));
-      } catch (IOException uex) {
-          // "fromProtobuf" may throw an exception
-          // do nothing , just go ahead
-      }
+      cps.add(ContainerWithPipeline.fromProtobuf(cp));
     }
     return cps;
   }
