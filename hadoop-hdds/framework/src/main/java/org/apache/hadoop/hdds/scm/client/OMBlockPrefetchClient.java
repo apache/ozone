@@ -68,21 +68,6 @@ import org.slf4j.LoggerFactory;
  */
 public class OMBlockPrefetchClient {
   private static final Logger LOG = LoggerFactory.getLogger(OMBlockPrefetchClient.class);
-  private static final ReplicationConfig RATIS_THREE =
-      ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE);
-  private static final ReplicationConfig RATIS_ONE =
-      ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.ONE);
-  private static final ReplicationConfig RS_3_2_1024 =
-      ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
-          toProto(3, 2, ECReplicationConfig.EcCodec.RS, 1024));
-  private static final ReplicationConfig RS_6_3_1024 =
-      ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
-          toProto(6, 3, ECReplicationConfig.EcCodec.RS, 1024));
-  private static final ReplicationConfig XOR_10_4_4096 =
-      ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
-          toProto(10, 4, ECReplicationConfig.EcCodec.XOR, 4096));
   private final ScmBlockLocationProtocol scmBlockLocationProtocol;
   private int maxBlocks;
   private int minBlocks;
@@ -95,28 +80,59 @@ public class OMBlockPrefetchClient {
   private ExecutorService prefetchExecutor;
   private final AtomicBoolean isPrefetching = new AtomicBoolean(false);
 
-  public static HddsProtos.ECReplicationConfig toProto(int data, int parity, ECReplicationConfig.EcCodec codec,
-                                                       int ecChunkSize) {
-    return HddsProtos.ECReplicationConfig.newBuilder()
-        .setData(data)
-        .setParity(parity)
-        .setCodec(codec.toString())
-        .setEcChunkSize(ecChunkSize)
-        .build();
-  }
-
   public OMBlockPrefetchClient(ScmBlockLocationProtocol scmBlockClient, boolean isAllocateBlockCacheEnabled) {
     this.scmBlockLocationProtocol = scmBlockClient;
     this.isAllocateBlockCacheEnabled = isAllocateBlockCacheEnabled;
     initializeBlockQueueMap();
   }
 
+  /**
+   * Enum representing the replication configurations that are tested.
+   */
+  public enum TestedReplicationConfig {
+    RATIS_THREE(ReplicationConfig.fromProtoTypeAndFactor(
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE)),
+
+    RATIS_ONE(ReplicationConfig.fromProtoTypeAndFactor(
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE)),
+
+    RS_3_2_1024(ReplicationConfig.fromProto(
+        HddsProtos.ReplicationType.EC, null,
+        toProto(3, 2, ECReplicationConfig.EcCodec.RS, 1024))),
+
+    RS_6_3_1024(ReplicationConfig.fromProto(
+        HddsProtos.ReplicationType.EC, null,
+        toProto(6, 3, ECReplicationConfig.EcCodec.RS, 1024))),
+
+    XOR_10_4_4096(ReplicationConfig.fromProto(
+        HddsProtos.ReplicationType.EC, null,
+        toProto(10, 4, ECReplicationConfig.EcCodec.XOR, 4096)));
+
+    private final ReplicationConfig config;
+
+    TestedReplicationConfig(ReplicationConfig config) {
+      this.config = config;
+    }
+
+    public ReplicationConfig getConfig() {
+      return config;
+    }
+
+    public static HddsProtos.ECReplicationConfig toProto(int data, int parity, ECReplicationConfig.EcCodec codec,
+                                                         int ecChunkSize) {
+      return HddsProtos.ECReplicationConfig.newBuilder()
+          .setData(data)
+          .setParity(parity)
+          .setCodec(codec.toString())
+          .setEcChunkSize(ecChunkSize)
+          .build();
+    }
+  }
+
   private void initializeBlockQueueMap() {
-    blockQueueMap.put(RATIS_THREE, new ConcurrentLinkedDeque<>());
-    blockQueueMap.put(RATIS_ONE, new ConcurrentLinkedDeque<>());
-    blockQueueMap.put(RS_3_2_1024, new ConcurrentLinkedDeque<>());
-    blockQueueMap.put(RS_6_3_1024, new ConcurrentLinkedDeque<>());
-    blockQueueMap.put(XOR_10_4_4096, new ConcurrentLinkedDeque<>());
+    for (TestedReplicationConfig config : TestedReplicationConfig.values()) {
+      blockQueueMap.put(config.getConfig(), new ConcurrentLinkedDeque<>());
+    }
   }
 
   /**
@@ -186,43 +202,49 @@ public class OMBlockPrefetchClient {
     if (isAllocateBlockCacheEnabled) {
       long readStartTime = Time.monotonicNowNanos();
       List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
-      int retrievedBlocksCount = 0;
       ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
 
       // We redirect to the allocateBlock RPC call to SCM when we encounter an untested ReplicationConfig or a populated
       // ExcludeList, otherwise we return blocks from cache.
       if (queue != null && excludeList.isEmpty()) {
-        while (retrievedBlocksCount < numBlocks) {
+        List<ExpiringAllocatedBlock> tempValidBlocks = new ArrayList<>();
+        long now = System.currentTimeMillis();
+        while (tempValidBlocks.size() < numBlocks) {
           ExpiringAllocatedBlock expiringBlock = queue.poll();
           if (expiringBlock == null) {
             break;
           }
 
-          if (System.currentTimeMillis() > expiringBlock.getExpiryTime()) {
+          if (now > expiringBlock.getExpiryTime()) {
             continue;
           }
 
-          AllocatedBlock block = expiringBlock.getBlock();
-          List<DatanodeDetails> sortedNodes = sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
-          if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
-            block = block.toBuilder()
-                .setPipeline(block.getPipeline().copyWithNodesInOrder(sortedNodes))
-                .build();
-          }
-          allocatedBlocks.add(block);
-          retrievedBlocksCount++;
+          tempValidBlocks.add(expiringBlock);
         }
 
-        int remainingBlocks = numBlocks - retrievedBlocksCount;
-
-        // If there aren't enough blocks in cache, we make a synchronous RPC call to SCM for fetching the remaining
-        // blocks.
-        if (remainingBlocks > 0) {
-          List<AllocatedBlock> newBlocks = scmBlockLocationProtocol.allocateBlock(scmBlockSize, remainingBlocks,
+        // If there aren't enough blocks in cache, we fallback to SCM.
+        if (tempValidBlocks.size() < numBlocks) {
+          List<AllocatedBlock> newBlocks = scmBlockLocationProtocol.allocateBlock(scmBlockSize, numBlocks,
               replicationConfig, serviceID, excludeList, clientMachine);
           allocatedBlocks.addAll(newBlocks);
+
+          // Return unused valid blocks back to the front of the queue (preserving original order).
+          for (int i = tempValidBlocks.size() - 1; i >= 0; i--) {
+            queue.addFirst(tempValidBlocks.get(i));
+          }
           metrics.incrementCacheMisses();
         } else {
+          for (ExpiringAllocatedBlock expiringBlock : tempValidBlocks) {
+            AllocatedBlock block = expiringBlock.getBlock();
+            List<DatanodeDetails> sortedNodes =
+                sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
+            if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
+              block = block.toBuilder()
+                  .setPipeline(block.getPipeline().copyWithNodesInOrder(sortedNodes))
+                  .build();
+            }
+            allocatedBlocks.add(block);
+          }
           metrics.incrementCacheHits();
         }
 
