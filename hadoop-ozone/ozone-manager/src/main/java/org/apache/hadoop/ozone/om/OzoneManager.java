@@ -1887,6 +1887,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Unable to initialize OMBlockPrefetchClient ", ex);
       throw new UncheckedIOException(ex);
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     } catch (TimeoutException e) {
       throw new RuntimeException(e);
