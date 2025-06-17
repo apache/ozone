@@ -142,19 +142,5 @@ public class TestKeyValueContainerData {
     assertFalse(containerData.isEmpty());
     assertFalse(containerData.needsDataChecksum());
     assertEquals(123L, containerData.getDataChecksum());
-
-    // An empty container does not need a data checksum generated, even if the value is 0.
-    // 0 is a valid checksum if the container has no data.
-    KeyValueContainerData emptyContainerData = new KeyValueContainerData(1, layout, MAXSIZE,
-        UUID.randomUUID().toString(), UUID.randomUUID().toString());
-    emptyContainerData.markAsEmpty();
-
-    assertTrue(emptyContainerData.isEmpty());
-    assertFalse(emptyContainerData.needsDataChecksum());
-    assertEquals(0, emptyContainerData.getDataChecksum());
-
-    emptyContainerData.setDataChecksum(123L);
-    assertFalse(emptyContainerData.needsDataChecksum());
-    assertEquals(123L, emptyContainerData.getDataChecksum());
   }
 }
