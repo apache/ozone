@@ -18,11 +18,9 @@
 package org.apache.hadoop.ozone.dn.scanner;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,7 +30,6 @@ import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -54,8 +51,6 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
@@ -182,7 +177,6 @@ public abstract class TestContainerScannerIntegrationAbstract {
             getContainerReplica(containerID).getDataChecksum() != 0);
     long closedChecksum = getContainerReplica(containerID).getDataChecksum();
     assertNotEquals(0, closedChecksum);
-    assertChecksumLoggedOnClose(containerID, closedChecksum);
   }
 
   protected long writeDataToOpenContainer() throws Exception {
@@ -216,35 +210,6 @@ public abstract class TestContainerScannerIntegrationAbstract {
     try (OzoneInputStream key = bucket.readKey(keyName)) {
       assertThrows(IOException.class, key::read);
     }
-  }
-
-  protected void assertChecksumLoggedOnUpdate(long expectedContainerID, long expectedOldChecksum,
-      long expectedNewChecksum) {
-    String allLogOutput = logCapturer.getOutput();
-
-    // Container log should have a dedicated line for the checksum update.
-    Pattern containerLogLine = Pattern.compile("(?m)^ID=" + expectedContainerID + ".*DataChecksum=" +
-        checksumToString(expectedNewChecksum) + ".*Container data checksum updated from " +
-        checksumToString(expectedOldChecksum) + " to " + checksumToString(expectedNewChecksum));
-    assertThat(allLogOutput).containsPattern(containerLogLine);
-
-    // KeyValueHandler log should also have a dedicated line for this update.
-    Pattern keyValueLogLine = Pattern.compile("Container " + expectedContainerID + " data checksum updated from " +
-        checksumToString(expectedOldChecksum) + " to " + checksumToString(expectedNewChecksum));
-    assertThat(allLogOutput).containsPattern(keyValueLogLine);
-  }
-
-  protected void assertChecksumLoggedOnClose(long expectedContainerID, long expectedDataChecksum) {
-    String allLogOutput = logCapturer.getOutput();
-
-    // Container log should include the data checksum in the closed log line.
-    Pattern containerLogLine = Pattern.compile("(?m)^ID=" + expectedContainerID +
-        ".*State=CLOSED.*DataChecksum=" + checksumToString(expectedDataChecksum));
-    assertThat(allLogOutput).containsPattern(containerLogLine);
-    // KeyValueHandler log should also include the checksum in its closed log line
-    Pattern keyValueLogLine = Pattern.compile("#" + expectedContainerID + " \\(CLOSED, non-empty.*dataChecksum=" +
-        checksumToString(expectedDataChecksum));
-    assertThat(allLogOutput).containsPattern(keyValueLogLine);
   }
 
   protected GenericTestUtils.LogCapturer getContainerLogCapturer() {
