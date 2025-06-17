@@ -293,7 +293,7 @@ class TestContainerMerkleTreeWriter {
         .setOffset(chunk.getOffset())
         .setLength(chunk.getLen())
         .setDataChecksum(computeExpectedChunkChecksum(chunk.getChecksumData().getChecksumsList()))
-        .setIsHealthy(isHealthy)
+        .setChecksumMatches(isHealthy)
         .build();
   }
 

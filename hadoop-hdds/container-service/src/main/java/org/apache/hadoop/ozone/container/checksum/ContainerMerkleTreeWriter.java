@@ -219,7 +219,7 @@ public class ContainerMerkleTreeWriter {
     ChunkMerkleTreeWriter(ContainerProtos.ChunkMerkleTree chunkTree) {
       length = chunkTree.getLength();
       offset = chunkTree.getOffset();
-      isHealthy = chunkTree.getIsHealthy();
+      isHealthy = chunkTree.getChecksumMatches();
       dataChecksum = chunkTree.getDataChecksum();
     }
 
@@ -237,7 +237,7 @@ public class ContainerMerkleTreeWriter {
       return ContainerProtos.ChunkMerkleTree.newBuilder()
           .setOffset(offset)
           .setLength(length)
-          .setIsHealthy(isHealthy)
+          .setChecksumMatches(isHealthy)
           .setDataChecksum(dataChecksum)
           .build();
     }

@@ -274,7 +274,7 @@ public class ContainerChecksumTreeManager {
         // thisTree = Healthy, peerTree = unhealthy -> Do nothing as thisTree is healthy.
         // thisTree = Unhealthy, peerTree = Unhealthy -> Do Nothing as both are corrupt.
         if (thisChunkMerkleTree.getDataChecksum() != peerChunkMerkleTree.getDataChecksum() &&
-            !thisChunkMerkleTree.getIsHealthy() && peerChunkMerkleTree.getIsHealthy()) {
+            !thisChunkMerkleTree.getChecksumMatches() && peerChunkMerkleTree.getChecksumMatches()) {
           report.addCorruptChunk(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTree);
         }
         thisIdx++;
