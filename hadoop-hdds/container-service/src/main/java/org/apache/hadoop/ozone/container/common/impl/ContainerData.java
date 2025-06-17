@@ -658,6 +658,7 @@ public abstract class ContainerData {
   }
 
   public long getDataChecksum() {
+    // UNSET_DATA_CHECKSUM is an internal placeholder, it should not be used outside this class.
     if (needsDataChecksum()) {
       return 0;
     }

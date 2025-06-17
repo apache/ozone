@@ -130,7 +130,6 @@ public class TestKeyValueContainerData {
   public void testNeedsDataChecksum(ContainerTestVersionInfo versionInfo) {
     initVersionInfo(versionInfo);
 
-    // A non-empty container needs a data checksum if the value is 0, indicating it was never generated.
     KeyValueContainerData containerData = new KeyValueContainerData(1, layout, MAXSIZE, UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
 
