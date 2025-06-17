@@ -112,7 +112,8 @@
             <property name="regexp" value="true"/>
             <property name="illegalPkgs" value="^sun\..*, ^.*\.relocated\..*, ^.*\.shaded\..*"/>
             <property name="illegalClasses"
-                      value="^org.apache.hadoop.test.(GenericTestUtils|LambdaTestUtils|TimedOutTestsListener)"/>
+                      value="^org.apache.hadoop.test.(GenericTestUtils|LambdaTestUtils|TimedOutTestsListener)
+                      |^org.apache.hadoop.fs.CommonConfigurationKeys"/>
         </module>
         <module name="RedundantImport"/>
         <module name="UnusedImports"/>

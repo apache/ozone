@@ -50,7 +50,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -187,7 +187,7 @@ public class SCMClientProtocolServer implements
         updateRPCListenAddress(conf,
             scm.getScmNodeDetails().getClientProtocolServerAddressKey(),
             scmAddress, clientRpcServer);
-    if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
+    if (conf.getBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       clientRpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
     }
