@@ -62,7 +62,6 @@ public class TestStreamBlockInputStream {
   private static final String CHUNK_NAME = "chunk-";
   private OzoneConfiguration conf = new OzoneConfiguration();
 
-
   @BeforeEach
   public void setup() throws Exception {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);

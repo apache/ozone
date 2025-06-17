@@ -93,10 +93,10 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
-import org.apache.hadoop.util.Time;
-import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -122,8 +122,6 @@ public class TestKeyValueHandler {
   private static final String DUMMY_PATH = "dummy/dir/doesnt/exist";
   private static final long CHUNK_SIZE = 1024 * 1024;          // 1MB
   private static final long BYTES_PER_CHECKSUM = 256 * 1024;
-  private final Function<ByteBuffer, ByteString> byteBufferToByteString =
-      ByteStringConversion.createByteBufferConversion(true);
 
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;

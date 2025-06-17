@@ -92,7 +92,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   private final RetryPolicy retryPolicy;
   private int retries;
 
-
   public StreamBlockInputStream(
       BlockID blockID, long length, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
@@ -113,7 +112,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
             TimeUnit.SECONDS.toMillis(config.getReadRetryInterval()));
 
   }
-
 
   @Override
   public BlockID getBlockID() {
