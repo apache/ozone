@@ -194,7 +194,6 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
 
   private void initializeRule() {
     ecContainers.clear();
-    ecContainerDNsMap.clear();
     containerManager.getContainers(ReplicationType.EC).stream()
         .filter(this::isClosed).filter(c -> c.getNumberOfKeys() > 0)
         .map(ContainerInfo::getContainerID).forEach(ecContainers::add);
