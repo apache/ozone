@@ -100,14 +100,9 @@ public class TestOMBlockPrefetchClient {
   private static final int NUM_DATANODES = 5;
   private static final String RACK_0 = "/rack0";
   private static final String RACK_1 = "/rack1";
-
   private Map<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>> blockQueueMap;
-
   private Constructor<?> expiringBlockConstructor;
-
   private List<DatanodeDetails> datanodes;
-
-  private int actualAdditionalBlocksMax = 10;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -156,7 +151,6 @@ public class TestOMBlockPrefetchClient {
     }
     StaticMapping.resetMap();
   }
-
 
   private AllocatedBlock createMockAllocatedBlock(long containerId, long localId, List<DatanodeDetails> pipelineNodes) {
     Pipeline pipeline = Pipeline.newBuilder()
@@ -278,7 +272,6 @@ public class TestOMBlockPrefetchClient {
         actualRemaining.stream().map(AllocatedBlock::getBlockID).collect(Collectors.toList()));
     actualRemaining.forEach(b -> assertEquals(defaultNodes, b.getPipeline().getNodesInOrder()));
   }
-
 
   @Test
   void testExpiredBlockIsSkipped() throws IOException, InterruptedException {
