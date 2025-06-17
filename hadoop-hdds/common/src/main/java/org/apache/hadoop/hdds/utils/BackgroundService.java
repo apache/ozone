@@ -131,6 +131,8 @@ public abstract class BackgroundService {
 
   public abstract BackgroundTaskQueue getTasks();
 
+  protected void execTaskCompletion() {}
+
   /**
    * Run one or more background tasks concurrently.
    * Wait until all tasks to return the result.
@@ -174,6 +176,7 @@ public abstract class BackgroundService {
           }
         }, exec), (Void1, Void) -> null);
       }
+      execTaskCompletion();
     }
   }
 

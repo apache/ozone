@@ -91,6 +91,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final SnapshotChainManager snapshotChainManager;
   private int ratisByteLimit;
   private static final double RATIS_LIMIT_FACTOR = 0.9;
+  // Track metrics for current task execution
+  private final AtomicLong curDeletedKeyCount;
+  private final AtomicLong curDeletedKeyReplSize;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient, long serviceInterval,
@@ -113,6 +116,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         StorageUnit.BYTES);
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * RATIS_LIMIT_FACTOR);
+    this.curDeletedKeyCount = new AtomicLong(0);
+    this.curDeletedKeyReplSize = new AtomicLong(0);
   }
 
   /**
@@ -260,8 +265,29 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return Pair.of(deletedCount, purgeSuccess);
   }
 
+  /**
+   * Updates ServiceMetrics for the last run of the service.
+   */
+  @Override
+  protected void execTaskCompletion() {
+    getMetrics().setKdsServiceState(false);
+    getMetrics().setKdsLastRunTimestamp(System.currentTimeMillis());
+    getMetrics().setKdsNextRunTimestamp(System.currentTimeMillis() + getIntervalMs());
+    getMetrics().updateIntervalCumulativeMetrics(curDeletedKeyCount.get(), curDeletedKeyReplSize.get());
+  }
+
+  /**
+   * Resets ServiceMetrics for the current run of the service.
+   */
+  private void execTaskInit() {
+    getMetrics().setKdsServiceState(true);
+    curDeletedKeyCount.set(0);
+    curDeletedKeyReplSize.set(0);
+  }
+
   @Override
   public BackgroundTaskQueue getTasks() {
+    execTaskInit();
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
     queue.add(new KeyDeletingTask(null));
     if (deepCleanSnapshots) {
@@ -320,7 +346,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     }
 
     /**
-     *
      * @param currentSnapshotInfo if null, deleted directories in AOS should be processed.
      * @param keyManager KeyManager of the underlying store.
      */
@@ -387,6 +412,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             successStatus = purgeResult.getValue();
             getMetrics().incrNumKeysProcessed(keyBlocksList.size());
             getMetrics().incrNumKeysSentForPurge(purgeResult.getKey());
+            curDeletedKeyCount.addAndGet(purgeResult.getKey());
             if (successStatus) {
               deletedKeyCount.addAndGet(purgeResult.getKey());
             }
