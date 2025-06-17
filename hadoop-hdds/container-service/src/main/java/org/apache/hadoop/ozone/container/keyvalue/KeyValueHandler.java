@@ -18,9 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
-import static org.apache.hadoop.hdds.HddsUtils.isOpenToWriteState;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
@@ -1383,15 +1381,15 @@ public class KeyValueHandler extends Handler {
    * Write the merkle tree for this container using the existing checksum metadata only. The data is not read or
    * validated by this method, so it is expected to run quickly.
    * <p>
-   * If the container's previous state was not open, closing, or recovering, this method does nothing. Containers in
-   * these states previously were not eligible for scanning, so we will not overwrite the scanner generated checksum
-   * (which actually looked at the data) with this call.
+   * If a data checksum for the container already exists, this method does nothing. The existing value would have either
+   * been made from the metadata or data itself so there is no need to recreate it from the metadata. This method
+   * does not send an ICR with the updated checksum info.
+   * <p>
    *
    * @param container The container which will have a tree generated.
-   * @param prevState The previous state the container was in before needing the checksum generated.
    */
-  private void updateContainerChecksumFromMetadataIfNeeded(Container container, State prevState) {
-    if (!isOpenToWriteState(prevState) && prevState != CLOSING) {
+  private void updateContainerChecksumFromMetadataIfNeeded(Container container) {
+    if (!container.getContainerData().needsDataChecksum()) {
       return;
     }
 
@@ -1462,11 +1460,10 @@ public class KeyValueHandler extends Handler {
   @Override
   public void markContainerUnhealthy(Container container, ScanResult reason)
       throws IOException {
-    long containerID = container.getContainerData().getContainerID();
-    State prevState = container.getContainerState();
     container.writeLock();
+    long containerID = 0L;
     try {
-      if (prevState == State.UNHEALTHY) {
+      if (container.getContainerState() == State.UNHEALTHY) {
         LOG.debug("Call to mark already unhealthy container {} as unhealthy",
             containerID);
         return;
@@ -1487,7 +1484,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    updateContainerChecksumFromMetadataIfNeeded(container, prevState);
+    updateContainerChecksumFromMetadataIfNeeded(container);
     // Even if the container file is corrupted/missing and the unhealthy
     // update fails, the unhealthy state is kept in memory and sent to
     // SCM. Write a corresponding entry to the container log as well.
@@ -1498,27 +1495,27 @@ public class KeyValueHandler extends Handler {
   @Override
   public void quasiCloseContainer(Container container, String reason)
       throws IOException {
-    final State prevState = container.getContainerState();
     container.writeLock();
     try {
+      final State state = container.getContainerState();
       // Quasi close call is idempotent.
-      if (prevState == State.QUASI_CLOSED) {
+      if (state == State.QUASI_CLOSED) {
         return;
       }
       // The container has to be in CLOSING state.
-      if (prevState != State.CLOSING) {
+      if (state != State.CLOSING) {
         ContainerProtos.Result error =
-            prevState == State.INVALID ? INVALID_CONTAINER_STATE :
+            state == State.INVALID ? INVALID_CONTAINER_STATE :
                 CONTAINER_INTERNAL_ERROR;
         throw new StorageContainerException(
             "Cannot quasi close container #" + container.getContainerData()
-                .getContainerID() + " while in " + prevState + " state.", error);
+                .getContainerID() + " while in " + state + " state.", error);
       }
       container.quasiClose();
     } finally {
       container.writeUnlock();
     }
-    updateContainerChecksumFromMetadataIfNeeded(container, prevState);
+    updateContainerChecksumFromMetadataIfNeeded(container);
     ContainerLogger.logQuasiClosed(container.getContainerData(), reason);
     sendICR(container);
   }
@@ -1526,33 +1523,33 @@ public class KeyValueHandler extends Handler {
   @Override
   public void closeContainer(Container container)
       throws IOException {
-    final State prevState = container.getContainerState();
     container.writeLock();
     try {
+      final State state = container.getContainerState();
       // Close call is idempotent.
-      if (prevState == State.CLOSED) {
+      if (state == State.CLOSED) {
         return;
       }
-      if (prevState == State.UNHEALTHY) {
+      if (state == State.UNHEALTHY) {
         throw new StorageContainerException(
             "Cannot close container #" + container.getContainerData()
-                .getContainerID() + " while in " + prevState + " state.",
+                .getContainerID() + " while in " + state + " state.",
             ContainerProtos.Result.CONTAINER_UNHEALTHY);
       }
       // The container has to be either in CLOSING or in QUASI_CLOSED state.
-      if (prevState != State.CLOSING && prevState != State.QUASI_CLOSED) {
+      if (state != State.CLOSING && state != State.QUASI_CLOSED) {
         ContainerProtos.Result error =
-            prevState == State.INVALID ? INVALID_CONTAINER_STATE :
+            state == State.INVALID ? INVALID_CONTAINER_STATE :
                 CONTAINER_INTERNAL_ERROR;
         throw new StorageContainerException(
             "Cannot close container #" + container.getContainerData()
-                .getContainerID() + " while in " + prevState + " state.", error);
+                .getContainerID() + " while in " + state + " state.", error);
       }
       container.close();
     } finally {
       container.writeUnlock();
     }
-    updateContainerChecksumFromMetadataIfNeeded(container, prevState);
+    updateContainerChecksumFromMetadataIfNeeded(container);
     ContainerLogger.logClosed(container.getContainerData());
     sendICR(container);
   }
