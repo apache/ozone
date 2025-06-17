@@ -36,7 +36,7 @@ This is particularly useful when DataNodes have multiple disks.
 - Adequate CPU, memory, and network bandwidth
 
 ## How It Works
-SCM can now create overlapping pipelines: each DataNode can join multiple RAFT groups, up to a configurable limit. This boosts concurrency and avoids idle nodes. Raft logs are stored separately on different metadata volumes to reduce disk contention. Ratis handles concurrent logs per node.
+SCM can now create overlapping pipelines: each DataNode can join multiple Raft groups, up to a configurable limit. This boosts concurrency and avoids idle nodes. Raft logs are stored separately on different metadata volumes to reduce disk contention. Ratis handles concurrent logs per node.
 
 ## How to Use
 1. Configure DataNode metadata volumes:
