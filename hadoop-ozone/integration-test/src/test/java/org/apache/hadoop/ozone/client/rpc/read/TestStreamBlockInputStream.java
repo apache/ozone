@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.om.TestBucket;
-import org.junit.Assert;
 
 /**
  * Tests {@link StreamBlockInputStream}.
