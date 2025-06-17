@@ -44,7 +44,7 @@ This design proposes a mechanism to preallocate blocks in OM and cache them for 
 #### 2. Block Pre-Fetching:
 
 - For every client write request made, we see if the cache size falls below the minimum threshold (configurable property: ozone.om.prefetch.min.blocks), if yes - the background thread is triggered to asynchronously prefetch blocks from SCM while adhering to a maximum cache size limit (configurable property: ozone.om.prefetch.max.blocks).
-- Example: A client write request for x blocks with an empty cache size results in max_threshold blocks being cached asynchronously in the background once the actual client request is through (ref: Figure 2).
+- Example: A client write request for x blocks with an empty cache size results in max_threshold blocks (max_threshold - cache_size) being cached asynchronously in the background once the actual client request is through (ref: Figure 2).
 
 #### Figure 2
 ![Block Pre-Fetching](block-prefetching.png)
@@ -53,12 +53,12 @@ This design proposes a mechanism to preallocate blocks in OM and cache them for 
 
 - Cached blocks are used for the request if available.
 - If the cache has fewer blocks than requested, we leave the cache as is and fallback to a synchronous RPC call to SCM.
-  - Example (ref: Figure 3): If the client requests x blocks (where x < min_threshold), x of the min_threshold cached blocks are used. Post this step, Step 2. is repeated to refill the cache asynchronously (if needed).
+  - Example (ref: Figure 3): If the client requests x blocks (where x < min_threshold), and min_threshold blocks remain cached, x of the min_threshold cached blocks are utilized for the request. Post this step, Step 2. is repeated to refill the cache asynchronously (if needed).
 
    #### Figure 3
    ![Block Usage and Refilling I](block-usage-refill-i.png)
 
-  - Example (ref: Figure 4): If the client requests x blocks (where x > min_threshold), and min_threshold blocks remain cached, all x blocks are fetched from SCM synchronously and returned to the client. Post this step, Step 2. is repeated to refill the cache asynchronously (if needed).
+  - Example (ref: Figure 4): If the client requests x blocks (where x > min_threshold), and min_threshold blocks remain cached, all x blocks are fetched from SCM synchronously and returned to the client (leaving the cache untouched). Post this step, Step 2. is repeated to refill the cache asynchronously (if needed).
   #### Figure 4
   ![Block Usage and Refilling II](block-usage-refill-ii.png)
 
