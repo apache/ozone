@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
@@ -336,7 +337,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     // Small performance optimization. We check if the operation is of type
     // write before trying to send CloseContainerAction.
     if (!HddsUtils.isReadOnly(msg)) {
-      sendCloseContainerActionIfNeeded(container);
+      try {
+        sendCloseContainerActionIfNeeded(container, cmdType);
+      } catch (StorageContainerException e) {
+        return ContainerUtils.logAndReturnError(LOG, e, msg);
+      }
     }
     Handler handler = getHandler(containerType);
     if (handler == null) {
@@ -404,7 +409,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // in any case, the in memory state of the container should be unhealthy
         Preconditions.checkArgument(
             container.getContainerData().getState() == State.UNHEALTHY);
-        sendCloseContainerActionIfNeeded(container);
+        try {
+          sendCloseContainerActionIfNeeded(container, cmdType);
+        } catch (StorageContainerException e) {
+          LOG.error("Exception while handling disk / space full check for containerId " + containerID, e);
+        }
       }
       if (cmdType == Type.CreateContainer
           && result == Result.SUCCESS && dispatcherContext != null) {
@@ -577,9 +586,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   /**
    * If the container usage reaches the close threshold or the container is
    * marked unhealthy we send Close ContainerAction to SCM.
+   *
    * @param container current state of container
+   * @param cmdType request command type
    */
-  private void sendCloseContainerActionIfNeeded(Container container) {
+  private void sendCloseContainerActionIfNeeded(Container container, Type cmdType) throws StorageContainerException {
     // We have to find a more efficient way to close a container.
     boolean isOpen = container != null && container.getContainerState() == State.OPEN;
     boolean isVolumeFull = isOpen && isVolumeFullExcludingCommittedSpace(container);
@@ -594,11 +605,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           .setContainerID(containerData.getContainerID())
           .setAction(ContainerAction.Action.CLOSE).setReason(reason).build();
       context.addContainerActionIfAbsent(action);
-      if (isVolumeFull) {
-        HddsVolume volume = containerData.getVolume();
-        LOG.warn("Volume [{}] is full. containerID: {}. Volume usage: [{}].", volume, containerData.getContainerID(),
-            volume.getCurrentUsage());
-      }
       AtomicBoolean immediateCloseActionSent = containerData.getImmediateCloseActionSent();
       // if an immediate heartbeat has not been triggered already, trigger it now
       if (immediateCloseActionSent.compareAndSet(false, true)) {
@@ -607,6 +613,17 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           // log only if volume is full
           // don't want to log if only container is full because that is expected to happen frequently
           LOG.warn("Triggered immediate heartbeat because of full volume.");
+        }
+      }
+      if (isVolumeFull) {
+        HddsVolume volume = containerData.getVolume();
+        LOG.warn("Volume [{}] is full. containerID: {}. Volume usage: [{}].", volume, containerData.getContainerID(),
+            volume.getCurrentUsage());
+        if (cmdType == Type.WriteChunk || cmdType == Type.PutBlock || cmdType == Type.PutSmallFile) {
+          // If the container is full, we should not allow any more writes.
+          // This will prevent the client from writing to a full container.
+          throw new StorageContainerException("Container creation failed, due to volume out of space",
+              DISK_OUT_OF_SPACE);
         }
       }
     }
