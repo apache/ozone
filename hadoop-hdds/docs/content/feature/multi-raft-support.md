@@ -42,7 +42,7 @@ SCM can now create overlapping pipelines: each DataNode can join multiple Raft g
 1. Configure DataNode metadata volumes:
    ```xml
    <property>
-     <name>dfs.container.ratis.datanode.storage.dir</name>
+     <name>hdds.container.ratis.datanode.storage.dir</name>
      <value>/disk1/ratis,/disk2/ratis</value>
    </property>
    ```
