@@ -69,7 +69,7 @@ SCM can now create overlapping pipelines: each DataNode can join multiple Raft g
   - Set to `0` to auto-compute based on metadata volumes
 - `ozone.scm.pipeline.per.metadata.disk` (default: 2)
   - Number of pipelines to be created per metadata volume.
-- `dfs.container.ratis.datanode.storage.dir`: list of metadata volume paths
+- `hdds.container.ratis.datanode.storage.dir`: list of metadata volume paths
 
 ## Operational Tips
 - Monitor with `ozone admin` CLI and Recon UI
