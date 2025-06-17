@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -68,8 +70,30 @@ public final class DeletingServiceMetrics {
   @Metric("Total no. of rename entries purged")
   private MutableGaugeLong numRenameEntriesPurged;
 
+  /*
+   * Key deletion metrics in the last 24 hours.
+   */
+  private static final long METRIC_RESET_INTERVAL = TimeUnit.DAYS.toSeconds(1);
+  @Metric("Last time the metrics were reset")
+  private MutableGaugeLong metricsResetTimeS;
+  @Metric("No. of reclaimed keys in the last interval")
+  private MutableGaugeLong keysReclaimedInInterval;
+  @Metric("Replicated size of reclaimed keys in the last interval (bytes)")
+  private MutableGaugeLong reclaimedSizeInInterval;
+
+  /*
+   * Deletion service state metrics.
+   */
+  @Metric("Key Deleting Service state: 1=Running, 0=Idle")
+  private MutableGaugeLong kdsServiceState;
+  @Metric("Key Deleting Service last run timestamp in ms")
+  private MutableGaugeLong kdsLastRunTimestamp;
+  @Metric("Key Deleting Service next scheduled run timestamp in ms")
+  private MutableGaugeLong kdsNextRunTimestamp;
+
   private DeletingServiceMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
+    this.metricsResetTimeS.set(Instant.now().getEpochSecond());
   }
 
   /**
@@ -158,6 +182,37 @@ public final class DeletingServiceMetrics {
 
   public void incrNumRenameEntriesPurged(long renameEntriesPurged) {
     this.numRenameEntriesPurged.incr(renameEntriesPurged);
+  }
+
+  public void setKdsServiceState(boolean running) {
+    this.kdsServiceState.set(running ? 1 : 0);
+  }
+
+  public void setKdsLastRunTimestamp(long timestamp) {
+    this.kdsLastRunTimestamp.set(timestamp);
+  }
+
+  public void setKdsNextRunTimestamp(long timestamp) {
+    this.kdsNextRunTimestamp.set(timestamp);
+  }
+
+  private void resetMetrics() {
+    keysReclaimedInInterval.set(0);
+    reclaimedSizeInInterval.set(0);
+  }
+
+  private void checkAndResetMetrics() {
+    long currentTime = Instant.now().getEpochSecond();
+    if (currentTime - metricsResetTimeS.value() > METRIC_RESET_INTERVAL) {
+      resetMetrics();
+      metricsResetTimeS.set(currentTime);
+    }
+  }
+
+  public void updateIntervalCumulativeMetrics(long keysReclaimed, long replicatedSizeBytes) {
+    checkAndResetMetrics();
+    this.keysReclaimedInInterval.incr(keysReclaimed);
+    this.reclaimedSizeInInterval.incr(replicatedSizeBytes);
   }
 
   @VisibleForTesting

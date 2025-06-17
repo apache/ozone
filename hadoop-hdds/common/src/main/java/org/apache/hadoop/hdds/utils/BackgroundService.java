@@ -186,6 +186,7 @@ public abstract class BackgroundService {
           }, exec).exceptionally(e -> null), (Void1, Void) -> null);
         }
       }
+      execTaskCompletion();
     }
   }
 
