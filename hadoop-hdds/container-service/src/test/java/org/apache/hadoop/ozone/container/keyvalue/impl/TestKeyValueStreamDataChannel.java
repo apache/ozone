@@ -162,6 +162,7 @@ public class TestKeyValueStreamDataChannel {
   @Test
   public void testVolumeFullCase() throws Exception {
     File tempFile = File.createTempFile("test-kv-stream", ".tmp");
+    tempFile.deleteOnExit();
     HddsVolume mockVolume = mock(HddsVolume.class);
     when(mockVolume.getStorageID()).thenReturn("storageId");
     when(mockVolume.isVolumeFull()).thenReturn(true);
@@ -176,7 +177,9 @@ public class TestKeyValueStreamDataChannel {
     final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
         PUT_BLOCK_PROTO, null).getContent().asReadOnlyByteBuffer();
     ReferenceCountedObject<ByteBuffer> wrap = ReferenceCountedObject.wrap(putBlockBuf);
+    wrap.retain();
     assertThrows(StorageContainerException.class, () -> writeChannel.write(wrap));
+    wrap.release();
   }
 
   @Test
