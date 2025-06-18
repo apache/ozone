@@ -138,7 +138,7 @@ public class BucketEndpoint extends EndpointBase {
       S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       if (aclMarker != null) {
         s3GAction = S3GAction.GET_ACL;
-        S3BucketAcl result = getAcl(bucketName);
+        S3BucketAcl result = getAcl(bucket);
         getMetrics().updateGetAclSuccessStats(startNanos);
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
@@ -147,7 +147,7 @@ public class BucketEndpoint extends EndpointBase {
 
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
-        return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
+        return listMultipartUploads(bucket, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
 
       maxKeys = validateMaxKeys(maxKeys);
@@ -345,7 +345,7 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   public Response listMultipartUploads(
-      String bucketName,
+      OzoneBucket bucket,
       String prefix,
       String keyMarker,
       String uploadIdMarker,
@@ -360,14 +360,12 @@ public class BucketEndpoint extends EndpointBase {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
 
-    OzoneBucket bucket = getBucket(bucketName);
-
     try {
       OzoneMultipartUploadList ozoneMultipartUploadList =
           bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker, maxUploads);
 
       ListMultipartUploadsResult result = new ListMultipartUploadsResult();
-      result.setBucket(bucketName);
+      result.setBucket(bucket.getName());
       result.setKeyMarker(keyMarker);
       result.setUploadIdMarker(uploadIdMarker);
       result.setNextKeyMarker(ozoneMultipartUploadList.getNextKeyMarker());
@@ -441,8 +439,10 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.DELETE_BUCKET;
 
     try {
-      OzoneBucket bucket = getBucket(bucketName);
-      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
+      if (S3Owner.hasBucketOwnershipVerificationConditions(headers)) {
+        OzoneBucket bucket = getBucket(bucketName);
+        S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
+      }
       deleteS3Bucket(bucketName);
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
@@ -540,12 +540,12 @@ public class BucketEndpoint extends EndpointBase {
    * <p>
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html
    */
-  public S3BucketAcl getAcl(String bucketName)
+  public S3BucketAcl getAcl(OzoneBucket bucket)
       throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3BucketAcl result = new S3BucketAcl();
+    String bucketName = bucket.getName();
     try {
-      OzoneBucket bucket = getBucket(bucketName);
       S3Owner owner = S3Owner.of(bucket.getOwner());
       result.setOwner(owner);
 
@@ -573,9 +573,6 @@ public class BucketEndpoint extends EndpointBase {
       } else {
         throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       }
-    } catch (OS3Exception ex) {
-      getMetrics().updateGetAclFailureStats(startNanos);
-      throw ex;
     }
   }
 

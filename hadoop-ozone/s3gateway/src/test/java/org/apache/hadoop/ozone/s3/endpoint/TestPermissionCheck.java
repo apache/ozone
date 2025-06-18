@@ -154,7 +154,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.listMultipartUploads("bucketName", "prefix", "", "", 10));
+        bucketEndpoint.listMultipartUploads(bucket, "prefix", "", "", 10));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
