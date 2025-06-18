@@ -27,10 +27,12 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
@@ -94,11 +96,14 @@ abstract class StreamDataChannelBase
     return getChannel().isOpen();
   }
 
-  protected void assertSpaceAvailability() throws IOException {
-    if (containerData.getVolume().isVolumeFull()) {
+  protected void assertSpaceAvailability(int remaining) throws IOException {
+    HddsVolume volume = containerData.getVolume();
+    SpaceUsageSource currentUsage = volume.getCurrentUsage();
+    if (currentUsage.getAvailable() - volume.getFreeSpaceToSpare(currentUsage.getCapacity()) <= remaining) {
       throw new StorageContainerException("write failed for container " + containerData.getContainerID()
-          + " due to volume " + containerData.getVolume().getStorageID() + " out of space "
-          + containerData.getVolume().getCurrentUsage(), DISK_OUT_OF_SPACE);
+          + " with size " + remaining + " due to volume " + volume.getStorageID() + " out of space "
+          + volume.getCurrentUsage() + " with minimum free space required: "
+          + volume.getFreeSpaceToSpare(currentUsage.getCapacity()), DISK_OUT_OF_SPACE);
     }
   }
 

@@ -171,7 +171,8 @@ public class TestKeyValueStreamDataChannel {
     when(mockContainerData.getVolume()).thenReturn(mockVolume);
     ContainerMetrics mockMetrics = mock(ContainerMetrics.class);
     KeyValueStreamDataChannel writeChannel = new KeyValueStreamDataChannel(tempFile, mockContainerData, mockMetrics);
-    assertThrows(StorageContainerException.class, writeChannel::assertSpaceAvailability);
+    assertThrows(StorageContainerException.class,
+        () -> writeChannel.assertSpaceAvailability(1));
     final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
         PUT_BLOCK_PROTO, null).getContent().asReadOnlyByteBuffer();
     ReferenceCountedObject<ByteBuffer> wrap = ReferenceCountedObject.wrap(putBlockBuf);
