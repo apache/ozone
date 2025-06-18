@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.fs;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.google.common.base.Supplier;
+import java.util.function.Supplier;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;

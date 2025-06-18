@@ -46,7 +46,7 @@ public class DUOptimized implements SpaceUsageSource {
     }
     Supplier<Long> gatherContainerUsages = containerUsedSpaceProvider.get();
     long containerUsedSpace = gatherContainerUsages.get();
-    LOG.info("Disk du usages {}, container data usages {}", metaPathSize, containerUsedSpace);
+    LOG.info("Disk metaPath du usages {}, container data usages {}", metaPathSize, containerUsedSpace);
     return metaPathSize + containerUsedSpace;
   }
 
