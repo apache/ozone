@@ -185,7 +185,6 @@ public class OMPrepareRequest extends OMClientRequest {
     // If we purge logs without waiting for this index, it may not make it to
     // the RocksDB snapshot, and then the log entry is lost on this OM.
     long minRatisStateMachineIndex = minOMDBFlushIndex + 1; // for the ratis-metadata transaction
-    long lastRatisCommitIndex = RaftLog.INVALID_LOG_INDEX;
 
     // Wait OM state machine to apply the given index.
     long lastOMDBFlushIndex = RaftLog.INVALID_LOG_INDEX;
@@ -202,11 +201,10 @@ public class OMPrepareRequest extends OMClientRequest {
           lastOMDBFlushIndex);
 
       // Check ratis state machine.
-      lastRatisCommitIndex = stateMachine.getLastNotifiedTermIndex().getIndex();
-      ratisStateMachineApplied = (lastRatisCommitIndex >=
-          minRatisStateMachineIndex);
+      final long lastRatisAppliedIndex = stateMachine.getLastAppliedTermIndex().getIndex();
+      ratisStateMachineApplied = lastRatisAppliedIndex >= minRatisStateMachineIndex;
       LOG.debug("{} Current Ratis state machine transaction index {}.",
-          om.getOMNodeId(), lastRatisCommitIndex);
+          om.getOMNodeId(), ratisStateMachineApplied);
 
       if (!(omDBFlushed && ratisStateMachineApplied)) {
         Thread.sleep(flushCheckInterval.toMillis());
