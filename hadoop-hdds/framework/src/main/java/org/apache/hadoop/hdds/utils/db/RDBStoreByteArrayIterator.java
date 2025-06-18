@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
 import java.util.Arrays;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 
@@ -56,7 +55,7 @@ class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
   }
 
   @Override
-  void delete(byte[] key) throws IOException {
+  void delete(byte[] key) throws RocksDatabaseException {
     getRocksDBTable().delete(key);
   }
 

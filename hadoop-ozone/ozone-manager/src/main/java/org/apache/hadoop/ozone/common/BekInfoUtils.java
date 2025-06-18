@@ -23,7 +23,7 @@ import java.io.IOException;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketEncryptionInfoProto;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
@@ -42,7 +42,7 @@ public final class BekInfoUtils {
     BucketEncryptionInfoProto.Builder bekb = null;
     if (kmsProvider == null) {
       throw new OMException("Invalid KMS provider, check configuration " +
-          CommonConfigurationKeys.HADOOP_SECURITY_KEY_PROVIDER_PATH,
+          CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
           OMException.ResultCodes.INVALID_KMS_PROVIDER);
     }
     if (bek.getKeyName() == null) {
