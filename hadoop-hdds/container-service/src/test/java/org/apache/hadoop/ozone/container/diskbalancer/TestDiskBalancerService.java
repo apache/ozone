@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
@@ -116,12 +117,9 @@ public class TestDiskBalancerService {
         getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
 
     // Set a low bandwidth to delay job
-    svc.setShouldRun(true);
-    svc.setThreshold(10.0d);
-    svc.setBandwidthInMB(1L);
-    svc.setParallelThread(5);
-    svc.setStopAfterDiskEven(true);
-    svc.setVersion(DiskBalancerVersion.DEFAULT_VERSION);
+    DiskBalancerInfo initialInfo = new DiskBalancerInfo(DiskBalancerOperationalState.RUNNING, 10.0d, 1L, 5,
+        true, DiskBalancerVersion.DEFAULT_VERSION);
+    svc.refresh(initialInfo);
 
     svc.start();
 
@@ -131,7 +129,7 @@ public class TestDiskBalancerService {
     assertEquals(5, svc.getDiskBalancerInfo().getParallelThread());
     assertTrue(svc.getDiskBalancerInfo().isStopAfterDiskEven());
 
-    DiskBalancerInfo newInfo = new DiskBalancerInfo(false, 20.0d, 5L, 10, false);
+    DiskBalancerInfo newInfo = new DiskBalancerInfo(DiskBalancerOperationalState.STOPPED, 20.0d, 5L, 10, false);
     svc.refresh(newInfo);
 
     assertFalse(svc.getDiskBalancerInfo().isShouldRun());

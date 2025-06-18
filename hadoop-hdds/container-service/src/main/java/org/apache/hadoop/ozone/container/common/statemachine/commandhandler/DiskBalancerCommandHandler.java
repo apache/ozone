@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.DiskBalancerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -74,11 +75,18 @@ public class DiskBalancerCommandHandler implements CommandHandler {
     try {
       switch (opType) {
       case START:
-        diskBalancerInfo.setShouldRun(true);
+        HddsProtos.NodeOperationalState state = context.getParent().getDatanodeDetails().getPersistedOpState();
+
+        if (state == HddsProtos.NodeOperationalState.IN_SERVICE) {
+          diskBalancerInfo.setOperationalState(DiskBalancerOperationalState.RUNNING);
+        } else {
+          LOG.warn("Cannot start DiskBalancer as node is in {} state. Pausing instead.", state);
+          diskBalancerInfo.setOperationalState(DiskBalancerOperationalState.PAUSED_BY_NODE_STATE);
+        }
         diskBalancerInfo.updateFromConf(diskBalancerConf);
         break;
       case STOP:
-        diskBalancerInfo.setShouldRun(false);
+        diskBalancerInfo.setOperationalState(DiskBalancerOperationalState.STOPPED);
         break;
       case UPDATE:
         diskBalancerInfo.updateFromConf(diskBalancerConf);
