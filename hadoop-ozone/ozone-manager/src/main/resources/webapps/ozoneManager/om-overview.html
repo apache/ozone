@@ -91,3 +91,39 @@
     </tr>
     </tbody>
 </table>
+
+<h2>Deletion Progress [since {{$ctrl.overview.jmx.MetricsResetTimestamp * 1000 | date:'yyyy-MM-dd HH:mm:ss.sss'}}]</h2>
+<table class="table table-bordered table-striped" class="col-md-6">
+    <thead>
+    <tr>
+        <th>Total Reclaimed Key Size(Replicated)</th>
+        <th>No. of Keys Reclaimed</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>{{$ctrl.overview.jmx.ReclaimedSizeInInterval | bytes}}</td>
+        <td>{{$ctrl.overview.jmx.KeysReclaimedInInterval}}</td>
+    </tr>
+    </tbody>
+</table>
+<div class="card mb-4">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3 class="mb-0">Key Deletion</h3>
+            <span class="badge" ng-class="{'badge-success': $ctrl.overview.jmx.KdsServiceState == 1, 'badge-secondary': $ctrl.overview.jmx.KdsServiceState == 0}">
+                      {{$ctrl.overview.jmx.KdsServiceState == 1 ? 'Running' : 'Idle'}}
+            </span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row mb-2">
+            <div class="col-md-3 text-left">Last Run:</div>
+            <div class="col-md-9 text-right">{{$ctrl.overview.jmx.KdsLastRunTimestamp | timeAgo}}</div>
+        </div>
+        <div class="row">
+            <div class="col-md-3 text-left">Next Run:</div>
+            <div class="col-md-9 text-right">in {{$ctrl.overview.jmx.KdsNextRunTimestamp - Date.now() | timeSpan}}</div>
+        </div>
+    </div>
+</div>
