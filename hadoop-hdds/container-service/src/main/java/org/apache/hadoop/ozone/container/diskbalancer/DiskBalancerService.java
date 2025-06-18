@@ -92,7 +92,7 @@ public class DiskBalancerService extends BackgroundService {
   private AtomicLong balancedBytesInLastWindow = new AtomicLong(0L);
   private AtomicLong nextAvailableTime = new AtomicLong(Time.monotonicNow());
 
-  private Map<DiskBalancerTask, Integer> inProgressTasks;
+  private Set<DiskBalancerTask> inProgressTasks;
   private Set<Long> inProgressContainers;
 
   /**
@@ -151,7 +151,7 @@ public class DiskBalancerService extends BackgroundService {
     Preconditions.checkNotNull(diskBalancerInfoPath);
     diskBalancerInfoFile = new File(diskBalancerInfoPath);
 
-    inProgressTasks = new ConcurrentHashMap<>();
+    inProgressTasks = ConcurrentHashMap.newKeySet();
     inProgressContainers = ConcurrentHashMap.newKeySet();
     deltaSizes = new ConcurrentHashMap<>();
     volumeSet = ozoneContainer.getVolumeSet();
@@ -394,8 +394,10 @@ public class DiskBalancerService extends BackgroundService {
       ContainerData toBalanceContainer = containerChoosingPolicy
           .chooseContainer(ozoneContainer, sourceVolume, inProgressContainers);
       if (toBalanceContainer != null) {
-        queue.add(new DiskBalancerTask(toBalanceContainer, sourceVolume,
-            destVolume));
+        DiskBalancerTask task = new DiskBalancerTask(toBalanceContainer, sourceVolume,
+            destVolume);
+        queue.add(task);
+        inProgressTasks.add(task);
         inProgressContainers.add(toBalanceContainer.getContainerID());
         deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
             - toBalanceContainer.getBytesUsed());
@@ -570,6 +572,7 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     private void postCall() {
+      inProgressTasks.remove(this);
       inProgressContainers.remove(containerData.getContainerID());
       deltaSizes.put(sourceVolume, deltaSizes.get(sourceVolume) +
           containerData.getBytesUsed());
