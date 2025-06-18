@@ -359,7 +359,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               keyManager.getRenamesKeyEntries(volume, bucket, null, renameEntryFilter, remainNum);
           List<String> renamedTableEntries =
               renameEntriesPair.getValue().stream().map(Table.KeyValue::getKey).collect(Collectors.toList());
-          //remainNum -= renamedTableEntries.size();
           remainNum -= renameEntriesPair.getKey();
 
           // Get pending keys that can be deleted
@@ -374,7 +373,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 expectedPreviousSnapshotId);
             Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, pendingKeysDeletion.getKeysToModify(),
                 renamedTableEntries, snapshotTableKey, expectedPreviousSnapshotId);
-            //remainNum -= purgeResult.getKey();
             remainNum -= pendingKeysDeletion.getConsumedSize();
             successStatus = purgeResult.getValue();
             getMetrics().incrNumKeysProcessed(keyBlocksList.size());
