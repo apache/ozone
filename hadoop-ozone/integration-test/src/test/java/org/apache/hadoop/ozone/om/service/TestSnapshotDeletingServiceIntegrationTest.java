@@ -55,7 +55,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -504,8 +503,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     OmSnapshot snap1 = rcSnap1.get();
     Table<String, OmKeyInfo> snap1KeyTable =
         snap1.getMetadataManager().getFileTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String,
-        RepeatedOmKeyInfo>> iterator = deletedTable.iterator()) {
+    try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> iterator = deletedTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, RepeatedOmKeyInfo> next = iterator.next();
         String activeDBDeletedKey = next.getKey();

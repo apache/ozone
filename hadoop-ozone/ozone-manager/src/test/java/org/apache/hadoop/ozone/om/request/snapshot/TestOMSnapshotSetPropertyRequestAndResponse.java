@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -94,7 +93,7 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
         getOmSnapshotIntMetrics().getNumSnapshotSetProperties());
     assertEquals(initialSnapshotSetPropertyFailCount, getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails());
     // Check if the exclusive size is set.
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (Table.KeyValueIterator<String, SnapshotInfo>
              iterator = getOmMetadataManager().getSnapshotInfoTable().iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
@@ -155,7 +154,7 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
   private List<OMRequest> createSnapshotUpdateSizeRequest()
       throws IOException {
     List<OMRequest> omRequests = new ArrayList<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (Table.KeyValueIterator<String, SnapshotInfo>
              iterator = getOmMetadataManager().getSnapshotInfoTable().iterator()) {
       while (iterator.hasNext()) {
         String snapDbKey = iterator.next().getKey();
