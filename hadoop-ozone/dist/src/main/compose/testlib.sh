@@ -30,6 +30,7 @@ source "${_testlib_dir}/../smoketest/testlib.sh"
 : ${OZONE_COMPOSE_RUNNING:=false}
 : ${SECURITY_ENABLED:=false}
 : ${SCM:=scm}
+: ${SKIP_APACHE_VERIFY_DOWNLOAD:=${CI:-false}}
 
 # Check if running from output of Maven build or from source
 _is_build() {
@@ -631,6 +632,8 @@ download_and_verify_apache_release() {
   local download_dir="${DOWNLOAD_DIR:-/tmp}"
 
   download_if_not_exists "${base_url}${remote_path}" "${download_dir}/${f}"
-  download_if_not_exists "${checksum_base_url}${remote_path}.asc"  "${download_dir}/${f}.asc"
-  gpg --verify "${download_dir}/${f}.asc" "${download_dir}/${f}" || exit 1
+  if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" != "true" ]]; then
+    download_if_not_exists "${checksum_base_url}${remote_path}.asc"  "${download_dir}/${f}.asc"
+    gpg --verify "${download_dir}/${f}.asc" "${download_dir}/${f}" || exit 1
+  fi
 }

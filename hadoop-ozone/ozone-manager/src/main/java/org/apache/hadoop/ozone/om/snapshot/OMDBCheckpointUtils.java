@@ -73,7 +73,8 @@ public final class OMDBCheckpointUtils {
           counters.getFileCounter().get(),
           (includeSnapshotData ? ", snapshots: " + totalSnapshots : ""));
     } catch (Exception e) {
-      LOG.error("Could not estimate size of transfer to Checkpoint Tarball Stream.", e);
+      LOG.error("Could not estimate size of transfer to Checkpoint Tarball Stream for dbLocation:{} snapshotPaths:{}",
+          dbLocation, snapshotPaths, e);
     }
   }
 }

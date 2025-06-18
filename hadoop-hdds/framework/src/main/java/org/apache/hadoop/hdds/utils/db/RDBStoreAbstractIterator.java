@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -59,7 +58,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   abstract void seek0(RAW key);
 
   /** Delete the given key. */
-  abstract void delete(RAW key) throws IOException;
+  abstract void delete(RAW key) throws RocksDatabaseException;
 
   /** Does the given key start with the prefix? */
   abstract boolean startsWithPrefix(RAW key);
@@ -136,7 +135,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   @Override
-  public final void removeFromDB() throws IOException {
+  public final void removeFromDB() throws RocksDatabaseException, CodecException {
     if (rocksDBTable == null) {
       throw new UnsupportedOperationException("remove");
     }
