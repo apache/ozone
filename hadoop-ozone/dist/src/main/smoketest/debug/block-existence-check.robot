@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test block existence in case a block does not exist
+Documentation       Test existence of a block on a datanode
 Library             OperatingSystem
 Resource            ../lib/os.robot
 Resource            ozone-debug-keywords.robot

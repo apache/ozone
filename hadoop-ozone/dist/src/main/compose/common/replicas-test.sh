@@ -55,8 +55,6 @@ docker stop "${container}"
 wait_for_datanode "${container}" STALE 60
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "STALE_DATANODE:${host}" debug/stale-datanode-checksum.robot
 
-wait_for_datanode "${container}" DEAD 60
-
 docker start "${container}"
 
 wait_for_datanode "${container}" HEALTHY 60
