@@ -21,9 +21,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -31,6 +33,7 @@ import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
+import org.apache.hadoop.ozone.container.common.utils.SlidingWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
@@ -309,8 +312,16 @@ public class TestStorageVolumeHealthChecks {
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
+    // Change timeunit using reflection
+    Field timeUnitField = SlidingWindow.class.getDeclaredField("timeUnit");
+    timeUnitField.setAccessible(true);
+    timeUnitField.set(volume.getIoTestSlidingWindow(), TimeUnit.SECONDS);
+    Field timeWindowField = SlidingWindow.class.getDeclaredField("windowDuration");
+    timeWindowField.setAccessible(true);
+    timeWindowField.set(volume.getIoTestSlidingWindow(), ioTestCount);
 
     for (int i = 0; i < checkResults.length; i++) {
+      Thread.sleep(1000);
       final boolean result = checkResults[i];
       final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
             @Override
