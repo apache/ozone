@@ -92,7 +92,7 @@ public class S3Owner {
    * `expected-source-bucket-owner` header is present and not empty.
    *
    * @param headers the HTTP headers to check
-   * @return true if either bucket owner condition header is present and not empty, false otherwise
+   * @return true if either bucket ownership verificatoin condition header is present and not empty, false otherwise
    */
   public static boolean hasBucketOwnershipVerificationConditions(HttpHeaders headers) {
     if (headers == null) {
