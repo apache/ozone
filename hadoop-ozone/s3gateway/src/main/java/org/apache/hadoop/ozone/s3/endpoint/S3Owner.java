@@ -87,6 +87,26 @@ public class S3Owner {
   }
 
   /**
+   * Checks whether the HTTP headers contain a bucket owner condition,
+   * specifically if either the `expected-bucket-owner` or
+   * `expected-source-bucket-owner` header is present and not empty.
+   *
+   * @param headers the HTTP headers to check
+   * @return true if either bucket owner condition header is present and not empty, false otherwise
+   */
+  public static boolean hasBucketOwnerCondition(HttpHeaders headers) {
+    if (headers == null) {
+      return false;
+    }
+    final String expectedBucketOwner = headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER);
+    if (!StringUtils.isEmpty(expectedBucketOwner)) {
+      return true;
+    }
+    final String expectedSourceBucketOwner = headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER);
+    return !StringUtils.isEmpty(expectedSourceBucketOwner);
+  }
+
+  /**
    * Verify the bucket owner condition.
    *
    * @param headers       HTTP headers

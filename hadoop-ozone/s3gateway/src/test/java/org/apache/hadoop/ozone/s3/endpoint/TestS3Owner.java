@@ -47,6 +47,43 @@ public class TestS3Owner {
   }
 
   @Test
+  public void testHasBucketOwnershipVerificationConditionsWithNullHeaders() {
+    assertThat(S3Owner.hasBucketOwnershipVerificationConditions(null)).isFalse();
+  }
+
+  @Test
+  public void testHasBucketOwnershipVerificationConditionsWithEmptyHeaders() {
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(null);
+    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn(null);
+    assertThat(S3Owner.hasBucketOwnershipVerificationConditions(headers)).isFalse();
+
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("");
+    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn("");
+    assertThat(S3Owner.hasBucketOwnershipVerificationConditions(headers)).isFalse();
+  }
+
+  @Test
+  public void testHasBucketOwnerConditionWithExpectedBucketOwnerVerificationPresent() {
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner1");
+    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn(null);
+    assertThat(S3Owner.hasBucketOwnershipVerificationConditions(headers)).isTrue();
+  }
+
+  @Test
+  public void testHasBucketOwnerConditionWithExpectedSourceBucketOwnerVerificationPresent() {
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(null);
+    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn("owner2");
+    assertThat(S3Owner.hasBucketOwnershipVerificationConditions(headers)).isTrue();
+  }
+
+  @Test
+  public void testHasBucketOwnershipVerificationConditionsWithBothPresent() {
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner1");
+    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn("owner2");
+    assertThat(S3Owner.hasBucketOwnershipVerificationConditions(headers)).isTrue();
+  }
+
+  @Test
   public void testHeaderIsNull() {
     assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerCondition(null, SOURCE_BUCKET_NAME, "test"));
     assertDoesNotThrow(() -> S3Owner.verifyBucketOwnerConditionOnCopyOperation(null, SOURCE_BUCKET_NAME, "test",
