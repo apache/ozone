@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -95,11 +95,7 @@ public class TestDeletionService {
           .flatMap(group -> group.getAllBlocks().stream())
           .mapToLong(DeletedBlock::getUsedBytes)
           .sum();
-
-      System.out.println("Total used bytes passed to deleteBlocks: " + totalUsedBytes);
-      assertEquals("Expected used bytes should match the written key size.",
-          KEY_SIZE, totalUsedBytes);
-
+      assertEquals(KEY_SIZE, totalUsedBytes);
     } finally {
       if (cluster != null) {
         cluster.shutdown();
