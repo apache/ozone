@@ -1,0 +1,10 @@
+RULE skip notifyGroupRemove
+CLASS org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine
+METHOD notifyGroupRemove
+AT ENTRY
+IF TRUE
+DO
+    System.out.println("[" + java.time.LocalDateTime.now() + "] BYTEMAN: " +
+    "Skip notifyGroupRemove in ContainerStateMachine");
+    return;
+ENDRULE

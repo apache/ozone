@@ -1,0 +1,10 @@
+RULE Block putBlock
+CLASS org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl
+METHOD putBlock
+AT ENTRY
+IF TRUE
+DO
+    System.out.println("[" + java.time.LocalDateTime.now() + "] BYTEMAN: " +
+    "Blocking putBlock in BlockManagerImpl");
+    return 0;
+ENDRULE
