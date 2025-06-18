@@ -89,8 +89,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
   // Track metrics for current task execution
-  private final AtomicLong curDeletedKeyCount;
-  private final AtomicLong curDeletedKeyReplSize;
+  private final DeletionStats aosDeletionStats = new DeletionStats();
+  private final DeletionStats snapshotDeletionStats = new DeletionStats();
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient, long serviceInterval,
@@ -107,8 +107,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
     this.scmClient = scmClient;
-    this.curDeletedKeyCount = new AtomicLong(0);
-    this.curDeletedKeyReplSize = new AtomicLong(0);
   }
 
   /**
@@ -269,7 +267,15 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     getMetrics().setKdsServiceState(false);
     getMetrics().setKdsLastRunTimestamp(System.currentTimeMillis());
     getMetrics().setKdsNextRunTimestamp(System.currentTimeMillis() + getIntervalMs());
-    getMetrics().updateIntervalCumulativeMetrics(curDeletedKeyCount.get(), curDeletedKeyReplSize.get());
+    getMetrics().updateIntervalCumulativeMetrics(
+        aosDeletionStats.reclaimedKeyCount.get() + snapshotDeletionStats.reclaimedKeyCount.get(),
+        aosDeletionStats.reclaimedKeySize.get() + snapshotDeletionStats.reclaimedKeySize.get());
+    getMetrics().updateAosLastRunMetrics(aosDeletionStats.reclaimedKeyCount.get(),
+        aosDeletionStats.reclaimedKeySize.get(), aosDeletionStats.iteratedKeyCount.get(),
+        aosDeletionStats.notReclaimableKeyCount.get());
+    getMetrics().updateSnapLastRunMetrics(snapshotDeletionStats.reclaimedKeyCount.get(),
+        snapshotDeletionStats.reclaimedKeySize.get(), snapshotDeletionStats.iteratedKeyCount.get(),
+        snapshotDeletionStats.notReclaimableKeyCount.get());
   }
 
   /**
@@ -277,8 +283,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    */
   private void execTaskInit() {
     getMetrics().setKdsServiceState(true);
-    curDeletedKeyCount.set(0);
-    curDeletedKeyReplSize.set(0);
+    aosDeletionStats.reset();
+    snapshotDeletionStats.reset();
   }
 
   @Override
@@ -401,8 +407,16 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             successStatus = purgeResult.getValue();
             getMetrics().incrNumKeysProcessed(keyBlocksList.size());
             getMetrics().incrNumKeysSentForPurge(purgeResult.getKey().getKey());
-            curDeletedKeyCount.addAndGet(purgeResult.getKey().getKey());
-            curDeletedKeyReplSize.addAndGet(purgeResult.getKey().getValue());
+
+            if (currentSnapshotInfo == null) {
+              aosDeletionStats.updateDeletionStats(purgeResult.getKey().getKey(), purgeResult.getKey().getValue(),
+                  keyBlocksList.size() + pendingKeysDeletion.getNotReclaimableKeyCount(),
+                  pendingKeysDeletion.getNotReclaimableKeyCount());
+            } else {
+              snapshotDeletionStats.updateDeletionStats(purgeResult.getKey().getKey(), purgeResult.getKey().getValue(),
+                  keyBlocksList.size() + pendingKeysDeletion.getNotReclaimableKeyCount(),
+                  pendingKeysDeletion.getNotReclaimableKeyCount());
+            }
             if (successStatus) {
               deletedKeyCount.addAndGet(purgeResult.getKey().getKey());
             }
@@ -491,6 +505,28 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       }
       // By design, no one cares about the results of this call back.
       return EmptyTaskResult.newResult();
+    }
+  }
+
+  private class DeletionStats {
+    final AtomicLong reclaimedKeyCount = new AtomicLong(0);
+    final AtomicLong reclaimedKeySize = new AtomicLong(0);
+    final AtomicLong iteratedKeyCount = new AtomicLong(0);
+    final AtomicLong notReclaimableKeyCount = new AtomicLong(0);
+
+    void updateDeletionStats(long reclaimedKeyCount, long reclaimedKeySize,
+                                       long iteratedKeyCount, long notReclaimableKeyCount) {
+      this.reclaimedKeyCount.addAndGet(reclaimedKeyCount);
+      this.reclaimedKeySize.addAndGet(reclaimedKeySize);
+      this.iteratedKeyCount.addAndGet(iteratedKeyCount);
+      this.notReclaimableKeyCount.addAndGet(notReclaimableKeyCount);
+    }
+
+    void reset() {
+      reclaimedKeyCount.set(0);
+      reclaimedKeySize.set(0);
+      iteratedKeyCount.set(0);
+      notReclaimableKeyCount.set(0);
     }
   }
 }
