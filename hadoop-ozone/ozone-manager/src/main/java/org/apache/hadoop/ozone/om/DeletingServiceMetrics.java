@@ -75,7 +75,7 @@ public final class DeletingServiceMetrics {
    */
   private static final long METRIC_RESET_INTERVAL = TimeUnit.DAYS.toSeconds(1);
   @Metric("Last time the metrics were reset")
-  private MutableGaugeLong metricsResetTimeS;
+  private MutableGaugeLong metricsResetTimeStamp;
   @Metric("No. of reclaimed keys in the last interval")
   private MutableGaugeLong keysReclaimedInInterval;
   @Metric("Replicated size of reclaimed keys in the last interval (bytes)")
@@ -91,9 +91,28 @@ public final class DeletingServiceMetrics {
   @Metric("Key Deleting Service next scheduled run timestamp in ms")
   private MutableGaugeLong kdsNextRunTimestamp;
 
+  /*
+   * Deletion service last run metrics.
+   */
+  @Metric("AOS: No. of reclaimed keys in the last run")
+  private MutableGaugeLong aosKeysReclaimedLast;
+  @Metric("AOS: Replicated size of reclaimed keys in the last run (bytes)")
+  private MutableGaugeLong aosReclaimedSizeLast;
+  @Metric("AOS: No. of iterated keys in the last run")
+  private MutableGaugeLong aosKeysIteratedLast;
+  @Metric("AOS: No. of not reclaimable keys the last run")
+  private MutableGaugeLong aosKeysNotReclaimableLast;
+  @Metric("Snapshot: No. of reclaimed keys in the last run")
+  private MutableGaugeLong snapKeysReclaimedLast;
+  @Metric("Snapshot: Replicated size of reclaimed keys in the last run (bytes)")
+  private MutableGaugeLong snapReclaimedSizeLast;
+  @Metric("Snapshot: No. of iterated keys in the last run")
+  private MutableGaugeLong snapKeysIteratedLast;
+  @Metric("Snapshot: No. of not reclaimable keys the last run")
+  private MutableGaugeLong snapKeysNotReclaimableLast;
+
   private DeletingServiceMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
-    this.metricsResetTimeS.set(Instant.now().getEpochSecond());
   }
 
   /**
@@ -203,9 +222,12 @@ public final class DeletingServiceMetrics {
 
   private void checkAndResetMetrics() {
     long currentTime = Instant.now().getEpochSecond();
-    if (currentTime - metricsResetTimeS.value() > METRIC_RESET_INTERVAL) {
+    if (this.metricsResetTimeStamp == null || this.metricsResetTimeStamp.value() == 0) {
+      this.metricsResetTimeStamp.set(currentTime);
+    }
+    if (currentTime - metricsResetTimeStamp.value() > METRIC_RESET_INTERVAL) {
       resetMetrics();
-      metricsResetTimeS.set(currentTime);
+      metricsResetTimeStamp.set(currentTime);
     }
   }
 
@@ -213,6 +235,22 @@ public final class DeletingServiceMetrics {
     checkAndResetMetrics();
     this.keysReclaimedInInterval.incr(keysReclaimed);
     this.reclaimedSizeInInterval.incr(replicatedSizeBytes);
+  }
+
+  public void updateAosLastRunMetrics(long keysReclaimed, long replicatedSizeBytes, long iteratedKeys,
+      long notReclaimableKeys) {
+    this.aosKeysReclaimedLast.set(keysReclaimed);
+    this.aosReclaimedSizeLast.set(replicatedSizeBytes);
+    this.aosKeysIteratedLast.set(iteratedKeys);
+    this.aosKeysNotReclaimableLast.set(notReclaimableKeys);
+  }
+
+  public void updateSnapLastRunMetrics(long keysReclaimed, long replicatedSizeBytes, long iteratedKeys,
+      long notReclaimableKeys) {
+    this.snapKeysReclaimedLast.set(keysReclaimed);
+    this.snapReclaimedSizeLast.set(replicatedSizeBytes);
+    this.snapKeysIteratedLast.set(iteratedKeys);
+    this.snapKeysNotReclaimableLast.set(notReclaimableKeys);
   }
 
   @VisibleForTesting
