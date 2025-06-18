@@ -153,7 +153,8 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   }
 
   /** The same as iterator(null, type). */
-  default KeyValueIterator<KEY, VALUE> iterator(KeyValueIterator.Type type) throws IOException {
+  default KeyValueIterator<KEY, VALUE> iterator(KeyValueIterator.Type type)
+      throws RocksDatabaseException, CodecException {
     return iterator(null, type);
   }
 
