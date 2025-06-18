@@ -21,6 +21,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
@@ -367,6 +368,51 @@ public class OMDBInsightEndpoint {
   private Long getValueFromId(GlobalStats record) {
     // If the record is null, return 0
     return record != null ? record.getValue() : 0L;
+  }
+
+  /**
+   * Retrieves the summary of open MPU keys.
+   *
+   * @return The HTTP response body includes a map with the following entries:
+   * - "totalOpenMPUKeys": the total number of open MPU keys
+   * - "totalReplicatedDataSize": the total replicated size for open MPU keys
+   * - "totalUnreplicatedDataSize": the total unreplicated size for open MPU keys
+   *
+   * Example response:
+   *   {
+   *    "totalOpenMPUKeys": 2,
+   *    "totalReplicatedDataSize": 90000,
+   *    "totalUnreplicatedDataSize": 30000
+   *   }
+   */
+  @GET
+  @Path("/open/summary/mpu")
+  public Response getOpenMPUKeySummary() {
+    // Create a HashMap for the keysSummary
+    Map<String, Long> keysSummary = new HashMap<>();
+    // Create a keys summary for open MPU keys
+    createKeysSummaryForOpenMPUKey(keysSummary);
+    return Response.ok(keysSummary).build();
+  }
+
+  /**
+   * Creates a keys summary for open MPU keys and updates the provided keysSummary map.
+   * Calculates the total number of open keys, replicated data size, and unreplicated data size.
+   *
+   * @param keysSummary A map to store the keys summary information.
+   */
+  private void createKeysSummaryForOpenMPUKey(Map<String, Long> keysSummary) {
+    Long replicatedSizeOpenMPUKey = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getReplicatedSizeKeyFromTable(MULTIPART_INFO_TABLE)));
+    Long unreplicatedSizeOpenMPUKey = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(MULTIPART_INFO_TABLE)));
+    Long openMPUKeyCount = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getTableCountKeyFromTable(MULTIPART_INFO_TABLE)));
+    // Calculate the total number of open MPU keys
+    keysSummary.put("totalOpenMPUKeys", openMPUKeyCount);
+    // Calculate the total replicated and unreplicated sizes of open MPU keys
+    keysSummary.put("totalReplicatedDataSize", replicatedSizeOpenMPUKey);
+    keysSummary.put("totalUnreplicatedDataSize", unreplicatedSizeOpenMPUKey);
   }
 
   /** Retrieves the summary of deleted keys.
