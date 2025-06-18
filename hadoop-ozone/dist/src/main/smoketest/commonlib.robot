@@ -32,9 +32,7 @@ Get test user principal
     [return]            ${user}/${instance}@EXAMPLE.COM
 
 Get Security Enabled From Config
-    ${conf_dir} =    Get Environment Variable    OZONE_CONF_DIR
-    ${file} =     Set Variable    ${conf_dir}/ozone-site.xml
-    ${value} =    Execute    sed -n "/<name>ozone.security.enabled<\\/name>/,/<\\/property>/s|.*<value>\\(.*\\)</value>.*|\\1|p" ${file} | head -n1 | xargs
+    ${value} =    Execute    ozone getconf confKey ozone.security.enabled
     IF    '${value}' != 'true' and '${value}' != 'false'
            ${value} =    Set Variable    false
     END
