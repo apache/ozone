@@ -202,7 +202,7 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void parseKVContainerData(KeyValueContainerData kvContainerData,
-                                          ConfigurationSource config) throws IOException {
+      ConfigurationSource config) throws IOException {
     parseKVContainerData(kvContainerData, config, false);
   }
 
