@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3sts;
+package org.apache.hadoop.ozone.sts;
 
 import org.glassfish.jersey.server.ResourceConfig;
 
@@ -24,6 +24,6 @@ import org.glassfish.jersey.server.ResourceConfig;
  */
 public class Application extends ResourceConfig {
   public Application() {
-    packages("org.apache.hadoop.ozone.s3sts");
+    packages("org.apache.hadoop.ozone.sts");
   }
 }

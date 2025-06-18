@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3sts;
+package org.apache.hadoop.ozone.sts;
 
 import java.io.IOException;
 import java.time.Instant;
