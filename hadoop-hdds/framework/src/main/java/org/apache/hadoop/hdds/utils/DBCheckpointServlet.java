@@ -136,7 +136,7 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
-  private static void logSstFileList(Collection<String> sstList, String msg, int sampleSize) {
+  protected static void logSstFileList(Collection<String> sstList, String msg, int sampleSize) {
     int count = sstList.size();
     if (LOG.isDebugEnabled()) {
       LOG.debug(msg, count, "", sstList);
@@ -203,7 +203,7 @@ public class DBCheckpointServlet extends HttpServlet
     processMetadataSnapshotRequest(request, response, isFormData, flush);
   }
 
-  private void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+  protected void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, boolean flush) {
     List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?
@@ -296,7 +296,7 @@ public class DBCheckpointServlet extends HttpServlet
    * @param request the HTTP servlet request
    * @return array of parsed sst form data parameters for exclusion
    */
-  private static String[] parseFormDataParameters(HttpServletRequest request) {
+  protected static String[] parseFormDataParameters(HttpServletRequest request) {
     ServletFileUpload upload = new ServletFileUpload();
     List<String> sstParam = new ArrayList<>();
 
