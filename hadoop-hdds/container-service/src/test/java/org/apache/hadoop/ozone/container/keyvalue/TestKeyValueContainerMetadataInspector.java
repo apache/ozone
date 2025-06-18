@@ -505,7 +505,7 @@ public class TestKeyValueContainerMetadataInspector extends TestKeyValueContaine
         GenericTestUtils.LogCapturer.captureLogs(
             toLog4j(KeyValueContainerMetadataInspector.REPORT_LOG),
             new PatternLayout());
-    KeyValueContainerUtil.parseKVContainerData(containerData, getConf(), false);
+    KeyValueContainerUtil.parseKVContainerData(containerData, getConf());
     capturer.stopCapturing();
     String output = capturer.getOutput();
     capturer.clearOutput();

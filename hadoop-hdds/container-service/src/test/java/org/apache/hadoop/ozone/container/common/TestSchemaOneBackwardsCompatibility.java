@@ -610,7 +610,7 @@ public class TestSchemaOneBackwardsCompatibility {
         kvData.getReplicaIndex() > 0);
     kvData.computeAndSetChecksum(yaml);
 
-    KeyValueContainerUtil.parseKVContainerData(kvData, conf, false);
+    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
 
     return kvData;
   }

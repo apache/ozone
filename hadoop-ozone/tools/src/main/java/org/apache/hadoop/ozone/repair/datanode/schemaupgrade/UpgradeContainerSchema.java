@@ -372,7 +372,7 @@ public class UpgradeContainerSchema extends RepairTool {
             KeyValueContainerData kvContainerData =
                 (KeyValueContainerData) containerData;
             containerData.setVolume(hddsVolume);
-            KeyValueContainerUtil.parseKVContainerData(kvContainerData, config, false);
+            KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
             return kvContainerData;
           } else {
             error("Container is not KeyValueContainer type: %s.",

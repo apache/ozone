@@ -212,7 +212,7 @@ public class ContainerReader implements Runnable {
       KeyValueContainerData kvContainerData = (KeyValueContainerData)
           containerData;
       containerData.setVolume(hddsVolume);
-      KeyValueContainerUtil.parseKVContainerData(kvContainerData, config, false);
+      KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
       KeyValueContainer kvContainer = new KeyValueContainer(kvContainerData,
           config);
       if (kvContainer.getContainerState() == RECOVERING) {
