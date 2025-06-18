@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -336,10 +337,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
     // Small performance optimization. We check if the operation is of type
     // write before trying to send CloseContainerAction.
+    boolean isVolumeFullForWrite = false;
     if (!HddsUtils.isReadOnly(msg)) {
+      isVolumeFullForWrite = isVolumeFullForOpenContainer(container);
+      sendCloseContainerActionIfNeeded(container, isVolumeFullForWrite);
       try {
-        sendCloseContainerActionIfNeeded(container, cmdType);
+        validateVolumeFullForWrite(container, cmdType, isVolumeFullForWrite);
       } catch (StorageContainerException e) {
+        audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, e);
         return ContainerUtils.logAndReturnError(LOG, e, msg);
       }
     }
@@ -409,11 +414,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // in any case, the in memory state of the container should be unhealthy
         Preconditions.checkArgument(
             container.getContainerData().getState() == State.UNHEALTHY);
-        try {
-          sendCloseContainerActionIfNeeded(container, cmdType);
-        } catch (StorageContainerException e) {
-          LOG.error("Exception while handling disk / space full check for containerId " + containerID, e);
-        }
+        sendCloseContainerActionIfNeeded(container, isVolumeFullForWrite);
       }
       if (cmdType == Type.CreateContainer
           && result == Result.SUCCESS && dispatcherContext != null) {
@@ -587,13 +588,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
    * If the container usage reaches the close threshold or the container is
    * marked unhealthy we send Close ContainerAction to SCM.
    *
-   * @param container current state of container
-   * @param cmdType request command type
+   * @param container    current state of container
+   * @param isVolumeFull volume full flag for open containers
    */
-  private void sendCloseContainerActionIfNeeded(Container container, Type cmdType) throws StorageContainerException {
+  private void sendCloseContainerActionIfNeeded(Container container, boolean isVolumeFull) {
     // We have to find a more efficient way to close a container.
-    boolean isOpen = container != null && container.getContainerState() == State.OPEN;
-    boolean isVolumeFull = isOpen && isVolumeFullExcludingCommittedSpace(container);
     boolean isSpaceFull = isVolumeFull || isContainerFull(container);
     boolean shouldClose = isSpaceFull || isContainerUnhealthy(container);
     if (shouldClose) {
@@ -615,16 +614,25 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           LOG.warn("Triggered immediate heartbeat because of full volume.");
         }
       }
-      if (isVolumeFull) {
-        HddsVolume volume = containerData.getVolume();
-        LOG.warn("Volume [{}] is full. containerID: {}. Volume usage: [{}].", volume, containerData.getContainerID(),
-            volume.getCurrentUsage());
-        if (cmdType == Type.WriteChunk || cmdType == Type.PutBlock || cmdType == Type.PutSmallFile) {
-          // If the volume is full, we should not allow more writes.
-          throw new StorageContainerException("Container write failed due to volume " + volume.getStorageID()
-              + " out of space " + volume.getCurrentUsage(), DISK_OUT_OF_SPACE);
-        }
-      }
+    }
+  }
+
+  private void validateVolumeFullForWrite(
+      Container container, Type cmdType, boolean isVolumeFullForWrite) throws StorageContainerException {
+    if (!isVolumeFullForWrite) {
+      return;
+    }
+
+    HddsVolume volume = container.getContainerData().getVolume();
+    SpaceUsageSource currentUsage = volume.getCurrentUsage();
+    LOG.warn("Volume [{}] is full. containerID: {}. Volume usage: [{}]. Minimum required free space: {}", volume,
+        container.getContainerData().getContainerID(), currentUsage,
+        volume.getFreeSpaceToSpare(currentUsage.getCapacity()));
+    if (cmdType == Type.WriteChunk || cmdType == Type.PutBlock || cmdType == Type.PutSmallFile) {
+      // If the volume is full, we should not allow more writes.
+      throw new StorageContainerException("Container write failed due to volume " + volume.getStorageID()
+          + " out of space " + currentUsage + " with minimum free space required: "
+          + volume.getFreeSpaceToSpare(currentUsage.getCapacity()), DISK_OUT_OF_SPACE);
     }
   }
 
@@ -642,8 +650,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
-  private boolean isVolumeFullExcludingCommittedSpace(Container container) {
-    return container.getContainerData().getVolume().isVolumeFull();
+  private boolean isVolumeFullForOpenContainer(Container container) {
+    boolean isOpen = container != null && container.getContainerState() == State.OPEN;
+    return isOpen && container.getContainerData().getVolume().isVolumeFull();
   }
 
   private boolean isContainerUnhealthy(Container container) {
