@@ -18,6 +18,7 @@ Documentation       Test ozone shell CLI usage
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${prefix}    generated
@@ -256,7 +257,6 @@ Test prefix Acls
 Test native authorizer
     [arguments]     ${protocol}         ${server}       ${volume}
 
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Return From Keyword if    '${SECURITY_ENABLED}' == 'false'
 
     Execute         ozone sh volume removeacl ${protocol}${server}/${volume} -a group:root:a

@@ -20,6 +20,7 @@ Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${ENDPOINT_URL}             http://recon:9888
@@ -52,20 +53,16 @@ Create keys
     ${result} =     Execute             ozone sh key put /${VOLUME}/${BUCKET}/dir1/dir2/file2 HISTORY.md
                     Should not contain  ${result}       Failed
 Kinit as non admin
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     scm     scm.keytab
 
 Kinit as ozone admin
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
 
 Kinit as recon admin
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser2           testuser2.keytab
 
 Check http return code
     [Arguments]         ${url}          ${expected_code}
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     ${result} =         Execute                             curl --negotiate -u : --write-out '\%{http_code}\n' --silent --show-error --output /dev/null ${url}
                         IF  '${SECURITY_ENABLED}' == 'true'
                             Should contain      ${result}       ${expected_code}

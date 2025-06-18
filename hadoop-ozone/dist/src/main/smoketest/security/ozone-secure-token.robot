@@ -20,6 +20,7 @@ Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${TOKEN_FILE}    ${TEMP_DIR}/ozone.token
@@ -83,7 +84,6 @@ Token Test in Unsecure Cluster
 
 *** Test Cases ***
 Token Test
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if    '${SECURITY_ENABLED}' == 'false'   Token Test in Unsecure Cluster
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Token Test in Secure Cluster
     Print Nonexistent Token File

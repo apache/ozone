@@ -20,7 +20,8 @@ Library             String
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Test Timeout        5 minutes
-Suite Setup         Setup s3 tests
+Suite Setup         Run Keywords    Setup s3 tests 
+...                 AND             Get Security Enabled From Config
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
@@ -40,7 +41,6 @@ List buckets
 
 
 Get bucket info with Ozone Shell to check the owner field
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
     ${result} =         Execute             ozone sh bucket info /s3v/${BUCKET} | jq -r '.owner'
                         Should Be Equal     ${result}       testuser

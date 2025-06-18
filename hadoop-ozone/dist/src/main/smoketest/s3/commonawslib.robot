@@ -17,6 +17,7 @@
 Library             Collections
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${ENDPOINT_URL}                http://s3g:9878
@@ -75,7 +76,6 @@ Setup v2 headers
                         Set Environment Variable   AWS_SECRET_ACCESS_KEY   ANYKEY
 
 Setup v4 headers
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user    testuser    testuser.keytab
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Setup secure v4 headers
     Run Keyword if      '${SECURITY_ENABLED}' == 'false'    Setup dummy credentials for S3
@@ -154,7 +154,6 @@ Create generated bucket
     Set Global Variable   ${BUCKET}
 
 Create encrypted bucket
-    ${SECURITY_ENABLED} =     Get Security Enabled From Config
     Return From Keyword if    '${SECURITY_ENABLED}' == 'false'
     ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/encrypted
     Return From Keyword If    ${exists}

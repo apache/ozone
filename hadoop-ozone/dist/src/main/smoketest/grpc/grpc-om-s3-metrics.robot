@@ -21,7 +21,8 @@ Library             BuiltIn
 Resource            ../commonlib.robot
 Resource            ../s3/commonawslib.robot
 Test Timeout        5 minutes
-Suite Setup         Setup s3 tests
+Suite Setup         Run Keywords    Setup s3 tests 
+...                 AND             Get Security Enabled From Config
 
 *** Variables ***
 ${OM_URL}                   http://${OM_SERVICE_ID}:9874
@@ -40,7 +41,6 @@ Check gRPC conf
 
 Verify endpoint is up
     [arguments]         ${url}
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -v -s -I ${url}
     Should contain      ${result}       200 OK

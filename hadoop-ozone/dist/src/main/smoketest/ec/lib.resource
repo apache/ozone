@@ -18,6 +18,7 @@ Documentation       Keywords and other resources used by EC tests
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${SCM}       scm
@@ -28,5 +29,4 @@ Prepare For Tests
     Execute             dd if=/dev/urandom of=/tmp/2mb bs=1048576 count=2
     Execute             dd if=/dev/urandom of=/tmp/3mb bs=1048576 count=3
     Execute             dd if=/dev/urandom of=/tmp/100mb bs=1048576 count=100
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user    testuser    testuser.keytab

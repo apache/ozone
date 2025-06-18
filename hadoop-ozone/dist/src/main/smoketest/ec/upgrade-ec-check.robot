@@ -17,7 +17,8 @@
 Documentation       Test EC during upgrade
 Library             OperatingSystem
 Resource            lib.resource
-Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+Suite Setup         Run Keywords       Get Security Enabled From Config
+...    AND          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Test Cases ***
 Test EC Prior To Finalization

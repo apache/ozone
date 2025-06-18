@@ -19,6 +19,7 @@ Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${SCM}          scm
@@ -26,13 +27,11 @@ ${SCM}          scm
 *** Test Cases ***
 
 Check webui static resources
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit HTTP user
     ${result} =        Execute                curl --negotiate -u : -s -I http://${SCM}:9876/static/bootstrap-3.4.1/js/bootstrap.min.js
                        Should contain         ${result}    200
 
 Basic Freon smoketest
-   ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
     ${random} =        Generate Random String    10
     Freon OCKG    prefix=${random}

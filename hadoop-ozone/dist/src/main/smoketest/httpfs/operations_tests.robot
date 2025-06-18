@@ -22,7 +22,9 @@ Library             OperatingSystem
 Resource            operations.robot
 Resource            ../lib/os.robot
 Resource            ../commonlib.robot
-Suite Setup         Generate volume
+Suite Setup         Run Keywords    Generate volume 
+...                 AND             Get Security Enabled From Config
+
 Test Timeout        2 minutes
 
 *** Variables ***
@@ -38,7 +40,6 @@ Kinit admin
 
 *** Test Cases ***
 Kinit admin user
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If       '${SECURITY_ENABLED}'=='false'       This is for secured environment
     Kinit admin
 
@@ -47,13 +48,11 @@ Create volume
     Should contain  ${vol.stdout}   true
 
 Set owner of volume
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If       '${SECURITY_ENABLED}'=='false'       This is for secured environment
     ${rc} =                             Run And Return Rc       ozone sh volume update --user=testuser /${volume}
     Should Be Equal As Integers         ${rc}       0
 
 Kinit testuser
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If       '${SECURITY_ENABLED}'=='false'       This is for secured environment
     Kinit test user     testuser     testuser.keytab
 

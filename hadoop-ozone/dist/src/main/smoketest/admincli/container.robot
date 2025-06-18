@@ -18,7 +18,9 @@ Documentation       Test ozone admin container command
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
-Suite Setup         Create test data
+Suite Setup         Run Keywords    Create test data    
+...                 AND             Get Security Enabled From Config
+
 
 *** Variables ***
 ${CONTAINER}
@@ -26,7 +28,6 @@ ${SCM}       scm
 
 *** Keywords ***
 Create test data
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
                         Execute          ozone freon ockg -n1 -t1 -p container
 
@@ -171,5 +172,4 @@ Cannot create container without admin privilege
     Requires admin privilege    ozone admin container create
 
 Reset user
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab

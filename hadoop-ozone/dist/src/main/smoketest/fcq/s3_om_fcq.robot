@@ -20,6 +20,7 @@ Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
 Resource            ../s3/commonawslib.robot
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${OM_JMX_ENDPOINT}                          http://om:9874/jmx
@@ -44,7 +45,6 @@ Setup aws credentials
 
 Verify endpoint is up
     [arguments]         ${url}
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -v -s -I ${url}
     Should contain      ${result}       200 OK

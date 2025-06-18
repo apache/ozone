@@ -20,7 +20,8 @@ Library             String
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Test Timeout        5 minutes
-Suite Setup         Setup s3 tests
+Suite Setup         Run Keywords     Setup s3 tests
+...                 AND              Get Security Enabled From Config 
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
@@ -50,7 +51,6 @@ Get object from s3
 
 #This test depends on the previous test case. Can't be executed alone
 Get object with wrong signature
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If          '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
     ${result} =                 Execute and Ignore Error   curl -i -H 'Authorization: AWS scm/scm@EXAMPLE.COM:asdfqwerty' ${ENDPOINT_URL}/${BUCKET}/${PREFIX}/putobject/key=value/f1
                                 Should contain             ${result}        403 Forbidden
