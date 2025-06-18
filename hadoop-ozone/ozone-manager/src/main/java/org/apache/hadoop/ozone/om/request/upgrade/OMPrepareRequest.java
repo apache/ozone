@@ -167,7 +167,7 @@ public class OMPrepareRequest extends OMClientRequest {
    * - the applied index is updated after the transaction is flushed to db.
    * - after a transaction (i) is committed, ratis will append another ratis-metadata transaction (i+1).
    *
-   * @return the last Ratis commit index
+   * @return the last Ratis applied index
    */
   private static long waitForLogIndex(long minOMDBFlushIndex,
       OzoneManager om, OzoneManagerStateMachine stateMachine,
@@ -188,6 +188,7 @@ public class OMPrepareRequest extends OMClientRequest {
 
     // Wait OM state machine to apply the given index.
     long lastOMDBFlushIndex = RaftLog.INVALID_LOG_INDEX;
+    long lastRatisAppliedIndex = RaftLog.INVALID_LOG_INDEX;
 
     LOG.info("{} waiting for index {} to flush to OM DB and index {} to flush" +
             " to Ratis state machine.", om.getOMNodeId(), minOMDBFlushIndex,
@@ -201,10 +202,10 @@ public class OMPrepareRequest extends OMClientRequest {
           lastOMDBFlushIndex);
 
       // Check ratis state machine.
-      final long lastRatisAppliedIndex = stateMachine.getLastAppliedTermIndex().getIndex();
+      lastRatisAppliedIndex = stateMachine.getLastAppliedTermIndex().getIndex();
       ratisStateMachineApplied = lastRatisAppliedIndex >= minRatisStateMachineIndex;
       LOG.debug("{} Current Ratis state machine transaction index {}.",
-          om.getOMNodeId(), ratisStateMachineApplied);
+          om.getOMNodeId(), lastRatisAppliedIndex);
 
       if (!(omDBFlushed && ratisStateMachineApplied)) {
         Thread.sleep(flushCheckInterval.toMillis());
@@ -223,10 +224,10 @@ public class OMPrepareRequest extends OMClientRequest {
       throw new IOException(String.format("After waiting for %d seconds, " +
               "Ratis state machine applied index %d which is less than" +
               " the minimum required index %d.",
-          flushTimeout.getSeconds(), lastRatisCommitIndex,
+          flushTimeout.getSeconds(), lastRatisAppliedIndex,
           minRatisStateMachineIndex));
     }
-    return lastRatisCommitIndex;
+    return lastRatisAppliedIndex;
   }
 
   /**
