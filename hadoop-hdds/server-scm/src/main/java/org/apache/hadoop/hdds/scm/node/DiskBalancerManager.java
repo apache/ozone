@@ -74,6 +74,7 @@ public class DiskBalancerManager {
     this.nodeManager = nodeManager;
     this.useHostnames = conf.getBoolean(HDDS_DATANODE_USE_DN_HOSTNAME, HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     this.statusMap = new ConcurrentHashMap<>();
+    this.balancedBytesMap = new ConcurrentHashMap<>();
   }
 
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
