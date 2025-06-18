@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -63,17 +62,16 @@ class RDBTable implements Table<byte[], byte[]> {
     return family;
   }
 
-  void put(ByteBuffer key, ByteBuffer value) throws IOException {
+  void put(ByteBuffer key, ByteBuffer value) throws RocksDatabaseException {
     db.put(family, key, value);
   }
 
   @Override
-  public void put(byte[] key, byte[] value) throws IOException {
+  public void put(byte[] key, byte[] value) throws RocksDatabaseException {
     db.put(family, key, value);
   }
 
-  void putWithBatch(BatchOperation batch, CodecBuffer key, CodecBuffer value)
-      throws IOException {
+  void putWithBatch(BatchOperation batch, CodecBuffer key, CodecBuffer value) {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).put(family, key, value);
     } else {
@@ -83,8 +81,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void putWithBatch(BatchOperation batch, byte[] key, byte[] value)
-      throws IOException {
+  public void putWithBatch(BatchOperation batch, byte[] key, byte[] value) {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).put(family, key, value);
     } else {
@@ -93,7 +90,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public boolean isEmpty() throws IOException {
+  public boolean isEmpty() throws RocksDatabaseException {
     try (KeyValueIterator<byte[], byte[]> keyIter = iterator(KeyValueIterator.Type.NEITHER)) {
       keyIter.seekToFirst();
       return !keyIter.hasNext();
@@ -101,7 +98,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public boolean isExist(byte[] key) throws IOException {
+  public boolean isExist(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyMayExistChecks();
     final Supplier<byte[]> holder = db.keyMayExist(family, key);
     if (holder == null) {
@@ -121,12 +118,12 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public byte[] get(byte[] key) throws IOException {
+  public byte[] get(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGets();
     return db.get(family, key);
   }
 
-  Integer get(ByteBuffer key, ByteBuffer outValue) throws IOException {
+  Integer get(ByteBuffer key, ByteBuffer outValue) throws RocksDatabaseException {
     return db.get(family, key, outValue);
   }
 
@@ -136,15 +133,14 @@ class RDBTable implements Table<byte[], byte[]> {
    *
    * @param bytes metadata key
    * @return value in byte array or null if the key is not found.
-   * @throws IOException on Failure
    */
   @Override
-  public byte[] getSkipCache(byte[] bytes) throws IOException {
+  public byte[] getSkipCache(byte[] bytes) throws RocksDatabaseException {
     return get(bytes);
   }
 
   @Override
-  public byte[] getIfExist(byte[] key) throws IOException {
+  public byte[] getIfExist(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
     final Supplier<byte[]> value = db.keyMayExist(family, key);
     if (value == null) {
@@ -163,7 +159,7 @@ class RDBTable implements Table<byte[], byte[]> {
     return val;
   }
 
-  Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws IOException {
+  Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
     final Supplier<Integer> value = db.keyMayExist(
         family, key, outValue.duplicate());
@@ -185,22 +181,21 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void delete(byte[] key) throws IOException {
+  public void delete(byte[] key) throws RocksDatabaseException {
     db.delete(family, key);
   }
 
-  public void delete(ByteBuffer key) throws IOException {
+  public void delete(ByteBuffer key) throws RocksDatabaseException {
     db.delete(family, key);
   }
 
   @Override
-  public void deleteRange(byte[] beginKey, byte[] endKey) throws IOException {
+  public void deleteRange(byte[] beginKey, byte[] endKey) throws RocksDatabaseException {
     db.deleteRange(family, beginKey, endKey);
   }
 
   @Override
-  public void deleteWithBatch(BatchOperation batch, byte[] key)
-      throws IOException {
+  public void deleteWithBatch(BatchOperation batch, byte[] key) {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).delete(family, key);
     } else {
@@ -217,7 +212,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   KeyValueIterator<CodecBuffer, CodecBuffer> iterator(
-      CodecBuffer prefix, KeyValueIterator.Type type) throws IOException {
+      CodecBuffer prefix, KeyValueIterator.Type type) throws RocksDatabaseException {
     return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
         this, prefix, type);
   }
@@ -228,34 +223,30 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     // Nothing do for a Column Family.
   }
 
   @Override
-  public long getEstimatedKeyCount() throws IOException {
+  public long getEstimatedKeyCount() throws RocksDatabaseException {
     return db.estimateNumKeys(family);
   }
 
   @Override
-  public List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey,
-      int count, byte[] prefix,
-      MetadataKeyFilters.MetadataKeyFilter... filters)
-      throws IOException, IllegalArgumentException {
+  public List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey, int count, byte[] prefix,
+      MetadataKeyFilters.MetadataKeyFilter... filters) throws RocksDatabaseException, CodecException {
     return getRangeKVs(startKey, count, false, prefix, filters);
   }
 
   @Override
-  public List<KeyValue<byte[], byte[]>> getSequentialRangeKVs(byte[] startKey,
-      int count, byte[] prefix,
-      MetadataKeyFilters.MetadataKeyFilter... filters)
-      throws IOException, IllegalArgumentException {
+  public List<KeyValue<byte[], byte[]>> getSequentialRangeKVs(byte[] startKey, int count, byte[] prefix,
+      MetadataKeyFilters.MetadataKeyFilter... filters) throws RocksDatabaseException, CodecException {
     return getRangeKVs(startKey, count, true, prefix, filters);
   }
 
   @Override
   public void deleteBatchWithPrefix(BatchOperation batch, byte[] prefix)
-      throws IOException {
+      throws RocksDatabaseException, CodecException {
     try (KeyValueIterator<byte[], byte[]> iter = iterator(prefix)) {
       while (iter.hasNext()) {
         deleteWithBatch(batch, iter.next().getKey());
@@ -265,7 +256,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
-      throws IOException {
+      throws RocksDatabaseException, CodecException {
     try (KeyValueIterator<byte[], byte[]> iter = iterator(prefix);
          RDBSstFileWriter fileWriter = new RDBSstFileWriter(externalFile)) {
       while (iter.hasNext()) {
@@ -280,10 +271,8 @@ class RDBTable implements Table<byte[], byte[]> {
     RDBSstFileLoader.load(db, family, externalFile);
   }
 
-  private List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey,
-      int count, boolean sequential, byte[] prefix,
-      MetadataKeyFilters.MetadataKeyFilter... filters)
-      throws IOException, IllegalArgumentException {
+  private List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey, int count, boolean sequential, byte[] prefix,
+      MetadataKeyFilters.MetadataKeyFilter... filters) throws RocksDatabaseException, CodecException {
     long start = Time.monotonicNow();
 
     if (count < 0) {
