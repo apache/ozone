@@ -40,6 +40,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -85,6 +86,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final ScmBlockLocationProtocol scmClient;
 
   private int keyLimitPerTask;
+  private int ratisByteLimit;
   private final AtomicLong deletedKeyCount;
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
@@ -100,6 +102,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
     Preconditions.checkArgument(keyLimitPerTask >= 0,
         OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
+    int limit = (int) conf.getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    this.ratisByteLimit = (int) (limit * 0.9);
     this.deletedKeyCount = new AtomicLong(0);
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
@@ -348,11 +355,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
              ReclaimableRenameEntryFilter renameEntryFilter = new ReclaimableRenameEntryFilter(
                  getOzoneManager(), omSnapshotManager, snapshotChainManager, currentSnapshotInfo,
                  keyManager, lock)) {
+          Pair<Integer, List<Table.KeyValue<String, String>>> renameEntriesPair =
+              keyManager.getRenamesKeyEntries(volume, bucket, null, renameEntryFilter, remainNum);
           List<String> renamedTableEntries =
-              keyManager.getRenamesKeyEntries(volume, bucket, null, renameEntryFilter, remainNum).stream()
-                  .map(Table.KeyValue::getKey)
-                  .collect(Collectors.toList());
-          remainNum -= renamedTableEntries.size();
+              renameEntriesPair.getValue().stream().map(Table.KeyValue::getKey).collect(Collectors.toList());
+          //remainNum -= renamedTableEntries.size();
+          remainNum -= renameEntriesPair.getKey();
 
           // Get pending keys that can be deleted
           PendingKeysDeletion pendingKeysDeletion = currentSnapshotInfo == null
@@ -366,7 +374,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 expectedPreviousSnapshotId);
             Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, pendingKeysDeletion.getKeysToModify(),
                 renamedTableEntries, snapshotTableKey, expectedPreviousSnapshotId);
-            remainNum -= purgeResult.getKey();
+            //remainNum -= purgeResult.getKey();
+            remainNum -= pendingKeysDeletion.getConsumedSize();
             successStatus = purgeResult.getValue();
             getMetrics().incrNumKeysProcessed(keyBlocksList.size());
             getMetrics().incrNumKeysSentForPurge(purgeResult.getKey());
@@ -421,7 +430,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         } else {
           LOG.debug("Running KeyDeletingService for snapshot : {}, {}", snapshotId, run);
         }
-        int remainNum = keyLimitPerTask;
+        int remainNum = ratisByteLimit;
         OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
         SnapshotInfo snapInfo = null;
         try {

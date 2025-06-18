@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -154,11 +155,10 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * underlying metadataManager.
    * @throws IOException
    */
-  List<Table.KeyValue<String, String>> getRenamesKeyEntries(
+  Pair<Integer, List<Table.KeyValue<String, String>>> getRenamesKeyEntries(
       String volume, String bucket, String startKey,
       CheckedFunction<Table.KeyValue<String, String>, Boolean, IOException> filter, int count)
       throws IOException;
-
 
   /**
    * Returns the previous snapshot's ozone directorInfo corresponding for the object.
