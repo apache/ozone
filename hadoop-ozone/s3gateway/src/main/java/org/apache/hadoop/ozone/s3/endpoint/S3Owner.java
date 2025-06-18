@@ -96,19 +96,7 @@ public class S3Owner {
    */
   public static void verifyBucketOwnerCondition(HttpHeaders headers, String bucketName, String bucketOwner)
       throws OS3Exception {
-    if (headers == null || bucketOwner == null) {
-      return;
-    }
-
-    final String expectedBucketOwner = headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER);
-
-    if (StringUtils.isEmpty(expectedBucketOwner)) {
-      return;
-    }
-    if (expectedBucketOwner.equals(bucketOwner)) {
-      return;
-    }
-    throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, bucketName);
+    verify(headers, S3Consts.EXPECTED_BUCKET_OWNER_HEADER, bucketOwner, bucketName);
   }
 
   /**
@@ -125,19 +113,22 @@ public class S3Owner {
                                                                String sourceOwner, String destBucketName,
                                                                String destOwner)
       throws OS3Exception {
-    if (headers == null) {
+    verify(headers, S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER, sourceOwner, sourceBucketName);
+    verify(headers, S3Consts.EXPECTED_BUCKET_OWNER_HEADER, destOwner, destBucketName);
+  }
+
+  private static void verify(HttpHeaders headers, String headerKey, String actualOwner, String bucketName)
+      throws OS3Exception {
+    if (headers == null || actualOwner == null) {
       return;
     }
-
-    final String expectedSourceOwner = headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER);
-    final String expectedDestOwner = headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER);
-
-    if (expectedSourceOwner != null && sourceOwner != null && !sourceOwner.equals(expectedSourceOwner)) {
-      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, sourceBucketName);
+    final String expectedBucketOwner = headers.getHeaderString(headerKey);
+    if (StringUtils.isEmpty(expectedBucketOwner)) {
+      return;
     }
-
-    if (expectedDestOwner != null && destOwner != null && !destOwner.equals(expectedDestOwner)) {
-      throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, destBucketName);
+    if (expectedBucketOwner.equals(actualOwner)) {
+      return;
     }
+    throw S3ErrorTable.newError(S3ErrorTable.BUCKET_OWNER_MISMATCH, bucketName);
   }
 }
