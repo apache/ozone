@@ -223,6 +223,22 @@ public class RDBStore implements DBStore {
   }
 
   @Override
+  public void compactTable(String tableName) throws IOException {
+    try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
+      compactTable(tableName, options);
+    }
+  }
+
+  @Override
+  public void compactTable(String tableName, ManagedCompactRangeOptions options) throws IOException {
+    RocksDatabase.ColumnFamily columnFamily = db.getColumnFamily(tableName);
+    if (columnFamily == null) {
+      throw new IOException("Table not found: " + tableName);
+    }
+    db.compactRange(columnFamily, null, null, options);
+  }
+
+  @Override
   public void close() throws IOException {
     if (metrics != null) {
       metrics.unregister();
@@ -287,17 +303,18 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public RDBTable getTable(String name) throws IOException {
+  public RDBTable getTable(String name) throws RocksDatabaseException {
     final ColumnFamily handle = db.getColumnFamily(name);
     if (handle == null) {
-      throw new IOException("No such table in this DB. TableName : " + name);
+      throw new RocksDatabaseException("No such table in this DB. TableName : " + name);
     }
     return new RDBTable(this.db, handle, rdbMetrics);
   }
 
   @Override
   public <K, V> TypedTable<K, V> getTable(
-      String name, Codec<K> keyCodec, Codec<V> valueCodec, TableCache.CacheType cacheType) throws IOException {
+      String name, Codec<K> keyCodec, Codec<V> valueCodec, TableCache.CacheType cacheType)
+      throws RocksDatabaseException, CodecException {
     return new TypedTable<>(getTable(name), keyCodec, valueCodec, cacheType);
   }
 

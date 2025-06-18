@@ -26,7 +26,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
-import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
@@ -130,10 +129,11 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public ContainerInfo getContainer(final ContainerID id)
       throws ContainerNotFoundException {
-    return Optional.ofNullable(containerStateManager
-        .getContainer(id))
-        .orElseThrow(() -> new ContainerNotFoundException("Container with id " +
-            id + " not found."));
+    final ContainerInfo info = containerStateManager.getContainer(id);
+    if (info == null) {
+      throw new ContainerNotFoundException(id);
+    }
+    return info;
   }
 
   @Override
@@ -194,6 +194,9 @@ public class ContainerManagerImpl implements ContainerManager {
     if (pipelines.isEmpty()) {
       try {
         pipeline = pipelineManager.createPipeline(replicationConfig);
+        if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.EC) {
+          pipelineManager.openPipeline(pipeline.getId());
+        }
         pipelineManager.waitPipelineReady(pipeline.getId(), 0);
       } catch (IOException e) {
         scmContainerManagerMetrics.incNumFailureCreateContainers();
@@ -274,7 +277,7 @@ public class ContainerManagerImpl implements ContainerManager {
       if (containerExist(cid)) {
         containerStateManager.updateContainerState(protoId, event);
       } else {
-        throwContainerNotFoundException(cid);
+        throw new ContainerNotFoundException(cid);
       }
     } finally {
       lock.unlock();
@@ -289,7 +292,7 @@ public class ContainerManagerImpl implements ContainerManager {
       if (containerExist(containerID)) {
         containerStateManager.transitionDeletingOrDeletedToClosedState(proto);
       } else {
-        throwContainerNotFoundException(containerID);
+        throw new ContainerNotFoundException(containerID);
       }
     } finally {
       lock.unlock();
@@ -299,10 +302,11 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id)
       throws ContainerNotFoundException {
-    return Optional.ofNullable(containerStateManager
-        .getContainerReplicas(id))
-        .orElseThrow(() -> new ContainerNotFoundException("Container with id " +
-            id + " not found."));
+    final Set<ContainerReplica> replicas = containerStateManager.getContainerReplicas(id);
+    if (replicas == null) {
+      throw new ContainerNotFoundException(id);
+    }
+    return replicas;
   }
 
   @Override
@@ -312,7 +316,7 @@ public class ContainerManagerImpl implements ContainerManager {
     if (containerExist(cid)) {
       containerStateManager.updateContainerReplica(replica);
     } else {
-      throwContainerNotFoundException(cid);
+      throw new ContainerNotFoundException(cid);
     }
   }
 
@@ -323,7 +327,7 @@ public class ContainerManagerImpl implements ContainerManager {
     if (containerExist(cid)) {
       containerStateManager.removeContainerReplica(replica);
     } else {
-      throwContainerNotFoundException(cid);
+      throw new ContainerNotFoundException(cid);
     }
   }
 
@@ -430,19 +434,13 @@ public class ContainerManagerImpl implements ContainerManager {
       scmContainerManagerMetrics.incNumSuccessfulDeleteContainers();
     } else {
       scmContainerManagerMetrics.incNumFailureDeleteContainers();
-      throwContainerNotFoundException(cid);
+      throw new ContainerNotFoundException(cid);
     }
   }
 
   @Override
   public boolean containerExist(final ContainerID id) {
     return containerStateManager.contains(id);
-  }
-
-  private void throwContainerNotFoundException(final ContainerID id)
-      throws ContainerNotFoundException {
-    throw new ContainerNotFoundException("Container with id " +
-        id + " not found.");
   }
 
   @Override

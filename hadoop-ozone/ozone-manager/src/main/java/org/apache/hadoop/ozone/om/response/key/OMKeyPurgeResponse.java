@@ -34,10 +34,10 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Response for {@link OMKeyPurgeRequest} request.
@@ -45,15 +45,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMKeyPurgeResponse extends OmKeyResponse {
   private List<String> purgeKeyList;
+  private List<String> renamedList;
   private SnapshotInfo fromSnapshot;
   private List<SnapshotMoveKeyInfos> keysToUpdateList;
 
   public OMKeyPurgeResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<String> keyList,
+      @Nonnull List<String> renamedList,
       SnapshotInfo fromSnapshot,
       List<SnapshotMoveKeyInfos> keysToUpdate) {
     super(omResponse);
     this.purgeKeyList = keyList;
+    this.renamedList = renamedList;
     this.fromSnapshot = fromSnapshot;
     this.keysToUpdateList = keysToUpdate;
   }
@@ -75,7 +78,7 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
       OmSnapshotManager omSnapshotManager =
           ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager();
 
-      try (ReferenceCounted<OmSnapshot> rcOmFromSnapshot =
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmFromSnapshot =
           omSnapshotManager.getSnapshot(fromSnapshot.getSnapshotId())) {
 
         OmSnapshot fromOmSnapshot = rcOmFromSnapshot.get();
@@ -103,18 +106,20 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
 
     for (SnapshotMoveKeyInfos keyToUpdate : keysToUpdateList) {
       List<KeyInfo> keyInfosList = keyToUpdate.getKeyInfosList();
-      RepeatedOmKeyInfo repeatedOmKeyInfo =
-          createRepeatedOmKeyInfo(keyInfosList);
+      RepeatedOmKeyInfo repeatedOmKeyInfo = createRepeatedOmKeyInfo(keyInfosList);
       metadataManager.getDeletedTable().putWithBatch(batchOp,
           keyToUpdate.getKey(), repeatedOmKeyInfo);
     }
   }
 
-  private void processKeys(BatchOperation batchOp,
-      OMMetadataManager metadataManager) throws IOException {
+  private void processKeys(BatchOperation batchOp, OMMetadataManager metadataManager) throws IOException {
     for (String key : purgeKeyList) {
       metadataManager.getDeletedTable().deleteWithBatch(batchOp,
           key);
+    }
+    // Delete rename entries.
+    for (String key : renamedList) {
+      metadataManager.getSnapshotRenamedTable().deleteWithBatch(batchOp, key);
     }
   }
 

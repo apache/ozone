@@ -434,6 +434,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Container already exists. container Id {}", containerID);
       }
     } catch (StorageContainerException ex) {
+      newContainerData.releaseCommitSpace();
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } finally {
       containerIdLock.unlock();
@@ -1449,6 +1450,7 @@ public class KeyValueHandler extends Handler {
     long startTime = clock.millis();
     container.writeLock();
     try {
+      final ContainerData data = container.getContainerData();
       if (container.getContainerData().getVolume().isFailed()) {
         // if the  volume in which the container resides fails
         // don't attempt to delete/move it. When a volume fails,
@@ -1473,10 +1475,7 @@ public class KeyValueHandler extends Handler {
         // container is unhealthy or over-replicated).
         if (container.hasBlocks()) {
           metrics.incContainerDeleteFailedNonEmpty();
-          LOG.error("Received container deletion command for container {} but" +
-                  " the container is not empty with blockCount {}",
-              container.getContainerData().getContainerID(),
-              container.getContainerData().getBlockCount());
+          LOG.error("Received container deletion command for non-empty {}: {}", data, data.getStatistics());
           // blocks table for future debugging.
           // List blocks
           logBlocksIfNonZero(container);

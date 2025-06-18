@@ -82,7 +82,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
@@ -1579,11 +1578,7 @@ public class RpcClient implements ClientProtocol {
       List<DatanodeDetails> datanodes = pipelineBefore.getNodes();
 
       for (DatanodeDetails dn : datanodes) {
-        List<DatanodeDetails> nodes = new ArrayList<>();
-        nodes.add(dn);
-        Pipeline pipeline
-            = new Pipeline.Builder(pipelineBefore).setNodes(nodes)
-            .setId(PipelineID.randomId()).build();
+        Pipeline pipeline = pipelineBefore.copyForReadFromNode(dn);
         long length = replicationConfig instanceof ECReplicationConfig
                 ? ECBlockInputStream.internalBlockLength(pipelineBefore.getReplicaIndex(dn),
                 (ECReplicationConfig) replicationConfig, locationInfo.getLength())
@@ -2161,8 +2156,6 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneFileStatus getOzoneFileStatus(String volumeName,
       String bucketName, String keyName) throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)

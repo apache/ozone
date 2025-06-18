@@ -83,7 +83,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -91,6 +90,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -192,8 +192,8 @@ public class TestOMKeyRequest {
     when(ozoneManager.getAccessAuthorizer())
         .thenReturn(new OzoneNativeAuthorizer());
 
-    ReferenceCounted<IOmMetadataReader> rcOmMetadataReader =
-        mock(ReferenceCounted.class);
+    UncheckedAutoCloseableSupplier<IOmMetadataReader> rcOmMetadataReader =
+        mock(UncheckedAutoCloseableSupplier.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     // Init OmMetadataReader to let the test pass
     OmMetadataReader omMetadataReader = mock(OmMetadataReader.class);
@@ -248,7 +248,13 @@ public class TestOMKeyRequest {
         .thenReturn(bucket);
     when(ozoneManager.resolveBucketLink(any(Pair.class),
         any(OMClientRequest.class)))
-        .thenReturn(bucket);
+        .thenAnswer(i -> {
+          Pair<String, String> bucketLink = i.getArgument(0);
+          OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+              omMetadataManager.getBucketKey(bucketLink.getKey(), bucketLink.getValue()));
+          return new ResolvedBucket(bucketLink.getKey(), bucketLink.getValue(),
+              bucketLink.getKey(), bucketLink.getValue(), bucketInfo.getOwner(), bucketInfo.getBucketLayout());
+        });
     when(ozoneManager.resolveBucketLink(any(Pair.class)))
         .thenReturn(bucket);
     OmSnapshotManager omSnapshotManager = Mockito.spy(new OmSnapshotManager(ozoneManager));
@@ -299,15 +305,19 @@ public class TestOMKeyRequest {
     framework().clearInlineMocks();
   }
 
+  protected SnapshotInfo createSnapshot(String snapshot) throws Exception {
+    return createSnapshot(volumeName, bucketName, snapshot);
+  }
+
   /**
    * Create snapshot and checkpoint directory.
    */
-  protected SnapshotInfo createSnapshot(String snapshotName) throws Exception {
+  protected SnapshotInfo createSnapshot(String volume, String bucket, String snapshotName) throws Exception {
     when(ozoneManager.isAdmin(any())).thenReturn(true);
     BatchOperation batchOperation = omMetadataManager.getStore()
         .initBatchOperation();
     OzoneManagerProtocolProtos.OMRequest omRequest = OMRequestTestUtils
-        .createSnapshotRequest(volumeName, bucketName, snapshotName);
+        .createSnapshotRequest(volume, bucket, snapshotName);
     // Pre-Execute OMSnapshotCreateRequest.
     OMSnapshotCreateRequest omSnapshotCreateRequest =
         TestOMSnapshotCreateRequest.doPreExecute(omRequest, ozoneManager);
@@ -320,8 +330,8 @@ public class TestOMKeyRequest {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
     batchOperation.close();
 
-    String key = SnapshotInfo.getTableKey(volumeName,
-        bucketName, snapshotName);
+    String key = SnapshotInfo.getTableKey(volume,
+        bucket, snapshotName);
     SnapshotInfo snapshotInfo =
         omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfo);

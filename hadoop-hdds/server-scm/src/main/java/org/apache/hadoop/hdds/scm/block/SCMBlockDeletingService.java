@@ -186,11 +186,16 @@ public class SCMBlockDeletingService extends BackgroundService
           for (Map.Entry<DatanodeID, List<DeletedBlocksTransaction>> entry :
               transactions.getDatanodeTransactionMap().entrySet()) {
             DatanodeID dnId = entry.getKey();
+            long blocksToDn = 0;
             List<DeletedBlocksTransaction> dnTXs = entry.getValue();
             if (!dnTXs.isEmpty()) {
               Set<Long> dnTxSet = dnTXs.stream()
                   .map(DeletedBlocksTransaction::getTxID)
                   .collect(Collectors.toSet());
+              for (DeletedBlocksTransaction deletedBlocksTransaction : dnTXs) {
+                blocksToDn +=
+                    deletedBlocksTransaction.getLocalIDList().size();
+              }
               processedTxIDs.addAll(dnTxSet);
               DeleteBlocksCommand command = new DeleteBlocksCommand(dnTXs);
               command.setTerm(scmContext.getTermOfLeader());
@@ -198,8 +203,9 @@ public class SCMBlockDeletingService extends BackgroundService
                   dnTxSet);
               eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
                   new CommandForDatanode<>(dnId, command));
+              metrics.incrNumBlockDeletionSentDN(dnId, blocksToDn);
               metrics.incrBlockDeletionCommandSent();
-              metrics.incrBlockDeletionTransactionSent(dnTXs.size());
+              metrics.incrBlockDeletionTransactionsOnDatanodes(dnTXs.size());
               metrics.incrDNCommandsSent(dnId, 1);
               if (LOG.isDebugEnabled()) {
                 LOG.debug(
@@ -211,6 +217,7 @@ public class SCMBlockDeletingService extends BackgroundService
               }
             }
           }
+          metrics.incrTotalBlockSentToDNForDeletion(transactions.getBlocksDeleted());
           LOG.info("Totally added {} blocks to be deleted for"
               + " {} datanodes / {} totalnodes, limit per iteration : {}blocks, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),
@@ -313,7 +320,7 @@ public class SCMBlockDeletingService extends BackgroundService
     final Set<DatanodeDetails> included = new HashSet<>();
     for (DatanodeDetails dn : datanodes) {
       if (nodeManager.getTotalDatanodeCommandCount(dn, Type.deleteBlocksCommand) < deleteBlocksPendingCommandLimit
-          && nodeManager.getCommandQueueCount(dn.getUuid(), Type.deleteBlocksCommand) < 2) {
+          && nodeManager.getCommandQueueCount(dn.getID(), Type.deleteBlocksCommand) < 2) {
         included.add(dn);
       }
     }

@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -234,34 +235,71 @@ public class TestOzoneManagerHASnapshot {
     List<OzoneBucket> ozoneBuckets = new ArrayList<>();
     List<String> volumeNames = new ArrayList<>();
     List<String> bucketNames = new ArrayList<>();
+    List<List<String>> snapshotNamesList = new ArrayList<>();
 
+    // Create 10 buckets and initialize snapshot name lists.
     for (int i = 0; i < 10; i++) {
       OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
       ozoneBuckets.add(bucket);
       volumeNames.add(bucket.getVolumeName());
       bucketNames.add(bucket.getName());
+      snapshotNamesList.add(new ArrayList<>());
     }
 
-    for (int i = 0; i < 100; i++) {
-      int index = i % 10;
-      createFileKey(ozoneBuckets.get(index),
-          "key-" + RandomStringUtils.secure().nextNumeric(10));
-      String snapshot1 = "snapshot-" + RandomStringUtils.secure().nextNumeric(10);
-      store.createSnapshot(volumeNames.get(index),
-          bucketNames.get(index), snapshot1);
+    // Create multiple snapshots for each bucket.
+    // Here we create 5 snapshots per bucket.
+    for (int i = 0; i < 5; i++) {
+      for (int j = 0; j < 10; j++) {
+        OzoneBucket bucket = ozoneBuckets.get(j);
+        // Create a new key to generate state change.
+        createFileKey(bucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
+        String snapshotName = "snapshot-" + RandomStringUtils.secure().nextNumeric(10);
+        store.createSnapshot(volumeNames.get(j), bucketNames.get(j), snapshotName);
+        snapshotNamesList.get(j).add(snapshotName);
+      }
     }
 
-    // Restart leader OM
+    // Restart leader OM.
     OzoneManager omLeader = cluster.getOMLeader();
     cluster.shutdownOzoneManager(omLeader);
     cluster.restartOzoneManager(omLeader, true);
 
     cluster.waitForLeaderOM();
     assertNotNull(cluster.getOMLeader());
-    OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl) cluster
-        .getOMLeader().getMetadataManager();
-    assertFalse(metadataManager.getSnapshotChainManager()
-        .isSnapshotChainCorrupted());
+
+    // Now delete one snapshot from each bucket to simulate snapshot deletion.
+    for (int j = 0; j < 10; j++) {
+      // Choose the third snapshot (index 2) if it exists.
+      if (snapshotNamesList.get(j).size() > 2) {
+        String snapshotToDelete = snapshotNamesList.get(j).get(2);
+        store.deleteSnapshot(volumeNames.get(j), bucketNames.get(j), snapshotToDelete);
+      }
+    }
+
+    // Restart leader OM.
+    omLeader = cluster.getOMLeader();
+    cluster.shutdownOzoneManager(omLeader);
+    cluster.restartOzoneManager(omLeader, true);
+
+    cluster.waitForLeaderOM();
+    assertNotNull(cluster.getOMLeader());
+
+    // wait until the snapshots complete deletion
+    for (int j = 0; j < 10; j++) {
+      String snapshotToDelete = snapshotNamesList.get(j).get(2);
+      String tableKey = SnapshotInfo.getTableKey(volumeNames.get(j), bucketNames.get(j), snapshotToDelete);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return cluster.getOMLeader().getMetadataManager().getSnapshotInfoTable().get(tableKey) == null;
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }, 1000, 60000);
+    }
+
+    OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl) cluster.getOMLeader().getMetadataManager();
+    // Verify that the snapshot chain is not corrupted even after deletions.
+    assertFalse(metadataManager.getSnapshotChainManager().isSnapshotChainCorrupted());
   }
 
   private void createFileKey(OzoneBucket bucket, String keyName)
@@ -277,7 +315,8 @@ public class TestOzoneManagerHASnapshot {
    * and purgeSnapshot in same batch.
    */
   @Test
-  public void testKeyAndSnapshotDeletionService() throws IOException, InterruptedException, TimeoutException {
+  public void testKeyAndSnapshotDeletionService()
+      throws IOException, InterruptedException, TimeoutException, ExecutionException {
     OzoneManager omLeader = cluster.getOMLeader();
     OzoneManager omFollower;
 

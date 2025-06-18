@@ -265,7 +265,10 @@ jobs:
   integration:
     needs:
       - build-info
+      - build
       - basic
+      - dependency
+      - license
     if: needs.build-info.outputs.needs-integration-tests == 'true'
     uses: ./.github/workflows/check.yml
     secrets: inherit

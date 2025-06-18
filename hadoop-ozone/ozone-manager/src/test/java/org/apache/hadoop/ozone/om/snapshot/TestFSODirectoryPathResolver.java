@@ -57,19 +57,8 @@ public class TestFSODirectoryPathResolver {
           Iterator<? extends Table.KeyValue<String, OmDirectoryInfo>> iterator =
               dirMap
               .getOrDefault(dirId, Collections.emptyList()).stream()
-              .map(children -> new Table.KeyValue<String, OmDirectoryInfo>() {
-                  @Override
-                  public String getKey() {
-                    return prefix + children + OM_KEY_PREFIX + "dir" + children;
-                  }
-
-                  @Override
-                  public OmDirectoryInfo getValue() {
-                    return OmDirectoryInfo.newBuilder()
-                        .setName("dir" + children).setObjectID(children)
-                        .build();
-                  }
-              })
+              .map(children -> Table.newKeyValue(prefix + children + OM_KEY_PREFIX + "dir" + children,
+                  OmDirectoryInfo.newBuilder().setName("dir" + children).setObjectID(children).build()))
               .iterator();
           return new TableIterator<String,
               Table.KeyValue<String, OmDirectoryInfo>>() {

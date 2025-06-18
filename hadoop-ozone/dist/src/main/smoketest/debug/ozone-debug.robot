@@ -18,9 +18,12 @@ Documentation       Keyword definitions for Ozone Debug CLI tests
 Library             Collections
 Resource            ../lib/os.robot
 
+*** Variables ***
+${OM_SERVICE_ID}                    %{OM_SERVICE_ID}
+
 *** Keywords ***
 Execute replicas verify checksums CLI tool
-    Execute                         ozone debug -Dozone.network.topology.aware.read=true replicas verify --checksums --output-dir ${TEMP_DIR} o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
+    Execute                         ozone debug -Dozone.network.topology.aware.read=true replicas verify --checksums o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE}
     ${directory} =                  Execute     ls -d ${TEMP_DIR}/${VOLUME}_${BUCKET}_${TESTFILE}_*/ | tail -n 1
     Directory Should Exist          ${directory}
     File Should Exist               ${directory}/${TESTFILE}_manifest

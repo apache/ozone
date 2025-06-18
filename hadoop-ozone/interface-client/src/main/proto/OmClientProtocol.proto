@@ -303,6 +303,7 @@ message OMRequest {
   optional GetObjectTaggingRequest          getObjectTaggingRequest        = 140;
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
+  repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
 }
 
 message OMResponse {
@@ -892,6 +893,9 @@ message SnapshotInfo {
   // note: shared sizes can be calculated from: referenced - exclusive
   optional bool deepCleanedDeletedDir = 19;
   optional bytes lastTransactionInfo = 20;
+  optional uint64 exclusiveSizeDeltaFromDirDeepCleaning = 21;
+  // snapshot exclusive size after replication
+  optional uint64 exclusiveReplicatedSizeDeltaFromDirDeepCleaning = 22;
 }
 
 message SnapshotDiffJobProto {
@@ -1376,8 +1380,8 @@ message DeleteKeyResponse {
 }
 
 message DeletedKeys {
-    required string volumeName = 1;
-    required string bucketName = 2;
+    required string volumeName = 1 [deprecated = true];
+    required string bucketName = 2 [deprecated = true];
     repeated string keys = 3;
 }
 
@@ -1388,6 +1392,7 @@ message PurgeKeysRequest {
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
     // previous snapshotID can also be null & this field would be absent in older requests.
     optional NullableUUID expectedPreviousSnapshotID = 4;
+    repeated string renamedKeys = 5;
 }
 
 message PurgeKeysResponse {
@@ -2029,6 +2034,7 @@ message SetSnapshotPropertyRequest {
   optional SnapshotSize snapshotSize = 3;
   optional bool deepCleanedDeletedDir = 4;
   optional bool deepCleanedDeletedKey = 5;
+  optional SnapshotSize snapshotSizeDeltaFromDirDeepCleaning = 6;
 }
 
 // SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility

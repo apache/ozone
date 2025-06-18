@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
@@ -52,7 +51,6 @@ import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.CheckedConsumer;
@@ -87,8 +85,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       SCMHAService scmhaService,
       List<HddsDatanodeService> hddsDatanodes,
       String clusterPath,
-      ReconServer reconServer) {
-    super(conf, scmConfigurator, hddsDatanodes, reconServer, emptyList());
+      List<Service> services) {
+    super(conf, scmConfigurator, hddsDatanodes, services);
     this.omhaService = omhaService;
     this.scmhaService = scmhaService;
     this.clusterMetaPath = clusterPath;
@@ -421,11 +419,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       initOMRatisConf();
       SCMHAService scmService;
       OMHAService omService;
-      ReconServer reconServer;
       try {
         scmService = createSCMService();
         omService = createOMService();
-        reconServer = createRecon();
       } catch (AuthenticationException ex) {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
@@ -433,8 +429,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes();
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
-          scmConfigurator, omService, scmService, hddsDatanodes, path,
-          reconServer);
+          scmConfigurator, omService, scmService, hddsDatanodes, path, getServices());
+      try {
+        cluster.startServices();
+      } catch (Exception e) {
+        throw new IOException("Unable to start services", e);
+      }
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();

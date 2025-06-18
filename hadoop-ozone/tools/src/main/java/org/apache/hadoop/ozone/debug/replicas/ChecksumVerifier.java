@@ -17,14 +17,10 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Collections;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.NullOutputStream;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -57,13 +53,8 @@ public class ChecksumVerifier implements ReplicaVerifier {
   }
 
   @Override
-  public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation,
-                                             int replicaIndex) {
-    Pipeline pipeline = Pipeline.newBuilder(keyLocation.getPipeline())
-        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
-        .setNodes(Collections.singletonList(datanode))
-        .setReplicaIndexes(Collections.singletonMap(datanode, replicaIndex))
-        .build();
+  public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation) {
+    Pipeline pipeline = keyLocation.getPipeline().copyForReadFromNode(datanode);
 
     try (InputStream is = new BlockInputStreamFactoryImpl().create(
         keyLocation.getPipeline().getReplicationConfig(),
