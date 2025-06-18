@@ -423,12 +423,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void close() {
-    rawTable.close();
-
-  }
-
-  @Override
   public void addCacheEntry(CacheKey<KEY> cacheKey,
       CacheValue<VALUE> cacheValue) {
     // This will override the entry if there is already entry for this key.

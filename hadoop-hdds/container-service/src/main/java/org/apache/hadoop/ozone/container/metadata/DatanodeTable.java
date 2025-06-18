@@ -139,9 +139,4 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void loadFromFile(File externalFile) throws RocksDatabaseException {
     table.loadFromFile(externalFile);
   }
-
-  @Override
-  public void close() throws Exception {
-    table.close();
-  }
 }

@@ -1707,7 +1707,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       SCMHAMetrics.unRegister();
     }
 
-    IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
 
     if (ms != null) {
