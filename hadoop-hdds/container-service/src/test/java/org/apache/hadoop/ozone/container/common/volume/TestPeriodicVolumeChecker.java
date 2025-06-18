@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -49,6 +50,8 @@ public class TestPeriodicVolumeChecker {
   private Path folder;
 
   private OzoneConfiguration conf = new OzoneConfiguration();
+  private MutableVolumeSet volumeSet;
+  private MutableVolumeSet metaVolumeSet;
 
   @BeforeEach
   public void setup() throws IOException {
@@ -56,6 +59,12 @@ public class TestPeriodicVolumeChecker {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
     conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         Files.createDirectory(folder.resolve("VolumeCheckerDir")).toString());
+    String scmId = UUID.randomUUID().toString();
+    String datanodeUuid = UUID.randomUUID().toString();
+    volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    metaVolumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
+        StorageVolume.VolumeType.META_VOLUME, null);
   }
 
   @Test
@@ -69,40 +78,47 @@ public class TestPeriodicVolumeChecker {
     FakeTimer timer = new FakeTimer();
 
     StorageVolumeChecker volumeChecker = new StorageVolumeChecker(conf, timer, "");
-    StorageVolumeCheckerMetrics metrics = volumeChecker.getMetrics();
+    StorageVolumeScannerMetrics metrics = volumeChecker.getMetrics();
 
     try {
       volumeChecker.registerVolumeSet(new ImmutableVolumeSet(makeVolumes(2, HEALTHY)));
       volumeChecker.registerVolumeSet(new ImmutableVolumeSet(makeVolumes(1, HEALTHY)));
+      volumeChecker.registerVolumeSet(volumeSet);
+      volumeChecker.registerVolumeSet(metaVolumeSet);
       volumeChecker.setDelegateChecker(new TestStorageVolumeChecker.DummyChecker());
 
-      assertEquals(0, metrics.getNumAllVolumeChecks());
-      assertEquals(0, metrics.getNumAllVolumeSetsChecks());
+      assertEquals(0, metrics.getNumScanIterations());
+      assertEquals(0, metrics.getNumDataVolumesScanned());
+      assertEquals(0, metrics.getNumMetadataVolumesScanned());
+      assertEquals(0, metrics.getNumVolumesScanned());
 
       // first round
       timer.advance(gap.toMillis() / 3);
       volumeChecker.checkAllVolumeSets();
 
-      assertEquals(2, metrics.getNumAllVolumeChecks());
-      assertEquals(1, metrics.getNumAllVolumeSetsChecks());
-      assertEquals(0, metrics.getNumSkippedChecks());
+      assertEquals(4, metrics.getNumScanIterations());
+      assertEquals(1, metrics.getNumDataVolumesScanned());
+      assertEquals(1, metrics.getNumMetadataVolumesScanned());
+      assertEquals(5, metrics.getNumVolumesScanned());
 
       // periodic disk checker next round within gap
       timer.advance(gap.toMillis() / 3);
       volumeChecker.checkAllVolumeSets();
 
       // skipped next round
-      assertEquals(2, metrics.getNumAllVolumeChecks());
-      assertEquals(1, metrics.getNumAllVolumeSetsChecks());
-      assertEquals(1, metrics.getNumSkippedChecks());
+      assertEquals(4, metrics.getNumScanIterations());
+      assertEquals(1, metrics.getNumDataVolumesScanned());
+      assertEquals(1, metrics.getNumMetadataVolumesScanned());
+      assertEquals(5, metrics.getNumVolumesScanned());
 
       // periodic disk checker next round
       timer.advance(interval.toMillis());
       volumeChecker.checkAllVolumeSets();
 
-      assertEquals(4, metrics.getNumAllVolumeChecks());
-      assertEquals(2, metrics.getNumAllVolumeSetsChecks());
-      assertEquals(1, metrics.getNumSkippedChecks());
+      assertEquals(8, metrics.getNumScanIterations());
+      assertEquals(2, metrics.getNumDataVolumesScanned());
+      assertEquals(2, metrics.getNumMetadataVolumesScanned());
+      assertEquals(5, metrics.getNumVolumesScanned());
     } finally {
       volumeChecker.shutdownAndWait(1, TimeUnit.SECONDS);
     }

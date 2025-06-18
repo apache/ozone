@@ -65,7 +65,7 @@ public class StorageVolumeChecker {
 
   private AsyncChecker<Boolean, VolumeCheckResult> delegateChecker;
 
-  private final StorageVolumeCheckerMetrics metrics;
+  private final StorageVolumeScannerMetrics metrics;
 
   /**
    * Max allowed time for a disk check in milliseconds. If the check
@@ -105,7 +105,7 @@ public class StorageVolumeChecker {
   public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
       String threadNamePrefix) {
 
-    metrics = StorageVolumeCheckerMetrics.create();
+    metrics = StorageVolumeScannerMetrics.create();
 
     this.timer = timer;
 
@@ -164,7 +164,6 @@ public class StorageVolumeChecker {
   public synchronized void checkAllVolumeSets() {
     final long gap = timer.monotonicNow() - lastAllVolumeSetsCheckComplete;
     if (gap < minDiskCheckGapMs) {
-      metrics.incNumSkippedChecks();
       if (LOG.isTraceEnabled()) {
         LOG.trace(
             "Skipped checking all volumes, time since last check {} is less " +
@@ -175,12 +174,26 @@ public class StorageVolumeChecker {
     }
 
     try {
+      int totalScanned = 0;
       for (VolumeSet volSet : registeredVolumeSets) {
+        if (volSet instanceof MutableVolumeSet) {
+          StorageVolume.VolumeType type = ((MutableVolumeSet) volSet).getVolumeType();
+          switch (type) {
+          case DATA_VOLUME:
+            metrics.incNumDataVolumesScanned();
+            break;
+          case META_VOLUME:
+            metrics.incNumMetadataVolumesScanned();
+            break;
+          default:
+            break;
+          }
+        }
         volSet.checkAllVolumes(this);
+        totalScanned += volSet.getVolumesList().size();
       }
-
+      metrics.setNumVolumesScanned(totalScanned);
       lastAllVolumeSetsCheckComplete = timer.monotonicNow();
-      metrics.incNumAllVolumeSetsChecks();
     } catch (IOException e) {
       LOG.warn("Exception while checking disks", e);
     }
@@ -231,7 +244,7 @@ public class StorageVolumeChecker {
           maxAllowedTimeForCheckMs);
     }
 
-    metrics.incNumAllVolumeChecks();
+    metrics.incNumScanIterations();
     synchronized (this) {
       // All volumes that have not been detected as healthy should be
       // considered failed. This is a superset of 'failedVolumes'.
@@ -276,7 +289,6 @@ public class StorageVolumeChecker {
     Optional<ListenableFuture<VolumeCheckResult>> olf =
         delegateChecker.schedule(volume, null);
     if (olf.isPresent()) {
-      metrics.incNumVolumeChecks();
       Futures.addCallback(olf.get(),
           new ResultHandler(volume,
               ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(),
@@ -423,7 +435,7 @@ public class StorageVolumeChecker {
   }
 
   @VisibleForTesting
-  public StorageVolumeCheckerMetrics getMetrics() {
+  public StorageVolumeScannerMetrics getMetrics() {
     return metrics;
   }
 }

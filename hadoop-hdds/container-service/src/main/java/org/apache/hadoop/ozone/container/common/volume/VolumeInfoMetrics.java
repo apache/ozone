@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -57,6 +58,9 @@ public class VolumeInfoMetrics implements MetricsSource {
   private final HddsVolume volume;
   @Metric("Returns the RocksDB compact times of the Volume")
   private MutableRate dbCompactLatency;
+
+  @Metric("Returns the Number of Volumes Scanned")
+  private MutableCounterLong numScans;
 
   /**
    * @param identifier Typically, path to volume root. E.g. /data/hdds
@@ -125,6 +129,14 @@ public class VolumeInfoMetrics implements MetricsSource {
   @Metric("Returns the Container Count of the Volume")
   public long getContainers() {
     return volume.getContainers();
+  }
+
+  public long getNumScans() {
+    return numScans.value();
+  }
+
+  public void incNumScans() {
+    numScans.incr();
   }
 
   @Override
