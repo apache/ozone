@@ -176,6 +176,7 @@ public abstract class BackgroundService {
           }
         }, exec), (Void1, Void) -> null);
       }
+      future.join();
       execTaskCompletion();
     }
   }

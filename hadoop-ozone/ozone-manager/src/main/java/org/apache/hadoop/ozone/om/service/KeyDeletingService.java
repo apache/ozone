@@ -273,9 +273,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    */
   @Override
   protected void execTaskCompletion() {
-    getMetrics().setKdsServiceState(false);
-    getMetrics().setKdsLastRunTimestamp(System.currentTimeMillis());
-    getMetrics().setKdsNextRunTimestamp(System.currentTimeMillis() + getIntervalMs());
     getMetrics().updateIntervalCumulativeMetrics(
         aosDeletionStats.reclaimedKeyCount.get() + snapshotDeletionStats.reclaimedKeyCount.get(),
         aosDeletionStats.reclaimedKeySize.get() + snapshotDeletionStats.reclaimedKeySize.get());
@@ -285,6 +282,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     getMetrics().updateSnapLastRunMetrics(snapshotDeletionStats.reclaimedKeyCount.get(),
         snapshotDeletionStats.reclaimedKeySize.get(), snapshotDeletionStats.iteratedKeyCount.get(),
         snapshotDeletionStats.notReclaimableKeyCount.get());
+    getMetrics().setKdsServiceState(false);
+    getMetrics().setKdsLastRunTimestamp(System.currentTimeMillis());
+    getMetrics().setKdsNextRunTimestamp(System.currentTimeMillis() + getIntervalMs());
   }
 
   /**
@@ -529,10 +529,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   }
 
   private class DeletionStats {
-    final AtomicLong reclaimedKeyCount = new AtomicLong(0);
-    final AtomicLong reclaimedKeySize = new AtomicLong(0);
-    final AtomicLong iteratedKeyCount = new AtomicLong(0);
-    final AtomicLong notReclaimableKeyCount = new AtomicLong(0);
+    final AtomicLong reclaimedKeyCount = new AtomicLong(0L);
+    final AtomicLong reclaimedKeySize = new AtomicLong(0L);
+    final AtomicLong iteratedKeyCount = new AtomicLong(0L);
+    final AtomicLong notReclaimableKeyCount = new AtomicLong(0L);
 
     void updateDeletionStats(long reclaimedKeyCount, long reclaimedKeySize,
                                        long iteratedKeyCount, long notReclaimableKeyCount) {
@@ -543,10 +543,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     }
 
     void reset() {
-      reclaimedKeyCount.set(0);
-      reclaimedKeySize.set(0);
-      iteratedKeyCount.set(0);
-      notReclaimableKeyCount.set(0);
+      reclaimedKeyCount.set(0L);
+      reclaimedKeySize.set(0L);
+      iteratedKeyCount.set(0L);
+      notReclaimableKeyCount.set(0L);
     }
   }
 }
