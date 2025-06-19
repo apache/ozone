@@ -107,5 +107,5 @@ if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec -Dscan=false
 fi
 
-ERROR_PATTERN="BUILD FAILURE"
+ERROR_PATTERN="\[ERROR\]"
 source "${DIR}/_post_process.sh"
