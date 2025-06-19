@@ -364,6 +364,7 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = getBucket(bucketName);
 
     try {
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       OzoneMultipartUploadList ozoneMultipartUploadList =
           bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker, maxUploads);
 
@@ -547,6 +548,7 @@ public class BucketEndpoint extends EndpointBase {
     S3BucketAcl result = new S3BucketAcl();
     try {
       OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       S3Owner owner = S3Owner.of(bucket.getOwner());
       result.setOwner(owner);
 
