@@ -392,6 +392,10 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       boolean readValue() {
         return (this.ordinal() & VALUE_ONLY.ordinal()) != 0;
       }
+
+      Type addKey() {
+        return values()[ordinal() | KEY_ONLY.ordinal()];
+      }
     }
   }
 }
