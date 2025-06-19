@@ -1353,13 +1353,6 @@ public class OMDBInsightEndpoint {
         OmTableInsightTask.getTableCountKeyFromTable(DELETED_DIR_TABLE)));
     // Calculate the total number of deleted directories
     dirSummary.put("totalDeletedDirectories", deletedDirCount);
-
-    // Get all deleted directories without pagination
-    KeyInsightInfoResponse deletedDirInsightInfo = new KeyInsightInfoResponse();
-    getPendingForDeletionDirInfo(Integer.MAX_VALUE, "", deletedDirInsightInfo);
-    // Calculate the total replicated and unreplicated data size for deleted directories
-    dirSummary.put("totalReplicatedDataSize", deletedDirInsightInfo.getReplicatedDataSize());
-    dirSummary.put("totalUnreplicatedDataSize", deletedDirInsightInfo.getUnreplicatedDataSize());
   }
 
   private boolean validateStartPrefix(String startPrefix) {

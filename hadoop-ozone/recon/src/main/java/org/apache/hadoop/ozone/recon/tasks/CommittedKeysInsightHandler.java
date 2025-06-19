@@ -27,15 +27,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handler for committed keys in both FILE_TABLE and KEY_TABLE.
+ * Manages records in the key table and file table - updating counts, both replicated and unreplicated sizes of
+ * committed keys in the backend.
  */
 public class CommittedKeysInsightHandler implements OmTableHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(CommittedKeysInsightHandler.class);
 
   /**
-   * Invoked by the process method to add information on those keys that have
-   * been committed  in the OM DB.
+   * Invoked by the process method to add information on those keys that have been committed in the OM DB.
    */
   @Override
   public void handlePutEvent(OMDBUpdateEvent<String, Object> event,
@@ -58,7 +58,7 @@ public class CommittedKeysInsightHandler implements OmTableHandler {
   }
 
   /**
-   * Invoked by the process method to delete information on those keys that are no longer closed in the OM DB.
+   * Invoked by the process method to delete information on those keys that are no longer present in the OM DB.
    */
   @Override
   public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
@@ -100,8 +100,8 @@ public class CommittedKeysInsightHandler implements OmTableHandler {
         return;
       }
 
-      // In Update event the count for the key table and file table will not change. So we don't need to update the
-      // count.
+      // During an UPDATE event the count for the key table and file table will not change. So we don't have to
+      // update the count.
       OmKeyInfo oldKeyInfo = (OmKeyInfo) event.getOldValue();
       OmKeyInfo newKeyInfo = (OmKeyInfo) event.getValue();
       unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
@@ -118,8 +118,8 @@ public class CommittedKeysInsightHandler implements OmTableHandler {
 
   /**
    * This method is called by the reprocess method. It calculates the record counts for both the key table and the
-   * file table. Additionally, it computes the sizes of both replicated and unreplicated keys
-   * that are currently committed in the OM DB.
+   * file table. Additionally, it computes both replicated and unreplicated sizes of keys that are currently
+   * committed in the OM DB.
    */
   @Override
   public Triple<Long, Long, Long> getTableSizeAndCount(
