@@ -216,18 +216,18 @@ public final class DeletingServiceMetrics {
   }
 
   private void resetMetrics() {
-    keysReclaimedInInterval.set(0);
-    reclaimedSizeInInterval.set(0);
+    this.keysReclaimedInInterval.set(0);
+    this.reclaimedSizeInInterval.set(0);
   }
 
   private void checkAndResetMetrics() {
     long currentTime = Instant.now().getEpochSecond();
-    if (this.metricsResetTimeStamp == null || this.metricsResetTimeStamp.value() == 0) {
+    if (metricsResetTimeStamp == null || metricsResetTimeStamp.value() == 0) {
       this.metricsResetTimeStamp.set(currentTime);
     }
     if (currentTime - metricsResetTimeStamp.value() > METRIC_RESET_INTERVAL) {
       resetMetrics();
-      metricsResetTimeStamp.set(currentTime);
+      this.metricsResetTimeStamp.set(currentTime);
     }
   }
 
