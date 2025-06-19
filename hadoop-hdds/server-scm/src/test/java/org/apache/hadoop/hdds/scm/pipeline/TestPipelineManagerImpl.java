@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
@@ -49,6 +50,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -59,17 +61,21 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -88,6 +94,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
@@ -111,6 +118,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 /**
  * Tests for PipelineManagerImpl.
@@ -931,6 +939,79 @@ public class TestPipelineManagerImpl {
     for (DatanodeDetails dn : pipeline.getNodes())  {
       assertThat(dns).contains(dn);
     }
+  }
+
+  /**
+   * {@link PipelineManager#pipelineHasEnoughSpaceForNewContainer(Pipeline, long)} should return false if all the
+   * volumes on any Datanode in the pipeline have less than equal to the space required for creating a new container.
+   */
+  @Test
+  public void testPipelineHasEnoughSpaceForNewContainer() throws IOException {
+    // create a Mock NodeManager, the MockNodeManager class doesn't work for this test
+    NodeManager mockedNodeManager = Mockito.mock(NodeManager.class);
+    PipelineManagerImpl pipelineManager = PipelineManagerImpl.newPipelineManager(conf,
+        SCMHAManagerStub.getInstance(true),
+        mockedNodeManager,
+        SCMDBDefinition.PIPELINES.getTable(dbStore),
+        new EventQueue(),
+        scmContext,
+        serviceManager,
+        testClock);
+
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setNodes(ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails()))
+        .setState(OPEN)
+        .setReplicationConfig(ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, THREE))
+        .build();
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+    assertEquals(3, nodes.size());
+
+    long containerSize = 100L;
+
+    // Case 1: All nodes have enough space.
+    List<DatanodeInfo> datanodeInfoList = new ArrayList<>();
+    for (DatanodeDetails dn : nodes) {
+      // the method being tested needs NodeManager to return DatanodeInfo because DatanodeInfo has storage
+      // information (it extends DatanodeDetails)
+      DatanodeInfo info = new DatanodeInfo(dn, null, null);
+      info.updateStorageReports(createStorageReports(200L, 200L, 10L));
+      doReturn(info).when(mockedNodeManager).getNode(dn.getID());
+      datanodeInfoList.add(info);
+    }
+    assertTrue(pipelineManager.pipelineHasEnoughSpaceForNewContainer(pipeline, containerSize));
+
+    // Case 2: One node does not have enough space.
+    /*
+     Interestingly, SCMCommonPlacementPolicy#hasEnoughSpace returns false if exactly the required amount of space
+      is available. Which means it won't allow creating a pipeline on a node if all volumes have exactly 5 GB
+      available. We follow the same behavior here in the case of a new replica.
+
+      So here, remaining - committed == containerSize, and pipelineHasEnoughSpaceForNewContainer returns false.
+      TODO should this return true instead?
+     */
+    datanodeInfoList.get(0).updateStorageReports(createStorageReports(200L, 120L, 20L));
+    assertFalse(pipelineManager.pipelineHasEnoughSpaceForNewContainer(pipeline, containerSize));
+
+    // Case 3: All nodes do not have enough space.
+    for (DatanodeInfo info : datanodeInfoList) {
+      info.updateStorageReports(createStorageReports(200L, 100L, 20L));
+    }
+    assertFalse(pipelineManager.pipelineHasEnoughSpaceForNewContainer(pipeline, containerSize));
+  }
+
+  private List<StorageReportProto> createStorageReports(long capacity, long remaining, long committed) {
+    return Collections.singletonList(
+        StorageReportProto.newBuilder()
+            .setStorageUuid(UUID.randomUUID().toString())
+            .setStorageLocation("test")
+            .setCapacity(capacity)
+            .setRemaining(remaining)
+            .setCommitted(committed)
+            .setScmUsed(200L - remaining)
+            .build());
   }
 
   private Set<ContainerReplica> createContainerReplicasList(

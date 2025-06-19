@@ -191,7 +191,8 @@ public interface ContainerManager extends Closeable {
    * @param owner - the user which requires space in its owned container
    * @param pipeline - pipeline to which the container should belong.
    * @param excludedContainerIDS - containerIds to be excluded.
-   * @return ContainerInfo for the matching container.
+   * @return ContainerInfo for the matching container, or null if a container could not be found and could not be
+   * allocated
    */
   ContainerInfo getMatchingContainer(long size, String owner,
                                      Pipeline pipeline,
