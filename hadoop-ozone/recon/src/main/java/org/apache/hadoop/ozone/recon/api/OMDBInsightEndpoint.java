@@ -386,7 +386,7 @@ public class OMDBInsightEndpoint {
    *   }
    */
   @GET
-  @Path("/open/summary/mpu")
+  @Path("/open/mpu/summary")
   public Response getOpenMPUKeySummary() {
     // Create a HashMap for the keysSummary
     Map<String, Long> keysSummary = new HashMap<>();

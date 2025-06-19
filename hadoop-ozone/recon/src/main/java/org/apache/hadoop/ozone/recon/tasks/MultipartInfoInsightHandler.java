@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -147,8 +146,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
    */
   @Override
   public Triple<Long, Long, Long> getTableSizeAndCount(
-      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator)
-      throws IOException {
+      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator) {
     long count = 0;
     long unReplicatedSize = 0;
     long replicatedSize = 0;
@@ -169,4 +167,4 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
     }
     return Triple.of(count, unReplicatedSize, replicatedSize);
   }
-} 
+}

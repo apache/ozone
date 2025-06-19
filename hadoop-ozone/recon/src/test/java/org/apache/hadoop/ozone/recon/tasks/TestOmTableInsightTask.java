@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
@@ -47,7 +48,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -57,13 +60,17 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -358,6 +365,16 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         when(keyInfo.getOmKeyInfoList()).thenReturn(
             Arrays.asList(mock(OmKeyInfo.class)));
         when(mockKeyValue.getValue()).thenReturn(keyInfo);
+      } else if (tableName.equals(MULTIPART_INFO_TABLE)) {
+        String uploadID = UUID.randomUUID().toString();
+        OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+            .setUploadID(uploadID)
+            .build();
+        PartKeyInfo partKeyInfo =
+            createPartKeyInfo(UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+                uploadID, 1, 100L);
+        multipartKeyInfo.addPartKeyInfo(partKeyInfo);
+        when(mockKeyValue.getValue()).thenReturn(multipartKeyInfo);
       } else {
         when(mockKeyValue.getValue()).thenReturn(mock(OmKeyInfo.class));
       }
@@ -374,6 +391,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(5L, getCountForTable(BUCKET_TABLE));
     assertEquals(5L, getCountForTable(OPEN_KEY_TABLE));
     assertEquals(5L, getCountForTable(DELETED_TABLE));
+    assertEquals(5L, getCountForTable(MULTIPART_INFO_TABLE));
   }
 
   @Test
@@ -444,8 +462,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // Creating events for each table except the deleted table
     for (String tableName : omTableInsightTask.getTaskTables()) {
-      if (tableName.equals(DELETED_TABLE)) {
-        continue; // Skipping deleted table as it has a separate test
+      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)) {
+        continue; // Skipping deleted and multipartInfo tables as they have separate tests
       }
 
       // Adding 5 PUT events per table
@@ -472,7 +490,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // Verifying the count in each table
     for (String tableName : omTableInsightTask.getTaskTables()) {
-      if (tableName.equals(DELETED_TABLE)) {
+      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)) {
         continue;
       }
       assertEquals(4L, getCountForTable(
@@ -482,7 +500,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     List<OMDBUpdateEvent> additionalEvents = new ArrayList<>();
     // Simulating new PUT and DELETE events
     for (String tableName : omTableInsightTask.getTaskTables()) {
-      if (tableName.equals(DELETED_TABLE)) {
+      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)) {
         continue;
       }
       // Adding 1 new PUT event
@@ -500,7 +518,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     omTableInsightTask.process(additionalBatch, Collections.emptyMap());
     // Verifying the final count in each table
     for (String tableName : omTableInsightTask.getTaskTables()) {
-      if (tableName.equals(DELETED_TABLE)) {
+      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)) {
         continue;
       }
       // 5 items expected after processing the additional events.
@@ -626,6 +644,137 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     // After deleting "item0", size should be 4 * 1000 = 4000
     assertEquals(4000L, getUnReplicatedSizeForTable(DELETED_TABLE));
     assertEquals(12000L, getReplicatedSizeForTable(DELETED_TABLE));
+  }
+
+  @Test
+  public void testProcessForMultipartInfoTable() {
+    // Prepare 5 MPU key PUT events.
+    ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
+    String[] multipartKeys = new String[5];
+    OmMultipartKeyInfo[] mpuInfos = new OmMultipartKeyInfo[5];
+    String uploadID = UUID.randomUUID().toString();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    for (int i = 0; i < 5; i++) {
+      OmMultipartKeyInfo mpu = new OmMultipartKeyInfo.Builder()
+          .setObjectID(i + 1)
+          .setUploadID(uploadID)
+          .setCreationTime(Time.now())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(
+              HddsProtos.ReplicationFactor.THREE))
+          .build();
+
+      // Each MPU has 2 parts, each part is 100 bytes.
+      mpu.addPartKeyInfo(createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 1, 100L));
+      mpu.addPartKeyInfo(createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 2, 100L));
+      String multipartKey = reconOMMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
+      multipartKeys[i] = multipartKey;
+      mpuInfos[i] = mpu;
+      putEvents.add(getOMUpdateEvent(multipartKey, mpu, MULTIPART_INFO_TABLE, PUT, null));
+    }
+    OMUpdateEventBatch putBatch = new OMUpdateEventBatch(putEvents, 0L);
+    omTableInsightTask.process(putBatch, Collections.emptyMap());
+
+    // After 5 MPU key PUTs, each with 2 parts of 100 bytes, total unreplicated size = 5 * 2 * 100 bytes = 1000 bytes.
+    // Replicated size (with RATIS THREE replication) = 1000 bytes * 3 = 3000 bytes.
+    assertEquals(5L, getCountForTable(MULTIPART_INFO_TABLE));
+    assertEquals(1000L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(3000L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+
+    // DELETE the last MPU key.
+    ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
+    deleteEvents.add(getOMUpdateEvent(multipartKeys[4], mpuInfos[4], MULTIPART_INFO_TABLE, DELETE, null));
+    OMUpdateEventBatch deleteBatch = new OMUpdateEventBatch(deleteEvents, 0L);
+    omTableInsightTask.process(deleteBatch, Collections.emptyMap());
+
+    // After DELETE: 4 MPU keys left, 4 * 2 * 100 = 800 bytes unreplicated size, 800 bytes * 3 = 2400 bytes
+    // replicated size.
+    assertEquals(4L, getCountForTable(MULTIPART_INFO_TABLE));
+    assertEquals(800L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(2400L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+
+    // UPDATE the first MPU key: change part 1 to 200 bytes, part 2 stays 100 bytes.
+    OmMultipartKeyInfo newMpu = new OmMultipartKeyInfo.Builder()
+        .setObjectID(1L)
+        .setUploadID(uploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .build();
+
+    newMpu.addPartKeyInfo(createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 1, 200L));
+    newMpu.addPartKeyInfo(createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 2, 100L));
+
+    ArrayList<OMDBUpdateEvent> updateEvents = new ArrayList<>();
+    updateEvents.add(getOMUpdateEvent(multipartKeys[0], newMpu, MULTIPART_INFO_TABLE, UPDATE, mpuInfos[0]));
+    OMUpdateEventBatch updateBatch = new OMUpdateEventBatch(updateEvents, 0L);
+    omTableInsightTask.process(updateBatch, Collections.emptyMap());
+
+    // After UPDATE: 3 MPU keys unchanged (2*100 bytes each), 1 MPU with 200+100 bytes.
+    // Total unreplicated size = 3*2*100 + 200+100 = 600+300 = 900 bytes.
+    // Total replicated size (with RATIS THREE replication) = 900 * 3 = 2700 bytes.
+    assertEquals(4L, getCountForTable(MULTIPART_INFO_TABLE));
+    assertEquals(900L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(2700L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+  }
+
+  @Test
+  public void testReprocessForMultipartInfoTable() throws Exception {
+    String uploadID = UUID.randomUUID().toString();
+    OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo.Builder()
+        .setObjectID(1L)
+        .setUploadID(uploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .build();
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    PartKeyInfo part1 = createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 1, 100L);
+    omMultipartKeyInfo.addPartKeyInfo(part1);
+
+    PartKeyInfo part2 = createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 2, 100L);
+    omMultipartKeyInfo.addPartKeyInfo(part2);
+
+    PartKeyInfo part3 = createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 3, 100L);
+    omMultipartKeyInfo.addPartKeyInfo(part3);
+
+    String multipartKey = reconOMMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
+    reconOMMetadataManager.getMultipartInfoTable().put(multipartKey, omMultipartKeyInfo);
+
+    ReconOmTask.TaskResult result = omTableInsightTask.reprocess(reconOMMetadataManager);
+    assertTrue(result.isTaskSuccess());
+
+    assertEquals(1L, getCountForTable(MULTIPART_INFO_TABLE));
+    // each MPU part size is 100 bytes * 3 MPU parts = 300 bytes.
+    assertEquals(300L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    // each MPU part is replicated using RATIS THREE, total replicated size = 300 bytes * 3 = 900 bytes.
+    assertEquals(900L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+  }
+
+  public PartKeyInfo createPartKeyInfo(String volumeName, String bucketName,
+                                       String keyName, String uploadID, int partNumber, long dataSize) {
+    return PartKeyInfo.newBuilder()
+        .setPartNumber(partNumber)
+        .setPartName(reconOMMetadataManager.getMultipartKey(volumeName,
+            bucketName, keyName, uploadID))
+        .setPartKeyInfo(KeyInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setDataSize(dataSize)
+            .setCreationTime(Time.now())
+            .setModificationTime(Time.now())
+            .setObjectID(UUID.randomUUID().hashCode())
+            .setType(HddsProtos.ReplicationType.RATIS)
+            .setFactor(HddsProtos.ReplicationFactor.THREE)
+            .build())
+        .build();
   }
 
   private OMDBUpdateEvent getOMUpdateEvent(
