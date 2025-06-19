@@ -100,6 +100,7 @@ public class TestS3GatewayMetrics {
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn("mockSignature");
+    bucketEndpoint.setHeaders(headers);
     keyEndpoint.setHeaders(headers);
     metrics = bucketEndpoint.getMetrics();
 
