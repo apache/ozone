@@ -15,21 +15,17 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd">
   <servlet>
-    <servlet-name>webadmin</servlet-name>
+    <servlet-name>secret</servlet-name>
     <servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
     <init-param>
       <param-name>javax.ws.rs.Application</param-name>
-      <param-value>org.apache.hadoop.ozone.s3webadmin.Application</param-value>
+      <param-value>org.apache.hadoop.ozone.s3secret.Application</param-value>
     </init-param>
     <load-on-startup>1</load-on-startup>
   </servlet>
   <servlet-mapping>
-    <servlet-name>webadmin</servlet-name>
+    <servlet-name>secret</servlet-name>
     <url-pattern>/secret/*</url-pattern>
-  </servlet-mapping>
-  <servlet-mapping>
-    <servlet-name>webadmin</servlet-name>
-    <url-pattern>/sts/*</url-pattern>
   </servlet-mapping>
   <listener>
     <listener-class>org.jboss.weld.environment.servlet.Listener</listener-class>

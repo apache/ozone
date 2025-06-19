@@ -15,9 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.sts;
+package org.apache.hadoop.ozone.s3.endpoint;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
@@ -45,7 +44,7 @@ import org.slf4j.LoggerFactory;
  * @see <a href="https://docs.aws.amazon.com/STS/latest/APIReference/">AWS STS API Reference</a>
  */
 @Path("/")
-public class STSEndpoint {
+public class STSEndpoint extends EndpointBase {
 
   private static final Logger LOG = LoggerFactory.getLogger(STSEndpoint.class);
   
@@ -315,5 +314,9 @@ public class STSEndpoint {
   private String getExpirationTime(int durationSeconds) {
     Instant expiration = Instant.now().plusSeconds(durationSeconds);
     return DateTimeFormatter.ISO_INSTANT.format(expiration);
+  }
+
+  public void init () {
+
   }
 }

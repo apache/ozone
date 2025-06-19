@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREA
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STS_PAYLOAD;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.UnsupportedEncodingException;
@@ -119,7 +120,7 @@ public final class StringToSignProducer {
     }
     strToSign.append(signatureInfo.getDateTime()).append(NEWLINE);
     strToSign.append(credentialScope).append(NEWLINE);
-
+    boolean isStsRequest = credentialScope.contains("/sts/");
     String canonicalRequest = buildCanonicalRequest(
         scheme,
         method,
@@ -127,7 +128,8 @@ public final class StringToSignProducer {
         signatureInfo.getSignedHeaders(),
         headers,
         queryParams,
-        !signatureInfo.isSignPayload());
+        !signatureInfo.isSignPayload(),
+        isStsRequest);
     strToSign.append(hash(canonicalRequest));
     if (LOG.isDebugEnabled()) {
       LOG.debug("canonicalRequest:[{}]", canonicalRequest);
@@ -161,7 +163,8 @@ public final class StringToSignProducer {
       String signedHeaders,
       Map<String, String> headers,
       Map<String, String> queryParams,
-      boolean unsignedPayload
+      boolean unsignedPayload,
+      boolean isStsRequest
   ) throws OS3Exception {
 
     Iterable<String> parts = split("/", uri);
@@ -206,6 +209,8 @@ public final class StringToSignProducer {
         STREAMING_UNSIGNED_PAYLOAD_TRAILER.equals(headers.get(X_AMZ_CONTENT_SHA256)) ||
         unsignedPayload) {
       payloadHash = UNSIGNED_PAYLOAD;
+    } else if (isStsRequest) {
+      payloadHash = STS_PAYLOAD;
     } else {
       // According to AWS Sig V4 documentation
       // https://docs.aws.amazon.com/AmazonS3/latest/API/
