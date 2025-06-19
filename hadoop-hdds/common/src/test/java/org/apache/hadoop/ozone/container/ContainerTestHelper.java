@@ -18,18 +18,26 @@
 package org.apache.hadoop.ozone.container;
 
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -673,5 +681,42 @@ public final class ContainerTestHelper {
     }
 
     return builder.build();
+  }
+
+  /**
+   * Overwrite the file with random bytes.
+   */
+  public static void corruptFile(File file) {
+    try {
+      final int length = (int) file.length();
+      Path path = file.toPath();
+      try (InputStream originalInputStream = Files.newInputStream(path)) {
+        final byte[] original = IOUtils.readFully(originalInputStream, length);
+        final byte[] corruptedBytes = new byte[length];
+        ThreadLocalRandom.current().nextBytes(corruptedBytes);
+        Files.write(path, corruptedBytes, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+        try (InputStream corruptedInputStream = Files.newInputStream(path)) {
+          assertThat(IOUtils.readFully(corruptedInputStream, length))
+              .isEqualTo(corruptedBytes)
+              .isNotEqualTo(original);
+        }
+      }
+    } catch (IOException ex) {
+      // Fail the test.
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  /**
+   * Truncate the file to 0 bytes in length.
+   */
+  public static void truncateFile(File file) {
+    try {
+      Files.write(file.toPath(), new byte[0], StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+      assertEquals(0, file.length());
+    } catch (IOException ex) {
+      // Fail the test.
+      throw new UncheckedIOException(ex);
+    }
   }
 }

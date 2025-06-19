@@ -21,6 +21,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.corruptFile;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.truncateFile;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,8 +34,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -41,11 +41,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -346,46 +344,6 @@ public abstract class TestContainerScannerIntegrationAbstract {
           EnumSet.allOf(ContainerCorruptions.class);
       Arrays.asList(exclude).forEach(includeSet::remove);
       return includeSet;
-    }
-
-    /**
-     * Overwrite the file with random bytes.
-     */
-    private static void corruptFile(File file) {
-      try {
-        final int length = (int) file.length();
-
-        Path path = file.toPath();
-        final byte[] original = IOUtils.readFully(Files.newInputStream(path), length);
-
-        final byte[] corruptedBytes = new byte[length];
-        ThreadLocalRandom.current().nextBytes(corruptedBytes);
-
-        Files.write(path, corruptedBytes,
-            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
-
-        assertThat(IOUtils.readFully(Files.newInputStream(path), length))
-            .isEqualTo(corruptedBytes)
-            .isNotEqualTo(original);
-      } catch (IOException ex) {
-        // Fail the test.
-        throw new UncheckedIOException(ex);
-      }
-    }
-
-    /**
-     * Truncate the file to 0 bytes in length.
-     */
-    private static void truncateFile(File file) {
-      try {
-        Files.write(file.toPath(), new byte[0],
-            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
-
-        assertEquals(0, file.length());
-      } catch (IOException ex) {
-        // Fail the test.
-        throw new UncheckedIOException(ex);
-      }
     }
   }
 }
