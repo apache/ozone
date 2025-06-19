@@ -20,7 +20,7 @@ Test Timeout        5 minutes
 Suite Setup         Get Security Enabled From Config
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
-*** Keywords ***grpc
+*** Keywords ***
 Assert Leader Present
      [Arguments]                     ${output}
      Should Match Regexp             ${output}                      [om (: LEADER|)]

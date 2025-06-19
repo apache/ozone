@@ -20,7 +20,6 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 Suite Setup         Create test data
 
-
 *** Variables ***
 ${CONTAINER}
 ${SCM}       scm
