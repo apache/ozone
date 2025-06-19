@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.tools.contract;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IOSTATISTICS_LOGGING_LEVEL_INFO;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.createFile;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
@@ -188,7 +187,7 @@ public abstract class AbstractContractDistCpTest
   @Override
   public void teardown() throws Exception {
     // if remote FS supports IOStatistics log it.
-    logIOStatisticsAtLevel(LOG, IOSTATISTICS_LOGGING_LEVEL_INFO, getRemoteFS());
+    logIOStatisticsAtLevel(LOG, "info", getRemoteFS());
     super.teardown();
   }
 

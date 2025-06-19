@@ -33,7 +33,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -95,10 +95,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     }
 
-    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
-        .setKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
-        OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX)).build();
-    validateKey(ozoneManager, validateArgs);
+    if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
+      OmUtils.validateKeyName(keyArgs.getKeyName());
+    }
 
     boolean isHsync = commitKeyRequest.hasHsync() && commitKeyRequest.getHsync();
     boolean isRecovery = commitKeyRequest.hasRecovery() && commitKeyRequest.getRecovery();

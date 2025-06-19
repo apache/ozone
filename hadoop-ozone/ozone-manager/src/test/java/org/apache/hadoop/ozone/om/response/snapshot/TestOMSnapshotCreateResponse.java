@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -126,7 +125,7 @@ public class TestOMSnapshotCreateResponse {
 
     // Check contents of entry
     SnapshotInfo storedInfo;
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (Table.KeyValueIterator<String, SnapshotInfo>
              it = omMetadataManager.getSnapshotInfoTable().iterator()) {
       Table.KeyValue<String, SnapshotInfo> keyValue = it.next();
       storedInfo = keyValue.getValue();
@@ -260,7 +259,7 @@ public class TestOMSnapshotCreateResponse {
   private void verifyEntriesLeftInTable(
       Table<String, ?> table, Set<String> expectedKeys) throws IOException {
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, ?>>
+    try (Table.KeyValueIterator<String, ?>
              keyIter = table.iterator()) {
       keyIter.seekToFirst();
       while (keyIter.hasNext()) {

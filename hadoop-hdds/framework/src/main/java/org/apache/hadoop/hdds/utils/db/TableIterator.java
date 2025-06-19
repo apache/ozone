@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.util.Iterator;
 
 /**
@@ -28,6 +27,8 @@ import java.util.Iterator;
  * @param <T> The type to be iterated.
  */
 public interface TableIterator<KEY, T> extends Iterator<T>, Closeable {
+  @Override
+  void close() throws RocksDatabaseException;
 
   /**
    * seek to first entry.
@@ -45,14 +46,12 @@ public interface TableIterator<KEY, T> extends Iterator<T>, Closeable {
    * @param key - Bytes that represent the key.
    * @return VALUE.
    */
-  T seek(KEY key) throws IOException;
+  T seek(KEY key) throws RocksDatabaseException, CodecException;
 
   /**
    * Remove the actual value of the iterator from the database table on
    * which the iterator is working on.
-   *
-   * @throws IOException when there is an error occurred during deletion.
    */
-  void removeFromDB() throws IOException;
+  void removeFromDB() throws RocksDatabaseException, CodecException;
 
 }

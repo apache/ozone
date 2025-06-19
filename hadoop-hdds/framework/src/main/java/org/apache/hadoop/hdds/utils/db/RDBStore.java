@@ -303,17 +303,18 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public RDBTable getTable(String name) throws IOException {
+  public RDBTable getTable(String name) throws RocksDatabaseException {
     final ColumnFamily handle = db.getColumnFamily(name);
     if (handle == null) {
-      throw new IOException("No such table in this DB. TableName : " + name);
+      throw new RocksDatabaseException("No such table in this DB. TableName : " + name);
     }
     return new RDBTable(this.db, handle, rdbMetrics);
   }
 
   @Override
   public <K, V> TypedTable<K, V> getTable(
-      String name, Codec<K> keyCodec, Codec<V> valueCodec, TableCache.CacheType cacheType) throws IOException {
+      String name, Codec<K> keyCodec, Codec<V> valueCodec, TableCache.CacheType cacheType)
+      throws RocksDatabaseException, CodecException {
     return new TypedTable<>(getTable(name), keyCodec, valueCodec, cacheType);
   }
 
