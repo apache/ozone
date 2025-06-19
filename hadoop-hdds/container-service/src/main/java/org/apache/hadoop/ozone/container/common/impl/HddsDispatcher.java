@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
@@ -38,7 +37,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -71,7 +69,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.hadoop.util.Time;
@@ -339,13 +336,19 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     // write before trying to send CloseContainerAction.
     boolean isVolumeFullForWrite = false;
     if (!HddsUtils.isReadOnly(msg)) {
-      isVolumeFullForWrite = isVolumeFullForOpenContainer(container);
-      sendCloseContainerActionIfNeeded(container, isVolumeFullForWrite);
       try {
-        validateVolumeFullForWrite(container, cmdType, isVolumeFullForWrite);
+        if (container != null && container.getContainerState() == State.OPEN) {
+          ContainerUtils.assertSpaceAvailability(containerID, container.getContainerData().getVolume(), 0);
+        }
       } catch (StorageContainerException e) {
-        audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, e);
-        return ContainerUtils.logAndReturnError(LOG, e, msg);
+        LOG.warn(e.getMessage());
+        isVolumeFullForWrite = true;
+        if (cmdType == Type.WriteChunk || cmdType == Type.PutBlock || cmdType == Type.PutSmallFile) {
+          audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, e);
+          return ContainerUtils.logAndReturnError(LOG, e, msg);
+        }
+      } finally {
+        sendCloseContainerActionIfNeeded(container, isVolumeFullForWrite);
       }
     }
     Handler handler = getHandler(containerType);
@@ -617,25 +620,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
-  private void validateVolumeFullForWrite(
-      Container container, Type cmdType, boolean isVolumeFullForWrite) throws StorageContainerException {
-    if (!isVolumeFullForWrite) {
-      return;
-    }
-
-    HddsVolume volume = container.getContainerData().getVolume();
-    SpaceUsageSource currentUsage = volume.getCurrentUsage();
-    LOG.warn("Volume [{}] is full. containerID: {}. Volume usage: [{}]. Minimum required free space: {}", volume,
-        container.getContainerData().getContainerID(), currentUsage,
-        volume.getFreeSpaceToSpare(currentUsage.getCapacity()));
-    if (cmdType == Type.WriteChunk || cmdType == Type.PutBlock || cmdType == Type.PutSmallFile) {
-      // If the volume is full, we should not allow more writes.
-      throw new StorageContainerException("Container write failed due to volume " + volume.getStorageID()
-          + " out of space " + currentUsage + " with minimum free space required: "
-          + volume.getFreeSpaceToSpare(currentUsage.getCapacity()), DISK_OUT_OF_SPACE);
-    }
-  }
-
   private boolean isContainerFull(Container container) {
     boolean isOpen = Optional.ofNullable(container)
         .map(cont -> cont.getContainerState() == ContainerDataProto.State.OPEN)
@@ -648,11 +632,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     } else {
       return false;
     }
-  }
-
-  private boolean isVolumeFullForOpenContainer(Container container) {
-    boolean isOpen = container != null && container.getContainerState() == State.OPEN;
-    return isOpen && container.getContainerData().getVolume().isVolumeFull();
   }
 
   private boolean isContainerUnhealthy(Container container) {
