@@ -165,12 +165,16 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // When abort uploaded key, we need to subtract the PartKey length from
       // the volume usedBytes.
       long quotaReleased = 0;
+      long totalPendingDeleteSize = 0;
       for (PartKeyInfo iterPartKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
         quotaReleased += QuotaUtil.getReplicatedSize(
             iterPartKeyInfo.getPartKeyInfo().getDataSize(),
             omKeyInfo.getReplicationConfig());
+        totalPendingDeleteSize += sumBlockLengths(iterPartKeyInfo.getPartKeyInfo());
       }
-      omBucketInfo.incrUsedBytes(-quotaReleased);
+      omBucketInfo.decrUsedBytes(quotaReleased, false);
+      omBucketInfo.incrPendingSnapshotDeleteBytes(totalPendingDeleteSize);
+      omBucketInfo.incrPendingSnapshotDeleteNamespace(multipartKeyInfo.getPartKeyInfoMap().size());
 
       // Update cache of openKeyTable and multipartInfo table.
       // No need to add the cache entries to delete table, as the entries
