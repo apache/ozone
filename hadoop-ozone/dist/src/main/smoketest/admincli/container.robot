@@ -18,8 +18,7 @@ Documentation       Test ozone admin container command
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
-Suite Setup         Run Keywords    Create test data    
-...                 AND             Get Security Enabled From Config
+Suite Setup         Create test data
 
 
 *** Variables ***
@@ -28,6 +27,7 @@ ${SCM}       scm
 
 *** Keywords ***
 Create test data
+    Run Keyword         Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
                         Execute          ozone freon ockg -n1 -t1 -p container
 

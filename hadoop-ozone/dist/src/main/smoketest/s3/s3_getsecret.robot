@@ -17,8 +17,7 @@
 Documentation       Test ozone s3 getsecret command
 Resource            ../commonlib.robot
 Test Timeout        2 minutes
-Suite Setup         Run Keywords       Get Security Enabled From Config 
-...    AND          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+Suite Setup         Kinit test user     testuser     testuser.keytab
 
 *** Keywords ***
 Verify output

@@ -19,8 +19,8 @@ Library             OperatingSystem
 Resource            ../lib/os.robot
 Resource            ../commonlib.robot
 Test Timeout        5 minute
-Suite Setup         Run Keywords    Write keys 
-...                 AND             Get Security Enabled From Config
+Suite Setup         Run Keywords    Get Security Enabled From Config 
+...                 AND             Write keys
 
 *** Variables ***
 ${PREFIX}           ${EMPTY}

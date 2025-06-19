@@ -29,7 +29,6 @@ Test Teardown       Run Keyword        Revoke S3 secrets
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:19878
-${SECURITY_ENABLED}   true
 
 *** Test Cases ***
 

@@ -15,7 +15,6 @@
 
 *** Settings ***
 Resource            ../commonlib.robot
-Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${OM_HA_PARAM}         ${EMPTY}

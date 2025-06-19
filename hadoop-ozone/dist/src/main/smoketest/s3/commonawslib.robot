@@ -17,7 +17,6 @@
 Library             Collections
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
-Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${ENDPOINT_URL}                http://s3g:9878

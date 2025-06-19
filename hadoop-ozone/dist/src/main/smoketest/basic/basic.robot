@@ -24,6 +24,7 @@ Suite Setup         Get Security Enabled From Config
 *** Variables ***
 ${SCM}          scm
 
+
 *** Test Cases ***
 
 Check webui static resources

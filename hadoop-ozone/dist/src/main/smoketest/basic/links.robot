@@ -20,8 +20,8 @@ Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 Test Timeout        4 minute
-Suite Setup         Run Keywords      Create volumes
-...                 AND               Get Security Enabled From Config
+Suite Setup         Run Keywords      Get Security Enabled From Config
+...                 AND               Create volumes
 
 *** Variables ***
 ${prefix}    generated

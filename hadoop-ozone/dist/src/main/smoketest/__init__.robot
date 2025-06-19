@@ -16,5 +16,4 @@
 Documentation       Smoketest ozone secure cluster
 Test Timeout        10 minutes
 Resource            commonlib.robot
-Suite Setup         Run Keywords       Get Security Enabled From Config
-...    AND          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+Suite Setup         Kinit test user     testuser     testuser.keytab

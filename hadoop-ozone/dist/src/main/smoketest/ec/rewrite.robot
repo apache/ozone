@@ -21,8 +21,7 @@ Resource            ../lib/os.robot
 Resource            ../ozone-lib/shell.robot
 Resource            ../s3/commonawslib.robot
 Resource            lib.resource
-Suite Setup         Run Keywords       Get Security Enabled From Config
-...    AND          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+Suite Setup         Kinit test user     testuser     testuser.keytab
 
 
 *** Variables ***

@@ -21,7 +21,7 @@ Library             BuiltIn
 Resource            lib/os.robot
 
 *** Variables ***
-${SECURITY_ENABLED}  false
+${SECURITY_ENABLED}  ${EMPTY}
 ${OM_HA_PARAM}       ${EMPTY}
 ${OM_SERVICE_ID}     om
 
@@ -32,6 +32,7 @@ Get test user principal
     [return]            ${user}/${instance}@EXAMPLE.COM
 
 Get Security Enabled From Config
+    Return From Keyword If    '${SECURITY_ENABLED}' != ''
     ${value} =    Execute    ozone getconf confKey ozone.security.enabled
     IF    '${value}' != 'true' and '${value}' != 'false'
            ${value} =    Set Variable    false
@@ -44,6 +45,7 @@ Kinit HTTP user
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k -t /etc/security/keytabs/HTTP.keytab ${principal}
 
 Kinit test user
+    Run Keyword         Get Security Enabled From Config
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
     [arguments]                      ${user}       ${keytab}
     ${TEST_USER} =      Get test user principal    ${user}
@@ -57,7 +59,6 @@ Access should be denied
 
 Requires admin privilege
     [arguments]    ${command}
-    ${SECURITY_ENABLED} =    Get Security Enabled From Config
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'   Skip privilege check in unsecure cluster
     Kinit test user     testuser2     testuser2.keytab
     Access should be denied    ${command}
