@@ -96,14 +96,15 @@ abstract class StreamDataChannelBase
     return getChannel().isOpen();
   }
 
-  protected void assertSpaceAvailability(int remaining) throws IOException {
-    HddsVolume volume = containerData.getVolume();
-    SpaceUsageSource currentUsage = volume.getCurrentUsage();
-    if (currentUsage.getAvailable() - volume.getFreeSpaceToSpare(currentUsage.getCapacity()) <= remaining) {
-      throw new StorageContainerException("write failed for container " + containerData.getContainerID()
-          + " with size " + remaining + " due to volume " + volume.getStorageID() + " out of space "
-          + volume.getCurrentUsage() + " with minimum free space required: "
-          + volume.getFreeSpaceToSpare(currentUsage.getCapacity()), DISK_OUT_OF_SPACE);
+  protected void assertSpaceAvailability(int requested) throws StorageContainerException {
+    final HddsVolume volume = containerData.getVolume();
+    final SpaceUsageSource currentUsage = volume.getCurrentUsage();
+    final long spared = volume.getFreeSpaceToSpare(currentUsage.getCapacity());
+
+    if (currentUsage.getAvailable() - spared <= requested) {
+      throw new StorageContainerException("Failed to write " + requested + " bytes to container "
+          + containerData.getContainerID() + " due to volume " + volume.getStorageID() + " out of space "
+          + currentUsage + ", spared="  + spared, DISK_OUT_OF_SPACE);
     }
   }
 
