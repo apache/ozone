@@ -81,6 +81,8 @@ public class TestDecommissionStatusSubCommand {
     when(scmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
     when(scmClient.getMetrics(any())).thenReturn(metrics.get(1));
 
+    CommandLine cmdLine = new CommandLine(cmd);
+    cmdLine.parseArgs();
     cmd.execute(scmClient);
     Pattern p = Pattern.compile("Decommission\\sStatus:\\s" +
             "DECOMMISSIONING\\s-\\s2\\snode\\(s\\)\n");
@@ -112,6 +114,8 @@ public class TestDecommissionStatusSubCommand {
         .thenReturn(new ArrayList<>());
     when(scmClient.getContainersOnDecomNode(any())).thenReturn(new HashMap<>());
     when(scmClient.getMetrics(any())).thenReturn(metrics.get(0));
+    CommandLine cmdLine = new CommandLine(cmd);
+    cmdLine.parseArgs();
     cmd.execute(scmClient);
 
     Pattern p = Pattern.compile("Decommission\\sStatus:\\s" +
