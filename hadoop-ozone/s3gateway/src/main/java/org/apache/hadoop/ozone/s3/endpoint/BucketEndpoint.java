@@ -134,11 +134,9 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = null;
 
     try {
-      bucket = getBucket(bucketName);
-      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       if (aclMarker != null) {
         s3GAction = S3GAction.GET_ACL;
-        S3BucketAcl result = getAcl(bucket);
+        S3BucketAcl result = getAcl(bucketName);
         getMetrics().updateGetAclSuccessStats(startNanos);
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
@@ -147,7 +145,7 @@ public class BucketEndpoint extends EndpointBase {
 
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
-        return listMultipartUploads(bucket, prefix, keyMarker, uploadIdMarker, maxUploads);
+        return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
 
       maxKeys = validateMaxKeys(maxKeys);
@@ -170,6 +168,9 @@ public class BucketEndpoint extends EndpointBase {
       // delimited by OZONE_URI_DELIMITER
       boolean shallow = listKeysShallowEnabled
           && OZONE_URI_DELIMITER.equals(delimiter);
+
+      bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
 
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
 
@@ -345,7 +346,7 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   public Response listMultipartUploads(
-      OzoneBucket bucket,
+      String bucketName,
       String prefix,
       String keyMarker,
       String uploadIdMarker,
@@ -360,12 +361,15 @@ public class BucketEndpoint extends EndpointBase {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
 
+    OzoneBucket bucket = getBucket(bucketName);
+
     try {
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       OzoneMultipartUploadList ozoneMultipartUploadList =
           bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker, maxUploads);
 
       ListMultipartUploadsResult result = new ListMultipartUploadsResult();
-      result.setBucket(bucket.getName());
+      result.setBucket(bucketName);
       result.setKeyMarker(keyMarker);
       result.setUploadIdMarker(uploadIdMarker);
       result.setNextKeyMarker(ozoneMultipartUploadList.getNextKeyMarker());
@@ -540,12 +544,13 @@ public class BucketEndpoint extends EndpointBase {
    * <p>
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html
    */
-  public S3BucketAcl getAcl(OzoneBucket bucket)
+  public S3BucketAcl getAcl(String bucketName)
       throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3BucketAcl result = new S3BucketAcl();
-    String bucketName = bucket.getName();
     try {
+      OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       S3Owner owner = S3Owner.of(bucket.getOwner());
       result.setOwner(owner);
 
