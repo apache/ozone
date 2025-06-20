@@ -21,6 +21,8 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
@@ -362,6 +364,52 @@ public class OMDBInsightEndpoint {
     keysSummary.put("totalUnreplicatedDataSize",
         unreplicatedSizeOpenKey + unreplicatedSizeOpenFile);
 
+  }
+
+  /**
+   * Retrieves the summary of committed keys.
+   *
+   * @return The HTTP response body includes a map with the following entries:
+   * - "totalReplicatedDataSize": the total replicated size for committed keys/files
+   * - "totalUnreplicatedDataSize": the total unreplicated size for committed keys/files
+   *
+   * Example response:
+   *   {
+   *    "totalReplicatedDataSize": 90000,
+   *    "totalUnreplicatedDataSize": 30000
+   *   }
+   */
+  @GET
+  @Path("/committed/summary")
+  public Response getCommittedKeysSummary() {
+    Map<String, Long> keysSummary = new HashMap<>();
+    // Create a keys summary for committed keys
+    createKeysSummaryForCommittedKeys(keysSummary);
+    return Response.ok(keysSummary).build();
+  }
+
+  /**
+   * Creates a keys summary for keys/files and updates the provided
+   * keysSummary map. Calculates the total replicated and unreplicated data sizes.
+   *
+   * @param keysSummary A map to store the keys summary information.
+   */
+  private void createKeysSummaryForCommittedKeys(Map<String, Long> keysSummary) {
+    Long replicatedSizeFileTable = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getReplicatedSizeKeyFromTable(FILE_TABLE)));
+    Long replicatedSizeKeyTable = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getReplicatedSizeKeyFromTable(KEY_TABLE)));
+
+    Long unreplicatedSizeFileTable = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(FILE_TABLE)));
+    Long unreplicatedSizeKeyTable = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(KEY_TABLE)));
+
+    // Calculate the total replicated and unreplicated sizes
+    keysSummary.put("totalReplicatedDataSize",
+        replicatedSizeFileTable + replicatedSizeKeyTable);
+    keysSummary.put("totalUnreplicatedDataSize",
+        unreplicatedSizeFileTable + unreplicatedSizeKeyTable);
   }
 
   private Long getValueFromId(GlobalStats record) {
