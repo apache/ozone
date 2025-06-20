@@ -33,6 +33,7 @@ import java.util.Iterator;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -53,20 +54,25 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
 
   public static Collection<Object[]> data() {
-    return Arrays.asList(
-        new Object[]{true, true},
-        new Object[]{true, false},
-        new Object[]{false, true},
-        new Object[]{false, false});
+    return Arrays.asList(new Object[][]{
+        {true, true, true},
+        {true, true, false},
+        {true, false, true},
+        {true, false, false},
+        {false, true, true},
+        {false, true, false},
+        {false, false, true},
+        {false, false, false}
+    });
   }
 
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithKeyContainsSnapshotReservedWord(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+      boolean setKeyPathLock, boolean setFileSystemPaths, boolean cacheEnabled) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
-
+    ozoneManager.getConfiguration().setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, cacheEnabled);
     String[] validKeyNames = {
         keyName,
         OM_SNAPSHOT_INDICATOR + "a/" + keyName,
