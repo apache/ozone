@@ -41,11 +41,17 @@ abstract class RDBStoreAbstractIterator<RAW>
   // prefix for each key.
   private final RAW prefix;
 
-  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table,
-      RAW prefix) {
+  private final Type type;
+
+  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table, RAW prefix, Type type) {
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
     this.prefix = prefix;
+    this.type = this.prefix == null ? type : type.addKey(); // it has to read key for matching prefix.
+  }
+
+  Type getType() {
+    return type;
   }
 
   /** @return the key for the current entry. */
