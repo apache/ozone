@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 /**
@@ -97,6 +98,23 @@ public interface DBStore extends Closeable, BatchOperationHandler {
    * @throws IOException on Failure
    */
   void compactDB() throws IOException;
+
+  /**
+   * Compact the specific table.
+   *
+   * @param tableName - Name of the table to compact.
+   * @throws IOException on Failure
+   */
+  void compactTable(String tableName) throws IOException;
+
+  /**
+   * Compact the specific table.
+   *
+   * @param tableName - Name of the table to compact.
+   * @param options - Options for the compact operation.
+   * @throws IOException on Failure
+   */
+  void compactTable(String tableName, ManagedCompactRangeOptions options) throws IOException;
 
   /**
    * Moves a key from the Source Table to the destination Table.

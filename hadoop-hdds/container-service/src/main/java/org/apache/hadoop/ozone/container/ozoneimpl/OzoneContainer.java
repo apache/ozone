@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
@@ -46,6 +47,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -64,7 +66,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -195,6 +196,7 @@ public class OzoneContainer {
     this.witnessedContainerMetadataStore = WitnessedContainerMetadataStoreImpl.get(conf);
     containerSet = ContainerSet.newRwContainerSet(witnessedContainerMetadataStore.getContainerIdsTable(),
         recoveringContainerTimeout);
+    volumeSet.setGatherContainerUsages(this::gatherContainerUsages);
     metadataScanner = null;
 
     metrics = ContainerMetrics.create(conf);
@@ -344,8 +346,7 @@ public class OzoneContainer {
       for (Thread volumeThread : volumeThreads) {
         volumeThread.join();
       }
-      try (TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, String>> itr =
-               containerSet.getContainerIdsTable().iterator()) {
+      try (Table.KeyValueIterator<ContainerID, String> itr = containerSet.getContainerIdsTable().iterator(KEY_ONLY)) {
         final Map<ContainerID, Long> containerIds = new HashMap<>();
         while (itr.hasNext()) {
           containerIds.put(itr.next().getKey(), 0L);
@@ -503,12 +504,14 @@ public class OzoneContainer {
     // Do an immediate check of all volumes to ensure datanode health before
     // proceeding.
     volumeSet.checkAllVolumes();
+    volumeSet.startAllVolume();
     metaVolumeSet.checkAllVolumes();
+    metaVolumeSet.startAllVolume();
     // DB volume set may be null if dedicated DB volumes are not used.
     if (dbVolumeSet != null) {
       dbVolumeSet.checkAllVolumes();
+      dbVolumeSet.startAllVolume();
     }
-
     LOG.info("Attempting to start container services.");
     startContainerScrub();
 
@@ -575,6 +578,15 @@ public class OzoneContainer {
     return containerSet;
   }
 
+  public Long gatherContainerUsages(HddsVolume storageVolume) {
+    AtomicLong usages = new AtomicLong();
+    containerSet.getContainerMapIterator().forEachRemaining(e -> {
+      if (e.getValue().getContainerData().getVolume().getStorageID().equals(storageVolume.getStorageID())) {
+        usages.addAndGet(e.getValue().getContainerData().getBytesUsed());
+      }
+    });
+    return usages.get();
+  }
   /**
    * Returns container report.
    *

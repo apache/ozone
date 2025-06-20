@@ -29,17 +29,18 @@ ${BUCKET}           cli-debug-bucket
 ${TESTFILE}         testfile
 ${EC_DATA}          3
 ${EC_PARITY}        2
+${OM_SERVICE_ID}    %{OM_SERVICE_ID}
 
 *** Keywords ***
 Create Volume Bucket
-    Execute             ozone sh volume create o3://om/${VOLUME}
-    Execute             ozone sh bucket create o3://om/${VOLUME}/${BUCKET}
+    Execute             ozone sh volume create o3://${OM_SERVICE_ID}/${VOLUME}
+    Execute             ozone sh bucket create o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}
 
 Create EC key
     [arguments]       ${bs}    ${count}    
 
     Execute           dd if=/dev/urandom of=${TEMP_DIR}/testfile bs=${bs} count=${count}
-    Execute           ozone sh key put o3://om/${VOLUME}/${BUCKET}/testfile ${TEMP_DIR}/testfile -r rs-${EC_DATA}-${EC_PARITY}-1024k -t EC
+    Execute           ozone sh key put o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/testfile ${TEMP_DIR}/testfile -r rs-${EC_DATA}-${EC_PARITY}-1024k -t EC
 
 *** Test Cases ***
 0 data block
@@ -87,5 +88,5 @@ Create EC key
 
 Test ozone debug replicas chunk-info
     Create EC key     1048576    3
-    ${count} =        Execute           ozone debug replicas chunk-info o3://om/${VOLUME}/${BUCKET}/testfile | jq '[.keyLocations[0][] | select(.file | test("\\\\.block$")) | .file] | length'
+    ${count} =        Execute           ozone debug replicas chunk-info o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/testfile | jq '[.keyLocations[0][] | select(.file | test("\\\\.block$")) | .file] | length'
     Should Be Equal As Integers         ${count}          5

@@ -355,11 +355,12 @@ public class TestReplicationSupervisor {
   @ContainerLayoutTestInfo.ContainerTest
   public void testReplicationImportReserveSpace(ContainerLayoutVersion layout)
       throws IOException, InterruptedException, TimeoutException {
+    final long containerUsedSize = 100;
     this.layoutVersion = layout;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.getAbsolutePath());
 
-    long containerSize = (long) conf.getStorageSize(
+    long containerMaxSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
@@ -369,13 +370,17 @@ public class TestReplicationSupervisor {
         .clock(clock)
         .build();
 
+    MutableVolumeSet volumeSet = new MutableVolumeSet(datanode.getUuidString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+
     long containerId = 1;
     // create container
     KeyValueContainerData containerData = new KeyValueContainerData(containerId,
-        ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
-    HddsVolume vol = mock(HddsVolume.class);
-    containerData.setVolume(vol);
-    containerData.incrBytesUsed(100);
+        ContainerLayoutVersion.FILE_PER_BLOCK, containerMaxSize, "test", "test");
+    HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
+    containerData.setVolume(vol1);
+    // the container is not yet in HDDS, so only set its own size, leaving HddsVolume with used=0
+    containerData.getStatistics().updateWrite(100, false);
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     ContainerController controllerMock = mock(ContainerController.class);
     Semaphore semaphore = new Semaphore(1);
@@ -384,8 +389,7 @@ public class TestReplicationSupervisor {
           semaphore.acquire();
           return container;
         });
-    MutableVolumeSet volumeSet = new MutableVolumeSet(datanode.getUuidString(), conf, null,
-        StorageVolume.VolumeType.DATA_VOLUME, null);
+    
     File tarFile = containerTarFile(containerId, containerData);
 
     SimpleContainerDownloader moc =
@@ -398,14 +402,15 @@ public class TestReplicationSupervisor {
     ContainerImporter importer =
         new ContainerImporter(conf, set, controllerMock, volumeSet, volumeChoosingPolicy);
 
-    HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
     // Initially volume has 0 commit space
     assertEquals(0, vol1.getCommittedBytes());
     long usedSpace = vol1.getCurrentUsage().getUsedSpace();
     // Initially volume has 0 used space
     assertEquals(0, usedSpace);
     // Increase committed bytes so that volume has only remaining 3 times container size space
-    long initialCommittedBytes = vol1.getCurrentUsage().getCapacity() - containerSize * 3;
+    long minFreeSpace =
+        conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(vol1.getCurrentUsage().getCapacity());
+    long initialCommittedBytes = vol1.getCurrentUsage().getCapacity() - containerMaxSize * 3 - minFreeSpace;
     vol1.incCommittedBytes(initialCommittedBytes);
     ContainerReplicator replicator =
         new DownloadAndImportReplicator(conf, set, importer, moc);
@@ -424,11 +429,11 @@ public class TestReplicationSupervisor {
 
     // Wait such that first container import reserve space
     GenericTestUtils.waitFor(() ->
-        vol1.getCommittedBytes() > vol1.getCurrentUsage().getCapacity() - containerSize * 3,
+        vol1.getCommittedBytes() > initialCommittedBytes,
         1000, 50000);
 
     // Volume has reserved space of 2 * containerSize
-    assertEquals(vol1.getCommittedBytes(), initialCommittedBytes + 2 * containerSize);
+    assertEquals(vol1.getCommittedBytes(), initialCommittedBytes + 2 * containerMaxSize);
     // Container 2 import will fail as container 1 has reserved space and no space left to import new container
     // New container import requires at least (2 * container size)
     long containerId2 = 2;
@@ -443,10 +448,11 @@ public class TestReplicationSupervisor {
 
     usedSpace = vol1.getCurrentUsage().getUsedSpace();
     // After replication, volume used space should be increased by container used bytes
-    assertEquals(100, usedSpace);
+    assertEquals(containerUsedSize, usedSpace);
 
-    // Volume committed bytes should become initial committed bytes which was before replication
-    assertEquals(initialCommittedBytes, vol1.getCommittedBytes());
+    // Volume committed bytes used for replication has been released, no need to reserve space for imported container
+    // only closed container gets replicated, so no new data will be written it
+    assertEquals(vol1.getCommittedBytes(), initialCommittedBytes);
 
   }
 

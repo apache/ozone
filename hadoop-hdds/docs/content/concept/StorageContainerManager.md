@@ -93,6 +93,6 @@ key | default | description
 ----|---------|------------
 ozone.scm.container.size | 5GB | Default container size used by Ozone
 ozone.scm.block.size | 256MB |  The default size of a data block.
-hdds.scm.safemode.min.datanode | 1 | Minimum number of datanodes to start the real work.
+hdds.scm.safemode.min.datanode | 3 | Minimum number of datanodes to start the real work.
 ozone.scm.http-address | 0.0.0.0:9876 | HTTP address of the SCM server
 ozone.metadata.dirs | none | Directory to store persisted data (RocksDB).

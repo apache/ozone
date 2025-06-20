@@ -155,10 +155,10 @@ public class ListMultipartUploadsResult {
     private String uploadId;
 
     @XmlElement(name = "Owner")
-    private S3Owner owner = S3Owner.NOT_SUPPORTED_OWNER;
+    private S3Owner owner = S3Owner.DEFAULT_S3_OWNER;
 
     @XmlElement(name = "Initiator")
-    private S3Owner initiator = S3Owner.NOT_SUPPORTED_OWNER;
+    private S3Owner initiator = S3Owner.DEFAULT_S3_OWNER;
 
     @XmlElement(name = "StorageClass")
     private String storageClass = "STANDARD";

@@ -66,7 +66,11 @@ public class S3BucketAcl {
   }
 
   /**
-   * TODO: javadoc.
+   * Represents an S3 Access Control List containing a collection of permission grants.
+   *
+   * This class models the AccessControlList XML element in S3 ACL responses and requests.
+   * It contains a list of Grant objects that define specific permissions granted to
+   * particular grantees (users, groups, etc.).
    */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "AccessControlList")
@@ -100,7 +104,12 @@ public class S3BucketAcl {
   }
 
   /**
-   * TODO: javadoc.
+   * Represents a single permission grant within an S3 Access Control List.
+   *
+   * This class models the Grant XML element in S3 ACL responses and requests,
+   * associating a specific permission with a grantee (the recipient of the permission).
+   * Each Grant consists of a Grantee (which identifies a user, group, or other entity)
+   * and a Permission string that specifies what access level is being granted.
    */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "Grant")

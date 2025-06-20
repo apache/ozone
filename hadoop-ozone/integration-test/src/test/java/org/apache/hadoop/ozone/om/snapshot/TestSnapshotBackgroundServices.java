@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -79,6 +78,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -260,7 +260,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot c
     OmSnapshot snapC;
-    try (ReferenceCounted<OmSnapshot> rcC = newLeaderOM
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcC = newLeaderOM
         .getOmSnapshotManager()
         .getSnapshot(volumeName, bucketName, snapshotInfoC.getName())) {
       assertNotNull(rcC);
@@ -284,7 +284,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot d
     OmSnapshot snapD;
-    try (ReferenceCounted<OmSnapshot> rcD = newLeaderOM
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcD = newLeaderOM
         .getOmSnapshotManager()
         .getSnapshot(volumeName, bucketName, snapshotInfoD.getName())) {
       assertNotNull(rcD);
@@ -307,7 +307,7 @@ public class TestSnapshotBackgroundServices {
   }
 
   private static <V> boolean isKeyInTable(String key, Table<String, V> table) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, V>> iterator
+    try (Table.KeyValueIterator<String, V> iterator
              = table.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, V> next = iterator.next();
@@ -428,8 +428,7 @@ public class TestSnapshotBackgroundServices {
   private List<CompactionLogEntry> getCompactionLogEntries(OzoneManager om)
       throws IOException {
     List<CompactionLogEntry> compactionLogEntries = new ArrayList<>();
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, CompactionLogEntry>>
+    try (Table.KeyValueIterator<String, CompactionLogEntry>
              iterator = om.getMetadataManager().getCompactionLogTable()
         .iterator()) {
       iterator.seekToFirst();

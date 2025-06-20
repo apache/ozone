@@ -38,6 +38,8 @@ import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -385,6 +387,8 @@ public class TestKeyValueContainer {
           containerData.getMaxSize());
       assertEquals(keyValueContainerData.getBytesUsed(),
           containerData.getBytesUsed());
+      assertNotNull(containerData.getChecksum());
+      assertNotEquals(containerData.DUMMY_CHECKSUM, container.getContainerData().getChecksum());
 
       //Can't overwrite existing container
       KeyValueContainer finalContainer = container;
@@ -1096,5 +1100,20 @@ public class TestKeyValueContainer {
         importedContainer.getContainerData().getSchemaVersion());
     assertEquals(pendingDeleteBlockCount,
         importedContainer.getContainerData().getNumPendingDeletionBlocks());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerCreationCommitSpaceReserve(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    keyValueContainerData = spy(keyValueContainerData);
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
+    keyValueContainer = spy(keyValueContainer);
+
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    // verify that
+    verify(volumeChoosingPolicy).chooseVolume(anyList(), anyLong()); // this would reserve commit space
+    assertTrue(keyValueContainerData.isCommittedSpace());
   }
 }
