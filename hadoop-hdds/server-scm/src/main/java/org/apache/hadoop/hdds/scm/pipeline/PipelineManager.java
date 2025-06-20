@@ -224,5 +224,5 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * @return false if all the volumes on any Datanode in the pipeline have space less than equal to the specified
    * containerSize, otherwise true
    */
-  boolean pipelineHasEnoughSpaceForNewContainer(Pipeline pipeline, long containerSize);
+  boolean hasEnoughSpace(Pipeline pipeline, long containerSize);
 }

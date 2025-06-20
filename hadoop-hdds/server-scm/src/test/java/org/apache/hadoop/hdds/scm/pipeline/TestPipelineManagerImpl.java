@@ -942,11 +942,11 @@ public class TestPipelineManagerImpl {
   }
 
   /**
-   * {@link PipelineManager#pipelineHasEnoughSpaceForNewContainer(Pipeline, long)} should return false if all the
+   * {@link PipelineManager#hasEnoughSpace(Pipeline, long)} should return false if all the
    * volumes on any Datanode in the pipeline have less than equal to the space required for creating a new container.
    */
   @Test
-  public void testPipelineHasEnoughSpaceForNewContainer() throws IOException {
+  public void testHasEnoughSpace() throws IOException {
     // create a Mock NodeManager, the MockNodeManager class doesn't work for this test
     NodeManager mockedNodeManager = Mockito.mock(NodeManager.class);
     PipelineManagerImpl pipelineManager = PipelineManagerImpl.newPipelineManager(conf,
@@ -981,7 +981,7 @@ public class TestPipelineManagerImpl {
       doReturn(info).when(mockedNodeManager).getNode(dn.getID());
       datanodeInfoList.add(info);
     }
-    assertTrue(pipelineManager.pipelineHasEnoughSpaceForNewContainer(pipeline, containerSize));
+    assertTrue(pipelineManager.hasEnoughSpace(pipeline, containerSize));
 
     // Case 2: One node does not have enough space.
     /*
@@ -989,17 +989,17 @@ public class TestPipelineManagerImpl {
       is available. Which means it won't allow creating a pipeline on a node if all volumes have exactly 5 GB
       available. We follow the same behavior here in the case of a new replica.
 
-      So here, remaining - committed == containerSize, and pipelineHasEnoughSpaceForNewContainer returns false.
+      So here, remaining - committed == containerSize, and hasEnoughSpace returns false.
       TODO should this return true instead?
      */
     datanodeInfoList.get(0).updateStorageReports(createStorageReports(200L, 120L, 20L));
-    assertFalse(pipelineManager.pipelineHasEnoughSpaceForNewContainer(pipeline, containerSize));
+    assertFalse(pipelineManager.hasEnoughSpace(pipeline, containerSize));
 
     // Case 3: All nodes do not have enough space.
     for (DatanodeInfo info : datanodeInfoList) {
       info.updateStorageReports(createStorageReports(200L, 100L, 20L));
     }
-    assertFalse(pipelineManager.pipelineHasEnoughSpaceForNewContainer(pipeline, containerSize));
+    assertFalse(pipelineManager.hasEnoughSpace(pipeline, containerSize));
   }
 
   private List<StorageReportProto> createStorageReports(long capacity, long remaining, long committed) {

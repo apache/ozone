@@ -636,7 +636,7 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public boolean pipelineHasEnoughSpaceForNewContainer(Pipeline pipeline, long containerSize) {
+  public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
     for (DatanodeDetails node : pipeline.getNodes()) {
       if (!(node instanceof DatanodeInfo)) {
         node = nodeManager.getNode(node.getID());

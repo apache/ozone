@@ -140,7 +140,7 @@ public class TestContainerManagerImpl {
   public void testGetMatchingContainerReturnsNullWhenNotEnoughSpaceInDatanodes() throws IOException {
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
     Pipeline pipeline = pipelineManager.getPipelines().iterator().next();
-    // MockPipelineManager#pipelineHasEnoughSpaceForNewContainer always returns false
+    // MockPipelineManager#hasEnoughSpace always returns false
     // the pipeline has no existing containers, so a new container gets allocated in getMatchingContainer
     ContainerInfo container = containerManager
         .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
@@ -158,10 +158,10 @@ public class TestContainerManagerImpl {
   public void testGetMatchingContainerReturnsContainerWhenEnoughSpaceInDatanodes() throws IOException {
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
 
-    // create a spy to mock pipelineHasEnoughSpaceForNewContainer to always return true
+    // create a spy to mock hasEnoughSpace to always return true
     PipelineManager spyPipelineManager = spy(pipelineManager);
     doReturn(true).when(spyPipelineManager)
-        .pipelineHasEnoughSpaceForNewContainer(any(Pipeline.class), anyLong());
+        .hasEnoughSpace(any(Pipeline.class), anyLong());
 
     // create a new ContainerManager using the spy
     File tempDir = new File(testDir, "tempDir");

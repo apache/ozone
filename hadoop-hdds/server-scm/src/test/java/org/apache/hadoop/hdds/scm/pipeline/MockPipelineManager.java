@@ -351,7 +351,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public boolean pipelineHasEnoughSpaceForNewContainer(Pipeline pipeline, long containerSize) {
+  public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
     return false;
   }
 }
