@@ -313,7 +313,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         if (Files.isDirectory(p) || p.toFile().getName().equals(OmSnapshotManager.OM_HARDLINK_FILE)) {
           continue;
         }
-        String inode = getInode(OmSnapshotUtils.getInodeAndMtime(p));
+        String inode = getInode(OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(p));
         Path metadataDir = OMStorage.getOmDbDir(conf).toPath();
         String path  = metadataDir.relativize(p).toString();
         if (path.contains(OM_CHECKPOINT_DIR)) {

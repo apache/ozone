@@ -66,7 +66,21 @@ public final class OmSnapshotUtils {
     return Files.readAttributes(file, BasicFileAttributes.class).fileKey();
   }
 
-  public static String getInodeAndMtime(Path file) throws IOException {
+  /**
+   * Returns a string combining the inode (fileKey) and the last modification time (mtime) of the given file.
+   * <p>
+   * The returned string is formatted as "{inode}-{mtime}", where:
+   * <ul>
+   *   <li>{@code inode} is the unique file key obtained from the file system, typically representing
+   *   the inode on POSIX systems</li>
+   *   <li>{@code mtime} is the last modified time of the file in milliseconds since the epoch</li>
+   * </ul>
+   *
+   * @param file the {@link Path} to the file whose inode and modification time are to be retrieved
+   * @return a string in the format "{inode}-{mtime}"
+   * @throws IOException if an I/O error occurs
+   */
+  public static String getFileInodeAndLastModifiedTimeString(Path file) throws IOException {
     Object inode = Files.readAttributes(file, BasicFileAttributes.class).fileKey();
     FileTime mTime = Files.getLastModifiedTime(file);
     return String.format("%s-%s", inode, mTime.toMillis());

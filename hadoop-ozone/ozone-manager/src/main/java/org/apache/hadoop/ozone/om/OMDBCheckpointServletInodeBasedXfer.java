@@ -174,6 +174,24 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     return new File(differ.getCompactionLogDir()).toPath();
   }
 
+  /**
+   * Streams the Ozone Manager database checkpoint and (optionally) snapshot-related data
+   * as a tar archive to the provided output stream. This method handles deduplication
+   * based on file inodes to avoid transferring duplicate files (such as hardlinks),
+   * supports excluding specific SST files, enforces maximum total SST file size limits,
+   * and manages temporary directories for processing.
+   *
+   * The method processes snapshot directories and backup/compaction logs (if requested),
+   * then finally the active OM database. It also writes a hardlink mapping file
+   * and includes a completion flag for Ratis snapshot streaming.
+   *
+   * @param request           The HTTP servlet request containing parameters for the snapshot.
+   * @param destination       The output stream to which the tar archive is written.
+   * @param sstFilesToExclude Set of SST file identifiers to exclude from the archive.
+   * @param tmpdir            Temporary directory for staging files during archiving.
+   * @throws IOException if an I/O error occurs during processing or streaming.
+   */
+
   public void writeDbDataToStream(HttpServletRequest request, OutputStream destination,
       Set<String> sstFilesToExclude, Path tmpdir) throws IOException {
     DBCheckpoint checkpoint = null;
@@ -224,7 +242,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       if (shouldContinue) {
         // we finished transferring files from snapshot DB's by now and
         // this is the last step where we transfer the active om.db contents
-        checkpoint = getCheckpoint(tmpdir, true);
+        checkpoint = createAndPrepareCheckpoint(tmpdir, true);
         // unlimited files as we want the Active DB contents to be transferred in a single batch
         maxTotalSstSize.set(Long.MAX_VALUE);
         Path checkpointDir = checkpoint.getCheckpointLocation();
@@ -336,6 +354,8 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
 
   /**
    * Writes database files to the archive, handling deduplication based on inode IDs.
+   * Here the dbDir could either be a snapshot db directory, the active om.db,
+   * compaction log dir, sst backup dir.
    *
    * @param sstFilesToExclude Set of SST file IDs to exclude from the archive
    * @param dbDir Directory containing database files to archive
@@ -359,7 +379,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       Iterable<Path> iterable = files::iterator;
       for (Path dbFile : iterable) {
         if (!Files.isDirectory(dbFile)) {
-          String fileId = OmSnapshotUtils.getInodeAndMtime(dbFile);
+          String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
           String path = dbFile.toFile().getAbsolutePath();
           if (destDir != null) {
             path = destDir.resolve(dbFile.getFileName()).toString();
@@ -390,8 +410,18 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     return true;
   }
 
-  @Override
-  public DBCheckpoint getCheckpoint(Path tmpdir, boolean flush) throws IOException {
+  /**
+   * Creates a database checkpoint and copies compaction log and SST backup files
+   * into the given temporary directory.
+   * The copy to the temporary directory for compaction log and SST backup files
+   * is done to maintain a consistent view of the files in these directories.
+   *
+   * @param tmpdir Temporary directory for storing checkpoint-related files.
+   * @param flush  If true, flushes in-memory data to disk before checkpointing.
+   * @return The created database checkpoint.
+   * @throws IOException If an error occurs during checkpoint creation or file copying.
+   */
+  private DBCheckpoint createAndPrepareCheckpoint(Path tmpdir, boolean flush) throws IOException {
     // make tmp directories to contain the copies
     Path tmpCompactionLogDir = tmpdir.resolve(getCompactionLogDir().getFileName());
     Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());

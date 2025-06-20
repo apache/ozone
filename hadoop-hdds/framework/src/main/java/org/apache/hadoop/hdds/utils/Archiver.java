@@ -115,9 +115,22 @@ public final class Archiver {
   }
 
   /**
-   * Creates a hardlink for the given file in a temporary directory, adds it
-   * as an entry in the archive, and includes its contents in the archive output.
-   * The temporary hardlink is deleted after processing.
+   * Creates a hard link to the specified file in the provided temporary directory,
+   * adds the linked file as an entry to the archive with the given entry name, writes
+   * its contents to the archive output, and then deletes the temporary hard link.
+   * <p>
+   * This approach avoids altering the original file and works around limitations
+   * of certain archiving libraries that may require the source file to be present
+   * in a specific location or have a specific name. Any errors during the hardlink
+   * creation or archiving process are logged.
+   * </p>
+   *
+   * @param file         the file to be included in the archive
+   * @param entryName    the name/path under which the file should appear in the archive
+   * @param archiveOutput the output stream for the archive (e.g., tar)
+   * @param tmpDir       the temporary directory in which to create the hard link
+   * @return number of bytes copied to the archive for this file
+   * @throws IOException if an I/O error occurs other than hardlink creation failure
    */
   public static long linkAndIncludeFile(File file, String entryName,
       ArchiveOutputStream<TarArchiveEntry> archiveOutput, Path tmpDir) throws IOException {
@@ -134,10 +147,9 @@ public final class Archiver {
     } catch (IOException ioe) {
       LOG.error("Couldn't create hardlink for file {} while including it in tarball.",
           file.getAbsolutePath(), ioe);
+      throw ioe;
     } finally {
-      if (link != null) {
-        Files.deleteIfExists(link.toPath());
-      }
+      Files.deleteIfExists(link.toPath());
     }
     return bytes;
   }
