@@ -637,7 +637,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       try {
         return convert(rawIterator.next());
       } catch (CodecException e) {
-        throw new IllegalStateException("Failed next()", e);
+        throw new IllegalStateException("Failed next() in " + TypedTable.this, e);
       }
     }
 
