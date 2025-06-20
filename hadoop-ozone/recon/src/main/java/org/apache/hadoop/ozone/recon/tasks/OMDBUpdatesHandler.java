@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.recon.codec.ReconOMDBDefinition;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,7 +108,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
     // saved using Object as key and new task will also retrieve using Object
     // as key.
     final DBColumnFamilyDefinition<?, ?> cf
-        = omdbDefinition.getColumnFamily(tableName);
+        = ReconOMDBDefinition.COLUMN_FAMILIES.get(tableName);
     if (cf != null) {
       OMDBUpdateEvent.OMUpdateEventBuilder builder =
           new OMDBUpdateEvent.OMUpdateEventBuilder<>();
