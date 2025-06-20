@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -72,7 +73,7 @@ class TestArchiver {
     Path tmpDir = Files.createTempDirectory("archiver-test");
     File tempFile = File.createTempFile("test-file", ".txt");
     String entryName = "test-entry";
-    Files.write(tempFile.toPath(), "Test Content".getBytes());
+    Files.write(tempFile.toPath(), "Test Content".getBytes(StandardCharsets.UTF_8));
 
     TarArchiveOutputStream mockArchiveOutput = mock(TarArchiveOutputStream.class);
     TarArchiveEntry mockEntry = new TarArchiveEntry(entryName);
@@ -93,7 +94,7 @@ class TestArchiver {
     assertTrue(isHardLinkCreated.get());
     assertFalse(Files.exists(tmpDir.resolve(entryName)));
     // Cleanup
-    tempFile.delete();
+    assertTrue(tempFile.delete());
     Files.deleteIfExists(tmpDir);
   }
 
@@ -102,7 +103,7 @@ class TestArchiver {
     Path tmpDir = Files.createTempDirectory("archiver-test");
     File tempFile = File.createTempFile("test-file", ".txt");
     String entryName = "test-entry";
-    Files.write(tempFile.toPath(), "Test Content".getBytes());
+    Files.write(tempFile.toPath(), "Test Content".getBytes(StandardCharsets.UTF_8));
 
     TarArchiveOutputStream mockArchiveOutput =
         mock(TarArchiveOutputStream.class);
@@ -130,7 +131,7 @@ class TestArchiver {
     }
     assertFalse(isHardLinkCreated.get());
 
-    tempFile.delete();
+    assertTrue(tempFile.delete());
     Files.deleteIfExists(tmpDir);
   }
 

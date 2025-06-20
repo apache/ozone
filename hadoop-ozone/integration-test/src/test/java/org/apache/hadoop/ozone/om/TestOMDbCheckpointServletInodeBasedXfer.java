@@ -273,7 +273,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // create hardlinks now
     OmSnapshotUtils.createHardLinks(newDbDir.toPath());
     for (Path old : allPathsInTarball) {
-      old.toFile().delete();
+      assertTrue(old.toFile().delete());
     }
     assertFalse(hardlinkFilePath.toFile().exists());
   }
@@ -320,7 +320,11 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
           path = metadataDir.relativize(dbStore.getDbLocation().toPath().resolve(p.getFileName())).toString();
         }
         if (path.startsWith(OM_DB_NAME)) {
-          path = Paths.get(path).getFileName().toString();
+          Path fileName = Paths.get(path).getFileName();
+          // fileName will not be null, added null check for findbugs
+          if (fileName != null) {
+            path = fileName.toString();
+          }
         }
         hardlinkMap.computeIfAbsent(inode, k -> new ArrayList<>()).add(path);
         inodesFromOmDbCheckpoint.add(inode);
