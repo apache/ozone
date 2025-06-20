@@ -435,7 +435,7 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    OnDemandContainerDataScanner.init(c, controller);
+    OnDemandContainerScanner.init(c, controller);
   }
 
   /**
@@ -454,7 +454,7 @@ public class OzoneContainer {
     for (BackgroundContainerDataScanner s : dataScanners) {
       s.shutdown();
     }
-    OnDemandContainerDataScanner.shutdown();
+    OnDemandContainerScanner.shutdown();
   }
 
   @VisibleForTesting
