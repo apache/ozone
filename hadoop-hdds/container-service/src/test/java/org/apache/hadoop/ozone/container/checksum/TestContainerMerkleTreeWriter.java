@@ -288,7 +288,8 @@ class TestContainerMerkleTreeWriter {
     return buildExpectedChunkTree(chunk, true);
   }
 
-  private ContainerProtos.ChunkMerkleTree buildExpectedChunkTree(ContainerProtos.ChunkInfo chunk, boolean checksumMatches) {
+  private ContainerProtos.ChunkMerkleTree buildExpectedChunkTree(ContainerProtos.ChunkInfo chunk,
+      boolean checksumMatches) {
     return ContainerProtos.ChunkMerkleTree.newBuilder()
         .setOffset(chunk.getOffset())
         .setLength(chunk.getLen())
