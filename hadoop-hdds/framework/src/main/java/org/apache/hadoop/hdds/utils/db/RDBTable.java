@@ -223,11 +223,6 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void close() {
-    // Nothing do for a Column Family.
-  }
-
-  @Override
   public long getEstimatedKeyCount() throws RocksDatabaseException {
     return db.estimateNumKeys(family);
   }

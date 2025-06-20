@@ -221,18 +221,12 @@ public class TestRDBSnapshotProvider {
 
   public void insertRandomData(RDBStore dbStore, int familyIndex)
       throws IOException {
-    try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
-        get(familyIndex))) {
-      assertNotNull(firstTable, "Table cannot be null");
-      for (int x = 0; x < 100; x++) {
-        byte[] key =
-            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-      }
-    } catch (Exception e) {
-      throw new IOException(e);
+    Table<byte[], byte[]> firstTable = dbStore.getTable(families.get(familyIndex));
+    assertNotNull(firstTable, "Table cannot be null");
+    for (int x = 0; x < 100; x++) {
+      byte[] key = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      byte[] value = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      firstTable.put(key, value);
     }
   }
 
