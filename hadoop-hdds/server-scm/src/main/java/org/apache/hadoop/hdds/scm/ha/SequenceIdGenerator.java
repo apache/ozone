@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.SEQUENCE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.VALUE_ONLY;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -42,8 +43,6 @@ import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -276,8 +275,7 @@ public class SequenceIdGenerator {
     }
 
     private void initialize() throws IOException {
-      try (TableIterator<String, ? extends Table.KeyValue<String, Long>>
-          iterator = sequenceIdTable.iterator()) {
+      try (Table.KeyValueIterator<String, Long> iterator = sequenceIdTable.iterator()) {
 
         while (iterator.hasNext()) {
           Table.KeyValue<String, Long> kv = iterator.next();
@@ -368,9 +366,8 @@ public class SequenceIdGenerator {
     // upgrade containerId
     if (sequenceIdTable.get(CONTAINER_ID) == null) {
       long largestContainerId = 0;
-      try (TableIterator<ContainerID,
-          ? extends KeyValue<ContainerID, ContainerInfo>> iterator =
-               scmMetadataStore.getContainerTable().iterator()) {
+      try (Table.KeyValueIterator<ContainerID, ContainerInfo> iterator =
+               scmMetadataStore.getContainerTable().iterator(VALUE_ONLY)) {
         while (iterator.hasNext()) {
           ContainerInfo containerInfo = iterator.next().getValue();
           largestContainerId =
@@ -395,9 +392,8 @@ public class SequenceIdGenerator {
       // Start from ID 2.
       // ID 1 - root certificate, ID 2 - first SCM certificate.
       long largestCertId = BigInteger.ONE.add(BigInteger.ONE).longValueExact();
-      try (TableIterator<BigInteger,
-          ? extends KeyValue<BigInteger, X509Certificate>> iterator =
-               scmMetadataStore.getValidSCMCertsTable().iterator()) {
+      try (Table.KeyValueIterator<BigInteger, X509Certificate> iterator =
+               scmMetadataStore.getValidSCMCertsTable().iterator(VALUE_ONLY)) {
         while (iterator.hasNext()) {
           X509Certificate cert = iterator.next().getValue();
           largestCertId = Long.max(cert.getSerialNumber().longValueExact(),
@@ -405,9 +401,8 @@ public class SequenceIdGenerator {
         }
       }
 
-      try (TableIterator<BigInteger,
-          ? extends KeyValue<BigInteger, X509Certificate>> iterator =
-               scmMetadataStore.getValidCertsTable().iterator()) {
+      try (Table.KeyValueIterator<BigInteger, X509Certificate> iterator =
+               scmMetadataStore.getValidCertsTable().iterator(VALUE_ONLY)) {
         while (iterator.hasNext()) {
           X509Certificate cert = iterator.next().getValue();
           largestCertId = Long.max(
