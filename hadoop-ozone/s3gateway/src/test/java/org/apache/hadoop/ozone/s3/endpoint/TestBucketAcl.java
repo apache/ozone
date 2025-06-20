@@ -32,7 +32,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -54,14 +53,12 @@ public class TestBucketAcl {
   private Map<String, String[]> parameterMap;
   private HttpHeaders headers;
   private BucketEndpoint bucketEndpoint;
-  private OzoneBucket bucket;
   private static final String ACL_MARKER = "acl";
 
   @BeforeEach
   public void setup() throws IOException {
     client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
-    bucket = client.getObjectStore().getS3Bucket(BUCKET_NAME);
 
     servletRequest = mock(HttpServletRequest.class);
     parameterMap = mock(Map.class);
