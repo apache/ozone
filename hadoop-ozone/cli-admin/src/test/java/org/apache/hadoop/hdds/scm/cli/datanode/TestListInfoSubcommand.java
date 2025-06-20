@@ -78,6 +78,8 @@ public class TestListInfoSubcommand {
     when(scmClient.queryNode(any(), any(), any(), any())).thenAnswer(invocation -> getNodeDetails());
     when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
 
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs();
     cmd.execute(scmClient);
 
     // The output should contain a string like:

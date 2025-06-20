@@ -74,6 +74,12 @@
       <artifactId>hdds-interface-client</artifactId>
     </dependency>
     <dependency>
+      <!-- for generated sources, Java 11+ -->
+      <groupId>javax.annotation</groupId>
+      <artifactId>javax.annotation-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-codec-http2</artifactId>
       <scope>runtime</scope>

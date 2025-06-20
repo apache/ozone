@@ -37,7 +37,9 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.commons.lang3.tuple.Pair;
@@ -140,9 +142,11 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return SimpleStriped.readWriteLock(size, fair);
   }
 
-  private Iterable<ReadWriteLock> bulkGetLock(Map<Resource, Striped<ReadWriteLock>> lockMap, Resource resource,
-      Collection<String[]> keys) {
-    Striped<ReadWriteLock> striped = lockMap.get(resource);
+  private Iterable<ReadWriteLock> getAllLocks(Striped<ReadWriteLock> striped) {
+    return IntStream.range(0, striped.size()).mapToObj(striped::getAt).collect(Collectors.toList());
+  }
+
+  private Iterable<ReadWriteLock> bulkGetLock(Striped<ReadWriteLock> striped, Collection<String[]> keys) {
     List<Object> lockKeys = new ArrayList<>(keys.size());
     for (String[] key : keys) {
       if (Objects.nonNull(key)) {
@@ -200,7 +204,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public OMLockDetails acquireReadLocks(Resource resource, Collection<String[]> keys) {
-    return acquireLocks(resource, true, keys);
+    return acquireLocks(resource, true, striped -> bulkGetLock(striped, keys));
   }
 
   /**
@@ -244,7 +248,17 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public OMLockDetails acquireWriteLocks(Resource resource, Collection<String[]> keys) {
-    return acquireLocks(resource, false, keys);
+    return acquireLocks(resource, false, striped -> bulkGetLock(striped, keys));
+  }
+
+  /**
+   * Acquires all write locks for a specified resource.
+   *
+   * @param resource The resource for which the write lock is to be acquired.
+   */
+  @Override
+  public OMLockDetails acquireResourceWriteLock(Resource resource) {
+    return acquireLocks(resource, false, this::getAllLocks);
   }
 
   private void acquireLock(Resource resource, boolean isReadLock, ReadWriteLock lock,
@@ -258,7 +272,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
   }
 
-  private OMLockDetails acquireLocks(Resource resource, boolean isReadLock, Collection<String[]> keys) {
+  private OMLockDetails acquireLocks(Resource resource, boolean isReadLock,
+      Function<Striped<ReadWriteLock>, Iterable<ReadWriteLock>> lockListProvider) {
     Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockManager> resourceLockPair =
         resourcelockMap.get(resource.getClass());
     ResourceLockManager<Resource> resourceLockManager = resourceLockPair.getRight();
@@ -271,7 +286,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     long startWaitingTimeNanos = Time.monotonicNowNanos();
 
-    for (ReadWriteLock lock : bulkGetLock(resourceLockPair.getKey(), resource, keys)) {
+    for (ReadWriteLock lock : lockListProvider.apply(resourceLockPair.getKey().get(resource))) {
       acquireLock(resource, isReadLock, lock, startWaitingTimeNanos);
     }
     return resourceLockManager.lockResource(resource);
@@ -342,7 +357,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return "Thread '" + Thread.currentThread().getName() + "' cannot " +
         "acquire " + resource.getName() + " lock while holding " +
         getCurrentLocks().toString() + " lock(s).";
-
   }
 
   @VisibleForTesting
@@ -397,7 +411,17 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public OMLockDetails releaseWriteLocks(Resource resource, Collection<String[]> keys) {
-    return releaseLocks(resource, false, keys);
+    return releaseLocks(resource, false, striped -> bulkGetLock(striped, keys));
+  }
+
+  /**
+   * Releases a write lock acquired on the entire Stripe for a specified resource.
+   *
+   * @param resource The resource for which the write lock is to be acquired.
+   */
+  @Override
+  public OMLockDetails releaseResourceWriteLock(Resource resource) {
+    return releaseLocks(resource, false, this::getAllLocks);
   }
 
   /**
@@ -423,7 +447,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public OMLockDetails releaseReadLocks(Resource resource, Collection<String[]> keys) {
-    return releaseLocks(resource, true, keys);
+    return releaseLocks(resource, true, striped -> bulkGetLock(striped, keys));
   }
 
   private OMLockDetails releaseLock(Resource resource, boolean isReadLock,
@@ -445,12 +469,12 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private OMLockDetails releaseLocks(Resource resource, boolean isReadLock,
-      Collection<String[]> keys) {
+      Function<Striped<ReadWriteLock>, Iterable<ReadWriteLock>> lockListProvider) {
     Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockManager> resourceLockPair =
         resourcelockMap.get(resource.getClass());
     ResourceLockManager<Resource> resourceLockManager = resourceLockPair.getRight();
     resourceLockManager.clearLockDetails();
-    List<ReadWriteLock> locks = StreamSupport.stream(bulkGetLock(resourceLockPair.getKey(), resource, keys)
+    List<ReadWriteLock> locks = StreamSupport.stream(lockListProvider.apply(resourceLockPair.getKey().get(resource))
             .spliterator(), false).collect(Collectors.toList());
     // Release locks in reverse order.
     Collections.reverse(locks);
@@ -558,7 +582,10 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * Flat Resource defined in Ozone. Locks can be acquired on a resource independent of one another.
    */
   public enum FlatResource implements Resource {
-    SNAPSHOT_GC_LOCK("SNAPSHOT_GC_LOCK");
+    // Background services lock on a Snapshot.
+    SNAPSHOT_GC_LOCK("SNAPSHOT_GC_LOCK"),
+    // Lock acquired on a Snapshot's RocksDB Handle.
+    SNAPSHOT_DB_LOCK("SNAPSHOT_DB_LOCK");
 
     private String name;
     private ResourceManager resourceManager;

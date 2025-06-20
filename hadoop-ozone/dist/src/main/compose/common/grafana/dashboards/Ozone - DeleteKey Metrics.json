@@ -2779,7 +2779,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "(scm_block_deleting_service_num_block_deletion_transaction_success / clamp_min(scm_block_deleting_service_num_block_deletion_transaction_sent, 1)) * 100",
+              "expr": "(scm_block_deleting_service_num_block_deletion_transaction_success_on_datanodes / clamp_min(scm_block_deleting_service_num_block_deletion_transactions_on_datanodes, 1)) * 100",
               "legendFormat": "{{hostname}}",
               "range": true,
               "refId": "A"
@@ -3262,7 +3262,7 @@
             {
               "disableTextWrap": false,
               "editorMode": "builder",
-              "expr": "scm_block_deleting_service_num_block_deletion_transaction_sent",
+              "expr": "scm_block_deleting_service_num_block_deletion_transactions_on_datanodes",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "legendFormat": "{{hostname}}",
@@ -3544,7 +3544,7 @@
             {
               "disableTextWrap": false,
               "editorMode": "builder",
-              "expr": "scm_block_deleting_service_num_block_deletion_transaction_failure",
+              "expr": "scm_block_deleting_service_num_block_deletion_transaction_failure_on_datanodes",
               "fullMetaSearch": false,
               "hide": false,
               "includeNullMetadata": true,
