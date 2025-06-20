@@ -58,6 +58,7 @@ import org.mockito.stubbing.Answer;
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class TestOnDemandContainerDataScanner extends
     TestContainerScannersAbstract {
+  private static final String SCAN_REASON = "TEST";
 
   @Override
   @BeforeEach
@@ -102,7 +103,7 @@ public class TestOnDemandContainerDataScanner extends
   public void testScanTimestampUpdated() throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
     Optional<Future<?>> scanFuture =
-        OnDemandContainerDataScanner.scanContainer(healthy);
+        OnDemandContainerDataScanner.scanContainer(healthy, SCAN_REASON);
     assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
     verify(controller, atLeastOnce())
@@ -111,7 +112,7 @@ public class TestOnDemandContainerDataScanner extends
 
     // Metrics for deleted container should not be updated.
     scanFuture =
-        OnDemandContainerDataScanner.scanContainer(healthy);
+        OnDemandContainerDataScanner.scanContainer(healthy, SCAN_REASON);
     assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
     verify(controller, never())
@@ -126,7 +127,7 @@ public class TestOnDemandContainerDataScanner extends
     OnDemandContainerDataScanner.shutdown();
     OnDemandContainerDataScanner.shutdown();
     //There shouldn't be an interaction after shutdown:
-    OnDemandContainerDataScanner.scanContainer(corruptData);
+    OnDemandContainerDataScanner.scanContainer(corruptData, SCAN_REASON);
     verifyContainerMarkedUnhealthy(corruptData, never());
   }
 
@@ -143,12 +144,12 @@ public class TestOnDemandContainerDataScanner extends
           return getUnhealthyScanResult();
         });
     Optional<Future<?>> onGoingScan = OnDemandContainerDataScanner
-        .scanContainer(corruptData);
+        .scanContainer(corruptData, SCAN_REASON);
     assertTrue(onGoingScan.isPresent());
     assertFalse(onGoingScan.get().isDone());
     //When scheduling the same container again
     Optional<Future<?>> secondScan = OnDemandContainerDataScanner
-        .scanContainer(corruptData);
+        .scanContainer(corruptData, SCAN_REASON);
     //Then the second scan is not scheduled and the first scan can still finish
     assertFalse(secondScan.isPresent());
     latch.countDown();
@@ -163,12 +164,12 @@ public class TestOnDemandContainerDataScanner extends
     OnDemandContainerDataScanner.init(conf, controller);
     ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
     resultFutureList.add(OnDemandContainerDataScanner.scanContainer(
-        corruptData));
+        corruptData, SCAN_REASON));
     resultFutureList.add(
-        OnDemandContainerDataScanner.scanContainer(openContainer));
+        OnDemandContainerDataScanner.scanContainer(openContainer, SCAN_REASON));
     resultFutureList.add(
-        OnDemandContainerDataScanner.scanContainer(openCorruptMetadata));
-    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(healthy));
+        OnDemandContainerDataScanner.scanContainer(openCorruptMetadata, SCAN_REASON));
+    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(healthy, SCAN_REASON));
     waitOnScannerToFinish(resultFutureList);
     OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
     //Containers with shouldScanData = false shouldn't increase
@@ -184,7 +185,7 @@ public class TestOnDemandContainerDataScanner extends
     String metricsName = OnDemandContainerDataScanner.getMetrics().getName();
     assertNotNull(DefaultMetricsSystem.instance().getSource(metricsName));
     OnDemandContainerDataScanner.shutdown();
-    OnDemandContainerDataScanner.scanContainer(healthy);
+    OnDemandContainerDataScanner.scanContainer(healthy, SCAN_REASON);
     assertNull(DefaultMetricsSystem.instance().getSource(metricsName));
   }
 
@@ -193,7 +194,7 @@ public class TestOnDemandContainerDataScanner extends
   public void testUnhealthyContainersDetected() throws Exception {
     // Without initialization,
     // there shouldn't be interaction with containerController
-    OnDemandContainerDataScanner.scanContainer(corruptData);
+    OnDemandContainerDataScanner.scanContainer(corruptData, SCAN_REASON);
     verifyNoInteractions(controller);
 
     scanContainer(healthy);
@@ -246,7 +247,7 @@ public class TestOnDemandContainerDataScanner extends
 
     // Start the blocking scan.
     OnDemandContainerDataScanner.init(conf, controller);
-    OnDemandContainerDataScanner.scanContainer(healthy);
+    OnDemandContainerDataScanner.scanContainer(healthy, SCAN_REASON);
     // Shut down the on demand scanner. This will interrupt the blocked scan
     // on the healthy container.
     OnDemandContainerDataScanner.shutdown();
@@ -293,7 +294,7 @@ public class TestOnDemandContainerDataScanner extends
   private void scanContainer(Container<?> container) throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
     Optional<Future<?>> scanFuture =
-        OnDemandContainerDataScanner.scanContainer(container);
+        OnDemandContainerDataScanner.scanContainer(container, SCAN_REASON);
     if (scanFuture.isPresent()) {
       scanFuture.get().get();
     }
