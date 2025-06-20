@@ -14,11 +14,10 @@
 # limitations under the License.
 
 *** Settings ***
-Resource            ../lib/os.robot
+Resource            ../commonlib.robot
 
 *** Variables ***
 ${OM_HA_PARAM}         ${EMPTY}
-${SECURITY_ENABLED}    false
 
 *** Keywords ***
 Freon DCG

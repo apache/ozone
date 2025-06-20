@@ -22,7 +22,9 @@ Library             OperatingSystem
 Resource            operations.robot
 Resource            ../lib/os.robot
 Resource            ../commonlib.robot
-Suite Setup         Generate volume
+Suite Setup         Run Keywords    Generate volume 
+...                 AND             Get Security Enabled From Config
+
 Test Timeout        2 minutes
 
 *** Variables ***

@@ -17,6 +17,7 @@
 Library             Process
 Library             BuiltIn
 Library             String
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${URL}                  http://httpfs:14000/webhdfs/v1/

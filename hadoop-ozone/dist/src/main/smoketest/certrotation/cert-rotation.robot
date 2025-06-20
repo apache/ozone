@@ -25,6 +25,7 @@ ${port}        9859
 
 *** Keywords ***
 Setup Test
+    Run Keyword        Get Security Enabled From Config
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 Basic key generation and validation

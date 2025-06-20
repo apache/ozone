@@ -18,6 +18,7 @@ Documentation       Test ozone shell CLI usage
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${prefix}    generated

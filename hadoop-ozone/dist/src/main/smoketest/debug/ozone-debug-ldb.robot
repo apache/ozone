@@ -17,8 +17,10 @@
 Documentation       Test ozone debug ldb CLI
 Library             OperatingSystem
 Resource            ../lib/os.robot
+Resource            ../commonlib.robot
 Test Timeout        5 minute
-Suite Setup         Write keys
+Suite Setup         Run Keywords    Get Security Enabled From Config 
+...                 AND             Write keys
 
 *** Variables ***
 ${PREFIX}           ${EMPTY}

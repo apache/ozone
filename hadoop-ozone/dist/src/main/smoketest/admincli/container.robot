@@ -26,6 +26,7 @@ ${SCM}       scm
 
 *** Keywords ***
 Create test data
+    Run Keyword         Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
                         Execute          ozone freon ockg -n1 -t1 -p container
 

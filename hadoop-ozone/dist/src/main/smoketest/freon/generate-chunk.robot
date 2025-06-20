@@ -23,4 +23,5 @@ ${PREFIX}    ${EMPTY}
 
 *** Test Cases ***
 DN Chunk Generator
+    Run Keyword   Get Security Enabled From Config
     Freon DCG     prefix=dcg${PREFIX}    n=100
