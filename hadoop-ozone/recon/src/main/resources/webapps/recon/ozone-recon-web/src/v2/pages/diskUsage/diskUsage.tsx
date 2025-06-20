@@ -63,7 +63,7 @@ const DiskUsage: React.FC<{}> = () => {
   function loadData(path: string) {
     setLoading(true);
     const { request, controller } = AxiosGetHelper(
-      `/api/v1/namespace/du?path=${path}&files=true&sortSubPaths=true`,
+      `/api/v1/namespace/usage?path=${path}&files=true&sortSubPaths=true`,
       cancelPieSignal.current
     );
     cancelPieSignal.current = controller;
@@ -101,7 +101,7 @@ const DiskUsage: React.FC<{}> = () => {
   return (
     <>
       <div className='page-header-v2'>
-        Disk Usage
+        Namespace Usage
       </div>
       <div className='data-container'>
         <Alert
@@ -123,7 +123,7 @@ const DiskUsage: React.FC<{}> = () => {
               subPaths={duResponse.subPaths}
               updateHandler={loadData} />
             <Tooltip
-              title="Click to reload Disk Usage data">
+              title="Click to reload Namespace Usage data">
               <Button
                 type='primary'
                 icon={<ReloadOutlined />}

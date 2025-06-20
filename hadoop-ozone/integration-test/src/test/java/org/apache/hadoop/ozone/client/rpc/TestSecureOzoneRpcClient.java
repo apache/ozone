@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -179,11 +178,10 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
           omMetadataManager.getBucketTable().get(bucketKey).getObjectID());
       String keyPrefix =
           bucketLayout.isFileSystemOptimized() ? bucketId : bucketKey;
-      Table table = omMetadataManager.getKeyTable(bucketLayout);
+      Table<String, OmKeyInfo> table = omMetadataManager.getKeyTable(bucketLayout);
 
       // Check table entry.
-      try (
-          TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+      try (Table.KeyValueIterator<String, OmKeyInfo>
               keyIterator = table.iterator()) {
         Table.KeyValue<String, OmKeyInfo> kv =
             keyIterator.seek(keyPrefix + "/" + keyName);
@@ -315,7 +313,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
         // check unused pre-allocated blocks are reclaimed
         Table<String, RepeatedOmKeyInfo> deletedTable =
             getCluster().getOzoneManager().getMetadataManager().getDeletedTable();
-        try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+        try (Table.KeyValueIterator<String, RepeatedOmKeyInfo>
                  keyIter = deletedTable.iterator()) {
           while (keyIter.hasNext()) {
             Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
