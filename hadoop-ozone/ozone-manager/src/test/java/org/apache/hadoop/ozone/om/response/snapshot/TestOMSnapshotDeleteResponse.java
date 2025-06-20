@@ -28,8 +28,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -116,7 +114,7 @@ public class TestOMSnapshotDeleteResponse {
     assertEquals(1, omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
-    try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>> iter =
+    try (Table.KeyValueIterator<String, SnapshotInfo> iter =
              omMetadataManager.getSnapshotInfoTable().iterator()) {
       // Check snapshotInfo entry content
       Table.KeyValue<String, SnapshotInfo> keyValue = iter.next();
@@ -146,7 +144,7 @@ public class TestOMSnapshotDeleteResponse {
     assertEquals(1, omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
-    try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>> iter =
+    try (Table.KeyValueIterator<String, SnapshotInfo> iter =
              omMetadataManager.getSnapshotInfoTable().iterator()) {
       // 2. snapshot status should now be DELETED
       Table.KeyValue<String, SnapshotInfo> keyValue = iter.next();

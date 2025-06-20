@@ -323,7 +323,7 @@ public class TestRDBTableStore {
   @Test
   public void forEachAndIterator() throws Exception {
     final int iterCount = 100;
-    try (Table testTable = rdbStore.getTable("Sixth")) {
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
       for (int x = 0; x < iterCount; x++) {
         byte[] key =
             RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
@@ -332,9 +332,9 @@ public class TestRDBTableStore {
         testTable.put(key, value);
       }
       int localCount = 0;
-      try (TableIterator<byte[], Table.KeyValue> iter = testTable.iterator()) {
+      try (Table.KeyValueIterator<byte[], byte[]> iter = testTable.iterator()) {
         while (iter.hasNext()) {
-          Table.KeyValue keyValue = iter.next();
+          iter.next();
           localCount++;
         }
 
@@ -491,7 +491,7 @@ public class TestRDBTableStore {
     // Remove without next removes first entry.
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth")) {
       writeToTable(testTable, 3);
-      try (TableIterator<?, ? extends Table.KeyValue<?, ?>> iterator =
+      try (Table.KeyValueIterator<?, ?> iterator =
           testTable.iterator()) {
         iterator.removeFromDB();
       }
@@ -503,7 +503,7 @@ public class TestRDBTableStore {
     // Remove after seekToLast removes lastEntry
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
       writeToTable(testTable, 3);
-      try (TableIterator<?, ? extends Table.KeyValue<?, ?>> iterator =
+      try (Table.KeyValueIterator<?, ?> iterator =
                testTable.iterator()) {
         iterator.seekToLast();
         iterator.removeFromDB();
@@ -516,7 +516,7 @@ public class TestRDBTableStore {
     // Remove after seek deletes that entry.
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
       writeToTable(testTable, 3);
-      try (TableIterator<byte[], ? extends Table.KeyValue<?, ?>> iterator =
+      try (Table.KeyValueIterator<byte[], byte[]> iterator =
                testTable.iterator()) {
         iterator.seek(bytesOf[3]);
         iterator.removeFromDB();
@@ -529,7 +529,7 @@ public class TestRDBTableStore {
     // Remove after next() deletes entry that was returned by next.
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
       writeToTable(testTable, 3);
-      try (TableIterator<byte[], ? extends Table.KeyValue<?, ?>> iterator =
+      try (Table.KeyValueIterator<byte[], byte[]> iterator =
           testTable.iterator()) {
         iterator.seek(bytesOf[2]);
         iterator.next();
@@ -564,8 +564,7 @@ public class TestRDBTableStore {
       // iterator should seek to right pos in the middle
       byte[] samplePrefix = testPrefixes.get(2).getBytes(
           StandardCharsets.UTF_8);
-      try (TableIterator<byte[],
-          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable.iterator(
+      try (Table.KeyValueIterator<byte[], byte[]> iter = testTable.iterator(
               samplePrefix)) {
         int keyCount = 0;
         while (iter.hasNext()) {
@@ -614,7 +613,7 @@ public class TestRDBTableStore {
         assertEquals(prefix,
             entry.getKey().substring(0, PREFIX_LENGTH));
         assertEquals(entry.getValue().getBytes(StandardCharsets.UTF_8).length,
-            entry.getRawSize());
+            entry.getValueByteSize());
       }
       assertEquals(expectedCount, keyCount);
 
@@ -656,7 +655,7 @@ public class TestRDBTableStore {
 
       // test start at first
       byte[] startKey = samplePrefix;
-      List<? extends Table.KeyValue<byte[], byte[]>> rangeKVs = testTable
+      List<Table.KeyValue<byte[], byte[]>> rangeKVs = testTable
           .getRangeKVs(startKey, 3, samplePrefix);
       assertEquals(3, rangeKVs.size());
 
@@ -710,8 +709,7 @@ public class TestRDBTableStore {
       testTable2.loadFromFile(dumpFile);
 
       // check loaded keys
-      try (TableIterator<byte[],
-          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable2.iterator(
+      try (Table.KeyValueIterator<byte[], byte[]> iter = testTable2.iterator(
           samplePrefix)) {
         int keyCount = 0;
         while (iter.hasNext()) {
@@ -751,8 +749,7 @@ public class TestRDBTableStore {
       testTable2.loadFromFile(dumpFile);
 
       // check loaded keys
-      try (TableIterator<byte[],
-          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable2.iterator(
+      try (Table.KeyValueIterator<byte[], byte[]> iter = testTable2.iterator(
           samplePrefix)) {
         int keyCount = 0;
         while (iter.hasNext()) {

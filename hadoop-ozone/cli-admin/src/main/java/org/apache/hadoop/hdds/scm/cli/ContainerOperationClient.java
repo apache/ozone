@@ -201,13 +201,18 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, String owner) throws IOException {
+    ReplicationConfig replicationConfig =
+        ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor);
+    return createContainer(replicationConfig, owner);
+  }
+
+  @Override
+  public ContainerWithPipeline createContainer(ReplicationConfig replicationConfig, String owner) throws IOException {
     XceiverClientSpi client = null;
     XceiverClientManager clientManager = getXceiverClientManager();
     try {
-      // allocate container on SCM.
-      ContainerWithPipeline containerWithPipeline =
-          storageContainerLocationClient.allocateContainer(type, factor,
-              owner);
+      ContainerWithPipeline containerWithPipeline = 
+          storageContainerLocationClient.allocateContainer(replicationConfig, owner);
       Pipeline pipeline = containerWithPipeline.getPipeline();
       // connect to pipeline leader and allocate container on leader datanode.
       client = clientManager.acquireClient(pipeline);

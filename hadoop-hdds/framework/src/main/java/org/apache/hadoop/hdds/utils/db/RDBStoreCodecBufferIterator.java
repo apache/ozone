@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -33,16 +32,16 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   private final AtomicBoolean closed = new AtomicBoolean();
 
   RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
-      CodecBuffer prefix) {
-    super(iterator, table, prefix);
+      CodecBuffer prefix, Type type) {
+    super(iterator, table, prefix, type);
 
     final String name = table != null ? table.getName() : null;
     this.keyBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-key", 1 << 10),
-        buffer -> getRocksDBIterator().get().key(buffer));
+        getType().readKey() ? buffer -> getRocksDBIterator().get().key(buffer) : null);
     this.valueBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-value", 4 << 10),
-        buffer -> getRocksDBIterator().get().value(buffer));
+        getType().readValue() ? buffer -> getRocksDBIterator().get().value(buffer) : null);
     seekToFirst();
   }
 
@@ -69,7 +68,7 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   }
 
   @Override
-  void delete(CodecBuffer key) throws IOException {
+  void delete(CodecBuffer key) throws RocksDatabaseException {
     assertOpen();
     getRocksDBTable().delete(key.asReadOnlyByteBuffer());
   }
@@ -130,6 +129,10 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
     }
 
     CodecBuffer getFromDb() {
+      if (source == null) {
+        return CodecBuffer.getEmptyBuffer();
+      }
+
       for (prepare(); ; allocate()) {
         final Integer required = buffer.putFromSource(source);
         if (required == null) {
