@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -192,8 +191,7 @@ public class TestReconInsightsForDeletedDirectories {
 
     // Retrieve the object ID of dir1 from directory table.
     Long directoryObjectId = null;
-    try (
-        TableIterator<?, ? extends Table.KeyValue<?, OmDirectoryInfo>> iterator
+    try (Table.KeyValueIterator<?, OmDirectoryInfo> iterator
             = reconDirTable.iterator()) {
       if (iterator.hasNext()) {
         directoryObjectId = iterator.next().getValue().getObjectID();
@@ -421,22 +419,22 @@ public class TestReconInsightsForDeletedDirectories {
 
     Table<String, OmKeyInfo> deletedDirTable =
         metadataManager.getDeletedDirTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> it = deletedDirTable.iterator()) {
+    try (Table.KeyValueIterator<String, OmKeyInfo> it = deletedDirTable.iterator()) {
       removeAllFromDB(it, deletedDirTable);
     }
     Table<String, OmKeyInfo> fileTable = metadataManager.getFileTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> it = fileTable.iterator()) {
+    try (Table.KeyValueIterator<String, OmKeyInfo> it = fileTable.iterator()) {
       removeAllFromDB(it, fileTable);
     }
     Table<String, OmDirectoryInfo> directoryTable =
         metadataManager.getDirectoryTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> it = directoryTable.iterator()) {
+    try (Table.KeyValueIterator<String, OmDirectoryInfo> it = directoryTable.iterator()) {
       removeAllFromDB(it, directoryTable);
     }
   }
 
   private static void removeAllFromDB(
-      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator,
+      Table.KeyValueIterator<String, ?> iterator,
       Table<String, ?> table) throws IOException {
     List<String> keysToDelete = new ArrayList<>();
     while (iterator.hasNext()) {

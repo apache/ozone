@@ -142,9 +142,9 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   void deleteRange(KEY beginKey, KEY endKey) throws RocksDatabaseException, CodecException;
 
-  /** The same as iterator(null). */
+  /** The same as iterator(null, KEY_AND_VALUE). */
   default KeyValueIterator<KEY, VALUE> iterator() throws RocksDatabaseException, CodecException {
-    return iterator(null);
+    return iterator(null, KeyValueIterator.Type.KEY_AND_VALUE);
   }
 
   /** The same as iterator(prefix, KEY_AND_VALUE). */
@@ -152,11 +152,20 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
     return iterator(prefix, KeyValueIterator.Type.KEY_AND_VALUE);
   }
 
+  /** The same as iterator(null, type). */
+  default KeyValueIterator<KEY, VALUE> iterator(KeyValueIterator.Type type)
+      throws RocksDatabaseException, CodecException {
+    return iterator(null, type);
+  }
+
   /**
    * Iterate the elements in this table.
    *
    * @param prefix The prefix of the elements to be iterated.
    * @param type Specify whether key and/or value are required.
+   *             When the prefix is non-empty, it has to read keys for matching the prefix.
+   *             The type will be automatically changed to including keys;
+   *             see {@link KeyValueIterator.Type#addKey()}.
    * @return an iterator.
    */
   KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type)
@@ -385,6 +394,10 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
 
       boolean readValue() {
         return (this.ordinal() & VALUE_ONLY.ordinal()) != 0;
+      }
+
+      Type addKey() {
+        return values()[ordinal() | KEY_ONLY.ordinal()];
       }
     }
   }
