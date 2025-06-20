@@ -233,7 +233,7 @@ public class TestReconNodeManager {
     List<DatanodeDetails> nodes =
         reconNodeManager.getNodes(DECOMMISSIONING, null);
     assertEquals(1, nodes.size());
-    assertEquals(datanodeDetails.getUuid(), nodes.get(0).getUuid());
+    assertEquals(datanodeDetails.getID(), nodes.get(0).getID());
   }
 
   @Test

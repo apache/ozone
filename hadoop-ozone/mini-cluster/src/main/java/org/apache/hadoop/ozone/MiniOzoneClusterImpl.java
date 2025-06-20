@@ -235,7 +235,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
     }
     throw new IOException(
-        "Not able to find datanode with datanode Id " + dn.getUuid());
+        "Not able to find datanode with datanode Id " + dn.getID());
   }
 
   @Override
@@ -246,7 +246,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
     }
     throw new IOException(
-        "Not able to find datanode with datanode Id " + dn.getUuid());
+        "Not able to find datanode with datanode Id " + dn.getID());
   }
 
   @Override

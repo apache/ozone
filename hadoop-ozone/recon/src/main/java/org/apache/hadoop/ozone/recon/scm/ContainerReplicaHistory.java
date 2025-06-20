@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import java.util.UUID;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryProto;
 
 /**
@@ -30,8 +30,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryP
  * of one DN but later moved back to the same DN.
  */
 public class ContainerReplicaHistory {
-  // Datanode UUID
-  private final UUID uuid;
+  // Datanode ID
+  private final DatanodeID id;
   // First reported time of the replica on this datanode
   private final Long firstSeenTime;
   // Last reported time of the replica
@@ -40,9 +40,9 @@ public class ContainerReplicaHistory {
   private long bcsId;
   private String state;
 
-  public ContainerReplicaHistory(UUID id, Long firstSeenTime,
+  public ContainerReplicaHistory(DatanodeID id, Long firstSeenTime,
       Long lastSeenTime, long bcsId, String state) {
-    this.uuid = id;
+    this.id = id;
     this.firstSeenTime = firstSeenTime;
     this.lastSeenTime = lastSeenTime;
     this.bcsId = bcsId;
@@ -57,8 +57,8 @@ public class ContainerReplicaHistory {
     this.bcsId = bcsId;
   }
 
-  public UUID getUuid() {
-    return uuid;
+  public DatanodeID getId() {
+    return id;
   }
 
   public Long getFirstSeenTime() {
@@ -83,13 +83,13 @@ public class ContainerReplicaHistory {
 
   public static ContainerReplicaHistory fromProto(
       ContainerReplicaHistoryProto proto) {
-    return new ContainerReplicaHistory(UUID.fromString(proto.getUuid()),
+    return new ContainerReplicaHistory(DatanodeID.fromUuidString(proto.getUuid()),
         proto.getFirstSeenTime(), proto.getLastSeenTime(), proto.getBcsId(),
         proto.getState());
   }
 
   public ContainerReplicaHistoryProto toProto() {
-    return ContainerReplicaHistoryProto.newBuilder().setUuid(uuid.toString())
+    return ContainerReplicaHistoryProto.newBuilder().setUuid(id.toString())
         .setFirstSeenTime(firstSeenTime).setLastSeenTime(lastSeenTime)
         .setBcsId(bcsId).setState(state).build();
   }
