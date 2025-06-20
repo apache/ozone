@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -30,6 +31,8 @@ import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 
 /**
@@ -46,40 +49,36 @@ public class TestS3Owner {
     headers = mock(HttpHeaders.class);
   }
 
-  @Test
-  public void testHasBucketOwnershipVerificationConditionsWithNullHeaders() {
-    assertThat(S3Owner.hasBucketOwnershipVerificationConditions(null)).isFalse();
+  private static Stream<Arguments> noBucketOwnerSourceProvider() {
+    return Stream.of(
+        Arguments.of(null, null),
+        Arguments.of(null, ""),
+        Arguments.of("", null),
+        Arguments.of("", "")
+    );
   }
 
-  @Test
-  public void testHasBucketOwnershipVerificationConditionsWithEmptyHeaders() {
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(null);
-    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn(null);
+  @ParameterizedTest
+  @MethodSource("noBucketOwnerSourceProvider")
+  public void testHasBucketOwnershipVerificationConditionsFailed(String bucketOwner, String sourceBucketOwner) {
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(bucketOwner);
+    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn(sourceBucketOwner);
     assertThat(S3Owner.hasBucketOwnershipVerificationConditions(headers)).isFalse();
-
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("");
-    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn("");
-    assertThat(S3Owner.hasBucketOwnershipVerificationConditions(headers)).isFalse();
   }
 
-  @Test
-  public void testHasBucketOwnerConditionWithExpectedBucketOwnerVerificationPresent() {
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner1");
-    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn(null);
-    assertThat(S3Owner.hasBucketOwnershipVerificationConditions(headers)).isTrue();
+  private static Stream<Arguments> hasBucketOwnerSourceProvider() {
+    return Stream.of(
+        Arguments.of("owner1", null),
+        Arguments.of(null, "owner2"),
+        Arguments.of("owner1", "owner2")
+    );
   }
 
-  @Test
-  public void testHasBucketOwnerConditionWithExpectedSourceBucketOwnerVerificationPresent() {
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(null);
-    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn("owner2");
-    assertThat(S3Owner.hasBucketOwnershipVerificationConditions(headers)).isTrue();
-  }
-
-  @Test
-  public void testHasBucketOwnershipVerificationConditionsWithBothPresent() {
-    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner1");
-    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn("owner2");
+  @ParameterizedTest
+  @MethodSource("hasBucketOwnerSourceProvider")
+  public void testHasBucketOwnershipVerificationConditionsPass(String bucketOwner, String sourceBucketOwner) {
+    when(headers.getHeaderString(S3Consts.EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(bucketOwner);
+    when(headers.getHeaderString(S3Consts.EXPECTED_SOURCE_BUCKET_OWNER_HEADER)).thenReturn(sourceBucketOwner);
     assertThat(S3Owner.hasBucketOwnershipVerificationConditions(headers)).isTrue();
   }
 
