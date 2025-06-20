@@ -231,6 +231,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .forEachRemaining(snapInfo -> snapshotPaths.add(getSnapshotDBPath(snapInfo.getCheckpointDir())));
     Set<String> inodesFromOmDataDir = new HashSet<>();
     Set<String> inodesFromTarball = new HashSet<>();
+    Set<Path> allPathsInTarball = new HashSet<>();
     try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
       List<Path> files = filesInTarball.collect(Collectors.toList());
       for (Path p : files) {
@@ -240,6 +241,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         }
         String inode = getInode(file.getName());
         inodesFromTarball.add(inode);
+        allPathsInTarball.add(p);
       }
     }
     Map<String, List<String>> hardLinkMapFromOmData = new HashMap<>();
@@ -250,8 +252,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       populateInodesOfFilesInDirectory(dbStore, Paths.get(snapshotPath),
           inodesFromOmDataDir, hardLinkMapFromOmData);
     }
-    Map<String, List<String>> hardlinkMapFromTarball = readFileToMap(newDbDir.toPath()
-        .resolve(OmSnapshotManager.OM_HARDLINK_FILE).toString());
+    Path hardlinkFilePath =
+        newDbDir.toPath().resolve(OmSnapshotManager.OM_HARDLINK_FILE);
+    Map<String, List<String>> hardlinkMapFromTarball = readFileToMap(hardlinkFilePath.toString());
 
     // verify that all entries in hardLinkMapFromOmData are present in hardlinkMapFromTarball.
     // entries in hardLinkMapFromOmData are from the snapshots + OM db checkpoint so they
@@ -266,6 +269,13 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // all files from the checkpoint should be in the tarball
     assertFalse(inodesFromTarball.isEmpty());
     assertTrue(inodesFromTarball.containsAll(inodesFromOmDataDir));
+
+    // create hardlinks now
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath());
+    for (Path old : allPathsInTarball) {
+      old.toFile().delete();
+    }
+    assertFalse(hardlinkFilePath.toFile().exists());
   }
 
   public static Map<String, List<String>> readFileToMap(String filePath) throws IOException {
@@ -279,9 +289,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         }
         int tabIndex = trimmedLine.indexOf("\t");
         if (tabIndex > 0) {
-          String key = getInode(trimmedLine.substring(0, tabIndex).trim());
-          // Value starts after the tab, trimming any extra whitespace
-          String value = trimmedLine.substring(tabIndex + 1).trim();
+          // value is the full path that needs to be constructed
+          String value = trimmedLine.substring(0, tabIndex).trim();
+          // key is the inodeID
+          String key = getInode(trimmedLine.substring(tabIndex + 1).trim());
           if (!key.isEmpty() && !value.isEmpty()) {
             dataMap.computeIfAbsent(key, k -> new ArrayList<>()).add(value);
           }
@@ -307,6 +318,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         String path  = metadataDir.relativize(p).toString();
         if (path.contains(OM_CHECKPOINT_DIR)) {
           path = metadataDir.relativize(dbStore.getDbLocation().toPath().resolve(p.getFileName())).toString();
+        }
+        if (path.startsWith(OM_DB_NAME)) {
+          path = Paths.get(path).getFileName().toString();
         }
         hardlinkMap.computeIfAbsent(inode, k -> new ArrayList<>()).add(path);
         inodesFromOmDbCheckpoint.add(inode);
