@@ -41,11 +41,8 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
    * been initiated for multipart upload in the backend.
    */
   @Override
-  public void handlePutEvent(OMDBUpdateEvent<String, Object> event,
-                             String tableName,
-                             Map<String, Long> objectCountMap,
-                             Map<String, Long> unReplicatedSizeMap,
-                             Map<String, Long> replicatedSizeMap) {
+  public void handlePutEvent(OMDBUpdateEvent<String, Object> event, String tableName, Map<String, Long> objectCountMap,
+      Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       OmMultipartKeyInfo multipartKeyInfo = (OmMultipartKeyInfo) event.getValue();
@@ -69,11 +66,8 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
    * have been completed or aborted in the backend.
    */
   @Override
-  public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
-                                String tableName,
-                                Map<String, Long> objectCountMap,
-                                Map<String, Long> unReplicatedSizeMap,
-                                Map<String, Long> replicatedSizeMap) {
+  public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event, String tableName,
+      Map<String, Long> objectCountMap, Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       OmMultipartKeyInfo multipartKeyInfo = (OmMultipartKeyInfo) event.getValue();
@@ -99,11 +93,8 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
    * have been updated in the backend.
    */
   @Override
-  public void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
-                                String tableName,
-                                Map<String, Long> objectCountMap,
-                                Map<String, Long> unReplicatedSizeMap,
-                                Map<String, Long> replicatedSizeMap) {
+  public void handleUpdateEvent(OMDBUpdateEvent<String, Object> event, String tableName,
+      Map<String, Long> objectCountMap, Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       if (event.getOldValue() == null) {
