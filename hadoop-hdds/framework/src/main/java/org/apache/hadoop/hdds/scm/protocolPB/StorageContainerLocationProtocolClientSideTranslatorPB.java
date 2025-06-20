@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -86,6 +87,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
@@ -1227,5 +1230,38 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         builder -> builder.setGetMetricsRequest(request)).getGetMetricsResponse();
     String metricsJsonStr = response.getMetricsJson();
     return metricsJsonStr;
+  }
+
+  @Override
+  public GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid,
+      String hostName, int pageSize, String startItem) throws IOException {
+
+    // Prepare parameters.
+    GetVolumeInfosRequestProto.Builder requestBuilder =
+            GetVolumeInfosRequestProto.newBuilder();
+
+    if (StringUtils.isNotBlank(displayMode)) {
+      requestBuilder.setDisplayMode(displayMode);
+    }
+
+    if (StringUtils.isNotBlank(uuid)) {
+      requestBuilder.setUuid(uuid);
+    }
+
+    if (StringUtils.isNotBlank(hostName)) {
+      requestBuilder.setHostName(hostName);
+    }
+
+    if (StringUtils.isNotBlank(startItem)) {
+      requestBuilder.setStartItem(startItem);
+    }
+
+    requestBuilder.setPageSize(pageSize);
+
+    // Submit request.
+    GetVolumeInfosResponseProto response = submitRequest(Type.GetVolumeFailureInfos,
+        builder -> builder.setGetVolumeInfosRequest(requestBuilder.build())).
+        getGetVolumeInfosResponse();
+    return response;
   }
 }

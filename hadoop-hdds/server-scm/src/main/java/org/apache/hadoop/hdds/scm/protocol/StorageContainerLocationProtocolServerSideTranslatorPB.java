@@ -93,6 +93,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
@@ -731,6 +733,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetMetricsResponse(getMetrics(request.getGetMetricsRequest()))
             .build();
+      case GetVolumeFailureInfos:
+        GetVolumeInfosRequestProto getVolumeInfosRequest = request.getGetVolumeInfosRequest();
+        GetVolumeInfosResponseProto getVolumeInfosResponse = getVolumeInfos(getVolumeInfosRequest);
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetVolumeInfosResponse(getVolumeInfosResponse)
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1349,5 +1359,29 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {
     return GetMetricsResponseProto.newBuilder().setMetricsJson(impl.getMetrics(request.getQuery())).build();
+  }
+
+  /**
+   * Get getVolumeInfos based on query conditions.
+   *
+   * @param request The request object containing the parameters to
+   * fetch volume information (GetVolumeInfosRequestProto).
+   * @return  A response object containing the volume information
+   * (GetVolumeInfosResponseProto).
+   * @throws IOException
+   * If an input/output exception occurs while processing the request.
+   */
+  public GetVolumeInfosResponseProto getVolumeInfos(
+      GetVolumeInfosRequestProto request) throws IOException {
+
+    // Prepare parameters
+    String uuid = request.getUuid();
+    String hostName = request.getHostName();
+    String displayMode = request.getDisplayMode();
+    String startItem = request.getStartItem();
+    int pageSize = request.getPageSize();
+
+    // Invoke method and return result
+    return impl.getVolumeInfos(displayMode, uuid, hostName, pageSize, startItem);
   }
 }
