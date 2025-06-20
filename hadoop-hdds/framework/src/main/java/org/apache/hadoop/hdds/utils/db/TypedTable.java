@@ -389,15 +389,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type)
       throws RocksDatabaseException, CodecException {
     if (supportCodecBuffer) {
-      final CodecBuffer prefixBuffer = encodeKeyCodecBuffer(prefix);
-      try {
-        return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer, type));
-      } catch (Throwable t) {
-        if (prefixBuffer != null) {
-          prefixBuffer.release();
-        }
-        throw t;
-      }
+      return newCodecBufferTableIterator(prefix, type);
     } else {
       final byte[] prefixBytes = encodeKey(prefix);
       return new TypedTableIterator(rawTable.iterator(prefixBytes, type));
@@ -510,8 +502,28 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return cache;
   }
 
-  RawIterator<CodecBuffer> newCodecBufferTableIterator(
-      KeyValueIterator<CodecBuffer, CodecBuffer> i) {
+  private RawIterator<CodecBuffer> newCodecBufferTableIterator(KEY prefix, KeyValueIterator.Type type)
+      throws RocksDatabaseException, CodecException {
+    final CodecBuffer encoded = encodeKeyCodecBuffer(prefix);
+    final CodecBuffer prefixBuffer;
+    if (encoded != null && encoded.readableBytes() == 0) {
+      encoded.release();
+      prefixBuffer = null;
+    } else {
+      prefixBuffer = encoded;
+    }
+
+    try {
+      return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer, type));
+    } catch (Throwable t) {
+      if (prefixBuffer != null) {
+        prefixBuffer.release();
+      }
+      throw t;
+    }
+  }
+
+  private RawIterator<CodecBuffer> newCodecBufferTableIterator(KeyValueIterator<CodecBuffer, CodecBuffer> i) {
     return new RawIterator<CodecBuffer>(i) {
       @Override
       AutoCloseSupplier<CodecBuffer> convert(KEY key) throws CodecException {
@@ -619,7 +631,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       try {
         return convert(rawIterator.next());
       } catch (CodecException e) {
-        throw new IllegalStateException("Failed next()", e);
+        throw new IllegalStateException("Failed next() in " + TypedTable.this, e);
       }
     }
 

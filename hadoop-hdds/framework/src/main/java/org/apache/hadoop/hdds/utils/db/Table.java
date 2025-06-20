@@ -163,6 +163,9 @@ public interface Table<KEY, VALUE> {
    *
    * @param prefix The prefix of the elements to be iterated.
    * @param type Specify whether key and/or value are required.
+   *             When the prefix is non-empty, it has to read keys for matching the prefix.
+   *             The type will be automatically changed to including keys;
+   *             see {@link KeyValueIterator.Type#addKey()}.
    * @return an iterator.
    */
   KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type)
@@ -391,6 +394,10 @@ public interface Table<KEY, VALUE> {
 
       boolean readValue() {
         return (this.ordinal() & VALUE_ONLY.ordinal()) != 0;
+      }
+
+      Type addKey() {
+        return values()[ordinal() | KEY_ONLY.ordinal()];
       }
     }
   }
