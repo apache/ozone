@@ -42,7 +42,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -230,6 +229,69 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     super.shutdown();
   }
 
+  private ProcessingResult processDirectoriesHelper(
+      List<Pair<String, OmKeyInfo>> dirInfoList,
+      List<PurgePathRequest> purgePathRequestList,
+      long remainingBufLimit,
+      KeyManager keyManager,
+      CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableDirChecker,
+      CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableFileChecker,
+      List<Pair<String, OmKeyInfo>> allSubDirList) {
+
+    int dirDelNum = 0;
+    long subDirNum = 0;
+    long subFileNum = 0;
+    int consumedSize = 0;
+    int processedCount = 0;
+
+    while (processedCount < dirInfoList.size() && remainingBufLimit > 0) {
+      try {
+        Pair<String, OmKeyInfo> dirInfoPair = dirInfoList.get(processedCount++);
+        Boolean dirReclaimable = reclaimableDirChecker.apply(Table.newKeyValue(dirInfoPair.getKey(),
+            dirInfoPair.getValue()));
+        Optional<PurgePathRequest> request = prepareDeleteDirRequest(
+            dirInfoPair.getValue(), dirInfoPair.getKey(), dirReclaimable, allSubDirList,
+            keyManager, reclaimableFileChecker, remainingBufLimit);
+        if (!request.isPresent()) {
+          continue;
+        }
+        PurgePathRequest requestVal = request.get();
+        consumedSize += requestVal.getSerializedSize();
+        remainingBufLimit -= consumedSize;
+        purgePathRequestList.add(requestVal);
+        // Count up the purgeDeletedDir, subDirs and subFiles
+        if (requestVal.hasDeletedDir() && !StringUtils.isBlank(requestVal.getDeletedDir())) {
+          dirDelNum++;
+        }
+        subDirNum += requestVal.getMarkDeletedSubDirsCount();
+        subFileNum += requestVal.getDeletedSubFilesCount();
+      } catch (IOException e) {
+        LOG.error("Error while processing directories and files. " +
+            "Will retry at next run for subset.", e);
+        break;
+      }
+    }
+
+    return new ProcessingResult(dirDelNum, subDirNum, subFileNum, remainingBufLimit);
+  }
+
+  /**
+   * Class to hold the result of directory processing.
+   */
+  private static class ProcessingResult {
+    private final int dirDelNum;
+    private final long subDirNum;
+    private final long subFileNum;
+    private final long remainingBufLimit;
+
+    ProcessingResult(int dirDelNum, long subDirNum, long subFileNum, long remainingBufLimit) {
+      this.dirDelNum = dirDelNum;
+      this.subDirNum = subDirNum;
+      this.subFileNum = subFileNum;
+      this.remainingBufLimit = remainingBufLimit;
+    }
+  }
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   void optimizeDirDeletesAndSubmitRequest(
       long dirNum, long subDirNum, long subFileNum,
@@ -240,105 +302,42 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableDirChecker,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableFileChecker,
       UUID expectedPreviousSnapshotId, long rnCnt) {
-    Iterator<Pair<String, OmKeyInfo>> subDirIterator = allSubDirList.iterator();
-    Supplier<KeyValue<String, OmKeyInfo>> subDirSupplier = () -> {
-      if (subDirIterator.hasNext()) {
-        Pair<String, OmKeyInfo> pair = subDirIterator.next();
-        return Table.newKeyValue(pair.getKey(), pair.getValue());
-      }
-      return null;
-    };
 
-    try {
-      ProcessDirectoryResult result = processDirectoryRequests(
-          subDirSupplier,
-          allSubDirList,
-          purgePathRequestList,
-          keyManager,
-          reclaimableDirChecker,
-          reclaimableFileChecker,
-          remainingBufLimit);
+    // Optimization to handle delete sub-dir and keys to remove quickly
+    // This case will be useful to handle when depth of directory is high
+    ProcessingResult result = processDirectoriesHelper(
+        allSubDirList, 
+        purgePathRequestList, 
+        remainingBufLimit, 
+        keyManager, 
+        reclaimableDirChecker, 
+        reclaimableFileChecker,
+        allSubDirList);
 
-      long subdirDelNum = result.dirNum();
-      subDirNum += result.subDirNum();
-      subFileNum += result.subFileNum();
+    int subdirDelNum = result.dirDelNum;
+    subDirNum += result.subDirNum;
+    subFileNum += result.subFileNum;
 
-      if (!purgePathRequestList.isEmpty()) {
-        submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
-      }
-
-      if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
-        long subdirMoved = subDirNum - subdirDelNum;
-        deletedDirsCount.addAndGet(dirNum + subdirDelNum);
-        movedDirsCount.addAndGet(subdirMoved);
-        movedFilesCount.addAndGet(subFileNum);
-        long timeTakenInIteration = Time.monotonicNow() - startTime;
-
-        LOG.info("Number of dirs deleted: {}, Number of sub-dir " +
-                "deleted: {}, Number of sub-files moved:" +
-                " {} to DeletedTable, Number of sub-dirs moved {} to " +
-                "DeletedDirectoryTable, iteration elapsed: {}ms, " +
-                " totalRunCount: {}",
-            dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
-            timeTakenInIteration, rnCnt);
-
-        getMetrics().incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
-        getPerfMetrics().setDirectoryDeletingServiceLatencyMs(timeTakenInIteration);
-      }
-
-    } catch (IOException e) {
-      LOG.error("Error while running delete directories and files " +
-          "background task. Will retry at next run for subset.", e);
+    if (!purgePathRequestList.isEmpty()) {
+      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
     }
-  }
 
-  private ProcessDirectoryResult processDirectoryRequests(
-      Supplier<KeyValue<String, OmKeyInfo>> directorySupplier,
-      List<Pair<String, OmKeyInfo>> allSubDirList,
-      List<PurgePathRequest> purgePathRequestList,
-      KeyManager keyManager,
-      CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableDirChecker,
-      CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableFileChecker,
-      long remainingBufLimit) throws IOException {
-
-    long dirNum = 0L;
-    long subDirNum = 0L;
-    long subFileNum = 0L;
-    int consumedSize = 0;
-
-    while (remainingBufLimit > 0) {
-      KeyValue<String, OmKeyInfo> pendingDeletedDirInfo = directorySupplier.get();
-      if (pendingDeletedDirInfo == null) {
-        break;
-      }
-
-      boolean isDirReclaimable = reclaimableDirChecker.apply(pendingDeletedDirInfo);
-      Optional<PurgePathRequest> request = prepareDeleteDirRequest(
-          pendingDeletedDirInfo.getValue(),
-          pendingDeletedDirInfo.getKey(),
-          isDirReclaimable,
-          allSubDirList,
-          keyManager,
-          reclaimableFileChecker,
-          remainingBufLimit);
-
-      if (!request.isPresent()) {
-        continue;
-      }
-
-      PurgePathRequest purgePathRequest = request.get();
-      consumedSize += purgePathRequest.getSerializedSize();
-      remainingBufLimit -= consumedSize;
-      purgePathRequestList.add(purgePathRequest);
-
-      // Count up the purgeDeletedDir, subDirs and subFiles
-      if (purgePathRequest.hasDeletedDir() && !StringUtils.isBlank(purgePathRequest.getDeletedDir())) {
-        dirNum++;
-      }
-      subDirNum += purgePathRequest.getMarkDeletedSubDirsCount();
-      subFileNum += purgePathRequest.getDeletedSubFilesCount();
+    if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
+      long subdirMoved = subDirNum - subdirDelNum;
+      deletedDirsCount.addAndGet(dirNum + subdirDelNum);
+      movedDirsCount.addAndGet(subdirMoved);
+      movedFilesCount.addAndGet(subFileNum);
+      long timeTakenInIteration = Time.monotonicNow() - startTime;
+      LOG.info("Number of dirs deleted: {}, Number of sub-dir " +
+              "deleted: {}, Number of sub-files moved:" +
+              " {} to DeletedTable, Number of sub-dirs moved {} to " +
+              "DeletedDirectoryTable, iteration elapsed: {}ms, " +
+              " totalRunCount: {}",
+          dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
+          timeTakenInIteration, rnCnt);
+      getMetrics().incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
+      getPerfMetrics().setDirectoryDeletingServiceLatencyMs(timeTakenInIteration);
     }
-    return new ProcessDirectoryResult(dirNum, subDirNum, subFileNum, remainingBufLimit);
   }
 
   private static final class DeletedDirSupplier implements Closeable {
@@ -442,7 +441,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     // step-3: If both sub-dirs and sub-files are exhausted under a parent
     // directory, only then delete the parent.
     String purgeDeletedDir = purgeDir && subDirDeleteResult.isProcessedKeys() &&
-        subFileDeleteResult.isProcessedKeys() ? delDirName : null;
+        subFileDeleteResult.isProcessedKeys() ? delDirName :  null;
     if (purgeDeletedDir == null && subFiles.isEmpty() && subDirs.isEmpty()) {
       return Optional.empty();
     }
@@ -624,29 +623,42 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       String snapshotTableKey = currentSnapshotInfo == null ? null : currentSnapshotInfo.getTableKey();
       try (ReclaimableDirFilter reclaimableDirFilter = new ReclaimableDirFilter(getOzoneManager(),
           omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock);
-           ReclaimableKeyFilter reclaimableFileFilter = new ReclaimableKeyFilter(getOzoneManager(),
-               omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock)) {
+          ReclaimableKeyFilter reclaimableFileFilter = new ReclaimableKeyFilter(getOzoneManager(),
+              omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock)) {
         long startTime = Time.monotonicNow();
+        long dirNum = 0L;
         List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
         List<Pair<String, OmKeyInfo>> allSubDirList = new ArrayList<>();
+        List<Pair<String, OmKeyInfo>> pendingDirsList = new ArrayList<>();
 
-        ProcessDirectoryResult result = processDirectoryRequests(
-            dirSupplier::get,
-            allSubDirList,
+        // Collect directories from supplier into a list
+        while (remainingBufLimit > 0) {
+          KeyValue<String, OmKeyInfo> pendingDeletedDirInfo = dirSupplier.get();
+          if (pendingDeletedDirInfo == null) {
+            break;
+          }
+          pendingDirsList.add(Pair.of(pendingDeletedDirInfo.getKey(), pendingDeletedDirInfo.getValue()));
+        }
+
+        ProcessingResult result = processDirectoriesHelper(
+            pendingDirsList,
             purgePathRequestList,
+            remainingBufLimit,
             keyManager,
             reclaimableDirFilter,
             reclaimableFileFilter,
-            remainingBufLimit);
+            allSubDirList);
 
-        optimizeDirDeletesAndSubmitRequest(
-            result.dirNum(), result.subDirNum(), result.subFileNum(),
-            allSubDirList, purgePathRequestList, snapshotTableKey,
-            startTime, result.remainingBufLimit(), keyManager,
-            reclaimableDirFilter, reclaimableFileFilter,
-            expectedPreviousSnapshotId, runCount);
+        dirNum = result.dirDelNum;
+        long subDirNum = result.subDirNum;
+        long subFileNum = result.subFileNum;
+        remainingBufLimit = result.remainingBufLimit;
 
-        // Handle exclusive size maps (unchanged)
+        optimizeDirDeletesAndSubmitRequest(dirNum, subDirNum,
+            subFileNum, allSubDirList, purgePathRequestList, snapshotTableKey,
+            startTime, remainingBufLimit, getOzoneManager().getKeyManager(),
+            reclaimableDirFilter, reclaimableFileFilter, expectedPreviousSnapshotId,
+            runCount);
         Map<UUID, Long> exclusiveReplicatedSizeMap = reclaimableFileFilter.getExclusiveReplicatedSizeMap();
         Map<UUID, Long> exclusiveSizeMap = reclaimableFileFilter.getExclusiveSizeMap();
         List<UUID> previousPathSnapshotsInChain =
@@ -713,36 +725,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       }
       // By design, no one cares about the results of this call back.
       return BackgroundTaskResult.EmptyTaskResult.newResult();
-    }
-  }
-
-  private static class ProcessDirectoryResult {
-    private final long dirNum;
-    private final long subDirNum;
-    private final long subFileNum;
-    private final long remainingBufLimit;
-
-    ProcessDirectoryResult(long dirNum, long subDirNum, long subFileNum, long remainingBufLimit) {
-      this.dirNum = dirNum;
-      this.subDirNum = subDirNum;
-      this.subFileNum = subFileNum;
-      this.remainingBufLimit = remainingBufLimit;
-    }
-
-    public long dirNum() {
-      return dirNum;
-    }
-
-    public long subDirNum() {
-      return subDirNum;
-    }
-
-    public long subFileNum() {
-      return subFileNum;
-    }
-
-    public long remainingBufLimit() {
-      return remainingBufLimit;
     }
   }
 }
