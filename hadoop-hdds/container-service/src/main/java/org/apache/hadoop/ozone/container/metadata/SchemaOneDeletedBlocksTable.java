@@ -17,11 +17,12 @@
 
 package org.apache.hadoop.ozone.container.metadata;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 
@@ -51,50 +52,48 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   @Override
-  public void put(String key, ChunkInfoList value) throws IOException {
+  public void put(String key, ChunkInfoList value) throws RocksDatabaseException, CodecException {
     super.put(prefix(key), value);
   }
 
   @Override
-  public void putWithBatch(BatchOperation batch, String key,
-                           ChunkInfoList value)
-          throws IOException {
+  public void putWithBatch(BatchOperation batch, String key, ChunkInfoList value)
+      throws RocksDatabaseException, CodecException {
     super.putWithBatch(batch, prefix(key), value);
   }
 
   @Override
-  public void delete(String key) throws IOException {
+  public void delete(String key) throws RocksDatabaseException, CodecException {
     super.delete(prefix(key));
   }
 
   @Override
-  public void deleteWithBatch(BatchOperation batch, String key)
-          throws IOException {
+  public void deleteWithBatch(BatchOperation batch, String key) throws CodecException {
     super.deleteWithBatch(batch, prefix(key));
   }
 
   @Override
-  public void deleteRange(String beginKey, String endKey) throws IOException {
+  public void deleteRange(String beginKey, String endKey) throws RocksDatabaseException, CodecException {
     super.deleteRange(prefix(beginKey), prefix(endKey));
   }
 
   @Override
-  public boolean isExist(String key) throws IOException {
+  public boolean isExist(String key) throws RocksDatabaseException, CodecException {
     return super.isExist(prefix(key));
   }
 
   @Override
-  public ChunkInfoList get(String key) throws IOException {
+  public ChunkInfoList get(String key) throws RocksDatabaseException, CodecException {
     return super.get(prefix(key));
   }
 
   @Override
-  public ChunkInfoList getIfExist(String key) throws IOException {
+  public ChunkInfoList getIfExist(String key) throws RocksDatabaseException, CodecException {
     return super.getIfExist(prefix(key));
   }
 
   @Override
-  public ChunkInfoList getReadCopy(String key) throws IOException {
+  public ChunkInfoList getReadCopy(String key) throws RocksDatabaseException, CodecException {
     return super.getReadCopy(prefix(key));
   }
 
@@ -102,7 +101,7 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   public List<KeyValue<String, ChunkInfoList>> getRangeKVs(
           String startKey, int count, String prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws IOException, IllegalArgumentException {
+          throws RocksDatabaseException, CodecException {
 
     // Deleted blocks will always have the #deleted# key prefix and nothing
     // else in this schema version. Ignore any user passed prefixes that could
@@ -115,7 +114,7 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   public List<KeyValue<String, ChunkInfoList>> getSequentialRangeKVs(
           String startKey, int count, String prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws IOException, IllegalArgumentException {
+          throws RocksDatabaseException, CodecException {
 
     // Deleted blocks will always have the #deleted# key prefix and nothing
     // else in this schema version. Ignore any user passed prefixes that could

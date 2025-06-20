@@ -449,7 +449,7 @@ public class ReconUtils {
             if (lastKnonwnSnapshotTs < snapshotTimestamp) {
               if (lastKnownSnapshotFile != null) {
                 try {
-                  FileUtils.deleteDirectory(lastKnownSnapshotFile);
+                  FileUtils.forceDelete(lastKnownSnapshotFile);
                 } catch (IOException e) {
                   log.warn("Error deleting existing om db snapshot directory: {}",
                       lastKnownSnapshotFile.getAbsolutePath());

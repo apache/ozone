@@ -111,7 +111,7 @@ jobs:
   build:
     needs:
       - build-info
-    if: needs.build-info.outputs.needs-build == 'true'
+    if: needs.build-info.outputs.needs-build == 'true' || needs.build-info.outputs.needs-integration-tests == 'true'
     uses: ./.github/workflows/check.yml
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}

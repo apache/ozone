@@ -57,7 +57,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -137,8 +136,7 @@ public class DeletedBlockLogImpl
     lock.lock();
     try {
       final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
-      try (TableIterator<Long,
-          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
+      try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
         if (count == LIST_ALL_FAILED_TRANSACTIONS) {
           while (iter.hasNext()) {
@@ -245,8 +243,7 @@ public class DeletedBlockLogImpl
     lock.lock();
     try {
       final AtomicInteger num = new AtomicInteger(0);
-      try (TableIterator<Long,
-          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
+      try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
         while (iter.hasNext()) {
           DeletedBlocksTransaction delTX = iter.next().getValue();
@@ -394,8 +391,7 @@ public class DeletedBlockLogImpl
           scmCommandTimeoutMs);
       DatanodeDeletedBlockTransactions transactions =
           new DatanodeDeletedBlockTransactions();
-      try (TableIterator<Long,
-          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
+      try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
         if (lastProcessedTransactionId != -1) {
           iter.seek(lastProcessedTransactionId);

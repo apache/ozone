@@ -37,19 +37,25 @@ public final class Proto3Codec<M extends MessageLite> implements Codec<M> {
 
   private final Class<M> clazz;
   private final Parser<M> parser;
+  private final boolean allowInvalidProtocolBufferException;
 
   /**
    * @return the {@link Codec} for the given class.
    */
   public static <T extends MessageLite> Codec<T> get(T t) {
+    return get(t, false);
+  }
+
+  public static <T extends MessageLite> Codec<T> get(T t, boolean allowInvalidProtocolBufferException) {
     final Codec<?> codec = CODECS.computeIfAbsent(t.getClass(),
-        key -> new Proto3Codec<>(t));
+        key -> new Proto3Codec<>(t, allowInvalidProtocolBufferException));
     return (Codec<T>) codec;
   }
 
-  private Proto3Codec(M m) {
+  private Proto3Codec(M m, boolean allowInvalidProtocolBufferException) {
     this.clazz = (Class<M>) m.getClass();
     this.parser = (Parser<M>) m.getParserForType();
+    this.allowInvalidProtocolBufferException = allowInvalidProtocolBufferException;
   }
 
   @Override
@@ -85,6 +91,9 @@ public final class Proto3Codec<M extends MessageLite> implements Codec<M> {
     try {
       return parser.parseFrom(buffer.asReadOnlyByteBuffer());
     } catch (InvalidProtocolBufferException e) {
+      if (allowInvalidProtocolBufferException) {
+        return null;
+      }
       throw new CodecException("Failed to parse " + buffer + " for " + getTypeClass(), e);
     }
   }
@@ -97,7 +106,14 @@ public final class Proto3Codec<M extends MessageLite> implements Codec<M> {
   @Override
   public M fromPersistedFormatImpl(byte[] bytes)
       throws InvalidProtocolBufferException {
-    return parser.parseFrom(bytes);
+    try {
+      return parser.parseFrom(bytes);
+    } catch (InvalidProtocolBufferException e) {
+      if (allowInvalidProtocolBufferException) {
+        return null;
+      }
+      throw e;
+    }
   }
 
   @Override

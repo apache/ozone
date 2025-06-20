@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -207,8 +206,7 @@ public class TestOzoneManagerHASnapshot {
         String snapshotPrefix = OM_KEY_PREFIX + volumeName +
             OM_KEY_PREFIX + bucketName;
         SnapshotInfo snapshotInfo = null;
-        try (TableIterator<String, ?
-            extends Table.KeyValue<String, SnapshotInfo>>
+        try (Table.KeyValueIterator<String, SnapshotInfo>
                  iterator = ozoneManager.getMetadataManager()
             .getSnapshotInfoTable().iterator(snapshotPrefix)) {
           while (iterator.hasNext()) {

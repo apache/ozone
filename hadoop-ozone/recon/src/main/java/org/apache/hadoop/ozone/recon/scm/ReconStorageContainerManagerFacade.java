@@ -58,7 +58,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sql.DataSource;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -139,6 +138,8 @@ public class ReconStorageContainerManagerFacade
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconStorageContainerManagerFacade.class);
   public static final long CONTAINER_METADATA_SIZE = 1 * 1024 * 1024L;
+  private static final String IPC_MAXIMUM_DATA_LENGTH = "ipc.maximum.data.length";
+  private static final int IPC_MAXIMUM_DATA_LENGTH_DEFAULT = 128 * 1024 * 1024;
 
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconDatanodeProtocolServer datanodeProtocolServer;
@@ -594,9 +595,7 @@ public class ReconStorageContainerManagerFacade
     // Assumption of size of 1 container info object here is 1 MB
     long containersMetaDataTotalRpcRespSizeMB =
         CONTAINER_METADATA_SIZE * totalContainerCount;
-    long hadoopRPCSize = ozoneConfiguration.getInt(
-        CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH,
-        CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
+    long hadoopRPCSize = ozoneConfiguration.getInt(IPC_MAXIMUM_DATA_LENGTH, IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
     long containerCountPerCall = containersMetaDataTotalRpcRespSizeMB <=
         hadoopRPCSize ? totalContainerCount :
         Math.round(Math.floor(

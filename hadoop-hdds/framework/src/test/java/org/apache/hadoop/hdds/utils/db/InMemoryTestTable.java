@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -106,8 +105,7 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public List<KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey, int count, KEY prefix,
-                                                          MetadataKeyFilters.MetadataKeyFilter... filters)
-      throws IOException, IllegalArgumentException {
+      MetadataKeyFilters.MetadataKeyFilter... filters) {
     throw new UnsupportedOperationException();
   }
 

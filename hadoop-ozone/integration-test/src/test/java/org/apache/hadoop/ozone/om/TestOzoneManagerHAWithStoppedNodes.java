@@ -46,7 +46,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
@@ -455,7 +454,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
         GenericTestUtils.waitFor(() -> {
           Table<String, RepeatedOmKeyInfo> deletedTable =
               om.getMetadataManager().getDeletedTable();
-          try (TableIterator<?, ?> iterator = deletedTable.iterator()) {
+          try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> iterator = deletedTable.iterator()) {
             return !iterator.hasNext();
           } catch (Exception ex) {
             return false;

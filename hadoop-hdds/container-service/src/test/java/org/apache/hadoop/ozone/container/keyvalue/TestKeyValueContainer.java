@@ -387,6 +387,8 @@ public class TestKeyValueContainer {
           containerData.getMaxSize());
       assertEquals(keyValueContainerData.getBytesUsed(),
           containerData.getBytesUsed());
+      assertNotNull(containerData.getChecksum());
+      assertNotEquals(containerData.DUMMY_CHECKSUM, container.getContainerData().getChecksum());
 
       //Can't overwrite existing container
       KeyValueContainer finalContainer = container;

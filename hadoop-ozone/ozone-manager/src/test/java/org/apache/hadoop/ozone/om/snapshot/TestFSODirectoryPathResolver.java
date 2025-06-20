@@ -37,7 +37,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.junit.jupiter.api.Test;
 
@@ -60,8 +59,7 @@ public class TestFSODirectoryPathResolver {
               .map(children -> Table.newKeyValue(prefix + children + OM_KEY_PREFIX + "dir" + children,
                   OmDirectoryInfo.newBuilder().setName("dir" + children).setObjectID(children).build()))
               .iterator();
-          return new TableIterator<String,
-              Table.KeyValue<String, OmDirectoryInfo>>() {
+          return new Table.KeyValueIterator<String, OmDirectoryInfo>() {
 
             @Override
             public boolean hasNext() {
