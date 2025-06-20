@@ -99,7 +99,7 @@ Incomplete command
 
 List datanodes as JSON
     ${output} =         Execute          ozone admin datanode list --json | jq -r '.'
-                        Should contain   ${output}    datanodeDetails
+                        Should contain   ${output}    id
                         Should contain   ${output}    healthState
                         Should contain   ${output}    opState
 

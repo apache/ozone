@@ -94,8 +94,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
           node.getNodeStates(0));
       
       if (json) {
-        List<DatanodeWithAttributes> singleList = Collections.singletonList(dwa);
-        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(singleList));
+        List<DatanodeInfoJson> dtoList = Collections.singletonList(new DatanodeInfoJson(dwa));
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(dtoList));
       } else {
         printDatanodeInfo(dwa);
       }
@@ -124,10 +124,10 @@ public class ListInfoSubcommand extends ScmSubcommand {
     }
     
     if (json) {
-      List<DatanodeWithAttributes> datanodeList = allNodes.collect(
-              Collectors.toList());
-      System.out.println(
-              JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
+      List<DatanodeInfoJson> datanodeList = allNodes
+          .map(DatanodeInfoJson::new)
+          .collect(Collectors.toList());
+      System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
     } else {
       allNodes.forEach(this::printDatanodeInfo);
     }
@@ -179,7 +179,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
     System.out.println("Related pipelines:\n" + pipelineListInfo);
   }
 
-  private static class DatanodeWithAttributes {
+  static class DatanodeWithAttributes {
     private DatanodeDetails datanodeDetails;
     private HddsProtos.NodeOperationalState operationalState;
     private HddsProtos.NodeState healthState;
