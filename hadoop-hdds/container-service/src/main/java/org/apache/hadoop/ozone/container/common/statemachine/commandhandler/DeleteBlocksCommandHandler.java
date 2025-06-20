@@ -336,6 +336,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     ContainerBlocksDeletionACKProto blockDeletionACK = null;
     long startTime = Time.monotonicNow();
     boolean cmdExecuted = false;
+    int successCount = 0, failedCount = 0;
     try {
       // move blocks to deleting state.
       // this is a metadata update, the actual deletion happens in another
@@ -373,7 +374,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // Send ACK back to SCM as long as meta updated
       // TODO Or we should wait until the blocks are actually deleted?
       if (!containerBlocks.isEmpty()) {
-        int successCount = 0, failedCount = 0;
 
         for (DeleteBlockTransactionResult result : blockDeletionACK.getResultsList()) {
           boolean success = result.getSuccess();
@@ -391,8 +391,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             blockDeleteMetrics.incrProcessedTransactionFailCount(1);
           }
         }
-        LOG.info("Sending deletion ACK to SCM, successTransactionCount = {}," +
-            "failedTransactionCount= {}", successCount, failedCount);
       }
       cmdExecuted = true;
     } finally {
@@ -410,6 +408,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       updateCommandStatus(cmd.getContext(), cmd.getCmd(), statusUpdater, LOG);
       long endTime = Time.monotonicNow();
       this.opsLatencyMs.add(endTime - startTime);
+      LOG.info("Sending deletion ACK to SCM, successTransactionCount = {}," +
+          "failedTransactionCount = {}, time elapsed = {}", successCount, failedCount, opsLatencyMs);
       invocationCount++;
     }
   }

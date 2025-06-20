@@ -73,7 +73,7 @@ public class DiskUsageSubCommand implements Callable {
   @CommandLine.Mixin
   private PrefixFilterOption prefixFilter;
 
-  private static final String ENDPOINT = "/api/v1/namespace/du";
+  private static final String ENDPOINT = "/api/v1/namespace/usage";
 
   // For text alignment
   private static final String SIZE_HEADER = "Size";
