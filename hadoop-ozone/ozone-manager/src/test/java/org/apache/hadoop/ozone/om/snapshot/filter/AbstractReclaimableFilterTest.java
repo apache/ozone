@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot.filter;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_GC_LOCK;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
@@ -47,23 +48,24 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestInstance;
@@ -125,14 +127,14 @@ public abstract class AbstractReclaimableFilterTest {
     this.snapshotChainManager = mock(SnapshotChainManager.class);
     this.keyManager = mock(KeyManager.class);
     IOzoneManagerLock ozoneManagerLock = mock(IOzoneManagerLock.class);
-    when(ozoneManagerLock.acquireReadLocks(eq(OzoneManagerLock.Resource.SNAPSHOT_GC_LOCK), anyList()))
+    when(ozoneManagerLock.acquireReadLocks(eq(SNAPSHOT_GC_LOCK), anyList()))
         .thenAnswer(i -> {
           lockIds.set(
               (List<UUID>) i.getArgument(1, List.class).stream().map(val -> UUID.fromString(((String[]) val)[0]))
                   .collect(Collectors.toList()));
           return OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
         });
-    when(ozoneManagerLock.releaseReadLocks(eq(OzoneManagerLock.Resource.SNAPSHOT_GC_LOCK), anyList()))
+    when(ozoneManagerLock.releaseReadLocks(eq(SNAPSHOT_GC_LOCK), anyList()))
         .thenAnswer(i -> {
           Assertions.assertEquals(lockIds.get(),
               i.getArgument(1, List.class).stream().map(val -> UUID.fromString(((String[]) val)[0]))
@@ -159,19 +161,28 @@ public abstract class AbstractReclaimableFilterTest {
 
   private void mockOzoneManager(BucketLayout bucketLayout) throws IOException {
     OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    BucketManager bucketManager = mock(BucketManager.class);
     when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
+    when(ozoneManager.getBucketManager()).thenReturn(bucketManager);
     long volumeCount = 0;
-    long bucketCount = 0;
     for (String volume : volumes) {
       when(metadataManager.getVolumeId(eq(volume))).thenReturn(volumeCount);
-      for (String bucket : buckets) {
-        when(ozoneManager.getBucketInfo(eq(volume), eq(bucket)))
-            .thenReturn(OmBucketInfo.newBuilder().setVolumeName(volume).setBucketName(bucket)
-                .setObjectID(bucketCount).setBucketLayout(bucketLayout).build());
-        bucketCount++;
-      }
       volumeCount++;
     }
+
+    when(bucketManager.getBucketInfo(anyString(), anyString())).thenAnswer(i -> {
+      String volume = i.getArgument(0, String.class);
+      String bucket = i.getArgument(1, String.class);
+      if (!volumes.contains(volume)) {
+        throw new OMException("Volume " + volume + " doesn't exist", OMException.ResultCodes.VOLUME_NOT_FOUND);
+      }
+      if (!buckets.contains(bucket)) {
+        throw new OMException("Bucket " + bucket + " doesn't exist", OMException.ResultCodes.BUCKET_NOT_FOUND);
+      }
+      return OmBucketInfo.newBuilder().setVolumeName(volume).setBucketName(bucket)
+          .setObjectID((long) volumes.indexOf(volume) * buckets.size() + buckets.indexOf(bucket))
+          .setBucketLayout(bucketLayout).build();
+    });
   }
 
   private void mockOmSnapshotManager(OzoneManager om) throws RocksDBException, IOException {
@@ -181,7 +192,7 @@ public abstract class AbstractReclaimableFilterTest {
                  doNothing().when(mock).close());
          MockedConstruction<SnapshotCache> mockedCache = Mockito.mockConstruction(SnapshotCache.class,
              (mock, context) -> {
-               Map<UUID, ReferenceCounted<OmSnapshot>> map = new HashMap<>();
+               Map<UUID, UncheckedAutoCloseableSupplier<OmSnapshot>> map = new HashMap<>();
                when(mock.get(any(UUID.class))).thenAnswer(i -> {
                  if (snapshotInfos.values().stream().flatMap(List::stream)
                      .map(SnapshotInfo::getSnapshotId)
@@ -189,7 +200,7 @@ public abstract class AbstractReclaimableFilterTest {
                    throw new IOException("Snapshot " + i.getArgument(0, UUID.class) + " not found");
                  }
                  return map.computeIfAbsent(i.getArgument(0, UUID.class), (k) -> {
-                   ReferenceCounted<OmSnapshot> ref = mock(ReferenceCounted.class);
+                   UncheckedAutoCloseableSupplier<OmSnapshot> ref = mock(UncheckedAutoCloseableSupplier.class);
                    OmSnapshot omSnapshot = mock(OmSnapshot.class);
                    when(omSnapshot.getSnapshotID()).thenReturn(k);
                    when(ref.get()).thenReturn(omSnapshot);
@@ -232,7 +243,7 @@ public abstract class AbstractReclaimableFilterTest {
 
   protected List<SnapshotInfo> getLastSnapshotInfos(
       String volume, String bucket, int numberOfSnapshotsInChain, int index) {
-    List<SnapshotInfo> infos = getSnapshotInfos().get(getKey(volume, bucket));
+    List<SnapshotInfo> infos = getSnapshotInfos().getOrDefault(getKey(volume, bucket), Collections.emptyList());
     int endIndex = Math.min(index - 1, infos.size() - 1);
     return IntStream.range(endIndex - numberOfSnapshotsInChain + 1, endIndex + 1).mapToObj(i -> i >= 0 ?
         infos.get(i) : null).collect(Collectors.toList());

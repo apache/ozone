@@ -39,17 +39,17 @@ final class OzoneManagerLockUtil {
    * @param resourceName
    */
   public static String generateResourceLockName(
-      OzoneManagerLock.Resource resource, String resourceName) {
+      OzoneManagerLock.LeveledResource resource, String resourceName) {
 
-    if (resource == OzoneManagerLock.Resource.S3_BUCKET_LOCK) {
+    if (resource == OzoneManagerLock.LeveledResource.S3_BUCKET_LOCK) {
       return OM_S3_PREFIX + resourceName;
-    } else if (resource == OzoneManagerLock.Resource.VOLUME_LOCK) {
+    } else if (resource == OzoneManagerLock.LeveledResource.VOLUME_LOCK) {
       return OM_KEY_PREFIX + resourceName;
-    } else if (resource == OzoneManagerLock.Resource.USER_LOCK) {
+    } else if (resource == OzoneManagerLock.LeveledResource.USER_LOCK) {
       return OM_USER_PREFIX + resourceName;
-    } else if (resource == OzoneManagerLock.Resource.S3_SECRET_LOCK) {
+    } else if (resource == OzoneManagerLock.LeveledResource.S3_SECRET_LOCK) {
       return OM_S3_SECRET + resourceName;
-    } else if (resource == OzoneManagerLock.Resource.PREFIX_LOCK) {
+    } else if (resource == OzoneManagerLock.LeveledResource.PREFIX_LOCK) {
       return OM_PREFIX + resourceName;
     } else {
       // This is for developers who mistakenly call this method with resource

@@ -515,6 +515,7 @@ message CompactionFileInfoProto {
     optional string startKey = 2;
     optional string endKey = 3;
     optional string columnFamily = 4;
+    optional bool pruned = 5;
 }
 
 message CompactionLogEntryProto {

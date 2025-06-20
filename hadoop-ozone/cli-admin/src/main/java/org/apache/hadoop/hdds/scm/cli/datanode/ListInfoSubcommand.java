@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import com.google.common.base.Strings;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.shell.ListLimitOptions;
 import picocli.CommandLine;
 
 /**
@@ -76,6 +78,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
        defaultValue = "false")
   private boolean json;
 
+  @CommandLine.Mixin
+  private ListLimitOptions listLimitOptions;
+
   private List<Pipeline> pipelines;
 
   @Override
@@ -87,7 +92,13 @@ public class ListInfoSubcommand extends ScmSubcommand {
           .getFromProtoBuf(node.getNodeID()),
           node.getNodeOperationalStates(0),
           node.getNodeStates(0));
-      printDatanodeInfo(dwa);
+      
+      if (json) {
+        List<DatanodeWithAttributes> singleList = Collections.singletonList(dwa);
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(singleList));
+      } else {
+        printDatanodeInfo(dwa);
+      }
       return;
     }
     Stream<DatanodeWithAttributes> allNodes = getAllNodes(scmClient).stream();
@@ -108,10 +119,14 @@ public class ListInfoSubcommand extends ScmSubcommand {
           .compareToIgnoreCase(nodeState) == 0);
     }
 
+    if (!listLimitOptions.isAll()) {
+      allNodes = allNodes.limit(listLimitOptions.getLimit());
+    }
+    
     if (json) {
       List<DatanodeWithAttributes> datanodeList = allNodes.collect(
               Collectors.toList());
-      System.out.print(
+      System.out.println(
               JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
     } else {
       allNodes.forEach(this::printDatanodeInfo);

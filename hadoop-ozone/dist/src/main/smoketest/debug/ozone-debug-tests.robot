@@ -30,14 +30,14 @@ ${TESTFILE}         testfile
 
 *** Keywords ***
 Write keys
-    Execute             ozone sh volume create o3://om/${VOLUME} --space-quota 100TB --namespace-quota 100
-    Execute             ozone sh bucket create o3://om/${VOLUME}/${BUCKET} --space-quota 1TB
+    Execute             ozone sh volume create o3://${OM_SERVICE_ID}/${VOLUME} --space-quota 100TB --namespace-quota 100
+    Execute             ozone sh bucket create o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} --space-quota 1TB
     Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE} bs=100000 count=15
-    Execute             ozone sh key put o3://om/${VOLUME}/${BUCKET}/${TESTFILE} ${TEMP_DIR}/${TESTFILE}
+    Execute             ozone sh key put o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} ${TEMP_DIR}/${TESTFILE}
 
 *** Test Cases ***
 Test ozone debug replicas verify checksums
-    ${output} =    Execute   ozone debug replicas verify --checksums o3://om/${VOLUME}/${BUCKET}/${TESTFILE} --output-dir ${TEMP_DIR}
+    ${output} =    Execute   ozone debug replicas verify --checksums --block-existence --container-state o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE}
     ${json} =      Evaluate  json.loads('''${output}''')      json
 
     # 'keys' array should be empty if all keys and their replicas passed checksum verification

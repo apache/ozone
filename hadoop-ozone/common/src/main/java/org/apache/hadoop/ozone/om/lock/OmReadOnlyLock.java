@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_A
 import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
 
 import java.util.Collection;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
 
 /**
  * Read only "lock" for snapshots
@@ -52,6 +51,11 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
   }
 
   @Override
+  public OMLockDetails acquireResourceWriteLock(Resource resource) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
   public boolean acquireMultiUserLock(String firstUser, String secondUser) {
     return false;
   }
@@ -69,6 +73,11 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
 
   @Override
   public OMLockDetails releaseWriteLocks(Resource resource, Collection<String[]> resources) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
+  public OMLockDetails releaseResourceWriteLock(Resource resource) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
