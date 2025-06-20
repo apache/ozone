@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +68,7 @@ import picocli.CommandLine;
  * FSORepairTool test cases.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Unhealthy("HDDS-13302")
 public class TestFSORepairTool {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestFSORepairTool.class);

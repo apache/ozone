@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -121,7 +122,7 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
     OmMetadataManagerImpl mockedMetadataManager = mock(OmMetadataManagerImpl.class);
     Table<String, SnapshotInfo> mockedSnapshotInfoTable = mock(Table.class);
 
-    when(mockedSnapshotInfoTable.get(anyString())).thenThrow(new IOException("Injected fault error."));
+    when(mockedSnapshotInfoTable.get(anyString())).thenThrow(new CodecException("Injected fault error."));
     when(mockedMetadataManager.getSnapshotInfoTable()).thenReturn(mockedSnapshotInfoTable);
     when(getOzoneManager().getMetadataManager()).thenReturn(mockedMetadataManager);
 
