@@ -31,6 +31,7 @@ public class BucketEndpointBuilder extends
   public BucketEndpoint build() {
     BucketEndpoint endpoint = super.build();
     endpoint.setOzoneConfiguration(getConfig());
+    endpoint.setHeaders(getHeaders());
 
     return endpoint;
   }
