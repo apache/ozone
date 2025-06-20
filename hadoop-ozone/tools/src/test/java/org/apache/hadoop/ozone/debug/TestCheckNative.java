@@ -62,6 +62,7 @@ class TestCheckNative {
         .contains("Native library checking:")
         .contains("hadoop: false")
         .contains("ISA-L: false")
+        .contains("OpenSSL: false")
         .contains("rocks-tools: " + expectedRocksNative);
   }
 

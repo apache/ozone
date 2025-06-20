@@ -31,7 +31,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
@@ -85,7 +85,7 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    OMMetrics omMetrics = ozoneManager.getMetrics();
+    OmSnapshotInternalMetrics omSnapshotIntMetrics = ozoneManager.getOmSnapshotIntMetrics();
 
     OMClientResponse omClientResponse;
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
@@ -133,7 +133,7 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
         metadataManager.getSnapshotInfoTable().addCacheEntry(
             new CacheKey<>(snapshot.getKey()),
             CacheValue.get(context.getIndex(), snapshot.getValue()));
-        omMetrics.incNumSnapshotSetProperties();
+        omSnapshotIntMetrics.incNumSnapshotSetProperties();
       }
 
       omClientResponse = new OMSnapshotSetPropertyResponse(omResponse.build(), snapshotInfoMap.values());
@@ -141,7 +141,7 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     } catch (UncheckedIOException | IOException ex) {
       omClientResponse = new OMSnapshotSetPropertyResponse(
           createErrorOMResponse(omResponse, ex));
-      omMetrics.incNumSnapshotSetPropertyFails();
+      omSnapshotIntMetrics.incNumSnapshotSetPropertyFails();
       LOG.error("Failed to execute snapshotSetPropertyRequest: {{}}.", setSnapshotPropertyRequests, ex);
     }
 

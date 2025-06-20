@@ -52,6 +52,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
@@ -81,6 +82,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
@@ -154,7 +156,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -280,6 +281,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.CompactDBService;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
@@ -404,6 +406,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OzoneAdmins s3OzoneAdmins;
 
   private final OMMetrics metrics;
+  private final OmSnapshotInternalMetrics omSnapshotIntMetrics;
   private OMHAMetrics omhaMetrics;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
       omClientProtocolMetrics;
@@ -494,6 +497,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // instance creation every single time.
   private UncheckedAutoCloseableSupplier<IOmMetadataReader> rcOmMetadataReader;
   private OmSnapshotManager omSnapshotManager;
+  private volatile DirectoryDeletingService dirDeletingService;
 
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
@@ -519,7 +523,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 this::reconfOzoneReadOnlyAdmins)
             .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
-                this::reconfOzoneKeyDeletingLimitPerTask);
+                this::reconfOzoneKeyDeletingLimitPerTask)
+            .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval)
+            .register(OZONE_THREAD_NUMBER_DIR_DELETION, this::reconfOzoneThreadNumberDirDeletion);
+
+    reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
@@ -662,6 +670,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMMultiTenantManager.checkAndEnableMultiTenancy(this, conf);
 
     metrics = OMMetrics.create();
+    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
     perfMetrics = OMPerformanceMetrics.register();
     omDeletionMetrics = DeletingServiceMetrics.create();
     // Get admin list
@@ -1430,7 +1439,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     HddsServerUtil.addPBProtocol(conf, ReconfigureProtocolOmPB.class,
         reconfigureProtocolService, rpcServer);
 
-    if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
+    if (conf.getBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       rpcServer.refreshServiceAcl(conf, OMPolicyProvider.getInstance());
     }
@@ -1744,6 +1753,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OMMetrics getMetrics() {
     return metrics;
+  }
+
+  public OmSnapshotInternalMetrics getOmSnapshotIntMetrics() {
+    return omSnapshotIntMetrics;
   }
 
   public OMPerformanceMetrics getPerfMetrics() {
@@ -5054,6 +5067,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.BUCKET, bucket);
     auditMap.put(OzoneConsts.FROM_SNAPSHOT, fromSnapshot);
     auditMap.put(OzoneConsts.TO_SNAPSHOT, toSnapshot);
+    metrics.incNumCancelSnapshotDiffs();
 
     try {
       ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
@@ -5064,6 +5078,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return omSnapshotManager.cancelSnapshotDiff(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
           fromSnapshot, toSnapshot);
     } catch (Exception ex) {
+      metrics.incNumCancelSnapshotDiffJobFails();
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.CANCEL_SNAPSHOT_DIFF_JOBS,
           auditMap, ex));
@@ -5089,6 +5104,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.VOLUME, volume);
     auditMap.put(OzoneConsts.BUCKET, bucket);
     auditMap.put(OzoneConsts.JOB_STATUS, jobStatus);
+    metrics.incNumListSnapshotDiffJobs();
 
     try {
       ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
@@ -5099,6 +5115,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return omSnapshotManager.getSnapshotDiffList(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
           jobStatus, listAllStatus, prevSnapshotDiffJob, maxListResult);
     } catch (Exception ex) {
+      metrics.incNumListSnapshotDiffJobFails();
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_SNAPSHOT_DIFF_JOBS,
           auditMap, ex));
@@ -5146,6 +5163,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     getConfiguration().set(OZONE_OM_VOLUME_LISTALL_ALLOWED, newVal);
     setAllowListAllVolumesFromConfig();
     return String.valueOf(allowListAllVolumes);
+  }
+
+  private String reconfOzoneDirDeletingServiceInterval(String newVal) {
+    getConfiguration().set(OZONE_DIR_DELETING_SERVICE_INTERVAL, newVal);
+    return newVal;
+  }
+
+  private String reconfOzoneThreadNumberDirDeletion(String newVal) {
+    Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
+        OZONE_THREAD_NUMBER_DIR_DELETION + " cannot be negative.");
+    getConfiguration().set(OZONE_THREAD_NUMBER_DIR_DELETION, newVal);
+    return newVal;
   }
 
   public void validateReplicationConfig(ReplicationConfig replicationConfig)

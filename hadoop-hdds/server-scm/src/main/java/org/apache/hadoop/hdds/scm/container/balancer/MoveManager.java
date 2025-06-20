@@ -425,7 +425,7 @@ public final class MoveManager implements
         //there should not be more than one replica of a container on the same
         //datanode. handle this if found in the future.
         .findFirst().orElseThrow(() ->
-            new ContainerReplicaNotFoundException("ID " + id + ", DN " + dn))
+            new ContainerReplicaNotFoundException(id, dn))
         .getReplicaIndex();
   }
 
