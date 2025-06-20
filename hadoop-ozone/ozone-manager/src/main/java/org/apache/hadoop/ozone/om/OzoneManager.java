@@ -82,6 +82,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
@@ -155,7 +156,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -524,7 +524,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
                 this::reconfOzoneKeyDeletingLimitPerTask)
-            .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval);
+            .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval)
+            .register(OZONE_THREAD_NUMBER_DIR_DELETION, this::reconfOzoneThreadNumberDirDeletion);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
 
@@ -1438,7 +1439,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     HddsServerUtil.addPBProtocol(conf, ReconfigureProtocolOmPB.class,
         reconfigureProtocolService, rpcServer);
 
-    if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
+    if (conf.getBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       rpcServer.refreshServiceAcl(conf, OMPolicyProvider.getInstance());
     }
@@ -5166,6 +5167,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private String reconfOzoneDirDeletingServiceInterval(String newVal) {
     getConfiguration().set(OZONE_DIR_DELETING_SERVICE_INTERVAL, newVal);
+    return newVal;
+  }
+
+  private String reconfOzoneThreadNumberDirDeletion(String newVal) {
+    Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
+        OZONE_THREAD_NUMBER_DIR_DELETION + " cannot be negative.");
+    getConfiguration().set(OZONE_THREAD_NUMBER_DIR_DELETION, newVal);
     return newVal;
   }
 
