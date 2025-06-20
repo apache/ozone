@@ -259,9 +259,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           reclaimableFileChecker,
           remainingBufLimit);
 
-      long subdirDelNum = result.dirNum;
-      subDirNum += result.subDirNum;
-      subFileNum += result.subFileNum;
+      long subdirDelNum = result.dirNum();
+      subDirNum += result.subDirNum();
+      subFileNum += result.subFileNum();
 
       if (!purgePathRequestList.isEmpty()) {
         submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
@@ -640,9 +640,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             remainingBufLimit);
 
         optimizeDirDeletesAndSubmitRequest(
-            result.dirNum, result.subDirNum, result.subFileNum,
+            result.dirNum(), result.subDirNum(), result.subFileNum(),
             allSubDirList, purgePathRequestList, snapshotTableKey,
-            startTime, result.remainingBufLimit, keyManager,
+            startTime, result.remainingBufLimit(), keyManager,
             reclaimableDirFilter, reclaimableFileFilter,
             expectedPreviousSnapshotId, runCount);
 
@@ -717,16 +717,32 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   private static class ProcessDirectoryResult {
-    final long dirNum;
-    final long subDirNum;
-    final long subFileNum;
-    final long remainingBufLimit;
+    private final long dirNum;
+    private final long subDirNum;
+    private final long subFileNum;
+    private final long remainingBufLimit;
 
     ProcessDirectoryResult(long dirNum, long subDirNum, long subFileNum, long remainingBufLimit) {
       this.dirNum = dirNum;
       this.subDirNum = subDirNum;
       this.subFileNum = subFileNum;
       this.remainingBufLimit = remainingBufLimit;
+    }
+
+    public long dirNum() {
+      return dirNum;
+    }
+
+    public long subDirNum() {
+      return subDirNum;
+    }
+
+    public long subFileNum() {
+      return subFileNum;
+    }
+
+    public long remainingBufLimit() {
+      return remainingBufLimit;
     }
   }
 }
