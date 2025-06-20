@@ -122,6 +122,8 @@ public class TestSCMDbCheckpointServlet {
         responseMock);
     doCallRealMethod().when(scmDbCheckpointServletMock).getCheckpoint(any(),
         anyBoolean());
+    doCallRealMethod().when(scmDbCheckpointServletMock)
+        .processMetadataSnapshotRequest(any(), any(), anyBoolean(), anyBoolean());
 
     servletContextMock = mock(ServletContext.class);
     when(scmDbCheckpointServletMock.getServletContext())

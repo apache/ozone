@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FL
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -203,7 +204,8 @@ public class DBCheckpointServlet extends HttpServlet
     processMetadataSnapshotRequest(request, response, isFormData, flush);
   }
 
-  protected void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+  @VisibleForTesting
+  public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, boolean flush) {
     List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?

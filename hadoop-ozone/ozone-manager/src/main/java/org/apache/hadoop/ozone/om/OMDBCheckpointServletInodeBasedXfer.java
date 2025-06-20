@@ -124,7 +124,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   }
 
   @Override
-  protected void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+  public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, boolean flush) {
     List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?
