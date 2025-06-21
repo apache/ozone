@@ -42,7 +42,8 @@ public enum DNAction implements AuditAction {
   GET_COMMITTED_BLOCK_LENGTH,
   STREAM_INIT,
   FINALIZE_BLOCK,
-  ECHO;
+  ECHO,
+  READ_BLOCK;
 
   @Override
   public String getAction() {

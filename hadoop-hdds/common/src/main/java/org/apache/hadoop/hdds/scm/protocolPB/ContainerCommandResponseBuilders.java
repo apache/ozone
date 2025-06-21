@@ -334,6 +334,23 @@ public final class ContainerCommandResponseBuilders {
         .build();
   }
 
+  public static ContainerCommandResponseProto getReadBlockResponse(
+      ContainerCommandRequestProto request, DatanodeBlockID blockID,
+      ChunkInfo chunkInfo, ChunkBufferToByteString data,
+      Function<ByteBuffer, ByteString> byteBufferToByteString) {
+
+    ReadChunkResponseProto.Builder response;
+    response = ReadChunkResponseProto.newBuilder()
+        .setChunkData(chunkInfo)
+        .setDataBuffers(DataBuffers.newBuilder()
+            .addAllBuffers(data.toByteStringList(byteBufferToByteString))
+            .build())
+        .setBlockID(blockID);
+    return getSuccessResponseBuilder(request)
+        .setReadChunk(response)
+        .build();
+  }
+
   public static ContainerCommandResponseProto getFinalizeBlockResponse(
       ContainerCommandRequestProto msg, BlockData data) {
 
