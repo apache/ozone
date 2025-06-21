@@ -20,11 +20,10 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -228,15 +227,10 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey, int count, byte[] prefix,
-      MetadataKeyFilters.MetadataKeyFilter... filters) throws RocksDatabaseException, CodecException {
-    return getRangeKVs(startKey, count, false, prefix, filters);
-  }
-
-  @Override
-  public List<KeyValue<byte[], byte[]>> getSequentialRangeKVs(byte[] startKey, int count, byte[] prefix,
-      MetadataKeyFilters.MetadataKeyFilter... filters) throws RocksDatabaseException, CodecException {
-    return getRangeKVs(startKey, count, true, prefix, filters);
+  public List<KeyValue<byte[], byte[]>> getRangeKVs(
+      byte[] startKey, int count, byte[] prefix, KeyPrefixFilter filter, boolean isSequential)
+      throws RocksDatabaseException, CodecException {
+    return getRangeKVsImpl(startKey, count, prefix, filter, isSequential);
   }
 
   @Override
@@ -266,8 +260,9 @@ class RDBTable implements Table<byte[], byte[]> {
     RDBSstFileLoader.load(db, family, externalFile);
   }
 
-  private List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey, int count, boolean sequential, byte[] prefix,
-      MetadataKeyFilters.MetadataKeyFilter... filters) throws RocksDatabaseException, CodecException {
+  private List<KeyValue<byte[], byte[]>> getRangeKVsImpl(
+      byte[] startKey, int count, byte[] prefix, KeyPrefixFilter filter, boolean sequential)
+      throws RocksDatabaseException, CodecException {
     long start = Time.monotonicNow();
 
     if (count < 0) {
@@ -289,42 +284,26 @@ class RDBTable implements Table<byte[], byte[]> {
 
       while (it.hasNext() && result.size() < count) {
         final KeyValue<byte[], byte[]> currentEntry = it.next();
-        byte[] currentKey = currentEntry.getKey();
-
-        if (filters == null) {
+        if (filter == null || filter.filterKey(currentEntry.getKey())) {
           result.add(currentEntry);
-        } else {
-          // NOTE: the preKey and nextKey are never checked
-          // in all existing underlying filters, so they could
-          // be safely as null here.
-          if (Arrays.stream(filters)
-                  .allMatch(entry -> entry.filterKey(null,
-                          currentKey, null))) {
-            result.add(currentEntry);
-          } else {
-            if (!result.isEmpty() && sequential) {
-              // if the caller asks for a sequential range of results,
-              // and we met a dis-match, abort iteration from here.
-              // if result is empty, we continue to look for the first match.
-              break;
-            }
-          }
+        } else if (!result.isEmpty() && sequential) {
+          // if the caller asks for a sequential range of results,
+          // and we met a dis-match, abort iteration from here.
+          // if result is empty, we continue to look for the first match.
+          break;
         }
       }
     } finally {
       long end = Time.monotonicNow();
       long timeConsumed = end - start;
       if (LOG.isDebugEnabled()) {
-        if (filters != null) {
-          for (MetadataKeyFilters.MetadataKeyFilter filter : filters) {
-            int scanned = filter.getKeysScannedNum();
-            int hinted = filter.getKeysHintedNum();
-            if (scanned > 0 || hinted > 0) {
-              LOG.debug(
-                  "getRangeKVs ({}) numOfKeysScanned={}, numOfKeysHinted={}",
-                  filter.getClass().getSimpleName(), filter.getKeysScannedNum(),
-                  filter.getKeysHintedNum());
-            }
+        if (filter != null) {
+          int scanned = filter.getKeysScannedNum();
+          int hinted = filter.getKeysHintedNum();
+          if (scanned > 0 || hinted > 0) {
+            LOG.debug("getRangeKVs ({}) numOfKeysScanned={}, numOfKeysHinted={}",
+                filter.getClass().getSimpleName(), filter.getKeysScannedNum(),
+                filter.getKeysHintedNum());
           }
         }
         LOG.debug("Time consumed for getRangeKVs() is {}ms,"
