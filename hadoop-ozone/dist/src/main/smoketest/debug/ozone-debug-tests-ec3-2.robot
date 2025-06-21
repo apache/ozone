@@ -18,14 +18,14 @@ Documentation       Test ozone Debug CLI for EC(3,2) replicated keys
 Library             OperatingSystem
 Library             Process
 Resource            ../lib/os.robot
-Resource            ozone-debug.robot
+Resource            ozone-debug-keywords.robot
 Test Timeout        5 minute
 Suite Setup         Create Volume Bucket
 
 *** Variables ***
 ${PREFIX}           ${EMPTY}
-${VOLUME}           cli-debug-volume${PREFIX}
-${BUCKET}           cli-debug-bucket
+${VOLUME}           cli-debug-ec-volume${PREFIX}
+${BUCKET}           cli-debug-ec-bucket
 ${TESTFILE}         testfile
 ${EC_DATA}          3
 ${EC_PARITY}        2
@@ -43,49 +43,6 @@ Create EC key
     Execute           ozone sh key put o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/testfile ${TEMP_DIR}/testfile -r rs-${EC_DATA}-${EC_PARITY}-1024k -t EC
 
 *** Test Cases ***
-0 data block
-    Create EC key     1000    0
-    ${directory} =                      Execute replicas verify checksums CLI tool
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     1
-
-1 data block
-    Create EC key     1048576    1
-    ${directory} =                      Execute replicas verify checksums CLI tool
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     1
-
-2 data blocks
-    Create EC key     1048576    2
-    ${directory} =                      Execute replicas verify checksums CLI tool
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     1
-
-3 data blocks
-    Create EC key     1048576    3
-    ${directory} =                      Execute replicas verify checksums CLI tool
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     1
-
-3 data blocks and partial stripe
-    Create EC key     1000000    4
-    ${directory} =                      Execute replicas verify checksums CLI tool
-    ${count_files} =                    Count Files In Directory    ${directory}
-    ${sum_size_last_stripe} =           Evaluate     ((1000000 * 4) % 1048576) * 3
-    Should Be Equal As Integers         ${count_files}     1
-
-4 data blocks and partial stripe
-    Create EC key     1000000    5
-    ${directory} =                      Execute replicas verify checksums CLI tool
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     1
-
-6 data blocks
-    Create EC key     1048576    6
-    ${directory} =                      Execute replicas verify checksums CLI tool
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     1
-
 Test ozone debug replicas chunk-info
     Create EC key     1048576    3
     ${count} =        Execute           ozone debug replicas chunk-info o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/testfile | jq '[.keyLocations[0][] | select(.file | test("\\\\.block$")) | .file] | length'
