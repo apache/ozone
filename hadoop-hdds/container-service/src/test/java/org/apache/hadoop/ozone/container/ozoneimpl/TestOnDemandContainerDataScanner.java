@@ -29,6 +29,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -288,6 +290,16 @@ public class TestOnDemandContainerDataScanner extends
     // This iteration should skip the already unhealthy container.
     assertEquals(0, metrics.getNumContainersScanned());
     assertEquals(0, metrics.getNumUnHealthyContainers());
+  }
+
+  @Test
+  @Override
+  public void testUnhealthyContainersTriggersVolumeScan() throws Exception {
+    LogCapturer logCapturer = LogCapturer.captureLogs(
+        OnDemandContainerDataScanner.class);
+    scanContainer(corruptData);
+    verifyContainerMarkedUnhealthy(corruptData, times(1));
+    assertTrue(logCapturer.getOutput().contains("Triggering a volume scan for volume"));
   }
 
   private void scanContainer(Container<?> container) throws Exception {

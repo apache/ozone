@@ -23,6 +23,7 @@ import java.util.Iterator;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +81,9 @@ public class BackgroundContainerMetadataScanner extends
           containerID, result.getException());
       metrics.incNumUnHealthyContainers();
       controller.markContainerUnhealthy(containerID, result);
+      LOG.info("Triggering a volume scan for volume [{}] as unhealthy container [{}] was on it.",
+          containerVolume.getStorageDir().getPath(), containerID);
+      StorageVolumeUtil.onFailure(containerVolume);
     }
 
     // Do not update the scan timestamp after the scan since this was just a
