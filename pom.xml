@@ -155,7 +155,7 @@
     <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
     <maven-javadoc-plugin.version>3.11.1</maven-javadoc-plugin.version>
     <maven-patch-plugin.version>1.1.1</maven-patch-plugin.version>
-    <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
+    <maven-pdf-plugin.version>1.6.2</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>3.3.0</maven-remote-resources-plugin.version>
     <maven-resources-plugin.version>3.3.0</maven-resources-plugin.version>
     <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
