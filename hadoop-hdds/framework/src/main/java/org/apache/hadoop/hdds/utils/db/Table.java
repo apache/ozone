@@ -152,18 +152,13 @@ public interface Table<KEY, VALUE> {
     return iterator(prefix, KeyValueIterator.Type.KEY_AND_VALUE);
   }
 
-  /** The same as iterator(null, type). */
-  default KeyValueIterator<KEY, VALUE> iterator(KeyValueIterator.Type type)
-      throws RocksDatabaseException, CodecException {
-    return iterator(null, type);
-  }
-
   /**
    * Iterate the elements in this table.
    * <p>
-   * Using a more restrictive type may improve performance
-   * since the unrequired data will not be read from the DB.
-   * Note that, when the prefix is non-empty,
+   * Note that using a more restrictive type may improve performance
+   * since the unrequired data may not be read from the DB.
+   * <p>
+   * Note also that, when the prefix is non-empty,
    * using a non-key type may not improve performance
    * since it has to read keys for matching the prefix.
    *

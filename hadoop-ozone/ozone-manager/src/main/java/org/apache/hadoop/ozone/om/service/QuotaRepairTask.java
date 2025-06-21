@@ -351,7 +351,7 @@ public class QuotaRepairTask {
     int count = 0;
     long startTime = Time.monotonicNow();
     try (Table.KeyValueIterator<String, VALUE> keyIter
-             = table.iterator(haveValue ? KEY_AND_VALUE : KEY_ONLY)) {
+        = table.iterator(null, haveValue ? KEY_AND_VALUE : KEY_ONLY)) {
       while (keyIter.hasNext()) {
         count++;
         kvList.add(keyIter.next());
