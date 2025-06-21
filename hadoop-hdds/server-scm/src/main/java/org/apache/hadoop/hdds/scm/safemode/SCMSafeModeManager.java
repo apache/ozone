@@ -70,6 +70,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   private static final Logger LOG = LoggerFactory.getLogger(SCMSafeModeManager.class);
 
   private final AtomicBoolean inSafeMode = new AtomicBoolean(true);
+  private final AtomicBoolean inManualSafeMode = new AtomicBoolean(false);
   private final AtomicBoolean preCheckComplete = new AtomicBoolean(false);
   private final AtomicBoolean forceExitSafeMode = new AtomicBoolean(false);
   private final Map<String, SafeModeExitRule<?>> exitRules = new HashMap<>();
@@ -122,6 +123,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     final SafeModeStatus safeModeStatus = SafeModeStatus.of(
         getInSafeMode(), getPreCheckComplete(), isForceExitSafeMode());
     scmContext.updateSafeModeStatus(safeModeStatus);
+    safeModeStatus.setManualSafeMode(isManualSafeModeEnabled());
 
     // notify SCMServiceManager
     if (!safeModeStatus.isInSafeMode()) {
@@ -181,9 +183,29 @@ public class SCMSafeModeManager implements SafeModeManager {
     inSafeMode.set(false);
     forceExitSafeMode.set(force);
 
+    // Manual flag will reset only if we exit from commandline.
+    if (force && inManualSafeMode.get()) {
+      inManualSafeMode.set(false);
+      LOG.info("Manual safe mode cleared due to force exit.");
+    }
     // TODO: Remove handler registration as there is no need to listen to
     //   register events anymore.
 
+    if (inManualSafeMode.get()) {
+      LOG.info("SCM remains in safe mode as it was manually triggered.");
+    }
+    emitSafeModeStatus();
+  }
+
+  /**
+   * Enter safe mode. It does following actions:
+   * <ol>
+   * <li>Set safe mode status to true.
+   * <li>Emit safe mode status.
+   * </ol>
+   */
+  public void enterManualSafeMode() {
+    inManualSafeMode.set(true);
     emitSafeModeStatus();
   }
 
@@ -218,7 +240,11 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   @Override
   public boolean getInSafeMode() {
-    return inSafeMode.get();
+    return inSafeMode.get() || inManualSafeMode.get();
+  }
+
+  public boolean isManualSafeModeEnabled() {
+    return inManualSafeMode.get();
   }
 
   /** Get the safe mode status of all rules. */
@@ -258,6 +284,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     private final boolean safeModeStatus;
     private final boolean preCheckPassed;
     private final boolean forceExitSafeMode;
+    private boolean manualSafeMode;
 
     private SafeModeStatus(boolean safeModeState, boolean preCheckPassed, boolean forceExitSafeMode) {
       this.safeModeStatus = safeModeState;
@@ -285,6 +312,14 @@ public class SCMSafeModeManager implements SafeModeManager {
       return forceExitSafeMode;
     }
 
+    public boolean isManualSafeMode() {
+      return manualSafeMode;
+    }
+
+    public void setManualSafeMode(boolean manualSafeMode) {
+      this.manualSafeMode = manualSafeMode;
+    }
+
     @Override
     public String toString() {
       return "SafeModeStatus{" +
@@ -293,5 +328,4 @@ public class SCMSafeModeManager implements SafeModeManager {
           '}';
     }
   }
-
 }

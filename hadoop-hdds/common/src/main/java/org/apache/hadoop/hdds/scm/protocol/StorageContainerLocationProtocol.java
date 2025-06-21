@@ -69,7 +69,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
   Set<Type> ADMIN_COMMAND_TYPE = Collections.unmodifiableSet(EnumSet.of(
       Type.StartReplicationManager,
       Type.StopReplicationManager,
-      Type.ForceExitSafeMode));
+      Type.ForceExitSafeMode,
+      Type.EnterSafeMode));
 
   /**
    * Asks SCM where a container should be allocated. SCM responds with the
@@ -377,6 +378,22 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   boolean forceExitSafeMode() throws IOException;
+
+  /**
+   * Allow SCM to enter Safe mode.
+   *
+   * @return returns true if operation is successful.
+   * @throws IOException In case of exception while checking admin access
+   */
+  boolean enterSafeMode() throws IOException;
+
+  /**
+   * Check if SCM is in safe mode.
+   *
+   * @return Returns true if SCM is in safe mode else returns false.
+   * @throws IOException In case of exception while connecting SCM
+   */
+  boolean inManualSafeMode() throws IOException;
 
   /**
    * Start ReplicationManager.

@@ -63,6 +63,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.EnterSafeModeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.EnterSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
@@ -86,6 +88,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InManualSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
@@ -865,6 +868,33 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     return resp.getExitedSafeMode();
 
+  }
+
+  /**
+   * Allow SCM to enter Safe mode.
+   *
+   * @return returns true if operation is successful.
+   */
+  @Override
+  public boolean enterSafeMode() throws IOException {
+    EnterSafeModeRequestProto request =
+        EnterSafeModeRequestProto.getDefaultInstance();
+
+    EnterSafeModeResponseProto resp =
+        submitRequest(Type.EnterSafeMode,
+            builder -> builder.setEnterSafeModeRequest(request))
+            .getEnterSafeModeResponse();
+    return resp.getEnteredSafeMode();
+  }
+
+  @Override
+  public boolean inManualSafeMode() throws IOException {
+    InManualSafeModeRequestProto request =
+        InManualSafeModeRequestProto.getDefaultInstance();
+
+    return submitRequest(Type.InManualSafeMode,
+        builder -> builder.setInManualSafeModeRequest(request))
+        .getInManualSafeModeResponse().getInManualSafeMode();
   }
 
   @Override
