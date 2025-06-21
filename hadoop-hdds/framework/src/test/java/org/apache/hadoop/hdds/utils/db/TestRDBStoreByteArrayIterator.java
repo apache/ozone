@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ON
 import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.NEITHER;
 import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.VALUE_ONLY;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -316,10 +315,5 @@ public class TestRDBStoreByteArrayIterator {
 
     assertTrue(KEY_AND_VALUE.readKey());
     assertTrue(KEY_AND_VALUE.readValue());
-
-    assertEquals(KEY_ONLY, NEITHER.addKey());
-    assertEquals(KEY_ONLY, KEY_ONLY.addKey());
-    assertEquals(KEY_AND_VALUE, VALUE_ONLY.addKey());
-    assertEquals(KEY_AND_VALUE, KEY_AND_VALUE.addKey());
   }
 }

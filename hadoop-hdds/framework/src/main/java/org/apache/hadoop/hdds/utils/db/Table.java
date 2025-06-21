@@ -160,16 +160,47 @@ public interface Table<KEY, VALUE> {
 
   /**
    * Iterate the elements in this table.
+   * <p>
+   * Using a more restrictive type may improve performance
+   * since the unrequired data will not be read from the DB.
+   * Note that, when the prefix is non-empty,
+   * using a non-key type may not improve performance
+   * since it has to read keys for matching the prefix.
    *
    * @param prefix The prefix of the elements to be iterated.
    * @param type Specify whether key and/or value are required.
-   *             When the prefix is non-empty, it has to read keys for matching the prefix.
-   *             The type will be automatically changed to including keys;
-   *             see {@link KeyValueIterator.Type#addKey()}.
    * @return an iterator.
    */
   KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type)
       throws RocksDatabaseException, CodecException;
+
+  /**
+   * @param prefix The prefix of the elements to be iterated.
+   * @return a key-only iterator
+   */
+  default TableIterator<KEY, KEY> keyIterator(KEY prefix) throws RocksDatabaseException, CodecException {
+    final KeyValueIterator<KEY, VALUE> i = iterator(prefix, KeyValueIterator.Type.KEY_ONLY);
+    return TableIterator.convert(i, KeyValue::getKey);
+  }
+
+  /** The same as keyIterator(null). */
+  default TableIterator<KEY, KEY> keyIterator() throws RocksDatabaseException, CodecException {
+    return keyIterator(null);
+  }
+
+  /**
+   * @param prefix The prefix of the elements to be iterated.
+   * @return a value-only iterator.
+   */
+  default TableIterator<KEY, VALUE> valueIterator(KEY prefix) throws RocksDatabaseException, CodecException {
+    final KeyValueIterator<KEY, VALUE> i = iterator(prefix, KeyValueIterator.Type.VALUE_ONLY);
+    return TableIterator.convert(i, KeyValue::getValue);
+  }
+
+  /** The same as valueIterator(null). */
+  default TableIterator<KEY, VALUE> valueIterator() throws RocksDatabaseException, CodecException {
+    return valueIterator(null);
+  }
 
   /**
    * Returns the Name of this Table.
@@ -355,8 +386,8 @@ public interface Table<KEY, VALUE> {
         return false;
       }
       final KeyValue<?, ?> that = (KeyValue<?, ?>) obj;
-      return this.getKey().equals(that.getKey())
-          && this.getValue().equals(that.getValue());
+      return Objects.equals(this.getKey(), that.getKey())
+          && Objects.equals(this.getValue(), that.getValue());
     }
 
     @Override
@@ -394,10 +425,6 @@ public interface Table<KEY, VALUE> {
 
       boolean readValue() {
         return (this.ordinal() & VALUE_ONLY.ordinal()) != 0;
-      }
-
-      Type addKey() {
-        return values()[ordinal() | KEY_ONLY.ordinal()];
       }
     }
   }
