@@ -129,6 +129,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       LOG.warn("Skipping handling command, expected command "
               + "type {} but found {}",
           SCMCommandProto.Type.deleteBlocksCommand, command.getType());
+      updateCommandStatus(context, command, CommandStatus::markAsFailed, LOG);
       return;
     }
     DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
@@ -136,17 +137,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     try {
       deleteCommandQueues.add(cmd);
     } catch (IllegalStateException e) {
-      String dnId = context.getParent().getDatanodeDetails().getUuidString();
-      Consumer<CommandStatus> updateFailure = (cmdStatus) -> {
-        cmdStatus.markAsFailed();
-        ContainerBlocksDeletionACKProto emptyACK =
-            ContainerBlocksDeletionACKProto
-                .newBuilder()
-                .setDnId(dnId)
-                .build();
-        ((DeleteBlockCommandStatus)cmdStatus).setBlocksDeletionAck(emptyACK);
-      };
-      updateCommandStatus(cmd.getContext(), cmd.getCmd(), updateFailure, LOG);
+      updateCommandStatus(context, command, CommandStatus::markAsFailed, LOG);
       LOG.warn("Command is discarded because of the command queue is full");
     }
   }
@@ -252,6 +243,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           try {
             processCmd(cmd);
           } catch (Throwable e) {
+            updateCommandStatus(cmd.getContext(), cmd.getCmd(), CommandStatus::markAsFailed, LOG);
             LOG.error("taskProcess failed.", e);
           }
         }

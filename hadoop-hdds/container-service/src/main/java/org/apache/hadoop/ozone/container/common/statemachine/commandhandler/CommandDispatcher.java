@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
@@ -93,9 +94,13 @@ public final class CommandDispatcher {
       try {
         handler.handle(command, container, context, connectionManager);
       } catch (Exception ex) {
+        context.updateCommandStatus(command.getId(),
+            status -> status.setStatus(CommandStatus.Status.FAILED));
         LOG.error("Exception while handle command, ", ex);
       }
     } else {
+      context.updateCommandStatus(command.getId(),
+          status -> status.setStatus(CommandStatus.Status.FAILED));
       LOG.error("Unknown SCM Command queued. There is no handler for this " +
           "command. Command: {}", command.getType().getDescriptorForType()
           .getName());
