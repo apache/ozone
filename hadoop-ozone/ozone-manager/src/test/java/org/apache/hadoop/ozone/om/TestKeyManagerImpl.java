@@ -184,9 +184,10 @@ public class TestKeyManagerImpl {
         startBucketNumber, keyPrefix, startKeyNumber));
     if (expectedException != null) {
       assertThrows(expectedException, () -> km.getRenamesKeyEntries(volumeName, bucketName, startKey,
-          filter, numberOfEntries));
+          filter, numberOfEntries).getValue());
     } else {
-      assertEquals(expectedEntries, km.getRenamesKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
+      assertEquals(expectedEntries,
+          km.getRenamesKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries).getValue());
     }
   }
 
