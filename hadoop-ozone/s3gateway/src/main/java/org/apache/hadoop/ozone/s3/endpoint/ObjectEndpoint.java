@@ -243,6 +243,9 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(NOT_IMPLEMENTED, keyPath);
       }
       OzoneVolume volume = getVolume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      String bucketOwner = bucket.getOwner();
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucketOwner);
       if (taggingMarker != null) {
         s3GAction = S3GAction.PUT_OBJECT_TAGGING;
         return putObjectTagging(volume, bucketName, keyPath, body);
@@ -265,7 +268,6 @@ public class ObjectEndpoint extends EndpointBase {
       boolean storageTypeDefault = StringUtils.isEmpty(storageType);
 
       // Normal put object
-      OzoneBucket bucket = volume.getBucket(bucketName);
       ReplicationConfig replicationConfig =
           getReplicationConfig(bucket, storageType, storageConfig);
 
@@ -428,6 +430,8 @@ public class ObjectEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.GET_KEY;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
     try {
+      OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       if (taggingMarker != null) {
         s3GAction = S3GAction.GET_OBJECT_TAGGING;
         return getObjectTagging(bucketName, keyPath);
@@ -622,6 +626,8 @@ public class ObjectEndpoint extends EndpointBase {
 
     OzoneKey key;
     try {
+      OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
@@ -743,6 +749,8 @@ public class ObjectEndpoint extends EndpointBase {
 
     try {
       OzoneVolume volume = getVolume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       if (taggingMarker != null) {
         s3GAction = S3GAction.DELETE_OBJECT_TAGGING;
         return deleteObjectTagging(volume, bucketName, keyPath);
@@ -818,6 +826,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
+      S3Owner.verifyBucketOwnerCondition(headers, bucket, ozoneBucket.getOwner());
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
       String storageConfig = headers.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
 
@@ -889,6 +898,9 @@ public class ObjectEndpoint extends EndpointBase {
 
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
+      OzoneBucket ozoneBucket = volume.getBucket(bucket);
+      S3Owner.verifyBucketOwnerCondition(headers, bucket, ozoneBucket.getOwner());
+
       for (CompleteMultipartUploadRequest.Part part : partList) {
         partsMap.put(part.getPartNumber(), part.getETag());
       }
@@ -896,9 +908,7 @@ public class ObjectEndpoint extends EndpointBase {
         LOG.debug("Parts map {}", partsMap);
       }
 
-      omMultipartUploadCompleteInfo = getClientProtocol()
-          .completeMultipartUpload(volume.getName(), bucket, key, uploadID,
-              partsMap);
+      omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(key, uploadID, partsMap);
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
           new CompleteMultipartUploadResponse();
       completeMultipartUploadResponse.setBucket(bucket);
@@ -990,6 +1000,9 @@ public class ObjectEndpoint extends EndpointBase {
         Pair<String, String> result = parseSourceHeader(copyHeader);
         String sourceBucket = result.getLeft();
         String sourceKey = result.getRight();
+        String sourceBucketOwner = volume.getBucket(sourceBucket).getOwner();
+        S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, sourceBucket, sourceBucketOwner, bucket,
+            ozoneBucket.getOwner());
 
         OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
             volume.getName(), sourceBucket, sourceKey);
@@ -1236,6 +1249,10 @@ public class ObjectEndpoint extends EndpointBase {
     String sourceBucket = result.getLeft();
     String sourceKey = result.getRight();
     DigestInputStream sourceDigestInputStream = null;
+
+    String sourceBucketOwner = volume.getBucket(sourceBucket).getOwner();
+    // The destBucket owner has already been checked in the caller method
+    S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, sourceBucket, sourceBucketOwner, null, null);
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);

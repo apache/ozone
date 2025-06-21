@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.EOFException;
@@ -32,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -295,10 +292,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     boolean okForRead =
         pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
             || pipeline.getType() == HddsProtos.ReplicationType.EC;
-    Pipeline readPipeline = okForRead ? pipeline : Pipeline.newBuilder(pipeline)
-        .setReplicationConfig(StandaloneReplicationConfig.getInstance(
-            getLegacyFactor(pipeline.getReplicationConfig())))
-        .build();
+    Pipeline readPipeline = okForRead ? pipeline : pipeline.copyForRead();
     pipelineRef.set(readPipeline);
   }
 

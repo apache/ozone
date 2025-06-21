@@ -185,7 +185,6 @@ public class TestIncrementalContainerReportHandler {
 
   @AfterEach
   public void tearDown() throws Exception {
-    containerStateManager.close();
     nodeManager.close();
     if (dbStore != null) {
       dbStore.close();
