@@ -41,7 +41,7 @@ List datanodes
 
 Filter list by UUID
     ${uuid} =           Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$2 }'
-    ${output} =         Execute      ozone admin datanode list --id "${uuid}"
+    ${output} =         Execute      ozone admin datanode list --node-id "${uuid}"
     Assert Output       ${output}    1    ${uuid}
 
 Filter list by Ip address
@@ -70,22 +70,22 @@ Filter list by NodeState
 
 Get usage info by UUID
     ${uuid} =           Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$2 }'
-    ${output} =         Execute      ozone admin datanode usageinfo --uuid "${uuid}"
+    ${output} =         Execute      ozone admin datanode usageinfo --node-id "${uuid}"
     Should contain      ${output}    Usage Information (1 Datanodes)
 
 Get usage info by Ip address
     ${ip} =             Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$3 }' | awk -F '[/]' '{ print \$3 }'
-    ${output} =         Execute      ozone admin datanode usageinfo --address "${ip}"
+    ${output} =         Execute      ozone admin datanode usageinfo --ip "${ip}"
     Should contain      ${output}    Usage Information (1 Datanodes)
 
 Get usage info by Hostname
     ${hostname} =       Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$3 }' | awk -F '[/]' '{ print \$4 }'
-    ${output} =         Execute      ozone admin datanode usageinfo --address "${hostname}"
+    ${output} =         Execute      ozone admin datanode usageinfo --hostname "${hostname}"
     Should contain      ${output}    Usage Information (1 Datanodes)
 
 Get usage info with invalid address
     ${uuid} =           Execute      grep '^Datanode:' ${LIST_FILE} | head -1 | awk '{ print \$2 }'
-    ${output} =         Execute      ozone admin datanode usageinfo --address "${uuid}"
+    ${output} =         Execute      ozone admin datanode usageinfo --ip "${uuid}"
     Should contain      ${output}    Usage Information (0 Datanodes)
 
 Incomplete command
