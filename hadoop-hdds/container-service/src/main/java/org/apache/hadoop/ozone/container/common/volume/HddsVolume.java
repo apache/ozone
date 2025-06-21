@@ -295,6 +295,7 @@ public class HddsVolume extends StorageVolume {
   @Override
   public synchronized VolumeCheckResult check(@Nullable Boolean unused)
       throws Exception {
+    volumeInfoMetrics.incNumScans();
     checkVolumeUsages();
 
     VolumeCheckResult result = super.check(unused);
