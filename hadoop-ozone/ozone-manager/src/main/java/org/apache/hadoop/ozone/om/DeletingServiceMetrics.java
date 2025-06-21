@@ -38,7 +38,7 @@ public final class DeletingServiceMetrics {
   /*
    * Total directory deletion metrics across all iterations of DirectoryDeletingService since last restart.
    */
-  @Metric("Total no. of deleted directories sent for purge")
+  @Metric("Total no. of directories deleted")
   private MutableGaugeLong numDirsSentForPurge;
   @Metric("Total no. of sub-directories sent for purge")
   private MutableGaugeLong numSubDirsSentForPurge;
