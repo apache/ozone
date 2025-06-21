@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
  * different kind of tables.
  */
 @InterfaceStability.Evolving
-public interface Table<KEY, VALUE> extends AutoCloseable {
+public interface Table<KEY, VALUE> {
 
   /**
    * Puts a key-value pair into the store.
