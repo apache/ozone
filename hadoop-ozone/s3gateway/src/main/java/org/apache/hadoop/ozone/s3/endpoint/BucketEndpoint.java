@@ -578,6 +578,9 @@ public class BucketEndpoint extends EndpointBase {
       } else {
         throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       }
+    } catch (OS3Exception ex) {
+      getMetrics().updateGetAclFailureStats(startNanos);
+      throw ex;
     }
   }
 
