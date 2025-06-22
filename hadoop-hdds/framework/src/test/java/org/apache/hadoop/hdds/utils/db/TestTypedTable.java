@@ -117,68 +117,60 @@ public class TestTypedTable {
 
     // Table 1: ContainerID -> String
     // Table 2: Long -> String
-    try (TypedTable<ContainerID, String> idTable = newTypedTable(
-        1, ContainerID.getCodec(), StringCodec.get());
-         TypedTable<Long, String> longTable = newTypedTable(
-             2, LongCodec.get(), StringCodec.get())) {
+    final TypedTable<ContainerID, String> idTable = newTypedTable(1, ContainerID.getCodec(), StringCodec.get());
+    final TypedTable<Long, String> longTable = newTypedTable(2, LongCodec.get(), StringCodec.get());
 
-      for (Map.Entry<Long, ContainerID> e : keys.entrySet()) {
-        final long n = e.getKey();
-        final ContainerID id = e.getValue();
-        final String value = id.toString();
-        // put the same value to both tables
-        idTable.put(id, value);
-        longTable.put(n, value);
-      }
+    for (Map.Entry<Long, ContainerID> e : keys.entrySet()) {
+      final long n = e.getKey();
+      final ContainerID id = e.getValue();
+      final String value = id.toString();
+      // put the same value to both tables
+      idTable.put(id, value);
+      longTable.put(n, value);
     }
 
     // Reopen tables with different key types
 
     // Table 1: Long -> String
     // Table 2: ContainerID -> String
-    try (TypedTable<ContainerID, String> idTable = newTypedTable(
-        2, ContainerID.getCodec(), StringCodec.get());
-         TypedTable<Long, String> longTable = newTypedTable(
-             1, LongCodec.get(), StringCodec.get())) {
+    final TypedTable<ContainerID, String> idTable2 = newTypedTable(2, ContainerID.getCodec(), StringCodec.get());
+    final TypedTable<Long, String> longTable2 = newTypedTable(1, LongCodec.get(), StringCodec.get());
 
-      for (Map.Entry<Long, ContainerID> e : keys.entrySet()) {
-        final long n = e.getKey();
-        final ContainerID id = e.getValue();
-        final String expected = id.toString();
-        // Read the value using a different key type
-        final String idValue = idTable.get(id);
-        assertEquals(expected, idValue);
-        final String longValue = longTable.get(n);
-        assertEquals(expected, longValue);
-      }
+    for (Map.Entry<Long, ContainerID> e : keys.entrySet()) {
+      final long n = e.getKey();
+      final ContainerID id = e.getValue();
+      final String expected = id.toString();
+      // Read the value using a different key type
+      final String idValue = idTable2.get(id);
+      assertEquals(expected, idValue);
+      final String longValue = longTable2.get(n);
+      assertEquals(expected, longValue);
     }
 
     // test iterator type
-    try (TypedTable<Long, String> longTable = newTypedTable(
-        1, LongCodec.get(), StringCodec.get());
-         Table.KeyValueIterator<Long, String> neither = longTable.iterator(NEITHER);
-         Table.KeyValueIterator<Long, String> keyOnly = longTable.iterator(KEY_ONLY);
-         Table.KeyValueIterator<Long, String> valueOnly = longTable.iterator(VALUE_ONLY);
-         Table.KeyValueIterator<Long, String> keyAndValue = longTable.iterator(KEY_AND_VALUE)) {
-      while (keyAndValue.hasNext()) {
-        final Table.KeyValue<Long, String> keyValue = keyAndValue.next();
-        final Long expectedKey = Objects.requireNonNull(keyValue.getKey());
+    final TypedTable<Long, String> longTable3 = newTypedTable(1, LongCodec.get(), StringCodec.get());
+    final Table.KeyValueIterator<Long, String> neither = longTable3.iterator(NEITHER);
+    final Table.KeyValueIterator<Long, String> keyOnly = longTable3.iterator(KEY_ONLY);
+    final Table.KeyValueIterator<Long, String> valueOnly = longTable3.iterator(VALUE_ONLY);
+    final Table.KeyValueIterator<Long, String> keyAndValue = longTable3.iterator(KEY_AND_VALUE);
+    while (keyAndValue.hasNext()) {
+      final Table.KeyValue<Long, String> keyValue = keyAndValue.next();
+      final Long expectedKey = Objects.requireNonNull(keyValue.getKey());
 
-        final String expectedValue = Objects.requireNonNull(keyValue.getValue());
-        assertEquals(keys.get(expectedKey).toString(), expectedValue);
+      final String expectedValue = Objects.requireNonNull(keyValue.getValue());
+      assertEquals(keys.get(expectedKey).toString(), expectedValue);
 
-        final int expectedValueSize = keyValue.getValueByteSize();
-        assertEquals(expectedValue.length(), expectedValueSize);
+      final int expectedValueSize = keyValue.getValueByteSize();
+      assertEquals(expectedValue.length(), expectedValueSize);
 
-        assertKeyValue(expectedKey, null, 0, keyOnly);
-        assertKeyValue(null, expectedValue, expectedValueSize, valueOnly);
-        assertKeyValue(null, null, 0, neither);
-      }
-
-      assertFalse(keyOnly.hasNext());
-      assertFalse(valueOnly.hasNext());
-      assertFalse(neither.hasNext());
+      assertKeyValue(expectedKey, null, 0, keyOnly);
+      assertKeyValue(null, expectedValue, expectedValueSize, valueOnly);
+      assertKeyValue(null, null, 0, neither);
     }
+
+    assertFalse(keyOnly.hasNext());
+    assertFalse(valueOnly.hasNext());
+    assertFalse(neither.hasNext());
   }
 
   static <K, V> void assertKeyValue(K expectedKey, V expectedValue, int expectedValueSize,
