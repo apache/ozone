@@ -100,8 +100,10 @@ public final class OnDemandContainerDataScanner {
         LOG) && container.shouldScanData();
   }
 
-  public static Optional<Future<?>> scanContainer(Container<?> container) {
+  public static Optional<Future<?>> scanContainer(Container<?> container, String reason) {
     if (!shouldScan(container)) {
+      LOG.debug("Container: {}, Reason for on-demand scan: {}, Result: skipped",
+          container.getContainerData().getContainerID(), reason);
       return Optional.empty();
     }
 
@@ -113,6 +115,8 @@ public final class OnDemandContainerDataScanner {
         removeContainerFromScheduledContainers(containerId);
       });
     }
+    LOG.debug("Container: {}, Reason for on-demand scan: {}, Result: Scheduled",
+        container.getContainerData().getContainerID(), reason);
     return Optional.ofNullable(resultFuture);
   }
 
