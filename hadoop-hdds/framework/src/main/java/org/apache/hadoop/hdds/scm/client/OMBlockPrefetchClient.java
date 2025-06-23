@@ -349,7 +349,7 @@ public class OMBlockPrefetchClient {
         }
       }
     } catch (Exception e) {
-      LOG.info("Could not resolve client {}: {}", clientMachine, e.getMessage());
+      LOG.warn("Could not resolve client {}: {}", clientMachine, e.getMessage());
     }
     return null;
   }
