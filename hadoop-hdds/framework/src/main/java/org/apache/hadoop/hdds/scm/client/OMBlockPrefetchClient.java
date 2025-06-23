@@ -88,7 +88,8 @@ public class OMBlockPrefetchClient {
   }
 
   /**
-   * Enum representing the replication configurations that are supported by default. Clients requesting replication configurations outside of these will not benefit from the cache.
+   * Enum representing the replication configurations that are supported by default. Clients requesting replication
+   * configurations outside of these will not benefit from the cache.
    */
   public enum DefaultReplicationConfigsSupported {
     RATIS_THREE(ReplicationConfig.fromProtoTypeAndFactor(
