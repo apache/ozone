@@ -18,12 +18,15 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE;
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ONLY;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
 
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -49,20 +52,48 @@ public class ContainerTableSchemaFinalizeAction
   public void execute(DatanodeStateMachine arg) throws Exception {
     WitnessedContainerMetadataStore metadataStore = arg.getContainer().getWitnessedContainerMetadataStore();
     Table<ContainerID, ContainerCreateInfo> previousTable
-        = ((WitnessedContainerMetadataStoreImpl) metadataStore).getPreviousVersionBasedTable().getContainerIdsTable();
+        = ((WitnessedContainerMetadataStoreImpl) metadataStore).getPreviousVersionTables().getContainerIdsTable();
     Table<ContainerID, ContainerCreateInfo> currTable =
-        WitnessedContainerDBDefinition.CONTAINER_IDS_TABLE.getTable(metadataStore.getStore());
+        WitnessedContainerDBDefinition.CONTAINER_CREATE_INFO_TABLE_DEF.getTable(metadataStore.getStore());
 
     // data is moved from old table to new table, no need cleanup if previous exist as this is just overwrite of data
     try (BatchOperation batch = metadataStore.getStore().initBatchOperation();
          TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, ContainerCreateInfo>> iterator =
-             previousTable.iterator()) {
+             previousTable.iterator();
+         Table.KeyValueIterator<ContainerID, ContainerCreateInfo> curTblItr = currTable.iterator(KEY_ONLY)) {
+      truncateCurrentTable(curTblItr, currTable);
+      while (curTblItr.hasNext()) {
+        currTable.delete(curTblItr.next().getKey());
+      }
       while (iterator.hasNext()) {
         Table.KeyValue<ContainerID, ContainerCreateInfo> next = iterator.next();
         currTable.putWithBatch(batch, next.getKey(), next.getValue());
       }
       metadataStore.getStore().commitBatchOperation(batch);
       LOG.info("Finished copy to containerIdsTable from previous table");
+    }
+  }
+
+  private static void truncateCurrentTable(
+      Table.KeyValueIterator<ContainerID, ContainerCreateInfo> curTblItr,
+      Table<ContainerID, ContainerCreateInfo> currTable) throws RocksDatabaseException, CodecException {
+    // delete all previous entry if present in current table, this might come if previous upgrade is not finalized
+    // and crashed in between. Below logic for deleteRange is used to avoid tombstone creation for each entry
+    ContainerID startContainerID = null;
+    ContainerID endContainerID = null;
+    if (curTblItr.hasNext()) {
+      startContainerID = curTblItr.next().getKey();
+      endContainerID = startContainerID;
+    }
+    while (curTblItr.hasNext()) {
+      endContainerID = curTblItr.next().getKey();
+    }
+    if (startContainerID != null) {
+      if (startContainerID != endContainerID) {
+        currTable.deleteRange(startContainerID, endContainerID);
+      }
+      // remove last one entry as its exclusive end of range
+      currTable.delete(endContainerID);
     }
   }
 }

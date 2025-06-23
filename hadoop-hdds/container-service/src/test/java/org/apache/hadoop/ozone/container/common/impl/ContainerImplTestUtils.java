@@ -38,13 +38,13 @@ public final class ContainerImplTestUtils {
 
   public static ContainerSet newContainerSet(long recoveringTimeout) {
     WitnessedContainerMetadataStore mockMetadataStore = mock(WitnessedContainerMetadataStore.class);
-    when(mockMetadataStore.getContainerIdsTable()).thenReturn(new InMemoryTestTable<>());
+    when(mockMetadataStore.getContainerCreateInfoTable()).thenReturn(new InMemoryTestTable<>());
     return ContainerSet.newRwContainerSet(mockMetadataStore, recoveringTimeout);
   }
 
   public static ContainerSet newContainerSet(long recoveringTimeout, Clock clock) {
     WitnessedContainerMetadataStore mockMetadataStore = mock(WitnessedContainerMetadataStore.class);
-    when(mockMetadataStore.getContainerIdsTable()).thenReturn(new InMemoryTestTable<>());
+    when(mockMetadataStore.getContainerCreateInfoTable()).thenReturn(new InMemoryTestTable<>());
     return new ContainerSet(mockMetadataStore, recoveringTimeout, clock);
   }
 }

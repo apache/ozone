@@ -39,8 +39,8 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<WitnessedContainerDBDefinition>
     implements WitnessedContainerMetadataStore {
 
-  private Table<ContainerID, ContainerCreateInfo> containerIdsTable;
-  private PreviousVersionBasedTable previousVersionBasedTable;
+  private Table<ContainerID, ContainerCreateInfo> containerCreateInfoTable;
+  private PreviousVersionTables previousVersionTables;
 
   private static final ConcurrentMap<String, WitnessedContainerMetadataStore> INSTANCES =
       new ConcurrentHashMap<>();
@@ -71,34 +71,34 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
   @Override
   protected DBStore initDBStore(DBStoreBuilder dbStoreBuilder, ManagedDBOptions options, ConfigurationSource config)
       throws IOException {
-    previousVersionBasedTable = new PreviousVersionBasedTable();
-    previousVersionBasedTable.addTables(dbStoreBuilder);
+    previousVersionTables = new PreviousVersionTables();
+    previousVersionTables.addTables(dbStoreBuilder);
     final DBStore dbStore = dbStoreBuilder.build();
-    previousVersionBasedTable.init(dbStore);
-    this.containerIdsTable = this.getDbDef().getContainerIdsTable().getTable(dbStore);
+    previousVersionTables.init(dbStore);
+    this.containerCreateInfoTable = this.getDbDef().getContainerCreateInfoTableDef().getTable(dbStore);
     return dbStore;
   }
 
   @Override
-  public Table<ContainerID, ContainerCreateInfo> getContainerIdsTable() {
+  public Table<ContainerID, ContainerCreateInfo> getContainerCreateInfoTable() {
     if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
-      return previousVersionBasedTable.getContainerIdsTable();
+      return previousVersionTables.getContainerIdsTable();
     }
-    return containerIdsTable;
+    return containerCreateInfoTable;
   }
 
-  public PreviousVersionBasedTable getPreviousVersionBasedTable() {
-    return previousVersionBasedTable;
+  public PreviousVersionTables getPreviousVersionTables() {
+    return previousVersionTables;
   }
 
   /**
    * this will hold old version tables required during upgrade, and these are initialized based on version only.
    */
-  public static class PreviousVersionBasedTable {
+  public static class PreviousVersionTables {
     private static final String CONTAINER_IDS_STR_VAL_TABLE = "containerIds";
     private Table<ContainerID, ContainerCreateInfo> containerIdsTable;
 
-    public PreviousVersionBasedTable() throws IOException {
+    public PreviousVersionTables() throws IOException {
     }
 
     public void addTables(DBStoreBuilder dbStoreBuilder) throws IOException {

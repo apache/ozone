@@ -347,7 +347,7 @@ public class OzoneContainer {
         volumeThread.join();
       }
       try (Table.KeyValueIterator<ContainerID, ContainerCreateInfo> itr
-               = getWitnessedContainerMetadataStore().getContainerIdsTable().iterator(KEY_ONLY)) {
+               = getWitnessedContainerMetadataStore().getContainerCreateInfoTable().iterator(KEY_ONLY)) {
         final Map<ContainerID, Long> containerIds = new HashMap<>();
         while (itr.hasNext()) {
           containerIds.put(itr.next().getKey(), 0L);

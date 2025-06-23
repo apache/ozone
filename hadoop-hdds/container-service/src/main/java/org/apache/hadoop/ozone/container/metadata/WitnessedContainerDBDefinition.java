@@ -29,17 +29,17 @@ import org.apache.hadoop.ozone.OzoneConsts;
  */
 public final class WitnessedContainerDBDefinition extends DBDefinition.WithMap {
 
-  private static final String CONTAINER_IDS_TABLE_NAME = "containerIdsTable";
+  private static final String CONTAINER_CREATE_INFO_TABLE_NAME = "ContainerCreateInfoTable";
 
   public static final DBColumnFamilyDefinition<ContainerID, ContainerCreateInfo>
-      CONTAINER_IDS_TABLE = new DBColumnFamilyDefinition<>(
-      CONTAINER_IDS_TABLE_NAME,
+      CONTAINER_CREATE_INFO_TABLE_DEF = new DBColumnFamilyDefinition<>(
+      CONTAINER_CREATE_INFO_TABLE_NAME,
       ContainerID.getCodec(),
       ContainerCreateInfo.getCodec());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
-      CONTAINER_IDS_TABLE);
+      CONTAINER_CREATE_INFO_TABLE_DEF);
 
   private static final WitnessedContainerDBDefinition INSTANCE = new WitnessedContainerDBDefinition();
 
@@ -61,7 +61,7 @@ public final class WitnessedContainerDBDefinition extends DBDefinition.WithMap {
     return ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR;
   }
 
-  DBColumnFamilyDefinition<ContainerID, ContainerCreateInfo> getContainerIdsTable() {
-    return CONTAINER_IDS_TABLE;
+  DBColumnFamilyDefinition<ContainerID, ContainerCreateInfo> getContainerCreateInfoTableDef() {
+    return CONTAINER_CREATE_INFO_TABLE_DEF;
   }
 }

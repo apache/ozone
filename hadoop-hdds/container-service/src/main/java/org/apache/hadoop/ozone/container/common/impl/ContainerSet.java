@@ -168,7 +168,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   private void updateContainerIdTable(long containerId, State containerState) throws StorageContainerException {
     if (null != metadataStore) {
       try {
-        metadataStore.getContainerIdsTable().put(ContainerID.valueOf(containerId),
+        metadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(containerId),
             ContainerCreateInfo.valueOf(containerState));
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
@@ -253,7 +253,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   private void deleteFromContainerTable(long containerId) throws StorageContainerException {
     if (null != metadataStore) {
       try {
-        metadataStore.getContainerIdsTable().delete(ContainerID.valueOf(containerId));
+        metadataStore.getContainerCreateInfoTable().delete(ContainerID.valueOf(containerId));
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }
