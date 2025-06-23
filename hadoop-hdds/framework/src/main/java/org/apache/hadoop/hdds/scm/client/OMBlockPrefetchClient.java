@@ -266,7 +266,6 @@ public class OMBlockPrefetchClient {
       } else {
         LOG.debug("Bypassing cache for {}. Reason: {}", replicationConfig, queue == null ?
             "Unsupported replication config for caching." : "ExcludeList provided.");
-        metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
         metrics.incrementCacheMisses();
         return scmBlockLocationProtocol.allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
             excludeList, clientMachine);
