@@ -311,6 +311,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
 
     } catch (IOException ex) {
+      containerData.setYamlData(null);
       onFailure(containerData.getVolume());
       final String op = tempContainerFile == null ? "create tmp file for "
           : (isCreate ? "create" : "update") + " container file ";

@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.ToLongFunction;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -547,5 +548,31 @@ public class ContainerSet implements Iterable<Container<?>> {
         }
       }
     });
+  }
+
+  /**
+   * Dump container metadata cache for a volume to reduce startup time.
+   */
+  public void dumpContainerCache(Iterable<? extends HddsVolume> volumes,
+                               ConfigurationSource config) {
+    ContainerStartupCache containerCache = new ContainerStartupCache();
+
+    // Set dump in progress flag to prevent YAML modifications
+    ContainerDataYaml.setDisableWrite(true);
+
+    try {
+      for (HddsVolume volume : volumes) {
+        try {
+          containerCache.dumpContainerCache(
+              containerMap.values(), volume, config);
+        } catch (IOException e) {
+          LOG.warn("Failed to dump container cache for volume {}",
+                   volume.getStorageID(), e);
+        }
+      }
+    } finally {
+      // Always reset the flag to allow future YAML modifications
+      ContainerDataYaml.setDisableWrite(false);
+    }
   }
 }

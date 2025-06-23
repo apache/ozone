@@ -25,12 +25,13 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -62,6 +63,7 @@ public final class ContainerDataYaml {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerDataYaml.class);
+  private static volatile boolean disableWrite = false;
 
   private ContainerDataYaml() {
 
@@ -71,6 +73,11 @@ public final class ContainerDataYaml {
    * Creates a .container file in yaml format.
    */
   public static void createContainerFile(ContainerData containerData, File containerFile) throws IOException {
+    if (disableWrite) {
+      throw new IOException("Container cache dump is in progress. " +
+          "Container file modification is temporarily disabled to ensure cache consistency. " +
+          "ContainerID: " + containerData.getContainerID());
+    }
     // Create Yaml for given container type
     final Yaml yaml = getYamlForContainerType(containerData.getContainerType(), containerData.getReplicaIndex() > 0);
     // Compute Checksum and update ContainerData
@@ -78,6 +85,7 @@ public final class ContainerDataYaml {
 
     // Write the ContainerData with checksum to Yaml file.
     YamlUtils.dump(yaml, containerData, containerFile, LOG);
+    containerData.setYamlData(yaml.dump(containerData));
   }
 
   /**
@@ -88,10 +96,11 @@ public final class ContainerDataYaml {
   public static ContainerData readContainerFile(File containerFile)
       throws IOException {
     Preconditions.checkNotNull(containerFile, "containerFile cannot be null");
-    try (InputStream inputFileStream = Files.newInputStream(containerFile.toPath())) {
-      return readContainer(inputFileStream);
-    }
-
+    String originalContent = FileUtils.readFileToString(containerFile, StandardCharsets.UTF_8);
+    ContainerData containerData =
+        readContainer(originalContent.getBytes(StandardCharsets.UTF_8));
+    containerData.setYamlData(originalContent);
+    return containerData;
   }
 
   /**
@@ -340,6 +349,13 @@ public final class ContainerDataYaml {
       result = Long.valueOf(number, radix);
       return result;
     }
+  }
+
+  /**
+   * Set disable write flag to prevent container yaml modifications.
+   */
+  public static void setDisableWrite(boolean inProgress) {
+    ContainerDataYaml.disableWrite = inProgress;
   }
 
 }

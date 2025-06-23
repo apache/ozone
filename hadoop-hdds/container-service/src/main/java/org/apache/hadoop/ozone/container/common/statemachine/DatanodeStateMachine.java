@@ -23,6 +23,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -64,6 +65,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Reco
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
@@ -442,7 +444,12 @@ public class DatanodeStateMachine implements Closeable {
       connectionManager.close();
     }
 
+    List<StorageVolume> volumes = null;
     if (container != null) {
+      // The MutableVolumeSet will clear the volumeMap after MutableVolumeSet shutdown, so we should keep it first
+      if (container.getVolumeSet() != null) {
+        volumes = container.getVolumeSet().getVolumesList();
+      }
       container.stop();
     }
 
@@ -456,6 +463,12 @@ public class DatanodeStateMachine implements Closeable {
 
     if (nettyMetrics != null) {
       nettyMetrics.unregister();
+    }
+    // We should always dump the Container cache after all the other service shutdown
+    if (volumes != null) {
+      container.dumpContainerCache(volumes);
+    } else {
+      LOG.info("Volume list is empty, cannot dump Container cache");
     }
   }
 

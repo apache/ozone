@@ -17,13 +17,17 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CONTAINER_STARTUP_CACHE_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CONTAINER_STARTUP_CACHE_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -32,6 +36,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.impl.ContainerStartupCache;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -75,6 +80,9 @@ public class ContainerReader implements Runnable {
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
   private final boolean shouldDelete;
+  private final ContainerStartupCache containerCache;
+  private final ContainerStartupCache.CacheMetadata cacheMetadata;
+  private final boolean cacheEnabled;
 
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
@@ -86,6 +94,16 @@ public class ContainerReader implements Runnable {
     this.config = conf;
     this.volumeSet = volSet;
     this.shouldDelete = shouldDelete;
+    this.cacheEnabled = conf.getBoolean(HDDS_DATANODE_CONTAINER_STARTUP_CACHE_ENABLED,
+        HDDS_DATANODE_CONTAINER_STARTUP_CACHE_ENABLED_DEFAULT);
+    this.containerCache = new ContainerStartupCache();
+
+    if (cacheEnabled) {
+      this.cacheMetadata = containerCache.loadContainerCache(hddsVolume, conf);
+    } else {
+      LOG.debug("Container cache is disabled for volume {}", hddsVolume.getStorageID());
+      this.cacheMetadata = null;
+    }
   }
 
   @Override
@@ -96,6 +114,16 @@ public class ContainerReader implements Runnable {
       LOG.error("Caught an exception during reading container files" +
           " from Volume {} {}", hddsVolumeDir, t);
       volumeSet.failVolume(hddsVolumeDir.getPath());
+    } finally {
+      // Clean up cache file after container loading is complete
+      if (cacheEnabled) {
+        try {
+          containerCache.deleteCacheFile(hddsVolume);
+        } catch (Exception e) {
+          LOG.warn("Failed to delete cache file for volume {}",
+                   hddsVolume.getStorageID(), e);
+        }
+      }
     }
   }
 
@@ -151,16 +179,9 @@ public class ContainerReader implements Runnable {
             if (containerDirs != null) {
               for (File containerDir : containerDirs) {
                 try {
-                  File containerFile = ContainerUtils.getContainerFile(
-                      containerDir);
-                  long containerID =
-                      ContainerUtils.getContainerID(containerDir);
-                  if (containerFile.exists()) {
-                    verifyContainerFile(containerID, containerFile);
-                  } else {
-                    LOG.error("Missing .container file for ContainerID: {}",
-                        containerDir.getName());
-                  }
+                  long containerID = ContainerUtils.getContainerID(containerDir);
+                  // Use cache if available, otherwise read from disk
+                  verifyContainerFromCacheOrDisk(containerID, containerDir);
                 } catch (Throwable e) {
                   LOG.error("Failed to load container from {}",
                       containerDir.getAbsolutePath(), e);
@@ -174,20 +195,60 @@ public class ContainerReader implements Runnable {
     LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
   }
 
-  private void verifyContainerFile(long containerID,
-                                   File containerFile) {
+  /**
+   * Verify container from cache if available, otherwise from disk.
+   */
+  private void verifyContainerFromCacheOrDisk(long containerID, File containerDir) {
     try {
-      ContainerData containerData = ContainerDataYaml.readContainerFile(
-          containerFile);
-      if (containerID != containerData.getContainerID()) {
-        LOG.error("Invalid ContainerID in file {}. " +
-            "Skipping loading of this container.", containerFile);
+      // Try to load from cache first
+      ContainerData containerData = loadContainerDataFromCache(containerID);
+      if (containerData == null) {
+        // fall back to disk
+        containerData = loadContainerDataFromDisk(containerID, containerDir);
+      }
+      if (containerData == null || containerID != containerData.getContainerID()) {
+        LOG.error("Invalid ContainerID for container {}. " +
+            "Skipping loading of this container.", containerID);
         return;
       }
       verifyAndFixupContainerData(containerData);
     } catch (IOException ex) {
       LOG.error("Failed to parse ContainerFile for ContainerID: {}",
           containerID, ex);
+    }
+  }
+
+  /**
+   * Load container data from cache if available.
+   */
+  private ContainerData loadContainerDataFromCache(long containerID) throws IOException {
+    if (!cacheEnabled || cacheMetadata == null) {
+      return null;
+    }
+
+    String yamlData = cacheMetadata.getContainerYamlData().get(containerID);
+    if (yamlData == null) {
+      return null;
+    }
+
+    ContainerData containerData = ContainerDataYaml.readContainer(
+        yamlData.getBytes(StandardCharsets.UTF_8));
+    containerData.setYamlData(yamlData);
+    LOG.debug("Loaded container {} from cache", containerID);
+    return containerData;
+  }
+
+  /**
+   * Load container data from disk.
+   */
+  private ContainerData loadContainerDataFromDisk(long containerID, File containerDir) throws IOException {
+    File containerFile = ContainerUtils.getContainerFile(containerDir);
+    try {
+      return ContainerDataYaml.readContainerFile(containerFile);
+    } catch (FileNotFoundException e) {
+      LOG.error("Missing the Container file for ContainerID: {}, path {}",
+          containerID, containerFile.getPath());
+      return null;
     }
   }
 

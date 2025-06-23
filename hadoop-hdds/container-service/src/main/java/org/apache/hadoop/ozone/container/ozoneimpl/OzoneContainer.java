@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CONTAINER_STARTUP_CACHE_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CONTAINER_STARTUP_CACHE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
@@ -85,6 +87,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -570,6 +573,24 @@ public class OzoneContainer {
             witnessedContainerMetadataStore.isClosed(), e);
       }
       this.witnessedContainerMetadataStore = null;
+    }
+  }
+
+  public void dumpContainerCache(List<StorageVolume> volumes) {
+    boolean cacheEnabled = config.getBoolean(HDDS_DATANODE_CONTAINER_STARTUP_CACHE_ENABLED,
+        HDDS_DATANODE_CONTAINER_STARTUP_CACHE_ENABLED_DEFAULT);
+    if (cacheEnabled) {
+      try {
+        LOG.info("Dumping container cache for faster startup...");
+        long startTime = Time.monotonicNow();
+        List<HddsVolume> hddsVolumes = StorageVolumeUtil.getHddsVolumesList(volumes);
+        containerSet.dumpContainerCache(hddsVolumes, config);
+        LOG.info("Container cache dump completed, cost {}ms",  Time.monotonicNow() - startTime);
+      } catch (Exception e) {
+        LOG.warn("Failed to dump container cache, but continuing shutdown", e);
+      }
+    } else {
+      LOG.info("Container cache is disabled, skipping cache dump");
     }
   }
 
