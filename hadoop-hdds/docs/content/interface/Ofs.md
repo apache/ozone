@@ -237,7 +237,7 @@ In order to enable trash in Ozone, Please add these configs to core-site.xml
 </property>
 <property>
   <name>fs.trash.classname</name>
-  <value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
+  <value>org.apache.hadoop.fs.ozone.OzoneTrashPolicy</value>
 </property>
 {{< /highlight >}}
                                            

@@ -143,7 +143,7 @@ class NavBar extends React.Component<INavBarProps> {
     ), (
       <Menu.Item key='/DiskUsage'
         icon={<PieChartOutlined />}>
-        <span>Disk Usage</span>
+        <span>Namespace Usage</span>
         <Link to='/DiskUsage' />
       </Menu.Item>
     ), (
