@@ -164,6 +164,7 @@ public class StorageVolumeChecker {
   public synchronized void checkAllVolumeSets() {
     final long gap = timer.monotonicNow() - lastAllVolumeSetsCheckComplete;
     if (gap < minDiskCheckGapMs) {
+      metrics.incNumIterationsSkipped();
       if (LOG.isTraceEnabled()) {
         LOG.trace(
             "Skipped checking all volumes, time since last check {} is less " +
@@ -176,14 +177,15 @@ public class StorageVolumeChecker {
     try {
       int totalScanned = 0;
       for (VolumeSet volSet : registeredVolumeSets) {
+        long volumeCount = volSet.getVolumesList().size();
         if (volSet instanceof MutableVolumeSet) {
           StorageVolume.VolumeType type = ((MutableVolumeSet) volSet).getVolumeType();
           switch (type) {
           case DATA_VOLUME:
-            metrics.incNumDataVolumesScanned();
+            metrics.incNumDataVolumesScanned(volumeCount);
             break;
           case META_VOLUME:
-            metrics.incNumMetadataVolumesScanned();
+            metrics.incNumMetadataVolumesScanned(volumeCount);
             break;
           default:
             break;
@@ -192,7 +194,8 @@ public class StorageVolumeChecker {
         volSet.checkAllVolumes(this);
         totalScanned += volSet.getVolumesList().size();
       }
-      metrics.setNumVolumesScanned(totalScanned);
+      metrics.setNumVolumesScannedInLastIteration(totalScanned);
+      metrics.incNumScanIterations();
       lastAllVolumeSetsCheckComplete = timer.monotonicNow();
     } catch (IOException e) {
       LOG.warn("Exception while checking disks", e);
@@ -231,6 +234,9 @@ public class StorageVolumeChecker {
                 numVolumes, (ignored1, ignored2) -> latch.countDown()),
             MoreExecutors.directExecutor());
       } else {
+        if (v instanceof HddsVolume) {
+          ((HddsVolume) v).getVolumeInfoStats().incNumScansSkipped();
+        }
         if (numVolumes.decrementAndGet() == 0) {
           latch.countDown();
         }
@@ -244,7 +250,6 @@ public class StorageVolumeChecker {
           maxAllowedTimeForCheckMs);
     }
 
-    metrics.incNumScanIterations();
     synchronized (this) {
       // All volumes that have not been detected as healthy should be
       // considered failed. This is a superset of 'failedVolumes'.

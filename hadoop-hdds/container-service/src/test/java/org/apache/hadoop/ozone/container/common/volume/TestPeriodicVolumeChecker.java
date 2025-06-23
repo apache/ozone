@@ -90,35 +90,38 @@ public class TestPeriodicVolumeChecker {
       assertEquals(0, metrics.getNumScanIterations());
       assertEquals(0, metrics.getNumDataVolumesScanned());
       assertEquals(0, metrics.getNumMetadataVolumesScanned());
-      assertEquals(0, metrics.getNumVolumesScanned());
+      assertEquals(0, metrics.getNumVolumesScannedInLastIteration());
 
       // first round
       timer.advance(gap.toMillis() / 3);
       volumeChecker.checkAllVolumeSets();
 
-      assertEquals(4, metrics.getNumScanIterations());
+      assertEquals(1, metrics.getNumScanIterations());
       assertEquals(1, metrics.getNumDataVolumesScanned());
       assertEquals(1, metrics.getNumMetadataVolumesScanned());
-      assertEquals(5, metrics.getNumVolumesScanned());
+      assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
+      assertEquals(0, metrics.getNumIterationsSkipped());
 
       // periodic disk checker next round within gap
       timer.advance(gap.toMillis() / 3);
       volumeChecker.checkAllVolumeSets();
 
       // skipped next round
-      assertEquals(4, metrics.getNumScanIterations());
+      assertEquals(1, metrics.getNumScanIterations());
       assertEquals(1, metrics.getNumDataVolumesScanned());
       assertEquals(1, metrics.getNumMetadataVolumesScanned());
-      assertEquals(5, metrics.getNumVolumesScanned());
+      assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
+      assertEquals(1, metrics.getNumIterationsSkipped());
 
       // periodic disk checker next round
       timer.advance(interval.toMillis());
       volumeChecker.checkAllVolumeSets();
 
-      assertEquals(8, metrics.getNumScanIterations());
+      assertEquals(2, metrics.getNumScanIterations());
       assertEquals(2, metrics.getNumDataVolumesScanned());
       assertEquals(2, metrics.getNumMetadataVolumesScanned());
-      assertEquals(5, metrics.getNumVolumesScanned());
+      assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
+      assertEquals(1, metrics.getNumIterationsSkipped());
     } finally {
       volumeChecker.shutdownAndWait(1, TimeUnit.SECONDS);
     }

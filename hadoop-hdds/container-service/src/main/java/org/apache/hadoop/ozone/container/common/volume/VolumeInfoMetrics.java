@@ -67,6 +67,9 @@ public class VolumeInfoMetrics implements MetricsSource {
   @Metric("Returns the Number of Volumes Scanned")
   private MutableCounterLong numScans;
 
+  @Metric("Returns the Number of Volume Scans Skipped")
+  private MutableCounterLong numScansSkipped;
+
   /**
    * @param identifier Typically, path to volume root. E.g. /data/hdds
    */
@@ -166,6 +169,10 @@ public class VolumeInfoMetrics implements MetricsSource {
 
   public void incNumScans() {
     numScans.incr();
+  }
+
+  public void incNumScansSkipped() {
+    numScansSkipped.incr();
   }
 
   @Override

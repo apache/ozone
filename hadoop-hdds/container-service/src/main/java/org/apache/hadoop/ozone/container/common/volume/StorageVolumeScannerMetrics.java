@@ -34,17 +34,20 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 public class StorageVolumeScannerMetrics {
   public static final String SOURCE_NAME = StorageVolumeScannerMetrics.class.getSimpleName();
 
-  @Metric("number of volumes scanned in the current iteration")
-  private MutableGaugeLong numVolumesScanned;
+  @Metric("number of volumes scanned in the last iteration")
+  private MutableGaugeLong numVolumesScannedInLastIteration;
 
   @Metric("number of iterations of scanner completed since the restart")
   private MutableCounterLong numScanIterations;
 
   @Metric("number of data volume sets scanned")
-  private MutableCounterLong numDataVolumesScanned;
+  private MutableGaugeLong numDataVolumesScanned;
 
   @Metric("number of metadata volume sets scanned")
-  private MutableCounterLong numMetadataVolumesScanned;
+  private MutableGaugeLong numMetadataVolumesScanned;
+
+  @Metric("number of checks skipped because the minimum gap since the last check had not elapsed")
+  private MutableCounterLong numIterationsSkipped;
 
   public StorageVolumeScannerMetrics() {
   }
@@ -57,12 +60,12 @@ public class StorageVolumeScannerMetrics {
   /**
    * Return the number of volumes scanned during current {@link StorageVolumeChecker#checkAllVolumeSets()} iteration.
    */
-  public long getNumVolumesScanned() {
-    return numVolumesScanned.value();
+  public long getNumVolumesScannedInLastIteration() {
+    return numVolumesScannedInLastIteration.value();
   }
 
-  public void setNumVolumesScanned(long value) {
-    numVolumesScanned.set(value);
+  public void setNumVolumesScannedInLastIteration(long value) {
+    numVolumesScannedInLastIteration.set(value);
   }
 
   /**
@@ -84,8 +87,8 @@ public class StorageVolumeScannerMetrics {
     return numDataVolumesScanned.value();
   }
 
-  public void incNumDataVolumesScanned() {
-    numDataVolumesScanned.incr();
+  public void incNumDataVolumesScanned(long count) {
+    numDataVolumesScanned.incr(count);
   }
 
   /**
@@ -96,8 +99,20 @@ public class StorageVolumeScannerMetrics {
     return numMetadataVolumesScanned.value();
   }
 
-  public void incNumMetadataVolumesScanned() {
-    numMetadataVolumesScanned.incr();
+  public void incNumMetadataVolumesScanned(long count) {
+    numMetadataVolumesScanned.incr(count);
+  }
+
+  /**
+   * Return the number of checks skipped because the minimum gap since the
+   * last check had not elapsed.
+   */
+  public long getNumIterationsSkipped() {
+    return numIterationsSkipped.value();
+  }
+
+  public void incNumIterationsSkipped() {
+    numIterationsSkipped.incr();
   }
 
   public void unregister() {
