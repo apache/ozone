@@ -116,6 +116,7 @@ public class TestOMBlockPrefetchClient {
     conf.setClass(ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     when(ozoneManager.isAllocateBlockCacheEnabled()).thenReturn(true);
+    when(ozoneManager.getClusterMap()).thenReturn(networkTopology);
     omBlockPrefetchClient = new OMBlockPrefetchClient(ozoneManager, scmBlockLocationProtocol);
     datanodes = createFixedDatanodes(NUM_DATANODES);
     StaticMapping.resetMap();
@@ -223,8 +224,7 @@ public class TestOMBlockPrefetchClient {
     assertEquals(initialCacheSize, queue.size());
 
     List<AllocatedBlock> resultBlocks = omBlockPrefetchClient.getBlocks(
-        BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID,
-        new ExcludeList(), null, networkTopology);
+        BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, new ExcludeList(), null);
 
     verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(),
         anyString());
@@ -238,7 +238,7 @@ public class TestOMBlockPrefetchClient {
   void testBoundaryRequestingZeroBlocks() throws IOException {
     int numBlocksToRequest = 0;
     List<AllocatedBlock> resultBlocks = omBlockPrefetchClient.getBlocks(
-        BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, new ExcludeList(), null, networkTopology);
+        BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, new ExcludeList(), null);
 
     assertTrue(resultBlocks.isEmpty());
     verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(),
@@ -262,7 +262,7 @@ public class TestOMBlockPrefetchClient {
     assertEquals(initialCacheSize, queue.size());
 
     List<AllocatedBlock> resultBlocks = omBlockPrefetchClient.getBlocks(
-        BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, new ExcludeList(), null, networkTopology);
+        BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, new ExcludeList(), null);
 
     verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(),
         anyString());
@@ -291,7 +291,7 @@ public class TestOMBlockPrefetchClient {
     assertEquals(2, queue.size());
 
     List<AllocatedBlock> resultBlocks = omBlockPrefetchClient.getBlocks(
-        BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, new ExcludeList(), null, networkTopology);
+        BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, new ExcludeList(), null);
 
     verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), anyString(), any(),
         anyString());
@@ -329,7 +329,7 @@ public class TestOMBlockPrefetchClient {
         .thenReturn(scmBlocks);
 
     List<AllocatedBlock> resultBlocks = omBlockPrefetchClient.getBlocks(
-        BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, excludeList, null, networkTopology);
+        BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, excludeList, null);
 
     verify(scmBlockLocationProtocol, times(1)).allocateBlock(
         eq(BLOCK_SIZE), eq(numBlocksToRequest), eq(REP_CONFIG), eq(SERVICE_ID), eq(excludeList), eq(null));
@@ -380,8 +380,7 @@ public class TestOMBlockPrefetchClient {
         UNTESTED_REP_CONFIG,
         SERVICE_ID,
         excludeList,
-        clientMachineName,
-        networkTopology);
+        clientMachineName);
 
     verify(scmBlockLocationProtocol, times(1)).allocateBlock(
         eq(BLOCK_SIZE),

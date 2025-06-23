@@ -200,8 +200,7 @@ public class OMBlockPrefetchClient {
 
   @SuppressWarnings("parameternumber")
   public List<AllocatedBlock> getBlocks(long scmBlockSize, int numBlocks, ReplicationConfig replicationConfig,
-                                        String serviceID, ExcludeList excludeList, String clientMachine,
-                                        NetworkTopology clusterMap) throws IOException {
+      String serviceID, ExcludeList excludeList, String clientMachine) throws IOException {
     if (ozoneManager.isAllocateBlockCacheEnabled()) {
       long readStartTime = Time.monotonicNowNanos();
       List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
@@ -240,7 +239,7 @@ public class OMBlockPrefetchClient {
           for (ExpiringAllocatedBlock expiringBlock : tempValidBlocks) {
             AllocatedBlock block = expiringBlock.getBlock();
             List<DatanodeDetails> sortedNodes =
-                sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
+                sortDatanodes(block.getPipeline().getNodes(), clientMachine, ozoneManager.getClusterMap());
             if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
               block = block.toBuilder()
                   .setPipeline(block.getPipeline().copyWithNodesInOrder(sortedNodes))

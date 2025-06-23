@@ -118,7 +118,6 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.isGrpcBlockTokenEnabled(),
             ozoneManager.getOMServiceId(), ozoneManager.getMetrics(),
             keyArgs.getSortDatanodes(), userInfo,
-            ozoneManager.getClusterMap(),
             ozoneManager.getOmBlockPrefetchClient(),
             ozoneManager.getPerfMetrics());
 
