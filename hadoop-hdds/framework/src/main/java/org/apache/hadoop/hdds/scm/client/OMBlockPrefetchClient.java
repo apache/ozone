@@ -291,7 +291,7 @@ public class OMBlockPrefetchClient {
       try {
         List<AllocatedBlock> prefetchedBlocks = captureLatencyNs(metrics.getPrefetchLatencyNs(),
             () -> scmBlockLocationProtocol.allocateBlock(blockSize, blocksToPrefetch,
-            repConfig, serviceID, (ExcludeList) Collections.emptyList(), null));
+            repConfig, serviceID, new ExcludeList(), null));
         if (prefetchedBlocks != null && !prefetchedBlocks.isEmpty()) {
           ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(repConfig);
           if (queue != null) {
