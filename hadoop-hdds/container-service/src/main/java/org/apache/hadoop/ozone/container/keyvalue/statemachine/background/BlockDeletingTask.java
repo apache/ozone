@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.statemachine.background;
 
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.VALUE_ONLY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
@@ -39,7 +40,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
@@ -277,9 +277,7 @@ public class BlockDeletingTask implements BackgroundTask {
     Table<Long, DeletedBlocksTransaction> deleteTxns =
         ((DeleteTransactionStore<Long>) meta.getStore())
             .getDeleteTransactionTable();
-    try (TableIterator<Long,
-        ? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
-             iterator = deleteTxns.iterator()) {
+    try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iterator = deleteTxns.iterator(VALUE_ONLY)) {
       return deleteViaTransactionStore(
           iterator, meta,
           container, dataDir, startTime, schema2Deleter);
@@ -298,9 +296,8 @@ public class BlockDeletingTask implements BackgroundTask {
     Table<String, DeletedBlocksTransaction> deleteTxns =
         ((DeleteTransactionStore<String>) meta.getStore())
             .getDeleteTransactionTable();
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, DeletedBlocksTransaction>>
-             iterator = deleteTxns.iterator(containerData.containerPrefix())) {
+    try (Table.KeyValueIterator<String, DeletedBlocksTransaction> iterator
+        = deleteTxns.iterator(containerData.containerPrefix(), VALUE_ONLY)) {
       return deleteViaTransactionStore(
           iterator, meta,
           container, dataDir, startTime, schema3Deleter);
@@ -308,8 +305,7 @@ public class BlockDeletingTask implements BackgroundTask {
   }
 
   private ContainerBackgroundTaskResult deleteViaTransactionStore(
-      TableIterator<?, ? extends Table.KeyValue<?, DeletedBlocksTransaction>>
-          iter, DBHandle meta, Container container, File dataDir,
+      Table.KeyValueIterator<?, DeletedBlocksTransaction> iter, DBHandle meta, Container container, File dataDir,
       long startTime, Deleter deleter) throws IOException {
     ContainerBackgroundTaskResult crr = new ContainerBackgroundTaskResult();
     if (!checkDataDir(dataDir)) {

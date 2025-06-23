@@ -159,7 +159,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -1459,7 +1458,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     HddsServerUtil.addPBProtocol(conf, ReconfigureProtocolOmPB.class,
         reconfigureProtocolService, rpcServer);
 
-    if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
+    if (conf.getBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       rpcServer.refreshServiceAcl(conf, OMPolicyProvider.getInstance());
     }
