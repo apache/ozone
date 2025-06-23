@@ -56,8 +56,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.client.OMBlockPrefetchClient;
-import org.apache.hadoop.hdds.scm.client.OMBlockPrefetchClient.ExpiringAllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -66,6 +64,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.StaticMapping;
+import org.apache.hadoop.ozone.om.OMBlockPrefetchClient;
+import org.apache.hadoop.ozone.om.OMBlockPrefetchClient.ExpiringAllocatedBlock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -124,7 +124,7 @@ public class TestOMBlockPrefetchClient {
         queueMapField.get(omBlockPrefetchClient);
 
     Class<?> expiringBlockClass =
-        Class.forName("org.apache.hadoop.hdds.scm.client.OMBlockPrefetchClient$ExpiringAllocatedBlock");
+        Class.forName("org.apache.hadoop.ozone.om.OMBlockPrefetchClient$ExpiringAllocatedBlock");
     expiringBlockConstructor = expiringBlockClass.getDeclaredConstructor(AllocatedBlock.class, long.class);
     expiringBlockConstructor.setAccessible(true);
   }

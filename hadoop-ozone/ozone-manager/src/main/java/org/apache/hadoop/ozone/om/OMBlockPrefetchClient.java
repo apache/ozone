@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.client;
+package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL;
@@ -259,10 +259,8 @@ public class OMBlockPrefetchClient {
               replicationConfig, queueSize, minBlocks, blocksToPrefetch);
           submitPrefetchTask(scmBlockSize, blocksToPrefetch, replicationConfig, serviceID);
         }
-
         metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
         return allocatedBlocks;
-
       } else {
         LOG.debug("Bypassing cache for {}. Reason: {}", replicationConfig, queue == null ?
             "Unsupported replication config for caching." : "ExcludeList provided.");
