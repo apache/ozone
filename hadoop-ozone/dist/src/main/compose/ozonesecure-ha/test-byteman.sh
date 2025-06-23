@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:HA-secure
+#suite:misc
 
 set -u -o pipefail
 
@@ -25,15 +25,12 @@ export COMPOSE_DIR
 export SECURITY_ENABLED=true
 export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
-export OM=om1.org
-
-: ${OZONE_BUCKET_KEY_NAME:=key1}
+export COMPOSE_FILE=docker-compose.yaml:byteman.yaml
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
-
-execute_robot_test $OM ozone-fi/byteman_faults_sample.robot
+## Run virtual host test cases
+execute_robot_test om1 ozone-fi/byteman_faults_sample.robot

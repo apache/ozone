@@ -13,19 +13,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+x-byteman-config:
+  &byteman-config
+  environment:
+    BYTEMAN_HOME: /opt/byteman/
+    OZONE_OPTS: -javaagent:/opt/byteman/lib/byteman.jar=listener:true,interface:0.0.0.0,port:${BYTEMAN_PORT}
+    BYTEMAN_PORT: ${BYTEMAN_PORT}
+  volumes:
+    - ../common/byteman-scripts:/opt/byteman/scripts
 
-HDDS_VERSION=${hdds.version}
-HADOOP_IMAGE=apache/hadoop
-HADOOP_VERSION=${hadoop.version}
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_RUNNER_IMAGE=apache/ozone-runner
-OZONE_TESTKRB5_IMAGE=${docker.ozone-testkr5b.image}
-OZONE_VOLUME=./data
-OZONE_OPTS=
-RANGER_DB_IMAGE=postgres
-RANGER_DB_IMAGE_VERSION=12
-RANGER_IMAGE=ghcr.io/adoroszlai/ranger-admin
-RANGER_IMAGE_VERSION=0ae34250d3af672776fca6a53047699adf3afce5-${ranger.version}-8
-RANGER_VERSION=${ranger.version}
-# Byteman agent configuration for different Ozone components
-BYTEMAN_OPTS="-javaagent:/opt/byteman.jar=listener:true"
+services:
+  datanode1:
+    <<: *byteman-config
+  datanode2:
+    <<: *byteman-config
+  datanode3:
+    <<: *byteman-config
+  om1:
+    <<: *byteman-config
+  om2:
+    <<: *byteman-config
+  om3:
+    <<: *byteman-config
+  httpfs:
+    <<: *byteman-config
+  s3g:
+    <<: *byteman-config
+  scm1.org:
+    <<: *byteman-config
+  scm2.org:
+    <<: *byteman-config
+  scm3.org:
+    <<: *byteman-config
+  recon:
+    <<: *byteman-config

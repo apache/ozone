@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
+# distributed with this work for additional consolermation
 # regarding copyright ownership.  The ASF licenses this file
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
@@ -17,7 +17,6 @@
 # under the License.
 
 import subprocess
-import requests
 import json
 from robot.api import logger
 
@@ -29,39 +28,36 @@ class BytemanLibrary:
         """Connect to Byteman agent on specific component"""
         self.byteman_clients[component_name] = {'host': host, 'port': port, 
                                                 'base_url': f"http://{host}:{port}"}
-        logger.info(f"Connected to Byteman agent for {component_name} at {host}:{port}")
+        logger.console(f"Connected to Byteman agent for {component_name} at {host}:{port}")
         
     def add_byteman_rule(self, component_name, rule_file):
         """Add Byteman rule into specific component"""
         client = self.byteman_clients[component_name]
         
         # Use bmsubmit command to load rule
-        cmd = ["bmsubmit", f"-p {client['port']}", f"-l {rule_file}"]
-        
+        cmd = ["bmsubmit", "-h", component_name, "-p", str(client['port']), "-l", rule_file]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"Failed to load rule: {result.stderr}")
-            
-        logger.info(f"Loaded Byteman rule {rule_file} into {component_name}")
+        logger.console(f"Loaded Byteman rule {rule_file} into {component_name}")
         
     def remove_byteman_rule(self, component_name, rule_file):
         """Remove Byteman rule for specific component"""
         client = self.byteman_clients[component_name]
         
-        cmd = ["bmsubmit", f"-p {client['port']}", f"-u {rule_file}"]
-        
+        cmd = ["bmsubmit", "-h", component_name, "-p", str(client['port']), "-u", rule_file]
+        logger.console(cmd)
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"Failed to unload rule: {result.stderr}")
-            
-        logger.info(f"Unloaded Byteman rule {rule_file} from {component_name}")
+        logger.console(f"Unloaded Byteman rule {rule_file} from {component_name}")
         
-    def list_all_byteman_rules(self, component_name):
+    def list_byteman_rules(self, component_name):
         """List all Byteman rules for specific component"""
         client = self.byteman_clients[component_name]
         
-        cmd = ["bmsubmit", f"-p {client['port']}", "-l"]
+        cmd = ["bmsubmit", "-h", component_name, "-p", str(client['port']), "-l"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
-        logger.info(f"Active rules in {component_name}: {result.stdout}")
+        logger.console(f"Active rules in {component_name}: {result.stdout}")
         return result.stdout
