@@ -263,9 +263,9 @@ public class TestTypedTable {
         final int expectedValueSize = keyValue.getValueByteSize();
         assertEquals(ContainerID.getCodec().toPersistedFormat(expectedValue).length, expectedValueSize);
 
-        assertIterator(expectedKey, null, 0, keyOnly);
+        assertIterator(expectedKey, null, -1, keyOnly);
         assertIterator(null, expectedValue, expectedValueSize, valueOnly);
-        assertIterator(null, null, 0, neither);
+        assertIterator(null, null, -1, neither);
       }
 
       assertFalse(keyIterator.hasNext());
