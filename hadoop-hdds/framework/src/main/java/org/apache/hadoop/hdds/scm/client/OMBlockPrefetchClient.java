@@ -90,7 +90,7 @@ public class OMBlockPrefetchClient {
   /**
    * Enum representing the replication configurations that are supported by default. Clients requesting replication configurations outside of these will not benefit from the cache.
    */
-  public enum TestedReplicationConfig {
+  public enum DefaultReplicationConfigsSupported {
     RATIS_THREE(ReplicationConfig.fromProtoTypeAndFactor(
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE)),
 
@@ -111,7 +111,7 @@ public class OMBlockPrefetchClient {
 
     private final ReplicationConfig config;
 
-    TestedReplicationConfig(ReplicationConfig config) {
+    DefaultReplicationConfigsSupported(ReplicationConfig config) {
       this.config = config;
     }
 
@@ -131,7 +131,7 @@ public class OMBlockPrefetchClient {
   }
 
   private void initializeBlockQueueMap() {
-    for (TestedReplicationConfig config : TestedReplicationConfig.values()) {
+    for (DefaultReplicationConfigsSupported config : DefaultReplicationConfigsSupported.values()) {
       blockQueueMap.put(config.getConfig(), new ConcurrentLinkedDeque<>());
     }
   }

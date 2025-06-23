@@ -682,11 +682,11 @@ public final class OzoneConfigKeys {
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
 
   // Sets the upper limit on the number of prefetched blocks OM can hold.
-  public static final String OZONE_OM_PREFETCH_MAX_BLOCKS = "ozone.om.prefetch.max.blocks";
+  public static final String OZONE_OM_PREFETCH_MAX_BLOCKS = "ozone.om.prefetch.blocks.max";
   public static final int OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT = 10000;
 
   // Sets the lower limit on the number of prefetched blocks OM can hold.
-  public static final String OZONE_OM_PREFETCH_MIN_BLOCKS = "ozone.om.prefetch.min.blocks";
+  public static final String OZONE_OM_PREFETCH_MIN_BLOCKS = "ozone.om.prefetch.blocks.min";
   public static final int OZONE_OM_PREFETCH_MIN_BLOCKS_DEFAULT = 500;
 
   // Specifies how often prefetched blocks should be expired in OM.

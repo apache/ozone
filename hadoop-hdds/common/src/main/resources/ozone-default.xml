@@ -4221,7 +4221,7 @@
   <property>
     <name>ozone.om.allocate.block.cache.enabled</name>
     <value>false</value>
-    <tag>OZONE, OM, SCM</tag>
+    <tag>OZONE, OM</tag>
     <description>
       Enable prefetch blocks to be cached within OM.
     </description>
@@ -4792,7 +4792,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.prefetch.max.blocks</name>
+    <name>ozone.om.prefetch.blocks.max</name>
     <value>10000</value>
     <tag>OZONE, OM</tag>
     <description>
@@ -4800,7 +4800,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.prefetch.min.blocks</name>
+    <name>ozone.om.prefetch.blocks.min</name>
     <value>500</value>
     <tag>OZONE, OM</tag>
     <description>

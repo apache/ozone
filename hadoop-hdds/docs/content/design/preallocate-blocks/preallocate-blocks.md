@@ -43,7 +43,7 @@ This design proposes a mechanism to preallocate blocks in OM and cache them for 
 
 #### 2. Block Pre-Fetching:
 
-- For every client write request made, we see if the cache size falls below the minimum threshold (configurable property: ozone.om.prefetch.min.blocks), if yes - the background thread is triggered to asynchronously prefetch blocks from SCM while adhering to a maximum cache size limit (configurable property: ozone.om.prefetch.max.blocks).
+- For every client write request made, we see if the cache size falls below the minimum threshold (configurable property: ozone.om.prefetch.blocks.min), if yes - the background thread is triggered to asynchronously prefetch blocks from SCM while adhering to a maximum cache size limit (configurable property: ozone.om.prefetch.blocks.max).
 - Example: A client write request for x blocks with an empty cache size results in max_threshold blocks (max_threshold - cache_size) being cached asynchronously in the background once the actual client request is through (ref: Figure 2).
 
 #### Figure 2
