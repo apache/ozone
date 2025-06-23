@@ -137,10 +137,8 @@ public class CertificateCodec {
     try {
       return writePEMEncoded(certificate, new StringWriter()).toString();
     } catch (IOException e) {
-      LOG.error("Error in encoding certificate." + certificate
-          .getSubjectDN().toString(), e);
-      throw new SCMSecurityException("PEM Encoding failed for certificate." +
-          certificate.getSubjectDN().toString(), e, PEM_ENCODE_FAILED);
+      throw new SCMSecurityException("Failed to getPEMEncodedString for certificate with subject "
+          + certificate.getSubjectDN(), e, PEM_ENCODE_FAILED);
     }
   }
 
@@ -155,9 +153,13 @@ public class CertificateCodec {
    */
   public static X509Certificate getX509Certificate(String pemEncoded)
       throws CertificateException {
+    return getX509Certificate(pemEncoded.getBytes(DEFAULT_CHARSET));
+  }
+
+  public static X509Certificate getX509Certificate(byte[] pemEncoded)
+      throws CertificateException {
     // ByteArrayInputStream.close(), which is a noop, can be safely ignored.
-    final ByteArrayInputStream input = new ByteArrayInputStream(
-        pemEncoded.getBytes(DEFAULT_CHARSET));
+    final ByteArrayInputStream input = new ByteArrayInputStream(pemEncoded);
     return readX509Certificate(input);
   }
 

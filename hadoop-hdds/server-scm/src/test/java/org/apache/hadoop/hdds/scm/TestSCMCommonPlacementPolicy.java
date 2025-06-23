@@ -68,7 +68,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestSCMCommonPlacementPolicy {
 
-  private NodeManager nodeManager;
+  private MockNodeManager nodeManager;
   private OzoneConfiguration conf;
 
   @BeforeEach
@@ -535,7 +535,7 @@ public class TestSCMCommonPlacementPolicy {
     DummyPlacementPolicy(NodeManager nodeManager, ConfigurationSource conf,
         int rackCnt) {
       this(nodeManager, conf,
-           IntStream.range(0, nodeManager.getAllNodes().size()).boxed()
+           IntStream.range(0, nodeManager.getAllNodeCount()).boxed()
            .collect(Collectors.toMap(Function.identity(),
                    idx -> idx % rackCnt)), rackCnt);
     }
@@ -552,7 +552,7 @@ public class TestSCMCommonPlacementPolicy {
       this.rackCnt = rackCnt;
       this.racks = IntStream.range(0, rackCnt)
       .mapToObj(i -> mock(Node.class)).collect(Collectors.toList());
-      List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
+      final List<? extends DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
       rackMap = datanodeRackMap.entrySet().stream()
               .collect(Collectors.toMap(
                       entry -> datanodeDetails.get(entry.getKey()),

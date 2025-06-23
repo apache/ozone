@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -138,13 +137,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
   HddsDatanodeService getHddsDatanode(DatanodeDetails dn) throws IOException;
 
   /**
-   * Returns a {@link ReconServer} instance.
-   *
-   * @return {@link ReconServer} instance if it is initialized, otherwise null.
-   */
-  ReconServer getReconServer();
-
-  /**
    * Returns an {@link OzoneClient} to access the {@link MiniOzoneCluster}.
    * The caller is responsible for closing the client after use.
    *
@@ -170,11 +162,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * Restarts OzoneManager instance.
    */
   void restartOzoneManager() throws IOException;
-
-  /**
-   * Restarts Recon instance.
-   */
-  void restartReconServer() throws Exception;
 
   /**
    * Restart a particular HddsDatanode.
@@ -207,16 +194,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * @param dn HddsDatanode in the MiniOzoneCluster
    */
   void shutdownHddsDatanode(DatanodeDetails dn) throws IOException;
-
-  /**
-   * Start Recon.
-   */
-  void startRecon();
-
-  /**
-   * Stop Recon.
-   */
-  void stopRecon();
 
   /**
    * Shutdown the MiniOzoneCluster and delete the storage dirs.
@@ -275,8 +252,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     protected String scmId = UUID.randomUUID().toString();
     protected String omId = UUID.randomUUID().toString();
-
-    protected boolean includeRecon = false;
 
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
@@ -374,11 +349,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     public Builder setDatanodeFactory(DatanodeFactory factory) {
       this.dnFactory = factory;
-      return this;
-    }
-
-    public Builder includeRecon(boolean include) {
-      this.includeRecon = include;
       return this;
     }
 

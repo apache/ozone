@@ -39,6 +39,9 @@ public class ListBucketResponse {
   @XmlElement(name = "Bucket")
   private List<BucketMetadata> buckets = new ArrayList<>();
 
+  @XmlElement(name = "Owner")
+  private S3Owner owner;
+  
   public List<BucketMetadata> getBuckets() {
     return buckets;
   }
@@ -54,5 +57,13 @@ public class ListBucketResponse {
 
   public void addBucket(BucketMetadata bucket) {
     buckets.add(bucket);
+  }
+
+  public S3Owner getOwner() {
+    return owner;
+  }
+
+  public void setOwner(S3Owner owner) {
+    this.owner = owner;
   }
 }

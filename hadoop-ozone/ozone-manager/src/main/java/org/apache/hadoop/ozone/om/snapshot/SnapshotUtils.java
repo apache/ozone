@@ -93,6 +93,11 @@ public final class SnapshotUtils {
                                              SnapshotChainManager chainManager,
                                              UUID snapshotId) throws IOException {
     String tableKey = chainManager.getTableKey(snapshotId);
+    if (tableKey == null) {
+      LOG.error("Snapshot not found with UUID '{}'", snapshotId);
+      throw new OMException("Snapshot not found with UUID '" + snapshotId + "'",
+          FILE_NOT_FOUND);
+    }
     return SnapshotUtils.getSnapshotInfo(ozoneManager, tableKey);
   }
 
@@ -320,7 +325,7 @@ public final class SnapshotUtils {
     // at the time of snapshot and key deletion as blocks can be appended.
     // If the objectId is same then the key is same.
     if (prevKeyInfo.isHsync() && deletedKeyInfo.isHsync()) {
-      return true;
+      return prevKeyInfo.getObjectID() == deletedKeyInfo.getObjectID();
     }
 
     if (prevKeyInfo.getKeyLocationVersions().size() !=

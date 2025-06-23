@@ -149,7 +149,7 @@ public class  TestMultiRaftSetup {
     nodeManager.getAllNodes().forEach((dn) -> {
       Collection<DatanodeDetails> peers = nodeManager.getPeerList(dn);
       assertThat(peers).doesNotContain(dn);
-      List<DatanodeDetails> trimList = nodeManager.getAllNodes();
+      List<? extends DatanodeDetails> trimList = nodeManager.getAllNodes();
       trimList.remove(dn);
       assertThat(peers).containsAll(trimList);
     });

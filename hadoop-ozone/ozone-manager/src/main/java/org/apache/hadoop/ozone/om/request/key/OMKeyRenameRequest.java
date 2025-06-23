@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -76,9 +77,10 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     Preconditions.checkNotNull(renameKeyRequest);
 
     KeyArgs renameKeyArgs = renameKeyRequest.getKeyArgs();
-    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
-        .setKeyName(renameKeyRequest.getToKeyName()).build();
-    validateKey(ozoneManager, validateArgs);
+
+    if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
+      OmUtils.validateKeyName(renameKeyRequest.getToKeyName());
+    }
 
     String srcKey = extractSrcKey(renameKeyArgs);
     String dstKey = extractDstKey(renameKeyRequest);

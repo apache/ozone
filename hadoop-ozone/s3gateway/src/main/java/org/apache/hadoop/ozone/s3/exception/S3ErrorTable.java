@@ -150,6 +150,16 @@ public final class S3ErrorTable {
       HTTP_FORBIDDEN
   );
 
+  public static final OS3Exception INVALID_STORAGE_CLASS = new OS3Exception(
+      "InvalidStorageClass", "The storage class that you specified is not valid. " +
+      "Provide a supported storage class[STANDARD|REDUCED_REDUNDANCY|STANDARD_IA] or " +
+      "a valid custom EC storage config for if using STANDARD_IA.",
+      HTTP_BAD_REQUEST);
+
+  public static final OS3Exception BUCKET_OWNER_MISMATCH = new OS3Exception(
+      "Access Denied", "User doesn't have permission to access this resource due to a " +
+      "bucket ownership mismatch.", HTTP_FORBIDDEN);
+
   private static Function<Exception, OS3Exception> generateInternalError =
       e -> new OS3Exception("InternalError", e.getMessage(), HTTP_INTERNAL_ERROR);
 

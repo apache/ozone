@@ -30,6 +30,7 @@ source "${_testlib_dir}/../smoketest/testlib.sh"
 : ${OZONE_COMPOSE_RUNNING:=false}
 : ${SECURITY_ENABLED:=false}
 : ${SCM:=scm}
+: ${SKIP_APACHE_VERIFY_DOWNLOAD:=${CI:-false}}
 
 # Check if running from output of Maven build or from source
 _is_build() {
@@ -273,7 +274,7 @@ reorder_om_nodes() {
 
   if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
     for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om'); do
-      docker exec "${c}" sh -c \
+      docker exec "${c}" bash -c \
         "if [[ -f /etc/hadoop/ozone-site.xml ]]; then \
           sed -i -e 's/om1,om2,om3/${new_order}/' /etc/hadoop/ozone-site.xml; \
           echo 'Replaced OM order with ${new_order} in ${c}'; \
@@ -289,7 +290,7 @@ create_stack_dumps() {
     while read -r pid procname; do
       echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
       docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
-    done < <(docker exec "${c}" sh -c "jps | grep -v Jps" || true)
+    done < <(docker exec "${c}" bash -c "jps | grep -v Jps" || true)
   done
 }
 
@@ -608,4 +609,31 @@ wait_for_root_certificate(){
   done
   echo "Timed out waiting on $count root certificates. Current timestamp " $(date +"%T")
   return 1
+}
+
+download_if_not_exists() {
+  local url="$1"
+  local f="$2"
+
+  if [[ -e "${f}" ]]; then
+    echo "${f} already downloaded"
+  else
+    echo "Downloading ${f} from ${url}"
+    curl --fail --location --output "${f}" --show-error --silent "${url}" || rm -fv "${f}"
+  fi
+}
+
+download_and_verify_apache_release() {
+  local remote_path="$1"
+
+  local f="$(basename "${remote_path}")"
+  local base_url="${APACHE_MIRROR_URL:-https://www.apache.org/dyn/closer.lua?action=download&filename=}"
+  local checksum_base_url="${APACHE_OFFICIAL_URL:-https://downloads.apache.org/}"
+  local download_dir="${DOWNLOAD_DIR:-/tmp}"
+
+  download_if_not_exists "${base_url}${remote_path}" "${download_dir}/${f}"
+  if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" != "true" ]]; then
+    download_if_not_exists "${checksum_base_url}${remote_path}.asc"  "${download_dir}/${f}.asc"
+    gpg --verify "${download_dir}/${f}.asc" "${download_dir}/${f}" || exit 1
+  fi
 }
