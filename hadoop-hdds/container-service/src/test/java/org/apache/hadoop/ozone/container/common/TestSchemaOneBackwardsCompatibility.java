@@ -359,8 +359,7 @@ public class TestSchemaOneBackwardsCompatibility {
 
       for (Table.KeyValue<String, ChunkInfoList> chunkListKV: deletedBlocks) {
         preUpgradeBlocks.add(chunkListKV.getKey());
-        assertThrows(IOException.class, () -> chunkListKV.getValue(),
-            "No exception thrown when trying to retrieve old deleted blocks values as chunk lists.");
+        assertNull(chunkListKV.getValue());
       }
 
       assertEquals(TestDB.NUM_DELETED_BLOCKS, preUpgradeBlocks.size());

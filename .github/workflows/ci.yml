@@ -45,7 +45,7 @@ jobs:
       integration-suites: ${{ steps.integration-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
-      needs-build: ${{ steps.selective-checks.outputs.needs-build || steps.selective-checks.outputs.needs-integration-tests }}
+      needs-build: ${{ steps.selective-checks.outputs.needs-build }}
       needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
@@ -111,7 +111,7 @@ jobs:
   build:
     needs:
       - build-info
-    if: needs.build-info.outputs.needs-build == 'true'
+    if: needs.build-info.outputs.needs-build == 'true' || needs.build-info.outputs.needs-integration-tests == 'true'
     uses: ./.github/workflows/check.yml
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}

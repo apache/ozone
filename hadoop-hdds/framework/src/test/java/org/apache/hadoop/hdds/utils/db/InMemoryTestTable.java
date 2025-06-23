@@ -40,10 +40,6 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void close() {
-  }
-
-  @Override
   public void put(KEY key, VALUE value) {
     map.put(key, value);
   }
