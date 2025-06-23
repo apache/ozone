@@ -66,6 +66,7 @@ import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.om.OMBlockPrefetchClient;
 import org.apache.hadoop.ozone.om.OMBlockPrefetchClient.ExpiringAllocatedBlock;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,6 +84,8 @@ public class TestOMBlockPrefetchClient {
   private static final Logger LOG = LoggerFactory.getLogger(TestOMBlockPrefetchClient.class);
   @Mock
   private ScmBlockLocationProtocol scmBlockLocationProtocol;
+  @Mock
+  private OzoneManager ozoneManager;
   @Mock
   private NetworkTopology networkTopology;
   private OMBlockPrefetchClient omBlockPrefetchClient;
@@ -112,7 +115,8 @@ public class TestOMBlockPrefetchClient {
     conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME, true);
     conf.setClass(ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
-    omBlockPrefetchClient = new OMBlockPrefetchClient(scmBlockLocationProtocol, true);
+    when(ozoneManager.isAllocateBlockCacheEnabled()).thenReturn(true);
+    omBlockPrefetchClient = new OMBlockPrefetchClient(ozoneManager, scmBlockLocationProtocol);
     datanodes = createFixedDatanodes(NUM_DATANODES);
     StaticMapping.resetMap();
     StaticMapping.addNodeToRack(null, CLIENT_RACK);

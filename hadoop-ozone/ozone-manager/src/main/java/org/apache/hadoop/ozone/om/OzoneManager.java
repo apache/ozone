@@ -618,7 +618,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     scmTopologyClient = new ScmTopologyClient(scmBlockClient);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
         configuration);
-    this.omBlockPrefetchClient = new OMBlockPrefetchClient(scmBlockClient, isAllocateBlockCacheEnabled);
+    this.omBlockPrefetchClient = new OMBlockPrefetchClient(this, scmBlockClient);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
 
@@ -1074,6 +1074,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public boolean isStrictS3() {
     return isStrictS3;
+  }
+
+  /**
+   * Return config value of {@link OMConfigKeys#OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED}.
+   */
+  public boolean isAllocateBlockCacheEnabled() {
+    return isAllocateBlockCacheEnabled;
   }
 
   /**

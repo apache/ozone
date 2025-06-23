@@ -70,9 +70,9 @@ import org.slf4j.LoggerFactory;
 public class OMBlockPrefetchClient {
   private static final Logger LOG = LoggerFactory.getLogger(OMBlockPrefetchClient.class);
   private final ScmBlockLocationProtocol scmBlockLocationProtocol;
+  private final OzoneManager ozoneManager;
   private int maxBlocks;
   private int minBlocks;
-  private final boolean isAllocateBlockCacheEnabled;
   private DNSToSwitchMapping dnsToSwitchMapping;
   private final Map<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>> blockQueueMap =
       new ConcurrentHashMap<>();
@@ -81,9 +81,9 @@ public class OMBlockPrefetchClient {
   private ExecutorService prefetchExecutor;
   private final AtomicBoolean isPrefetching = new AtomicBoolean(false);
 
-  public OMBlockPrefetchClient(ScmBlockLocationProtocol scmBlockClient, boolean isAllocateBlockCacheEnabled) {
+  public OMBlockPrefetchClient(OzoneManager ozoneManager, ScmBlockLocationProtocol scmBlockClient) {
+    this.ozoneManager = ozoneManager;
     this.scmBlockLocationProtocol = scmBlockClient;
-    this.isAllocateBlockCacheEnabled = isAllocateBlockCacheEnabled;
     initializeBlockQueueMap();
   }
 
@@ -202,7 +202,7 @@ public class OMBlockPrefetchClient {
   public List<AllocatedBlock> getBlocks(long scmBlockSize, int numBlocks, ReplicationConfig replicationConfig,
                                         String serviceID, ExcludeList excludeList, String clientMachine,
                                         NetworkTopology clusterMap) throws IOException {
-    if (isAllocateBlockCacheEnabled) {
+    if (ozoneManager.isAllocateBlockCacheEnabled()) {
       long readStartTime = Time.monotonicNowNanos();
       List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
       ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
