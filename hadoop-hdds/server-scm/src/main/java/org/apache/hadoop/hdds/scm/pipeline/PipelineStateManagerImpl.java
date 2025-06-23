@@ -303,15 +303,10 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     lock.writeLock().lock();
     try {
-      if (pipelineStore != null) {
-        pipelineStore.close();
-        pipelineStore = null;
-      }
-    } catch (Exception ex) {
-      LOG.error("Pipeline store close failed", ex);
+      pipelineStore = null;
     } finally {
       lock.writeLock().unlock();
     }
@@ -322,7 +317,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       throws IOException {
     lock.writeLock().lock();
     try {
-      pipelineStore.close();
       this.pipelineStateMap = new PipelineStateMap();
       this.pipelineStore = store;
       initialize();

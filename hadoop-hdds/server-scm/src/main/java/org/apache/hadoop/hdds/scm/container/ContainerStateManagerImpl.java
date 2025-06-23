@@ -532,20 +532,10 @@ public final class ContainerStateManagerImpl
   public void reinitialize(
       Table<ContainerID, ContainerInfo> store) throws IOException {
     try (AutoCloseableLock ignored = writeLock()) {
-      close();
       this.containerStore = store;
       this.containers = new ContainerStateMap();
       this.lastUsedMap = new ConcurrentHashMap<>();
       initialize();
-    }
-  }
-
-  @Override
-  public void close() throws IOException {
-    try {
-      containerStore.close();
-    } catch (Exception e) {
-      throw new IOException(e);
     }
   }
 

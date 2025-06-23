@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
  * different kind of tables.
  */
 @InterfaceStability.Evolving
-public interface Table<KEY, VALUE> extends AutoCloseable {
+public interface Table<KEY, VALUE> {
 
   /**
    * Puts a key-value pair into the store.
@@ -338,8 +338,9 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       return value;
     }
 
+    /** @return the value serialized byte size if it is available; otherwise, return -1. */
     public int getValueByteSize() {
-      return valueByteSize;
+      return value != null ? valueByteSize : -1;
     }
 
     @Override
@@ -366,7 +367,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   }
 
   static <K, V> KeyValue<K, V> newKeyValue(K key, V value) {
-    return newKeyValue(key, value, 0);
+    return newKeyValue(key, value, -1);
   }
 
   static <K, V> KeyValue<K, V> newKeyValue(K key, V value, int valueByteSize) {

@@ -123,11 +123,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   private KEY decodeKey(byte[] key) throws CodecException {
-    return key != null && key.length > 0 ? keyCodec.fromPersistedFormat(key) : null;
+    return key != null ? keyCodec.fromPersistedFormat(key) : null;
   }
 
   private VALUE decodeValue(byte[] value) throws CodecException {
-    return value != null && value.length > 0 ? valueCodec.fromPersistedFormat(value) : null;
+    return value != null ? valueCodec.fromPersistedFormat(value) : null;
   }
 
   @Override
@@ -415,12 +415,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void close() {
-    rawTable.close();
-
-  }
-
-  @Override
   public void addCacheEntry(CacheKey<KEY> cacheKey,
       CacheValue<VALUE> cacheValue) {
     // This will override the entry if there is already entry for this key.
@@ -550,13 +544,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       @Override
       KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw) throws CodecException {
         final CodecBuffer keyBuffer = raw.getKey();
-        final KEY key = keyBuffer.readableBytes() > 0 ? keyCodec.fromCodecBuffer(keyBuffer) : null;
+        final KEY key = keyBuffer != null ? keyCodec.fromCodecBuffer(keyBuffer) : null;
 
         final CodecBuffer valueBuffer = raw.getValue();
-        final int valueByteSize = valueBuffer.readableBytes();
-        final VALUE value = valueByteSize > 0 ? valueCodec.fromCodecBuffer(valueBuffer) : null;
-
-        return Table.newKeyValue(key, value, valueByteSize);
+        return valueBuffer == null ? Table.newKeyValue(key, null)
+            : Table.newKeyValue(key, valueCodec.fromCodecBuffer(valueBuffer), valueBuffer.readableBytes());
       }
     };
   }
@@ -577,8 +569,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     KeyValue<KEY, VALUE> convert(KeyValue<byte[], byte[]> raw) throws CodecException {
+      final KEY key = decodeKey(raw.getKey());
       final byte[] valueBytes = raw.getValue();
-      return Table.newKeyValue(decodeKey(raw.getKey()), decodeValue(valueBytes), valueBytes.length);
+      return valueBytes == null ? Table.newKeyValue(key, null)
+          : Table.newKeyValue(key, decodeValue(valueBytes), valueBytes.length);
     }
   }
 
