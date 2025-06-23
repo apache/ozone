@@ -274,15 +274,15 @@ public class ReconUtils {
       isDirectoryPresent = true;
     }
 
-    Collections.reverse(pathSegments);
     StringBuilder fullPath = new StringBuilder();
-
-    // Build the components in a list, then reverse and join once
     fullPath.append(volumeName).append(OM_KEY_PREFIX)
         .append(bucketName).append(OM_KEY_PREFIX);
-    for (String segment : pathSegments) {
-      fullPath.append(segment).append(OM_KEY_PREFIX);
+
+    // Build the components in a list, then reverse and join once
+    for (int i = pathSegments.size() - 1; i >= 0; i--) {
+      fullPath.append(pathSegments.get(i)).append(OM_KEY_PREFIX);
     }
+
     // TODO - why is this needed? It seems lke it should handle double slashes in the path name,
     //        but its not clear how they get there. This normalize call is quite expensive as it
     //        creates several objects (URI, PATH, back to string). There was a bug fixed above
