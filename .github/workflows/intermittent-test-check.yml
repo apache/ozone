@@ -65,7 +65,6 @@ env:
   RATIS_REPO: ${{ github.event.inputs.ratis-repo }}
   RATIS_VERSION: ${{ github.event.inputs.ratis-ref }}
   JAVA_VERSION: ${{ github.event.inputs.java-version }}
-  OUTPUT_DIR: flaky-test-check-ci-results
   # Surefire 3.0.0-M4 is used because newer versions do not reliably kill the fork on timeout
   # SUREFIRE-1722, SUREFIRE-1815
   SUREFIRE_VERSION: 3.0.0-M4
@@ -132,8 +131,8 @@ jobs:
       - name: Find modules
         id: modules
         run: |
-          grep --text -e 'surefire:${{ env.SUREFIRE_VERSION }}:test' -e 'Running org.apache' ${{ env.OUTPUT_DIR }}/output.log | grep --text -B1 'Running org.apache'
-          modules=$(grep --text -e 'surefire:${{ env.SUREFIRE_VERSION }}:test' -e 'Running org.apache' ${{ env.OUTPUT_DIR }}/output.log | grep --text -B1 'Running org.apache' \
+          grep --text -e 'surefire:${{ env.SUREFIRE_VERSION }}:test' -e 'Running org.apache' target/unit/output.log | grep --text -B1 'Running org.apache'
+          modules=$(grep --text -e 'surefire:${{ env.SUREFIRE_VERSION }}:test' -e 'Running org.apache' target/unit/output.log | grep --text -B1 'Running org.apache' \
               | grep --text surefire | cut -f2 -d'@' | awk '{ print $1 }' | sed 's/^/:/' | xargs | sed -e 's/ /,/g')
           echo "modules=$modules" >> $GITHUB_OUTPUT
         if: ${{ !cancelled() }}
@@ -276,14 +275,14 @@ jobs:
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh ${{ env.OUTPUT_DIR }}/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: ${{ failure() }}
         with:
           name: result-${{ github.run_number }}-${{ github.run_id }}-split-${{ matrix.split }}
-          path: ${{ env.OUTPUT_DIR }}
+          path: target/unit
   count-failures:
     if: ${{ failure() }}
     needs: run-test
