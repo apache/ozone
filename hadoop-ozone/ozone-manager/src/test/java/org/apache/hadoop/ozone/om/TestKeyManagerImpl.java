@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.utils.MapBackedTableIterator;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -74,7 +75,8 @@ public class TestKeyManagerImpl {
       Class<V> valueClass, Table<String, V> table, int numberOfVolumes, int numberOfBucketsPerVolume,
       int numberOfKeysPerBucket, String volumeNamePrefix, String bucketNamePrefix, String keyPrefix,
       Integer volumeNumberFilter, Integer bucketNumberFilter, Integer startVolumeNumber, Integer startBucketNumber,
-      Integer startKeyNumber, int numberOfEntries) throws IOException {
+      Integer startKeyNumber, CheckedFunction<Table.KeyValue<String, V>, Boolean, IOException> filter,
+      int numberOfEntries) throws IOException {
     TreeMap<String, V> values = new TreeMap<>();
     List<Table.KeyValue<String, V>> keyValues = new ArrayList<>();
     String startKey = startVolumeNumber == null || startBucketNumber == null || startKeyNumber == null ? null
@@ -98,7 +100,13 @@ public class TestKeyManagerImpl {
     }
 
     when(table.iterator(anyString())).thenAnswer(i -> new MapBackedTableIterator<>(values, i.getArgument(0)));
-    return keyValues.subList(0, Math.min(numberOfEntries, keyValues.size()));
+    return keyValues.stream().filter(kv -> {
+      try {
+        return filter.apply(kv);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }).limit(numberOfEntries).collect(Collectors.toList());
   }
 
   @ParameterizedTest
@@ -119,20 +127,18 @@ public class TestKeyManagerImpl {
     KeyManagerImpl km = new KeyManagerImpl(null, null, metadataManager, configuration, null, null, null);
     Table<String, RepeatedOmKeyInfo> mockedDeletedTable = Mockito.mock(Table.class);
     when(metadataManager.getDeletedTable()).thenReturn(mockedDeletedTable);
+    CheckedFunction<Table.KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter =
+        (kv) -> Long.parseLong(kv.getKey().split(keyPrefix)[1]) % 2 == 0;
     List<Table.KeyValue<String, List<OmKeyInfo>>> expectedEntries = mockTableIterator(
         RepeatedOmKeyInfo.class, mockedDeletedTable, numberOfVolumes, numberOfBucketsPerVolume, numberOfKeysPerBucket,
         volumeNamePrefix, bucketNamePrefix, keyPrefix, volumeNumber, bucketNumber, startVolumeNumber, startBucketNumber,
-        startKeyNumber, numberOfEntries).stream()
+        startKeyNumber, filter, numberOfEntries).stream()
         .map(kv -> {
-          try {
-            String key = kv.getKey();
-            RepeatedOmKeyInfo value = kv.getValue();
-            List<OmKeyInfo> omKeyInfos = Collections.singletonList(Mockito.mock(OmKeyInfo.class));
-            when(value.cloneOmKeyInfoList()).thenReturn(omKeyInfos);
-            return Table.newKeyValue(key, omKeyInfos);
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
+          String key = kv.getKey();
+          RepeatedOmKeyInfo value = kv.getValue();
+          List<OmKeyInfo> omKeyInfos = Collections.singletonList(Mockito.mock(OmKeyInfo.class));
+          when(value.cloneOmKeyInfoList()).thenReturn(omKeyInfos);
+          return Table.newKeyValue(key, omKeyInfos);
         }).collect(Collectors.toList());
     String volumeName = volumeNumber == null ? null : (String.format("%s%010d", volumeNamePrefix, volumeNumber));
     String bucketName = bucketNumber == null ? null : (String.format("%s%010d", bucketNamePrefix, bucketNumber));
@@ -140,9 +146,10 @@ public class TestKeyManagerImpl {
         : (String.format("/%s%010d/%s%010d/%s%010d", volumeNamePrefix, startVolumeNumber, bucketNamePrefix,
         startBucketNumber, keyPrefix, startKeyNumber));
     if (expectedException != null) {
-      assertThrows(expectedException, () -> km.getDeletedKeyEntries(volumeName, bucketName, startKey, numberOfEntries));
+      assertThrows(expectedException, () -> km.getDeletedKeyEntries(volumeName, bucketName, startKey, filter,
+          numberOfEntries));
     } else {
-      assertEquals(expectedEntries, km.getDeletedKeyEntries(volumeName, bucketName, startKey, numberOfEntries));
+      assertEquals(expectedEntries, km.getDeletedKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
     }
   }
 
@@ -164,19 +171,22 @@ public class TestKeyManagerImpl {
     KeyManagerImpl km = new KeyManagerImpl(null, null, metadataManager, configuration, null, null, null);
     Table<String, String> mockedRenameTable = Mockito.mock(Table.class);
     when(metadataManager.getSnapshotRenamedTable()).thenReturn(mockedRenameTable);
+    CheckedFunction<Table.KeyValue<String, String>, Boolean, IOException> filter =
+        (kv) -> Long.parseLong(kv.getKey().split("/")[3]) % 2 == 0;
     List<Table.KeyValue<String, String>> expectedEntries = mockTableIterator(
         String.class, mockedRenameTable, numberOfVolumes, numberOfBucketsPerVolume, numberOfKeysPerBucket,
         volumeNamePrefix, bucketNamePrefix, keyPrefix, volumeNumber, bucketNumber, startVolumeNumber, startBucketNumber,
-        startKeyNumber, numberOfEntries);
+        startKeyNumber, filter, numberOfEntries);
     String volumeName = volumeNumber == null ? null : (String.format("%s%010d", volumeNamePrefix, volumeNumber));
     String bucketName = bucketNumber == null ? null : (String.format("%s%010d", bucketNamePrefix, bucketNumber));
     String startKey = startVolumeNumber == null || startBucketNumber == null || startKeyNumber == null ? null
         : (String.format("/%s%010d/%s%010d/%s%010d", volumeNamePrefix, startVolumeNumber, bucketNamePrefix,
         startBucketNumber, keyPrefix, startKeyNumber));
     if (expectedException != null) {
-      assertThrows(expectedException, () -> km.getRenamesKeyEntries(volumeName, bucketName, startKey, numberOfEntries));
+      assertThrows(expectedException, () -> km.getRenamesKeyEntries(volumeName, bucketName, startKey,
+          filter, numberOfEntries));
     } else {
-      assertEquals(expectedEntries, km.getRenamesKeyEntries(volumeName, bucketName, startKey, numberOfEntries));
+      assertEquals(expectedEntries, km.getRenamesKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
     }
   }
 
@@ -202,7 +212,7 @@ public class TestKeyManagerImpl {
     List<Table.KeyValue<String, OmKeyInfo>> expectedEntries = mockTableIterator(
         OmKeyInfo.class, mockedDeletedDirTable, numberOfVolumes, numberOfBucketsPerVolume, numberOfKeysPerBucket,
         volumeNamePrefix, bucketNamePrefix, keyPrefix, volumeNumber, bucketNumber, startVolumeNumber, startBucketNumber,
-        startKeyNumber, numberOfEntries);
+        startKeyNumber, (kv) -> true, numberOfEntries);
     String volumeName = volumeNumber == null ? null : (String.format("%s%010d", volumeNamePrefix, volumeNumber));
     String bucketName = bucketNumber == null ? null : (String.format("%s%010d", bucketNamePrefix, bucketNumber));
     if (expectedException != null) {

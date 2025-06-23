@@ -36,6 +36,8 @@ public interface IOzoneManagerLock {
   OMLockDetails acquireWriteLocks(Resource resource,
                                  Collection<String[]> resources);
 
+  OMLockDetails acquireResourceWriteLock(Resource resource);
+
   boolean acquireMultiUserLock(String firstUser, String secondUser);
 
   void releaseMultiUserLock(String firstUser, String secondUser);
@@ -45,6 +47,8 @@ public interface IOzoneManagerLock {
 
   OMLockDetails releaseWriteLocks(Resource resource,
                                  Collection<String[]> resources);
+
+  OMLockDetails releaseResourceWriteLock(Resource resource);
 
   OMLockDetails releaseReadLock(Resource resource,
                                 String... resources);

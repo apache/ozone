@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -176,15 +177,12 @@ public class BlockManagerImpl implements BlockManager {
         // block length is used, And also on restart the blocks committed to DB
         // is only used to compute the bytes used. This is done to keep the
         // current behavior and avoid DB write during write chunk operation.
-        db.getStore().getMetadataTable().putWithBatch(
-            batch, containerData.getBytesUsedKey(),
-            containerData.getBytesUsed());
+        final ContainerData.BlockByteAndCounts b = containerData.getStatistics().getBlockByteAndCounts();
+        db.getStore().getMetadataTable().putWithBatch(batch, containerData.getBytesUsedKey(), b.getBytes());
 
         // Set Block Count for a container.
         if (incrBlockCount) {
-          db.getStore().getMetadataTable().putWithBatch(
-              batch, containerData.getBlockCountKey(),
-              containerData.getBlockCount() + 1);
+          db.getStore().getMetadataTable().putWithBatch(batch, containerData.getBlockCountKey(), b.getCount() + 1);
         }
 
         db.getStore().getBatchHandler().commitBatchOperation(batch);
@@ -197,7 +195,7 @@ public class BlockManagerImpl implements BlockManager {
       // Increment block count and add block to pendingPutBlockCache
       // in-memory after the DB update.
       if (incrBlockCount) {
-        containerData.incrBlockCount();
+        containerData.getStatistics().incrementBlockCount();
       }
 
       // If the Block is not in PendingPutBlockCache (and it is not endOfBlock),
@@ -353,7 +351,7 @@ public class BlockManagerImpl implements BlockManager {
         result = new ArrayList<>();
         String startKey = (startLocalID == -1) ? cData.startKeyEmpty()
             : cData.getBlockKey(startLocalID);
-        List<? extends Table.KeyValue<String, BlockData>> range =
+        List<Table.KeyValue<String, BlockData>> range =
             db.getStore().getBlockDataTable()
                 .getSequentialRangeKVs(startKey, count,
                     cData.containerPrefix(), cData.getUnprefixedKeyFilter());
