@@ -1,5 +1,5 @@
 *** Variables ***
-${RULE}    /opt/hadoop/compose/common/byteman-scripts/skip-put-block.btm
+${RULE}    /opt/hadoop/share/ozone/byteman/skip-put-block.btm
 ${vol}     vol1
 ${buck}    buck1
 ${key}     key1

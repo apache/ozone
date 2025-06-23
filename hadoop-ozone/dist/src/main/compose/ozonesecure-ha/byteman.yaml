@@ -17,10 +17,8 @@ x-byteman-config:
   &byteman-config
   environment:
     BYTEMAN_HOME: /opt/byteman/
-    OZONE_OPTS: -javaagent:/opt/byteman/lib/byteman.jar=listener:true,interface:0.0.0.0,port:${BYTEMAN_PORT}
+    OZONE_OPTS: -javaagent:/opt/byteman.jar=listener:true,interface:0.0.0.0,port:${BYTEMAN_PORT}
     BYTEMAN_PORT: ${BYTEMAN_PORT}
-  volumes:
-    - ../common/byteman-scripts:/opt/byteman/scripts
 
 services:
   datanode1:
