@@ -21,12 +21,15 @@ import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_AN
 import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ONLY;
 import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.NEITHER;
 import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.VALUE_ONLY;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -56,7 +59,7 @@ import org.rocksdb.RocksDB;
  */
 public class TestTypedTable {
   private final List<String> families = Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-      "First", "Second", "Third", "Fourth", "Fifth", "Sixth");
+      "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth");
 
   private RDBStore rdb;
   private final List<UncheckedAutoCloseable> closeables = new ArrayList<>();
@@ -110,6 +113,74 @@ public class TestTypedTable {
     }
     System.out.println("generated " + map.size() + " keys");
     return map;
+  }
+
+  @Test
+  public void testEmptyByteArray() throws Exception {
+    final TypedTable<byte[], byte[]> table = newTypedTable(7, ByteArrayCodec.get(), ByteArrayCodec.get());
+    final byte[] empty = {};
+    final byte[] nonEmpty = "123".getBytes(StandardCharsets.UTF_8);
+    runTestSingleKeyValue(empty, empty, table);
+    runTestSingleKeyValue(empty, nonEmpty, table);
+    runTestSingleKeyValue(nonEmpty, nonEmpty, table);
+    runTestSingleKeyValue(nonEmpty, empty, table);
+  }
+
+  static <K, V> void runTestSingleKeyValue(K key, V value, TypedTable<K, V> table) throws Exception {
+    // The table is supposed to be empty
+    try (Table.KeyValueIterator<K, V> i = table.iterator()) {
+      assertFalse(i.hasNext());
+    }
+    assertNull(table.get(key));
+
+    // test put and then get
+    table.put(key, value);
+    assertEqualsSupportingByteArray(value, table.get(key));
+
+    // test iterator
+    try (Table.KeyValueIterator<K, V> i = table.iterator()) {
+      assertTrue(i.hasNext());
+      final Table.KeyValue<K, V> next = i.next();
+      assertEqualsSupportingByteArray(key, next.getKey());
+      assertEqualsSupportingByteArray(value, next.getValue());
+      assertFalse(i.hasNext());
+    }
+
+    // test delete
+    table.delete(key);
+    assertNull(table.get(key));
+  }
+
+  static <T> void assertEqualsSupportingByteArray(T left, T right) {
+    if (left instanceof byte[] || right instanceof byte[]) {
+      assertArrayEquals((byte[]) left, (byte[]) right);
+    } else {
+      assertEquals(left, right);
+    }
+  }
+
+  @Test
+  public void testEmptyStringCodecBuffer() throws Exception {
+    final StringCodec codec = StringCodec.get();
+    assertTrue(codec.supportCodecBuffer());
+    runTestEmptyString(codec);
+  }
+
+  @Test
+  public void testEmptyStringByteArray() throws Exception {
+    final Codec<String> codec = CodecTestUtil.newCodecWithoutCodecBuffer(StringCodec.get());
+    assertFalse(codec.supportCodecBuffer());
+    runTestEmptyString(codec);
+  }
+
+  void runTestEmptyString(Codec<String> codec) throws Exception {
+    final TypedTable<String, String> table = newTypedTable(8, codec, codec);
+    final String empty = "";
+    final String nonEmpty = "123";
+    runTestSingleKeyValue(empty, empty, table);
+    runTestSingleKeyValue(empty, nonEmpty, table);
+    runTestSingleKeyValue(nonEmpty, nonEmpty, table);
+    runTestSingleKeyValue(nonEmpty, empty, table);
   }
 
   @Test

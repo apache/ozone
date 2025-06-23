@@ -59,7 +59,7 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   @Override
   Table.KeyValue<CodecBuffer, CodecBuffer> getKeyValue() {
     assertOpen();
-    final CodecBuffer key = getType().readKey() ? key() : CodecBuffer.getEmptyBuffer();
+    final CodecBuffer key = getType().readKey() ? key() : null;
     return Table.newKeyValue(key, valueBuffer.getFromDb());
   }
 
@@ -132,7 +132,7 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
 
     CodecBuffer getFromDb() {
       if (source == null) {
-        return CodecBuffer.getEmptyBuffer();
+        return null;
       }
 
       for (prepare(); ; allocate()) {
