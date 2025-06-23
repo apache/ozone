@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
@@ -29,8 +30,12 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.server.OzoneAdmins.isS3Admin;
 
 /**
  * AWS STS (Security Token Service) compatible endpoint for Ozone S3 Gateway.
@@ -113,6 +118,7 @@ public class STSEndpoint extends EndpointBase {
       Integer durationSeconds, String version) {
     
     try {
+      // TODO: Consider removing checks that are already done by the STS client (e.g., AWS SDK)
       // Validate version - AWS STS API version is always 2011-06-15
       if (version != null && !"2011-06-15".equals(version)) {
         return createErrorResponse("InvalidParameterValue", 
@@ -172,8 +178,8 @@ public class STSEndpoint extends EndpointBase {
     return durationSeconds;
   }
 
-  private Response handleAssumeRole(String roleArn, String roleSessionName, int duration) {
-    
+  private Response handleAssumeRole(String roleArn, String roleSessionName, int duration)
+      throws IOException {
     // Validate required parameters for AssumeRole
     if (roleArn == null || roleArn.trim().isEmpty()) {
       return createErrorResponse("MissingParameter", 
@@ -191,7 +197,11 @@ public class STSEndpoint extends EndpointBase {
           "RoleSessionName must be 2-64 characters long and contain only alphanumeric characters, " +
           "plus signs (+), equal signs (=), commas (,), periods (.), at symbols (@), and hyphens (-)");
     }
-    
+    // TODO: Add a validation if a user is not an admin but still allowed to call AssumeRole
+    if (!canCallAssumeRole()) {
+      return createErrorResponse("AccessDenied",
+          "You are not authorized to perform this operation");
+    }
     // Generate AssumeRole response
     String responseXml = generateAssumeRoleResponse(roleArn, roleSessionName, duration);
     
@@ -314,6 +324,13 @@ public class STSEndpoint extends EndpointBase {
   private String getExpirationTime(int durationSeconds) {
     Instant expiration = Instant.now().plusSeconds(durationSeconds);
     return DateTimeFormatter.ISO_INSTANT.format(expiration);
+  }
+
+  private boolean canCallAssumeRole() throws IOException {
+    return isS3Admin(
+        UserGroupInformation.getCurrentUser(),
+        OzoneConfigurationHolder.configuration()
+    );
   }
 
   public void init () {
