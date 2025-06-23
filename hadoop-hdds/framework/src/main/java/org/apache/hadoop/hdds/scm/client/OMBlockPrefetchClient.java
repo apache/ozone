@@ -164,6 +164,7 @@ public class OMBlockPrefetchClient {
     expiryDuration = conf.getTimeDuration(OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL,
         OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
 
+    // Resolves the rack/network location of a given hostname using the configured DNSToSwitchMapping.
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
         conf.getClass(ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
             TableMapping.class, DNSToSwitchMapping.class);
