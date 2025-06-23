@@ -2120,6 +2120,23 @@
                 </rules>
               </configuration>
             </execution>
+            <execution>
+              <id>ban-jetty-stringutil</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>process-sources</phase>
+              <configuration>
+                <rules>
+                  <restrictImports>
+                    <reason>Jetty's StringUtil is disabled by default.  Replace it with Apache Common's StringUtils.</reason>
+                    <bannedImports>
+                      <bannedImport>org.eclipse.jetty.util.StringUtil</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
+                </rules>
+              </configuration>
+            </execution>
           </executions>
         </plugin>
         <plugin>
