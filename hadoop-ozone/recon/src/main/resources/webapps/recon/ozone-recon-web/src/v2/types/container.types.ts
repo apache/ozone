@@ -25,6 +25,7 @@ export type ContainerReplica = {
   firstSeenTime: number;
   lastSeenTime: number;
   lastBcsId: number;
+  dataChecksum?: string;
 }
 
 export type Container = {
