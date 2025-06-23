@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS;
@@ -28,7 +27,6 @@ import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,25 +37,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.net.InnerNode;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.net.Node;
-import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
-import org.apache.hadoop.net.TableMapping;
-import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,16 +151,6 @@ public class OMBlockPrefetchClient {
     minBlocks = conf.getInt(OZONE_OM_PREFETCH_MIN_BLOCKS, OZONE_OM_PREFETCH_MIN_BLOCKS_DEFAULT);
     expiryDuration = conf.getTimeDuration(OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL,
         OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
-
-    // Resolves the rack/network location of a given hostname using the configured DNSToSwitchMapping.
-    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
-        conf.getClass(ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            TableMapping.class, DNSToSwitchMapping.class);
-    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
-        dnsToSwitchMappingClass, OzoneConfiguration.of(conf));
-    dnsToSwitchMapping =
-        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
-            : new CachedDNSToSwitchMapping(newInstance));
     metrics = OMBlockPrefetchMetrics.register();
     prefetchExecutor = Executors.newSingleThreadExecutor(r -> {
       Thread t = new Thread(r, "OMBlockPrefetchClient-AsyncPrefetcher");
@@ -238,8 +216,8 @@ public class OMBlockPrefetchClient {
         } else {
           for (ExpiringAllocatedBlock expiringBlock : tempValidBlocks) {
             AllocatedBlock block = expiringBlock.getBlock();
-            List<DatanodeDetails> sortedNodes =
-                sortDatanodes(block.getPipeline().getNodes(), clientMachine, ozoneManager.getClusterMap());
+            List<? extends DatanodeDetails> sortedNodes =
+                ozoneManager.sortDatanodes(block.getPipeline().getNodes(), clientMachine);
             if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
               block = block.toBuilder()
                   .setPipeline(block.getPipeline().copyWithNodesInOrder(sortedNodes))
@@ -310,58 +288,5 @@ public class OMBlockPrefetchClient {
         isPrefetching.set(false);
       }
     });
-  }
-
-  public List<DatanodeDetails> sortDatanodes(List<DatanodeDetails> nodes, String clientMachine,
-                                             NetworkTopology clusterMap) {
-    long sortStartTime = Time.monotonicNowNanos();
-    final Node client = getClientNode(clientMachine, nodes, clusterMap);
-    List<DatanodeDetails> sortedNodes = clusterMap.sortByDistanceCost(client, nodes, nodes.size());
-    metrics.addSortingLogicLatency(Time.monotonicNowNanos() - sortStartTime);
-    return sortedNodes;
-  }
-
-  private Node getClientNode(String clientMachine, List<DatanodeDetails> nodes, NetworkTopology clusterMap) {
-    if (StringUtils.isEmpty(clientMachine)) {
-      return null;
-    }
-    List<DatanodeDetails> matchingNodes = new ArrayList<>();
-    for (DatanodeDetails node : nodes) {
-      if (node.getIpAddress().equals(clientMachine)) {
-        matchingNodes.add(node);
-      }
-    }
-    return !matchingNodes.isEmpty() ? matchingNodes.get(0) :
-        getOtherNode(clientMachine, clusterMap);
-  }
-
-  private Node getOtherNode(String clientMachine, NetworkTopology clusterMap) {
-    try {
-      String clientLocation = resolveNodeLocation(clientMachine);
-      if (clientLocation != null) {
-        Node rack = clusterMap.getNode(clientLocation);
-        if (rack instanceof InnerNode) {
-          return new NodeImpl(clientMachine, clientLocation,
-              (InnerNode) rack, rack.getLevel() + 1,
-              NODE_COST_DEFAULT);
-        }
-      }
-    } catch (Exception e) {
-      LOG.warn("Could not resolve client {}: {}", clientMachine, e.getMessage());
-    }
-    return null;
-  }
-
-  private String resolveNodeLocation(String hostname) {
-    List<String> hosts = Collections.singletonList(hostname);
-    List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
-    if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
-      String location = resolvedHosts.get(0);
-      LOG.debug("Node {} resolved to location {}", hostname, location);
-      return location;
-    } else {
-      LOG.debug("Node resolution did not yield any result for {}", hostname);
-      return null;
-    }
   }
 }
