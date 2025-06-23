@@ -174,7 +174,7 @@ impact of introducing a new member variable in `ContainerData` for each containe
 
 For code implementation, see https://github.com/apache/ozone/pull/8590.
 
-## Preventing over allocation of blocks in the SCM
+### Preventing over allocation of blocks in the SCM
 The other part of the problem is that SCM has stale information about the size of the container and ends up 
 over-allocating blocks (beyond the container's 5GB size) to the same container. Solving this problem is complicated. 
 We could track how much space we've allocated to a container in the SCM - this is doable on the surface but won't 
