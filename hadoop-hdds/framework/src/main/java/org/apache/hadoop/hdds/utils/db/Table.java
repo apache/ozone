@@ -338,8 +338,9 @@ public interface Table<KEY, VALUE> {
       return value;
     }
 
+    /** @return the value serialized byte size if it is available; otherwise, return -1. */
     public int getValueByteSize() {
-      return valueByteSize;
+      return value != null ? valueByteSize : -1;
     }
 
     @Override
@@ -366,7 +367,7 @@ public interface Table<KEY, VALUE> {
   }
 
   static <K, V> KeyValue<K, V> newKeyValue(K key, V value) {
-    return newKeyValue(key, value, 0);
+    return newKeyValue(key, value, -1);
   }
 
   static <K, V> KeyValue<K, V> newKeyValue(K key, V value, int valueByteSize) {
