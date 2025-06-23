@@ -21,6 +21,8 @@ author: Siddhant Sangwan, Sumit Agrawal
   limitations under the License. See accompanying LICENSE file.
 -->
 
+> **Note**: The feature described here was implemented in [pull request #8590](https://github.com/apache/ozone/pull/8590). This document reflects the final, merged design.
+
 ## Summary
 Trigger datanode heartbeat immediately when the container being written to is (close) to full, or volume is full, 
 or container is unhealthy, while handling a write request. The immediate heartbeat will contain close container action. 
@@ -40,38 +42,19 @@ that has reached the min free space boundary.
 So, in the future, when the Datanode fails writes for such a volume, overall write performance will drop because the 
 client will have to request for a different set of blocks.
 
-We currently do queue a close container action to be sent in the next heartbeat, when:
-1. Container is at 90% capacity.
-2. Volume is full, counting committed space. That is `available - reserved - committed - min free space <= 0`.
-3. Container is `UNHEALTHY`.
+Before this change, a close container action was queued to be sent in the next heartbeat, when:
+1. Container was at 90% capacity.
+2. Volume was full, __counting committed space__. That is `available - reserved - committed - min free space <= 0`.
+3. Container was `UNHEALTHY`.
 
-But since the next heartbeat can be sent up to 30 seconds later in the worst case, this reaction time is too slow. 
+But since the next heartbeat could be sent up to 30 seconds later in the worst case, this reaction time was too slow. 
 This design proposes sending Datanode heartbeat immediately so SCM can get the close container action 
 immediately. This will help in reducing performance drop because of write failures when 
 https://issues.apache.org/jira/browse/HDDS-12151 is implemented in the future.
 
 ### The definition of a full volume
-Currently, a volume is considered full if the following (existing) method returns true.
-```java
-  private boolean isVolumeFull(Container container) {
-    boolean isOpen = Optional.ofNullable(container)
-        .map(cont -> cont.getContainerState() == ContainerDataProto.State.OPEN)
-        .orElse(Boolean.FALSE);
-    if (isOpen) {
-      HddsVolume volume = container.getContainerData().getVolume();
-      StorageLocationReport volumeReport = volume.getReport();
-      boolean full = volumeReport.getUsableSpace() <= 0;
-      if (full) {
-        LOG.info("Container {} volume is full: {}", container.getContainerData().getContainerID(), volumeReport);
-      }
-      return full;
-    }
-    return false;
-  }
-```
-
-It accounts for available space, committed space, min free space and reserved space (`available` already considers 
-`reserved` space):
+Previously, a volume was considered full if the following method returned true. It accounts for available space, 
+committed space, min free space and reserved space (`available` already considers `reserved` space):
 ```java
   private static long getUsableSpace(
       long available, long committed, long minFreeSpace) {
@@ -87,35 +70,11 @@ discussed here.
 
 ## Proposed Solution
 
-### What does the Datanode do currently when a volume is full?
-
-In `HddsDispatcher`, on detecting that the volume being written to is full (as defined previously), we add a 
-Close Container Action for that container:
-
-```java
-  private void sendCloseContainerActionIfNeeded(Container container) {
-    // We have to find a more efficient way to close a container.
-    boolean isSpaceFull = isContainerFull(container) || isVolumeFull(container);
-    boolean shouldClose = isSpaceFull || isContainerUnhealthy(container);
-    if (shouldClose) {
-      ContainerData containerData = container.getContainerData();
-      ContainerAction.Reason reason =
-          isSpaceFull ? ContainerAction.Reason.CONTAINER_FULL :
-              ContainerAction.Reason.CONTAINER_UNHEALTHY;
-      ContainerAction action = ContainerAction.newBuilder()
-          .setContainerID(containerData.getContainerID())
-          .setAction(ContainerAction.Action.CLOSE).setReason(reason).build();
-      context.addContainerActionIfAbsent(action);
-    }
-  }
-```
-This is sent to the SCM in the next heartbeat and makes the SCM close that container. This reaction time is too slow.
-
 ### Proposal for immediately triggering Datanode heartbeat
 
 We will immediately trigger the heartbeat when:
 1. The container is (close) to full (this is existing behaviour, the container full check already exists).
-2. The volume is full EXCLUDING committed space (`available - reserved available - min free <= 0`). This is because 
+2. The volume is __full EXCLUDING committed space__ (`available - reserved available - min free <= 0`). This is because 
    when a volume 
    is full INCLUDING committed space (`available - reserved available - committed - min free <= 0`), open containers 
    can still accept writes. So the current behaviour of sending a close container action when volume is full including 
@@ -174,23 +133,24 @@ impact of introducing a new member variable in `ContainerData` for each containe
 
 For code implementation, see https://github.com/apache/ozone/pull/8590.
 
+## Alternatives
 ### Preventing over allocation of blocks in the SCM
-The other part of the problem is that SCM has stale information about the size of the container and ends up 
-over-allocating blocks (beyond the container's 5GB size) to the same container. Solving this problem is complicated. 
-We could track how much space we've allocated to a container in the SCM - this is doable on the surface but won't 
-actually work well. That's because SCM is asked for a block (256MB), but SCM doesn't know how much data a client will 
-actually write to that block file. The client may only write 1MB, for example. So SCM could track that it has already 
-allocated 5 GB to a container, and will open another container for incoming requests, but the client may actually only 
+The other part of the problem is that SCM has stale information about the size of the container and ends up
+over-allocating blocks (beyond the container's 5 GB size) to the same container. Solving this problem is complicated.
+We could track how much space we've allocated to a container in the SCM - this is doable on the surface but won't
+actually work well. That's because SCM is asked for a block (256 MB), but SCM doesn't know how much data a client will
+actually write to that block file. The client may only write 1 MB, for example. So SCM could track that it has already
+allocated 5 GB to a container, and will open another container for incoming requests, but the client may actually only
 write 1GB. This would lead to a lot of open containers when we have 10k requests/second.
 
 At this point, we've decided not to do anything about this.
 
 ### Regularly sending open container reports
-Sending open container reports regularly (every 30 seconds for example) can help a little bit, but won't solve the 
+Sending open container reports regularly (every 30 seconds for example) can help a little bit, but won't solve the
 problem. We won't take this approach for now.
 
-## Alternatives
-Alternatively, we considered triggering an immediate heartbeat every time the Datanode detects a volume is full 
+### Sending storage reports in immediate heartbeats
+We considered triggering an immediate heartbeat every time the Datanode detects a volume is full 
 while handling a write request, with per volume throttling. To each immediate heartbeat, we would the storage 
 reports of all volumes in the Datanode + Close Container Action for the particular container being written to. While 
 this would update the storage stats of a volume in the SCM faster, which the SCM can subsequently use to decide 
