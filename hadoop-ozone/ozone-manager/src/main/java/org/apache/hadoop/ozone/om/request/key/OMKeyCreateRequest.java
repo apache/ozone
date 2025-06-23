@@ -141,8 +141,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       //  till leader is identified.
       UserInfo userInfo = getUserInfo();
       List<OmKeyLocationInfo> omKeyLocationInfoList =
-          allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), repConfig,
+          allocateBlock(ozoneManager.getBlockTokenSecretManager(), repConfig,
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),

@@ -120,7 +120,7 @@ public final class OmTestManagers {
     ScmClient scmClient = new ScmClient(scmBlockClient, containerClient, conf);
     ScmTopologyClient scmTopologyClient =
         new ScmTopologyClient(scmBlockClient);
-    OMBlockPrefetchClient omBlockPrefetchClient = new OMBlockPrefetchClient(om, scmBlockClient);
+    OMBlockPrefetchClient omBlockPrefetchClient = new OMBlockPrefetchClient(om);
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,

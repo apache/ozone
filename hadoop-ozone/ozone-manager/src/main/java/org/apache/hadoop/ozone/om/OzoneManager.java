@@ -638,7 +638,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.dnsToSwitchMapping =
         ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
             : new CachedDNSToSwitchMapping(newInstance));
-    this.omBlockPrefetchClient = new OMBlockPrefetchClient(this, scmBlockClient);
+    this.omBlockPrefetchClient = new OMBlockPrefetchClient(this);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
 

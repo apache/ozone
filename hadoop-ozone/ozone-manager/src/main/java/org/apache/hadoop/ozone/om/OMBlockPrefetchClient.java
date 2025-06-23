@@ -44,8 +44,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +55,6 @@ import org.slf4j.LoggerFactory;
  */
 public class OMBlockPrefetchClient {
   private static final Logger LOG = LoggerFactory.getLogger(OMBlockPrefetchClient.class);
-  private final ScmBlockLocationProtocol scmBlockLocationProtocol;
   private final OzoneManager ozoneManager;
   private int maxBlocks;
   private int minBlocks;
@@ -68,9 +65,8 @@ public class OMBlockPrefetchClient {
   private ExecutorService prefetchExecutor;
   private final AtomicBoolean isPrefetching = new AtomicBoolean(false);
 
-  public OMBlockPrefetchClient(OzoneManager ozoneManager, ScmBlockLocationProtocol scmBlockClient) {
+  public OMBlockPrefetchClient(OzoneManager ozoneManager) {
     this.ozoneManager = ozoneManager;
-    this.scmBlockLocationProtocol = scmBlockClient;
     initializeBlockQueueMap();
   }
 
@@ -203,8 +199,8 @@ public class OMBlockPrefetchClient {
 
         // If there aren't enough blocks in cache, we fallback to SCM.
         if (tempValidBlocks.size() < numBlocks) {
-          List<AllocatedBlock> newBlocks = scmBlockLocationProtocol.allocateBlock(scmBlockSize, numBlocks,
-              replicationConfig, serviceID, excludeList, clientMachine);
+          List<AllocatedBlock> newBlocks = ozoneManager.getScmClient().getBlockClient()
+              .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList, clientMachine);
           allocatedBlocks.addAll(newBlocks);
 
           // Return unused valid blocks back to the front of the queue (preserving original order).
@@ -241,12 +237,12 @@ public class OMBlockPrefetchClient {
         LOG.debug("Bypassing cache for {}. Reason: {}", replicationConfig, queue == null ?
             "Unsupported replication config for caching." : "ExcludeList provided.");
         metrics.incrementCacheMisses();
-        return scmBlockLocationProtocol.allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-            excludeList, clientMachine);
+        return ozoneManager.getScmClient().getBlockClient()
+            .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList, clientMachine);
       }
     } else {
-      return scmBlockLocationProtocol.allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList,
-          clientMachine);
+      return ozoneManager.getScmClient().getBlockClient()
+          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList, clientMachine);
     }
   }
 
@@ -265,7 +261,7 @@ public class OMBlockPrefetchClient {
     prefetchExecutor.submit(() -> {
       try {
         List<AllocatedBlock> prefetchedBlocks = captureLatencyNs(metrics.getPrefetchLatencyNs(),
-            () -> scmBlockLocationProtocol.allocateBlock(blockSize, blocksToPrefetch,
+            () -> ozoneManager.getScmClient().getBlockClient().allocateBlock(blockSize, blocksToPrefetch,
             repConfig, serviceID, new ExcludeList(), null));
         if (prefetchedBlocks != null && !prefetchedBlocks.isEmpty()) {
           ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(repConfig);

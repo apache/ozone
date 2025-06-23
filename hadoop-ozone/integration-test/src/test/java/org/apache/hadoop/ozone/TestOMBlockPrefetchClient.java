@@ -58,7 +58,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -67,6 +66,7 @@ import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.om.OMBlockPrefetchClient;
 import org.apache.hadoop.ozone.om.OMBlockPrefetchClient.ExpiringAllocatedBlock;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ScmClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,11 +83,11 @@ import org.slf4j.LoggerFactory;
 public class TestOMBlockPrefetchClient {
   private static final Logger LOG = LoggerFactory.getLogger(TestOMBlockPrefetchClient.class);
   @Mock
-  private ScmBlockLocationProtocol scmBlockLocationProtocol;
-  @Mock
   private OzoneManager ozoneManager;
   @Mock
-  private NetworkTopology networkTopology;
+  private ScmClient scmClient;
+  @Mock
+  private ScmBlockLocationProtocol scmBlockLocationProtocol;
   private OMBlockPrefetchClient omBlockPrefetchClient;
   private OzoneConfiguration conf;
   private static final long BLOCK_SIZE = 1024 * 1024 * 256;
@@ -116,7 +116,6 @@ public class TestOMBlockPrefetchClient {
     conf.setClass(ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     when(ozoneManager.isAllocateBlockCacheEnabled()).thenReturn(true);
-    when(ozoneManager.getClusterMap()).thenReturn(networkTopology);
     omBlockPrefetchClient = new OMBlockPrefetchClient(ozoneManager);
     datanodes = createFixedDatanodes(NUM_DATANODES);
     StaticMapping.resetMap();
@@ -327,7 +326,8 @@ public class TestOMBlockPrefetchClient {
     when(scmBlockLocationProtocol.allocateBlock(
         eq(BLOCK_SIZE), eq(numBlocksToRequest), eq(REP_CONFIG), eq(SERVICE_ID), eq(excludeList), eq(null)))
         .thenReturn(scmBlocks);
-
+    when(ozoneManager.getScmClient()).thenReturn(scmClient);
+    when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
     List<AllocatedBlock> resultBlocks = omBlockPrefetchClient.getBlocks(
         BLOCK_SIZE, numBlocksToRequest, REP_CONFIG, SERVICE_ID, excludeList, null);
 
@@ -373,6 +373,8 @@ public class TestOMBlockPrefetchClient {
         eq(excludeList),
         eq(clientMachineName)))
         .thenReturn(expectedScmBlocks);
+    when(ozoneManager.getScmClient()).thenReturn(scmClient);
+    when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
 
     List<AllocatedBlock> actualBlocks = omBlockPrefetchClient.getBlocks(
         BLOCK_SIZE,

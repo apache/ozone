@@ -125,8 +125,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     //  bucket/key/volume or not and also with out any authorization checks.
 
     List< OmKeyLocationInfo > omKeyLocationInfoList =
-        allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), repConfig,
+        allocateBlock(ozoneManager.getBlockTokenSecretManager(), repConfig,
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
